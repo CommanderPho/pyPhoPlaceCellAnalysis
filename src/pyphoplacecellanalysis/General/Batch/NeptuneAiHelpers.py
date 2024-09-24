@@ -407,7 +407,7 @@ class Neptuner(object):
         ## OUTPUTS: active_runs_table_df, most_recent_runs_table_df
         # active_runs_table_df
 
-    def get_most_recent_session_runs(self, **kwargs) -> Tuple[Dict[str,AutoValueConvertingNeptuneRun], pd.DataFrame]:
+    def get_most_recent_session_runs(self, **kwargs) -> Tuple[Dict[str,AutoValueConvertingNeptuneRun], pd.DataFrame, Dict[str, str]]:
         """ Main accessor method
         
         """
@@ -420,14 +420,27 @@ class Neptuner(object):
         for run_id in most_recent_runs_table_df['sys/id']:
             try:
                 # Access the run by ID:
-                run: AutoValueConvertingNeptuneRun = AutoValueConvertingNeptuneRun(with_id=str(run_id), project=self.project_name, api_token=self.api_token, mode="read-only")
+                run: AutoValueConvertingNeptuneRun = AutoValueConvertingNeptuneRun(with_id=str(run_id), project=self.project_name, api_token=self.api_token,
+                                                                                    # mode="read-only",
+                                                                                    mode="sync",
+                                                                                   )
                 runs_dict[run_id] = run
                 
             except Exception as e:
                 print(f"Failed to fetch figures for run {run_id}: {e}")
                 
 
-        return runs_dict, most_recent_runs_table_df
+        # Drop excessive monitoring column names:
+        good_column_names = [v for v in list(most_recent_runs_table_df.columns) if not v.startswith('monitoring')] # ['sys/creation_time', 'sys/description', 'sys/failed', 'sys/group_tags', 'sys/hostname', 'sys/id', 'sys/modification_time', 'sys/monitoring_time', 'sys/name', 'sys/owner', 'sys/ping_time', 'sys/running_time', 'sys/size', 'sys/state', 'sys/tags', 'sys/trashed', 'animal', 'exper_name', 'format_name', 'session_descriptor_string', 'session_name', 'source_code/entrypoint', 'source_code/git'
+        # print(good_column_names) # ['sys/creation_time', 'sys/description', 'sys/failed', 'sys/group_tags', 'sys/hostname', 'sys/id', 'sys/modification_time', 'sys/monitoring_time', 'sys/name', 'sys/owner', 'sys/ping_time', 'sys/running_time', 'sys/size', 'sys/state', 'sys/tags', 'sys/trashed', 'animal', 'exper_name', 'format_name', 'session_descriptor_string', 'session_name', 'source_code/entrypoint', 'source_code/git'
+        most_recent_runs_table_df = most_recent_runs_table_df[good_column_names]
+
+        ## remove columns with a forward slash in them (such as 'sys/modification_time' and replace them with just 'modification_time')
+        # valid_good_column_rename_dict = {v:'_'.join(v.split('/')) for v in good_column_names if (len(v.split('/'))>1)}
+        valid_good_column_rename_dict = {v:'_'.join(v.split('/')[1:]) for v in good_column_names if (len(v.split('/'))>1)}
+        most_recent_runs_table_df = most_recent_runs_table_df.rename(columns=valid_good_column_rename_dict, inplace=False)
+        original_column_names_map: Dict[str, str] = dict(zip(valid_good_column_rename_dict.values(), valid_good_column_rename_dict.keys()))
+        return runs_dict, most_recent_runs_table_df, original_column_names_map
         
     @classmethod
     def get_most_recent_session_logs(cls, runs_dict: Dict[str, AutoValueConvertingNeptuneRun], ordering_datetime_col_name: str = 'sys/modification_time', oldest_included_run_date:str='2024-08-01', debug_print: bool = False) -> pd.DataFrame:
@@ -475,6 +488,107 @@ class Neptuner(object):
                 
         ## OUTPUTS: most_recent_runs_table_df, figures_paths
         return run_logs
+
+
+
+    @classmethod
+    def build_interactive_session_display(cls, context_indexed_run_logs, most_recent_runs_session_descriptor_string_to_context_map, most_recent_runs_context_indexed_run_extra_data):
+        """Creates and displays an interactive session display with a tree widget, session info, and log output.
+
+        Arguments:
+        - context_indexed_run_logs: dict of session contexts to log text.
+        - most_recent_runs_session_descriptor_string_to_context_map: dict of session descriptor strings to context mappings.
+        - most_recent_runs_context_indexed_run_extra_data: dict of additional session context data.
+        
+        Returns:
+        - layout: The main layout containing the tree, header, and log output.
+        
+        Usage:
+        
+            interactive_layout = Neptuner.build_interactive_session_display(context_indexed_run_logs, most_recent_runs_session_descriptor_string_to_context_map, most_recent_runs_context_indexed_run_extra_data)
+            display(interactive_layout)
+
+        """
+        from pandas import Timestamp
+        import ipywidgets as widgets
+        from IPython.display import display
+        from pyphocorehelpers.gui.Jupyter.TreeWidget import JupyterTreeWidget
+        from typing import List, Tuple
+        
+        # Tree Widget __________________________________________________________________________________________________ #
+        included_session_contexts: List[IdentifyingContext] = list(most_recent_runs_session_descriptor_string_to_context_map.values())
+        jupyter_tree_widget = JupyterTreeWidget(included_session_contexts=included_session_contexts,
+                                                on_selection_changed_callbacks=[],
+                                                display_on_init=False)
+
+        jupyter_tree_widget.tree.layout = widgets.Layout(min_width='200px', max_width='600px', overflow='auto', height='auto')
+
+        # Content Widget ________________________________________________________________________________________________ #
+        def build_session_tuple_header_widget(a_session_tuple: Tuple):
+            """Builds a widget to display the session tuple's properties."""
+            header_label_widgets = {key: widgets.Label(f"{key}: '{value}',") for key, value in a_session_tuple.items()}
+            
+            box_layout = widgets.Layout(display='flex', flex_flow='row wrap', align_items='stretch', width='100%')
+            header_hbox = widgets.Box(list(header_label_widgets.values()), layout=box_layout)
+
+            def update_header_labels_fn(new_values):
+                for key, value in new_values.items():
+                    header_label_widgets[key].value = f"{key}: {value}"
+
+            return header_hbox, header_label_widgets, update_header_labels_fn
+
+        # Empty session tuple for initialization
+        empty_session_tuple = {
+            'format_name': '',
+            'animal': '',
+            'exper_name': '',
+            'session_name': '',
+            'session_descriptor_string': '',
+            'id': '<Selection Not Found>',
+            'hostname': '',
+            'creation_time': '',
+            'running_time': '',
+            'ping_time': '',
+            'monitoring_time': '',
+            'size': '',
+            'tags': '',
+            'entrypoint': ''
+        }
+
+        # Build header widget and labels
+        header_hbox, header_label_widgets, update_header_labels_fn = build_session_tuple_header_widget(a_session_tuple=empty_session_tuple)
+
+        # Create Textarea widget with a defined width for log display
+        textarea = widgets.Textarea(value='<No Selection>', disabled=True, style={'font_size': '10px'}, 
+                                    layout=widgets.Layout(flex='1', width='650px', min_height='650px', height='850px'))
+
+        content_view_layout = widgets.VBox([header_hbox, textarea], layout=widgets.Layout(min_width='500px', min_height='200px', width='auto', height='auto'))
+
+        # Layout the widgets side by side
+        layout = widgets.HBox([jupyter_tree_widget.tree, content_view_layout], layout=widgets.Layout(min_width='500px', min_height='100px', width='auto', height='auto'))
+
+        # Callback function for when a tree node is selected
+        def _on_tree_node_selection_changed(selected_node, selected_context):
+            """Updates the header and log content based on the selected tree node."""
+            if isinstance(selected_context, dict):
+                selected_context = IdentifyingContext(**selected_context)
+            
+            curr_context_extra_data_tuple = most_recent_runs_context_indexed_run_extra_data.get(selected_context, empty_session_tuple)
+            update_header_labels_fn(curr_context_extra_data_tuple)
+            
+            curr_context_run_log = context_indexed_run_logs.get(selected_context, '<Context Not Found>')
+            textarea.value = curr_context_run_log
+
+        # Set the callback function to trigger on tree selection changes
+        jupyter_tree_widget.on_selection_changed_callback = [_on_tree_node_selection_changed]
+
+        # Return the layout for display
+        return layout
+
+
+
+
+
 
 # ==================================================================================================================== #
 # Independent Helper Functions                                                                                         #
