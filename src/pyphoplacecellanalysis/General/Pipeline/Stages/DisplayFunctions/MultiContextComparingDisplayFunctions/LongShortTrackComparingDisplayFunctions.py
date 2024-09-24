@@ -21,6 +21,7 @@ from neuropy.utils.mixins.print_helpers import ProgressMessagePrinter # for `_pl
 from neuropy.utils.matplotlib_helpers import fit_both_axes
 from neuropy.utils.matplotlib_helpers import draw_epoch_regions # plot_expected_vs_observed
 from neuropy.utils.indexing_helpers import find_desired_sort_indicies # used in `determine_long_short_pf1D_indicies_sort_by_peak`
+from neuropy.core.neuron_identities import NeuronIdentityDataframeAccessor
 
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.programming_helpers import metadata_attributes
@@ -223,11 +224,32 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             short_results = computation_results[short_epoch_name]
             global_results = computation_results[global_epoch_name]
         
+            ## Proper global-computations based way:
+            sess = owning_pipeline_reference.sess
+            active_identifying_session_ctx = sess.get_context()
+            t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
+            # t_split = sess.paradigm[0][0,1] # passed to _make_pho_jonathan_batch_plots(t_split, ...)
+            t_split = t_delta
+
             ## Add three columns to global_results.sess.spikes_df, indicating whether each spike is included in the filtered_spikes_df for the (long, short, global) pf1Ds
             # global_results.sess.flattened_spiketrains._spikes_df = add_spikes_df_placefield_inclusion_columns(curr_active_pipeline=owning_pipeline_reference, global_spikes_df=global_results.sess.spikes_df, overwrite_columns=True)
             # global_results.sess.spikes_df = add_spikes_df_placefield_inclusion_columns(curr_active_pipeline=owning_pipeline_reference, global_spikes_df=global_results.sess.spikes_df, overwrite_columns=True)            
             global_spikes_df: pd.DataFrame = add_spikes_df_placefield_inclusion_columns(curr_active_pipeline=owning_pipeline_reference, global_spikes_df=global_results.sess.spikes_df, overwrite_columns=True) ## in_place
+            # global_spikes_df = global_spikes_df.copy()
+            global_spikes_df = global_spikes_df.neuron_identity.make_neuron_indexed_df_global(curr_session_context=active_identifying_session_ctx, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
+            # global_spikes_df
 
+            unique_aclu_information_df: pd.DataFrame = owning_pipeline_reference.get_session_unique_aclu_information()
+            # unique_aclu_information_df['neuron_type'] = [neuronTypesEnum[v.hdfcodingClassName] for v in unique_aclu_information_df['neuron_type']]
+            unique_aclu_information_df['neuron_type'] = [str(v.hdfcodingClassName) for v in unique_aclu_information_df['neuron_type'].values] # convert from NeuronType to str column
+
+
+            # unique_aclu_information_df: pd.DataFrame = global_spikes_df.neuron_identity.extract_unique_neuron_identities()
+            # unique_aclu_identity_subcomponents_column_names = list(unique_aclu_information_df.columns)
+            # # Horizontally join (merge) the dataframes
+            # result_df: pd.DataFrame = pd.merge(unique_aclu_information_df, neuron_indexed_df, left_on='aclu', right_on='aclu', how='inner', suffixes=('', '_dup')) # to prevent column duplication, suffix the right df with the _dup suffix which will be dropped after merging
+            # result_df = result_df.drop(columns=[col for col in result_df.columns if col.endswith('_dup')]) # Drop the duplicate columns
+        
             use_filtered_positions: bool = kwargs.pop('use_filtered_positions', False)
             cell_spikes_dfs_dict, aclu_to_fragile_linear_idx_map = PhoJonathanPlotHelpers._build_spikes_df_interpolated_props(global_results, should_interpolate_to_filtered_positions=use_filtered_positions) # cell_spikes_dfs_list is indexed by aclu_to_fragile_linear_idx_map
             time_variable_name = global_results.sess.spikes_df.spikes.time_variable_name
@@ -236,12 +258,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             # pf1d_short = computation_results[short_epoch_name]['computed_data']['pf1D']
             pf1D_all = global_results['computed_data']['pf1D'] # passed to _make_pho_jonathan_batch_plots(t_split, ...)
 
-            ## Proper global-computations based way:
-            sess = owning_pipeline_reference.sess
-            active_identifying_session_ctx = sess.get_context()
-            t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
-            # t_split = sess.paradigm[0][0,1] # passed to _make_pho_jonathan_batch_plots(t_split, ...)
-            t_split = t_delta
+
 
             aclu_to_idx = global_computation_results.computed_data['jonathan_firing_rate_analysis'].rdf.aclu_to_idx
             rdf = global_computation_results.computed_data['jonathan_firing_rate_analysis'].rdf.rdf
@@ -255,6 +272,11 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             # time_binned_unit_specific_binned_spike_rate = global_computation_results.computed_data['jonathan_firing_rate_analysis']['time_binned_instantaneous_unit_specific_spike_rate']['instantaneous_unit_specific_spike_rate_values']
             neuron_replay_stats_df = global_computation_results.computed_data['jonathan_firing_rate_analysis'].neuron_replay_stats_df
             # compare_firing_rates(rdf, irdf)
+
+            # Add neuron_identity information (qclu, neuron_type, etc) to `neuron_replay_stats_df`` ______________________________ #
+            # Horizontally join (merge) the dataframes
+            neuron_replay_stats_df: pd.DataFrame = pd.merge(unique_aclu_information_df, neuron_replay_stats_df, left_on='aclu', right_on='aclu', how='inner', suffixes=('', '_dup')) # to prevent column duplication, suffix the right df with the _dup suffix which will be dropped after merging
+            neuron_replay_stats_df = neuron_replay_stats_df.drop(columns=[col for col in neuron_replay_stats_df.columns if col.endswith('_dup')]) # Drop the duplicate columns
 
             n_max_plot_rows = kwargs.pop('n_max_plot_rows', 6)
             show_inter_replay_frs = kwargs.pop('show_inter_replay_frs', True)
@@ -893,13 +915,13 @@ class PhoJonathanPlotHelpers:
         }
     
     @classmethod
-    def get_default_spike_scatter_kwargs_dict(cls) -> Dict[str, Dict]:
-        default_spikes_alpha: float = 0.9
+    def get_default_spike_scatter_kwargs_dict(cls, spikes_alpha:float=0.9) -> Dict[str, Dict]:
+        common_simple_kwargs_overrides = {'spikes_color_RGB': None, 'spikes_alpha': None}
         spike_plot_kwargs_dict = {
-            'all': {'markersize':4.0, 'marker': '.', 'markerfacecolor':(0.1, 0.1, 0.1, (default_spikes_alpha*0.6*0.5)), 'markeredgecolor':(0.1, 0.1, 0.1, (default_spikes_alpha*0.5)), 'zorder':10},
-            'is_included_long_pf1D': {'markersize':5.0, 'marker': '.', 'markerfacecolor':(0, 0, 1, (default_spikes_alpha*0.6)), 'markeredgecolor':(0, 0, 1, default_spikes_alpha), 'zorder':15},
-            'is_included_short_pf1D': {'markersize':5.0, 'marker': '.', 'markerfacecolor':(1, 0, 0, (default_spikes_alpha*0.6)), 'markeredgecolor':(1, 0, 0, default_spikes_alpha), 'zorder':15},
-            'is_included_PBE': {'markersize':5.0, 'marker': '.', 'markerfacecolor':(0.102, 0.831, 0, (default_spikes_alpha*0.6)), 'markeredgecolor':(0.102, 0.831, 0, default_spikes_alpha), 'zorder':15},
+            'all': {**common_simple_kwargs_overrides, 'markersize':4.0, 'marker': '.', 'markerfacecolor':(0.1, 0.1, 0.1, (spikes_alpha*0.6*0.5)), 'markeredgecolor':(0.1, 0.1, 0.1, (spikes_alpha*0.5)), 'zorder':10},
+            'is_included_long_pf1D': {**common_simple_kwargs_overrides, 'markersize':5.0, 'marker': '.', 'markerfacecolor':(0, 0, 1, (spikes_alpha*0.6)), 'markeredgecolor':(0, 0, 1, spikes_alpha), 'zorder':15},
+            'is_included_short_pf1D': {**common_simple_kwargs_overrides, 'markersize':5.0, 'marker': '.', 'markerfacecolor':(1, 0, 0, (spikes_alpha*0.6)), 'markeredgecolor':(1, 0, 0, spikes_alpha), 'zorder':15},
+            'is_included_PBE': {**common_simple_kwargs_overrides, 'markersize':5.0, 'marker': '.', 'markerfacecolor':(0.102, 0.831, 0, (spikes_alpha*0.6)), 'markeredgecolor':(0.102, 0.831, 0, spikes_alpha), 'zorder':15},
         }
         # spike_plot_kwargs_dict.update(
         # {k:[*v, spikes_alpha] for k, v in cls.get_default_spike_colors_dict().items()}
@@ -1278,7 +1300,14 @@ class PhoJonathanPlotHelpers:
     @classmethod
     @function_attributes(short_name=None, tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[], uses=[], used_by=['_plot_general_all_spikes'], creation_date='2023-10-03 19:42', related_items=[])
     def _simple_plot_spikes(cls, ax, a_spk_t: NDArray, a_spk_pos: NDArray, spikes_color_RGB=(1, 0, 0), spikes_alpha=0.2, **kwargs):
-        spikes_color_RGBA = [*spikes_color_RGB, spikes_alpha]
+        if (spikes_color_RGB is None) and (spikes_alpha is None):
+            # spikes_color_RGBA = None
+            assert kwargs.get('markerfacecolor', None) is not None
+            assert kwargs.get('markeredgecolor', None) is not None
+            spikes_color_RGBA = kwargs.get('markeredgecolor', None)
+        else:
+            spikes_color_RGBA = [*spikes_color_RGB, spikes_alpha]
+
         spike_plot_kwargs = ({'linestyle':'none', 'markersize':5.0, 'marker': '.', 'markerfacecolor':spikes_color_RGBA, 'markeredgecolor':spikes_color_RGBA, 'zorder':10} | kwargs)
         ax.plot(a_spk_t, a_spk_pos, color=spikes_color_RGBA, **(spike_plot_kwargs or {})) # , color=[*spikes_color, spikes_alpha]
         return ax
@@ -1305,13 +1334,13 @@ class PhoJonathanPlotHelpers:
             ) # , spikes_color=spikes_color, spikes_alpha=spikes_alpha
         """
         # ax_activity_v_time = _simple_plot_spikes(ax_activity_v_time, active_spikes_df[global_results.sess.spikes_df.spikes.time_variable_name].values, active_spikes_df['x'].values, spikes_color_RGB=(0, 0, 0), spikes_alpha=1.0) # all
-        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_spikes_df[time_variable_name].values, active_spikes_df['x'].values, spikes_color_RGB=cls.get_default_spike_colors_dict()['all'], spikes_alpha=spikes_alpha) # all
+        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_spikes_df[time_variable_name].values, active_spikes_df['x'].values, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha)['all']) # all
 
         active_long_spikes_df: pd.DataFrame = active_spikes_df[active_spikes_df.is_included_long_pf1D]
-        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_long_spikes_df[time_variable_name].values, active_long_spikes_df['x'].values, spikes_color_RGB=cls.get_default_spike_colors_dict()['is_included_long_pf1D'], spikes_alpha=spikes_alpha, zorder=15)
+        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_long_spikes_df[time_variable_name].values, active_long_spikes_df['x'].values, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha)['is_included_long_pf1D'])
 
         active_short_spikes_df: pd.DataFrame = active_spikes_df[active_spikes_df.is_included_short_pf1D]
-        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_short_spikes_df[time_variable_name].values, active_short_spikes_df['x'].values, spikes_color_RGB=cls.get_default_spike_colors_dict()['is_included_short_pf1D'], spikes_alpha=spikes_alpha, zorder=15)
+        ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_short_spikes_df[time_variable_name].values, active_short_spikes_df['x'].values, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha)['is_included_short_pf1D'])
 
         # active_global_spikes_df = active_spikes_df[active_spikes_df.is_included_PBE]
         # ax_activity_v_time = _simple_plot_spikes(ax_activity_v_time, active_global_spikes_df[time_variable_name].values, active_global_spikes_df['x'].values, spikes_color_RGB=(0, 1, 0), spikes_alpha=1.0, zorder=25, markersize=2.5)
@@ -1319,7 +1348,7 @@ class PhoJonathanPlotHelpers:
         if 'is_included_PBE' in active_spikes_df:
             ## PBE spikes:
             active_PBE_spikes_df: pd.DataFrame = active_spikes_df[active_spikes_df.is_included_PBE]
-            ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_PBE_spikes_df[time_variable_name].values, active_PBE_spikes_df['x'].values, spikes_color_RGB=cls.get_default_spike_colors_dict()['is_included_PBE'], spikes_alpha=spikes_alpha, zorder=15)
+            ax_activity_v_time = cls._simple_plot_spikes(ax_activity_v_time, active_PBE_spikes_df[time_variable_name].values, active_PBE_spikes_df['x'].values, **cls.get_default_spike_scatter_kwargs_dict(spikes_alpha=spikes_alpha)['is_included_PBE'])
 
         if not defer_render:
             fig = ax_activity_v_time.get_figure().get_figure() # For SubFigure
@@ -1330,7 +1359,7 @@ class PhoJonathanPlotHelpers:
     @classmethod
     @function_attributes(short_name='_plot_pho_jonathan_batch_plot_single_cell', tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[],
                           uses=['plot_single_cell_1D_placecell_validation', '_temp_draw_jonathan_ax', '_plot_general_all_spikes'], used_by=['_make_pho_jonathan_batch_plots'], creation_date='2023-04-11 08:06')
-    def _plot_pho_jonathan_batch_plot_single_cell(cls, t_split: float, time_bins: NDArray, unit_specific_time_binned_firing_rates, pf1D_all, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs, pf1D_aclu_to_idx: Dict, aclu: int, curr_fig, colors, debug_print=False, disable_top_row=False, **kwargs):
+    def _plot_pho_jonathan_batch_plot_single_cell(cls, t_split: float, time_bins: NDArray, unit_specific_time_binned_firing_rates, pf1D_all, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs: bool, pf1D_aclu_to_idx: Dict, aclu: int, curr_fig, colors, debug_print=False, disable_top_row=False, **kwargs):
         """ Plots a single cell's plots for a stacked Jonathan-style firing-rate-across-epochs-plot
         Internally calls `plot_single_cell_1D_placecell_validation`, `_temp_draw_jonathan_ax`, and `_plot_general_all_spikes`
 
@@ -1347,6 +1376,8 @@ class PhoJonathanPlotHelpers:
         """
         # short_title_string = f'{aclu:02d}'
 
+        curr_aclu_row_tuple = kwargs.get('optional_aclu_info_row_tuple', None)
+
         formatted_cell_label_string = (f"<size:22><weight:bold>{aclu:02d}</></>")
 
         ## Optional additional information about the cell to be rendered next to its aclu, like it's firing rate indicies, etc:
@@ -1356,20 +1387,37 @@ class PhoJonathanPlotHelpers:
         # the index passed into `plot_single_cell_1D_placecell_validation(...)` must be in terms of the `pf1D_all` ratemap that's provided. the `rdf_aclu_to_idx` does NOT work and will result in indexing errors
         # pf1D_aclu_to_idx = {aclu:i for i, aclu in enumerate(pf1D_all.ratemap.neuron_ids)}
 
-        # Not sure if this is okay, but it's possible that the aclu isn't in the ratemap, in which case currently we'll just skip plotting?
         cell_linear_fragile_IDX = pf1D_aclu_to_idx.get(aclu, None)
-        if cell_linear_fragile_IDX is None:
-            print(f'WARNING: aclu {aclu} is not present in the `pf1D_all` ratemaps. Which contain aclus: {pf1D_all.ratemap.neuron_ids}') #TODO 2023-07-07 20:55: - [ ] Note this is hit all the time, not sure what it's supposed to warn about
-        else:
-            cell_neuron_extended_ids = pf1D_all.ratemap.neuron_extended_ids[cell_linear_fragile_IDX]
-            # print(f'aclu: {aclu}, cell_neuron_extended_ids: {cell_neuron_extended_ids}')
-            # subtitle_string = f'(shk <size:10><weight:bold>{cell_neuron_extended_ids.shank}</></>, clu <size:10><weight:bold>{cell_neuron_extended_ids.cluster}</></>)'
-            try:
-                subtitle_string = f'shk <size:10><weight:bold>{cell_neuron_extended_ids.shank}</></>, clu <size:10><weight:bold>{cell_neuron_extended_ids.cluster}</></>\nqclu <size:10><weight:bold>{cell_neuron_extended_ids.quality}</></>\ntype <size:10><weight:bold>{cell_neuron_extended_ids.neuron_type}</></>'
-            except AttributeError: # 'NeuronExtendedIdentityTuple' object has no attribute 'quality'
-                # Older definition that is missing the quality and neuron type:
-                subtitle_string = f'shk <size:10><weight:bold>{cell_neuron_extended_ids.shank}</></>, clu <size:10><weight:bold>{cell_neuron_extended_ids.cluster}</></>'
+        cell_neuron_extended_ids = None
+        if curr_aclu_row_tuple is not None:
+            # 2024-09-24 new way of passing a parsed namedtuple
+            # AcluInfoRow(aclu=26, shank=5, cluster=12, qclu=2, neuron_type='pyr', long_pf_peak_x=72.33932444734472, has_long_pf=True, short_pf_peak_x=nan, has_short_pf=False, has_na=True, track_membership=<SplitPartitionMembership.LEFT_ONLY: 0>, long_non_replay_mean=0.6909583550863698, short_non_replay_mean=0.19728538729997622, non_replay_diff=-0.4936729677863936, long_replay_mean=nan, short_replay_mean=nan, replay_diff=nan, long_mean=nan, short_mean=nan, mean_diff=nan, neuron_IDX=24, num_replays=0, long_num_replays=0, short_num_replays=0, custom_frs_index=0.05663414113488662, is_rate_extrema=False, is_refined_exclusive=False, is_refined_LxC=False, is_refined_SxC=False, is_long_peak_left_cap=False, is_long_peak_right_cap=False, is_long_peak_either_cap=False, LS_pf_peak_x_diff=nan)
+            cell_neuron_extended_ids = deepcopy(curr_aclu_row_tuple)
 
+        else:
+            # fallback to pre-2024-09-24 way using `pf1D_all.ratemap.neuron_extended_ids`
+            # Not sure if this is okay, but it's possible that the aclu isn't in the ratemap, in which case currently we'll just skip plotting?
+            if cell_linear_fragile_IDX is None:
+                print(f'WARNING: aclu {aclu} is not present in the `pf1D_all` ratemaps. Which contain aclus: {pf1D_all.ratemap.neuron_ids}') #TODO 2023-07-07 20:55: - [ ] Note this is hit all the time, not sure what it's supposed to warn about
+            else:
+                cell_neuron_extended_ids = pf1D_all.ratemap.neuron_extended_ids[cell_linear_fragile_IDX]
+                # print(f'aclu: {aclu}, cell_neuron_extended_ids: {cell_neuron_extended_ids}')
+                # subtitle_string = f'(shk <size:10><weight:bold>{cell_neuron_extended_ids.shank}</></>, clu <size:10><weight:bold>{cell_neuron_extended_ids.cluster}</></>)'
+
+        if cell_neuron_extended_ids is not None:
+            subtitle_string = f'shk <size:10><weight:bold>{cell_neuron_extended_ids.shank}</></>, clu <size:10><weight:bold>{cell_neuron_extended_ids.cluster}</></>'
+            try:
+                # _temp_qclu_str = f'\nqclu <size:10><weight:bold>{cell_neuron_extended_ids.quality}</></>'
+                _temp_qclu_str = f'\nqclu <size:10><weight:bold>{cell_neuron_extended_ids.qclu}</></>'
+                subtitle_string += _temp_qclu_str
+            except AttributeError: # 'NeuronExtendedIdentityTuple' object has no attribute 'quality'
+                pass
+
+            try:
+                _temp_neuron_type_str = f'\ntype <size:10><weight:bold>{cell_neuron_extended_ids.neuron_type}</></>'
+                subtitle_string += _temp_neuron_type_str
+            except AttributeError: # 'NeuronExtendedIdentityTuple' object has no attribute 'neuron_type'
+                pass
 
             # print(f'\tsubtitle_string: {subtitle_string}')
             formatted_cell_label_string = f'{formatted_cell_label_string}\n<size:9>{subtitle_string}</>'
@@ -1559,6 +1607,13 @@ class PhoJonathanPlotHelpers:
                 print(f'WARNING: truncating included_unit_neuron_IDs of length {len(included_unit_neuron_IDs)} to length {actual_num_unit_neuron_IDs} due to n_max_plot_rows: {n_max_plot_rows}...')
                 included_unit_neuron_IDs = included_unit_neuron_IDs[:actual_num_unit_neuron_IDs]
 
+
+    
+        # neuron_replay_stats_df = neuron_replay_stats_df.copy()
+        # neuron_replay_stats_df = neuron_replay_stats_df.neuron_identity.make_neuron_indexed_df_global(curr_session_context=None, add_expanded_session_context_keys=False, add_extended_aclu_identity_columns=True)
+        # neuron_replay_stats_df
+
+
         # the index passed into plot_single_cell_1D_placecell_validation(...) must be in terms of the pf1D_all ratemap that's provided. the rdf_aclu_to_idx does not work and will result in indexing errors
         _temp_aclu_to_fragile_linear_neuron_IDX = {aclu:i for i, aclu in enumerate(pf1D_all.ratemap.neuron_ids)}
 
@@ -1606,6 +1661,10 @@ class PhoJonathanPlotHelpers:
             except BaseException as e:
                 # Unhandled exception
                 raise e
+            
+            curr_aclu_row_tuple = list(neuron_replay_stats_df[neuron_replay_stats_df['aclu'] == aclu].itertuples(index=False, name='AcluInfoRow'))[0]
+            kwargs['optional_aclu_info_row_tuple'] = curr_aclu_row_tuple
+            # curr_aclu_row_tuple = kwargs.get('optional_aclu_info_row_tuple', None)
 
             curr_single_cell_out_dict = cls._plot_pho_jonathan_batch_plot_single_cell(t_split, time_bins, unit_specific_time_binned_firing_rates, pf1D_all, aclu_to_idx, rdf, irdf, show_inter_replay_frs, _temp_aclu_to_fragile_linear_neuron_IDX, aclu, curr_fig, colors, debug_print=debug_print, disable_top_row=disable_top_row, **kwargs)
 
