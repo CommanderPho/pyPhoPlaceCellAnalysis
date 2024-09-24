@@ -248,7 +248,7 @@ with noop_context():
                                                         existing_task_logger=curr_task_logger,
                                                         force_reload = result_handler.force_reload_all,
                                                         post_run_callback_fn=result_handler.on_complete_success_execution_session,
-                                                        fail_on_exception=True,
+                                                        fail_on_exception=False,
                                                         saving_mode=result_handler.saving_mode)
 
         new_print(f'finished run: {run_status}\nerrors: {run_errors}\n') # 'outputs: {run_outputs}'
