@@ -344,6 +344,77 @@ class Neptuner(object):
         # end for loop
         return succeeded_fig_paths, failed_fig_paths
 
+    ## FETCH results:
+    def get_runs_table(self) -> pd.DataFrame:
+        """ 
+        Usage:
+            neptune_kwargs = {'project':"commander.pho/PhoDibaLongShortUpdated", 'api_token':"eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxOGIxODU2My1lZTNhLTQ2ZWMtOTkzNS02ZTRmNzM5YmNjNjIifQ=="}
+            neptuner = Neptuner(project_name=neptune_kwargs['project'], api_token=neptune_kwargs['api_token'])
+            runs_table_df: pd.DataFrame = neptuner.get_runs_table()
+            runs_table_df
+        """
+        _neptuner_runs_table = self.project.fetch_runs_table()
+        runs_table_df: pd.DataFrame = _neptuner_runs_table.to_pandas()
+        return runs_table_df
+
+
+    @classmethod
+    def get_most_recent_session_runs_table(cls, runs_table_df: pd.DataFrame, ordering_datetime_col_name: str = 'sys/modification_time', oldest_included_run_date:str='2024-08-01', n_recent_results: int = 1) -> pd.DataFrame:
+        # Filter rows based on column: 'sys/creation_time'
+        assert isinstance(oldest_included_run_date, str), f"oldest_included_run_date should be of type str (provided like '2024-08-01') but it is of type: {type(oldest_included_run_date)}, oldest_included_run_date: {oldest_included_run_date}"
+        ## INPUTS: runs_table_df
+        active_runs_table_df: pd.DataFrame = deepcopy(runs_table_df)
+
+        ## filter `active_runs_table_df` by modification_time
+        # ordering_datetime_col_name: str = 'sys/creation_time'
+        
+        # Sort by column: 'sys/creation_time' (ascending)
+        active_runs_table_df = active_runs_table_df.sort_values([ordering_datetime_col_name], ascending=True)
+        active_runs_table_df = active_runs_table_df[active_runs_table_df[ordering_datetime_col_name] > datetime.strptime(f'{oldest_included_run_date}T00:30:00.000Z', '%Y-%m-%dT%H:%M:%S.%fZ')]
+        # active_runs_table_df = active_runs_table_df[active_runs_table_df['sys/creation_time'] > datetime.strptime('2024-09-01T00:30:00.000Z', '%Y-%m-%dT%H:%M:%S.%fZ')]
+        # active_runs_table_df = active_runs_table_df[active_runs_table_df['sys/ping_time'] > datetime.strptime('2024-09-01T00:30:00.000Z', '%Y-%m-%dT%H:%M:%S.%fZ')]
+        # active_runs_table_df 
+        # Grouped on column: 'session_descriptor_string'
+        # active_runs_table_df = active_runs_table_df.groupby(['session_descriptor_string']).count().reset_index()[['session_descriptor_string']]
+        # Performed 1 aggregation grouped on column: 'session_descriptor_string'
+        # most_recent_runs_table_df = active_runs_table_df.groupby(['session_descriptor_string']).agg(sysid_last=('sys/id', 'last')).reset_index() ## this version only has two columns: ['session_descriptor_string','sysid_last']
+        # # most_recent_runs_table_df
+        # is_run_included = np.isin(active_runs_table_df['sys/id'], most_recent_runs_table_df['sysid_last'])
+        # most_recent_runs_table_df: pd.DataFrame = deepcopy(active_runs_table_df)[is_run_included] # find only the rows that match the latest row_id
+        # Group by 'session_descriptor_string' and get the most recent `n_recent_results` rows for each group
+        most_recent_runs_table_df: pd.DataFrame = (
+            active_runs_table_df
+            .sort_values([ordering_datetime_col_name], ascending=False)
+            .groupby('session_descriptor_string')
+            .head(n_recent_results)
+            .reset_index(drop=True)
+        )
+        
+        return most_recent_runs_table_df
+
+        # active_runs_table_df = active_runs_table_df[is_run_included] # find only the rows that match the latest row_id
+        ## OUTPUTS: active_runs_table_df, most_recent_runs_table_df
+        # active_runs_table_df
+
+    def get_most_recent_session_runs(self, **kwargs):
+        runs_table_df: pd.DataFrame = self.get_runs_table()
+        most_recent_runs_table_df: pd.DataFrame = self.get_most_recent_session_runs_table(runs_table_df=runs_table_df, **kwargs) # find only the rows that match the latest row_id
+        # most_recent_runs_table_df: pd.DataFrame = self.get_most_recent_session_runs_table(runs_table_df=deepcopy(runs_table_df), oldest_included_run_date='2024-06-01', n_recent_results=2) # find only the rows that match the latest row_id
+        runs_dict: Dict[str, AutoValueConvertingNeptuneRun]  = {}
+
+        # Iterate over each run in the DataFrame
+        for run_id in most_recent_runs_table_df['sys/id']:
+            try:
+                # Access the run by ID:
+                run: AutoValueConvertingNeptuneRun = AutoValueConvertingNeptuneRun(with_id=str(run_id), project=self.project_name, api_token=self.api_token, mode="read-only")
+                runs_dict[run_id] = run
+                
+            except Exception as e:
+                print(f"Failed to fetch figures for run {run_id}: {e}")
+                
+
+        return runs_dict, most_recent_runs_table_df
+        
 
 
 # ==================================================================================================================== #
