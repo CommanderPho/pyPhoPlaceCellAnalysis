@@ -104,7 +104,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     import plotly.express as px
     import plotly.graph_objs as go
 
-
+    data_results_df = data_results_df.copy()
     use_latex_labels: bool = False
 
     if use_latex_labels:
@@ -139,6 +139,12 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
 
     if px_scatter_kwargs is None:
         px_scatter_kwargs = {}
+        
+    # if ('color' in px_scatter_kwargs):
+    #     if ('color' == 'time_bin_size'):
+    #         print(f'converting data_results_df["time_bin_size"] column to str so it can be treated categorically.')
+    #         # Convert 'time_bin_size' to string to treat it as categorical
+    #         data_results_df['time_bin_size'] = data_results_df['time_bin_size'].astype(str)
 
     # f"Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes"
     # main_title: str = f"Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes"
@@ -161,15 +167,44 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
 
     # common_plot_kwargs = dict(color="time_bin_size")
     common_plot_kwargs = dict() # color=None
+    
     if hist_kwargs is None:
         hist_kwargs = {}
     hist_kwargs = dict(opacity=0.5, range_y=[0.0, 1.0], nbins=histogram_bins, barmode='overlay') | hist_kwargs
     # print(f'hist_kwargs: {hist_kwargs}')
 
+    ## Build legends:
+    if (('color' in hist_kwargs) and ('color' in px_scatter_kwargs)):
+        if (hist_kwargs['color'] == px_scatter_kwargs['color']):
+            # if the value is the same
+            shared_color_key: str = hist_kwargs.pop('color')
+            del px_scatter_kwargs['color'] # remove from px_scatter_kwargs too
+            ## add to shared instead
+            # Categorical 'time_bin_size' as color _______________________________________________________________________________ #
+            # Convert shared_color_key to string to treat it as categorical
+            # data_results_df[shared_color_key] = [f"{v:.3f}" for v in data_results_df[shared_color_key].values]
+            
+            # Sort based on numeric values, then convert to strings
+            category_orders = {shared_color_key: [f'{v:.3f}' for v in sorted(data_results_df[shared_color_key].astype(float).unique())]}
+
+            # Standardize formatting of 'time_bin_size' to 3 decimal places
+            data_results_df['time_bin_size'] = data_results_df['time_bin_size'].map(lambda x: f'{x:.3f}')
+            # data_results_df[shared_color_key] = data_results_df[shared_color_key].astype(str) # convert to categorical
+            # Define consistent category orders and color sequence
+            # category_orders = {shared_color_key: sorted(data_results_df[shared_color_key].unique())} # category_orders: {'time_bin_size': ['0.025', '0.030', '0.044', '0.050', '0.058', '0.250', '1.500']},
+            color_sequence = px.colors.qualitative.Plotly
+            print(f'category_orders: {category_orders},\ncolor_sequence: {color_sequence}\n')
+            common_plot_kwargs.update(dict(category_orders=category_orders, color_discrete_sequence=color_sequence,
+                                        color=shared_color_key,
+                                        ))
+            # shared_color_key: 'time_bin_size'
+            
+
+
     # get the pre-delta epochs
     pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
     post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
-
+    
     # ==================================================================================================================== #
     # Build Figure                                                                                                         #
     # ==================================================================================================================== #
@@ -194,8 +229,6 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
 
         fig.add_trace(a_trace, row=1, col=1)
 
-
-
     # Scatter Plot _______________________________________________________________________________________________________ #
     # adding scatter plot
     if out_scatter_fig is not None:
@@ -207,7 +240,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     else:
         ## Create a new scatter plot:
         assert px_scatter_kwargs is not None
-        out_scatter_fig = px.scatter(data_results_df, **px_scatter_kwargs)
+        out_scatter_fig = px.scatter(data_results_df, **common_plot_kwargs, **px_scatter_kwargs)
 
         for i, a_trace in enumerate(out_scatter_fig.data):
             a_trace_name = a_trace.name
@@ -284,6 +317,15 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
         fig.update_layout(
             legend_title_text=legend_title_text  # Add a title to the legend
         )
+
+    # Force legend to follow the category order
+    fig.update_layout(
+        legend=dict(
+            itemsizing='constant',
+            # traceorder='normal',  # Ensures legend follows trace (category) order
+            traceorder='grouped',  # Group traces with the same legendgroup
+        )
+    )
 
 
     fig.update_xaxes(title_text="# Events", row=1, col=1)
