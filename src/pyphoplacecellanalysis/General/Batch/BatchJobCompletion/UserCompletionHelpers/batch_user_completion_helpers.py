@@ -232,7 +232,7 @@ def determine_session_t_delta_completion_function(self, global_data_root_parent_
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['CSV', 'time_bin_sizes', 'marginals'], input_requires=['DirectionalMergedDecoders'], output_provides=[], uses=['_compute_all_df_score_metrics'], used_by=[], creation_date='2024-04-27 21:24', related_items=[])
+@function_attributes(short_name=None, tags=['CSV', 'time_bin_sizes', 'marginals', 'multi_timebin'], input_requires=['DirectionalMergedDecoders'], output_provides=[], uses=['_compute_all_df_score_metrics'], used_by=[], creation_date='2024-04-27 21:24', related_items=[])
 def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                                              save_hdf=True, save_csvs=True, return_full_decoding_results:bool=False, 
                                                                              custom_all_param_sweep_options=None,
@@ -252,7 +252,11 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     additional_session_context if provided, this is combined with the session context.
     ## CSVs are saved out in `_subfn_process_time_bin_swept_results`
 
-
+    
+    'K:/scratch/collected_outputs/2024-09-25_Apogee-2006-4-28_12-38-13-None_time_bin_size_sweep_results.h5'
+    'K:/scratch/collected_outputs/2024-09-25-kdiba_vvp01_two_2006-4-28_12-38-13_None-(ripple_time_bin_marginals_df).csv'
+    
+    
     """
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
@@ -282,9 +286,13 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     if additional_session_context is None:
         print(f'\t!!!! 2024-07-10 WARNING: additional_session_context is None!')
 
+    # BEGIN _SUBFNS_ _____________________________________________________________________________________________________ #
     # Export CSVs:
     def export_marginals_df_csv(marginals_df: pd.DataFrame, data_identifier_str: str, parent_output_path: Path, active_context: IdentifyingContext):
         """ captures nothing
+        
+        Outputs: '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
+        
         """
         # output_date_str: str = get_now_rounded_time_str()
         output_date_str: str = get_now_day_str()
@@ -292,7 +300,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
         # active_context = curr_active_pipeline.get_session_context()
         session_identifier_str: str = active_context.get_description()
         assert output_date_str is not None
-        out_basename = '-'.join([output_date_str, session_identifier_str, data_identifier_str]) # '2024-01-04|kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
+        out_basename = '-'.join([output_date_str, session_identifier_str, data_identifier_str]) # '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
         out_filename = f"{out_basename}.csv"
         out_path = parent_output_path.joinpath(out_filename).resolve()
         marginals_df.to_csv(out_path)
@@ -305,6 +313,13 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
         GLOBAL Captures: collected_outputs_path
         
         Produces: a single output df flattened acrossed all time bin sizes
+        
+        Outputs:
+        [laps_time_bin_marginals_out_path, laps_out_path, ripple_time_bin_marginals_out_path, ripple_out_path]:
+            '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_time_bin_marginals_df).csv'
+            '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
+            '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(ripple_time_bin_marginals_df).csv'
+            '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(ripple_marginals_df).csv'
         
         """
         several_time_bin_sizes_laps_time_bin_marginals_df_list = []
@@ -530,7 +545,10 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     ## INPUT PARAMETER: time_bin_size sweep paraemters    
     if custom_all_param_sweep_options is None:
         if desired_shared_decoding_time_bin_sizes is None:
-            desired_shared_decoding_time_bin_sizes = np.linspace(start=0.030, stop=0.10, num=6) ####### <<<------ Default sweep is defined here
+            # desired_shared_decoding_time_bin_sizes = np.linspace(start=0.030, stop=0.10, num=6) ####### <<<------ Default sweep is defined here
+            # desired_shared_decoding_time_bin_sizes = np.array([0.025, 0.030, 0.044, 0.050, 0.058, 0.072, 0.086, 0.100, 0.250, 1.5]) ####### <<<------ Default sweep is defined here
+            desired_shared_decoding_time_bin_sizes = np.array([0.025, 0.030, 0.044, 0.050, 0.058, 0.072, 0.086, 0.100]) ####### <<<------ Default sweep is defined here
+            
         # Shared time bin sizes
         custom_all_param_sweep_options, param_sweep_option_n_values = parameter_sweeps(desired_shared_decoding_time_bin_size=desired_shared_decoding_time_bin_sizes, use_single_time_bin_per_epoch=[False], minimum_event_duration=[desired_shared_decoding_time_bin_sizes[-1]]) # with Ripples
 
@@ -699,6 +717,9 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     combined_multi_timebin_outputs_tuple = _subfn_process_time_bin_swept_results(output_extracted_result_tuples, active_context=active_context)
     # Unpacking:    
     # (several_time_bin_sizes_laps_df, laps_out_path, several_time_bin_sizes_time_bin_laps_df, laps_time_bin_marginals_out_path), (several_time_bin_sizes_ripple_df, ripple_out_path, several_time_bin_sizes_time_bin_ripple_df, ripple_time_bin_marginals_out_path) = combined_multi_timebin_outputs_tuple
+    
+    # combined_multi_timebin_outputs_tuple
+    
 
     # add to output dict
     # across_session_results_extended_dict['compute_and_export_marginals_dfs_completion_function'] = _out
@@ -736,8 +757,9 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
     # can unpack like:
     (several_time_bin_sizes_laps_df, laps_out_path, several_time_bin_sizes_time_bin_laps_df, laps_time_bin_marginals_out_path), (several_time_bin_sizes_ripple_df, ripple_out_path, several_time_bin_sizes_time_bin_ripple_df, ripple_time_bin_marginals_out_path) = combined_multi_timebin_outputs_tuple
-
-
+    _temp_saved_files_dict = {'laps_out_path': laps_out_path, 'laps_time_bin_marginals_out_path': laps_time_bin_marginals_out_path, 'ripple_out_path': ripple_out_path, 'ripple_time_bin_marginals_out_path': ripple_time_bin_marginals_out_path}
+    print(f'>>>>>>>>>> exported files: {_temp_saved_files_dict}\n\n')
+    
     # 2024-07-12 - Export computed CSVs in here?!?! ______________________________________________________________________ #
     ## INPUTS: active_context (from before), should be correct
     t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
@@ -769,7 +791,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
                                                                                         user_annotation_selections={'ripple': any_good_selected_epoch_times},
                                                                                         valid_epochs_selections={'ripple': filtered_valid_epoch_times},
                                                                                     )
-
+        print(f'\t>>>>>>>>>> exported files: {_output_csv_paths}\n\n')
 
 
 
@@ -780,7 +802,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['CSVs', 'export', 'across-sessions', 'batch', 'ripple_all_scores_merged_df'], input_requires=['DirectionalDecodersEpochsEvaluations'], output_provides=[], uses=[], used_by=[], creation_date='2024-04-27 21:20', related_items=[])
+@function_attributes(short_name=None, tags=['CSVs', 'export', 'across-sessions', 'batch', 'single-time-bin-size', 'ripple_all_scores_merged_df'], input_requires=['DirectionalDecodersEpochsEvaluations'], output_provides=[], uses=['filter_and_update_epochs_and_spikes', 'DecoderDecodedEpochsResult', 'DecoderDecodedEpochsResult.export_csvs'], used_by=[], creation_date='2024-04-27 21:20', related_items=[])
 def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
     """
     Aims to export the results of the global 'directional_decoders_evaluate_epochs' calculation
@@ -1049,7 +1071,7 @@ def export_session_h5_file_completion_function(self, global_data_root_parent_pat
     return across_session_results_extended_dict
 
 
-
+@function_attributes(short_name=None, tags=['backup', 'versioning', 'copy'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-25 06:22', related_items=[])
 def backup_previous_session_files_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
     """  Makes a backup copy of the pipeline's files (pkl, HDF5) with desired suffix
     
@@ -1126,8 +1148,8 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
     
     Results can be extracted from batch output by 
     
-    # Extracts the callback results 'determine_session_t_delta_completion_function':
-    extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('determine_session_t_delta_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
+    # Extracts the callback results 'compute_and_export_session_wcorr_shuffles_completion_function':
+    extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('compute_and_export_session_wcorr_shuffles_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
 
 
     """
@@ -1287,7 +1309,7 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
 
 
 
-@function_attributes(short_name=None, tags=['wcorr', 'shuffle', 'replay', 'epochs'], input_requires=[], output_provides=[], uses=['compute_all_replay_epoch_variations'], used_by=[], creation_date='2024-06-28 01:50', related_items=[])
+@function_attributes(short_name=None, tags=['wcorr', 'shuffle', 'replay', 'epochs', 'alternative_replays'], input_requires=[], output_provides=[], uses=['compute_all_replay_epoch_variations'], used_by=[], creation_date='2024-06-28 01:50', related_items=[])
 def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
     """  Computes several different alternative replay-detection variants and computes and exports the shuffled wcorrs for each of them
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function
@@ -1562,7 +1584,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 
 
 
-@function_attributes(short_name=None, tags=['recomputed_inst_firing_rate', 'inst_fr'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
+@function_attributes(short_name=None, tags=['recomputed_inst_firing_rate', 'inst_fr', 'independent'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def compute_and_export_session_instantaneous_spike_rates_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                                             #  instantaneous_time_bin_size_seconds_list:List[float]=[0.0005, 0.0009, 0.0015, 0.0025, 0.025], epoch_handling_mode:str='DropShorterMode',
                                                                             instantaneous_time_bin_size_seconds_list:List[float]=[1000.0], epoch_handling_mode:str='UseAllEpochsMode', # single-bin per epoch
@@ -1715,7 +1737,7 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
+@function_attributes(short_name=None, tags=['JSON', 'CSV', 'peak', 'pf', 'peak_promenance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def compute_and_export_session_extended_placefield_peak_information_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                                              save_hdf:bool=True, save_across_session_hdf:bool=False) -> dict:
     """  Extracts peak information for the placefields for each neuron
@@ -1723,8 +1745,8 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
     
     Results can be extracted from batch output by 
     
-    # Extracts the callback results 'determine_session_t_delta_completion_function':
-    extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('determine_session_t_delta_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
+    # Extracts the callback results 'compute_and_export_session_extended_placefield_peak_information_completion_function':
+    extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('compute_and_export_session_extended_placefield_peak_information_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
 
 
     """
