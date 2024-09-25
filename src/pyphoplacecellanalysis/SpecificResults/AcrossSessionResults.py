@@ -2653,10 +2653,11 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
         
         custom_replay_name = row['custom_replay_name']
         file_type = row['file_type']
-        decoding_time_bin_size_str = row['decoding_time_bin_size_str']
+        decoding_time_bin_size_str = row['decoding_time_bin_size_str'] #TODO 2024-09-25 09:49: - [ ] Looks like `row['decoding_time_bin_size_str']` must be not set for the basic dataframes
     
         ## Setup:
-        additional_columns_dict = {'custom_replay_name': custom_replay_name}
+        common_additional_columns_dict = {'custom_replay_name': custom_replay_name} # skip ['time_bin_size'] override for `common_additional_columns_dict`, so we can use it for 'laps_marginals_df', 'laps_time_bin_marginals_df', ... which already have good time_bin_size columns
+        additional_columns_dict = deepcopy(common_additional_columns_dict)
         additional_columns_dict['time_bin_size'] = try_convert_to_float(decoding_time_bin_size_str, default_val=np.nan)
 
         export_datetime = row['export_datetime']
@@ -2675,18 +2676,18 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
             print(f'processing session_name: {session_name}')
         curr_session_t_delta = t_delta_dict.get(session_name, {}).get('t_delta', None)
         if curr_session_t_delta is None:
-            print(f'WARN: curr_session_t_delta is None for session_str = "{session_str}"')
+            print(f'WARN: curr_session_t_delta is None for session_str = "{session_str}"') # fails for 'kdiba_gor01_one_2006-6-09_1-22-43_None'
 
         _is_file_valid = True # shouldn't mark unknown files as invalid
         # Process each file type with its corresponding details
         if file_type == 'laps_marginals_df':
-            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **additional_columns_dict)
+            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **common_additional_columns_dict)
         elif file_type == 'ripple_marginals_df':
-            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **additional_columns_dict)
+            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **common_additional_columns_dict)
         elif file_type == 'laps_time_bin_marginals_df':
-            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', **additional_columns_dict)
+            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', **common_additional_columns_dict)
         elif file_type == 'ripple_time_bin_marginals_df':
-            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', **additional_columns_dict)
+            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', **common_additional_columns_dict)
         elif file_type == 'laps_simple_pf_pearson_merged_df':
             _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_simple_pearson_laps_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **additional_columns_dict)
         elif file_type == 'ripple_simple_pf_pearson_merged_df':
@@ -2715,6 +2716,9 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
     
     ## Build across_sessions join dataframes:
     all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df = _concat_all_dicts_to_dfs(final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict, final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict)
+    ## #TODO 2024-09-25 09:42: - [X] FIXED: Unfortunately both `all_sessions_laps_*df` dataframes have all missing values for their ['time_bin_size'] column.
+    ## - [X] FIXED: ALL of the 4 basic dataframes and their input dicts (for both laps and ripples) lack a valid time_bin_size, while all of the derived additional computation dfs have them.
+     
     ## OUTPUTS: all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df
     try:
         if all_session_experiment_experience_csv_path is None:
