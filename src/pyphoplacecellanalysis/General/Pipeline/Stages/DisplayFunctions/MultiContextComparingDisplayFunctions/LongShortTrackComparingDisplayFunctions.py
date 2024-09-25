@@ -261,8 +261,6 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             pf1d_long = computation_results[long_epoch_name]['computed_data']['pf1D']
             pf1d_short = computation_results[short_epoch_name]['computed_data']['pf1D']
 
-
-
             aclu_to_idx = global_computation_results.computed_data['jonathan_firing_rate_analysis'].rdf.aclu_to_idx
             rdf = global_computation_results.computed_data['jonathan_firing_rate_analysis'].rdf.rdf
             irdf = global_computation_results.computed_data['jonathan_firing_rate_analysis'].irdf.irdf
@@ -280,7 +278,8 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             # Horizontally join (merge) the dataframes
             neuron_replay_stats_df: pd.DataFrame = pd.merge(unique_aclu_information_df, neuron_replay_stats_df, left_on='aclu', right_on='aclu', how='inner', suffixes=('', '_dup')) # to prevent column duplication, suffix the right df with the _dup suffix which will be dropped after merging
             neuron_replay_stats_df = neuron_replay_stats_df.drop(columns=[col for col in neuron_replay_stats_df.columns if col.endswith('_dup')]) # Drop the duplicate columns
-
+            neuron_replay_stats_df = neuron_replay_stats_df.set_index('aclu', drop=False, inplace=False) # NOW the indexing should be right again! `drop=False` means that the 'aclu' column will remain accessible by name
+            
             n_max_plot_rows = kwargs.pop('n_max_plot_rows', 6)
             show_inter_replay_frs = kwargs.pop('show_inter_replay_frs', True)
             included_unit_neuron_IDs = kwargs.pop('included_unit_neuron_IDs', None)
@@ -1504,9 +1503,9 @@ class PhoJonathanPlotHelpers:
             curr_ax_firing_rate = None
             curr_ax_cell_label = curr_fig.add_subplot(gs[0, 0], label=f'ax_cell_label[{aclu:02d}]') # the last element of the first row contains the labels that identify the cell
             curr_ax_extra_information_labels = curr_fig.add_subplot(gs[1, 0], label=f'ax_extra_info_labels[{aclu:02d}]') # the last two element of the first row contains the labels that identify the cell
-            curr_ax_lap_spikes = curr_fig.add_subplot(gs[:, 1:-1], label=f'ax_lap_spikes[{aclu:02d}]') # all up to excluding the last element of the row
-            # curr_ax_left_placefield = curr_fig.add_subplot(gs[:, 1], sharey=curr_ax_lap_spikes) # only the last element of the row
-            curr_ax_placefield = curr_fig.add_subplot(gs[:, -1], sharey=curr_ax_lap_spikes, label=f'ax_pf1D[{aclu:02d}]') # only the last element of the row
+            curr_ax_left_placefield = curr_fig.add_subplot(gs[:, 1]) # only the last element of the row
+            curr_ax_lap_spikes = curr_fig.add_subplot(gs[:, 2:-1], label=f'ax_lap_spikes[{aclu:02d}]', sharey=curr_ax_left_placefield) # all up to excluding the last element of the row
+            curr_ax_right_placefield = curr_fig.add_subplot(gs[:, -1], sharey=curr_ax_lap_spikes, label=f'ax_pf1D[{aclu:02d}]') # only the last element of the row
 
         else:
             curr_ax_firing_rate = curr_fig.add_subplot(gs[0, 2:-1], label=f'ax_firing_rate[{aclu:02d}]') # the whole top row except: the first element (which will contain the label column) the last element (to match the firing rates below)
@@ -1514,7 +1513,7 @@ class PhoJonathanPlotHelpers:
             curr_ax_extra_information_labels = curr_fig.add_subplot(gs[1, 0], label=f'ax_extra_info_labels[{aclu:02d}]') # the last two element of the first row contains the labels that identify the cell
             curr_ax_left_placefield = curr_fig.add_subplot(gs[1, 1]) # only the last element of the row
             curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, 2:-1], label=f'ax_lap_spikes[{aclu:02d}]', sharey=curr_ax_left_placefield) # all up to excluding the last element of the row
-            curr_ax_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes, label=f'ax_pf1D[{aclu:02d}]') # only the last element of the row
+            curr_ax_right_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes, label=f'ax_pf1D[{aclu:02d}]') # only the last element of the row
 
 
         text_formatter = FormattedFigureText()
@@ -1569,13 +1568,13 @@ class PhoJonathanPlotHelpers:
         curr_ax_left_placefield.set_yticklabels([])
         curr_ax_left_placefield.sharey(curr_ax_lap_spikes)
         
-        curr_ax_placefield.set_xticklabels([])
-        curr_ax_placefield.set_yticklabels([])
-        curr_ax_placefield.sharey(curr_ax_lap_spikes)
+        curr_ax_right_placefield.set_xticklabels([])
+        curr_ax_right_placefield.set_yticklabels([])
+        curr_ax_right_placefield.sharey(curr_ax_lap_spikes)
         
         ## global (_all) placefield
         ## I think that `plot_single_cell_1D_placecell_validation` is used to plot the position v time AND the little placefield on the right
-        _ = plot_single_cell_1D_placecell_validation(pf1D_all, cell_linear_fragile_IDX, extant_fig=curr_fig, extant_axes=(curr_ax_lap_spikes, curr_ax_placefield),
+        _ = plot_single_cell_1D_placecell_validation(pf1D_all, cell_linear_fragile_IDX, extant_fig=curr_fig, extant_axes=(curr_ax_lap_spikes, curr_ax_right_placefield),
                 **({'should_include_labels': False, 'should_plot_spike_indicator_points_on_placefield': should_plot_spike_indicator_points_on_placefield,
                     'should_plot_spike_indicator_lines_on_trajectory': False, 'spike_indicator_lines_alpha': 0.2,
                     'spikes_color':(0.1, 0.1, 0.1), 'spikes_alpha':0.1, 'should_include_spikes': False} | kwargs))
@@ -1588,14 +1587,14 @@ class PhoJonathanPlotHelpers:
             pf1d_short_cell_linear_fragile_IDX = pf1d_short_aclu_to_idx.get(aclu, None)
             if pf1d_short_cell_linear_fragile_IDX is None:
                 ## neuron aclu is missing from pf1d_short.
-                curr_ax_placefield.clear()
+                curr_ax_right_placefield.clear()
                 # curr_ax_left_placefield.set_visible(False) # hide completely?
                 print(f'WARNING: aclu {aclu} is not present in the `pf1d_short` ratemaps. Which contain aclus: {pf1d_short.ratemap.neuron_ids}')
             else:
                 ## `curr_ax_placefield` was drawn on by the global (_all) placefield tuning curve. Clear this one to plot the short-exclusive.
-                curr_ax_placefield.clear()
+                curr_ax_right_placefield.clear()
                 _subfn_plot_pf1D_placefield(active_epoch_placefields1D=pf1d_short, placefield_cell_index=pf1d_short_cell_linear_fragile_IDX,
-                                            ax_activity_v_time=curr_ax_lap_spikes, ax_pf_tuning_curve=curr_ax_placefield, pf_tuning_curve_ax_position='right',
+                                            ax_activity_v_time=curr_ax_lap_spikes, ax_pf_tuning_curve=curr_ax_right_placefield, pf_tuning_curve_ax_position='right',
                                             **({'should_plot_spike_indicator_points_on_placefield': should_plot_spike_indicator_points_on_placefield,
                                                 'should_plot_spike_indicator_lines_on_trajectory': False, 'spike_indicator_lines_alpha': 0.2,
                                                 'tuning_curve_color': 'r',
@@ -1620,11 +1619,11 @@ class PhoJonathanPlotHelpers:
                                                 'tuning_curve_color': 'b',
                                                 } | kwargs))
 
-        curr_ax_placefield.axis('off')
-        curr_ax_placefield.set_xlim((0, 1))    
-        curr_ax_placefield.set_xticklabels([])
-        curr_ax_placefield.set_yticklabels([])
-        curr_ax_placefield.sharey(curr_ax_lap_spikes)
+        curr_ax_right_placefield.axis('off')
+        curr_ax_right_placefield.set_xlim((0, 1))    
+        curr_ax_right_placefield.set_xticklabels([])
+        curr_ax_right_placefield.set_yticklabels([])
+        curr_ax_right_placefield.sharey(curr_ax_lap_spikes)
         
         curr_ax_left_placefield.axis('off')
         curr_ax_left_placefield.set_xlim((0, 1))
@@ -1646,7 +1645,7 @@ class PhoJonathanPlotHelpers:
             curr_ax_firing_rate.set_xlim((t_start, t_end)) # We don't want to clip to only the spiketimes for this cell, we want it for all cells, or even when the recording started/ended
             curr_ax_lap_spikes.sharex(curr_ax_firing_rate) # Sync the time axes of the laps and the firing rates
 
-        return {'firing_rate':curr_ax_firing_rate, 'lap_spikes': curr_ax_lap_spikes, 'placefield': curr_ax_placefield, 'left_placefield': curr_ax_left_placefield, 'labels': curr_ax_cell_label}
+        return {'firing_rate':curr_ax_firing_rate, 'lap_spikes': curr_ax_lap_spikes, 'placefield': curr_ax_right_placefield, 'left_placefield': curr_ax_left_placefield, 'labels': curr_ax_cell_label}
 
 
     @classmethod
@@ -1666,7 +1665,7 @@ class PhoJonathanPlotHelpers:
         if included_unit_neuron_IDs is None:
             n_all_neuron_IDs = np.shape(neuron_replay_stats_df)[0]
             n_max_plot_rows = min(n_all_neuron_IDs, n_max_plot_rows) # don't allow more than the possible number of neuronIDs
-            included_unit_neuron_IDs = [int(neuron_replay_stats_df.index[i]) for i in np.arange(n_max_plot_rows)]
+            included_unit_neuron_IDs = [int(neuron_replay_stats_df.index[i]) for i in np.arange(n_max_plot_rows)] #FIXED 2024-09-25 04:20: - [X] I think this could be the error, maybe neuron_replay_stats_df used to have the aclu as its index column
         else:
             # truncate to n_max_plot_rows if needed:
             actual_num_unit_neuron_IDs = min(len(included_unit_neuron_IDs), n_max_plot_rows) # only include the possible rows
