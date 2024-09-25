@@ -254,9 +254,12 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             cell_spikes_dfs_dict, aclu_to_fragile_linear_idx_map = PhoJonathanPlotHelpers._build_spikes_df_interpolated_props(global_results, should_interpolate_to_filtered_positions=use_filtered_positions) # cell_spikes_dfs_list is indexed by aclu_to_fragile_linear_idx_map
             time_variable_name = global_results.sess.spikes_df.spikes.time_variable_name
             
-            # pf1d_long = computation_results[long_epoch_name]['computed_data']['pf1D']
-            # pf1d_short = computation_results[short_epoch_name]['computed_data']['pf1D']
+            ## Combined placefield
             pf1D_all = global_results['computed_data']['pf1D'] # passed to _make_pho_jonathan_batch_plots(t_split, ...)
+
+            ## Separate long/short
+            pf1d_long = computation_results[long_epoch_name]['computed_data']['pf1D']
+            pf1d_short = computation_results[short_epoch_name]['computed_data']['pf1D']
 
 
 
@@ -292,6 +295,10 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 ## Set the fig_num, if not already set:
                 curr_fig_num = f'long|short fr indicies_{active_context.get_description(separator="/")}'
             kwargs['fignum'] = curr_fig_num
+
+            ## add the long/short placefields in addition to the pf1d_all
+            kwargs['pf1d_long'] = pf1d_long
+            kwargs['pf1d_short'] = pf1d_short
 
             ## Have to pull out the rate-remapping stats for each neuron_id
             try:
@@ -1378,6 +1385,12 @@ class PhoJonathanPlotHelpers:
 
         curr_aclu_row_tuple = kwargs.get('optional_aclu_info_row_tuple', None)
 
+
+        ## add the long/short placefields in addition to the pf1d_all
+        pf1d_long = kwargs.get('pf1d_long', None)
+        pf1d_short = kwargs.get('pf1d_short', None)
+        
+
         formatted_cell_label_string = (f"<size:22><weight:bold>{aclu:02d}</></>")
 
         ## Optional additional information about the cell to be rendered next to its aclu, like it's firing rate indicies, etc:
@@ -1436,8 +1449,8 @@ class PhoJonathanPlotHelpers:
         # subtitle_string = ' '.join([f'{pf1D_all.config.str_for_display(False)}'])
         # if debug_print:
         #     print(f'\t{title_string}\n\t{subtitle_string}')
-        from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_single_cell_1D_placecell_validation
-
+        from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_single_cell_1D_placecell_validation, _subfn_plot_pf1D_placefield
+    
         # gridspec mode:
         # curr_fig.set_facecolor('0.65') # light grey
         curr_fig.set_facecolor('1.0') # white
@@ -1496,11 +1509,11 @@ class PhoJonathanPlotHelpers:
             curr_ax_placefield = curr_fig.add_subplot(gs[:, -1], sharey=curr_ax_lap_spikes, label=f'ax_pf1D[{aclu:02d}]') # only the last element of the row
 
         else:
-            curr_ax_firing_rate = curr_fig.add_subplot(gs[0, 1:-1], label=f'ax_firing_rate[{aclu:02d}]') # the whole top row except the last element (to match the firing rates below)
-            curr_ax_cell_label = curr_fig.add_subplot(gs[0, 0], label=f'ax_cell_label[{aclu:02d}]') # the last element of the first row contains the labels that identify the cell
+            curr_ax_firing_rate = curr_fig.add_subplot(gs[0, 2:-1], label=f'ax_firing_rate[{aclu:02d}]') # the whole top row except: the first element (which will contain the label column) the last element (to match the firing rates below)
+            curr_ax_cell_label = curr_fig.add_subplot(gs[0, 0:1], label=f'ax_cell_label[{aclu:02d}]') # the first two elements of the first row contains the labels that identify the cell
             curr_ax_extra_information_labels = curr_fig.add_subplot(gs[1, 0], label=f'ax_extra_info_labels[{aclu:02d}]') # the last two element of the first row contains the labels that identify the cell
-            curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, 1:-1], label=f'ax_lap_spikes[{aclu:02d}]') # all up to excluding the last element of the row
-            # curr_ax_left_placefield = curr_fig.add_subplot(gs[1, 1], sharey=curr_ax_lap_spikes) # only the last element of the row
+            curr_ax_left_placefield = curr_fig.add_subplot(gs[1, 1]) # only the last element of the row
+            curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, 2:-1], label=f'ax_lap_spikes[{aclu:02d}]', sharey=curr_ax_left_placefield) # all up to excluding the last element of the row
             curr_ax_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes, label=f'ax_pf1D[{aclu:02d}]') # only the last element of the row
 
 
@@ -1521,14 +1534,11 @@ class PhoJonathanPlotHelpers:
         extra_information_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, optional_formatted_cell_label_string, xycoords='axes fraction', ax=curr_ax_extra_information_labels, ha="center", va="center")
 
         # # # `flexitext` version:
-
         # plt.title('')
         # plt.suptitle('')
         # fig = plt.gcf() # get figure to setup the margins on.
         # text_formatter.setup_margins(curr_fig)
-        # # flexitext(text_formatter.left_margin, text_formatter.top_margin, '<size:22><color:crimson, weight:bold>long ($L$)</>|<color:royalblue, weight:bold>short($S$)</> <weight:bold>firing rate indicies</></>', va="bottom", xycoords="figure fraction")
         # footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
-
 
         curr_ax_cell_label.axis('off')
         curr_ax_extra_information_labels.axis('off')
@@ -1555,16 +1565,60 @@ class PhoJonathanPlotHelpers:
         curr_ax_lap_spikes.set_yticklabels([])
         curr_ax_lap_spikes.axis('off')
 
+        curr_ax_left_placefield.set_xticklabels([])
+        curr_ax_left_placefield.set_yticklabels([])
+        curr_ax_left_placefield.sharey(curr_ax_lap_spikes)
+        
         curr_ax_placefield.set_xticklabels([])
         curr_ax_placefield.set_yticklabels([])
         curr_ax_placefield.sharey(curr_ax_lap_spikes)
-
+        
+        ## global (_all) placefield
         ## I think that `plot_single_cell_1D_placecell_validation` is used to plot the position v time AND the little placefield on the right
         _ = plot_single_cell_1D_placecell_validation(pf1D_all, cell_linear_fragile_IDX, extant_fig=curr_fig, extant_axes=(curr_ax_lap_spikes, curr_ax_placefield),
                 **({'should_include_labels': False, 'should_plot_spike_indicator_points_on_placefield': should_plot_spike_indicator_points_on_placefield,
                     'should_plot_spike_indicator_lines_on_trajectory': False, 'spike_indicator_lines_alpha': 0.2,
                     'spikes_color':(0.1, 0.1, 0.1), 'spikes_alpha':0.1, 'should_include_spikes': False} | kwargs))
 
+
+        if pf1d_short is not None:
+            # have short-specific pf
+            ## setup the right placefield independently without `plot_single_cell_1D_placecell_validation`
+            pf1d_short_aclu_to_idx = {aclu:i for i, aclu in enumerate(pf1d_short.ratemap.neuron_ids)}
+            pf1d_short_cell_linear_fragile_IDX = pf1d_short_aclu_to_idx.get(aclu, None)
+            if pf1d_short_cell_linear_fragile_IDX is None:
+                ## neuron aclu is missing from pf1d_short.
+                curr_ax_placefield.clear()
+                # curr_ax_left_placefield.set_visible(False) # hide completely?
+                print(f'WARNING: aclu {aclu} is not present in the `pf1d_short` ratemaps. Which contain aclus: {pf1d_short.ratemap.neuron_ids}')
+            else:
+                _subfn_plot_pf1D_placefield(active_epoch_placefields1D=pf1d_short, placefield_cell_index=pf1d_short_cell_linear_fragile_IDX,
+                                            ax_activity_v_time=curr_ax_lap_spikes, ax_pf_tuning_curve=curr_ax_placefield, pf_tuning_curve_ax_position='right',
+                                            **({'should_plot_spike_indicator_points_on_placefield': should_plot_spike_indicator_points_on_placefield,
+                                                'should_plot_spike_indicator_lines_on_trajectory': False, 'spike_indicator_lines_alpha': 0.2,
+                                                } | kwargs))
+                
+
+        if pf1d_long is not None:
+            # have long-specific pf
+            ## setup the left placefield independently without `plot_single_cell_1D_placecell_validation`
+            pf1d_long_aclu_to_idx = {aclu:i for i, aclu in enumerate(pf1d_long.ratemap.neuron_ids)}
+            pf1d_long_cell_linear_fragile_IDX = pf1d_long_aclu_to_idx.get(aclu, None)
+            if pf1d_long_cell_linear_fragile_IDX is None:
+                ## neuron aclu is missing from pf1d_long.
+                curr_ax_left_placefield.clear()
+                # curr_ax_left_placefield.set_visible(False) # hide completely?
+                print(f'WARNING: aclu {aclu} is not present in the `pf1d_long` ratemaps. Which contain aclus: {pf1d_long.ratemap.neuron_ids}')
+            else:
+                _subfn_plot_pf1D_placefield(active_epoch_placefields1D=pf1d_long, placefield_cell_index=pf1d_long_cell_linear_fragile_IDX,
+                                            ax_activity_v_time=curr_ax_lap_spikes, ax_pf_tuning_curve=curr_ax_left_placefield, pf_tuning_curve_ax_position='left',
+                                            **({'should_plot_spike_indicator_points_on_placefield': should_plot_spike_indicator_points_on_placefield,
+                                                'should_plot_spike_indicator_lines_on_trajectory': False, 'spike_indicator_lines_alpha': 0.2,
+                                                } | kwargs))
+                
+        curr_ax_left_placefield.axis('off')
+        curr_ax_left_placefield.set_xlim((0, 1))
+    
         # Custom All Spikes: Note that I set `'should_include_spikes': False` in call to `plot_single_cell_1D_placecell_validation` above so the native spikes from that function aren't plotted
         cell_spikes_dfs_dict = kwargs.get('cell_spikes_dfs_dict', None)
         time_variable_name = kwargs.get('time_variable_name', None)
@@ -1579,7 +1633,7 @@ class PhoJonathanPlotHelpers:
             curr_ax_firing_rate.set_xlim((t_start, t_end)) # We don't want to clip to only the spiketimes for this cell, we want it for all cells, or even when the recording started/ended
             curr_ax_lap_spikes.sharex(curr_ax_firing_rate) # Sync the time axes of the laps and the firing rates
 
-        return {'firing_rate':curr_ax_firing_rate, 'lap_spikes': curr_ax_lap_spikes, 'placefield': curr_ax_placefield, 'labels': curr_ax_cell_label}
+        return {'firing_rate':curr_ax_firing_rate, 'lap_spikes': curr_ax_lap_spikes, 'placefield': curr_ax_placefield, 'left_placefield': curr_ax_left_placefield, 'labels': curr_ax_cell_label}
 
 
     @classmethod
