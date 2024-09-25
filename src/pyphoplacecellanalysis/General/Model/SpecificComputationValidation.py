@@ -1,6 +1,8 @@
 import numpy as np
 from attrs import define, Factory, field, fields
 from typing import Callable, List, Dict, Optional
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 import networkx as nx
 
 @define(slots=False, repr=True)
@@ -604,4 +606,28 @@ class DependencyGraph:
     #     nx.draw_networkx_edge_labels(subgraph, pos, edge_labels=edge_labels, font_color='red')
         
     #     plt.show()
+
+
+
+@function_attributes(short_name=None, tags=['UNTESTED', 'UNFINISHED', 'cleanup', 'dependencies'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-25 08:46', related_items=[])
+def find_immediate_dependencies(remaining_comp_specifiers_dict, provided_global_keys):
+    dependent_validators = {}
+    for a_name, a_validator in remaining_comp_specifiers_dict.items():
+        # set(provided_global_keys)
+        # set(a_validator.results_specification.requires_global_keys)
+        if a_validator.is_dependency_in_required_global_keys(provided_global_keys):
+            dependent_validators[a_name] = a_validator
+        # (provided_global_keys == (a_validator.results_specification.requires_global_keys or []))
+
+    for a_name, a_found_validator in dependent_validators.items():
+        new_provided_global_keys = a_found_validator.results_specification.provides_global_keys
+        provided_global_keys.extend(new_provided_global_keys)
+        remaining_comp_specifiers_dict.pop(a_name) # remove
+
+    remaining_comp_specifiers_dict = {k:v for k,v in remaining_comp_specifiers_dict.items() if k not in dependent_validators}
+    # dependent_validators
+    # remaining_comp_specifiers_dict
+    print(f'len(remaining_comp_specifiers_dict): {len(remaining_comp_specifiers_dict)}, dependent_validators: {dependent_validators}')
+    return remaining_comp_specifiers_dict, dependent_validators, provided_global_keys
+
 
