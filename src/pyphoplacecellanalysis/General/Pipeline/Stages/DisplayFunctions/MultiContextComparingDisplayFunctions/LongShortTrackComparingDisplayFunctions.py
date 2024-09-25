@@ -1592,10 +1592,13 @@ class PhoJonathanPlotHelpers:
                 # curr_ax_left_placefield.set_visible(False) # hide completely?
                 print(f'WARNING: aclu {aclu} is not present in the `pf1d_short` ratemaps. Which contain aclus: {pf1d_short.ratemap.neuron_ids}')
             else:
+                ## `curr_ax_placefield` was drawn on by the global (_all) placefield tuning curve. Clear this one to plot the short-exclusive.
+                curr_ax_placefield.clear()
                 _subfn_plot_pf1D_placefield(active_epoch_placefields1D=pf1d_short, placefield_cell_index=pf1d_short_cell_linear_fragile_IDX,
                                             ax_activity_v_time=curr_ax_lap_spikes, ax_pf_tuning_curve=curr_ax_placefield, pf_tuning_curve_ax_position='right',
                                             **({'should_plot_spike_indicator_points_on_placefield': should_plot_spike_indicator_points_on_placefield,
                                                 'should_plot_spike_indicator_lines_on_trajectory': False, 'spike_indicator_lines_alpha': 0.2,
+                                                'tuning_curve_color': 'r',
                                                 } | kwargs))
                 
 
@@ -1614,10 +1617,20 @@ class PhoJonathanPlotHelpers:
                                             ax_activity_v_time=curr_ax_lap_spikes, ax_pf_tuning_curve=curr_ax_left_placefield, pf_tuning_curve_ax_position='left',
                                             **({'should_plot_spike_indicator_points_on_placefield': should_plot_spike_indicator_points_on_placefield,
                                                 'should_plot_spike_indicator_lines_on_trajectory': False, 'spike_indicator_lines_alpha': 0.2,
+                                                'tuning_curve_color': 'b',
                                                 } | kwargs))
-                
+
+        curr_ax_placefield.axis('off')
+        curr_ax_placefield.set_xlim((0, 1))    
+        curr_ax_placefield.set_xticklabels([])
+        curr_ax_placefield.set_yticklabels([])
+        curr_ax_placefield.sharey(curr_ax_lap_spikes)
+        
         curr_ax_left_placefield.axis('off')
         curr_ax_left_placefield.set_xlim((0, 1))
+        curr_ax_left_placefield.set_xticklabels([])
+        curr_ax_left_placefield.set_yticklabels([])
+        curr_ax_left_placefield.sharey(curr_ax_lap_spikes)
     
         # Custom All Spikes: Note that I set `'should_include_spikes': False` in call to `plot_single_cell_1D_placecell_validation` above so the native spikes from that function aren't plotted
         cell_spikes_dfs_dict = kwargs.get('cell_spikes_dfs_dict', None)
