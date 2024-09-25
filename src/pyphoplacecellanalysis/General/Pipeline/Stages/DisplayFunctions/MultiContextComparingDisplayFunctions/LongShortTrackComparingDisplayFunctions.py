@@ -1728,7 +1728,12 @@ class PhoJonathanPlotHelpers:
                 # Unhandled exception
                 raise e
             
-            curr_aclu_row_tuple = list(neuron_replay_stats_df[neuron_replay_stats_df['aclu'] == aclu].itertuples(index=False, name='AcluInfoRow'))[0]
+            _curr_aclu_row_tuple_list = list(neuron_replay_stats_df[neuron_replay_stats_df['aclu'] == aclu].itertuples(index=False, name='AcluInfoRow'))
+            if len(_curr_aclu_row_tuple_list) >= 1:
+                curr_aclu_row_tuple = _curr_aclu_row_tuple_list[0]
+            else:
+                curr_aclu_row_tuple = None # no info
+            
             kwargs['optional_aclu_info_row_tuple'] = curr_aclu_row_tuple
             # curr_aclu_row_tuple = kwargs.get('optional_aclu_info_row_tuple', None)
 
