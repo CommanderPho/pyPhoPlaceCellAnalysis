@@ -420,8 +420,6 @@ class PosteriorExporting:
             # v: DecodedFilterEpochsResult
             a_result: SingleEpochDecodedResult = v.get_result_for_epoch_at_time(epoch_start_time=clicked_epoch[0])
             print(f"{k}: filtered_decoder_filter_epochs_decoder_result_dict[{k}].decoding_time_bin_size: {v.decoding_time_bin_size}") # 0.016!! 
-            
-
             _img_path = ripple_specific_folder.joinpath(f'{epoch_id_str}_posterior_{k}.png').resolve()
             a_result.save_posterior_as_image(_img_path, colormap='Oranges', allow_override_aspect_ratio=allow_override_aspect_ratio, flip_vertical_axis=True, **kwargs)
             out_image_paths[k] = _img_path

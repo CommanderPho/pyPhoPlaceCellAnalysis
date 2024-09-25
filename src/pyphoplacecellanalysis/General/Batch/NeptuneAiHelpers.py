@@ -330,7 +330,8 @@ class NeptuneRunCollectedResults:
 
                 a_log_file_field = a_run['outputs']['log'] # either <File field at "outputs/log"> or <Unassigned field at "outputs/log">
                 a_run_ctxt = a_ctxt.adding_context_if_missing(script_type=a_script_type, run_id=a_run_id)
-                a_log_file_basename: str = a_run_ctxt.get_description(separator='|')
+                # a_log_file_basename: str = a_run_ctxt.get_description(separator='|') # invalid on windows
+                a_log_file_basename: str = a_run_ctxt.get_description(separator='--')
                 a_log_file_filename: str = a_log_file_basename + '.log'
                 a_log_file_dest_path = neptune_logs_output_path.joinpath(a_log_file_filename).resolve()
                 # print(f'a_log_file_dest_path: {a_log_file_dest_path}')

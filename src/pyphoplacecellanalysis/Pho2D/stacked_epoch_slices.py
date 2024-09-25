@@ -489,7 +489,9 @@ import matplotlib.transforms as mtransforms # used for `EpochAxesLocator`
 
 class EpochAxesLocator:
     """ used only for `insets_view` produced by `stacked_epoch_slices_matplotlib_build_insets_view` """
-    def __init__(self, a_slice_idx, epoch_durations, max_subplots_per_page: int, left_pad=0.05, right_pad=0.05, top_pad=0.05, bottom_pad=0.05):
+    def __init__(self, a_slice_idx, epoch_durations, max_subplots_per_page: int,
+                  left_pad=0.05, right_pad=0.05, top_pad=0.05, bottom_pad=0.05, v_spacing: float=0.01,
+                  global_max_epoch_duration: Optional[float]=None):
         self.max_subplots_per_page = max_subplots_per_page
         self.a_slice_idx = a_slice_idx
         self.epoch_durations = epoch_durations
@@ -497,6 +499,8 @@ class EpochAxesLocator:
         self.right_pad = right_pad
         self.top_pad = top_pad
         self.bottom_pad = bottom_pad
+        self.v_spacing = v_spacing
+        self.global_max_epoch_duration = global_max_epoch_duration
         
     def __call__(self, ax, renderer):
         """ previously was using:
@@ -504,10 +508,16 @@ class EpochAxesLocator:
         
         """
         # total_duration = sum(self.epoch_durations)
-        max_duration: float = np.max(self.epoch_durations)
+        if self.global_max_epoch_duration is None:
+            max_duration: float = np.max(self.epoch_durations)
+        else:
+            # use global max
+            max_duration = self.global_max_epoch_duration
+            
+        total_v_spacing_height = (self.v_spacing * (self.max_subplots_per_page - 1))
         # Calculate available width and height after padding
-        available_width = 1.0 - self.left_pad - self.right_pad
-        available_height = 1.0 - self.top_pad - self.bottom_pad        
+        available_width = 1.0 - (self.left_pad + self.right_pad)
+        available_height = 1.0 - (self.top_pad + self.bottom_pad + total_v_spacing_height)     
 
         # Calculate the normalized width and position based on epoch durations
         
@@ -517,21 +527,8 @@ class EpochAxesLocator:
 
         # Vertical positioning
         axis_height = available_height / self.max_subplots_per_page
-        bottom = self.bottom_pad + available_height - (self.a_slice_idx + 1) * axis_height
+        bottom = self.bottom_pad + (available_height - (self.a_slice_idx + 1) * axis_height) + ((self.a_slice_idx - 1) * self.v_spacing)
         height = axis_height
-        
-        
-        # left = 0.0
-        # # bottom = float(self.a_slice_idx) # y-offset coordinates, works if parent_ax has ylims spanning the whole range (which it currently does)
-        # width = self.epoch_durations[self.a_slice_idx] / max_duration
-        # # height = 1.0/float(self.max_subplots_per_page)  # Assuming full height for each subplot
-        
-        # # Vertical positioning (bottom and height)
-        # total_height = 1.0
-        # axis_height = total_height / self.max_subplots_per_page
-        # # Stack axes from top to bottom
-        # bottom = total_height - (self.a_slice_idx + 1) * axis_height
-        # height = axis_height
         
         # Return the bounding box for the axes
         return mtransforms.Bbox.from_bounds(left, bottom, width, height)
@@ -580,12 +577,14 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
         params.setdefault('is_insets_view', True)
         ui.setdefault('insets_view_update_epoch_durations_fn', None)
         
-        params.setdefault('insets_view_ax_locator_padding', dict(left_pad=0.03, right_pad=0.05, top_pad=0.01, bottom_pad=0.3))
+        # params.setdefault('insets_view_ax_locator_padding', dict(left_pad=0.03, right_pad=0.05, top_pad=0.01, bottom_pad=0.03))
+        params.setdefault('insets_view_ax_locator_padding', dict(left_pad=0.05, right_pad=0.05, top_pad=0.05, bottom_pad=0.05))
 
-
-        global_xrange = (params.global_epoch_start_t, params.global_epoch_end_t)
-        global_xduration = params.global_epoch_end_t - params.global_epoch_start_t
+        # global_xrange = (params.global_epoch_start_t, params.global_epoch_end_t)
+        # global_xduration = params.global_epoch_end_t - params.global_epoch_start_t
         epoch_durations = np.squeeze(np.diff(plots_data.epoch_slices, axis=1))
+        global_max_epoch_duration: float = np.max(epoch_durations)
+        print(f"global_max_epoch_duration: {global_max_epoch_duration}")
         ## Somehow the axes get added from top to bottom, so we need to reverse the heights since we reverse the images at the end. These never get updated tho
         epoch_durations = np.array(list(reversed(epoch_durations.tolist())))   
 
@@ -635,7 +634,8 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
             if debug_print:
                 print(f'plotting axis[{a_slice_idx}]: {a_slice_idx}')
             # Create inset in data coordinates using ax.transData as transform
-            curr_percent_width="100%"
+            # curr_percent_width="100%"
+            curr_percent_width="96%"
             curr_percent_height="95%"
             # curr_percent_width=f"{inset_plot_widths[i]}%"
             # curr_percent_height=f"{inset_plot_heights[i]}%"
@@ -648,7 +648,7 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
                                 # loc='upper left', bbox_to_anchor=(0.0, -float(a_slice_idx), epoch_durations[a_slice_idx], 1.0), # [left, bottom, width, height] 
                                 # borderpad=1.0,
                                 # bbox_to_anchor=(0.0, float(a_slice_idx), 1.0, 1.0), borderpad=0, # OpenAI suggested values for using custom `EpochAxesLocator`
-                                bbox_to_anchor=(0.0, 0.0, 1.0, 1.0), borderpad=0, # OpenAI suggested values for using custom `EpochAxesLocator`
+                                bbox_to_anchor=(0.0, 0.0, 1.0, 1.0), borderpad=1.0, # OpenAI suggested values for using custom `EpochAxesLocator`
                                 )
             
 
@@ -674,16 +674,15 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
 
 
             ## Adds the special inset axes locator:
-            locator = EpochAxesLocator(a_slice_idx, epoch_durations, max_subplots_per_page=params._debug_test_max_num_slices, **params.insets_view_ax_locator_padding) # left_pad=0.1, right_pad=0.05, top_pad=0.05, bottom_pad=0.1,
-            curr_ax.set_axes_locator(locator)
-            
+            locator = EpochAxesLocator(a_slice_idx, epoch_durations, max_subplots_per_page=params._debug_test_max_num_slices, **params.insets_view_ax_locator_padding,
+                                       global_max_epoch_duration=global_max_epoch_duration, # optional global ax
+                                       ) # left_pad=0.1, right_pad=0.05, top_pad=0.05, bottom_pad=0.1,
+            curr_ax.set_axes_locator(locator)            
 
             # Appends:
             plots.axs.append(curr_ax)
         
         plots.axs.reverse()
-        
-
         
 
         def update_insets_view_epoch_durations(new_epoch_durations):
@@ -2618,9 +2617,45 @@ def align_decoder_pagination_controller_windows(pagination_controller_dict):
 # ==================================================================================================================== #
 # 2024-04-25 - Factoring Out Helper GUI Code                                                                           #
 # ==================================================================================================================== #
+def _extract_matplotlib_ax_xticks(ax):
+    """
+    from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import _extract_matplotlib_ax_xticks, _apply_xticks_to_pyqtgraph_plotitem
+    
+    """
+	# Assume 'ax' is your Matplotlib Axes object
+    # Get the tick positions
+    tick_positions = ax.get_xticks()
 
-@function_attributes(short_name=None, tags=['raster', 'attached'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-29 17:14', related_items=[])
-def _build_attached_raster_viewer(paginated_multi_decoder_decoded_epochs_window, track_templates, active_spikes_df, filtered_ripple_simple_pf_pearson_merged_df):
+    # Get the tick labels (as Text objects)
+    tick_labels = ax.get_xticklabels()
+
+    # Extract the text from the tick labels
+    tick_label_texts = [label.get_text() for label in tick_labels]
+
+    # If labels are empty (which can happen if labels are autogenerated), use the formatter
+    if not any(tick_label_texts):
+        tick_label_texts = [ax.xaxis.get_major_formatter().format_data(tick) for tick in tick_positions]
+
+    return tick_positions, tick_label_texts
+
+
+def _apply_xticks_to_pyqtgraph_plotitem(plot_item, custom_ticks: List[Tuple]):
+    """ 
+    custom_ticks: List[Tuple] - a list of tuples for ticks: (position, label)
+    """
+    # Access the x-axis of the PyQtGraph PlotItem
+    x_axis = plot_item.getAxis('bottom')
+
+    # Set the custom ticks
+    x_axis.setTicks([custom_ticks])
+
+    # Optionally, enable the grid to align with the custom ticks
+    plot_item.showGrid(x=True, y=True, alpha=0.5)
+
+
+
+@function_attributes(short_name=None, tags=['raster', 'attached'], input_requires=[], output_provides=[], uses=[], used_by=['build_attached_raster_viewer_widget'], creation_date='2024-04-29 17:14', related_items=[])
+def _build_attached_raster_viewer(paginated_multi_decoder_decoded_epochs_window: PhoPaginatedMultiDecoderDecodedEpochsWindow, track_templates, active_spikes_df: pd.DataFrame, filtered_ripple_simple_pf_pearson_merged_df: pd.DataFrame):
     """ creates a new RankOrderRastersDebugger for use by `paginated_multi_decoder_decoded_epochs_window`.
     
     You can middle-click on any epoch heatmap in `paginated_multi_decoder_decoded_epochs_window` to display that corresponding epoch in the RankOrderRastersDebugger
@@ -2669,23 +2704,25 @@ def _build_attached_raster_viewer(paginated_multi_decoder_decoded_epochs_window,
         if not a_pagination_controller.params.has_attr('on_middle_click_item_callbacks'):
             a_pagination_controller.params['on_middle_click_item_callbacks'] = {}
         a_pagination_controller.params.on_middle_click_item_callbacks['update_attached_raster_viewer_epoch_callback'] = update_attached_raster_viewer_epoch_callback
-
         
     return _out_ripple_rasters
 
 
-def build_attached_raster_viewer_widget(paginated_multi_decoder_decoded_epochs_window, track_templates, active_spikes_df: pd.DataFrame, filtered_ripple_simple_pf_pearson_merged_df: pd.DataFrame):
-    """
+@function_attributes(short_name=None, tags=['spike_raster', 'attached'], input_requires=[], output_provides=[], uses=['_build_attached_raster_viewer'], used_by=[], creation_date='2024-09-25 15:50', related_items=[])
+def build_attached_raster_viewer_widget(paginated_multi_decoder_decoded_epochs_window: PhoPaginatedMultiDecoderDecodedEpochsWindow, track_templates, active_spikes_df: pd.DataFrame, filtered_ripple_simple_pf_pearson_merged_df: pd.DataFrame):
+    """ Plots a synchronized raster_viewer_widget for the epochs in 
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
     from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import build_attached_raster_viewer_widget
 
     _out_ripple_rasters, update_attached_raster_viewer_epoch_callback = build_attached_raster_viewer_widget(paginated_multi_decoder_decoded_epochs_window=paginated_multi_decoder_decoded_epochs_window, track_templates=track_templates, active_spikes_df=active_spikes_df, filtered_ripple_simple_pf_pearson_merged_df=filtered_ripple_simple_pf_pearson_merged_df)
 
     """
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
+    
 
     print(f'Middle-click any epoch to adjust the Attached Raster Window to that epoch.')
     
-    _out_ripple_rasters = _build_attached_raster_viewer(paginated_multi_decoder_decoded_epochs_window, track_templates=track_templates, active_spikes_df=active_spikes_df, filtered_ripple_simple_pf_pearson_merged_df=filtered_ripple_simple_pf_pearson_merged_df)
+    _out_ripple_rasters: RankOrderRastersDebugger = _build_attached_raster_viewer(paginated_multi_decoder_decoded_epochs_window, track_templates=track_templates, active_spikes_df=active_spikes_df, filtered_ripple_simple_pf_pearson_merged_df=filtered_ripple_simple_pf_pearson_merged_df)
 
     ## Enable programmatically updating the rasters viewer to the clicked epoch index when middle clicking on a posterior.
     @function_attributes(short_name=None, tags=['callback', 'raster'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-29 17:13', related_items=[])
@@ -2696,11 +2733,47 @@ def build_attached_raster_viewer_widget(paginated_multi_decoder_decoded_epochs_w
         captures: _out_ripple_rasters
         """
         print(f'update_attached_raster_viewer_epoch_callback(clicked_data_index: {clicked_data_index}, clicked_epoch_is_selected: {clicked_epoch_is_selected}, clicked_epoch_start_stop_time: {clicked_epoch_start_stop_time})')
+        _did_update_selected_epoch: bool = False
         if clicked_epoch_start_stop_time is not None:
             if len(clicked_epoch_start_stop_time) == 2:
                 start_t, end_t = clicked_epoch_start_stop_time
                 print(f'start_t: {start_t}')
-                _out_ripple_rasters.programmatically_update_epoch_IDX_from_epoch_start_time(start_t)
+                try:
+                    _out_ripple_rasters.programmatically_update_epoch_IDX_from_epoch_start_time(start_t)
+                    _did_update_selected_epoch = True
+                except Exception as e:
+                    print(f'could not update selected epoch: {e}.')
+                    # raise e
+
+        if _did_update_selected_epoch:
+            ## update the grid to match the epoch bins
+            print(f'_did_update_selected_epoch: True, clicked_data_index: {clicked_data_index}')
+            included_page_data_indicies, (curr_page_active_filter_epochs, curr_page_epoch_labels, curr_page_time_bin_containers, curr_page_posterior_containers) = self.plots_data.paginator.get_page_data(page_idx=self.current_page_idx)
+            # page_rel_clicked_ax_index = included_page_data_indicies.index(clicked_data_index)
+            page_rel_clicked_ax_index = clicked_data_index-included_page_data_indicies[0]
+            print(f'\tpage_rel_clicked_ax_index: {page_rel_clicked_ax_index}')
+            # [clicked_ax]
+            # self.plots.axs
+            a_binning_container = curr_page_time_bin_containers[page_rel_clicked_ax_index] # BinningContainer 
+            curr_epoch_bin_edges: NDArray = deepcopy(a_binning_container.edges)
+            # curr_epoch_bin_edges
+            
+            ## Get the plot to modify on the raster_plot_widget
+            # a_render_plots_container = _out_ripple_rasters.plots['all_separate_plots']['Long_LR'] # RenderPlots
+            for a_decoder_name, a_render_plots_container in _out_ripple_rasters.plots['all_separate_plots'].items():         
+                plot_item = a_render_plots_container['root_plot']
+                # Define custom ticks at desired x-values
+                # Each tick is a tuple of (position, label)
+                # custom_ticks = [(pos, str(pos)) for pos in curr_epoch_bin_edges]
+                custom_ticks = [(pos, '') for pos in curr_epoch_bin_edges]
+                _apply_xticks_to_pyqtgraph_plotitem(plot_item=plot_item, custom_ticks=custom_ticks)
+                # Update the PlotItem and its scene
+                plot_item.update()
+                plot_item.scene().update()
+
+                
+            print(f'done.')
+
 
     for a_name, a_pagination_controller in paginated_multi_decoder_decoded_epochs_window.pagination_controllers.items():
         # a_pagination_controller.params.debug_print = True
@@ -2714,7 +2787,7 @@ def build_attached_raster_viewer_widget(paginated_multi_decoder_decoded_epochs_w
     return _out_ripple_rasters, update_attached_raster_viewer_epoch_callback
 
 
-
+@function_attributes(short_name=None, tags=['ui', 'buttons'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-25 16:03', related_items=[])
 def build_extra_programmatic_buttons(paginated_multi_decoder_decoded_epochs_window: PhoPaginatedMultiDecoderDecodedEpochsWindow):
     """ Builds a row of buttons that populate the bottom-most toolbar in the window to provide page-specific functionality and perform various tasks.
     

@@ -780,20 +780,25 @@ class RankOrderRastersDebugger:
 
 
 
-    def save_figure(self, export_path: Path, **kwargs):
+    def save_figure(self, export_path: Path, export_topmost_scene_element:bool=False, **kwargs):
         """ Exports all four rasters to a specified file path
         
         _out_rank_order_event_raster_debugger.save_figure(export_path=export_path)
         
+        export_topmost_scene_element: False - export the PlotItem
+            True: export the parent of the PlotItem (includes the grid, a few other things).
         """
         save_paths = []
         # root_plots_dict = {k:v['root_plot'] for k,v in _out_rank_order_event_raster_debugger.plots.all_separate_plots.items()} # PlotItem 
 
         root_plots_dict = self.root_plots_dict
+        # root_plots_dict = self.root_plots_dict
         root_plots_dict['long_LR'].setYRange(-0.5, float(self.max_n_neurons))
 
         for a_decoder, a_plot in root_plots_dict.items():
             a_plot.setYRange(-0.5, float(self.max_n_neurons))
+            if export_topmost_scene_element:
+                a_plot = a_plot.parentItem()
             self.get_epoch_active_aclus()
             out_path = export_path.joinpath(f'{a_decoder}_raster.png').resolve()
             export_pyqtgraph_plot(a_plot, savepath=out_path, background=pg.mkColor(0, 0, 0, 0), **kwargs)
