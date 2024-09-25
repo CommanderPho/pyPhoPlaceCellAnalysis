@@ -489,11 +489,15 @@ import matplotlib.transforms as mtransforms # used for `EpochAxesLocator`
 
 class EpochAxesLocator:
     """ used only for `insets_view` produced by `stacked_epoch_slices_matplotlib_build_insets_view` """
-    def __init__(self, a_slice_idx, epoch_durations, max_subplots_per_page: int):
+    def __init__(self, a_slice_idx, epoch_durations, max_subplots_per_page: int, left_pad=0.05, right_pad=0.05, top_pad=0.05, bottom_pad=0.05):
         self.max_subplots_per_page = max_subplots_per_page
         self.a_slice_idx = a_slice_idx
         self.epoch_durations = epoch_durations
-
+        self.left_pad = left_pad
+        self.right_pad = right_pad
+        self.top_pad = top_pad
+        self.bottom_pad = bottom_pad
+        
     def __call__(self, ax, renderer):
         """ previously was using:
         `bbox_to_anchor=(0.0, float(a_slice_idx), epoch_durations[a_slice_idx], 1.0), # [left, bottom, width, height]`
@@ -501,18 +505,33 @@ class EpochAxesLocator:
         """
         # total_duration = sum(self.epoch_durations)
         max_duration: float = np.max(self.epoch_durations)
+        # Calculate available width and height after padding
+        available_width = 1.0 - self.left_pad - self.right_pad
+        available_height = 1.0 - self.top_pad - self.bottom_pad        
+
         # Calculate the normalized width and position based on epoch durations
-        left = 0.0
-        # bottom = float(self.a_slice_idx) # y-offset coordinates, works if parent_ax has ylims spanning the whole range (which it currently does)
-        width = self.epoch_durations[self.a_slice_idx] / max_duration
-        # height = 1.0/float(self.max_subplots_per_page)  # Assuming full height for each subplot
         
-        # Vertical positioning (bottom and height)
-        total_height = 1.0
-        axis_height = total_height / self.max_subplots_per_page
-        # Stack axes from top to bottom
-        bottom = total_height - (self.a_slice_idx + 1) * axis_height
+        # Horizontal positioning
+        width = (self.epoch_durations[self.a_slice_idx] / max_duration) * available_width
+        left = self.left_pad
+
+        # Vertical positioning
+        axis_height = available_height / self.max_subplots_per_page
+        bottom = self.bottom_pad + available_height - (self.a_slice_idx + 1) * axis_height
         height = axis_height
+        
+        
+        # left = 0.0
+        # # bottom = float(self.a_slice_idx) # y-offset coordinates, works if parent_ax has ylims spanning the whole range (which it currently does)
+        # width = self.epoch_durations[self.a_slice_idx] / max_duration
+        # # height = 1.0/float(self.max_subplots_per_page)  # Assuming full height for each subplot
+        
+        # # Vertical positioning (bottom and height)
+        # total_height = 1.0
+        # axis_height = total_height / self.max_subplots_per_page
+        # # Stack axes from top to bottom
+        # bottom = total_height - (self.a_slice_idx + 1) * axis_height
+        # height = axis_height
         
         # Return the bounding box for the axes
         return mtransforms.Bbox.from_bounds(left, bottom, width, height)
@@ -560,6 +579,9 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
         
         params.setdefault('is_insets_view', True)
         ui.setdefault('insets_view_update_epoch_durations_fn', None)
+        
+        params.setdefault('insets_view_ax_locator_padding', dict(left_pad=0.03, right_pad=0.05, top_pad=0.01, bottom_pad=0.3))
+
 
         global_xrange = (params.global_epoch_start_t, params.global_epoch_end_t)
         global_xduration = params.global_epoch_end_t - params.global_epoch_start_t
@@ -567,10 +589,10 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
         ## Somehow the axes get added from top to bottom, so we need to reverse the heights since we reverse the images at the end. These never get updated tho
         epoch_durations = np.array(list(reversed(epoch_durations.tolist())))   
 
-        print("WARNING 2024-08-16 - the 'insets' version built by `stacked_epoch_slices_matplotlib_build_insets_view(...)` is not ready for paginated output as the widths cannot be updated. Furthermore there is a weird axis reversal issue.")
+        # print("WARNING 2024-08-16 - the 'insets' version built by `stacked_epoch_slices_matplotlib_build_insets_view(...)` is not ready for paginated output as the widths cannot be updated. Furthermore there is a weird axis reversal issue.")
         
         # epoch_durations
-        epoch_slices_max_duration = np.max(epoch_durations) # 28.95714869396761
+        # epoch_slices_max_duration = np.max(epoch_durations) # 28.95714869396761
         # epoch_slice_relative_durations = epoch_durations / epoch_slices_max_duration # computes the relative duration/xlength foe ach epoch slice as a range from 0.0-1.0 to determine relative sizes to parent
         # # epoch_slice_relative_durations
         # inset_plot_heights = np.full((params.active_num_slices,), (100.0 / float(params.active_num_slices))) # array([11.1111, 11.1111, 11.1111, 11.1111, 11.1111, 11.1111, 11.1111, 11.1111, 11.1111])
@@ -652,7 +674,7 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
 
 
             ## Adds the special inset axes locator:
-            locator = EpochAxesLocator(a_slice_idx, epoch_durations, max_subplots_per_page=params._debug_test_max_num_slices)
+            locator = EpochAxesLocator(a_slice_idx, epoch_durations, max_subplots_per_page=params._debug_test_max_num_slices, **params.insets_view_ax_locator_padding) # left_pad=0.1, right_pad=0.05, top_pad=0.05, bottom_pad=0.1,
             curr_ax.set_axes_locator(locator)
             
 
