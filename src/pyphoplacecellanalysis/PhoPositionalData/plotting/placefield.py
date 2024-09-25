@@ -204,15 +204,16 @@ def _subfn_plot_pf1D_placefield(active_epoch_placefields1D, placefield_cell_inde
         ax_activity_v_time.hlines(y=curr_cell_interpolated_spike_positions, xmin=curr_cell_spike_times, xmax=t_end, linestyles='solid', color='orange', alpha=spike_indicator_lines_alpha, linewidth=spike_indcator_lines_linewidth, zorder=0, rasterized=True) # plot the lines that underlie the spike points
     # ax_activity_v_time.set_xlim((t_start, t_end)) # We don't want to clip to only the spiketimes for this cell, we want it for all cells, or even when the recording started/ended
 
-    ## The computed placefield on the right-hand side:
-    if pf_tuning_curve_ax_position == 'left':
-        # left: flip the curve over the y-axis (over the x=0 line)
-        curr_cell_normalized_tuning_curve = -curr_cell_normalized_tuning_curve
-        # still want it between [0, 1] instead of [0, -1], so we need to shift up by 2
-        curr_cell_normalized_tuning_curve += 2.0
-    else:
-        # right
-        pass # non-flipped
+    #TODO 2024-09-25 04:30: - [ ] Flip across x=0 and shade appropriately when `pf_tuning_curve_ax_position == 'left'`:
+    # ## The computed placefield on the right-hand side:
+    # if pf_tuning_curve_ax_position == 'left':
+    #     # left: flip the curve over the y-axis (over the x=0 line)
+    #     curr_cell_normalized_tuning_curve = -curr_cell_normalized_tuning_curve
+    #     # still want it between [0, 1] instead of [0, -1], so we need to shift up by 2
+    #     curr_cell_normalized_tuning_curve += 2.0
+    # else:
+    #     # right
+    #     pass # non-flipped
     
     ax_pf_tuning_curve = plot_placefield_tuning_curve(active_epoch_placefields1D.ratemap.xbin_centers, tuning_curve=curr_cell_normalized_tuning_curve, ax=ax_pf_tuning_curve, is_horizontal=True, color=tuning_curve_color)
     if should_plot_spike_indicator_points_on_placefield:
