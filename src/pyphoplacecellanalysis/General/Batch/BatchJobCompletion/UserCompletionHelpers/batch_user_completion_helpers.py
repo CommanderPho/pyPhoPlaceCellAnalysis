@@ -547,8 +547,10 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
         if desired_shared_decoding_time_bin_sizes is None:
             # desired_shared_decoding_time_bin_sizes = np.linspace(start=0.030, stop=0.10, num=6) ####### <<<------ Default sweep is defined here
             # desired_shared_decoding_time_bin_sizes = np.array([0.025, 0.030, 0.044, 0.050, 0.058, 0.072, 0.086, 0.100, 0.250, 1.5]) ####### <<<------ Default sweep is defined here
-            desired_shared_decoding_time_bin_sizes = np.array([0.025, 0.030, 0.044, 0.050, 0.058, 0.072, 0.086, 0.100]) ####### <<<------ Default sweep is defined here
-            
+            # desired_shared_decoding_time_bin_sizes = np.array([0.025, 0.030, 0.044, 0.050, 0.058, 0.072, 0.086, 0.100]) ####### <<<------ Default sweep is defined here
+            # desired_shared_decoding_time_bin_sizes = np.array([0.025, 0.030, 0.044, 0.050, 0.058, 0.072, 0.086, 0.100])
+            desired_shared_decoding_time_bin_sizes = np.array([0.025, 0.030, 0.044, 0.050, 0.058,])
+
         # Shared time bin sizes
         custom_all_param_sweep_options, param_sweep_option_n_values = parameter_sweeps(desired_shared_decoding_time_bin_size=desired_shared_decoding_time_bin_sizes, use_single_time_bin_per_epoch=[False], minimum_event_duration=[desired_shared_decoding_time_bin_sizes[-1]]) # with Ripples
 
