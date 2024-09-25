@@ -1493,8 +1493,8 @@ class PhoJonathanPlotHelpers:
         num_gridspec_columns = 9 # hardcoded
         gs_kw = dict(width_ratios=np.repeat(1, num_gridspec_columns).tolist(), height_ratios=height_ratios, wspace=0.0, hspace=0.0)
         # gs_kw['width_ratios'][0] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
-        # gs_kw['width_ratios'][1] = 0.0 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
-        # gs_kw['width_ratios'][-1] = 0.1 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
+        gs_kw['width_ratios'][1] = 0.3 # make the 2nd column (containing the left 1D placefield plot) a fraction of the width of the others
+        gs_kw['width_ratios'][-1] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
 
         gs = curr_fig.add_gridspec(num_gridspec_rows, num_gridspec_columns, **gs_kw) # layout figure is usually a gridspec of (1,8)
 
