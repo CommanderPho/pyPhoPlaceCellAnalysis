@@ -643,6 +643,12 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
             # curr_ax.spines['right'].set_visible(False)
             # curr_ax.spines['left'].set_visible(False)
             # curr_ax.spines['bottom'].set_visible(False)
+            # After creating curr_ax
+            curr_ax.xaxis.set_clip_on(False)
+            curr_ax.yaxis.set_clip_on(False)
+            for tick in curr_ax.get_xticklabels() + curr_ax.get_yticklabels():
+                tick.set_clip_on(False)
+                
 
 
             ## Adds the special inset axes locator:
