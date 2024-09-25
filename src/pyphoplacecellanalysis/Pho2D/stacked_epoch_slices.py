@@ -484,6 +484,41 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
     return params, plots_data, plots, ui
 
 
+# `insets_view` helpers ______________________________________________________________________________________________ #
+import matplotlib.transforms as mtransforms # used for `EpochAxesLocator`
+
+class EpochAxesLocator:
+    """ used only for `insets_view` produced by `stacked_epoch_slices_matplotlib_build_insets_view` """
+    def __init__(self, a_slice_idx, epoch_durations, max_subplots_per_page: int):
+        self.max_subplots_per_page = max_subplots_per_page
+        self.a_slice_idx = a_slice_idx
+        self.epoch_durations = epoch_durations
+
+    def __call__(self, ax, renderer):
+        """ previously was using:
+        `bbox_to_anchor=(0.0, float(a_slice_idx), epoch_durations[a_slice_idx], 1.0), # [left, bottom, width, height]`
+        
+        """
+        # total_duration = sum(self.epoch_durations)
+        max_duration: float = np.max(self.epoch_durations)
+        # Calculate the normalized width and position based on epoch durations
+        left = 0.0
+        # bottom = float(self.a_slice_idx) # y-offset coordinates, works if parent_ax has ylims spanning the whole range (which it currently does)
+        width = self.epoch_durations[self.a_slice_idx] / max_duration
+        # height = 1.0/float(self.max_subplots_per_page)  # Assuming full height for each subplot
+        
+        # Vertical positioning (bottom and height)
+        total_height = 1.0
+        axis_height = total_height / self.max_subplots_per_page
+        # Stack axes from top to bottom
+        bottom = total_height - (self.a_slice_idx + 1) * axis_height
+        height = axis_height
+        
+        # Return the bounding box for the axes
+        return mtransforms.Bbox.from_bounds(left, bottom, width, height)
+    
+
+
 @function_attributes(short_name=None, tags=['matplotlib', 'plot', 'figure', 'variant', 'helper'], input_requires=[], output_provides=[], uses=['stacked_epoch_basic_setup', 'MatplotlibTimeSynchronizedWidget', 'inset_axes'], used_by=[], creation_date='2023-05-30 10:06', related_items=[])
 def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacked_epoch_slices_matplotlib_INSET_subplots_laps', plot_function_name=None, epoch_labels=None,
                                                         single_plot_fixed_height=100.0, debug_test_max_num_slices=12,
@@ -523,10 +558,12 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
     with plt.rc_context({'axes.spines.left': False, 'axes.spines.right': False, 'axes.spines.top': False, 'axes.spines.bottom': False}):
         params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, epoch_labels=epoch_labels, name=name, plot_function_name=plot_function_name, should_use_MatplotlibTimeSynchronizedWidget=should_use_MatplotlibTimeSynchronizedWidget, debug_test_max_num_slices=debug_test_max_num_slices, single_plot_fixed_height=single_plot_fixed_height, debug_print=debug_print)
         
+        params.setdefault('is_insets_view', True)
+        ui.setdefault('insets_view_update_epoch_durations_fn', None)
+
         global_xrange = (params.global_epoch_start_t, params.global_epoch_end_t)
         global_xduration = params.global_epoch_end_t - params.global_epoch_start_t
         epoch_durations = np.squeeze(np.diff(plots_data.epoch_slices, axis=1))
-
         ## Somehow the axes get added from top to bottom, so we need to reverse the heights since we reverse the images at the end. These never get updated tho
         epoch_durations = np.array(list(reversed(epoch_durations.tolist())))   
 
@@ -534,11 +571,11 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
         
         # epoch_durations
         epoch_slices_max_duration = np.max(epoch_durations) # 28.95714869396761
-        epoch_slice_relative_durations = epoch_durations / epoch_slices_max_duration # computes the relative duration/xlength foe ach epoch slice as a range from 0.0-1.0 to determine relative sizes to parent
-        # epoch_slice_relative_durations
-        inset_plot_heights = np.full((params.active_num_slices,), (100.0 / float(params.active_num_slices))) # array([11.1111, 11.1111, 11.1111, 11.1111, 11.1111, 11.1111, 11.1111, 11.1111, 11.1111])
-        # inset_plot_heights
-        inset_plot_widths = epoch_slice_relative_durations * 100.0 # convert to percent width of parent
+        # epoch_slice_relative_durations = epoch_durations / epoch_slices_max_duration # computes the relative duration/xlength foe ach epoch slice as a range from 0.0-1.0 to determine relative sizes to parent
+        # # epoch_slice_relative_durations
+        # inset_plot_heights = np.full((params.active_num_slices,), (100.0 / float(params.active_num_slices))) # array([11.1111, 11.1111, 11.1111, 11.1111, 11.1111, 11.1111, 11.1111, 11.1111, 11.1111])
+        # # inset_plot_heights
+        # inset_plot_widths = epoch_slice_relative_durations * 100.0 # convert to percent width of parent
         # inset_plot_widths.shape
         # plots.figure_id = 'stacked_epoch_slices_INSET_matplotlib'
         plots.figure_id = plots.name # copy the name as the figure_id
@@ -560,7 +597,13 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
 
         plots.axs = [] # an empty list of core axes
         plots.fig.suptitle(plots.name)
-        plots.parent_ax.set(xlim=(0.0, epoch_slices_max_duration), ylim=(0, float(params.active_num_slices)))
+        # plots.parent_ax.set(xlim=(0.0, epoch_slices_max_duration), ylim=(0, float(params.active_num_slices)))
+        plots.parent_ax.set(xlim=(0.0, 1.0), ylim=(0, 1.0))
+
+        assert '_debug_test_max_num_slices' in params
+        # fixed_num_axes_per_page: int = params.max_subplots_per_page # len(plots.axs)
+        # params['fixed_num_axes_per_page'] = fixed_num_axes_per_page
+        
 
         for a_slice_idx in np.arange(params.active_num_slices):
             if debug_print:
@@ -578,13 +621,16 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
                 print(f'\tcurr_percent_width: {curr_percent_width}, curr_percent_height: {curr_percent_height}')
             curr_ax = inset_axes(plots.parent_ax, width=curr_percent_width, height=curr_percent_height,
                                 bbox_transform=plots.parent_ax.transData,
-                                loc='lower left', bbox_to_anchor=(0.0, float(a_slice_idx), epoch_durations[a_slice_idx], 1.0), # [left, bottom, width, height] #TODO 2024-08-16 04:36: - [ ] WRONG, in bottom to top order
+                                loc='lower left', 
+                                # bbox_to_anchor=(0.0, float(a_slice_idx), epoch_durations[a_slice_idx], 1.0), # [left, bottom, width, height] #TODO 2024-08-16 04:36: - [ ] WRONG, in bottom to top order
                                 # loc='upper left', bbox_to_anchor=(0.0, -float(a_slice_idx), epoch_durations[a_slice_idx], 1.0), # [left, bottom, width, height] 
-                                borderpad=1.0)
+                                # borderpad=1.0,
+                                # bbox_to_anchor=(0.0, float(a_slice_idx), 1.0, 1.0), borderpad=0, # OpenAI suggested values for using custom `EpochAxesLocator`
+                                bbox_to_anchor=(0.0, 0.0, 1.0, 1.0), borderpad=0, # OpenAI suggested values for using custom `EpochAxesLocator`
+                                )
             
 
             # loc : str, default: 'upper right' - Location to place the inset axes. Valid locations are 'upper left', 'upper center', 'upper right', 'center left', 'center', 'center right', 'lower left', 'lower center', 'lower right'. For backward compatibility, numeric values are accepted as well. See the parameter *loc* of .Legend for details.
-
 
             
             curr_ax.set_xlim(*plots_data.epoch_slices[a_slice_idx,:])
@@ -597,6 +643,11 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
             # curr_ax.spines['right'].set_visible(False)
             # curr_ax.spines['left'].set_visible(False)
             # curr_ax.spines['bottom'].set_visible(False)
+
+
+            ## Adds the special inset axes locator:
+            locator = EpochAxesLocator(a_slice_idx, epoch_durations, max_subplots_per_page=params._debug_test_max_num_slices)
+            curr_ax.set_axes_locator(locator)
             
 
             # Appends:
@@ -604,6 +655,47 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
         
         plots.axs.reverse()
         
+
+        
+
+        def update_insets_view_epoch_durations(new_epoch_durations):
+            """ captures plots, plots_data
+            
+            epoch_durations = np.squeeze(np.diff(plots_data.epoch_slices, axis=1))
+            epoch_durations = np.array(list(reversed(epoch_durations.tolist()))) ## Somehow the axes get added from top to bottom, so we need to reverse the heights since we reverse the images at the end.
+            update_epoch_durations(new_epoch_durations=epoch_durations)
+            
+            """
+
+            # epoch_slices_max_duration: float = np.max(epoch_durations) # 28.95714869396761
+            # epoch_slice_relative_durations = epoch_durations / epoch_slices_max_duration # computes the relative duration/xlength foe ach epoch slice as a range from 0.0-1.0 to determine relative sizes to parent
+            
+            ## Assumes `params.active_num_slices` updates
+            last_valid_slice_idx: int = params.active_num_slices - 1 # the last valid index
+                        
+            for a_slice_idx, ax in enumerate(plots.axs):
+                is_valid_slice: bool = (a_slice_idx <= last_valid_slice_idx)
+                locator = ax.get_axes_locator()
+                locator.epoch_durations = new_epoch_durations
+                if is_valid_slice:
+                    locator.a_slice_idx = a_slice_idx # gets `epoch_durations[a_slice_idx]`
+                else:
+                    print(f'WARN: slice_idx: {a_slice_idx} exceeds last_valid_slice_idx: {last_valid_slice_idx}')
+                    # do not update
+                    
+            # Force a redraw of the figure
+            plots.parent_ax.figure.canvas.draw_idle()
+    
+
+        ## store a reference to the update function
+        ui.insets_view_update_epoch_durations_fn = update_insets_view_epoch_durations
+        # ## retrieve update function via:
+        # if params.get('is_insets_view', False):
+        #     ## insets view mode. try to get the duration/widget update function
+        #     insets_view_update_epoch_durations_fn = ui.get('insets_view_update_epoch_durations_fn', None)
+        #     assert insets_view_update_epoch_durations_fn is not None
+
+
         if params.should_use_MatplotlibTimeSynchronizedWidget:
             ## Required only for MatplotlibTimeSynchronizedWidget-embedded version:
             ui.mw.draw()
@@ -1178,7 +1270,21 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         included_page_data_indicies, (curr_page_active_filter_epochs, curr_page_epoch_labels, curr_page_time_bin_containers, curr_page_posterior_containers) = self.plots_data.paginator.get_page_data(page_idx=page_idx)
         if self.params.debug_print:
             self.ui.print(f'\tincluded_page_data_indicies: {included_page_data_indicies}')
-    
+
+
+        ## retrieve update function via:
+        if self.params.get('is_insets_view', False):
+            ## insets view mode. try to get the duration/widget update function
+            insets_view_update_epoch_durations_fn = self.ui.get('insets_view_update_epoch_durations_fn', None)
+            assert insets_view_update_epoch_durations_fn is not None
+            
+            # epoch_durations = np.squeeze(np.diff(self.plots_data.epoch_slices, axis=1)) ## hope these are the CURRENT epoch_slices
+            epoch_durations = np.squeeze(np.diff(curr_page_active_filter_epochs, axis=1)) ## hope these are the CURRENT epoch_slices
+            epoch_durations = np.array(list(reversed(epoch_durations.tolist()))) ## Somehow the axes get added from top to bottom, so we need to reverse the heights since we reverse the images at the end.
+            print(f'epoch_durations: {epoch_durations}')
+            insets_view_update_epoch_durations_fn(epoch_durations)
+            print(f'updated durations!')
+
         for i, curr_ax in enumerate(self.plots.axs):
             try:
                 curr_slice_idx: int = included_page_data_indicies[i]
@@ -2581,10 +2687,10 @@ def build_attached_raster_viewer_widget(paginated_multi_decoder_decoded_epochs_w
 
 
 
-def build_extra_programmatic_buttons(paginated_multi_decoder_decoded_epochs_window):
-    """ Extra buttons to perform various tasks.
+def build_extra_programmatic_buttons(paginated_multi_decoder_decoded_epochs_window: PhoPaginatedMultiDecoderDecodedEpochsWindow):
+    """ Builds a row of buttons that populate the bottom-most toolbar in the window to provide page-specific functionality and perform various tasks.
     
-    
+ 
     from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import build_extra_programmatic_buttons
     
     build_extra_programmatic_buttons(paginated_multi_decoder_decoded_epochs_window)
