@@ -646,7 +646,7 @@ class AcrossSessionsResults:
         global_batch_result_inst_fr_file_path = Path(global_data_root_parent_path).joinpath(inst_fr_output_filename).resolve() # Use Default
         print(f'global_batch_result_inst_fr_file_path: {global_batch_result_inst_fr_file_path}')
         Assert.path_exists(global_batch_result_inst_fr_file_path)
-        across_sessions_instantaneous_fr_dict = loadData(global_batch_result_inst_fr_file_path)
+        across_sessions_instantaneous_fr_dict = loadData(global_batch_result_inst_fr_file_path) ## LOAD THE DATA - across_sessions_instantaneous_fr_dict
         num_sessions = len(across_sessions_instantaneous_fr_dict)
         print(f'num_sessions: {num_sessions}')
         # across_sessions_instantaneous_frs_list: List[InstantaneousSpikeRateGroupsComputation] = list(across_sessions_instantaneous_fr_dict.values())
