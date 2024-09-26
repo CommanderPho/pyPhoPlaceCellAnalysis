@@ -41,6 +41,10 @@ from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
+from pyphocorehelpers.plotting.media_output_helpers import vertical_image_stack, horizontal_image_stack
+from PIL import Image, ImageOps, ImageFilter # for export_array_as_image
+
+
 
 @metadata_attributes(short_name=None, tags=['export', 'helper', 'static'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-11 07:35', related_items=[])
 class PosteriorExporting:
@@ -326,7 +330,7 @@ class PosteriorExporting:
         
             
     @classmethod
-    def _test_export_marginals_for_figure(cls, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], clicked_epoch: NDArray, context_specific_root_export_path: Path, ripple_specific_folder: Path, epoch_id_identifier_str='ripple', debug_print=True, allow_override_aspect_ratio:bool=True, **kwargs):
+    def _test_export_marginals_for_figure(cls, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], clicked_epoch: NDArray, context_specific_root_export_path: Path, epoch_specific_folder: Path, epoch_id_identifier_str='ripple', debug_print=True, allow_override_aspect_ratio:bool=True, **kwargs):
         """
         
                 epoch_id_identifier_str='ripple'
@@ -377,10 +381,20 @@ class PosteriorExporting:
         print(f'parent_array_as_image_output_folder: "{context_specific_root_export_path}"')
 
         ## INPUTS: clicked_epoch, 
-        active_filter_epochs_decoder_result: DecodedFilterEpochsResult = deepcopy(directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result)
+        if epoch_id_identifier_str == 'ripple':
+            active_filter_epochs_decoder_result: DecodedFilterEpochsResult = deepcopy(directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result)
+        elif epoch_id_identifier_str == 'lap':
+            active_filter_epochs_decoder_result: DecodedFilterEpochsResult = deepcopy(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
+        else:
+            raise NotImplementedError(f'epoch_id_identifier_str: {epoch_id_identifier_str}')
+        
         epoch_ids = active_filter_epochs_decoder_result.filter_epochs.epochs.find_data_indicies_from_epoch_times(np.atleast_1d(clicked_epoch[0])) # [262], [296]
         if debug_print:
             print(f'epoch_ids: {epoch_ids}')
+
+        if len(epoch_ids) < 1:
+            print(f'WARN: no found epoch_ids from the provided clicked_epoch: {clicked_epoch}!!')
+        assert (len(epoch_ids) > 0), f"no found epoch_ids from the provided clicked_epoch: {clicked_epoch}"
 
         ## Sanity check:
         if debug_print:
@@ -402,7 +416,7 @@ class PosteriorExporting:
         ## INPUTS: filtered_decoder_filter_epochs_decoder_result_dict, parent_array_as_image_output_folder, epoch_id_identifier_str='ripple', 
 
         # assert parent_array_as_image_output_folder.exists()
-        assert ripple_specific_folder.exists()
+        assert epoch_specific_folder.exists()
 
         epoch_id = epoch_ids[0] # assume a single epoch idx
         if debug_print:
@@ -420,9 +434,96 @@ class PosteriorExporting:
             # v: DecodedFilterEpochsResult
             a_result: SingleEpochDecodedResult = v.get_result_for_epoch_at_time(epoch_start_time=clicked_epoch[0])
             print(f"{k}: filtered_decoder_filter_epochs_decoder_result_dict[{k}].decoding_time_bin_size: {v.decoding_time_bin_size}") # 0.016!! 
-            _img_path = ripple_specific_folder.joinpath(f'{epoch_id_str}_posterior_{k}.png').resolve()
+            _img_path = epoch_specific_folder.joinpath(f'{epoch_id_str}_posterior_{k}.png').resolve()
             a_result.save_posterior_as_image(_img_path, colormap='Oranges', allow_override_aspect_ratio=allow_override_aspect_ratio, flip_vertical_axis=True, **kwargs)
             out_image_paths[k] = _img_path
 
         return out_image_save_tuple_dict, out_image_paths
 
+
+    @classmethod
+    def _perform_export_current_epoch_marginal_and_raster_images(cls, _out_ripple_rasters, directional_merged_decoders_result, filtered_decoder_filter_epochs_decoder_result_dict, active_session_context, root_export_path: Path, epoch_id_identifier_str='lap',
+                                                                 desired_width = 2048, desired_height = 720, debug_print=False
+                                                                 ):
+        """ captures: _out_ripple_rasters, directional_merged_decoders_result, (filtered_decoder_filter_epochs_decoder_result_dict, decoder_laps_filter_epochs_decoder_result_dict)
+        """
+
+        # Get the clicked epoch from the _out_ripple_rasters GUI _____________________________________________________________ #
+        active_epoch_tuple = deepcopy(_out_ripple_rasters.active_epoch_tuple)
+        if debug_print:
+            print(f'active_epoch_tuple: {active_epoch_tuple}')
+        # active_epoch_dict = {k:getattr(active_epoch_tuple, k) for k in ['start', 'stop', 'ripple_idx', 'Index']} # , 'session_name', 'time_bin_size', 'delta_aligned_start_t' {'start': 1161.0011335673044, 'stop': 1161.274357107468, 'session_name': '2006-6-09_1-22-43', 'time_bin_size': 0.025, 'delta_aligned_start_t': 131.68452480540145}
+        active_epoch_dict = {k:getattr(active_epoch_tuple, k) for k in ['start', 'stop', 'Index']} # , 'session_name', 'time_bin_size', 'delta_aligned_start_t' {'start': 1161.0011335673044, 'stop': 1161.274357107468, 'session_name': '2006-6-09_1-22-43', 'time_bin_size': 0.025, 'delta_aligned_start_t': 131.68452480540145}
+        # EpochTuple(Index=8, lap_idx=8, lap_start_t=499.299262000015, P_Long_LR=0.83978564760147, P_Long_RL=0.06863305250806279, P_Short_LR=0.08466212906826685, P_Short_RL=0.006919170822200387, most_likely_decoder_index=0, start=499.299262000015, stop=504.80590599996503, label='8', duration=5.506643999950029, lap_id=9, lap_dir=1, long_LR_pf_peak_x_pearsonr=-0.775475552508641, long_RL_pf_peak_x_pearsonr=-0.5082034915116096, short_LR_pf_peak_x_pearsonr=-0.7204573376193804, short_RL_pf_peak_x_pearsonr=-0.4648058215927542, best_decoder_index=0, session_name='2006-6-08_14-26-15', time_bin_size=0.25, delta_aligned_start_t=-712.2588180310559)
+
+        # clicked_epoch = np.array([169.95631618227344, 170.15983607806265])
+        # clicked_epoch = np.array([91.57839279191103, 91.857145929])
+        if debug_print:
+            print(f'clicked_epoch: {active_epoch_dict}')
+        clicked_epoch = np.array([active_epoch_dict['start'], active_epoch_dict['stop']])
+        # OUTPUTS: clicked_epoch
+        if debug_print:
+            print(f'clicked_epoch: {clicked_epoch}')
+
+        ## Export Marginal Pseudo2D posteriors and rasters for middle-clicked epochs:
+
+        # epoch_id_identifier_str='ripple'
+        
+
+        ## Session-specific folder:
+        context_specific_root_export_path = root_export_path.joinpath(active_session_context.get_description(separator='_')).resolve()
+        context_specific_root_export_path.mkdir(exist_ok=True)
+        assert context_specific_root_export_path.exists()
+
+        # Epoch-specific folder:
+        # ripple_specific_folder: Path = context_specific_root_export_path.joinpath(f"ripple_{active_epoch_dict['ripple_idx']}").resolve()
+        # ripple_specific_folder: Path = context_specific_root_export_path.joinpath(f"ripple_{active_epoch_dict['Index']}").resolve()
+        ripple_specific_folder: Path = context_specific_root_export_path.joinpath(f"{epoch_id_identifier_str}_{active_epoch_dict['Index']}").resolve()
+        ripple_specific_folder.mkdir(exist_ok=True)
+        assert ripple_specific_folder.exists()
+        # file_uri_from_path(ripple_specific_folder)
+        # fullwidth_path_widget(a_path=ripple_specific_folder, file_name_label="lap_specific_folder:")
+
+        # clicked_epoch: {'start': 105.40014315512963, 'stop': 105.56255971186329, 'ripple_idx': 8, 'Index': 8}
+        # clicked_epoch: [105.4 105.563]
+        # ripple_8
+
+        # ==================================================================================================================== #
+        # Export Rasters:                                                                                                      #
+        # ==================================================================================================================== #
+
+        # Save out the actual raster-plots ___________________________________________________________________________________ #
+        _out_rasters_save_paths = _out_ripple_rasters.save_figure(export_path=ripple_specific_folder,
+                                                                width=desired_width,
+                                                                #    height=desired_height,
+                                                                )
+        # _out_rasters_save_paths
+
+        # OUTPUTS: ripple_specific_folder, _out_rasters_save_paths
+        out_image_save_tuple_dict = cls._test_export_marginals_for_figure(directional_merged_decoders_result=directional_merged_decoders_result,
+                                                                                        filtered_decoder_filter_epochs_decoder_result_dict=filtered_decoder_filter_epochs_decoder_result_dict, ## laps
+                                                                                        clicked_epoch=clicked_epoch,
+                                                                                        context_specific_root_export_path=context_specific_root_export_path, epoch_specific_folder=ripple_specific_folder,
+                                                                                        epoch_id_identifier_str=epoch_id_identifier_str, debug_print=False, desired_width=desired_width, desired_height=desired_height)
+        # out_image_save_tuple_dict
+
+        ## INPUTS: _out_rasters_save_paths, out_image_save_tuple_dict[-1]
+
+        # Open the images
+        _raster_imgs = [Image.open(i) for i in _out_rasters_save_paths]
+        # Open the images
+        _posterior_imgs = [Image.open(i) for i in list(out_image_save_tuple_dict[-1].values())]
+            
+        # _out_hstack = horizontal_image_stack([vertical_image_stack([a_posterior_img, a_raster_img], padding=5, v_overlap=50) for a_raster_img, a_posterior_img in zip(_raster_imgs, _posterior_imgs)], padding=5)
+        _out_all_decoders_posteriors_and_rasters_stack_image = horizontal_image_stack([vertical_image_stack([a_posterior_img, a_raster_img], padding=0) for a_raster_img, a_posterior_img in zip(_raster_imgs, _posterior_imgs)], padding=0) # no overlap
+        _out_all_decoders_posteriors_and_rasters_stack_image
+
+        # _out_all_decoders_posteriors_and_rasters_stack_image = horizontal_image_stack([vertical_image_stack([a_posterior_img, a_raster_img], padding=0, v_overlap=a_posterior_img.size[-1]) for a_raster_img, a_posterior_img in zip(_raster_imgs, _posterior_imgs)], padding=5) # posterior is inset to the top of the raster (raster image is taller).
+
+        ## Save merged image:
+        merged_img_save_path = _out_rasters_save_paths[0].parent.resolve().joinpath(f'all_decoders_posteriors_and_rasters_stack_image.png').resolve()
+        _out_all_decoders_posteriors_and_rasters_stack_image.save(merged_img_save_path) # Save image to file
+        print(f'saved image to: "{merged_img_save_path.as_posix()}"')
+        # _out_save_tuples.append((_out_all_decoders_posteriors_and_rasters_stack_image, _sub_img_path))
+
+        return ripple_specific_folder, (out_image_save_tuple_dict, _out_rasters_save_paths, merged_img_save_path)
