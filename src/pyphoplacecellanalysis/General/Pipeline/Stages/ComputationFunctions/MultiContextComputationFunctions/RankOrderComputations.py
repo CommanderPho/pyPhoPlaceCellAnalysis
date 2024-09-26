@@ -314,6 +314,11 @@ def save_rank_order_results(curr_active_pipeline, day_date: str='2023-12-19_729p
     
     rank_order_output_path, directional_laps_output_path, directional_merged_decoders_output_path, out_filename_str
     
+    
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import save_rank_order_results
+    
+     rank_order_output_path, directional_laps_output_path, directional_merged_decoders_output_path, out_filename_str = save_rank_order_results(curr_active_pipeline, day_date: str='2024-09-26_503pm')
+    
     """
     from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
     ## Uses `SaveStringGenerator.generate_save_suffix` and the current rank_order_result's parameters to build a reasonable save name:
