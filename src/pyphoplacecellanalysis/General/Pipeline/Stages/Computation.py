@@ -1609,13 +1609,13 @@ class PipelineWithComputedPipelineStageMixin:
         allow_overwrite_existing_allow_keys: keys allowed to be overwritten in the current computation_results if they can be loaded from disk.
         
         Usage:
-            sucessfully_updated_keys, successfully_loaded_keys, found_split_paths = curr_active_pipeline.load_split_pickled_global_computation_results(allow_overwrite_existing_allow_keys=['DirectionalLaps', 'RankOrder'])
+            sucessfully_updated_keys, successfully_loaded_keys, failed_loaded_keys, found_split_paths = curr_active_pipeline.load_split_pickled_global_computation_results(allow_overwrite_existing_allow_keys=['DirectionalLaps', 'RankOrder'])
         """
         allow_overwrite_existing_allow_keys = allow_overwrite_existing_allow_keys or []
         loaded_global_computation_results, successfully_loaded_keys, failed_loaded_keys, found_split_paths = self.try_load_split_pickled_global_computation_results(global_computation_results_pickle_path=(override_global_computation_results_pickle_path or self.global_computation_results_pickle_path),
                                                                                                                                                                     debug_print=debug_print)
         
-        sucessfully_updated_keys = {}
+        sucessfully_updated_keys = []
         ## append them to the extant global_computations (`curr_active_pipeline.global_computation_results.computed_data`)
         for curr_result_key, loaded_value in loaded_global_computation_results.items():
             should_apply: bool = False
