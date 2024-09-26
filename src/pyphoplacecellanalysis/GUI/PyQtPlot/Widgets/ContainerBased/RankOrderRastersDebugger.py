@@ -388,7 +388,7 @@ class RankOrderRastersDebugger:
         short_info_label = short_info_label
         info_labels_widgets_dict = dict(long_short_info_layout=long_short_info_layout, long_info_label=long_info_label, short_info_label=short_info_label)
 
-        root_dockAreaWindow.resize(600, 900)
+        root_dockAreaWindow.resize(1440, 360) # set the (width, height)
 
         ## Build final .plots and .plots_data:
         _obj.plots = RenderPlots(name=name, root_dockAreaWindow=root_dockAreaWindow, apps=all_apps, all_windows=all_windows, all_separate_plots=all_separate_plots,
