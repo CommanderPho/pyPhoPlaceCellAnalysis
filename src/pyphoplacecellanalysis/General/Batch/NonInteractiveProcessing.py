@@ -494,6 +494,7 @@ def batch_programmatic_figures(curr_active_pipeline, debug_print=False):
     active_identifying_session_ctx, active_out_figures_dict = batch_programmatic_figures(curr_active_pipeline)
     
     """
+    
     ## 🗨️🟢 2022-10-26 - Jonathan Firing Rate Analyses
     # Perform missing global computations                                                                                  #
     # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['_perform_jonathan_replay_firing_rate_analyses', '_perform_long_short_pf_overlap_analyses'], fail_on_exception=True, debug_print=True)
@@ -506,7 +507,6 @@ def batch_programmatic_figures(curr_active_pipeline, debug_print=False):
     # Batch Output of Figures                                                                                              #
     # ==================================================================================================================== #
     ## 🗨️🟢 2022-11-05 - Pho-Jonathan Batch Outputs of Firing Rate Figures
-    # %matplotlib qt
     short_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.RIGHT_ONLY]
     short_only_aclus = short_only_df.index.values.tolist()
     long_only_df = neuron_replay_stats_df[neuron_replay_stats_df.track_membership == SplitPartitionMembership.LEFT_ONLY]
@@ -537,6 +537,8 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
     Generation and display of figures should produce as many as possible, not stopping after failing on one.
     
     """
+    disable_unsafe_qt_calls: bool = True # variable to attempt to diagnose the failure of plotting on GreatLakes without a framebuffer (which seems to be related to Qt)
+    
     _bak_rcParams = mpl.rcParams.copy()
     mpl.rcParams['toolbar'] = 'None' # disable toolbars
     matplotlib.use('AGG') # non-interactive backend ## 2022-08-16 - Surprisingly this works to make the matplotlib figures render only to .png file, not appear on the screen!
@@ -597,12 +599,14 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
     except BaseException as e:
         print(f'batch_extended_programmatic_figures(...): _display_long_short_pf1D_comparison failed with error: {e}\n skipping.')
 
-    ## TODO 2023-06-02 NOW, NEXT: this might not work in 'AGG' mode because it tries to render it with QT, but we can see.
-    try:
-        #TODO 2023-07-06 14:46: - [ ] This is quite slow - can I do defer_render=True?
-        _out = curr_active_pipeline.display('_display_long_and_short_stacked_epoch_slices', curr_active_pipeline.get_session_context(), defer_render=False, save_figure=save_figure)
-    except BaseException as e:
-        print(f'batch_extended_programmatic_figures(...): _prepare_plot_long_and_short_epochs failed with error: {e}\n skipping.')
+    
+    if not disable_unsafe_qt_calls:
+        ## TODO 2023-06-02 NOW, NEXT: this might not work in 'AGG' mode because it tries to render it with QT, but we can see.
+        try:
+            #TODO 2023-07-06 14:46: - [ ] This is quite slow - can I do defer_render=True?
+            _out = curr_active_pipeline.display('_display_long_and_short_stacked_epoch_slices', curr_active_pipeline.get_session_context(), defer_render=False, save_figure=save_figure)
+        except BaseException as e:
+            print(f'batch_extended_programmatic_figures(...): _prepare_plot_long_and_short_epochs failed with error: {e}\n skipping.')
         
     ## Exports the video of the surprise:
     try:
@@ -730,10 +734,7 @@ class BatchPhoJonathanFiguresHelper:
             ## pre-filter the `neuron_replay_stats_df` by the included_unit_neuron_IDs only:
             neuron_replay_stats_df = neuron_replay_stats_df[np.isin(neuron_replay_stats_df.index, included_unit_neuron_IDs)]
             
-        ## 🗨️🟢 2022-11-05 - Pho-Jonathan Batch Outputs of Firing Rate Figures
-        # %matplotlib qt
-
-         
+        ## 🗨️🟢 2022-11-05 - Pho-Jonathan Batch Outputs of Firing Rate Figures         
         if split_by_short_long_shared:
             ## 2023-09-28 - Refined Outputs
             if show_only_refined_cells:
