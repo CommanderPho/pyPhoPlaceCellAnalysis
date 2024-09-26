@@ -1,4 +1,5 @@
-
+from __future__ import annotations # prevents having to specify types for typehinting as strings
+from typing import TYPE_CHECKING
 # ==================================================================================================================== #
 # 2023-11-14 - Transition Matrix                                                                                       #
 # ==================================================================================================================== #
@@ -20,8 +21,11 @@ from neuropy.utils.mixins.binning_helpers import transition_matrix
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder #typehinting only
-from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow, LayoutScrollability
+
+if TYPE_CHECKING:
+    ## typehinting only imports here
+    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder #typehinting only
+    from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow
 
 from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
 

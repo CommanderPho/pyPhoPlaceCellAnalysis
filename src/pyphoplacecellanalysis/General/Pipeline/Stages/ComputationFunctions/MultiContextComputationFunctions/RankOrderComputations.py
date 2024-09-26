@@ -1,3 +1,5 @@
+from __future__ import annotations # prevents having to specify types for typehinting as strings
+from typing import TYPE_CHECKING
 
 from copy import deepcopy
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
@@ -41,17 +43,21 @@ from pyphocorehelpers.function_helpers import function_attributes
 from neuropy.core.epoch import NamedTimerange
 
 from scipy import stats # _recover_samples_per_sec_from_laps_df
-import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum, LongShortDisplayConfigManager
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, TrackTemplates, DirectionalPseudo2DDecodersResult
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult # used in TrackTemplates
 
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
-from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field, custom_define
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin, HDF_Converter
 from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
 
+if TYPE_CHECKING:
+    ## typehinting only imports here
+    # import pyphoplacecellanalysis.External.pyqtgraph as pg
+    from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots # plot_histogram #TODO 2024-01-02 12:41: - [ ] Is this where the Qt5 Import dependency Pickle complains about is coming from?
+    
 # ==================================================================================================================== #
 # 2023-10-20 - Close-to-working Rank Order Strategy:                                                                   #
 # ==================================================================================================================== #
@@ -578,10 +584,6 @@ DirectionalRankOrderResultBase = namedtuple('DirectionalRankOrderResultBase', ['
 
 
 
-
-from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots # plot_histogram #TODO 2024-01-02 12:41: - [ ] Is this where the Qt5 Import dependency Pickle complains about is coming from?
-
-
 # @define(slots=False, order=True)
 class DirectionalRankOrderResult(DirectionalRankOrderResultBase):
 
@@ -909,6 +911,7 @@ class RankOrderAnalyses:
             app, win, p1, (even_out_plot_1D, odd_out_plot_1D) = _subfn_perform_common_build_plot(deepcopy(global_laps).lap_id, RL_laps_long_short_z_score_diff_values, LR_laps_long_short_z_score_diff_values)
 
         """
+        import pyphoplacecellanalysis.External.pyqtgraph as pg
         from neuropy.utils.matplotlib_helpers import FormattedFigureText
         
         if active_display_context is not None:
@@ -945,6 +948,7 @@ class RankOrderAnalyses:
             app, win, p1, (long_even_out_plot_1D, long_odd_out_plot_1D, short_even_out_plot_1D, short_odd_out_plot_1D) = _perform_plot_z_score_raw(deepcopy(global_laps).lap_id, odd_laps_long_z_score_values, odd_laps_short_z_score_values, even_laps_long_z_score_values, even_laps_short_z_score_values)
 
         """
+        import pyphoplacecellanalysis.External.pyqtgraph as pg
         from neuropy.utils.matplotlib_helpers import FormattedFigureText
         
         if active_display_context is not None:
@@ -1045,6 +1049,7 @@ class RankOrderAnalyses:
         Usage:
             app, win, p1, (even_out_plot_1D, odd_out_plot_1D) = _perform_plot_z_score_diff(deepcopy(global_laps).lap_id, RL_laps_long_short_z_score_diff_values, LR_laps_long_short_z_score_diff_values)
         """
+        import pyphoplacecellanalysis.External.pyqtgraph as pg
         from neuropy.utils.matplotlib_helpers import FormattedFigureText
         
         if active_display_context is not None:

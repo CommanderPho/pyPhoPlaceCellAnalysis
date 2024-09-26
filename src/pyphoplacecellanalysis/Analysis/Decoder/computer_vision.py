@@ -1,3 +1,6 @@
+from __future__ import annotations # prevents having to specify types for typehinting as strings
+from typing import TYPE_CHECKING
+
 # ==================================================================================================================== #
 # 2024-08-15 - Computer Vision Approches to line recognition                                                           #
 # ==================================================================================================================== #
@@ -21,8 +24,10 @@ from neuropy.utils.mixins.binning_helpers import transition_matrix
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, SingleEpochDecodedResult #typehinting only
-from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow, LayoutScrollability
+if TYPE_CHECKING:
+    ## typehinting only imports here
+    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, SingleEpochDecodedResult #typehinting only
+    from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow, LayoutScrollability
 
 from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
 

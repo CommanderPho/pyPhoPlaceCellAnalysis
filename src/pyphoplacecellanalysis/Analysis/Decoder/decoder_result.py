@@ -1,3 +1,13 @@
+from __future__ import annotations # prevents having to specify types for typehinting as strings
+from typing import TYPE_CHECKING
+from warnings import warn
+from copy import deepcopy
+from typing import Optional, Union
+import numpy as np
+import pandas as pd
+from pandas.core.frame import DataFrame
+from neuropy.core.epoch import Epoch, ensure_dataframe
+
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple, Union
@@ -1155,7 +1165,9 @@ def get_radon_transform(posterior: Union[List, NDArray], decoding_time_bin_durat
 # Plotting                                                                                                             #
 # ==================================================================================================================== #
 from pyphocorehelpers.indexing_helpers import build_pairwise_indicies # used in plot_kourosh_activity_style_figure
-import pyphoplacecellanalysis.External.pyqtgraph as pg # required for `DiagnosticDistanceMetricFigure`
+if TYPE_CHECKING:
+    ## typehinting only imports here
+    import pyphoplacecellanalysis.External.pyqtgraph as pg # required for `DiagnosticDistanceMetricFigure`
 
 
 @define(slots=False, repr=False)
@@ -1216,6 +1228,8 @@ class DiagnosticDistanceMetricFigure:
 
     def __attrs_post_init__(self):
         """ called after initializer built by `attrs` library. """
+        import pyphoplacecellanalysis.External.pyqtgraph as pg # required for `DiagnosticDistanceMetricFigure`
+        
         # Perform the primary setup to build the placefield
         self.win = pg.GraphicsLayoutWidget(show=True, title='diagnostic_plot')
         
@@ -1298,6 +1312,8 @@ class DiagnosticDistanceMetricFigure:
         """ Define an update function that will be called with the current slider index 
         Captures plot_dict, and all data variables
         """
+        import pyphoplacecellanalysis.External.pyqtgraph as pg # required for `DiagnosticDistanceMetricFigure`
+        
         # print(f'Slider index: {index}')
         hardcoded_sub_epoch_item_idx = 0
         updated_plot_data, is_valid, (normal_surprise, random_surprise) = self._get_updated_plot_data(index)
