@@ -14,23 +14,23 @@
 export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
 module load python/3.9.12
 
-# Load Xvfb module if available
-{# module load Xvfb #}
-
 source '/home/halechr/repos/Spike3D/.venv/bin/activate'
 
 # Set Matplotlib backend to 'Agg' to prevent GUI issues
 export MPLBACKEND=Agg
 export PYVISTA_OFF_SCREEN=true
 
+{% if should_use_virtual_framebuffer %}
+# Load Xvfb module if available
+{# module load Xvfb #}
 # Start Xvfb
 export DISPLAY=:99
 Xvfb :99 -screen 0 1024x768x16 &
 # Store the PID of Xvfb to kill it later
 XVFB_PID=$!
-
 # Optional: Wait a bit for Xvfb to start
 sleep 2
+{% endif %}
 
 {# Redirect all output to a single file
 exec > >(tee -a slurm_${SLURM_JOB_NAME}-${SLURM_JOB_ID}.log) 2>&1
@@ -45,8 +45,10 @@ exit_code=$?
 {# # Deactivate the virtual environment when done (optional here but good practice)
 deactivate #}
 
+{% if should_use_virtual_framebuffer %}
 # Kill Xvfb
 kill $XVFB_PID
+{% endif %}
 
 # Exit with the captured exit code
 exit $exit_code

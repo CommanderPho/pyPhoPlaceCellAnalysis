@@ -209,10 +209,10 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 
         
     """
-    def _subfn_build_slurm_script(curr_batch_script_rundir, a_python_script_path, a_curr_session_context, a_slurm_script_name_prefix:str='run'):
+    def _subfn_build_slurm_script(curr_batch_script_rundir, a_python_script_path, a_curr_session_context, a_slurm_script_name_prefix:str='run', should_use_virtual_framebuffer:bool=False):
         slurm_script_path = os.path.join(curr_batch_script_rundir, f'{a_slurm_script_name_prefix}_{a_curr_session_context}.sh')
         with open(slurm_script_path, 'w') as script_file:
-            script_content = slurm_template.render(curr_session_context=f"{a_curr_session_context}", python_script_path=a_python_script_path, curr_batch_script_rundir=curr_batch_script_rundir)
+            script_content = slurm_template.render(curr_session_context=f"{a_curr_session_context}", python_script_path=a_python_script_path, curr_batch_script_rundir=curr_batch_script_rundir, should_use_virtual_framebuffer=should_use_virtual_framebuffer)
             script_file.write(script_content)
         return slurm_script_path
     
@@ -308,11 +308,11 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 
         # Create the SLURM script
         if create_slurm_scripts:
-            slurm_run_script_path = _subfn_build_slurm_script(a_python_script_path=python_script_path, curr_batch_script_rundir=curr_batch_script_rundir, a_curr_session_context=curr_session_context, a_slurm_script_name_prefix='run')
+            slurm_run_script_path = _subfn_build_slurm_script(a_python_script_path=python_script_path, curr_batch_script_rundir=curr_batch_script_rundir, a_curr_session_context=curr_session_context, a_slurm_script_name_prefix='run', should_use_virtual_framebuffer=False)
             output_slurm_scripts['run'].append(slurm_run_script_path)
 
             if should_perform_figure_generation_to_file:
-                slurm_figure_script_path = _subfn_build_slurm_script(a_python_script_path=python_figures_script_path, curr_batch_script_rundir=curr_batch_script_rundir, a_curr_session_context=curr_session_context, a_slurm_script_name_prefix='figs')
+                slurm_figure_script_path = _subfn_build_slurm_script(a_python_script_path=python_figures_script_path, curr_batch_script_rundir=curr_batch_script_rundir, a_curr_session_context=curr_session_context, a_slurm_script_name_prefix='figs', should_use_virtual_framebuffer=True)
                 output_slurm_scripts['figs'].append(slurm_figure_script_path)
 
 
