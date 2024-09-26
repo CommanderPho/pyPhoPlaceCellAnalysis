@@ -346,9 +346,9 @@ class SpecificComputationValidator:
         if needs_computation:
             ## validate_computation_test(...) failed, so we need to recompute.
             if progress_print or debug_print:
-                print(f'{comp_short_name} missing.')
+                print(f'`{comp_short_name}` missing.')
             if progress_print or debug_print:
-                print(f'\t Recomputing {comp_short_name}...')
+                print(f'\t Recomputing `{comp_short_name}`...')
             # When this fails due to unwrapping from the load, add `, computation_kwargs_list=[{'perform_cache_load': False}]` as an argument to the `perform_specific_computation` call below
             try:
                 curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=[comp_specifier.computation_fn_name], computation_kwargs_list=[comp_specifier.computation_fn_kwargs], fail_on_exception=True, debug_print=False) # fail_on_exception MUST be True or error handling is all messed up 
