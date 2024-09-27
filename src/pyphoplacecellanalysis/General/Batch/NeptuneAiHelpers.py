@@ -323,30 +323,63 @@ class AutoValueConvertingNeptuneRun(neptune.Run):
         fig_split_key_value_pair_parts = [k.split(':')[-1] for k in fig_input_key_parts] ## remove the keys from the path, ['display_short_long_pf1D_comparison', 'short']
         # fig_split_key_value_pair_parts
 
-        a_session_figures_output_path = neptune_project_figures_output_path.joinpath(a_session_descriptor_str)
-        a_session_figures_output_path.mkdir(exist_ok=True)
-
-        a_fig_output_name: str = '-'.join(fig_split_key_value_pair_parts) + '.png'
-        a_fig_output_path = a_session_figures_output_path.joinpath(a_fig_output_name).resolve()
-        if debug_print:
-            print(f'a_fig_output_path: "{a_fig_output_path}"')
+        ## Find the figure or figure(s):
 
         # a_fig_file_field = a_parsed_structure['display_fn_name:display_short_long_pf1D_comparison']["track:long"]
         a_fig_file_field = get_nested_value(a_parsed_structure, fig_input_key_parts)
         a_fig_file_field
+        
+        ## INPUTS: a_session_figures_output_path, fig_split_key_value_pair_parts, a_fig_file_field
+        ## Build the output file path
+        a_session_figures_output_path = neptune_project_figures_output_path.joinpath(a_session_descriptor_str)
+        a_session_figures_output_path.mkdir(exist_ok=True)
 
         if a_session_descriptor_str not in _context_fig_files_dict:
             _context_fig_files_dict[a_session_descriptor_str] = {}
+            
 
-        try:
-            _a_download_result = a_fig_file_field.download(destination=a_fig_output_path.as_posix())
-            _context_fig_files_dict[a_session_descriptor_str][fig_input_key] = a_fig_output_path.as_posix()
+        if isinstance(a_fig_file_field, File):
+            ## typical case where a full, complete path is passed
+            a_fig_output_name: str = '-'.join(fig_split_key_value_pair_parts) + '.png'
+            a_fig_output_path = a_session_figures_output_path.joinpath(a_fig_output_name).resolve()
             if debug_print:
-                print(f'\tdone.')
-        except MissingFieldException as err:
-            # print(f'MissingFieldException for a_run.id: {a_run_id} (err: {err})')
-            print(f'MissingFieldException for a_run.id: {self}')
-            pass
+                print(f'a_fig_output_path: "{a_fig_output_path}"')
+
+            try:
+                _a_download_result = a_fig_file_field.download(destination=a_fig_output_path.as_posix())
+                _context_fig_files_dict[a_session_descriptor_str][fig_input_key] = a_fig_output_path.as_posix()
+                if debug_print:
+                    print(f'\tdone.')
+            except MissingFieldException as err:
+                # print(f'MissingFieldException for a_run.id: {a_run_id} (err: {err})')
+                print(f'MissingFieldException for a_run.id: {self}')
+                pass
+        else:
+            ## Non-File, usually a path that contains multiple files
+            print(f'not a figure file! a dictionary instead probably: type(a_fig_file_field): {type(a_fig_file_field)}')
+            a_flattened_figure_dict = flatten_dict(a_fig_file_field) ## use flatten_dict to turn potentially nested dictionaries with leaf of type File into a flat dictionary with keys of string, values of type File.
+            for a_sub_key, a_sub_fig_file_field in a_flattened_figure_dict.items():
+                ## Each sub-item:
+                sub_fig_full_input_key: str = '/'.join([fig_input_key, a_sub_key])
+                if debug_print:
+                    print(f'sub_fig_full_input_key: "{sub_fig_full_input_key}"')
+                sub_fig_input_key_parts: List[str] = a_sub_key.split('/') # ['display_fn_name:display_short_long_pf1D_comparison', 'track:long']
+                sub_fig_split_key_value_pair_parts = [k.split(':')[-1] for k in sub_fig_input_key_parts]
+                a_fig_output_name: str = '-'.join(fig_split_key_value_pair_parts + sub_fig_split_key_value_pair_parts) + '.png' # add in the `fig_split_key_value_pair_parts` as well
+                a_fig_output_path = a_session_figures_output_path.joinpath(a_fig_output_name).resolve()
+                if debug_print:
+                    print(f'a_fig_output_path: "{a_fig_output_path}"')
+                ## Try the download
+                try:
+                    _a_download_result = a_sub_fig_file_field.download(destination=a_fig_output_path.as_posix())
+                    _context_fig_files_dict[a_session_descriptor_str][sub_fig_full_input_key] = a_fig_output_path.as_posix()
+                    if debug_print:
+                        print(f'\tdone.')
+                except MissingFieldException as err:
+                    # print(f'MissingFieldException for a_run.id: {a_run_id} (err: {err})')
+                    print(f'MissingFieldException for a_run.id: {self}')
+                    pass
+    
 
         return _context_fig_files_dict
 
@@ -443,7 +476,7 @@ class NeptuneRunCollectedResults:
         return _context_log_files_dict
     
 
-    def download_uploaded_figure_files(self, neptune_project_figures_output_path:Path, fig_input_key: str = "display_fn_name:running_and_replay_speeds_over_time"):
+    def download_uploaded_figure_files(self, neptune_project_figures_output_path:Path, fig_input_key: str = "display_fn_name:running_and_replay_speeds_over_time", debug_print=False):
         """ Downloads figures
         Usage:
             fig_input_key: str = "display_fn_name:running_and_replay_speeds_over_time"
@@ -463,7 +496,7 @@ class NeptuneRunCollectedResults:
                 
             for a_run in a_run_list:
                 try:
-                    _context_figures_dict[a_ctxt][a_run['sys/id']] = a_run.download_image(fig_input_key=fig_input_key, a_session_descriptor_str=a_session_descriptor_str, neptune_project_figures_output_path=neptune_project_figures_output_path)
+                    _context_figures_dict[a_ctxt][a_run['sys/id']] = a_run.download_image(fig_input_key=fig_input_key, a_session_descriptor_str=a_session_descriptor_str, neptune_project_figures_output_path=neptune_project_figures_output_path, debug_print=debug_print)
                 except (ValueError, KeyError) as e:
                     continue # just try the next one
                 except Exception as e:
