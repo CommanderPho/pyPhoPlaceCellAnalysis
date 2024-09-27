@@ -530,7 +530,7 @@ class EpochAxesLocator:
 
         # Vertical positioning
         axis_height = available_height / self.max_subplots_per_page
-        bottom = self.bottom_pad + (available_height - (self.a_slice_idx + 1) * axis_height) + ((self.a_slice_idx - 1) * self.v_spacing)
+        bottom = self.bottom_pad + (axis_height + self.v_spacing) * (self.max_subplots_per_page - self.a_slice_idx - 1) # chatGPT corrected version
         height = axis_height
         
         # Return the bounding box for the axes
