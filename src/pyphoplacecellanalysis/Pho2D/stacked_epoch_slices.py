@@ -583,8 +583,8 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
         params.setdefault('is_insets_view', True)
         ui.setdefault('insets_view_update_epoch_durations_fn', None)
         
-        # params.setdefault('insets_view_ax_locator_padding', dict(left_pad=0.03, right_pad=0.05, top_pad=0.01, bottom_pad=0.03))
-        params.setdefault('insets_view_ax_locator_padding', dict(left_pad=0.05, right_pad=0.05, top_pad=0.05, bottom_pad=0.05))
+        # params.setdefault('insets_view_ax_locator_padding', dict(left_pad=0.03, right_pad=0.05, top_pad=0.01, bottom_pad=0.03, v_spacing=0.005))
+        params.setdefault('insets_view_ax_locator_padding', dict(left_pad=0.05, right_pad=0.05, top_pad=0.05, bottom_pad=0.05, v_spacing=0.005))
         params.setdefault('insets_view_use_global_max_epoch_duration', True)
         # global_xrange = (params.global_epoch_start_t, params.global_epoch_end_t)
         # global_xduration = params.global_epoch_end_t - params.global_epoch_start_t
