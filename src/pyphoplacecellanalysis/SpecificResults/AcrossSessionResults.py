@@ -1981,91 +1981,122 @@ class AcrossSessionCSVOutputFormat:
             raise NotImplementedError(f"a_csv_filename: '{a_filename}' expected four parts but got {len(parts)} parts.\n\tparts: {parts}")
         return export_date, date_name, epochs, granularity
 
+
     @classmethod
-    def debug_print_discovered_csv_infos(cls, `...finish the function by including the necissary variables`):
+    def debug_print_discovered_csv_infos(cls, all_sessions_laps_time_bin_df, sessions_df, all_sessions_all_scores_ripple_df, all_sessions_laps_df, all_sessions_wcorr_laps_df, all_sessions_simple_pearson_laps_df, all_sessions_ripple_df, all_sessions_ripple_time_bin_df):
         """ # 🔜🔜 MAJOR: trying to get to the bottom of the basic marginal exports not loading
         """
+        from IPython.display import display
         
-        # `Wrap each of these output statements that were copied from a notebook with the appropriate print or display function and a short description/label of each`
-        # np.sum(all_sessions_laps_time_bin_df['time_bin_size'].isna())
-
-        np.sum(all_sessions_laps_time_bin_df['time_bin_size'] == np.nan)
-        all_sessions_laps_time_bin_df['time_bin_size'].nunique()
-        all_sessions_laps_time_bin_df['session_name'].nunique()
-
-        # print(list(sessions_df.columns)) # ['Unnamed: 0', 'format_name', 'animal', 'exper_name', 'session_name', 'path', 'session_datetime', 'experience_rank', 'experience_orientation_rank', 'session_uid']
-
-        # sessions_df[['format_name', 'animal', 'exper_name', 'session_name']]
-
-        # ensure no repeats:
+        # Wrap each of these output statements that were copied from a notebook with the appropriate print or display function and a short description/label of each
+        
+        # Check for NaNs in 'time_bin_size'
+        print("Number of NaNs in 'time_bin_size' of 'all_sessions_laps_time_bin_df':", 
+            np.sum(all_sessions_laps_time_bin_df['time_bin_size'].isna()))
+        
+        # Check for entries where 'time_bin_size' equals np.nan (this will always be zero because np.nan != np.nan)
+        print("Number of entries where 'time_bin_size' == np.nan in 'all_sessions_laps_time_bin_df':", 
+            np.sum(all_sessions_laps_time_bin_df['time_bin_size'] == np.nan))
+        
+        # Number of unique 'time_bin_size' values
+        print("Number of unique 'time_bin_size' in 'all_sessions_laps_time_bin_df':", 
+            all_sessions_laps_time_bin_df['time_bin_size'].nunique())
+        
+        # Number of unique 'session_name' values
+        print("Number of unique 'session_name' in 'all_sessions_laps_time_bin_df':", 
+            all_sessions_laps_time_bin_df['session_name'].nunique())
+        
+        # Print the columns of 'sessions_df'
+        print("Columns in 'sessions_df':", list(sessions_df.columns))
+        
+        # # Display selected columns from 'sessions_df'
+        # print("Selected columns from 'sessions_df':")
+        # print(sessions_df[['format_name', 'animal', 'exper_name', 'session_name']])
+        
+        # Ensure no duplicates in specified columns
+        print("Checking for duplicates in ['format_name', 'animal', 'exper_name', 'session_name']:")
         if sessions_df[['format_name', 'animal', 'exper_name', 'session_name']].duplicated().any():
             raise ValueError("Duplicate entries found in the specified columns.")
-
-        # sessions_df.drop_duplicates(subset=['format_name', 'animal', 'exper_name', 'session_name'], inplace=False)
-
+        
+        # Ensure no duplicates in 'session_uid'
+        print("Checking for duplicates in 'session_uid' column:")
         if sessions_df[['session_uid']].duplicated().any():
-            raise ValueError("Duplicate entries found in the session_uid columns.")
-
-
+            raise ValueError("Duplicate entries found in the 'session_uid' column.")
+        
+        # Create a deep copy of 'sessions_df'
         df: pd.DataFrame = deepcopy(sessions_df)
-
+        
+        # Get unique values
         unique_animals = df['animal'].unique().tolist()
         unique_exper_names = df['exper_name'].unique().tolist()
         unique_session_names = df['session_name'].unique().tolist()
-
+        
+        # Build sessions trees
         sessions_tree = {}
         sessions_number_tree = {}
-
-
+        
         for animal in unique_animals:
-            sessions_tree[animal] = list(unique_session_names)
-            sessions_number_tree[animal] = len(list(unique_session_names))
-            # unique_exper_names
-
-
-            # for sess in unique_session_names:
-        # sessions_tree
-        sessions_number_tree
-
-        # Performed 1 aggregation grouped on columns: 'animal', 'exper_name'
-        sessions_count_df = sessions_df.groupby(['animal', 'exper_name']).agg(session_name_count=('session_name', 'count')).reset_index()
-        # 	animal	exper_name	session_name_count
-        # 0	gor01	one	6
-        # 1	gor01	two	6
-        # 2	pin01	one	16
-        # 3	vvp01	one	19
-        # 4	vvp01	two	21
-
-        # sessions_count_df.to_clipboard() #['session_name_count']
-        sessions_count_df
-
-        # Get the number of time_bin_size values for each session:
-        # a_df: pd.DataFrame = all_sessions_all_scores_ripple_df
-        # a_df: pd.DataFrame = all_sessions_laps_df
+            animal_sessions = df[df['animal'] == animal]['session_name'].unique().tolist()
+            sessions_tree[animal] = animal_sessions
+            sessions_number_tree[animal] = len(animal_sessions)
+        
+        # Display sessions number tree
+        print("Sessions number tree:")
+        display(sessions_number_tree)
+        
+        # Perform aggregation grouped on 'animal' and 'exper_name'
+        sessions_count_df = sessions_df.groupby(['animal', 'exper_name']).agg(
+            session_name_count=('session_name', 'count')
+        ).reset_index()
+        
+        # Display session counts
+        # print("Session counts grouped by 'animal' and 'exper_name':")
+        display("Session counts grouped by 'animal' and 'exper_name':", sessions_count_df, '\n\n')
+        
+        # Use 'all_sessions_laps_time_bin_df' for further analysis
         a_df: pd.DataFrame = all_sessions_laps_time_bin_df
+        
+        # Perform aggregations grouped on 'session_name'
+        n_time_bin_sizes_per_session = a_df.groupby(['session_name']).agg(
+            time_bin_size_nunique=('time_bin_size', 'nunique'),
+            time_bin_size_max=('time_bin_size', 'max'),
+            time_bin_size_min=('time_bin_size', 'min')
+        )
+        print("Number of unique 'time_bin_size' per 'session_name':")
+        display(n_time_bin_sizes_per_session)
+        
+        # Display unique 'time_bin_size' values in different DataFrames
+        print("Unique 'time_bin_size' in 'all_sessions_all_scores_ripple_df':", 
+            all_sessions_all_scores_ripple_df['time_bin_size'].unique())
+        print("Unique 'time_bin_size' in 'all_sessions_laps_time_bin_df':", 
+            all_sessions_laps_time_bin_df['time_bin_size'].unique())
+        print("Unique 'time_bin_size' in 'all_sessions_laps_df':", 
+            all_sessions_laps_df['time_bin_size'].unique())
+        print("Unique 'time_bin_size' in 'all_sessions_wcorr_laps_df':", 
+            all_sessions_wcorr_laps_df['time_bin_size'].unique())
+        print("Unique 'time_bin_size' in 'all_sessions_simple_pearson_laps_df':", 
+            all_sessions_simple_pearson_laps_df['time_bin_size'].unique())
+        print("Unique 'time_bin_size' in 'all_sessions_ripple_df':", 
+            all_sessions_ripple_df['time_bin_size'].unique())
+        print("Unique 'time_bin_size' in 'all_sessions_ripple_time_bin_df':", 
+            all_sessions_ripple_time_bin_df['time_bin_size'].unique())
+        
+        # Aggregated counts of 'time_bin_size' per 'session_name'
+        print("\nAggregated 'time_bin_size' counts per 'session_name' in 'all_sessions_laps_time_bin_df':")
+        time_bin_agg_df = all_sessions_laps_time_bin_df.groupby(['session_name']).agg(
+            time_bin_size_count=('time_bin_size', 'count'),
+            time_bin_size_nunique=('time_bin_size', 'nunique')
+        ).reset_index()
+        display(time_bin_agg_df)
+        
+        # # Analyze a specific session
+        # test_session_name: str = 'kdiba_gor01_two_2006-6-07_16-40-19'
+        # _prev_loaded_df: pd.DataFrame = deepcopy(
+        #     all_sessions_laps_df[all_sessions_laps_df['session_name'] == test_session_name]
+        # )
+        # print(f"Data for session '{test_session_name}' in 'all_sessions_laps_df':")
+        # display(_prev_loaded_df)
 
-        # Performed 3 aggregations grouped on column: 'session_name'
-        n_time_bin_sizes_per_session = a_df.groupby(['session_name']).agg(time_bin_size_nunique=('time_bin_size', 'nunique'), time_bin_size_max=('time_bin_size', 'max'), time_bin_size_min=('time_bin_size', 'min'))['time_bin_size_nunique'] #.reset_index(drop=False)['time_bin_size_nunique']
-        n_time_bin_sizes_per_session
-
-        all_sessions_all_scores_ripple_df['time_bin_size'].unique() # array([0.01 , 0.02 , 0.025, 0.05 , 0.03 , 0.044, 0.058])
-        all_sessions_laps_time_bin_df['time_bin_size'].unique() # array([0.025, 0.03 , 0.044, 0.05 , 0.058])
-        all_sessions_laps_df['time_bin_size'].unique() # array([0.025, 0.03 , 0.044, 0.05 , 0.058])
-        all_sessions_wcorr_laps_df['time_bin_size'].unique() # array([0.025, 0.05 , 0.25 , 1.5  , 0.03 , 0.044, 0.058])
-        all_sessions_simple_pearson_laps_df['time_bin_size'].unique() # array([0.025, 0.05 , 0.25 , 1.5  , 0.03 , 0.044, 0.058])
-        all_sessions_ripple_df['time_bin_size'].unique() # array([0.025, 0.03 , 0.044, 0.05 , 0.058])
-        all_sessions_ripple_time_bin_df['time_bin_size'].unique() # array([0.025, 0.03 , 0.044, 0.05 , 0.058])
-
-        all_sessions_laps_time_bin_df.groupby(['session_name']).agg(time_bin_size_count=('time_bin_size', 'count'), time_bin_size_nunique=('time_bin_size', 'nunique')).reset_index()
-
-        test_session_name: str = 'kdiba_gor01_two_2006-6-07_16-40-19'
-        # all_sessions_laps_df
-
-        _prev_loaded_df: pd.DataFrame = deepcopy(all_sessions_laps_df[all_sessions_laps_df['session_name'] == test_session_name]) # time_bin_size is all NaN ... 
-        _prev_loaded_df
-
-        # _prev_loaded_df: pd.DataFrame = deepcopy(all_sessions_laps_time_bin_df[all_sessions_laps_time_bin_df['session_name'] == test_session_name]) # time_bin_size is all NaN ... 
-        # _prev_loaded_df
 
 
 
