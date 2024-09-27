@@ -914,7 +914,7 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
                                                                                 name=name, plot_function_name=plot_function_name,
                                                                                 single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=debug_test_max_num_slices, size=size,
                                                                                 should_use_MatplotlibTimeSynchronizedWidget=should_use_MatplotlibTimeSynchronizedWidget, scrollable_figure=scrollable_figure,
-                                                                                debug_print=debug_print, **kwargs)
+                                                                                debug_print=debug_print, params_kwargs=params_kwargs, **kwargs)
 
 
 
@@ -924,7 +924,8 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
     params.enable_flat_line_drawing = enable_flat_line_drawing
     params.skip_plotting_measured_positions = kwargs.pop('skip_plotting_measured_positions', False)
     params.skip_plotting_most_likely_positions = kwargs.pop('skip_plotting_most_likely_positions', False)
-    
+
+    ## applying params_kwargs has been moved into the two `stacked_epoch_slices_matplotlib_build_fn` function calls so they can use the params immediately. Not sure if it's supposed to overwrite with user defaults. Actually why not, this might break less.
     if params_kwargs is not None:
         params.update(**params_kwargs)
     
@@ -1133,7 +1134,9 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
     def decoder_build_single_radon_transform_data(cls, curr_results_obj):
         """ builds for a single decoder. """
         curr_radon_transform_column_names: List[str] = ['score', 'velocity', 'intercept', 'speed']
-        num_filter_epochs:int = curr_results_obj.num_filter_epochs
+        num_filter_epochs:int = curr_results_obj.num_filter_epochs # AttributeError: 'LeaveOneOutDecodingAnalysisResult' object has no attribute 'num_filter_epochs'
+        # num_filter_epochs:int = len(curr_results_obj.active_filter_epochs) # LeaveOneOutDecodingAnalysisResult does have this though
+        
         time_bin_containers: List[BinningContainer] = deepcopy(curr_results_obj.time_bin_containers)
         active_filter_epochs_df: pd.DataFrame = curr_results_obj.active_filter_epochs
         if (not isinstance(active_filter_epochs_df, pd.DataFrame)):
@@ -1965,7 +1968,7 @@ def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, 
         
     NOTES: curr_results_obj - seems to contain the epochs decoding result and the associated decoder/metadata.
         curr_results_obj: LeaveOneOutDecodingAnalysisResult - for Long/Short plotting
-
+        `pyphoplacecellanalysis.Analysis.Decoder.decoder_result.LeaveOneOutDecodingAnalysisResult`
 
     _out_pagination_controller = DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data(curr_results_obj.active_filter_epochs, curr_results_obj.all_included_filter_epochs_decoder_result, 
         xbin=curr_results_obj.original_1D_decoder.xbin, global_pos_df=global_session.position.df, a_name=controller_name, active_context=display_context,  max_subplots_per_page=max_subplots_per_page, included_epoch_indicies=included_epoch_indicies) # 10
@@ -2009,7 +2012,20 @@ def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, 
     # _out_pagination_controller
 
 
-    _out_pagination_controller.add_data_overlays(curr_results_obj)
+    should_try_again: bool = True
+    try:
+        _out_pagination_controller.add_data_overlays(curr_results_obj)
+        should_try_again = False
+    except BaseException as e:
+        print(f'method 1 failed with error: {e}')
+        # raise e
+
+    if should_try_again:
+        _out_pagination_controller.add_data_overlays(curr_results_obj.all_included_filter_epochs_decoder_result) ## maybe this works?
+        should_try_again = False
+
+
+
     # _tmp_out_selections = paginated_multi_decoder_decoded_epochs_window.restore_selections_from_user_annotations()
 
     ### 2023-05-30 - Add the radon-transformed linear fits to each epoch to the stacked epoch plots:
