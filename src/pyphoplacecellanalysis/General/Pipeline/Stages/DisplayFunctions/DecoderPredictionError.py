@@ -1995,12 +1995,13 @@ def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, 
     params_kwargs = kwargs.pop('params_kwargs', {})
     params_kwargs={'skip_plotting_measured_positions': True, 'skip_plotting_most_likely_positions': True,
                     'enable_per_epoch_action_buttons': False,
-                    'enable_radon_transform_info': True, 'enable_weighted_correlation_info': True,
-                    # 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False,
+                    # 'enable_radon_transform_info': True, 'enable_weighted_correlation_info': True,
+                    'enable_radon_transform_info': enable_radon_transform_info, 'enable_weighted_correlation_info': False,
                     # 'disable_y_label': True
                     'enable_update_window_title_on_page_change': False, 'build_internal_callbacks': False,
                     }  | params_kwargs
     
+    enable_radon_transform_info: bool = params_kwargs.get('enable_radon_transform_info', False)
 
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
     long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
@@ -2011,19 +2012,19 @@ def plot_decoded_epoch_slices_paginated(curr_active_pipeline, curr_results_obj, 
             max_subplots_per_page=max_subplots_per_page, included_epoch_indicies=included_epoch_indicies, params_kwargs=params_kwargs, **kwargs) # 10
     # _out_pagination_controller
 
+    ## Add the data_overlays
+    if enable_radon_transform_info:
+        should_try_again: bool = True
+        try:
+            _out_pagination_controller.add_data_overlays(curr_results_obj)
+            should_try_again = False
+        except BaseException as e:
+            print(f'method 1 failed with error: {e}')
+            raise e
 
-    should_try_again: bool = True
-    try:
-        _out_pagination_controller.add_data_overlays(curr_results_obj)
-        should_try_again = False
-    except BaseException as e:
-        print(f'method 1 failed with error: {e}')
-        # raise e
-
-    if should_try_again:
-        _out_pagination_controller.add_data_overlays(curr_results_obj.all_included_filter_epochs_decoder_result) ## maybe this works?
-        should_try_again = False
-
+        if should_try_again:
+            _out_pagination_controller.add_data_overlays(curr_results_obj.all_included_filter_epochs_decoder_result) ## maybe this works?
+            should_try_again = False
 
 
     # _tmp_out_selections = paginated_multi_decoder_decoded_epochs_window.restore_selections_from_user_annotations()
