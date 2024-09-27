@@ -600,6 +600,13 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
         print(f'batch_extended_programmatic_figures(...): _display_long_short_pf1D_comparison failed with error: {e}\n skipping.')
 
     
+    try:
+        _out = curr_active_pipeline.display('_display_directional_merged_pf_decoded_stacked_epoch_slices', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure, is_dark_mode=False)
+        print(f'`directional_decoded_stacked_epoch_slices` completed. \n\t_out_paths: {_out}\n\n')
+    except BaseException as e:
+        print(f'batch_extended_programmatic_figures(...): "_display_directional_merged_pf_decoded_stacked_epoch_slices" failed with error: {e}\n skipping.')
+
+
     if not disable_unsafe_qt_calls:
         ## TODO 2023-06-02 NOW, NEXT: this might not work in 'AGG' mode because it tries to render it with QT, but we can see.
         try:
@@ -668,6 +675,9 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
         _out = curr_active_pipeline.display('_display_trial_to_trial_reliability', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure, is_dark_mode=False)
     except BaseException as e:
         print(f'batch_extended_programmatic_figures(...): "_display_trial_to_trial_reliability" failed with error: {e}\n skipping.')
+
+
+
 
     # _display_directional_merged_pf_decoded_epochs ______________________________________________________________________ #
     # this open the Yellow-Blue plots and various marginals

@@ -22,6 +22,7 @@ from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.print_helpers import strip_type_str_to_classname
 from pyphocorehelpers.exception_helpers import ExceptionPrintingContext
 from neuropy.utils.indexing_helpers import NumpyHelpers
+from pyphocorehelpers.assertion_helpers import Assert
 
 from neuropy.core.laps import Laps # used in `DirectionalLapsHelpers`
 from neuropy.utils.result_context import IdentifyingContext
@@ -6618,81 +6619,42 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
     @function_attributes(short_name='directional_decoded_stacked_epoch_slices', tags=['scatter-plot', 'directional_merged_decoder_decoded_epochs','directional','marginal'],
                           input_requires=['RankOrder', 'DirectionalLaps', 'DirectionalMergedDecoders', 'DirectionalDecodersEpochsEvaluations'], output_provides=[], uses=['PhoPaginatedMultiDecoderDecodedEpochsWindow'], used_by=[], creation_date='2024-09-27 17:08', related_items=[], is_global=True)
     def _display_directional_merged_pf_decoded_stacked_epoch_slices(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, **kwargs):
-        """ Plots four separate figures showing the entire stack of decoded epochs for both the long and short, including their Radon transformed lines if that information is available.
+        """ Exports all decoded epoch posteriors separately to a folder. NON-VISUAL, never displays.
+         Effectively the entire stack of decoded epochs for both the long and short, including their Radon transformed lines if that information is available.
+
+
+        # '_display_directional_merged_pf_decoded_stacked_epoch_slices' or  directional_decoded_stacked_epoch_slices
+        curr_active_pipeline.reload_default_display_functions()
+        _out_paths = curr_active_pipeline.display('_display_directional_merged_pf_decoded_stacked_epoch_slices')
+        _out_paths
 
         """
-        from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import PhoPaginatedMultiDecoderDecodedEpochsWindow
-        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
-        from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots        
+        # from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots        
         from neuropy.utils.result_context import IdentifyingContext
-        # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices_paginated
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
+        from pyphoplacecellanalysis.Analysis.Decoder.computer_vision import ComputerVisionComputations
+        from datetime import datetime, date, timedelta
+        from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path
+        
+        DAY_DATE_STR: str = date.today().strftime("%Y-%m-%d")
+        DAY_DATE_TO_USE = f'{DAY_DATE_STR}' # used for filenames throught the notebook
+        # print(f'DAY_DATE_STR: {DAY_DATE_STR}, DAY_DATE_TO_USE: {DAY_DATE_TO_USE}')
 
-
-        defer_render: bool = kwargs.pop('defer_render', False)
-        should_show: bool = (not defer_render)
+        # defer_render: bool = kwargs.pop('defer_render', False)
+        # should_show: bool = (not defer_render)
         
         # #TODO 2024-01-03 05:24: - [ ] Do something to switch the matplotlib backend to 'AGG' if defer_render == True. Currently only adjusts the pyqtgraph-based figures (`plot_rank_order_epoch_inst_fr_result_tuples`)
 
         active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
-        if include_includelist is None:
-            include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
-
-        # params_kwargs = {'enable_per_epoch_action_buttons': False,
-        #         'skip_plotting_most_likely_positions': True, 'skip_plotting_measured_positions': True, 
-        #         'enable_decoded_most_likely_position_curve': False, 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False,
-        #         # 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False,
-        #         # 'disable_y_label': True,
-        #         # 'isPaginatorControlWidgetBackedMode': True,
-        #         'isPaginatorControlWidgetBackedMode': False,
-        #         'enable_update_window_title_on_page_change': False, 'build_internal_callbacks': True,
-        #         # 'debug_print': True,
-        #         'max_subplots_per_page': 50,
-        #         'scrollable_figure': False,
-        #         # 'scrollable_figure': True,
-        #         # 'posterior_heatmap_imshow_kwargs': dict(vmin=0.0075),
-        #         'use_AnchoredCustomText': False,
-        #         'should_suppress_callback_exceptions': False,
-        #         # 'build_fn': 'insets_view', 'constrained_layout': True,
-        #         # 'insets_view_ax_locator_padding': dict(left_pad=0.08, right_pad=0.05, top_pad=0.03, bottom_pad=0.03, v_spacing=0.005),
-        #         # 'insets_view_use_global_max_epoch_duration': False,
-        # } | kwargs.pop('params_kwargs', {})
-        
-        params_kwargs = {'enable_per_epoch_action_buttons': False,
-                        'skip_plotting_most_likely_positions': True, 'skip_plotting_measured_positions': True, 
-                        'enable_decoded_most_likely_position_curve': False, 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': True,
-                        # 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False,
-                        # 'disable_y_label': True,
-                        'isPaginatorControlWidgetBackedMode': True,
-                        'enable_update_window_title_on_page_change': False, 'build_internal_callbacks': True,
-                        # 'debug_print': True,
-                        'max_subplots_per_page': 10,
-                        'scrollable_figure': False,
-                        # 'scrollable_figure': True,
-                        # 'posterior_heatmap_imshow_kwargs': dict(vmin=0.0075),
-                        'use_AnchoredCustomText': False,
-                        'should_suppress_callback_exceptions': False,
-                        # 'build_fn': 'insets_view',
-        } | kwargs.pop('params_kwargs', {})
-    
-
-        # def _perform_write_to_file_callback(final_context, fig):
-        #     if save_figure:
-        #         return owning_pipeline_reference.output_figure(final_context, fig)
-        #     else:
-        #         pass # do nothing, don't save
-
 
         rank_order_results = global_computation_results.computed_data['RankOrder'] # : "RankOrderComputationsContainer"
         minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
         # included_qclu_values: List[int] = rank_order_results.included_qclu_values
 
         directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
-        # selected_spikes_df = deepcopy(global_computation_results.computed_data['RankOrder'].LR_ripple.selected_spikes_df)
-        # active_epochs = global_computation_results.computed_data['RankOrder'].ripple_most_likely_result_tuple.active_epochs
-        # active_epochs = deepcopy(global_computation_results.computed_data['RankOrder'].LR_ripple.epochs_df)
         track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
-
+        
         directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']
         directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(owning_pipeline_reference, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=False)
 
@@ -6705,85 +6667,54 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         print(f'pos_bin_size: {pos_bin_size}')
         print(f'ripple_decoding_time_bin_size: {ripple_decoding_time_bin_size}')
         print(f'laps_decoding_time_bin_size: {laps_decoding_time_bin_size}')
-
-
-        ## INPUTS filtered_decoder_filter_epochs_decoder_result_dict
-        # decoder_decoded_epochs_result_dict: generic
         
-        active_session_context: IdentifyingContext = kwargs.pop('active_context', owning_pipeline_reference.get_session_context())
-
-        with (active_session_context + IdentifyingContext(display_fn_name='DecodedEpochSlices', epochs='laps')) as active_display_context:
+        parent_output_folder: Path = kwargs.pop('parent_output_folder', None)
         
-            ## Laps:
-            laps_app, laps_paginated_multi_decoder_decoded_epochs_window, laps_pagination_controller_dict = PhoPaginatedMultiDecoderDecodedEpochsWindow.init_from_track_templates(owning_pipeline_reference, track_templates,
-                        decoder_decoded_epochs_result_dict=decoder_laps_filter_epochs_decoder_result_dict, epochs_name='laps', ## LAPS
-                        included_epoch_indicies=None, debug_print=False,
-                        params_kwargs=params_kwargs,
-            )
-            
-            # do the laps export
-            laps_paginated_multi_decoder_decoded_epochs_window.export_all_pages(owning_pipeline_reference, active_context=active_display_context)
-            ## TEAR IT DOWN
-            if defer_render:
-                laps_paginated_multi_decoder_decoded_epochs_window.close()
-            
-
-        with (active_session_context + IdentifyingContext(display_fn_name='DecodedEpochSlices', epochs='replays')) as active_display_context:        
-            pbe_app, pbe_paginated_multi_decoder_decoded_epochs_window, pbe_pagination_controller_dict = PhoPaginatedMultiDecoderDecodedEpochsWindow.init_from_track_templates(owning_pipeline_reference, track_templates,
-                        decoder_decoded_epochs_result_dict=decoder_ripple_filter_epochs_decoder_result_dict, epochs_name='ripple', ## RIPPLE
-                        included_epoch_indicies=None, debug_print=False,
-                        params_kwargs=params_kwargs,
-            )
-            # do the export
-            pbe_paginated_multi_decoder_decoded_epochs_window.export_all_pages(owning_pipeline_reference, active_context=active_display_context)
-            ## TEAR IT DOWN
-            if defer_render:
-                pbe_paginated_multi_decoder_decoded_epochs_window.close()
+        needs_discover_default_collected_outputs_dir: bool = True
+        if parent_output_folder is not None:
+            if isinstance(parent_output_folder, str):
+                parent_output_folder = Path(parent_output_folder).resolve()
+                if parent_output_folder.exists():
+                    needs_discover_default_collected_outputs_dir = False # we're good, the provided dir exists
+                    
+        if needs_discover_default_collected_outputs_dir:
+                ## if none is provided it tries to find one in collected_outputs
+                known_collected_outputs_paths = [Path(v).resolve() for v in ['/Users/pho/data/collected_outputs',
+                                                                            '/Volumes/SwapSSD/Data/collected_outputs', r"K:/scratch/collected_outputs", '/Users/pho/Dropbox (University of Michigan)/MED-DibaLabDropbox/Data/Pho/Outputs/output/collected_outputs', r'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs',
+                                                                            '/home/halechr/FastData/collected_outputs/', '/home/halechr/cloud/turbo/Data/Output/collected_outputs']]
+                collected_outputs_directory = find_first_extant_path(known_collected_outputs_paths)
+                assert collected_outputs_directory.exists(), f"collected_outputs_directory: {collected_outputs_directory} does not exist! Is the right computer's config commented out above?"
+                # fullwidth_path_widget(scripts_output_path, file_name_label='Scripts Output Path:')
+                print(f'collected_outputs_directory: "{collected_outputs_directory}"')
+                # Create a 'figures' subfolder if it doesn't exist
+                figures_folder: Path = collected_outputs_directory.joinpath('figures', '_temp_individual_posteriors').resolve()
+                figures_folder.mkdir(parents=False, exist_ok=True)
+                assert figures_folder.exists()
+                print(f'\tfigures_folder: "{figures_folder}"')
+                ## this is good
+                parent_output_folder = figures_folder
 
 
-        # def _subfn_prepare_plot_long_and_short_stacked_epoch_slices(curr_active_pipeline, included_epoch_indicies=None, defer_render=True, save_figure=True, **kwargs):
-        #     """ 2023-06-01 - 
-            
-        #     ## TODO 2023-06-02 NOW, NEXT: this might not work in 'AGG' mode because it tries to render it with QT, but we can see.
-            
-        #     Usage:
-        #         (pagination_controller_L, pagination_controller_S), (fig_L, fig_S), (ax_L, ax_S), (final_context_L, final_context_S), (active_out_figure_paths_L, active_out_figure_paths_S) = _subfn_prepare_plot_long_and_short_stacked_epoch_slices(curr_active_pipeline, defer_render=False)
-        #     """
-        #     from neuropy.utils.result_context import IdentifyingContext
-        #     from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices_paginated
+        Assert.path_exists(parent_output_folder)
+        posterior_out_folder = parent_output_folder.joinpath(DAY_DATE_TO_USE).resolve()
+        posterior_out_folder.mkdir(parents=True, exist_ok=True)
+        save_path = posterior_out_folder.resolve()
+        _parent_save_context: IdentifyingContext = owning_pipeline_reference.build_display_context_for_session('perform_export_all_decoded_posteriors_as_images')
+        _specific_session_output_folder = save_path.joinpath(active_context.get_description(subset_excludelist=['format_name'])).resolve()
+        _specific_session_output_folder.mkdir(parents=True, exist_ok=True)
 
-        #     active_session_context: IdentifyingContext = kwargs.pop('active_context', curr_active_pipeline.get_session_context())
-
-        #     with (active_session_context + IdentifyingContext(display_fn_name='DecodedEpochSlices', epochs='replays')) as active_display_context:
-        #         ## long_short_decoding_analyses:
-        #         curr_long_short_decoding_analyses = curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis']
-        #         ## Extract variables from results object:
-        #         long_results_obj, short_results_obj = curr_long_short_decoding_analyses.long_results_obj, curr_long_short_decoding_analyses.short_results_obj
-        #         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-        #         pagination_controller_L, active_out_figure_paths_L, final_context_L = plot_decoded_epoch_slices_paginated(curr_active_pipeline, long_results_obj, (active_display_context + IdentifyingContext(decoder='long_results_obj')), included_epoch_indicies=included_epoch_indicies, save_figure=save_figure, 
-		# 																						 params_kwargs=params_kwargs, **kwargs)
-        #         fig_L = pagination_controller_L.plots.fig
-        #         ax_L = fig_L.get_axes()
-        #         if defer_render:
-        #             widget_L = pagination_controller_L.ui.mw # MatplotlibTimeSynchronizedWidget
-        #             widget_L.close()
-        #             pagination_controller_L = None
-                
-        #         pagination_controller_S, active_out_figure_paths_S, final_context_S = plot_decoded_epoch_slices_paginated(curr_active_pipeline, short_results_obj, (active_display_context + IdentifyingContext(decoder='short_results_obj')), included_epoch_indicies=included_epoch_indicies, save_figure=save_figure, 
-		# 																						 params_kwargs=params_kwargs, **kwargs)
-        #         fig_S = pagination_controller_S.plots.fig
-        #         ax_S = fig_S.get_axes()
-        #         if defer_render:
-        #             widget_S = pagination_controller_S.ui.mw # MatplotlibTimeSynchronizedWidget
-        #             widget_S.close()
-        #             pagination_controller_S = None
-
-        #         return (pagination_controller_L, pagination_controller_S), (fig_L, fig_S), (ax_L, ax_S), (final_context_L, final_context_S), (active_out_figure_paths_L, active_out_figure_paths_S)
-
+        out_paths = ComputerVisionComputations.perform_export_all_decoded_posteriors_as_images(decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, _save_context=_parent_save_context, parent_output_folder=_specific_session_output_folder, desired_height=None)
+        # out_paths
+        print(_specific_session_output_folder)
 
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
         # pagination_controllers, figs, axs, ctxts, out_figure_paths = _subfn_prepare_plot_long_and_short_stacked_epoch_slices(owning_pipeline_reference, included_epoch_indicies=included_epoch_indicies, defer_render=defer_render, save_figure=save_figure, **kwargs)
-        graphics_output_dict = MatplotlibRenderPlots(name='directional_decoded_stacked_epoch_slices', figures=figs, axes=axs, context=ctxts, plot_data={'context': ctxts, 'path': out_figure_paths})
+        graphics_output_dict = {'export_paths': out_paths,
+                                'parent_output_folder': parent_output_folder,
+                                'parent_specific_session_output_folder': _specific_session_output_folder,
+            
+        }
+        # MatplotlibRenderPlots(name='directional_decoded_stacked_epoch_slices', figures=figs, axes=axs, context=ctxts, plot_data={'context': ctxts, 'paths': out_paths, 'parent_path': _specific_session_output_folder})
         # if not defer_render:
         #     graphics_output_dict.plot_data['app'] = app
         #     graphics_output_dict.plot_data['root_window'] = paginated_multi_decoder_decoded_epochs_window
