@@ -66,10 +66,10 @@ class ComputerVisionComputations:
     # Save/Load                                                                                                            #
     # ==================================================================================================================== #
     @classmethod
-    @function_attributes(short_name=None, tags=['transition_matrix', 'save', 'export'], input_requires=[], output_provides=[], uses=['h5py'], used_by=[], creation_date='2024-08-05 10:47', related_items=[])
+    @function_attributes(short_name=None, tags=['IMPORTANT', 'save', 'export', 'ESSENTIAL', 'posterior', 'export'], input_requires=[], output_provides=[], uses=['h5py'], used_by=[], creation_date='2024-08-05 10:47', related_items=[])
     def export_decoded_posteriors_as_images(cls, a_decoder_decoded_epochs_result: DecodedFilterEpochsResult, # decoder_ripple_filter_epochs_decoder_result_dict: DecoderResultDict,
                                              posterior_out_folder:Path='output/_temp_individual_posteriors', should_export_separate_color_and_greyscale: bool = True, desired_height=None, out_context=None, debug_print=False): # decoders_dict: Dict[types.DecoderName, BasePositionDecoder], 
-        """Save the transitiion matrix info to a file
+        """Save the decoded posteiors (decoded epochs) into an image file
         
         Usage:
             from pyphoplacecellanalysis.Analysis.Decoder.computer_vision import ComputerVisionComputations
@@ -136,7 +136,7 @@ class ComputerVisionComputations:
                 
         
     @classmethod
-    @function_attributes(short_name=None, tags=['export', 'images'], input_requires=[], output_provides=[], uses=['export_decoded_posteriors_as_images'], used_by=[], creation_date='2024-08-28 08:36', related_items=[])
+    @function_attributes(short_name=None, tags=['export', 'images', 'ESSENTIAL'], input_requires=[], output_provides=[], uses=['export_decoded_posteriors_as_images'], used_by=[], creation_date='2024-08-28 08:36', related_items=[])
     def perform_export_all_decoded_posteriors_as_images(cls, decoder_laps_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult],
                                                          _save_context: IdentifyingContext, parent_output_folder: Path, should_export_separate_color_and_greyscale: bool = True, desired_height=None):
         """
