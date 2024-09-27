@@ -848,7 +848,8 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         graphics_output_dict = MatplotlibRenderPlots(name='long_short_expected_v_observed_firing_rate', figures=(fig,), axes=(axes,), context=final_context, plot_data={'context': final_context, 'path': active_out_figure_paths})
         return graphics_output_dict
 
-    @function_attributes(short_name=None, tags=['long_short_stacked_epoch_slices', 'epoch', 'needs_improvement', 'inefficient'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices_paginated'], used_by=[], creation_date='2023-06-02 14:12', is_global=True)
+    @function_attributes(short_name=None, tags=['Qt', 'figure', 'display', 'long_short_stacked_epoch_slices', 'epoch', 'needs_improvement', 'inefficient'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[],
+                          uses=['plot_decoded_epoch_slices_paginated', 'QT'], used_by=[], creation_date='2023-06-02 14:12', is_global=True)
     def _display_long_and_short_stacked_epoch_slices(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, included_epoch_indicies=None, defer_render=False, save_figure=True, **kwargs):
         """ Plots two figures showing the entire stack of decoded epochs for both the long and short, including their Radon transformed lines if that information is available.
 
