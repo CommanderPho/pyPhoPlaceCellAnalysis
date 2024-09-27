@@ -100,7 +100,7 @@ class LoadedObjectPersistanceState:
 
     
 
-class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, FilteredPipelineMixin, PipelineWithComputedPipelineStageMixin, PipelineWithDisplayPipelineStageMixin, PipelineWithDisplaySavingMixin, HDF_SerializationMixin, QtCore.QObject):
+class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, FilteredPipelineMixin, PipelineWithComputedPipelineStageMixin, PipelineWithDisplayPipelineStageMixin, PipelineWithDisplaySavingMixin, HDF_SerializationMixin, object):
     """ 
     
     Exposes the active sessions via its .sess member.
@@ -126,7 +126,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
     """
     
-    sigStageChanged = QtCore.Signal(object) # Emitted when the pipeline stage changes
+    # sigStageChanged = QtCore.Signal(object) # Emitted when the pipeline stage changes
     
     
     def __init__(self, name="pipeline", session_data_type='kdiba', basedir=None, outputs_specifier: Optional[OutputsSpecifier]=None, load_function: Callable = None, post_load_functions: List[Callable] = [], parent=None, **kwargs):
@@ -152,7 +152,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         self._plot_object = None
         self._registered_output_files = None # for RegisteredOutputsMixin
         
-        _stage_changed_connection = self.sigStageChanged.connect(self.on_stage_changed)
+        # _stage_changed_connection = self.sigStageChanged.connect(self.on_stage_changed)
         self.set_input(name=name, session_data_type=session_data_type, basedir=basedir, load_function=load_function, post_load_functions=post_load_functions)
 
         if outputs_specifier is None:
@@ -501,7 +501,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
     @stage.setter
     def stage(self, value):
         self._stage = value
-        self.sigStageChanged.emit(self._stage) # pass the new stage
+        # self.sigStageChanged.emit(self._stage) # pass the new stage
     
     @property
     def last_completed_stage(self) -> PipelineStage:
@@ -597,7 +597,6 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
         super(NeuropyPipeline, self).__init__() # from 
         
-        
         # Restore unpickable properties:
         task_id: str = build_run_log_task_identifier(self.get_session_context(), logging_root_FQDN=None) # '2024-05-01_14-05-26.Apogee.Spike3D.test', used to have `, logging_root_FQDN='pipeline'`
         self._logger = build_logger(full_logger_string=task_id, file_logging_dir=None, debug_print=False)
@@ -608,7 +607,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         self._registered_output_files = None # for RegisteredOutputsMixin
         self._outputs_specifier = None
         
-        _stage_changed_connection = self.sigStageChanged.connect(self.on_stage_changed)
+        # _stage_changed_connection = self.sigStageChanged.connect(self.on_stage_changed)
          
         # Reload both the computation and display functions to get the updated values:
         self.reload_default_computation_functions()
