@@ -1640,6 +1640,7 @@ def load_and_apply_session_experience_rank_csv(csv_path="./data/sessions_experim
 
     def _callback_add_df_columns(df, session_id_column_name: str = 'session_uid'):
         """ captures `experience_rank_map_dict`, `experience_orientation_rank_map_dict` """
+        assert df is not None
         assert session_id_column_name in df.columns, f"session_id_column_name: '{session_id_column_name}' not in df.columns: {list(df.columns)}"
         df['session_experience_rank'] = df[session_id_column_name].map(experience_rank_map_dict)
         df['session_experience_orientation_rank'] = df[session_id_column_name].map(experience_orientation_rank_map_dict)
@@ -1814,15 +1815,15 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
     parsed_paths_df: pd.DataFrame = pd.DataFrame(parsed_paths, columns=tuple_column_names)
     # Sort by columns: 'session' (ascending), 'custom_replay_name' (ascending) and 3 other columns
     parsed_paths_df = parsed_paths_df.sort_values(['session', 'file_type', 'custom_replay_name', 'decoding_time_bin_size_str', 'export_datetime']).reset_index(drop=True)
-
+    ## #TODO 2024-09-27 01:49: - [ ] Confirmed that `parsed_paths_df` still has the `laps_time_bin_marginals` outputs in the list
     ## This is where we drop all but the most recent:
-    filtered_parsed_paths_df = get_only_most_recent_csv_sessions(parsed_paths_df=deepcopy(parsed_paths_df))
+    filtered_parsed_paths_df = get_only_most_recent_csv_sessions(parsed_paths_df=deepcopy(parsed_paths_df)) ## `filtered_parsed_paths_df` still has it
 
     # Drop rows with export_datetime less than or equal to cutoff_date
     if cuttoff_date is not None:
-        filtered_parsed_paths_df = filtered_parsed_paths_df[filtered_parsed_paths_df['export_datetime'] > cuttoff_date]
+        filtered_parsed_paths_df = filtered_parsed_paths_df[filtered_parsed_paths_df['export_datetime'] >= cuttoff_date] ## fails HERE?!?
 
-    ## filtered_parsed_paths_df is new 2024-07-11 output
+    ## filtered_parsed_paths_df is new 2024-07-11 output, NOTE we don't use `filtered_parsed_paths_df` below, instead `parsed_paths`.
 
     sessions = {}
     for export_datetime, session_str, custom_replay_name, file_type, decoding_time_bin_size_str, path in parsed_paths:
@@ -1838,6 +1839,7 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
                 # if there is no cutoff date, add
                 should_add = True
 
+            # #TODO 2024-09-27 01:46: - [ ] Is this indentation right? Is it supposed to be out-dented?
             if should_add:
                 sessions[session_str][file_type] = (path, decoding_time_bin_size_str, export_datetime)
 

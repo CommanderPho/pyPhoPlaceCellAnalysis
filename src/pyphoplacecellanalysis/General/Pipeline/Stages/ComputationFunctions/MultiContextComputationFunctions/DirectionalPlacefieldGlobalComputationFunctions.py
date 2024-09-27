@@ -626,7 +626,7 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
 @function_attributes(short_name=None, tags=['ESSENTIAL', 'filter', 'epoch_selection', 'user-annotations', 'replay'], input_requires=['filtered_sessions[*].replay'], output_provides=[], uses=[], used_by=[], creation_date='2024-03-08 13:28', related_items=[])
 def filter_and_update_epochs_and_spikes(curr_active_pipeline, global_epoch_name: str, track_templates: TrackTemplates, required_min_percentage_of_active_cells: float = 0.333333, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1):
     """
-    Filters epochs and spikes based on the specified criteria, and updates the epoch IDs.
+    Filters epochs and spikes based on the specified criteria, and updates the epoch IDs. Only seems to be for `.replay` events
 
     Args:
         curr_active_pipeline (object): The current active pipeline object.
