@@ -253,6 +253,12 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
                 already_added_legend_entries.add(a_trace_name)
                 a_trace.showlegend = True  # This is usually true by default, can be omitted
 
+
+            # Update marker properties to remove the white border
+            a_trace.marker.line.width = 0
+            a_trace.marker.opacity = 0.5
+            a_trace.marker.size = 10
+            
             # is_first_item: bool = (i == 0)
             # if (not is_first_item):
             #     a_trace['showlegend'] = False

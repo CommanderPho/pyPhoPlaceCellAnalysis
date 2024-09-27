@@ -450,17 +450,31 @@ def plot_histograms_across_sessions(data_results_df: pd.DataFrame, data_type: st
 
 
 
-@function_attributes(short_name=None, tags=['histogram', 'stacked', 'multi-session', 'plot', 'figure', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
+@function_attributes(short_name=None, tags=['histogram', 'stacked', 'multi-session', 'plot', 'figure', 'matplotlib', 'good'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
 def plot_stacked_histograms(data_results_df: pd.DataFrame, data_type: str, session_spec: str, time_bin_duration_str: str, column_name:str='P_Long', **kwargs) -> None:
     """ plots a colorful stacked histogram for each of the many time-bin sizes
+    
+    variable_name = 'P_Short' # Shows expected effect - short-only replay prior to delta and then split replays post-delta
+    
+    y_baseline_level: float = 0.5 # for P(short), etc
+    # y_baseline_level: float = 0.0 # for wcorr, etc
+    
+    
+    if is_dark_mode:
+        _extras_output_dict["y_mid_line"] = new_fig_ripples.add_hline(y=y_baseline_level, line=dict(color="rgba(0.8,0.8,0.8,.75)", width=2), row='all', col='all')
+    else:
+        _extras_output_dict["y_mid_line"] = new_fig_ripples.add_hline(y=y_baseline_level, line=dict(color="rgba(0.2,0.2,0.2,.75)", width=2), row='all', col='all')
+        
+
     """
     from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots # plot_histogram #TODO 2024-01-02 12:41: - [ ] Is this where the Qt5 Import dependency Pickle complains about is coming from?
     layout = kwargs.pop('layout', 'none')
     defer_show = kwargs.pop('defer_show', False)
+    figsize = kwargs.pop('figsize', (12, 2))
     descriptor_str: str = '|'.join([data_type, session_spec, time_bin_duration_str])
     figure_identifier: str = f"{descriptor_str}_PrePostDelta"
 
-    fig = plt.figure(num=figure_identifier, clear=True, figsize=(12, 2), layout=layout, **kwargs) # layout="constrained", 
+    fig = plt.figure(num=figure_identifier, clear=True, figsize=figsize, layout=layout, **kwargs) # layout="constrained", 
     fig.suptitle(f'{descriptor_str}')
     
     ax_dict = fig.subplot_mosaic(
