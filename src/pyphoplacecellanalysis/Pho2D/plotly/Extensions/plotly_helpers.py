@@ -234,6 +234,9 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     if out_scatter_fig is not None:
         for a_trace in out_scatter_fig.data:
             a_trace.legendgroup = a_trace_name ## set the legend group so they can all be toggled together
+            # Update marker properties to remove the white border
+            a_trace.marker.line.width = 0 
+            a_trace.marker.opacity = 0.5
             fig.add_trace(a_trace, row=1, col=2)
             # if forced_range_y is not None:
             #     fig.update_layout(yaxis=dict(range=forced_range_y))
@@ -255,9 +258,9 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
 
 
             # Update marker properties to remove the white border
-            a_trace.marker.line.width = 0
+            a_trace.marker.line.width = 0 
             a_trace.marker.opacity = 0.5
-            a_trace.marker.size = 10
+            # a_trace.marker.size = 10
             
             # is_first_item: bool = (i == 0)
             # if (not is_first_item):
