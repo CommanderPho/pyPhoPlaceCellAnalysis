@@ -104,6 +104,34 @@ class KnownNeptuneProjects:
 
 
 
+# ==================================================================================================================== #
+# UTILITY FUNCTIONS                                                                                                    #
+# ==================================================================================================================== #
+
+def get_nested_value(d: dict, keys: List[Any]) -> Any:
+    """  how can I index into nested dictionaries using a list of keys? """
+    for key in keys:
+        d = d[key]
+    return d
+
+def flatten_dict(d, parent_key='', sep='/'):
+    if (not isinstance(d, dict)):
+        assert isinstance(parent_key, str), f"expected type(parent_key) == str but instead type(parent_key): {type(parent_key)}, parent_key: {parent_key}"
+        return {parent_key:d}
+    
+    items = {}
+    for k, v in d.items():
+        # Construct the new key by concatenating the parent key and current key
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            # If the value is a dictionary, recursively flatten it
+            items.update(flatten_dict(v, new_key, sep=sep))
+        else:
+            # If the value is not a dictionary, add it to the items
+            items[new_key] = v
+    return items
+
+
 
 def capture_print_output(func):
     """Captures the output of the provided function."""
@@ -123,6 +151,12 @@ def clean_quotes(text: str) -> str:
     """Cleans surrounding quotes from the keys and values."""
     return text.strip("'\"")
 
+
+
+
+# ==================================================================================================================== #
+# END UTILITY FUNCTIONS                                                                                                #
+# ==================================================================================================================== #
 
 class AutoValueConvertingNeptuneRun(neptune.Run):
     
@@ -256,7 +290,66 @@ class AutoValueConvertingNeptuneRun(neptune.Run):
         # merged_log_df
         log_contents_str: str = "\n".join([f"{row['timestamp']}: {row['value']}" for _, row in merged_log_df.iterrows()])
         return log_contents_str, merged_log_df
-    
+
+
+    def download_image(self: "AutoValueConvertingNeptuneRun", fig_input_key: str, a_session_descriptor_str: str, neptune_project_figures_output_path: Path, debug_print=False):
+        """ locates and downloads an image with a specific `fig_input_key` like "display_fn_name:display_short_long_pf1D_comparison/track:short"
+        
+        """
+        ## INPUTS: a_parsed_structure
+        ## UPDATES: _context_fig_files_dict
+        _context_fig_files_dict = {}
+
+        a_parsed_structure = self.get_structure().get('outputs', {}).get('figures', None)
+        if a_parsed_structure is None:
+            raise ValueError(f'No "outputs/values" in this run.') #skip this one
+
+        # a_parsed_structure = a_run.get_structure()['outputs']['figures']
+        assert isinstance(a_parsed_structure, dict), f"type(a_parsed_structure): {type(a_parsed_structure)} instead of dict. a_parsed_structure: {a_parsed_structure}"
+        if debug_print:
+            print(f'a_parsed_structure: {a_parsed_structure}')
+        
+        # for k, v in a_parsed_structure.items():
+        #     # Flatten each nested dictionary and update the flattened_dict
+        #     _parsed_run_structure_dict[a_ctxt].update(flatten_dict(v, parent_key=k))
+
+        ## parse the key:
+        fig_input_key_parts: List[str] = fig_input_key.split('/') # ['display_fn_name:display_short_long_pf1D_comparison', 'track:long']
+        # fig_input_key_parts
+
+        ## parse key:value pairs into split arrays
+        # [k.split(':') for k in fig_input_key_parts] # [['display_fn_name', 'display_short_long_pf1D_comparison'], ['track', 'short']]
+
+        fig_split_key_value_pair_parts = [k.split(':')[-1] for k in fig_input_key_parts] ## remove the keys from the path, ['display_short_long_pf1D_comparison', 'short']
+        # fig_split_key_value_pair_parts
+
+        a_session_figures_output_path = neptune_project_figures_output_path.joinpath(a_session_descriptor_str)
+        a_session_figures_output_path.mkdir(exist_ok=True)
+
+        a_fig_output_name: str = '-'.join(fig_split_key_value_pair_parts) + '.png'
+        a_fig_output_path = a_session_figures_output_path.joinpath(a_fig_output_name).resolve()
+        if debug_print:
+            print(f'a_fig_output_path: "{a_fig_output_path}"')
+
+        # a_fig_file_field = a_parsed_structure['display_fn_name:display_short_long_pf1D_comparison']["track:long"]
+        a_fig_file_field = get_nested_value(a_parsed_structure, fig_input_key_parts)
+        a_fig_file_field
+
+        if a_session_descriptor_str not in _context_fig_files_dict:
+            _context_fig_files_dict[a_session_descriptor_str] = {}
+
+        try:
+            _a_download_result = a_fig_file_field.download(destination=a_fig_output_path.as_posix())
+            _context_fig_files_dict[a_session_descriptor_str][fig_input_key] = a_fig_output_path.as_posix()
+            if debug_print:
+                print(f'\tdone.')
+        except MissingFieldException as err:
+            # print(f'MissingFieldException for a_run.id: {a_run_id} (err: {err})')
+            print(f'MissingFieldException for a_run.id: {self}')
+            pass
+
+        return _context_fig_files_dict
+
 
 
 @define(slots=False, repr=False)
@@ -348,6 +441,39 @@ class NeptuneRunCollectedResults:
             # END FOR a_run
         ## OUTPUTS: _context_log_files_dict
         return _context_log_files_dict
+    
+
+    def download_uploaded_figure_files(self, neptune_project_figures_output_path:Path, fig_input_key: str = "display_fn_name:running_and_replay_speeds_over_time"):
+        """ Downloads figures
+        Usage:
+            fig_input_key: str = "display_fn_name:running_and_replay_speeds_over_time"
+            _context_figures_dict = neptune_run_collected_results.download_uploaded_figure_files(neptune_project_figures_output_path=neptune_project_figures_output_path, fig_input_key=fig_input_key)
+            _context_figures_dict
+
+        """
+        Assert.path_exists(neptune_project_figures_output_path)
+
+        context_indexed_runs_list_dict: Dict[IdentifyingContext, List[AutoValueConvertingNeptuneRun]] = self.context_indexed_runs_list_dict
+        
+        _context_figures_dict = {}
+
+        for a_ctxt, a_run_list in context_indexed_runs_list_dict.items():
+            _context_figures_dict[a_ctxt] = {}
+            a_session_descriptor_str: str = a_ctxt.get_description(separator='_', subset_excludelist='format_name') # 'kdiba_gor01_two_2006-6-07_16-40-19'
+                
+            for a_run in a_run_list:
+                try:
+                    _context_figures_dict[a_ctxt][a_run['sys/id']] = a_run.download_image(fig_input_key=fig_input_key, a_session_descriptor_str=a_session_descriptor_str, neptune_project_figures_output_path=neptune_project_figures_output_path)
+                except (ValueError, KeyError) as e:
+                    continue # just try the next one
+                except Exception as e:
+                    raise e
+            # END FOR a_run
+        # END FOR a_ctxt
+        
+        ## OUTPUTS: _context_figures_dict
+        return _context_figures_dict
+    
     
 
 @define(slots=False, repr=False)
