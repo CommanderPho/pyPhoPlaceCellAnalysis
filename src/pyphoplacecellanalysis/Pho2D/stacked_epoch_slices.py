@@ -410,7 +410,7 @@ def _pagination_helper_plot_single_epoch_slice(curr_ax, params, plots_data, plot
 def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch_slices_matplotlib_subplots_laps', plot_function_name=None, epoch_labels=None,
                                                 single_plot_fixed_height=100.0, debug_test_max_num_slices=127,
                                                 size=(15,15), dpi=72, constrained_layout=True, scrollable_figure=True, should_use_MatplotlibTimeSynchronizedWidget=True,
-                                                debug_print=False, **kwargs) -> Tuple[VisualizationParameters, RenderPlotsData, RenderPlots, PhoUIContainer]:
+                                                debug_print=False, params_kwargs=None, **kwargs) -> Tuple[VisualizationParameters, RenderPlotsData, RenderPlots, PhoUIContainer]:
     """ Builds a matplotlib figure view with empty subplots that can be plotted after the fact by iterating through plots.axs
         
     epoch_description_list: list of length 
@@ -438,6 +438,9 @@ def stacked_epoch_slices_matplotlib_build_view(epoch_slices, name='stacked_epoch
     if plot_function_name is None:
         plot_function_name = 'Stacked Epoch Slices View - MATPLOTLIB subplots Version'
     params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, epoch_labels=epoch_labels, name=name, plot_function_name=plot_function_name, should_use_MatplotlibTimeSynchronizedWidget=should_use_MatplotlibTimeSynchronizedWidget, debug_test_max_num_slices=debug_test_max_num_slices, single_plot_fixed_height=single_plot_fixed_height, debug_print=debug_print)
+    if params_kwargs is not None:
+        params.update(**params_kwargs)
+    
     # plots.figure_id = 'stacked_epoch_slices_matplotlib'
     plots.figure_id = plots.name # copy the name as the figure_id
     
@@ -539,7 +542,7 @@ class EpochAxesLocator:
 def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacked_epoch_slices_matplotlib_INSET_subplots_laps', plot_function_name=None, epoch_labels=None,
                                                         single_plot_fixed_height=100.0, debug_test_max_num_slices=12,
                                                         size=(15,15), dpi=72, constrained_layout=True, scrollable_figure=True, should_use_MatplotlibTimeSynchronizedWidget=True,
-                                                        debug_print=False, **kwargs) -> Tuple[VisualizationParameters, RenderPlotsData, RenderPlots, PhoUIContainer]:
+                                                        debug_print=False, params_kwargs=None, **kwargs) -> Tuple[VisualizationParameters, RenderPlotsData, RenderPlots, PhoUIContainer]:
     """ Builds a matplotlib figure view with empty subplots that can be plotted after the fact by iterating through plots.axs
         
     epoch_description_list: list of length 
@@ -574,17 +577,25 @@ def stacked_epoch_slices_matplotlib_build_insets_view(epoch_slices, name='stacke
     with plt.rc_context({'axes.spines.left': False, 'axes.spines.right': False, 'axes.spines.top': False, 'axes.spines.bottom': False}):
         params, plots_data, plots, ui = stacked_epoch_basic_setup(epoch_slices, epoch_labels=epoch_labels, name=name, plot_function_name=plot_function_name, should_use_MatplotlibTimeSynchronizedWidget=should_use_MatplotlibTimeSynchronizedWidget, debug_test_max_num_slices=debug_test_max_num_slices, single_plot_fixed_height=single_plot_fixed_height, debug_print=debug_print)
         
+        if params_kwargs is not None:
+            params.update(**params_kwargs)
+            
         params.setdefault('is_insets_view', True)
         ui.setdefault('insets_view_update_epoch_durations_fn', None)
         
         # params.setdefault('insets_view_ax_locator_padding', dict(left_pad=0.03, right_pad=0.05, top_pad=0.01, bottom_pad=0.03))
         params.setdefault('insets_view_ax_locator_padding', dict(left_pad=0.05, right_pad=0.05, top_pad=0.05, bottom_pad=0.05))
-
+        params.setdefault('insets_view_use_global_max_epoch_duration', True)
         # global_xrange = (params.global_epoch_start_t, params.global_epoch_end_t)
         # global_xduration = params.global_epoch_end_t - params.global_epoch_start_t
         epoch_durations = np.squeeze(np.diff(plots_data.epoch_slices, axis=1))
-        global_max_epoch_duration: float = np.max(epoch_durations)
-        print(f"global_max_epoch_duration: {global_max_epoch_duration}")
+    
+        if params.insets_view_use_global_max_epoch_duration:
+            global_max_epoch_duration: float = np.max(epoch_durations)
+            print(f"global_max_epoch_duration: {global_max_epoch_duration}")
+        else:
+            # use relative epoch duration
+            global_max_epoch_duration = None
         ## Somehow the axes get added from top to bottom, so we need to reverse the heights since we reverse the images at the end. These never get updated tho
         epoch_durations = np.array(list(reversed(epoch_durations.tolist())))   
 
@@ -984,7 +995,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         return self.plots_data.epoch_slices[self.is_selected] # returns an S x 2 array of epoch start/end times that are currently selected.
 
     @property
-    def thin_button_bar_widget(self) -> ThinButtonBarWidget:
+    def thin_button_bar_widget(self) -> ThinButtonBarWidget: 
         return self.ui.mw.ui.thin_button_bar_widget
     
     @property
