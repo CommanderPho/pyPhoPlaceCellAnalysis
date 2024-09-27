@@ -865,6 +865,26 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             from neuropy.utils.result_context import IdentifyingContext
             from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices_paginated
 
+            params_kwargs = {'enable_per_epoch_action_buttons': False,
+                    'skip_plotting_most_likely_positions': True, 'skip_plotting_measured_positions': True, 
+                    'enable_decoded_most_likely_position_curve': False, 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False,
+                    # 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False,
+                    # 'disable_y_label': True,
+                    # 'isPaginatorControlWidgetBackedMode': True,
+                    'isPaginatorControlWidgetBackedMode': False,
+                    'enable_update_window_title_on_page_change': False, 'build_internal_callbacks': True,
+                    # 'debug_print': True,
+                    'max_subplots_per_page': 50,
+                    'scrollable_figure': False,
+                    # 'scrollable_figure': True,
+                    # 'posterior_heatmap_imshow_kwargs': dict(vmin=0.0075),
+                    'use_AnchoredCustomText': False,
+                    'should_suppress_callback_exceptions': False,
+                    # 'build_fn': 'insets_view', 'constrained_layout': True,
+                    # 'insets_view_ax_locator_padding': dict(left_pad=0.08, right_pad=0.05, top_pad=0.03, bottom_pad=0.03, v_spacing=0.005),
+                    # 'insets_view_use_global_max_epoch_duration': False,
+            } | kwargs.pop('params_kwargs', {})
+
             active_session_context: IdentifyingContext = kwargs.pop('active_context', curr_active_pipeline.get_session_context())
 
             with (active_session_context + IdentifyingContext(display_fn_name='DecodedEpochSlices', epochs='replays')) as active_display_context:
@@ -873,7 +893,8 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                 ## Extract variables from results object:
                 long_results_obj, short_results_obj = curr_long_short_decoding_analyses.long_results_obj, curr_long_short_decoding_analyses.short_results_obj
                 long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-                pagination_controller_L, active_out_figure_paths_L, final_context_L = plot_decoded_epoch_slices_paginated(curr_active_pipeline, long_results_obj, (active_display_context + IdentifyingContext(decoder='long_results_obj')), included_epoch_indicies=included_epoch_indicies, save_figure=save_figure, **kwargs)
+                pagination_controller_L, active_out_figure_paths_L, final_context_L = plot_decoded_epoch_slices_paginated(curr_active_pipeline, long_results_obj, (active_display_context + IdentifyingContext(decoder='long_results_obj')), included_epoch_indicies=included_epoch_indicies, save_figure=save_figure, 
+																								 params_kwargs=params_kwargs, **kwargs)
                 fig_L = pagination_controller_L.plots.fig
                 ax_L = fig_L.get_axes()
                 if defer_render:
@@ -881,7 +902,8 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
                     widget_L.close()
                     pagination_controller_L = None
                 
-                pagination_controller_S, active_out_figure_paths_S, final_context_S = plot_decoded_epoch_slices_paginated(curr_active_pipeline, short_results_obj, (active_display_context + IdentifyingContext(decoder='short_results_obj')), included_epoch_indicies=included_epoch_indicies, save_figure=save_figure, **kwargs)
+                pagination_controller_S, active_out_figure_paths_S, final_context_S = plot_decoded_epoch_slices_paginated(curr_active_pipeline, short_results_obj, (active_display_context + IdentifyingContext(decoder='short_results_obj')), included_epoch_indicies=included_epoch_indicies, save_figure=save_figure, 
+																								 params_kwargs=params_kwargs, **kwargs)
                 fig_S = pagination_controller_S.plots.fig
                 ax_S = fig_S.get_axes()
                 if defer_render:
