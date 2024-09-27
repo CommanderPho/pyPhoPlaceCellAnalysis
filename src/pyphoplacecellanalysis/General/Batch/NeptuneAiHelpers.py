@@ -25,6 +25,8 @@ from pathlib import Path
 from neuropy.utils.result_context import IdentifyingContext
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.assertion_helpers import Assert
+from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata
+
 
 # SessionDescriptorString: TypeAlias = str # an integer index that is an aclu
 SessionDescriptorString = NewType('SessionDescriptorString', str) # session_descriptor_string
@@ -452,19 +454,28 @@ class NeptuneRunCollectedResults:
             curr_ctxt_num_runs: int = len(a_run_list)
             for a_run in a_run_list:
                 a_run_id: str = a_run['sys/id'].fetch()
+                a_modification_time: datetime = a_run['sys/modification_time'].fetch()
+                assert isinstance(a_modification_time, datetime), f"a_modification_time is not of type datetime, it is instead type(a_modification_time): {type(a_modification_time)}, value: {a_modification_time}"
+                
                 a_script_type: str = a_run['parameters/script_type'].fetch() # should be either ['figures', 'run']
 
+                a_formatted_modification_time: str = a_modification_time.strftime('%Y%m%dT%H%M%S') # Example Output: 20240427T153045
                 a_log_file_field = a_run['outputs']['log'] # either <File field at "outputs/log"> or <Unassigned field at "outputs/log">
-                a_run_ctxt = a_ctxt.adding_context_if_missing(script_type=a_script_type, run_id=a_run_id)
+                a_run_ctxt = a_ctxt.adding_context_if_missing(script_type=a_script_type,
+                                                            #    run_id=a_run_id
+                                                              )
+                
                 # a_log_file_basename: str = a_run_ctxt.get_description(separator='|') # invalid on windows
-                a_log_file_basename: str = a_run_ctxt.get_description(separator='--')
-                a_log_file_filename: str = a_log_file_basename + '.log'
+                a_log_file_basename: str = a_run_ctxt.get_description(separator='--') # "kdiba--gor01--one--2006-6-07_11-26-53--figures--PHDBATCH-1486.log"
+                a_log_file_filename: str = f"{a_formatted_modification_time}--{a_run_id}--" + a_log_file_basename + '.log' # start with modification time so they can be sorted in the filesystem
                 a_log_file_dest_path = neptune_logs_output_path.joinpath(a_log_file_filename).resolve()
                 # print(f'a_log_file_dest_path: {a_log_file_dest_path}')
 
                 try:
                     _a_download_result = a_log_file_field.download(destination=a_log_file_dest_path.as_posix())
                     _context_log_files_dict[a_ctxt][a_run_id] = a_log_file_dest_path.as_posix()
+                    # a_log_file_dest_path
+                    FilesystemMetadata.set_modification_time(a_log_file_dest_path.as_posix(), new_time=a_modification_time) ## try to set the modification time
 
                 except MissingFieldException as err:
                     # print(f'MissingFieldException for a_run.id: {a_run_id} (err: {err})')
@@ -672,7 +683,7 @@ class Neptuner(object):
         # ordering_datetime_col_name: str = 'sys/creation_time'
         
         # Sort by column: 'sys/creation_time' (ascending)
-        active_runs_table_df = active_runs_table_df.sort_values([ordering_datetime_col_name], ascending=True)
+        # active_runs_table_df = active_runs_table_df.sort_values([ordering_datetime_col_name], ascending=True)
         active_runs_table_df = active_runs_table_df[active_runs_table_df[ordering_datetime_col_name] > datetime.strptime(f'{oldest_included_run_date}T00:30:00.000Z', '%Y-%m-%dT%H:%M:%S.%fZ')]
         # Group by 'session_descriptor_string' and get the most recent `n_recent_results` rows for each group
         most_recent_runs_table_df: pd.DataFrame = (
