@@ -2609,6 +2609,8 @@ def _subfn_new_df_process_and_load_exported_file(file_path, loaded_dict: Dict, s
             print(f'session "{session_name}", file_path: "{file_path}" - did not fully work. (error "{e}". Skipping.')
         return False
 
+
+
 @function_attributes(short_name=None, tags=['csv'], input_requires=[], output_provides=[], uses=['_new_df_process_and_load_exported_file', 'recover_user_annotation_and_is_valid_columns'], used_by=[], creation_date='2024-07-11 17:11', related_items=[])
 def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict, cuttoff_date=None, known_bad_session_strs=[], all_session_experiment_experience_csv_path:Path=None, debug_print=False):
     """  NEW `parsed_csv_files_df1-based approach 2024-07-11 
@@ -2680,6 +2682,10 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
         if curr_session_t_delta is None:
             print(f'WARN: curr_session_t_delta is None for session_str = "{session_str}"') # fails for 'kdiba_gor01_one_2006-6-09_1-22-43_None'
 
+
+        basic_marginals_file_types = ['laps_marginals_df', 'ripple_marginals_df', 'laps_time_bin_marginals_df', 'ripple_time_bin_marginals_df',]
+        #TODO 2024-09-27 09:43: - [ ] the 4 basic marginals return two tuples ('session_id_str', 'custom_replay_name') while all the others return 3-tuples ('session_id_str', 'custom_replay_name', time_bin_size)
+        ## Basic marginals: final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict
         _is_file_valid = True # shouldn't mark unknown files as invalid
         # Process each file type with its corresponding details
         if file_type == 'laps_marginals_df':
@@ -2711,11 +2717,16 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
             
         if (not _is_file_valid):
             excluded_or_outdated_files_list.append(row['path']) ## mark file for exclusion/removal
+        else:
+            if file_type in basic_marginals_file_types:
+                print(f'file_type: {file_type} -- "{path.name}" is valid and has been loaded.')
+            # np.any([v[0] for k, v in final_sessions_loaded_laps_dict.items()])
             
         ## END FOR    
 
+    print(f'done with main processing loop')
     ## OUTPUTS: final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict, final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict,
-    
+    # #TODO 2024-09-27 09:48: - [ ] ERROR: the basic dataframes are now missing their 'time_bin_size' columns somehow!!
     ## Build across_sessions join dataframes:
     all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df = _concat_all_dicts_to_dfs(final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict, final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict)
     ## #TODO 2024-09-25 09:42: - [X] FIXED: Unfortunately both `all_sessions_laps_*df` dataframes have all missing values for their ['time_bin_size'] column.
