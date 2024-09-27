@@ -54,9 +54,10 @@ from qtpy import QtCore, QtWidgets, QtGui
 # Pipeline Logging:
 import logging
 
-from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum # for PipelineSavingScheme
+# from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum # for PipelineSavingScheme
+from enum import Enum
 
-class PipelineSavingScheme(ExtendedEnum):
+class PipelineSavingScheme(Enum):
     """Describes how the pickled pipeline is saved and how it impacts existing files.
     Used by `save_pipeline(...)`
 
@@ -81,6 +82,56 @@ class PipelineSavingScheme(ExtendedEnum):
         return dict(zip(cls.all_member_values(), values_list)) # doing it this way (comparing the string value) requires self.value in the shouldSave property!
         # return cls.build_member_value_dict([False, True, True])
 
+    # Implementing methods from ExtendedEnum directly
+    @classmethod
+    def all_members(cls) -> list:
+        return list(cls)
+
+    @classmethod
+    def all_member_names(cls) -> list:
+        return [member.name for member in cls]
+
+    @classmethod
+    def all_member_values(cls) -> list:
+        return [member.value for member in cls]
+
+    @classmethod
+    def build_member_value_dict(cls, values_list) -> dict:
+        assert len(values_list) == len(cls.all_members()), (
+            f"values_list must have one value for each member of the enum, "
+            f"but got {len(values_list)} values for {len(cls.all_members())} members."
+        )
+        return dict(zip(cls.all_members(), values_list))
+
+    @classmethod
+    def _init_from_upper_name_dict(cls) -> dict:
+        return dict(zip([name.upper() for name in cls.all_member_names()], cls.all_members()))
+
+    @classmethod
+    def _init_from_value_dict(cls) -> dict:
+        return dict(zip(cls.all_member_values(), cls.all_members()))
+
+    @classmethod
+    def init(cls, name=None, value=None, fallback_value=None):
+        """Allows enum values to be initialized from either a name or value (but not both).
+        Also allows passthrough of parameters already of the correct Enum type.
+        """
+        assert (name is not None) or (value is not None), (
+            "You must specify either name or value."
+        )
+        assert not (name is not None and value is not None), (
+            "Specify either name or value, not both."
+        )
+        if name is not None:
+            if isinstance(name, str):
+                return cls._init_from_upper_name_dict().get(name.upper(), fallback_value)
+            elif isinstance(name, cls):
+                return name
+        elif value is not None:
+            if isinstance(value, cls):
+                return value
+            return cls._init_from_value_dict().get(value, fallback_value)
+        raise NotImplementedError("Invalid parameters provided.")
 
 
 
