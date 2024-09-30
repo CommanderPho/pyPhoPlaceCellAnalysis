@@ -471,8 +471,8 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         return get_array_as_image(img_data, desired_height=desired_height, desired_width=desired_width, skip_img_normalization=skip_img_normalization, export_grayscale=export_grayscale, **kwargs)
 
 
-    @function_attributes(short_name=None, tags=['export', 'image', 'posterior'], input_requires=[], output_provides=[], uses=['save_array_as_image'], used_by=[], creation_date='2024-05-09 05:49', related_items=[])
-    def save_posterior_as_image(self, parent_array_as_image_output_folder: Union[Path, str]='', epoch_id_identifier_str: str = 'p_x_given_n', desired_height=None, desired_width=None, skip_img_normalization=True, export_grayscale:bool=False, allow_override_aspect_ratio:bool=False, **kwargs):
+    @function_attributes(short_name=None, tags=['export', 'image', 'posterior'], input_requires=[], output_provides=[], uses=['pyphocorehelpers.plotting.media_output_helpers.save_array_as_image'], used_by=['PosteriorExporting.export_decoded_posteriors_as_images'], creation_date='2024-05-09 05:49', related_items=[])
+    def save_posterior_as_image(self, parent_array_as_image_output_folder: Union[Path, str]='', epoch_id_identifier_str: str = 'p_x_given_n', desired_height=None, desired_width=None, colormap:str='viridis', skip_img_normalization=True, export_grayscale:bool=False, allow_override_aspect_ratio:bool=False, **kwargs):
         """ saves the posterior to disk
         
         Usage:
@@ -505,7 +505,7 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
             desired_height = 100
             
         img_data = self.p_x_given_n.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
-        raw_tuple = save_array_as_image(img_data, desired_height=desired_height, desired_width=desired_width, skip_img_normalization=skip_img_normalization, out_path=_img_path, export_grayscale=export_grayscale, allow_override_aspect_ratio=allow_override_aspect_ratio, **kwargs)
+        raw_tuple = save_array_as_image(img_data, desired_height=desired_height, desired_width=desired_width, colormap=colormap, skip_img_normalization=skip_img_normalization, out_path=_img_path, export_grayscale=export_grayscale, allow_override_aspect_ratio=allow_override_aspect_ratio, **kwargs)
         image_raw, path_raw = raw_tuple
         return image_raw, path_raw
 

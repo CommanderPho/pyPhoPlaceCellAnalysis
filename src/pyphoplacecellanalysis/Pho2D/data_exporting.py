@@ -6,6 +6,8 @@ from nptyping import NDArray
 from typing import NewType
 import neuropy.utils.type_aliases as types
 
+from attrs import define, field, Factory, asdict
+
 import numpy as np
 import pandas as pd
 import PIL
@@ -46,6 +48,38 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 from pyphocorehelpers.plotting.media_output_helpers import vertical_image_stack, horizontal_image_stack
 from PIL import Image, ImageOps, ImageFilter # for export_array_as_image
+
+
+
+@define(slots=False, eq=False)
+class HeatmapExportConfig:
+    """ specifies a single configuration for exporitng a heatmap, such as a posterior"""
+    colormap: Optional[str] = field()
+    export_folder: Optional[Path] = field(default=None)
+    export_grayscale: bool = field(default=False)
+    desired_height: Optional[int] = field(default=None) 
+    desired_width: Optional[int] = field(default=None)
+    skip_img_normalization:bool = field(default=False)
+    allow_override_aspect_ratio:bool = field(default=False)
+
+    ## OUTPUTS:
+    posterior_saved_image: Optional[Image.Image] = field(default=None, init=False)
+    posterior_saved_path: Optional[Path] = field(default=None, init=False)
+
+    def __attrs_post_init__(self):
+        self.export_grayscale = (self.colormap is None)
+
+    @classmethod
+    def init_greyscale(cls, **kwargs):
+        desired_colormap = kwargs.pop('colormap', None)
+        assert desired_colormap is None
+        _obj = cls(colormap=None, **kwargs) # is_greyscale=True, 
+        return _obj
+    
+
+    def to_dict(self) -> Dict:
+        filter_fn = lambda attr, value: attr.name not in ["export_folder", "posterior_saved_image", "posterior_saved_path"]
+        return asdict(deepcopy(self), recurse=False, filter=filter_fn)
 
 
 
@@ -333,9 +367,11 @@ class PosteriorExporting:
     # Save/Load                                                                                                            #
     # ==================================================================================================================== #
     @classmethod
-    @function_attributes(short_name=None, tags=['IMPORTANT', 'save', 'export', 'ESSENTIAL', 'posterior', 'export'], input_requires=[], output_provides=[], uses=['h5py'], used_by=[], creation_date='2024-08-05 10:47', related_items=[])
+    @function_attributes(short_name=None, tags=['IMPORTANT', 'save', 'export', 'ESSENTIAL', 'posterior', 'export'], input_requires=[], output_provides=[], uses=['SingleEpochDecodedResult.save_posterior_as_image'], used_by=['cls.perform_export_all_decoded_posteriors_as_images'], creation_date='2024-08-05 10:47', related_items=[])
     def export_decoded_posteriors_as_images(cls, a_decoder_decoded_epochs_result: DecodedFilterEpochsResult, # decoder_ripple_filter_epochs_decoder_result_dict: DecoderResultDict,
-                                             posterior_out_folder:Path='output/_temp_individual_posteriors', should_export_separate_color_and_greyscale: bool = True, desired_height=None, out_context=None, debug_print=False): # decoders_dict: Dict[types.DecoderName, BasePositionDecoder], 
+                                             posterior_out_folder:Path='output/_temp_individual_posteriors',
+                                             should_export_separate_color_and_greyscale: bool = True, custom_export_formats: Optional[Dict[str, HeatmapExportConfig]]=None, colormap='viridis',
+                                             desired_height=None, **kwargs): # decoders_dict: Dict[types.DecoderName, BasePositionDecoder], 
         """Save the decoded posteiors (decoded epochs) into an image file
         
         Usage:
@@ -370,12 +406,31 @@ class PosteriorExporting:
         # posterior_out_folder = parent_output_folder.joinpath(DAY_DATE_TO_USE, epochs_name).resolve()
         posterior_out_folder.mkdir(parents=True, exist_ok=True)
 
-        if should_export_separate_color_and_greyscale:
-            posterior_out_folder_greyscale = posterior_out_folder.joinpath('greyscale').resolve()
-            posterior_out_folder_color = posterior_out_folder.joinpath('color').resolve()
-            posterior_out_folder_greyscale.mkdir(parents=True, exist_ok=True)
-            posterior_out_folder_color.mkdir(parents=True, exist_ok=True)
+        # if should_export_separate_color_and_greyscale:
+        #     posterior_out_folder_greyscale = posterior_out_folder.joinpath('greyscale').resolve()
+        #     posterior_out_folder_color = posterior_out_folder.joinpath('color').resolve()
+        #     posterior_out_folder_greyscale.mkdir(parents=True, exist_ok=True)
+        #     posterior_out_folder_color.mkdir(parents=True, exist_ok=True)
 
+        if custom_export_formats is None:
+            if should_export_separate_color_and_greyscale:
+                custom_export_formats: Dict[str, HeatmapExportConfig] = {'greyscale': HeatmapExportConfig.init_greyscale(desired_height=desired_height, **kwargs),
+					   'color': HeatmapExportConfig(colormap=colormap, desired_height=desired_height, **kwargs),
+                }
+            else:
+                ## just greyscale?
+                custom_export_formats: Dict[str, HeatmapExportConfig] = {'greyscale': HeatmapExportConfig.init_greyscale(desired_height=desired_height, **kwargs)
+                                                                        }
+                
+                
+        
+        if custom_export_formats is not None:
+            for k, v in custom_export_formats.items():
+                if v.export_folder is None:
+                    v.export_folder = posterior_out_folder.joinpath(k).resolve()
+                ## create the folder if needed
+                v.export_folder.mkdir(parents=True, exist_ok=True)
+                    
         num_filter_epochs: int = a_decoder_decoded_epochs_result.num_filter_epochs
         
         _save_out_paths = []
@@ -386,27 +441,42 @@ class PosteriorExporting:
                 ## set to 1x
                 desired_height = active_captured_single_epoch_result.n_xbins # 1 pixel for each xbin
 
-            if should_export_separate_color_and_greyscale:
-                _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=posterior_out_folder_color, export_grayscale=False, skip_img_normalization=False, desired_height=desired_height)
-                _save_out_paths.append(posterior_save_path)
-                _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=posterior_out_folder_greyscale, export_grayscale=True, skip_img_normalization=False, desired_height=desired_height)
-                _save_out_paths.append(posterior_save_path)	
-            else:
-                # Greyscale only:
-                _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=posterior_out_folder, export_grayscale=True, skip_img_normalization=False, desired_height=desired_height)
-                _save_out_paths.append(posterior_save_path)
-        # end for
+            # if should_export_separate_color_and_greyscale:
+            #     _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=posterior_out_folder_color, export_grayscale=False, colormap=colormap, skip_img_normalization=False, desired_height=desired_height, **kwargs)
+            #     _save_out_paths.append(posterior_save_path)
+            #     _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=posterior_out_folder_greyscale, export_grayscale=True, skip_img_normalization=False, desired_height=desired_height, **kwargs)
+            #     _save_out_paths.append(posterior_save_path)	
+            # else:
+            #     # Greyscale only:
+            #     _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=posterior_out_folder, export_grayscale=True, skip_img_normalization=False, desired_height=desired_height, **kwargs)
+            #     _save_out_paths.append(posterior_save_path)
+                
 
-        if should_export_separate_color_and_greyscale:
-            return (posterior_out_folder, posterior_out_folder_greyscale, posterior_out_folder_color), _save_out_paths
-        else:
-            return (posterior_out_folder, ), _save_out_paths
+            if custom_export_formats is not None:
+                for k, v in custom_export_formats.items():
+                    if v.export_folder is None:
+                        v.export_folder = posterior_out_folder.joinpath(k).resolve()
+                    ## create the folder if needed
+                    # _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=v.export_folder, export_grayscale=v.export_grayscale, colormap=v.colormap, skip_img_normalization=False, desired_height=desired_height, **kwargs)
+                    _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=v.export_folder, **(kwargs|v.to_dict()))
+                    v.posterior_saved_path = posterior_save_path
+                    v.posterior_saved_image = _posterior_image
+                    _save_out_paths.append(posterior_save_path)
+                
+                    
+        # end for
+        
+        return (posterior_out_folder, custom_export_formats, ), _save_out_paths
+        # if should_export_separate_color_and_greyscale:
+        #     return (posterior_out_folder, custom_export_formats, ), _save_out_paths
+        # else:
+        #     return (posterior_out_folder, custom_export_formats, ), _save_out_paths
                 
         
     @classmethod
     @function_attributes(short_name=None, tags=['export', 'images', 'ESSENTIAL'], input_requires=[], output_provides=[], uses=['export_decoded_posteriors_as_images'], used_by=[], creation_date='2024-08-28 08:36', related_items=[])
     def perform_export_all_decoded_posteriors_as_images(cls, decoder_laps_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult],
-                                                         _save_context: IdentifyingContext, parent_output_folder: Path, should_export_separate_color_and_greyscale: bool = True, desired_height=None):
+                                                         _save_context: IdentifyingContext, parent_output_folder: Path, custom_export_formats: Optional[Dict[str, HeatmapExportConfig]]=None, desired_height=None):
         """
         
         Usage:
@@ -419,32 +489,38 @@ class PosteriorExporting:
         History:
             Refactored from `ComputerVisionComputations` on 2024-09-30
         """
-        def _subfn_perform_export_single_epochs(_active_filter_epochs_decoder_result_dict, a_save_context: IdentifyingContext, epochs_name: str, a_parent_output_folder: Path) -> IdentifyingContext:
+        def _subfn_perform_export_single_epochs(_active_filter_epochs_decoder_result_dict, a_save_context: IdentifyingContext, epochs_name: str, a_parent_output_folder: Path, custom_export_formats: Optional[Dict[str, HeatmapExportConfig]]=None) -> IdentifyingContext:
             """ saves a single set of named epochs, like 'laps' or 'ripple' 
             captures: desired_height, should_export_separate_color_and_greyscale, 
             """
             out_paths = {}
+            out_custom_export_formats_dict = {}
+
             for a_decoder_name, a_decoder_decoded_epochs_result in _active_filter_epochs_decoder_result_dict.items():
                 # _save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_decoded_posteriors_to_HDF5', decoder_name=a_decoder_name, epochs_name=epochs_name)
-                _specific_save_context = deepcopy(a_save_context).overwriting_context(decoder_name=a_decoder_name, epochs_name=epochs_name)                    
+                # _specific_save_context = deepcopy(a_save_context).overwriting_context(decoder_name=a_decoder_name, epochs_name=epochs_name)                    
                 posterior_out_folder = a_parent_output_folder.joinpath(epochs_name, a_decoder_name).resolve()
                 # posterior_out_folder.mkdir(parents=True, exist_ok=True)
                 # posterior_out_folder = posterior_out_folder.joinpath(a_decoder_name).resolve()
                 posterior_out_folder.mkdir(parents=True, exist_ok=True)
                 # print(f'a_decoder_name: {a_decoder_name}, _specific_save_context: {_specific_save_context}, posterior_out_folder: {posterior_out_folder}')
-                (an_out_posterior_out_folder, *an_out_path_extra_paths), an_out_flat_save_out_paths = cls.export_decoded_posteriors_as_images(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, out_context=_specific_save_context, posterior_out_folder=posterior_out_folder, desired_height=desired_height, should_export_separate_color_and_greyscale=should_export_separate_color_and_greyscale)
-                out_paths[a_decoder_name] = an_out_posterior_out_folder
+                # (an_out_posterior_out_folder, *an_out_path_extra_paths), an_out_flat_save_out_paths = cls.export_decoded_posteriors_as_images(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, out_context=_specific_save_context, posterior_out_folder=posterior_out_folder, desired_height=desired_height, custom_exports_dict=custom_exports_dict)
+                (an_out_posterior_out_folder, a_custom_export_formats), an_out_flat_save_out_paths = cls.export_decoded_posteriors_as_images(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, posterior_out_folder=posterior_out_folder, desired_height=desired_height, custom_export_formats=custom_export_formats)
                 
-            return out_paths
+                out_paths[a_decoder_name] = an_out_posterior_out_folder
+                out_custom_export_formats_dict[a_decoder_name] = a_custom_export_formats
+                
+            return out_paths, out_custom_export_formats_dict
 
 
         # parent_output_folder = Path(r'output/_temp_individual_posteriors').resolve()
         assert parent_output_folder.exists(), f"parent_output_folder: {parent_output_folder} does not exist"
         
-        out_paths = {'laps': None, 'ripple': None}
-        out_paths['laps'] = _subfn_perform_export_single_epochs(decoder_laps_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='laps', a_parent_output_folder=parent_output_folder)
-        out_paths['ripple'] = _subfn_perform_export_single_epochs(decoder_ripple_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='ripple', a_parent_output_folder=parent_output_folder)
-        return out_paths
+        out_paths_dict = {'laps': None, 'ripple': None}
+        out_custom_formats_dict = {'laps': None, 'ripple': None}
+        out_paths_dict['laps'], out_custom_formats_dict['laps'] = _subfn_perform_export_single_epochs(decoder_laps_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='laps', a_parent_output_folder=parent_output_folder, custom_export_formats=custom_export_formats)
+        out_paths_dict['ripple'], out_custom_formats_dict['ripple'] = _subfn_perform_export_single_epochs(decoder_ripple_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='ripple', a_parent_output_folder=parent_output_folder, custom_export_formats=custom_export_formats)
+        return out_paths_dict, out_custom_formats_dict
 
 
 
