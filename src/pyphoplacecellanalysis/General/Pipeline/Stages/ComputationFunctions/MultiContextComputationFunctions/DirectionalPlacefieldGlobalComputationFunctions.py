@@ -1,3 +1,5 @@
+from __future__ import annotations # prevents having to specify types for typehinting as strings
+from typing import TYPE_CHECKING
 import numpy as np
 import pandas as pd
 from attrs import define, field, Factory, asdict, astuple
@@ -47,6 +49,14 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import LayoutScrollability
 
 decoder_name_str: TypeAlias = str # an string name of a particular decoder, such as 'Long_LR' or 'Short_RL'
+
+if TYPE_CHECKING:
+    ## typehinting only imports here
+    # from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, SingleEpochDecodedResult #typehinting only
+    # from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow, LayoutScrollability
+    from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportConfig
+
+
 
 # Assume a1 and a2 are your numpy arrays
 # def find_shift(a1, a2):
@@ -6618,7 +6628,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
     @function_attributes(short_name='directional_decoded_stacked_epoch_slices', tags=['scatter-plot', 'directional_merged_decoder_decoded_epochs','directional','marginal'],
                           input_requires=['RankOrder', 'DirectionalLaps', 'DirectionalMergedDecoders', 'DirectionalDecodersEpochsEvaluations'], output_provides=[], uses=['PosteriorExporting.perform_export_all_decoded_posteriors_as_images'], used_by=[], creation_date='2024-09-27 17:08', related_items=[], is_global=True)
-    def _display_directional_merged_pf_decoded_stacked_epoch_slices(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, **kwargs):
+    def _display_directional_merged_pf_decoded_stacked_epoch_slices(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, custom_export_formats: Dict[str, "HeatmapExportConfig"]=None, **kwargs):
         """ Exports all decoded epoch posteriors separately to a folder. NON-VISUAL, never displays.
          Effectively the entire stack of decoded epochs for both the long and short, including their Radon transformed lines if that information is available.
 
@@ -6703,7 +6713,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         _specific_session_output_folder = save_path.joinpath(active_context.get_description(subset_excludelist=['format_name'])).resolve()
         _specific_session_output_folder.mkdir(parents=True, exist_ok=True)
         print(f'\tspecific_session_output_folder: "{_specific_session_output_folder}"')
-        out_paths, out_custom_formats_dict = PosteriorExporting.perform_export_all_decoded_posteriors_as_images(decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, _save_context=_parent_save_context, parent_output_folder=_specific_session_output_folder, desired_height=None)
+        out_paths, out_custom_formats_dict = PosteriorExporting.perform_export_all_decoded_posteriors_as_images(decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, _save_context=_parent_save_context, parent_output_folder=_specific_session_output_folder, desired_height=None, custom_export_formats=custom_export_formats)
         # out_paths
         print(_specific_session_output_folder)
 

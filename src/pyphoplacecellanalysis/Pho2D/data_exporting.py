@@ -421,9 +421,7 @@ class PosteriorExporting:
                 ## just greyscale?
                 custom_export_formats: Dict[str, HeatmapExportConfig] = {'greyscale': HeatmapExportConfig.init_greyscale(desired_height=desired_height, **kwargs)
                                                                         }
-                
-                
-        
+
         if custom_export_formats is not None:
             for k, v in custom_export_formats.items():
                 if v.export_folder is None:
@@ -434,6 +432,7 @@ class PosteriorExporting:
         num_filter_epochs: int = a_decoder_decoded_epochs_result.num_filter_epochs
         
         _save_out_paths = []
+        _save_out_format_results: Dict[str, List] = {}
         for i in np.arange(num_filter_epochs):
             active_captured_single_epoch_result: SingleEpochDecodedResult = a_decoder_decoded_epochs_result.get_result_for_epoch(active_epoch_idx=i)
 
@@ -453,20 +452,25 @@ class PosteriorExporting:
                 
 
             if custom_export_formats is not None:
+                
                 for k, v in custom_export_formats.items():
                     if v.export_folder is None:
                         v.export_folder = posterior_out_folder.joinpath(k).resolve()
+                    if k not in _save_out_format_results:
+                        ## create the empty result:
+                        _save_out_format_results[k] = []
+                        
                     ## create the folder if needed
                     # _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=v.export_folder, export_grayscale=v.export_grayscale, colormap=v.colormap, skip_img_normalization=False, desired_height=desired_height, **kwargs)
                     _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=v.export_folder, **(kwargs|v.to_dict()))
                     v.posterior_saved_path = posterior_save_path
                     v.posterior_saved_image = _posterior_image
                     _save_out_paths.append(posterior_save_path)
-                
+                    _save_out_format_results[k].append(v) # save out the modified v
                     
         # end for
         
-        return (posterior_out_folder, custom_export_formats, ), _save_out_paths
+        return (posterior_out_folder, _save_out_format_results, ), _save_out_paths
         # if should_export_separate_color_and_greyscale:
         #     return (posterior_out_folder, custom_export_formats, ), _save_out_paths
         # else:
@@ -494,7 +498,7 @@ class PosteriorExporting:
             captures: desired_height, should_export_separate_color_and_greyscale, 
             """
             out_paths = {}
-            out_custom_export_formats_dict = {}
+            out_custom_export_formats_results_dict = {}
 
             for a_decoder_name, a_decoder_decoded_epochs_result in _active_filter_epochs_decoder_result_dict.items():
                 # _save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_decoded_posteriors_to_HDF5', decoder_name=a_decoder_name, epochs_name=epochs_name)
@@ -505,22 +509,22 @@ class PosteriorExporting:
                 posterior_out_folder.mkdir(parents=True, exist_ok=True)
                 # print(f'a_decoder_name: {a_decoder_name}, _specific_save_context: {_specific_save_context}, posterior_out_folder: {posterior_out_folder}')
                 # (an_out_posterior_out_folder, *an_out_path_extra_paths), an_out_flat_save_out_paths = cls.export_decoded_posteriors_as_images(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, out_context=_specific_save_context, posterior_out_folder=posterior_out_folder, desired_height=desired_height, custom_exports_dict=custom_exports_dict)
-                (an_out_posterior_out_folder, a_custom_export_formats), an_out_flat_save_out_paths = cls.export_decoded_posteriors_as_images(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, posterior_out_folder=posterior_out_folder, desired_height=desired_height, custom_export_formats=custom_export_formats)
+                (an_out_posterior_out_folder, a_custom_export_format_results), an_out_flat_save_out_paths = cls.export_decoded_posteriors_as_images(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, posterior_out_folder=posterior_out_folder, desired_height=desired_height, custom_export_formats=custom_export_formats)
                 
                 out_paths[a_decoder_name] = an_out_posterior_out_folder
-                out_custom_export_formats_dict[a_decoder_name] = a_custom_export_formats
+                out_custom_export_formats_results_dict[a_decoder_name] = a_custom_export_format_results
                 
-            return out_paths, out_custom_export_formats_dict
+            return out_paths, out_custom_export_formats_results_dict
 
 
         # parent_output_folder = Path(r'output/_temp_individual_posteriors').resolve()
         assert parent_output_folder.exists(), f"parent_output_folder: {parent_output_folder} does not exist"
         
         out_paths_dict = {'laps': None, 'ripple': None}
-        out_custom_formats_dict = {'laps': None, 'ripple': None}
-        out_paths_dict['laps'], out_custom_formats_dict['laps'] = _subfn_perform_export_single_epochs(decoder_laps_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='laps', a_parent_output_folder=parent_output_folder, custom_export_formats=custom_export_formats)
-        out_paths_dict['ripple'], out_custom_formats_dict['ripple'] = _subfn_perform_export_single_epochs(decoder_ripple_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='ripple', a_parent_output_folder=parent_output_folder, custom_export_formats=custom_export_formats)
-        return out_paths_dict, out_custom_formats_dict
+        out_custom_formats_results_dict = {'laps': None, 'ripple': None}
+        out_paths_dict['laps'], out_custom_formats_results_dict['laps'] = _subfn_perform_export_single_epochs(decoder_laps_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='laps', a_parent_output_folder=parent_output_folder, custom_export_formats=custom_export_formats)
+        out_paths_dict['ripple'], out_custom_formats_results_dict['ripple'] = _subfn_perform_export_single_epochs(decoder_ripple_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='ripple', a_parent_output_folder=parent_output_folder, custom_export_formats=custom_export_formats)
+        return out_paths_dict, out_custom_formats_results_dict
 
 
 
