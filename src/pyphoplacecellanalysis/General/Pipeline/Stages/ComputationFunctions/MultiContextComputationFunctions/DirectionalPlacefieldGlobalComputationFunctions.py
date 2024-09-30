@@ -6713,7 +6713,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         _specific_session_output_folder = save_path.joinpath(active_context.get_description(subset_excludelist=['format_name'])).resolve()
         _specific_session_output_folder.mkdir(parents=True, exist_ok=True)
         print(f'\tspecific_session_output_folder: "{_specific_session_output_folder}"')
-        out_paths, out_custom_formats_dict = PosteriorExporting.perform_export_all_decoded_posteriors_as_images(decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, _save_context=_parent_save_context, parent_output_folder=_specific_session_output_folder, desired_height=None, custom_export_formats=custom_export_formats)
+        out_paths, out_custom_formats_dict = PosteriorExporting.perform_export_all_decoded_posteriors_as_images(decoder_laps_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict,
+                                                                                                                 _save_context=_parent_save_context, parent_output_folder=_specific_session_output_folder, desired_height=None, custom_export_formats=custom_export_formats)
         # out_paths
         print(_specific_session_output_folder)
 
