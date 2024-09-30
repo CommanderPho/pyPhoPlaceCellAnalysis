@@ -2022,7 +2022,7 @@ def plot_short_v_long_pf1D_scalar_overlap_comparison(overlap_scalars_df, pf_neur
 
 
 @function_attributes(short_name='long_short_fr_indicies', tags=['private', 'long_short', 'long_short_firing_rate', 'firing_rate', 'display', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['_display_short_long_firing_rate_index_comparison', 'AcrossSessionsVisualizations.across_sessions_firing_rate_index_figure'], creation_date='2023-03-28 14:20')
-def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, neurons_colors=None, debug_print=False, is_centered = False, enable_hover_labels=True, enable_tiny_point_labels=True, swap_xy_axis=False, include_axes_lines=True, enable_histograms=True, **scatter_params):
+def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, neurons_colors=None, debug_print=False, is_centered = False, enable_hover_labels=True, enable_tiny_point_labels=True, swap_xy_axis=False, include_axes_lines=True, enable_histograms=True, enable_subplot_mosaic_style:bool=True, **scatter_params):
     """ Plot long|short firing rate index 
     Each datapoint is a neuron.
 
@@ -2044,7 +2044,10 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     # rc('text',usetex=True)
     # rc('text.latex', preamble=r'\usepackage{color}')
 
-
+    enable_diagonal_histogram: bool = True      
+    diagonal_y_equals_x_line_kwargs = dict(linestyle='--', color='gray', label='y=x')
+    fig_kwargs = dict(figsize=(8.5, 7.25), num=f'long|short fr indicies_{active_context.get_description(separator="/")}', clear=True)
+    
     if enable_hover_labels:
         import mplcursors # for hover tooltips that specify the aclu of the selected point
 
@@ -2139,8 +2142,31 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         # point_colors = '#33333333'
         point_colors = scatter_params.pop('point_colors', '#33333333')
         
-    fig, ax = plt.subplots(figsize=(8.5, 7.25), num=f'long|short fr indicies_{active_context.get_description(separator="/")}', clear=True)
 
+    # Begin Plotting _____________________________________________________________________________________________________ #
+    
+    if enable_subplot_mosaic_style:
+        fig = plt.figure(**fig_kwargs) # layout="constrained", 
+        ax_dict = fig.subplot_mosaic(
+            [   
+                ["ax_histx", "ax_histdiagonal"],
+                ["ax_scatter", "ax_histy"],
+            ],
+            # set the height ratios between the rows
+            height_ratios=[1, 8],
+            # height_ratios=[1, 1],
+            # set the width ratios between the columns
+            width_ratios=[8, 1],
+            # sharey=True,
+            gridspec_kw=dict(wspace=0, hspace=0) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+        )
+        ax = ax_dict["ax_scatter"]
+
+    else:
+        # regular old subplot style
+        fig, ax = plt.subplots(**fig_kwargs)
+        ax_dict = None 
+        
     xlabel_kwargs = {}
     ylabel_kwargs = {}
     if is_centered:
@@ -2148,8 +2174,10 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         ylabel_kwargs = dict(loc='bottom')
 
     scatter_plot = ax.scatter(x_frs_index.values, y_frs_index.values, c=point_colors, **scatter_params) # , s=10, alpha=0.5
-    plt.xlabel(xlabel_str, fontsize=18, **xlabel_kwargs)
-    plt.ylabel(ylabel_str, fontsize=18, **ylabel_kwargs)
+    ax.set_xlabel(xlabel_str, fontsize=18, **xlabel_kwargs)
+    ax.set_ylabel(ylabel_str, fontsize=18, **ylabel_kwargs)
+    # plt.xlabel(xlabel_str, fontsize=18, **xlabel_kwargs)
+    # plt.ylabel(ylabel_str, fontsize=18, **ylabel_kwargs)
 
     ## Non-flexitext version:
     # plt.title('long ($L$)|short($S$) firing rate indicies')
@@ -2159,7 +2187,6 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     text_formatter = FormattedFigureText()
     plt.title('')
     plt.suptitle('')
-    fig = plt.gcf() # get figure to setup the margins on.
     text_formatter.setup_margins(fig)
     flexitext(text_formatter.left_margin, text_formatter.top_margin, '<size:22><color:royalblue, weight:bold>long ($L$)</>|<color:crimson, weight:bold>short($S$)</> <weight:bold>firing rate indicies</></>', va="bottom", xycoords="figure fraction")
     footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
@@ -2197,6 +2224,8 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     # # Call the function above. All the magic happens there.
     # add_value_labels(ax, labels=x_labels) # 
     
+
+    
     if include_axes_lines:
         # Plots axes lines at the zero and extremes of the x and y axis.
         
@@ -2215,8 +2244,8 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         ax.axhline(y=0.0, color='grey', linestyle='-', **_line_kwargs)  # Horizontal line at y = 0
         ax.axhline(y=1.0, color=short_color, **_boundary_line_kwargs, **_line_kwargs)  # Horizontal line at y = +1
 
-        # Add y=x line:
-        ax.plot(ax.get_xlim(), ax.get_ylim(), linestyle='--', color='gray', label='y=x')
+        # Add y=x diagonal line:
+        ax.plot(ax.get_xlim(), ax.get_ylim(), **diagonal_y_equals_x_line_kwargs)
 
         # Assuming you have an existing axis 'ax'
         # ax.margins(x=0.01, y=0.01)  # Adds 10% margin on x-axis and 20% margin on y-axis
@@ -2226,18 +2255,110 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         
 
     if enable_histograms:
-        
+        ## plot the left and top marginal histograms
+        from matplotlib.transforms import Affine2D
         from mpl_toolkits.axes_grid1 import make_axes_locatable
+        import mpl_toolkits.axisartist.angle_helper as angle_helper
+        import mpl_toolkits.axisartist.floating_axes as floating_axes
+        from mpl_toolkits.axisartist.grid_finder import (DictFormatter, FixedLocator, MaxNLocator)
+
+
+        def _build_diagonal_histogram(long_short_fr_indicies_analysis_table, ax_histdiagonal, binwidth:float=0.075):
+            """ 2024-09-30 - Plots the histogram along the y=x diagonal line:
+            
+            """
+            ## Add the 'x_frs_index_rot' and 'y_frs_index_rot' columns by applying a rotation by +90 degrees:
+            long_short_fr_indicies_analysis_table['x_frs_index_rot'] = long_short_fr_indicies_analysis_table['x_frs_index'].copy()
+            long_short_fr_indicies_analysis_table['y_frs_index_rot'] = long_short_fr_indicies_analysis_table['y_frs_index'].copy()
+
+            long_short_fr_indicies_analysis_table['x_frs_index_rot'] = (long_short_fr_indicies_analysis_table['x_frs_index'].copy() + long_short_fr_indicies_analysis_table['y_frs_index'].copy())/np.sqrt(2)
+            long_short_fr_indicies_analysis_table['y_frs_index_rot'] = (long_short_fr_indicies_analysis_table['y_frs_index'].copy() - long_short_fr_indicies_analysis_table['x_frs_index'].copy())/np.sqrt(2)
+
+            # x = long_short_fr_indicies_analysis_table['x_frs_index_rot'].values
+            y = long_short_fr_indicies_analysis_table['y_frs_index_rot'].values # we only actually need the rotated y-axis values
+
+            # now determine nice limits by hand:
+            
+            # xymax = max(np.max(np.abs(x)), np.max(np.abs(y)))
+            xymax = np.nanmax(np.abs(y))
+            lim = (int(xymax/binwidth) + 1)*binwidth
+            
+            xlims = [-lim, (lim + binwidth)]
+            # ylims = [np.nanmin(y), np.nanmax(y)]
+            bins = np.arange(xlims[0], xlims[1], binwidth)
+            # ax_histdiagonal.hist(x, bins=bins, color='black')
+            # diagonal_hist_artist_tuple = ax_histdiagonal.hist(y, bins=bins, orientation='horizontal', color='black')
+            diagonal_hist_artist_tuple = ax_histdiagonal.hist(y, bins=bins, orientation='vertical', color='black')
+            max_num_bins = np.max(diagonal_hist_artist_tuple[0])
+            ylims = [0.0, float(max_num_bins)] ## determine the max number of bars dynamically from the histogram outputs
+            
+            # Set the tick marks and labels as desired
+            # ax_histdiagonal.set_xticks([])
+            ax_histdiagonal.set_yticks([])
+
+            ax_histdiagonal.spines[['left', 'bottom', 'right', 'top']].set_visible(False)
+
+            # make some labels invisible
+            # ax_histdiagonal.xaxis.set_tick_params(labelbottom=False)
+            # ax_histdiagonal.yaxis.set_tick_params(labelleft=False)
+
+            # Set no tick labels for both axes
+            ax_histdiagonal.set_xticklabels([])  # No x-axis tick labels
+            # ax_histdiagonal.set_yticklabels([])  # No y-axis tick labels
+
+            # Optional: Completely disable ticks if you want to remove tick marks as well
+            # ax_histdiagonal.tick_params(axis='both', which='both', length=0)  # Hide all ticks
+            ax_histdiagonal.tick_params(axis='y', which='both', length=0)  # Hide all y-axis ticks
+            
+            # Vertical x=0.0 line
+            midline_artist = ax_histdiagonal.axvline(x=0, ymin=0, ymax=ylims[1], color='gray', linestyle='--')
+            
+            # Enable x-axis tick labels
+            ax_histdiagonal.spines[['bottom']].set_visible(True) # enable bottom bar
+            # ax_histdiagonal.spines[['left', 'bottom', 'right', 'top']].set_visible(False)
+            ax_histdiagonal.set_xticks([-np.sqrt(2), 0, np.sqrt(2)])
+            ax_histdiagonal.set_xticklabels(["$-\sqrt{2}$", 0, "$\sqrt{2}$"])  
+
+            return ((diagonal_hist_artist_tuple, midline_artist), (xlims, ylims))
+
 
         # Set aspect of the main Axes.
         ax.set_aspect(1.)
 
-        # create new Axes on the right and on the top of the current Axes
-        divider = make_axes_locatable(ax)
-        # below height and pad are in inches
-        ax_histx = divider.append_axes("top", 1.2, pad=0.1, sharex=ax)
-        ax_histy = divider.append_axes("right", 1.2, pad=0.1, sharey=ax)
+        if enable_subplot_mosaic_style:
+            # extract the already created dict axes:
+            ax_histx = ax_dict['ax_histx']
+            ax_histy = ax_dict['ax_histy']
+            if enable_diagonal_histogram:
+                ax_histdiagonal = ax_dict['ax_histdiagonal']
 
+            ax_histx.sharex(ax_dict["ax_scatter"])
+            ax_histy.sharey(ax_dict["ax_scatter"])
+
+            if enable_diagonal_histogram:
+                ax_histdiagonal.sharex(ax_dict["ax_scatter"])
+                ax_histdiagonal.sharey(ax_dict["ax_scatter"])
+                ax_histdiagonal.xaxis.set_tick_params(labelbottom=False)
+                ax_histdiagonal.yaxis.set_tick_params(labelleft=False)
+                ax_histdiagonal.xaxis.set_ticks_position('none')  # Hide x-axis ticks
+                ax_histdiagonal.yaxis.set_ticks_position('none')  # Hide x-axis ticks
+    
+
+        else:
+            # create new Axes on the right and on the top of the current Axes
+            divider = make_axes_locatable(ax_histx)
+            
+            # below height and pad are in inches
+            ax_histx = divider.append_axes("top", 1.2, pad=0.1, sharex=ax)
+            ax_histy = divider.append_axes("right", 1.2, pad=0.1, sharey=ax)
+            
+
+            if enable_diagonal_histogram:
+                raise NotImplementedError(f'enable_diagonal_histogram=True is only implemented for enable_subplot_mosaic_style=True!')
+                # divider = make_axes_locatable(ax)            
+                # ax_histdiagonal = divider.append_axes("top", 1.2, pad=0.1, sharex=ax)
+
+        # end if
         # make some labels invisible
         ax_histx.xaxis.set_tick_params(labelbottom=False)
         ax_histy.yaxis.set_tick_params(labelleft=False)
