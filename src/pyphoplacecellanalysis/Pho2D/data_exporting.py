@@ -23,14 +23,17 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionD
 
 
 # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
-from typing import Dict, List, Tuple, Optional, Callable, Union, Any
-from typing import NewType
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any, Literal, NewType
 from typing_extensions import TypeAlias
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
+
+# Custom Type Definitions ____________________________________________________________________________________________ #
 decoder_name: TypeAlias = str # a string that describes a decoder, such as 'LongLR' or 'ShortRL'
 epoch_split_key: TypeAlias = str # a string that describes a split epoch, such as 'train' or 'test'
 DecoderName = NewType('DecoderName', str)
+# Define the type alias
+KnownEpochsName = Literal['laps', 'ripple', 'other']
 
 import matplotlib.pyplot as plt
 import pyphoplacecellanalysis.External.pyqtgraph as pg
@@ -119,8 +122,6 @@ class PosteriorExporting:
         print(f'video_out_path: {video_out_path}')
         # reveal_in_system_file_manager(video_out_path)
         return video_out_path
-
-
 
     @function_attributes(short_name=None, tags=['figure', 'save', 'IMPORTANT', 'marginal'], input_requires=[], output_provides=[], uses=[], used_by=['save_marginals_arrays_as_image'], creation_date='2024-01-23 00:00', related_items=[])
     @classmethod
@@ -265,8 +266,6 @@ class PosteriorExporting:
         
         return marginal_dir_tuple, marginal_track_identity_tuple, marginal_dir_point_tuple, marginal_track_identity_point_tuple, _out_save_tuples
         
-
-
     @function_attributes(short_name=None, tags=['export','marginal', 'pseudo2D', 'IMPORTANT'], input_requires=[], output_provides=[], uses=['save_posterior'], used_by=[], creation_date='2024-09-10 00:06', related_items=[])
     @classmethod
     def save_marginals_arrays_as_image(cls, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, parent_array_as_image_output_folder: Path, epoch_id_identifier_str: str = 'ripple', epoch_ids=None, export_all_raw_marginals_separately: bool=True, include_value_labels:bool=False, allow_override_aspect_ratio:bool=True, debug_print=False):
@@ -328,7 +327,355 @@ class PosteriorExporting:
                                                                                         debug_print=debug_print)
         return out_tuple_dict
         
+
+
+    # ==================================================================================================================== #
+    # Save/Load                                                                                                            #
+    # ==================================================================================================================== #
+    @classmethod
+    @function_attributes(short_name=None, tags=['IMPORTANT', 'save', 'export', 'ESSENTIAL', 'posterior', 'export'], input_requires=[], output_provides=[], uses=['h5py'], used_by=[], creation_date='2024-08-05 10:47', related_items=[])
+    def export_decoded_posteriors_as_images(cls, a_decoder_decoded_epochs_result: DecodedFilterEpochsResult, # decoder_ripple_filter_epochs_decoder_result_dict: DecoderResultDict,
+                                             posterior_out_folder:Path='output/_temp_individual_posteriors', should_export_separate_color_and_greyscale: bool = True, desired_height=None, out_context=None, debug_print=False): # decoders_dict: Dict[types.DecoderName, BasePositionDecoder], 
+        """Save the decoded posteiors (decoded epochs) into an image file
+        
+        Usage:
+            from pyphoplacecellanalysis.Analysis.Decoder.computer_vision import ComputerVisionComputations
+            should_export_separate_color_and_greyscale: bool = True
+            # a_decoder_decoded_epochs_result: DecodedFilterEpochsResult = decoder_laps_filter_epochs_decoder_result_dict['long_LR']
+            # epochs_name='laps'
+            a_decoder_decoded_epochs_result: DecodedFilterEpochsResult = decoder_ripple_filter_epochs_decoder_result_dict['long_LR']
+            epochs_name='ripple'
+
+            parent_output_folder = Path(r'output/_temp_individual_posteriors').resolve()
+            posterior_out_folder = parent_output_folder.joinpath(DAY_DATE_TO_USE, epochs_name).resolve()
+
+            (posterior_out_folder, posterior_out_folder_greyscale, posterior_out_folder_color), _save_out_paths = PosteriorExporting.export_decoded_posteriors_as_images(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, posterior_out_folder=posterior_out_folder, should_export_separate_color_and_greyscale=should_export_separate_color_and_greyscale)
+
+            if should_export_separate_color_and_greyscale:
+                fullwidth_path_widget(posterior_out_folder_greyscale)
+                fullwidth_path_widget(posterior_out_folder_color)
+            else:
+                fullwidth_path_widget(posterior_out_folder)
+                
+        History:
+            Refactored from `ComputerVisionComputations` on 2024-09-30
+        """
+
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
+
+        if not isinstance(posterior_out_folder, Path):
+            posterior_out_folder = Path(posterior_out_folder).resolve()
+
+        # parent_output_folder = Path(r'output/_temp_individual_posteriors').resolve()
+        # posterior_out_folder = parent_output_folder.joinpath(DAY_DATE_TO_USE, epochs_name).resolve()
+        posterior_out_folder.mkdir(parents=True, exist_ok=True)
+
+        if should_export_separate_color_and_greyscale:
+            posterior_out_folder_greyscale = posterior_out_folder.joinpath('greyscale').resolve()
+            posterior_out_folder_color = posterior_out_folder.joinpath('color').resolve()
+            posterior_out_folder_greyscale.mkdir(parents=True, exist_ok=True)
+            posterior_out_folder_color.mkdir(parents=True, exist_ok=True)
+
+        num_filter_epochs: int = a_decoder_decoded_epochs_result.num_filter_epochs
+        
+        _save_out_paths = []
+        for i in np.arange(num_filter_epochs):
+            active_captured_single_epoch_result: SingleEpochDecodedResult = a_decoder_decoded_epochs_result.get_result_for_epoch(active_epoch_idx=i)
+
+            if desired_height is None:
+                ## set to 1x
+                desired_height = active_captured_single_epoch_result.n_xbins # 1 pixel for each xbin
+
+            if should_export_separate_color_and_greyscale:
+                _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=posterior_out_folder_color, export_grayscale=False, skip_img_normalization=False, desired_height=desired_height)
+                _save_out_paths.append(posterior_save_path)
+                _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=posterior_out_folder_greyscale, export_grayscale=True, skip_img_normalization=False, desired_height=desired_height)
+                _save_out_paths.append(posterior_save_path)	
+            else:
+                # Greyscale only:
+                _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=posterior_out_folder, export_grayscale=True, skip_img_normalization=False, desired_height=desired_height)
+                _save_out_paths.append(posterior_save_path)
+        # end for
+
+        if should_export_separate_color_and_greyscale:
+            return (posterior_out_folder, posterior_out_folder_greyscale, posterior_out_folder_color), _save_out_paths
+        else:
+            return (posterior_out_folder, ), _save_out_paths
+                
+        
+    @classmethod
+    @function_attributes(short_name=None, tags=['export', 'images', 'ESSENTIAL'], input_requires=[], output_provides=[], uses=['export_decoded_posteriors_as_images'], used_by=[], creation_date='2024-08-28 08:36', related_items=[])
+    def perform_export_all_decoded_posteriors_as_images(cls, decoder_laps_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult],
+                                                         _save_context: IdentifyingContext, parent_output_folder: Path, should_export_separate_color_and_greyscale: bool = True, desired_height=None):
+        """
+        
+        Usage:
+        
+            save_path = Path('output/newest_all_decoded_epoch_posteriors.h5').resolve()
+            _parent_save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_decoded_posteriors_to_HDF5')
+            out_contexts = PosteriorExporting.perform_save_all_decoded_posteriors_to_HDF5(decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, _save_context=_parent_save_context, save_path=save_path)
+            out_contexts
             
+        History:
+            Refactored from `ComputerVisionComputations` on 2024-09-30
+        """
+        def _subfn_perform_export_single_epochs(_active_filter_epochs_decoder_result_dict, a_save_context: IdentifyingContext, epochs_name: str, a_parent_output_folder: Path) -> IdentifyingContext:
+            """ saves a single set of named epochs, like 'laps' or 'ripple' 
+            captures: desired_height, should_export_separate_color_and_greyscale, 
+            """
+            out_paths = {}
+            for a_decoder_name, a_decoder_decoded_epochs_result in _active_filter_epochs_decoder_result_dict.items():
+                # _save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_decoded_posteriors_to_HDF5', decoder_name=a_decoder_name, epochs_name=epochs_name)
+                _specific_save_context = deepcopy(a_save_context).overwriting_context(decoder_name=a_decoder_name, epochs_name=epochs_name)                    
+                posterior_out_folder = a_parent_output_folder.joinpath(epochs_name, a_decoder_name).resolve()
+                # posterior_out_folder.mkdir(parents=True, exist_ok=True)
+                # posterior_out_folder = posterior_out_folder.joinpath(a_decoder_name).resolve()
+                posterior_out_folder.mkdir(parents=True, exist_ok=True)
+                # print(f'a_decoder_name: {a_decoder_name}, _specific_save_context: {_specific_save_context}, posterior_out_folder: {posterior_out_folder}')
+                (an_out_posterior_out_folder, *an_out_path_extra_paths), an_out_flat_save_out_paths = cls.export_decoded_posteriors_as_images(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, out_context=_specific_save_context, posterior_out_folder=posterior_out_folder, desired_height=desired_height, should_export_separate_color_and_greyscale=should_export_separate_color_and_greyscale)
+                out_paths[a_decoder_name] = an_out_posterior_out_folder
+                
+            return out_paths
+
+
+        # parent_output_folder = Path(r'output/_temp_individual_posteriors').resolve()
+        assert parent_output_folder.exists(), f"parent_output_folder: {parent_output_folder} does not exist"
+        
+        out_paths = {'laps': None, 'ripple': None}
+        out_paths['laps'] = _subfn_perform_export_single_epochs(decoder_laps_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='laps', a_parent_output_folder=parent_output_folder)
+        out_paths['ripple'] = _subfn_perform_export_single_epochs(decoder_ripple_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='ripple', a_parent_output_folder=parent_output_folder)
+        return out_paths
+
+
+
+
+    # ==================================================================================================================== #
+    # Save/Load                                                                                                            #
+    # ==================================================================================================================== #
+    @classmethod
+    @function_attributes(short_name=None, tags=['posterior', 'HDF5', 'output', 'save', 'export'], input_requires=[], output_provides=[], uses=['h5py'], used_by=[], creation_date='2024-08-28 02:38', related_items=['load_decoded_posteriors_from_HDF5'])
+    def save_decoded_posteriors_to_HDF5(cls, a_decoder_decoded_epochs_result: DecodedFilterEpochsResult, save_path:Path='decoded_epoch_posteriors.h5', allow_append:bool=False, out_context=None, debug_print=False): # decoders_dict: Dict[types.DecoderName, BasePositionDecoder], 
+        """Save the transitiion matrix info to a file
+        
+        _save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_transition_matricies')
+        _save_path = PosteriorExporting.save_decoded_posteriors_to_HDF5(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, out_context=_save_context, save_path='output/transition_matrix_data.h5')
+        _save_path
+
+        History:
+            Refactored from `ComputerVisionComputations` on 2024-09-30
+        """
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
+        import h5py
+
+        if not isinstance(save_path, Path):
+            save_path = Path(save_path).resolve()
+            
+        if out_context is None:
+            out_context = IdentifyingContext()
+
+        if not allow_append:
+            file_mode = 'w' 
+        else:
+            file_mode = 'r+' # 'x' #
+            
+        # Save to .h5 file
+        with h5py.File(save_path, file_mode) as f: #  
+            # r Readonly, file must exist (default)
+            # r+ Read/write, file must exist 
+            # w Create file, truncate if exists 
+            # w- or x Create file, fail if exists a Read/write if exists, create otherwise
+            if out_context is not None:
+                # add context to the file
+                if not isinstance(out_context, dict):
+                    flat_context_desc: str = out_context.get_description(separator='|') # 'kdiba|gor01|one|2006-6-08_14-26-15|save_transition_matricies'
+                    _out_context_dict = out_context.to_dict() | {'session_context_desc': flat_context_desc}
+                else:
+                    # it is a raw dict
+                    _out_context_dict = deepcopy(out_context)
+                    
+                for k, v in _out_context_dict.items():
+                    ## add the context as file-level metadata
+                    f.attrs[k] = v
+                    
+            ## BEGIN MAIN OUTPUT
+            num_filter_epochs: int = a_decoder_decoded_epochs_result.num_filter_epochs
+            num_required_zero_padding: int = len(str(num_filter_epochs))
+            
+            for i in np.arange(num_filter_epochs):
+                active_captured_single_epoch_result: SingleEpochDecodedResult = a_decoder_decoded_epochs_result.get_result_for_epoch(active_epoch_idx=i)
+                epoch_data_idx_str: str = f"{i:0{num_required_zero_padding}d}"
+                # _curr_context = out_context.overwriting_context(epoch_idx=i)
+                _curr_context = out_context.overwriting_context(epoch_idx=epoch_data_idx_str)
+                _curr_key: str = _curr_context.get_description(separator='/')
+                if not _curr_key.startswith('/'):
+                    _curr_key = "/" + _curr_key
+                # active_captured_single_epoch_result.to_hdf(save_path, key=_curr_key, debug_print=True, enable_hdf_testing_mode=True)
+                active_captured_single_epoch_result.to_hdf(f, key=_curr_key, debug_print=debug_print, enable_hdf_testing_mode=False, required_zero_padding=num_required_zero_padding)
+        
+        return save_path
+    
+
+    @classmethod
+    @function_attributes(short_name=None, tags=['export'], input_requires=[], output_provides=[], uses=['save_decoded_posteriors_to_HDF5'], used_by=[], creation_date='2024-08-28 08:36', related_items=[])
+    def perform_save_all_decoded_posteriors_to_HDF5(cls, decoder_laps_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], _save_context: IdentifyingContext, save_path: Path, should_overwrite_extant_file:bool=True):
+        """
+        
+        Usage:
+        
+            save_path = Path('output/newest_all_decoded_epoch_posteriors.h5').resolve()
+            _parent_save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_decoded_posteriors_to_HDF5')
+            out_contexts = PosteriorExporting.perform_save_all_decoded_posteriors_to_HDF5(decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, _save_context=_parent_save_context, save_path=save_path)
+            out_contexts
+
+        History:
+            Refactored from `ComputerVisionComputations` on 2024-09-30
+        """
+        def _subfn_perform_save_single_epochs(_active_filter_epochs_decoder_result_dict, a_save_context: IdentifyingContext, epochs_name: str, save_path: Path) -> Dict[types.DecoderName, IdentifyingContext]:
+            """ saves a single set of named epochs, like 'laps' or 'ripple' 
+            captures nothing
+            """
+            _sub_out_contexts = {}
+            for a_decoder_name, a_decoder_decoded_epochs_result in _active_filter_epochs_decoder_result_dict.items():
+                # _save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_decoded_posteriors_to_HDF5', decoder_name=a_decoder_name, epochs_name=epochs_name)
+                _specific_save_context = deepcopy(a_save_context).overwriting_context(decoder_name=a_decoder_name, epochs_name=epochs_name)
+                print(f'a_decoder_name: {a_decoder_name}, _specific_save_context: {_specific_save_context}')
+                if not save_path.exists():
+                    print(f'\t file does not exist, so setting allow_append = False')
+                    allow_append = False
+                else:
+                    print(f'\tsave_path exists, so allow_append = True')
+                    allow_append = True
+                an_out_path = cls.save_decoded_posteriors_to_HDF5(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, out_context=_specific_save_context, save_path=save_path, allow_append=allow_append)
+                _sub_out_contexts[a_decoder_name] = _specific_save_context
+                
+            return _sub_out_contexts
+
+
+        if save_path.exists() and should_overwrite_extant_file:
+            print(f'\tsave_path "{save_path}" exists and should_overwrite_extant_file==True, so removing file...')
+            save_path.unlink(missing_ok=False)
+            print(f'\t successfully removed.')
+            
+        out_contexts = {'laps': None, 'ripple': None}
+        out_contexts['laps'] = _subfn_perform_save_single_epochs(decoder_laps_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='laps', save_path=save_path)
+        out_contexts['ripple'] = _subfn_perform_save_single_epochs(decoder_ripple_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='ripple', save_path=save_path)
+        return out_contexts
+
+
+    @classmethod
+    @function_attributes(short_name=None, tags=['posterior', 'HDF5', 'load'], input_requires=[], output_provides=[], uses=['h5py'], used_by=[], creation_date='2024-08-05 10:47', related_items=['save_decoded_posteriors_to_HDF5'])
+    def load_decoded_posteriors_from_HDF5(cls, load_path: Path, debug_print=True) -> Dict[types.DecoderName, Dict[KnownEpochsName, Dict]]:
+        """
+        Load the transition matrix info from a file
+        
+        Usage:
+            load_path = Path('output/transition_matrix_data.h5')
+            _out_dict = PosteriorExporting.load_decoded_posteriors_from_HDF5(load_path=load_path, debug_print=False)
+            ripple_0_img = _out_dict['long_LR']['ripple']['p_x_given_n_grey'][0]
+            lap_0_img = _out_dict['long_LR']['laps']['p_x_given_n_grey'][0]
+            lap_0_img
+        
+        
+        History:
+            Refactored from `ComputerVisionComputations` on 2024-09-30
+        """
+        if not isinstance(load_path, Path):
+            load_path = Path(load_path).resolve()
+
+        assert load_path.exists(), f"load_path: '{load_path}' does not exist!"
+
+        dataset_type_fields = ['p_x_given_n', 'p_x_given_n_grey', 'most_likely_positions', 'most_likely_position_indicies', 'time_bin_edges', 't_bin_centers']
+        attribute_type_fields = ['nbins', 'epoch_data_index', 'n_xbins', 'creation_date']
+        
+
+        import h5py
+        from pyphocorehelpers.Filesystem.HDF5.hdf5_file_helpers import HDF5_Helper
+
+        # Usage
+        found_groups = HDF5_Helper.find_groups_by_name(load_path, 'save_decoded_posteriors_to_HDF5')
+        if debug_print:
+            print(found_groups) # ['kdiba/gor01/one/2006-6-08_14-26-15/save_decoded_posteriors_to_HDF5']
+        assert len(found_groups) == 1, f"{found_groups}"
+        _save_key: str = found_groups[0]
+        if debug_print:
+            print(f'_save_key: {_save_key}')
+
+        # leaf_datasets = get_leaf_datasets(load_path)
+        # print(leaf_datasets)
+
+        out_dict: Dict = {}
+
+        with h5py.File(load_path, 'r') as f:
+            
+            main_save_group = f[_save_key]
+            if debug_print:
+                print(f'main_save_group: {main_save_group}')
+            
+            for decoder_prefix in main_save_group.keys():
+                if debug_print:
+                    print(f'decoder_prefix: {decoder_prefix}')
+                if decoder_prefix not in out_dict:
+                    out_dict[decoder_prefix] = {}
+
+                decoder_group = main_save_group[decoder_prefix]
+                for known_epochs_name in decoder_group.keys():
+                    if debug_print:
+                        print(f'\tknown_epochs_name: {known_epochs_name}')
+                    if known_epochs_name not in out_dict[decoder_prefix]:
+                        out_dict[decoder_prefix][known_epochs_name] = {}
+                        
+                    decoder_epochtype_group = decoder_group[known_epochs_name]
+                    
+                    ## allocate outputs:
+                    out_dict[decoder_prefix][known_epochs_name] = {k:list() for k in dataset_type_fields} # allocate a dict of empty lists for each item in `dataset_type_fields`
+                    
+                    for dataset_name in decoder_epochtype_group.keys():
+                        if debug_print:
+                            print(f'\t\tdataset_name: {dataset_name}')
+                            
+                        ## the lowest-level group before the data itself
+                        dataset_final_group = decoder_epochtype_group[dataset_name]
+                        # dataset_type_fields
+                        
+                        for leaf_data_key, leaf_data in dataset_final_group.items():
+                            if debug_print:
+                                print(f'\t\t\tleaf_data_key: {leaf_data_key}')
+                            # array = decoder_epochtype_group[dataset_name][f"p_x_given_n[{dataset_name}]"][()]
+                            # array = decoder_epochtype_group[dataset_name][f"p_x_given_n[{dataset_name}]"][()]
+                            array = leaf_data[()] # should get the NDArray
+                            if debug_print:
+                                print(f'\t\t\t\tarray: {type(array)}')
+                            
+                            out_dict[decoder_prefix][known_epochs_name][leaf_data_key].append(array) #
+                            
+                        # array = decoder_epochtype_group[dataset_name] #[()]
+                        
+                        
+                        # array = decoder_epochtype_group[dataset_name][f"p_x_given_n[()]"]
+                        # array = decoder_epochtype_group[dataset_name][f"p_x_given_n[{dataset_name}]"][()]
+                        # if debug_print:
+                        #     print(f'\t\t\tarray: {type(array)}')
+                        # markov_order = group[dataset_name].attrs['index']
+                        # arrays_list.append((markov_order, array))
+                        # arrays_list.append(array)
+                
+                    # arrays_list.sort(key=lambda x: x[0])  # Sort by markov_order
+                    # out_dict[decoder_prefix] = [array for _, array in arrays_list]
+                    # if decoder_prefix not in out_dict[epochs_name]:
+                        # out_dict[epochs_name][decoder_prefix] = arrays_list
+                    # out_dict[epochs_name][decoder_prefix] = arrays_list
+                    
+        # END open
+
+        return out_dict
+
+
+
+    # ==================================================================================================================== #
+    # Other/Testing                                                                                                        #
+    # ==================================================================================================================== #
+
+
     @classmethod
     def _test_export_marginals_for_figure(cls, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], clicked_epoch: NDArray, context_specific_root_export_path: Path, epoch_specific_folder: Path, epoch_id_identifier_str='ripple', debug_print=True, allow_override_aspect_ratio:bool=True, **kwargs):
         """
