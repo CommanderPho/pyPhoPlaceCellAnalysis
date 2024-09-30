@@ -2263,19 +2263,18 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         from mpl_toolkits.axisartist.grid_finder import (DictFormatter, FixedLocator, MaxNLocator)
 
 
-        def _build_diagonal_histogram(long_short_fr_indicies_analysis_table, ax_histdiagonal, binwidth:float=0.075):
+        def _build_diagonal_histogram(x_frs_index, y_frs_index, ax_histdiagonal, binwidth:float=0.075):
             """ 2024-09-30 - Plots the histogram along the y=x diagonal line:
+            
+            
             
             """
             ## Add the 'x_frs_index_rot' and 'y_frs_index_rot' columns by applying a rotation by +90 degrees:
-            long_short_fr_indicies_analysis_table['x_frs_index_rot'] = long_short_fr_indicies_analysis_table['x_frs_index'].copy()
-            long_short_fr_indicies_analysis_table['y_frs_index_rot'] = long_short_fr_indicies_analysis_table['y_frs_index'].copy()
-
-            long_short_fr_indicies_analysis_table['x_frs_index_rot'] = (long_short_fr_indicies_analysis_table['x_frs_index'].copy() + long_short_fr_indicies_analysis_table['y_frs_index'].copy())/np.sqrt(2)
-            long_short_fr_indicies_analysis_table['y_frs_index_rot'] = (long_short_fr_indicies_analysis_table['y_frs_index'].copy() - long_short_fr_indicies_analysis_table['x_frs_index'].copy())/np.sqrt(2)
+            # x_frs_index_rot = (x_frs_index + long_short_fr_indicies_analysis_table['y_frs_index'].copy())/np.sqrt(2)
+            y_frs_index_rot = (y_frs_index - x_frs_index)/np.sqrt(2)
 
             # x = long_short_fr_indicies_analysis_table['x_frs_index_rot'].values
-            y = long_short_fr_indicies_analysis_table['y_frs_index_rot'].values # we only actually need the rotated y-axis values
+            y = y_frs_index_rot # we only actually need the rotated y-axis values
 
             # now determine nice limits by hand:
             
@@ -2323,7 +2322,7 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
 
 
         # Set aspect of the main Axes.
-        ax.set_aspect(1.)
+        # ax.set_aspect(1.)
 
         if enable_subplot_mosaic_style:
             # extract the already created dict axes:
@@ -2374,6 +2373,10 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         bins = np.arange(-lim, lim + binwidth, binwidth)
         ax_histx.hist(x, bins=bins, color='black')
         ax_histy.hist(y, bins=bins, orientation='horizontal', color='black')
+
+        if enable_diagonal_histogram:
+            (diagonal_hist_artist_tuple, midline_artist), (xlims, ylims) = _build_diagonal_histogram(x_frs_index=x_frs_index.values, y_frs_index=y_frs_index.values, ax_histdiagonal=ax_histdiagonal, binwidth=binwidth)
+
 
         # Set the tick marks and labels as desired
         # ax_histx.set_yticks([0, 50, 100])
