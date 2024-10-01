@@ -475,7 +475,7 @@ class PosteriorExporting:
     @function_attributes(short_name=None, tags=['export', 'images', 'ESSENTIAL'], input_requires=[], output_provides=[], uses=['export_decoded_posteriors_as_images'], used_by=[], creation_date='2024-08-28 08:36', related_items=[])
     def perform_export_all_decoded_posteriors_as_images(cls, decoder_laps_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult],
                                                          _save_context: IdentifyingContext, parent_output_folder: Path, custom_export_formats: Optional[Dict[str, HeatmapExportConfig]]=None, desired_height=None):
-        """
+        """ Exports the decoded epoch position posteriors as raw images, also includes functionality to export merged/combined images.
         
         Usage:
         
@@ -506,11 +506,7 @@ class PosteriorExporting:
                 # one for each epoch
                 an_epochs_export_result_list: List[HeatmapExportConfig] = a_single_export_format_export_result_dict[custom_export_format_series_name]
                 out_all_decoders_epochs_list.append([v.posterior_saved_image for v in an_epochs_export_result_list])
-                # _single_epoch_single_series_single_export_type_row.append(v.posterior_saved_image)
-                # v.posterior_saved_path
-                # v.posterior_saved_image
                 
-            # horizontal_image_stack(_single_epoch_single_series_single_export_type_row, padding=2)
             num_exported_epochs: int = len(out_all_decoders_epochs_list[0])
             print(f'num_exported_epochs: {num_exported_epochs}')
             # INPUT: out_all_decoders_epochs_list
@@ -519,8 +515,6 @@ class PosteriorExporting:
             _single_epoch_single_series_single_export_type_rows_list = []
             _output_combined_image_save_dirs = []
             for i in np.arange(num_exported_epochs):
-                # if i > 10:
-                #     continue
                 ## for a single epoch:
                 _single_epoch_row = [out_all_decoders_epochs_list[0][i], out_all_decoders_epochs_list[1][i], out_all_decoders_epochs_list[2][i], out_all_decoders_epochs_list[3][i]]
                 _single_epoch_combined_img = horizontal_image_stack(_single_epoch_row, padding=2)
@@ -547,8 +541,7 @@ class PosteriorExporting:
 
             for a_decoder_name, a_decoder_decoded_epochs_result in _active_filter_epochs_decoder_result_dict.items():
                 # _save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_decoded_posteriors_to_HDF5', decoder_name=a_decoder_name, epochs_name=epochs_name)
-                # _specific_save_context = deepcopy(a_save_context).overwriting_context(decoder_name=a_decoder_name, epochs_name=epochs_name)                    
-                # posterior_out_folder = a_parent_output_folder.joinpath(epochs_name, a_decoder_name).resolve() # 'K:/scratch/collected_outputs/figures/_temp_individual_posteriors/2024-09-30/gor01_one_2006-6-09_1-22-43/ripple/long_RL'
+                # _specific_save_context = deepcopy(a_save_context).overwriting_context(decoder_name=a_decoder_name, epochs_name=epochs_name)
                 posterior_out_folder = specific_epochs_posterior_out_folder.joinpath(a_decoder_name).resolve() # 'K:/scratch/collected_outputs/figures/_temp_individual_posteriors/2024-09-30/gor01_one_2006-6-09_1-22-43/ripple/long_RL'
                 posterior_out_folder.mkdir(parents=True, exist_ok=True)
                 # print(f'a_decoder_name: {a_decoder_name}, _specific_save_context: {_specific_save_context}, posterior_out_folder: {posterior_out_folder}')
@@ -568,7 +561,7 @@ class PosteriorExporting:
             return out_paths, out_custom_export_formats_results_dict
 
 
-        # parent_output_folder = Path(r'output/_temp_individual_posteriors').resolve()
+        # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
         assert parent_output_folder.exists(), f"parent_output_folder: {parent_output_folder} does not exist"
         
         out_paths_dict = {'laps': None, 'ripple': None}
