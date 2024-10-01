@@ -47,10 +47,15 @@ def apply_LR_to_RL_adjustment(an_RL_color):
     """ applies a consistent visual transformation to a color that represents LR direction to get the corresponding RL color. 
     General the RL colors look darker, slightly less saturated
 
-    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import apply_LR_to_RL_adjustment
-    color_dict = {'long_LR': long_epoch_config['brush'].color(), 'long_RL': long_epoch_config.apply_LR_to_RL_adjustment(long_epoch_config['brush'].color()),
-                    'short_LR': short_epoch_config['brush'].color(), 'short_RL': long_epoch_config.apply_LR_to_RL_adjustment(short_epoch_config['brush'].color()}
+    Usage:
+        from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager, DisplayConfig, long_short_display_config_manager
 
+        long_epoch_config = long_short_display_config_manager.long_epoch_config.as_pyqtgraph_kwargs()
+        short_epoch_config = long_short_display_config_manager.short_epoch_config.as_pyqtgraph_kwargs()
+
+        color_dict = {'long_LR': long_epoch_config['brush'].color(), 'long_RL': LongShortDisplayConfigManager.apply_LR_to_RL_adjustment(long_epoch_config['brush'].color()),
+                        'short_LR': short_epoch_config['brush'].color(), 'short_RL': LongShortDisplayConfigManager.apply_LR_to_RL_adjustment(short_epoch_config['brush'].color())}
+        color_dict
 
     """
     from pyphocorehelpers.gui.Qt.color_helpers import build_adjusted_color
@@ -220,6 +225,8 @@ class LongShortDisplayConfigManager:
     """ Singleton class to manage all configurations 
 
     Usage:
+        from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager, DisplayConfig
+
         from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import long_short_display_config_manager
 
         long_epoch_config = long_short_display_config_manager.long_epoch_config.as_pyqtgraph_kwargs()
@@ -249,9 +256,15 @@ class LongShortDisplayConfigManager:
         """ applies a consistent visual transformation to a color that represents LR direction to get the corresponding RL color. 
         General the RL colors look darker, slightly less saturated
 
-        color_dict = {'long_LR': long_epoch_config['brush'].color(), 'long_RL': long_epoch_config.apply_LR_to_RL_adjustment(long_epoch_config['brush'].color()),
-                     'short_LR': short_epoch_config['brush'].color(), 'short_RL': long_epoch_config.apply_LR_to_RL_adjustment(short_epoch_config['brush'].color()}
+        Usage:
+            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager, DisplayConfig, long_short_display_config_manager
 
+            long_epoch_config = long_short_display_config_manager.long_epoch_config.as_pyqtgraph_kwargs()
+            short_epoch_config = long_short_display_config_manager.short_epoch_config.as_pyqtgraph_kwargs()
+
+            color_dict = {'long_LR': long_epoch_config['brush'].color(), 'long_RL': LongShortDisplayConfigManager.apply_LR_to_RL_adjustment(long_epoch_config['brush'].color()),
+                            'short_LR': short_epoch_config['brush'].color(), 'short_RL': LongShortDisplayConfigManager.apply_LR_to_RL_adjustment(short_epoch_config['brush'].color())}
+            color_dict
   
         """
         from pyphocorehelpers.gui.Qt.color_helpers import build_adjusted_color

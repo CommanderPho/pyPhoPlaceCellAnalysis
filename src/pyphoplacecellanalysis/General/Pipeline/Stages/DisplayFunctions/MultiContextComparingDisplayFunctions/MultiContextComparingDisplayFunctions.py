@@ -125,7 +125,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
         """
         from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrialByTrialActivityResult
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import TrialByTrialActivityWindow
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TrialByTrialActivityWindow import TrialByTrialActivityWindow
         assert owning_pipeline_reference is not None
         #
         if include_includelist is None:
