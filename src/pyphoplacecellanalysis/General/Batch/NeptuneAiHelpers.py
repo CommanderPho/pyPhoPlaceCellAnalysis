@@ -399,6 +399,38 @@ class NeptuneRunCollectedResults:
     context_indexed_run_logs: Dict[IdentifyingContext, str] = field()
     most_recent_runs_context_indexed_run_extra_data: Dict[IdentifyingContext, Dict] = field()
     
+
+    # @property()
+    def get_resolved_structure(self, fig_input_key: str = "/", debug_print=False) -> Dict[IdentifyingContext, Dict[RunID, Dict[NeptuneKeyPath, Any]]]:
+        """ Downloads figures
+        Usage:
+            fig_input_key: str = "display_fn_name:running_and_replay_speeds_over_time"
+            _context_run_structure_dict = neptune_run_collected_results.get_resolved_structure()
+            _context_run_structure_dict
+
+        """
+        context_indexed_runs_list_dict: Dict[IdentifyingContext, List[AutoValueConvertingNeptuneRun]] = self.context_indexed_runs_list_dict
+        _context_run_structure_dict: Dict[IdentifyingContext, Dict[RunID, Dict[NeptuneKeyPath, Any]]] = {} # actually Any is Dict[IdentifyingContext, Dict[SessionDescriptorString, Dict[NeptuneKeyPath, Path]]]
+
+        for a_ctxt, a_run_list in context_indexed_runs_list_dict.items():
+            _context_run_structure_dict[a_ctxt] = {}
+            a_session_descriptor_str: str = a_ctxt.get_description(separator='_', subset_excludelist='format_name') # 'kdiba_gor01_two_2006-6-07_16-40-19'
+                
+            for a_run in a_run_list:
+                try:
+                    a_run_id: str = a_run['sys/id'].fetch()
+                    _context_run_structure_dict[a_ctxt][a_run_id] = a_run.get_parsed_structure()
+                except (ValueError, KeyError, MissingFieldException) as e:
+                    continue # just try the next one
+                except Exception as e:
+                    raise e
+            # END FOR a_run
+        # END FOR a_ctxt
+        
+        ## OUTPUTS: _context_run_structure_dict
+        return _context_run_structure_dict
+
+
     @classmethod
     def _perform_export_log_files_to_separate_files(cls, context_indexed_run_logs: Dict[IdentifyingContext, str], neptune_logs_output_path: Path):
         Assert.path_exists(neptune_logs_output_path)
