@@ -516,6 +516,9 @@ class Neptuner(object):
       
     from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import Neptuner
     neptuner = Neptuner()
+
+    Mostly initialized from `pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing.batch_perform_all_plots` to programmatically log the figures
+    
     
     """
     project_name: str = field(default="commander.pho/PhoDibaLongShortUpdated")
@@ -549,7 +552,7 @@ class Neptuner(object):
         assert self.run is None, f"run_new_pipeline(...) called while the Neptuner object already has an active self.run object!"
         if self.run is None:
             # self.run = neptune.init_run(project=self.project_name, api_token=self.api_token, source_files=[]) # see git_ref=GitRef(repository_path="/path/to/repo")
-            self.run = AutoValueConvertingNeptuneRun(project=self.project_name, api_token=self.api_token, source_files=[]) # see git_ref=GitRef(repository_path="/path/to/repo")
+            self.run = AutoValueConvertingNeptuneRun(project=self.project_name, api_token=self.api_token, source_files=[], monitoring_namespace="monitoring") # see git_ref=GitRef(repository_path="/path/to/repo")
 
             # Add the session_context properties to the run: {'format_name': 'kdiba', 'animal': 'vvp01', 'exper_name': 'two', 'session_name': '2006-4-09_16-40-54'}
             for k, v in curr_active_pipeline.get_session_context().to_dict().items():
@@ -984,7 +987,9 @@ def neptune_output_figures(curr_active_pipeline):
     from neptune.types import File
 
     neptune_kwargs = {'project':"commander.pho/PhoDibaLongShort2023",
-    'api_token':"eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxOGIxODU2My1lZTNhLTQ2ZWMtOTkzNS02ZTRmNzM5YmNjNjIifQ=="}
+    'api_token':"eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxOGIxODU2My1lZTNhLTQ2ZWMtOTkzNS02ZTRmNzM5YmNjNjIifQ==",
+    "monitoring_namespace":"monitoring",
+    }
 
     # kdiba_gor01_one_2006-6-09_1-22-43_sess
     active_session_context_string = str(curr_active_pipeline.active_sess_config)

@@ -30,12 +30,11 @@ BatchScriptsCollection = attrs.make_class("BatchScriptsCollection", {k:field() f
 
 from enum import Enum
 
+from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import KnownNeptuneProjects
 
 def get_batch_neptune_kwargs():
-    return dict(
-        project="commander.pho/PhoDibaBatchProcessing",
-        api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxOGIxODU2My1lZTNhLTQ2ZWMtOTkzNS02ZTRmNzM5YmNjNjIifQ==",
-    )
+    return KnownNeptuneProjects.get_PhoDibaBatchProcessing_neptune_kwargs()
+
 
 
 class ProcessingScriptPhases(Enum):

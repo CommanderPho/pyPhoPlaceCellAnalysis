@@ -935,12 +935,15 @@ def batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=
     """ 2023-05-25 - Performs all the batch plotting commands. 
     
     from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_perform_all_plots
-    
+    Always uses the "PhoDibaLongShortUpdated" neptue project
+
     """
     try:
-        from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import set_environment_variables, Neptuner
+        from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import Neptuner
+
         if neptuner is None:
-            neptuner = Neptuner.init_with_pipeline(curr_active_pipeline) 
+            neptuner = Neptuner.init_with_pipeline(curr_active_pipeline)
+
     except BaseException as e:
         print(f'in `batch_perform_all_plots(...)`: Neptuner.init_with_pipeline(curr_active_pipeline)(...) failed with exception: {e}. Continuing but disabling neptune.')
         enable_neptune = False
