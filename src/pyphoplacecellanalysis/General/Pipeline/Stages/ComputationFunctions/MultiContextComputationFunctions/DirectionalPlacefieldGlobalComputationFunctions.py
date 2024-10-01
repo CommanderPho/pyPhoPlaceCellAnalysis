@@ -6646,7 +6646,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
         from datetime import datetime, date, timedelta
         from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path
-        
+        from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportConfig
+
         DAY_DATE_STR: str = date.today().strftime("%Y-%m-%d")
         DAY_DATE_TO_USE = f'{DAY_DATE_STR}' # used for filenames throught the notebook
         # print(f'DAY_DATE_STR: {DAY_DATE_STR}, DAY_DATE_TO_USE: {DAY_DATE_TO_USE}')
@@ -6713,8 +6714,19 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         _specific_session_output_folder = save_path.joinpath(active_context.get_description(subset_excludelist=['format_name'])).resolve()
         _specific_session_output_folder.mkdir(parents=True, exist_ok=True)
         print(f'\tspecific_session_output_folder: "{_specific_session_output_folder}"')
+
+        if custom_export_formats is None:
+            ## use this default instead:
+            custom_export_formats: Dict[str, HeatmapExportConfig] = {
+                # 'greyscale': HeatmapExportConfig.init_greyscale(),
+                'color': HeatmapExportConfig(colormap='Oranges', desired_height=400),
+                # 'color': HeatmapExportConfig(colormap=additional_cmaps['long_LR']),
+                # 'color': HeatmapExportConfig(colormap=cmap1, desired_height=200),
+            }
+
         out_paths, out_custom_formats_dict = PosteriorExporting.perform_export_all_decoded_posteriors_as_images(decoder_laps_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict,
-                                                                                                                 _save_context=_parent_save_context, parent_output_folder=_specific_session_output_folder, desired_height=None, custom_export_formats=custom_export_formats)
+                                                                                                                 _save_context=_parent_save_context, parent_output_folder=_specific_session_output_folder,
+                                                                                                                  desired_height=None, custom_export_formats=custom_export_formats)
         # out_paths
         print(_specific_session_output_folder)
 
