@@ -448,7 +448,7 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
     enable_histograms: bool = True
     enable_scatter_plot: bool = True
     enable_epoch_shading_shapes: bool = True
-    px_histogram_kwargs = {'nbins': histogram_bins, 'barmode': barmode, 'opacity': 0.5, 'range_y': [0.0, 1.0]} #, 'histnorm': 'probability density'
+    px_histogram_kwargs = {'nbins': histogram_bins, 'barmode': barmode, 'opacity': 0.5, 'range_y': [0.0, 1.0], 'histnorm': 'probability density'} #, 'histnorm': 'probability density'
 
     if (main_plot_mode == 'default'):
         # main_plot_mode: str = 'default'
@@ -1030,6 +1030,7 @@ def plot_across_sessions_scatter_results(directory: Union[Path, str], concatenat
     #     # return go.Figure(data=data, **(dict(layout_yaxis_range=[0.0, 1.0]) | build_fig_kwargs))
     #     scatter_title = build_fig_kwargs.pop('title', None)
     #     return go.Figure(px.scatter(data_results_df, x='delta_aligned_start_t', y='P_Long', color='session_name', size='time_bin_size', title=scatter_title), layout_yaxis_range=[0.0, 1.0])
+    # , 'histnorm': 'probability density'
 
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
     if not isinstance(directory, Path):

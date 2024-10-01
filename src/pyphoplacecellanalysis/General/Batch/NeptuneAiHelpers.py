@@ -31,6 +31,7 @@ from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata
 # SessionDescriptorString: TypeAlias = str # an integer index that is an aclu
 SessionDescriptorString = NewType('SessionDescriptorString', str) # session_descriptor_string
 RunID = NewType('RunID', str) # session_descriptor_string
+NeptuneKeyPath = NewType('NeptuneKeyPath', str) # a path that indexes in to the Neptune.ai resource
 
 # from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import SessionDescriptorString, RunID
 
@@ -294,13 +295,14 @@ class AutoValueConvertingNeptuneRun(neptune.Run):
         return log_contents_str, merged_log_df
 
 
-    def download_image(self: "AutoValueConvertingNeptuneRun", fig_input_key: str, a_session_descriptor_str: str, neptune_project_figures_output_path: Path, debug_print=False):
+    def download_image(self: "AutoValueConvertingNeptuneRun", fig_input_key: str, a_session_descriptor_str: str, neptune_project_figures_output_path: Path, debug_print=False) -> Dict[IdentifyingContext, Dict[SessionDescriptorString, Dict[NeptuneKeyPath, Path]]]:
         """ locates and downloads an image with a specific `fig_input_key` like "display_fn_name:display_short_long_pf1D_comparison/track:short"
         
         """
         ## INPUTS: a_parsed_structure
         ## UPDATES: _context_fig_files_dict
-        _context_fig_files_dict = {}
+        # _context_fig_files_dict: Dict[IdentifyingContext, Dict[SessionDescriptorString, Dict[NeptuneKeyPath, Any]]] = {}
+        _context_fig_files_dict: Dict[IdentifyingContext, Dict[SessionDescriptorString, Dict[NeptuneKeyPath, Path]]] = {}
 
         a_parsed_structure = self.get_structure().get('outputs', {}).get('figures', None)
         if a_parsed_structure is None:
@@ -311,23 +313,15 @@ class AutoValueConvertingNeptuneRun(neptune.Run):
         if debug_print:
             print(f'a_parsed_structure: {a_parsed_structure}')
         
-        # for k, v in a_parsed_structure.items():
-        #     # Flatten each nested dictionary and update the flattened_dict
-        #     _parsed_run_structure_dict[a_ctxt].update(flatten_dict(v, parent_key=k))
-
         ## parse the key:
         fig_input_key_parts: List[str] = fig_input_key.split('/') # ['display_fn_name:display_short_long_pf1D_comparison', 'track:long']
         # fig_input_key_parts
-
-        ## parse key:value pairs into split arrays
-        # [k.split(':') for k in fig_input_key_parts] # [['display_fn_name', 'display_short_long_pf1D_comparison'], ['track', 'short']]
 
         fig_split_key_value_pair_parts = [k.split(':')[-1] for k in fig_input_key_parts] ## remove the keys from the path, ['display_short_long_pf1D_comparison', 'short']
         # fig_split_key_value_pair_parts
 
         ## Find the figure or figure(s):
 
-        # a_fig_file_field = a_parsed_structure['display_fn_name:display_short_long_pf1D_comparison']["track:long"]
         a_fig_file_field = get_nested_value(a_parsed_structure, fig_input_key_parts)
         a_fig_file_field
         
@@ -340,7 +334,8 @@ class AutoValueConvertingNeptuneRun(neptune.Run):
             _context_fig_files_dict[a_session_descriptor_str] = {}
             
 
-        if isinstance(a_fig_file_field, File):
+        # if isinstance(a_fig_file_field, File): # neptune.attributes.atoms.file.File
+        if (not isinstance(a_fig_file_field, dict)): # neptune.attributes.atoms.file.File
             ## typical case where a full, complete path is passed
             a_fig_output_name: str = '-'.join(fig_split_key_value_pair_parts) + '.png'
             a_fig_output_path = a_session_figures_output_path.joinpath(a_fig_output_name).resolve()
@@ -354,11 +349,11 @@ class AutoValueConvertingNeptuneRun(neptune.Run):
                     print(f'\tdone.')
             except MissingFieldException as err:
                 # print(f'MissingFieldException for a_run.id: {a_run_id} (err: {err})')
-                print(f'MissingFieldException for a_run.id: {self}')
+                print(f'MissingFieldException for a_run.id: {self}, err: {err}')
                 pass
         else:
             ## Non-File, usually a path that contains multiple files
-            print(f'not a figure file! a dictionary instead probably: type(a_fig_file_field): {type(a_fig_file_field)}')
+            print(f'not a figure file! a dictionary instead probably: type(a_fig_file_field): {type(a_fig_file_field)}') # neptune.attributes.atoms.file.File
             a_flattened_figure_dict = flatten_dict(a_fig_file_field) ## use flatten_dict to turn potentially nested dictionaries with leaf of type File into a flat dictionary with keys of string, values of type File.
             for a_sub_key, a_sub_fig_file_field in a_flattened_figure_dict.items():
                 ## Each sub-item:
@@ -382,7 +377,6 @@ class AutoValueConvertingNeptuneRun(neptune.Run):
                     print(f'MissingFieldException for a_run.id: {self}')
                     pass
     
-
         return _context_fig_files_dict
 
 
@@ -410,11 +404,6 @@ class NeptuneRunCollectedResults:
         Assert.path_exists(neptune_logs_output_path)
         _out_log_paths = {}
         for k, v in context_indexed_run_logs.items():
-            # session_context_path_fragment: str = k.get_description(separator='/', subset_excludelist='session_name')
-            # session_context_path_fragment: str = k.get_description(separator='/', subset_excludelist='session_name')
-            # session_context_path = neptune_logs_output_path.joinpath(session_context_path_fragment).resolve()
-            # session_context_path.mkdir(exist_ok=True, parents=True)
-
             ## flat filename approach:
             session_context_path_fragment: str = k.get_description(separator='=', subset_excludelist='format_name')
             # session_context_path_fragment
@@ -457,21 +446,21 @@ class NeptuneRunCollectedResults:
                 a_modification_time: datetime = a_run['sys/modification_time'].fetch()
                 assert isinstance(a_modification_time, datetime), f"a_modification_time is not of type datetime, it is instead type(a_modification_time): {type(a_modification_time)}, value: {a_modification_time}"
                 
-                a_script_type: str = a_run['parameters/script_type'].fetch() # should be either ['figures', 'run']
-
-                a_formatted_modification_time: str = a_modification_time.strftime('%Y%m%dT%H%M%S') # Example Output: 20240427T153045
-                a_log_file_field = a_run['outputs']['log'] # either <File field at "outputs/log"> or <Unassigned field at "outputs/log">
-                a_run_ctxt = a_ctxt.adding_context_if_missing(script_type=a_script_type,
-                                                            #    run_id=a_run_id
-                                                              )
-                
-                # a_log_file_basename: str = a_run_ctxt.get_description(separator='|') # invalid on windows
-                a_log_file_basename: str = a_run_ctxt.get_description(separator='--') # "kdiba--gor01--one--2006-6-07_11-26-53--figures--PHDBATCH-1486.log"
-                a_log_file_filename: str = f"{a_formatted_modification_time}--{a_run_id}--" + a_log_file_basename + '.log' # start with modification time so they can be sorted in the filesystem
-                a_log_file_dest_path = neptune_logs_output_path.joinpath(a_log_file_filename).resolve()
-                # print(f'a_log_file_dest_path: {a_log_file_dest_path}')
-
                 try:
+                    a_script_type: str = a_run['parameters/script_type'].fetch() # should be either ['figures', 'run']
+
+                    a_formatted_modification_time: str = a_modification_time.strftime('%Y%m%dT%H%M%S') # Example Output: 20240427T153045
+                    a_log_file_field = a_run['outputs']['log'] # either <File field at "outputs/log"> or <Unassigned field at "outputs/log">
+                    a_run_ctxt = a_ctxt.adding_context_if_missing(script_type=a_script_type,
+                                                                #    run_id=a_run_id
+                                                                )
+                    
+                    # a_log_file_basename: str = a_run_ctxt.get_description(separator='|') # invalid on windows
+                    a_log_file_basename: str = a_run_ctxt.get_description(separator='--') # "kdiba--gor01--one--2006-6-07_11-26-53--figures--PHDBATCH-1486.log"
+                    a_log_file_filename: str = f"{a_formatted_modification_time}--{a_run_id}--" + a_log_file_basename + '.log' # start with modification time so they can be sorted in the filesystem
+                    a_log_file_dest_path = neptune_logs_output_path.joinpath(a_log_file_filename).resolve()
+                    # print(f'a_log_file_dest_path: {a_log_file_dest_path}')
+
                     _a_download_result = a_log_file_field.download(destination=a_log_file_dest_path.as_posix())
                     _context_log_files_dict[a_ctxt][a_run_id] = a_log_file_dest_path.as_posix()
                     # a_log_file_dest_path
@@ -479,7 +468,7 @@ class NeptuneRunCollectedResults:
 
                 except MissingFieldException as err:
                     # print(f'MissingFieldException for a_run.id: {a_run_id} (err: {err})')
-                    print(f'MissingFieldException for a_run.id: {a_run_id}')
+                    print(f'MissingFieldException for a_run.id: "{a_run_id}". Make sure that this Neptuner object is for project `neptune_kwargs = KnownNeptuneProjects.get_PhoDibaBatchProcessing_neptune_kwargs()`.')
                     pass
 
             # END FOR a_run
@@ -499,7 +488,7 @@ class NeptuneRunCollectedResults:
 
         context_indexed_runs_list_dict: Dict[IdentifyingContext, List[AutoValueConvertingNeptuneRun]] = self.context_indexed_runs_list_dict
         
-        _context_figures_dict = {}
+        _context_figures_dict: Dict[IdentifyingContext, Dict[RunID, Dict[NeptuneKeyPath, Any]]] = {} # actually Any is Dict[IdentifyingContext, Dict[SessionDescriptorString, Dict[NeptuneKeyPath, Path]]]
 
         for a_ctxt, a_run_list in context_indexed_runs_list_dict.items():
             _context_figures_dict[a_ctxt] = {}
@@ -507,8 +496,9 @@ class NeptuneRunCollectedResults:
                 
             for a_run in a_run_list:
                 try:
-                    _context_figures_dict[a_ctxt][a_run['sys/id']] = a_run.download_image(fig_input_key=fig_input_key, a_session_descriptor_str=a_session_descriptor_str, neptune_project_figures_output_path=neptune_project_figures_output_path, debug_print=debug_print)
-                except (ValueError, KeyError) as e:
+                    a_run_id: str = a_run['sys/id'].fetch()
+                    _context_figures_dict[a_ctxt][a_run_id] = a_run.download_image(fig_input_key=fig_input_key, a_session_descriptor_str=a_session_descriptor_str, neptune_project_figures_output_path=neptune_project_figures_output_path, debug_print=debug_print)
+                except (ValueError, KeyError, MissingFieldException) as e:
                     continue # just try the next one
                 except Exception as e:
                     raise e
