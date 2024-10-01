@@ -2256,11 +2256,11 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
 
     if enable_histograms:
         ## plot the left and top marginal histograms
-        from matplotlib.transforms import Affine2D
+        # from matplotlib.transforms import Affine2D
         from mpl_toolkits.axes_grid1 import make_axes_locatable
-        import mpl_toolkits.axisartist.angle_helper as angle_helper
-        import mpl_toolkits.axisartist.floating_axes as floating_axes
-        from mpl_toolkits.axisartist.grid_finder import (DictFormatter, FixedLocator, MaxNLocator)
+        # import mpl_toolkits.axisartist.angle_helper as angle_helper
+        # import mpl_toolkits.axisartist.floating_axes as floating_axes
+        # from mpl_toolkits.axisartist.grid_finder import (DictFormatter, FixedLocator, MaxNLocator)
 
 
         def _build_diagonal_histogram(x_frs_index, y_frs_index, ax_histdiagonal, binwidth:float=0.075):
@@ -2335,13 +2335,16 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
             ax_histy.sharey(ax_dict["ax_scatter"])
 
             if enable_diagonal_histogram:
-                ax_histdiagonal.sharex(ax_dict["ax_scatter"])
-                ax_histdiagonal.sharey(ax_dict["ax_scatter"])
+                # ax_histdiagonal.sharex(ax_dict["ax_scatter"])
+                # ax_histdiagonal.sharey(ax_dict["ax_scatter"])
                 ax_histdiagonal.xaxis.set_tick_params(labelbottom=False)
                 ax_histdiagonal.yaxis.set_tick_params(labelleft=False)
                 ax_histdiagonal.xaxis.set_ticks_position('none')  # Hide x-axis ticks
                 ax_histdiagonal.yaxis.set_ticks_position('none')  # Hide x-axis ticks
-    
+                # Set the x and y axes to standard limits for easy visual comparison across sessions
+                ax_histdiagonal.set_xlim([-np.sqrt(2), np.sqrt(2)])
+                # ax_histdiagonal.set_ylim([-1.1, 1.1])
+                
 
         else:
             # create new Axes on the right and on the top of the current Axes
