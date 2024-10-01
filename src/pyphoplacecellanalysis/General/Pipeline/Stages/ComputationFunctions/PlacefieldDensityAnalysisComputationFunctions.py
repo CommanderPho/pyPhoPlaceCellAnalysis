@@ -675,6 +675,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                 
                 return peak_nearest_directional_boundary_bins, peak_nearest_directional_boundary_displacements, peak_nearest_directional_boundary_distances
 
+
             # ==================================================================================================================== #
             # begin main function body ___________________________________________________________________________________________ #
             active_pf_2D = computation_result.computed_data['pf2D']
@@ -803,26 +804,30 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             pf_peak_counts_map_blurred_gaussian = gaussian_filter(pf_peak_counts_map.astype('float'), sigma=gaussian_blur_sigma)
             pf_peak_counts_results = DynamicParameters(raw=pf_peak_counts_map, uniform_blurred=pf_peak_counts_map_blurred, gaussian_blurred=pf_peak_counts_map_blurred_gaussian)
 
-            ## Add distance to boundary by computing the distance to the nearest never-occupied bin
-            peak_nearest_directional_boundary_bins, peak_nearest_directional_boundary_displacements, peak_nearest_directional_boundary_distances = _compute_distances_from_peaks_to_boundary(active_pf_2D, filtered_summits_analysis_df, debug_print=debug_print)
+            try:
+                ## Add distance to boundary by computing the distance to the nearest never-occupied bin
+                peak_nearest_directional_boundary_bins, peak_nearest_directional_boundary_displacements, peak_nearest_directional_boundary_distances = _compute_distances_from_peaks_to_boundary(active_pf_2D, filtered_summits_analysis_df, debug_print=debug_print)
 
-            ## Add the output columns to the peaks dataframe:
-            # Output Columns:
-            # ['peak_nearest_boundary_bin_negX', 'peak_nearest_boundary_bin_posX', 'peak_nearest_boundary_bin_negY', 'peak_nearest_boundary_bin_posY'] # separate
-            # ['peak_nearest_directional_boundary_bins', 'peak_nearest_directional_boundary_displacements', 'peak_nearest_directional_boundary_distances'] # combined tuple columns
-            filtered_summits_analysis_df['peak_nearest_directional_boundary_bins'] = peak_nearest_directional_boundary_bins
-            filtered_summits_analysis_df['peak_nearest_directional_boundary_displacements'] = peak_nearest_directional_boundary_displacements
-            filtered_summits_analysis_df['peak_nearest_directional_boundary_distances'] = peak_nearest_directional_boundary_distances
-            filtered_summits_analysis_df['nearest_directional_boundary_direction_idx'] = np.argmin(peak_nearest_directional_boundary_distances, axis=1) # an index [0,1,2,3] corresponding to the direction of travel to the nearest index. Corresponds to (down, up, left, right)
-            filtered_summits_analysis_df['nearest_directional_boundary_direction_distance'] = np.min(peak_nearest_directional_boundary_distances, axis=1) # the distance in the minimal dimension towards the nearest boundary
+                ## Add the output columns to the peaks dataframe:
+                # Output Columns:
+                # ['peak_nearest_boundary_bin_negX', 'peak_nearest_boundary_bin_posX', 'peak_nearest_boundary_bin_negY', 'peak_nearest_boundary_bin_posY'] # separate
+                # ['peak_nearest_directional_boundary_bins', 'peak_nearest_directional_boundary_displacements', 'peak_nearest_directional_boundary_distances'] # combined tuple columns
+                filtered_summits_analysis_df['peak_nearest_directional_boundary_bins'] = peak_nearest_directional_boundary_bins
+                filtered_summits_analysis_df['peak_nearest_directional_boundary_displacements'] = peak_nearest_directional_boundary_displacements
+                filtered_summits_analysis_df['peak_nearest_directional_boundary_distances'] = peak_nearest_directional_boundary_distances
+                filtered_summits_analysis_df['nearest_directional_boundary_direction_idx'] = np.argmin(peak_nearest_directional_boundary_distances, axis=1) # an index [0,1,2,3] corresponding to the direction of travel to the nearest index. Corresponds to (down, up, left, right)
+                filtered_summits_analysis_df['nearest_directional_boundary_direction_distance'] = np.min(peak_nearest_directional_boundary_distances, axis=1) # the distance in the minimal dimension towards the nearest boundary
 
-            # ['peak_nearest_boundary_bin_negX', 'peak_nearest_boundary_bin_posX', 'peak_nearest_boundary_bin_negY', 'peak_nearest_boundary_bin_posY'] # separate
-            distances = np.vstack([np.asarray(a_tuple) for a_tuple in peak_nearest_directional_boundary_distances])
-            x_distances = np.min(distances[:,3:], axis=1) # find the distance to nearest wall vertically
-            y_distances = np.min(distances[:,:2], axis=1) # find the distance to nearest wall horizontally
+                # ['peak_nearest_boundary_bin_negX', 'peak_nearest_boundary_bin_posX', 'peak_nearest_boundary_bin_negY', 'peak_nearest_boundary_bin_posY'] # separate
+                distances = np.vstack([np.asarray(a_tuple) for a_tuple in peak_nearest_directional_boundary_distances])
+                x_distances = np.min(distances[:,3:], axis=1) # find the distance to nearest wall vertically
+                y_distances = np.min(distances[:,:2], axis=1) # find the distance to nearest wall horizontally
 
-            filtered_summits_analysis_df['nearest_x_boundary_distance'] = x_distances # the distance in the minimal dimension towards the nearest x boundary
-            filtered_summits_analysis_df['nearest_y_boundary_distance'] = y_distances # the distance in the minimal dimension towards the nearest y boundary
+                filtered_summits_analysis_df['nearest_x_boundary_distance'] = x_distances # the distance in the minimal dimension towards the nearest x boundary
+                filtered_summits_analysis_df['nearest_y_boundary_distance'] = y_distances # the distance in the minimal dimension towards the nearest y boundary
+            except (BaseException, NotImplementedError) as err:
+                print(f'could not find distances to nearest boundary in `ratemap_peaks_prominence2d`. Some columns will be missing from the output dataframe. Error: {err}')
+
 
             ## Build function output:
             if 'RatemapPeaksAnalysis' not in computation_result.computed_data:
