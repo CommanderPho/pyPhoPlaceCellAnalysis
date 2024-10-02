@@ -337,7 +337,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
     ## Generate VSCode Workspace for it
     if should_create_vscode_workspace:
         output_compute_python_scripts = [x[0] for x in output_python_scripts]
-        vscode_workspace_path = build_vscode_workspace(output_compute_python_scripts)
+        vscode_workspace_path = build_vscode_workspace(output_compute_python_scripts, python_executable=Path('~/Library/VSCode/black/.venv_black/bin/python').resolve())
         print(f'vscode_workspace_path: {vscode_workspace_path}')
     else:
         vscode_workspace_path = None
@@ -479,7 +479,7 @@ def get_python_environment(active_venv_path: Path, debug_print:bool=True):
 
 
 @function_attributes(short_name=None, tags=['vscode_workspace', 'vscode'], input_requires=[], output_provides=[], uses=['get_running_python'], used_by=[], creation_date='2024-04-15 10:35', related_items=[])
-def build_vscode_workspace(script_paths):
+def build_vscode_workspace(script_paths, python_executable=None):
     """ builds a VSCode workspace for the batch python scripts
     
         from pyphoplacecellanalysis.General.Batch.pythonScriptTemplating import build_vscode_workspace
@@ -490,8 +490,10 @@ def build_vscode_workspace(script_paths):
     """
     from jinja2 import Template
 
-    active_venv_path, python_executable, activate_script_path = get_running_python()
+    if python_executable is None:
+        active_venv_path, python_executable, activate_script_path = get_running_python()
 
+    
     assert len(script_paths) > 0, f"script_paths is empty!"
     top_level_script_folders_path: Path = Path(script_paths[0]).resolve().parent.parent # parent of the parents
     script_folders: List[Path] = [top_level_script_folders_path] + [Path(a_path).parent.resolve() for a_path in script_paths]
