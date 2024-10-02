@@ -1723,8 +1723,7 @@ def _perform_filter_replay_epochs(curr_active_pipeline, global_epoch_name, track
     # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
     session_name: str = curr_active_pipeline.session_name
     t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
-    df = DecoderDecodedEpochsResult.add_session_df_columns(df, session_name=session_name, time_bin_size=None, curr_session_t_delta=t_delta, time_col='ripple_start_t')
-    # df = _add_maze_id_to_epochs(df, t_delta)
+    df = DecoderDecodedEpochsResult.add_session_df_columns(df, session_name=session_name, time_bin_size=None, t_start=t_start, curr_session_t_delta=t_delta, t_end=t_end, time_col='ripple_start_t')
     df["time_bin_size"] = ripple_decoding_time_bin_size
     df['is_user_annotated_epoch'] = True # if it's filtered here, it's true
     return filtered_epochs_df, filtered_decoder_filter_epochs_decoder_result_dict, filtered_ripple_all_epoch_bins_marginals_df
