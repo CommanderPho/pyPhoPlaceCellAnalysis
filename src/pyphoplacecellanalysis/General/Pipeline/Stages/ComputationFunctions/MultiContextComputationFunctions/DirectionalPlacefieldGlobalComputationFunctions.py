@@ -2211,24 +2211,31 @@ class DecoderDecodedEpochsResult(ComputedResult):
     
         """
         from neuropy.core.epoch import EpochsAccessor
-        
+        from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+
         if time_col is None:
-            time_col = 'start' # 'ripple_start_t' for ripples, etc
+            # time_col = 'start' # 'ripple_start_t' for ripples, etc
+            time_col = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(df, col_connonical_name='start', required_columns_synonym_dict={"start":{'begin','start_t','ripple_start_t'}, "stop":['end','stop_t']}, should_raise_exception_on_fail=False)
+            
+        if end_time_col_name is None:
+            end_time_col_name = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(df, col_connonical_name='stop', required_columns_synonym_dict={"start":{'begin','start_t','ripple_start_t'}, "stop":['end','stop_t']}, should_raise_exception_on_fail=False)
+        
         df['session_name'] = session_name
         if time_bin_size is not None:
             df['time_bin_size'] = np.full((len(df), ), time_bin_size)
         if curr_session_t_delta is not None:
-            df['delta_aligned_start_t'] = df[time_col] - curr_session_t_delta
-            ## Add 'pre_post_delta_category' helper column:
-            df['pre_post_delta_category'] = 'post-delta'
-            df.loc[(df['delta_aligned_start_t'] <= 0.0), 'pre_post_delta_category'] = 'pre-delta'
-            if (t_start is not None) and (t_end is not None):
-                try:
-                    df = EpochsAccessor.add_maze_id_if_needed(epochs_df=df, t_start=t_start, t_delta=curr_session_t_delta, t_end=t_end, start_time_col_name=time_col, end_time_col_name=end_time_col_name) # Adds Columns: ['maze_id']
-                except (AttributeError, KeyError) as e:
-                    print(f'could not add the "maze_id" column to the dataframe (err: {e})\n\tlikely because it lacks valid "t_start" or "t_end" columns. df.columns: {list(df.columns)}. Skipping.')
-                except BaseException as e:
-                    raise e
+            if time_col is not None:
+                df['delta_aligned_start_t'] = df[time_col] - curr_session_t_delta
+                ## Add 'pre_post_delta_category' helper column:
+                df['pre_post_delta_category'] = 'post-delta'
+                df.loc[(df['delta_aligned_start_t'] <= 0.0), 'pre_post_delta_category'] = 'pre-delta'
+                if (t_start is not None) and (t_end is not None) and (end_time_col_name is not None):
+                    try:
+                        df = EpochsAccessor.add_maze_id_if_needed(epochs_df=df, t_start=t_start, t_delta=curr_session_t_delta, t_end=t_end, start_time_col_name=time_col, end_time_col_name=end_time_col_name) # Adds Columns: ['maze_id']
+                    except (AttributeError, KeyError) as e:
+                        print(f'could not add the "maze_id" column to the dataframe (err: {e})\n\tlikely because it lacks valid "t_start" or "t_end" columns. df.columns: {list(df.columns)}. Skipping.')
+                    except BaseException as e:
+                        raise e
 
         return df
 
@@ -2421,7 +2428,8 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
 
     @function_attributes(short_name=None, tags=['columns', 'epochs', 'IMPORTANT'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-14 09:22', related_items=[])
-    def add_all_extra_epoch_columns(self, curr_active_pipeline, track_templates: TrackTemplates, required_min_percentage_of_active_cells: float = 0.333333, debug_print=False, **additional_selections_context) -> None:
+    def add_all_extra_epoch_columns(self, curr_active_pipeline, track_templates: TrackTemplates, required_min_percentage_of_active_cells: float = 0.333333,
+                                     debug_print=False, **additional_selections_context) -> None:
         """ instead of filtering by the good/user-selected ripple epochs, it adds two columns: ['is_valid_epoch', 'is_user_annotated_epoch'] so they can be later identified and filtered to `self.decoder_ripple_filter_epochs_decoder_result_dict.filter_epochs`
         Updates `self.decoder_ripple_filter_epochs_decoder_result_dict.filter_epochs` in-place 
         """
@@ -2429,6 +2437,9 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
         # 2024-03-04 - Filter out the epochs based on the criteria:
         _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        session_name: str = curr_active_pipeline.session_name
+        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+
         filtered_epochs_df, active_spikes_df = filter_and_update_epochs_and_spikes(curr_active_pipeline=curr_active_pipeline, global_epoch_name=global_epoch_name, track_templates=track_templates, required_min_percentage_of_active_cells=required_min_percentage_of_active_cells, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1, **additional_selections_context)
         filtered_valid_epoch_times = filtered_epochs_df[['start', 'stop']].to_numpy()
 
@@ -2442,6 +2453,8 @@ class DecoderDecodedEpochsResult(ComputedResult):
             if debug_print:
                 print(f'did_update_user_annotation_col["{a_name}"]: {did_update_user_annotation_col}')
             did_update_is_valid = DecoderDecodedEpochsResult.try_add_is_valid_epoch_column(ensure_dataframe(a_result.filter_epochs), any_good_selected_epoch_times=filtered_valid_epoch_times, t_column_names=None)
+            # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
+            a_result.filter_epochs = DecoderDecodedEpochsResult.add_session_df_columns(ensure_dataframe(a_result.filter_epochs), session_name=session_name, time_bin_size=None, t_start=t_start, curr_session_t_delta=t_delta, t_end=t_end)            
             if debug_print:
                 print(f'did_update_is_valid["{a_name}"]: {did_update_is_valid}')
         if debug_print:
@@ -2499,7 +2512,8 @@ class DecoderDecodedEpochsResult(ComputedResult):
         # Column Names _______________________________________________________________________________________________________ #
         basic_df_column_names = ['start', 'stop', 'label', 'duration']
         selection_col_names = ['is_user_annotated_epoch', 'is_valid_epoch']
-
+        session_identity_col_names = ['session_name', 'time_bin_size', 'delta_aligned_start_t', 'pre_post_delta_category', 'maze_id']
+        
         # Score Columns (one value for each decoder) _________________________________________________________________________ #
         decoder_bayes_prob_col_names = ['P_decoder']
 
@@ -2510,7 +2524,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
         heuristic_score_col_names = ['travel', 'coverage', 'jump', 'longest_sequence_length_ratio', 'direction_change_bin_ratio', 'congruent_dir_bins_ratio', 'total_congruent_direction_change'] + ['total_variation', 'integral_second_derivative', 'stddev_of_diff'] # , 'sequential_correlation', 'monotonicity_score', 'laplacian_smoothness', 'longest_sequence_length'
 
         ## All included columns:
-        all_df_shared_column_names: List[str] = basic_df_column_names + selection_col_names # these are not replicated for each decoder, they're the same for the epoch
+        all_df_shared_column_names: List[str] = basic_df_column_names + selection_col_names + session_identity_col_names # these are not replicated for each decoder, they're the same for the epoch
         all_df_score_column_names: List[str] = decoder_bayes_prob_col_names + radon_transform_col_names + weighted_corr_col_names + pearson_col_names + heuristic_score_col_names 
         all_df_column_names: List[str] = all_df_shared_column_names + all_df_score_column_names ## All included columns, includes the score columns which will not be replicated
 
@@ -2655,29 +2669,6 @@ class DecoderDecodedEpochsResult(ComputedResult):
         return extracted_merged_scores_df
 
 
-    # def get_filtered_decoded_epochs_results(self, curr_active_pipeline, track_templates: TrackTemplates, required_min_percentage_of_active_cells: float = 0.333333):
-    #     ## INPUTS: decoder_ripple_filter_epochs_decoder_result_dict
-
-    #     # 2024-03-04 - Filter out the epochs based on the criteria:
-    #     _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-    #     filtered_epochs_df, active_spikes_df = filter_and_update_epochs_and_spikes(curr_active_pipeline=curr_active_pipeline, global_epoch_name=global_epoch_name, track_templates=track_templates, required_min_percentage_of_active_cells=required_min_percentage_of_active_cells, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1)
-    #     filtered_valid_epoch_times = filtered_epochs_df[['start', 'stop']].to_numpy()
-
-    #     ## 2024-03-08 - Also constrain the user-selected ones (just to try it):
-    #     decoder_user_selected_epoch_times_dict, any_user_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(curr_active_pipeline, track_templates=track_templates)
-
-    #     decoder_ripple_filter_epochs_decoder_result_dict = self.decoder_ripple_filter_epochs_decoder_result_dict
-
-    #     ## filter the epochs by something and only show those:
-    #     # INPUTS: filtered_epochs_df
-    #     # filtered_ripple_simple_pf_pearson_merged_df = filtered_ripple_simple_pf_pearson_merged_df.epochs.matching_epoch_times_slice(active_epochs_df[['start', 'stop']].to_numpy())
-    #     ## Update the `decoder_ripple_filter_epochs_decoder_result_dict` with the included epochs:
-    #     filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(filtered_epochs_df[['start', 'stop']].to_numpy()) for a_name, a_result in decoder_ripple_filter_epochs_decoder_result_dict.items()} # working filtered
-    #     ## Constrain again now by the user selections:
-    #     filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(any_user_selected_epoch_times) for a_name, a_result in filtered_decoder_filter_epochs_decoder_result_dict.items()}
-    #     # filtered_decoder_filter_epochs_decoder_result_dict
-
-    #     return filtered_decoder_filter_epochs_decoder_result_dict, any_user_selected_epoch_times
 
     @classmethod
     def _perform_export_dfs_dict_to_csvs(cls, extracted_dfs_dict: Dict, parent_output_path: Path, active_context, session_name: str, tbin_values_dict: Dict,
@@ -6654,7 +6645,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
 
 
-    @function_attributes(short_name='directional_decoded_stacked_epoch_slices', tags=['scatter-plot', 'directional_merged_decoder_decoded_epochs','directional','marginal'],
+    @function_attributes(short_name='directional_decoded_stacked_epoch_slices', tags=['export', 'heatmaps', 'posterior', 'directional_merged_decoder_decoded_epochs','directional','marginal'],
                           input_requires=['RankOrder', 'DirectionalLaps', 'DirectionalMergedDecoders', 'DirectionalDecodersEpochsEvaluations'], output_provides=[], uses=['PosteriorExporting.perform_export_all_decoded_posteriors_as_images'], used_by=[], creation_date='2024-09-27 17:08', related_items=[], is_global=True)
     def _display_directional_merged_pf_decoded_stacked_epoch_slices(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, custom_export_formats: Dict[str, "HeatmapExportConfig"]=None, **kwargs):
         """ Exports all decoded epoch posteriors separately to a folder. NON-VISUAL, never displays.
