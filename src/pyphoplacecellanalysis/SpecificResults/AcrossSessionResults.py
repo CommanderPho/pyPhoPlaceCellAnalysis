@@ -2210,7 +2210,7 @@ def load_across_sessions_exported_h5_files(collected_outputs_directory=None, cut
 
     """
     from neuropy.core.user_annotations import UserAnnotationsManager
-
+    from pyphocorehelpers.indexing_helpers import safe_get_if_not_None
     H5_parse_fields = ['session', 'file_type', 'path', 'decoding_time_bin_size_str', 'export_datetime']
     # H5_parse_fields = ['session', 'decoding_time_bin_size_str', 'export_datetime']
     # H5_parse_fields = ['session', 'file_type', 'path', 'decoding_time_bin_size_str', 'export_datetime']
@@ -2248,9 +2248,8 @@ def load_across_sessions_exported_h5_files(collected_outputs_directory=None, cut
     h5_session_names = list(h5_sessions.keys())
     good_sessions = UserAnnotationsManager.get_hardcoded_good_sessions()
     h5_session_contexts = [a_good_session_ctxt for a_good_session_ctxt in good_sessions if (a_good_session_ctxt.session_name in h5_session_names)]
-
     # included_h5_paths = [a_session_dict.get('pipeline_results', None)[0] for a_sess_name, a_session_dict in h5_sessions.items()] # these are mis-ordered
-    included_h5_paths = [h5_sessions[a_good_session_ctxt.session_name].get('pipeline_results', None)[0] for a_good_session_ctxt in h5_session_contexts]
+    included_h5_paths = [safe_get_if_not_None(h5_sessions[a_good_session_ctxt.session_name].get('pipeline_results', None), 0, None) for a_good_session_ctxt in h5_session_contexts]
     assert len(included_h5_paths) == len(h5_session_contexts)
 
     h5_contexts_paths_dict = dict(zip(h5_session_contexts, included_h5_paths))
