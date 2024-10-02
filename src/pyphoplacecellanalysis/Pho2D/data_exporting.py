@@ -554,9 +554,10 @@ class PosteriorExporting:
                 
             ## try to export the combined figures right away
             # custom_export_format_series_name: str = list(out_custom_export_formats_results_dict.keys())[0]
-            custom_export_format_series_name: str = list(out_custom_export_formats_results_dict[list(out_custom_export_formats_results_dict.keys())[0]].keys())[0] # the inner key is the decoder_name (like 'long_LR') but the outer key is the custom_export name like 'color'
-            _output_combined_dir, _output_combined_image_save_dirs = _subfn_build_combined_output_images(single_known_epoch_type_dict=out_custom_export_formats_results_dict, specific_epochs_posterior_out_folder=specific_epochs_posterior_out_folder,
-                                                                                                         known_epoch_type_name=epochs_name, custom_export_format_series_name=custom_export_format_series_name)
+            # custom_export_format_series_name: str = list(out_custom_export_formats_results_dict[list(out_custom_export_formats_results_dict.keys())[0]].keys())[0] # the inner key is the decoder_name (like 'long_LR') but the outer key is the custom_export name like 'color'
+            for custom_export_format_series_name in list(out_custom_export_formats_results_dict[list(out_custom_export_formats_results_dict.keys())[0]].keys()):
+                _output_combined_dir, _output_combined_image_save_dirs = _subfn_build_combined_output_images(single_known_epoch_type_dict=out_custom_export_formats_results_dict, specific_epochs_posterior_out_folder=specific_epochs_posterior_out_folder,
+                                                                                                            known_epoch_type_name=epochs_name, custom_export_format_series_name=custom_export_format_series_name)
                 
             return out_paths, out_custom_export_formats_results_dict
 
@@ -566,8 +567,10 @@ class PosteriorExporting:
         
         out_paths_dict = {'laps': None, 'ripple': None}
         out_custom_formats_results_dict = {'laps': None, 'ripple': None}
-        out_paths_dict['laps'], out_custom_formats_results_dict['laps'] = _subfn_perform_export_single_epochs(_active_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict, epochs_name='laps', a_parent_output_folder=parent_output_folder, custom_export_formats=custom_export_formats)
-        out_paths_dict['ripple'], out_custom_formats_results_dict['ripple'] = _subfn_perform_export_single_epochs(_active_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict,epochs_name='ripple', a_parent_output_folder=parent_output_folder, custom_export_formats=custom_export_formats)
+        if decoder_laps_filter_epochs_decoder_result_dict is not None:
+            out_paths_dict['laps'], out_custom_formats_results_dict['laps'] = _subfn_perform_export_single_epochs(_active_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict, epochs_name='laps', a_parent_output_folder=parent_output_folder, custom_export_formats=custom_export_formats)
+        if decoder_ripple_filter_epochs_decoder_result_dict is not None:
+            out_paths_dict['ripple'], out_custom_formats_results_dict['ripple'] = _subfn_perform_export_single_epochs(_active_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict,epochs_name='ripple', a_parent_output_folder=parent_output_folder, custom_export_formats=custom_export_formats)
         return out_paths_dict, out_custom_formats_results_dict
 
 
