@@ -277,7 +277,9 @@ class TrialByTrialActivityWindow:
 
     @function_attributes(short_name=None, tags=['reliability', 'decoders', 'all', 'pyqtgraph', 'display', 'figure'], input_requires=[], output_provides=[], uses=['plot_trial_to_trial_reliability_image_array', 'create_transparent_colormap'], used_by=[], creation_date='2024-08-29 04:34', related_items=[])
     @classmethod
-    def plot_trial_to_trial_reliability_all_decoders_image_stack(cls, directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity], active_one_step_decoder, drop_below_threshold=0.0000001, app=None, parent_root_widget=None, root_render_widget=None, debug_print=False, defer_show:bool=False, name:str = 'TrialByTrialActivityWindow', **param_kwargs):
+    def plot_trial_to_trial_reliability_all_decoders_image_stack(cls, directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity], active_one_step_decoder, drop_below_threshold=0.0000001, is_overlaid_heatmaps_mode: bool = True,
+                                                                  app=None, parent_root_widget=None, root_render_widget=None, debug_print=False, defer_show:bool=False, name:str = 'TrialByTrialActivityWindow',
+                                                                   **param_kwargs):
         """ Calls `plot_trial_to_trial_reliability_image_array` for each decoder's reliability from lap-top-lap, overlaying the results as different color heatmaps
         
         Usage:
@@ -295,119 +297,134 @@ class TrialByTrialActivityWindow:
         from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
         
+
+        
+        
         ## Usage:
         
         directional_active_lap_pf_results_dicts = {k:v for k, v in directional_active_lap_pf_results_dicts.items() if k in TrackTemplates.get_decoder_names()}
 
-        ## first decoder:
-        a_decoder_name = 'long_LR'
-        active_trial_by_trial_activity_obj = directional_active_lap_pf_results_dicts[a_decoder_name]
-        active_z_scored_tuning_map_matrix = active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix # shape (n_epochs, n_neurons, n_pos_bins),
-        print(f'np.shape(active_z_scored_tuning_map_matrix): {np.shape(active_z_scored_tuning_map_matrix)}')
+        if is_overlaid_heatmaps_mode:
+            ## first decoder:
+            a_decoder_name = 'long_LR'
+            active_trial_by_trial_activity_obj = directional_active_lap_pf_results_dicts[a_decoder_name]
+            active_z_scored_tuning_map_matrix = active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix # shape (n_epochs, n_neurons, n_pos_bins),
+            print(f'np.shape(active_z_scored_tuning_map_matrix): {np.shape(active_z_scored_tuning_map_matrix)}')
+        
+
+        else:
+            ## MODE 2: Concatenates them before passing them along        
+            # active_z_scored_tuning_map_matrix = [[directional_active_lap_pf_results_dicts['long_LR'].z_scored_tuning_map_matrix, directional_active_lap_pf_results_dicts['short_LR'].z_scored_tuning_map_matrix],
+            #                                     [directional_active_lap_pf_results_dicts['long_RL'].z_scored_tuning_map_matrix, directional_active_lap_pf_results_dicts['short_RL'].z_scored_tuning_map_matrix]]
+            active_z_scored_tuning_map_matrix = np.vstack([np.vstack([directional_active_lap_pf_results_dicts['long_LR'].z_scored_tuning_map_matrix, directional_active_lap_pf_results_dicts['long_RL'].z_scored_tuning_map_matrix]),
+                                                 np.vstack([directional_active_lap_pf_results_dicts['short_LR'].z_scored_tuning_map_matrix, directional_active_lap_pf_results_dicts['short_RL'].z_scored_tuning_map_matrix]),
+            ])
+            # active_z_scored_tuning_map_matrix = np.concatenate(active_z_scored_tuning_map_matrix)
 
         # Plots only the first data-series ('long_LR')
         app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array, (lblTitle, lblFooter) = cls._plot_trial_to_trial_reliability_image_array(active_one_step_decoder=active_one_step_decoder, z_scored_tuning_map_matrix=active_z_scored_tuning_map_matrix, drop_below_threshold=drop_below_threshold)
 
-        # Extract the heatmaps from the other decoders
-        ## INPUTS: directional_active_lap_pf_results_dicts
-        additional_heatmaps_data = {}
-        additional_cmap_names = {}
-        # MATPLOTLIB way
-        # additional_cmap_names['long_LR'] = 'Reds'
-        # additional_cmap_names['long_RL'] = 'Purples'
-        # additional_cmap_names['short_LR'] = 'Greens'
-        # additional_cmap_names['short_RL'] = 'Oranges'
-        # additional_cmap_names['maze_all'] = 'Greys'
-        # additional_cmaps = {k: create_transparent_colormap(cmap_name=v, lower_bound_alpha=0.1) for k, v in additional_cmap_names.items()}
+        if is_overlaid_heatmaps_mode:
+            # Extract the heatmaps from the other decoders
+            ## INPUTS: directional_active_lap_pf_results_dicts
+            additional_heatmaps_data = {}
+            additional_cmap_names = {}
+            # MATPLOTLIB way
+            # additional_cmap_names['long_LR'] = 'Reds'
+            # additional_cmap_names['long_RL'] = 'Purples'
+            # additional_cmap_names['short_LR'] = 'Greens'
+            # additional_cmap_names['short_RL'] = 'Oranges'
+            # additional_cmap_names['maze_all'] = 'Greys'
+            # additional_cmaps = {k: create_transparent_colormap(cmap_name=v, lower_bound_alpha=0.1) for k, v in additional_cmap_names.items()}
 
-        # additional_cmap_names = dict(zip(TrackTemplates.get_decoder_names(), ['red', 'purple', 'green', 'orange'])) # {'long_LR': 'red', 'long_RL': 'purple', 'short_LR': 'green', 'short_RL': 'orange'}
+            # additional_cmap_names = dict(zip(TrackTemplates.get_decoder_names(), ['red', 'purple', 'green', 'orange'])) # {'long_LR': 'red', 'long_RL': 'purple', 'short_LR': 'green', 'short_RL': 'orange'}
 
-        long_epoch_config = long_short_display_config_manager.long_epoch_config.as_pyqtgraph_kwargs()
-        short_epoch_config = long_short_display_config_manager.short_epoch_config.as_pyqtgraph_kwargs()
+            long_epoch_config = long_short_display_config_manager.long_epoch_config.as_pyqtgraph_kwargs()
+            short_epoch_config = long_short_display_config_manager.short_epoch_config.as_pyqtgraph_kwargs()
 
-        color_dict = {'long_LR': long_epoch_config['brush'].color(), 'long_RL': apply_LR_to_RL_adjustment(long_epoch_config['brush'].color()),
-                        'short_LR': short_epoch_config['brush'].color(), 'short_RL': apply_LR_to_RL_adjustment(short_epoch_config['brush'].color())}
-        additional_cmap_names = {k: ColorFormatConverter.qColor_to_hexstring(v) for k, v in color_dict.items()}
+            color_dict = {'long_LR': long_epoch_config['brush'].color(), 'long_RL': apply_LR_to_RL_adjustment(long_epoch_config['brush'].color()),
+                            'short_LR': short_epoch_config['brush'].color(), 'short_RL': apply_LR_to_RL_adjustment(short_epoch_config['brush'].color())}
+            additional_cmap_names = {k: ColorFormatConverter.qColor_to_hexstring(v) for k, v in color_dict.items()}
 
-        ## new
-        additional_cmap_names = {'long_LR': 'royalblue', 'long_RL': 'blue',
-                        'short_LR': 'crimson', 'short_RL': 'red'}
-        # additional_cmap_names = {k: ColorFormatConverter.qColor_to_hexstring(v) for k, v in color_dict.items()}
+            ## new
+            additional_cmap_names = {'long_LR': 'royalblue', 'long_RL': 'blue',
+                            'short_LR': 'crimson', 'short_RL': 'red'}
+            # additional_cmap_names = {k: ColorFormatConverter.qColor_to_hexstring(v) for k, v in color_dict.items()}
 
-        # plot_trial_to_trial_reliability_all_decoders_image_stack
+            # plot_trial_to_trial_reliability_all_decoders_image_stack
 
-        additional_cmaps = {k: ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=0.1) for k, v in additional_cmap_names.items()}
+            additional_cmaps = {k: ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=0.1) for k, v in additional_cmap_names.items()}
 
-        # additional_cmaps = {name: pg.ColorMap(np.array([0.0, 1.0]), np.array([pg.mkColor(color).getRgb()[:3] + (0,), pg.mkColor(color).getRgb()[:3] + (255,)], dtype=np.ubyte)) for name, color in additional_cmap_names.items()}
+            # additional_cmaps = {name: pg.ColorMap(np.array([0.0, 1.0]), np.array([pg.mkColor(color).getRgb()[:3] + (0,), pg.mkColor(color).getRgb()[:3] + (255,)], dtype=np.ubyte)) for name, color in additional_cmap_names.items()}
 
-        additional_legend_entries = list(zip(directional_active_lap_pf_results_dicts.keys(), additional_cmap_names.values() )) # ['red', 'purple', 'green', 'orange']
+            additional_legend_entries = list(zip(directional_active_lap_pf_results_dicts.keys(), additional_cmap_names.values() )) # ['red', 'purple', 'green', 'orange']
 
-        enable_stacked_long_and_short: bool = False # not currently working, they have to be overlayed exactly on top of each other
-        additional_decoder_y_offsets = {'long_LR': 0, 'long_RL': 0,
-                        'short_LR': 1, 'short_RL': 1}
-        
-        for decoder_name, active_trial_by_trial_activity_obj in directional_active_lap_pf_results_dicts.items():  # Replace with actual decoder names
-            if decoder_name != 'long_LR':
-                ## we already did 'long_LR', so skip that one    
-                # additional_heatmaps.append(active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix.transpose(1, 2, 0))
-                additional_heatmaps_data[decoder_name] = active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix.transpose(1, 2, 0)
-                # additional_cmaps[decoder_name] = pg.colormap.get('gray','matplotlib') # prepare a linear color map
-
-
-        # Overlay additional heatmaps if provided
-        ## INPUTS: additional_heatmaps, additional_cmaps, plot_array
-        ## UPDATES: plot_array
-        additional_img_items_dict = {}
-
-        if additional_heatmaps_data:
-            for i, (decoder_name, heatmap_matrix) in enumerate(additional_heatmaps_data.items()):
-                if decoder_name not in additional_img_items_dict:
-                    additional_img_items_dict[decoder_name] = []
-                cmap = additional_cmaps[decoder_name]
-                # Assuming heatmap_matrix is of shape (n_neurons, n_xbins, n_ybins)
-                for a_linear_index in range(len(plot_array)):
-                    curr_image_bounds_extent = plot_data_array[a_linear_index]['image_bounds_extent']
-                    # print(f'curr_image_bounds_extent[{a_linear_index}]: {curr_image_bounds_extent}')
-                    additional_image = np.squeeze(heatmap_matrix[a_linear_index, :, :])
-                    # additional_image = _scale_current_placefield_to_acceptable_range(additional_image, occupancy=occupancy, drop_below_threshold=drop_below_threshold)
-                    additional_image = _scale_current_placefield_to_acceptable_range(additional_image, occupancy=None, drop_below_threshold=None) # , occupancy=occupancy, drop_below_threshold=drop_below_threshold !! occupancy is not correct,it's the global one I think
-                    # print(f'\tadditional_image: {np.shape(additional_image)}')
-                    additional_img_item = pg.ImageItem(image=additional_image, levels=(0, 1))
-                    # Update the image:
-                    # additional_img_item.setImage(additional_image, autoLevels=False) # rect: [x, y, w, h] , rect=image_bounds_extent
-                    shifted_curr_image_bounds_extent = deepcopy(curr_image_bounds_extent)
-
-                    if enable_stacked_long_and_short:
-                        curr_item_y_offset = additional_decoder_y_offsets.get(decoder_name, 0)
-                        shifted_curr_image_bounds_extent[1] = curr_image_bounds_extent[1] + (curr_image_bounds_extent[3] * (curr_item_y_offset + 1)) # offset y = y + (h * (curr_item_y_offset + 1))
-                        shifted_curr_image_bounds_extent[3] = curr_image_bounds_extent[3] + (curr_image_bounds_extent[3] * curr_item_y_offset) # increase h = h + (h * (curr_item_y_offset))
-                    else:
-                        pass # do nothing, use the same bounds for each image
-
-                    additional_img_item.setImage(additional_image, rect=shifted_curr_image_bounds_extent, autoLevels=False) # rect: [x, y, w, h] 
-                    additional_img_item.setOpacity(0.5)  # Set transparency for overlay
-                    if isinstance(cmap, NDArray):
-                        additional_img_item.setLookupTable(cmap, update=False)
-                    else:
-                        additional_img_item.setLookupTable(cmap.getLookupTable(nPts=256), update=False)
-                        
-                    plot_array[a_linear_index].addItem(additional_img_item)
-                    additional_img_items_dict[decoder_name].append(additional_img_item)
-
-
-        ## Add the legend below all the rows:
-        root_render_widget.nextRow()
-        # Create a layout for the legend at the new row
-        # Add a layout for the legend at the bottom, spanning all columns
-        # legend_layout = root_render_widget.addLayout(row=root_render_widget.rowCount(), col=0, colspan=root_render_widget.columnCount())
-        legend_layout = root_render_widget.addLayout()  # Automatically places in the next available row
-
-        # Add labels for each entry in the legend
-        for i, (label, color) in enumerate(additional_legend_entries):
-            legend_text = pg.LabelItem(label, color=color)
-            # legend_layout.addItem(legend_text, row=0, col=i)  # Place all labels in a single row
-            legend_layout.addItem(legend_text, row=i, col=0)  # Place all labels in a single columns
+            enable_stacked_long_and_short: bool = False # not currently working, they have to be overlayed exactly on top of each other
+            additional_decoder_y_offsets = {'long_LR': 0, 'long_RL': 0,
+                            'short_LR': 1, 'short_RL': 1}
             
+            for decoder_name, active_trial_by_trial_activity_obj in directional_active_lap_pf_results_dicts.items():  # Replace with actual decoder names
+                if decoder_name != 'long_LR':
+                    ## we already did 'long_LR', so skip that one    
+                    # additional_heatmaps.append(active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix.transpose(1, 2, 0))
+                    additional_heatmaps_data[decoder_name] = active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix.transpose(1, 2, 0)
+                    # additional_cmaps[decoder_name] = pg.colormap.get('gray','matplotlib') # prepare a linear color map
+
+
+            # Overlay additional heatmaps if provided
+            ## INPUTS: additional_heatmaps, additional_cmaps, plot_array
+            ## UPDATES: plot_array
+            additional_img_items_dict = {}
+
+            if additional_heatmaps_data:
+                for i, (decoder_name, heatmap_matrix) in enumerate(additional_heatmaps_data.items()):
+                    if decoder_name not in additional_img_items_dict:
+                        additional_img_items_dict[decoder_name] = []
+                    cmap = additional_cmaps[decoder_name]
+                    # Assuming heatmap_matrix is of shape (n_neurons, n_xbins, n_ybins)
+                    for a_linear_index in range(len(plot_array)):
+                        curr_image_bounds_extent = plot_data_array[a_linear_index]['image_bounds_extent']
+                        # print(f'curr_image_bounds_extent[{a_linear_index}]: {curr_image_bounds_extent}')
+                        additional_image = np.squeeze(heatmap_matrix[a_linear_index, :, :])
+                        # additional_image = _scale_current_placefield_to_acceptable_range(additional_image, occupancy=occupancy, drop_below_threshold=drop_below_threshold)
+                        additional_image = _scale_current_placefield_to_acceptable_range(additional_image, occupancy=None, drop_below_threshold=None) # , occupancy=occupancy, drop_below_threshold=drop_below_threshold !! occupancy is not correct,it's the global one I think
+                        # print(f'\tadditional_image: {np.shape(additional_image)}')
+                        additional_img_item = pg.ImageItem(image=additional_image, levels=(0, 1))
+                        # Update the image:
+                        # additional_img_item.setImage(additional_image, autoLevels=False) # rect: [x, y, w, h] , rect=image_bounds_extent
+                        shifted_curr_image_bounds_extent = deepcopy(curr_image_bounds_extent)
+
+                        if enable_stacked_long_and_short:
+                            curr_item_y_offset = additional_decoder_y_offsets.get(decoder_name, 0)
+                            shifted_curr_image_bounds_extent[1] = curr_image_bounds_extent[1] + (curr_image_bounds_extent[3] * (curr_item_y_offset + 1)) # offset y = y + (h * (curr_item_y_offset + 1))
+                            shifted_curr_image_bounds_extent[3] = curr_image_bounds_extent[3] + (curr_image_bounds_extent[3] * curr_item_y_offset) # increase h = h + (h * (curr_item_y_offset))
+                        else:
+                            pass # do nothing, use the same bounds for each image
+
+                        additional_img_item.setImage(additional_image, rect=shifted_curr_image_bounds_extent, autoLevels=False) # rect: [x, y, w, h] 
+                        additional_img_item.setOpacity(0.5)  # Set transparency for overlay
+                        if isinstance(cmap, NDArray):
+                            additional_img_item.setLookupTable(cmap, update=False)
+                        else:
+                            additional_img_item.setLookupTable(cmap.getLookupTable(nPts=256), update=False)
+                            
+                        plot_array[a_linear_index].addItem(additional_img_item)
+                        additional_img_items_dict[decoder_name].append(additional_img_item)
+
+            ## Add the legend below all the rows:
+            root_render_widget.nextRow()
+            # Create a layout for the legend at the new row
+            # Add a layout for the legend at the bottom, spanning all columns
+            # legend_layout = root_render_widget.addLayout(row=root_render_widget.rowCount(), col=0, colspan=root_render_widget.columnCount())
+            legend_layout = root_render_widget.addLayout()  # Automatically places in the next available row
+
+            # Add labels for each entry in the legend
+            for i, (label, color) in enumerate(additional_legend_entries):
+                legend_text = pg.LabelItem(label, color=color)
+                # legend_layout.addItem(legend_text, row=0, col=i)  # Place all labels in a single row
+                legend_layout.addItem(legend_text, row=i, col=0)  # Place all labels in a single columns
+
+        # END if is_overlaid_heatmaps_mode                
         parent_root_widget.setWindowTitle('TrialByTrialActivity - trial_to_trial_reliability_all_decoders_image_stack')
 
 
