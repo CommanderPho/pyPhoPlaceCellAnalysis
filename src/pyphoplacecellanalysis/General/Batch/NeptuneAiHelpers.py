@@ -27,6 +27,7 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.assertion_helpers import Assert
 from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata
 
+from neuropy.utils.indexing_helpers import get_nested_value, flatten_dict
 
 # SessionDescriptorString: TypeAlias = str # an integer index that is an aclu
 SessionDescriptorString = NewType('SessionDescriptorString', str) # session_descriptor_string
@@ -111,28 +112,6 @@ class KnownNeptuneProjects:
 # UTILITY FUNCTIONS                                                                                                    #
 # ==================================================================================================================== #
 
-def get_nested_value(d: dict, keys: List[Any]) -> Any:
-    """  how can I index into nested dictionaries using a list of keys? """
-    for key in keys:
-        d = d[key]
-    return d
-
-def flatten_dict(d, parent_key='', sep='/'):
-    if (not isinstance(d, dict)):
-        assert isinstance(parent_key, str), f"expected type(parent_key) == str but instead type(parent_key): {type(parent_key)}, parent_key: {parent_key}"
-        return {parent_key:d}
-    
-    items = {}
-    for k, v in d.items():
-        # Construct the new key by concatenating the parent key and current key
-        new_key = f"{parent_key}{sep}{k}" if parent_key else k
-        if isinstance(v, dict):
-            # If the value is a dictionary, recursively flatten it
-            items.update(flatten_dict(v, new_key, sep=sep))
-        else:
-            # If the value is not a dictionary, add it to the items
-            items[new_key] = v
-    return items
 
 
 
