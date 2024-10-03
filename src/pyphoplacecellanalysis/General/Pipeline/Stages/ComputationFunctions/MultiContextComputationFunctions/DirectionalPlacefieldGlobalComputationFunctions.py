@@ -3938,8 +3938,8 @@ class TrialByTrialActivityResult(ComputedResult):
 
     any_decoder_neuron_IDs: NDArray = serialized_field(default=None)
     active_pf_dt: PfND_TimeDependent = serialized_field(default=None)
-    directional_lap_epochs_dict: Dict[str, Epoch] =  serialized_field(default=None)
-    directional_active_lap_pf_results_dicts: Dict[str, TrialByTrialActivity] = serialized_field(default=None)
+    directional_lap_epochs_dict: Dict[decoder_name, Epoch] =  serialized_field(default=None)
+    directional_active_lap_pf_results_dicts: Dict[decoder_name, TrialByTrialActivity] = serialized_field(default=None)
 
 
     def __repr__(self):

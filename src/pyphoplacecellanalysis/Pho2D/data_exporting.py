@@ -479,10 +479,6 @@ class PosteriorExporting:
         
         Usage:
         
-            save_path = Path('output/newest_all_decoded_epoch_posteriors.h5').resolve()
-            _parent_save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_decoded_posteriors_to_HDF5')
-            out_contexts = PosteriorExporting.perform_save_all_decoded_posteriors_to_HDF5(decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, _save_context=_parent_save_context, save_path=save_path)
-            out_contexts
             
         History:
             Refactored from `ComputerVisionComputations` on 2024-09-30
