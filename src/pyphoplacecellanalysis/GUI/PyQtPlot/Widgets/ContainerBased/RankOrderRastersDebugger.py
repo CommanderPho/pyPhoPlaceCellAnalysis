@@ -40,6 +40,8 @@ from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph
 
 from pyphocorehelpers.print_helpers import generate_html_string
 
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import PhoDockAreaContainingWindow
+
 
 __all__ = ['RankOrderRastersDebugger']
 
@@ -233,6 +235,12 @@ class RankOrderRastersDebugger:
         return {k:v['root_plot'] for k,v in self.plots.all_separate_plots.items()} # PlotItem 
     
     
+    @property
+    def root_dockAreaWindow(self) -> "PhoDockAreaContainingWindow":
+        return self.ui.root_dockAreaWindow
+    
+    
+
 
     @classmethod
     def init_from_rank_order_results(cls, rank_order_results: RankOrderComputationsContainer):

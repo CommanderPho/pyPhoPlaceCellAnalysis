@@ -2684,6 +2684,7 @@ def _build_attached_raster_viewer(paginated_multi_decoder_decoded_epochs_window:
     
     """
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
+
     # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
     # global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
     global_spikes_df = deepcopy(active_spikes_df)
@@ -2715,7 +2716,7 @@ def _build_attached_raster_viewer(paginated_multi_decoder_decoded_epochs_window:
         if not a_pagination_controller.params.has_attr('on_middle_click_item_callbacks'):
             a_pagination_controller.params['on_middle_click_item_callbacks'] = {}
         a_pagination_controller.params.on_middle_click_item_callbacks['update_attached_raster_viewer_epoch_callback'] = update_attached_raster_viewer_epoch_callback
-        
+
     return _out_ripple_rasters
 
 
@@ -2729,7 +2730,7 @@ def build_attached_raster_viewer_widget(paginated_multi_decoder_decoded_epochs_w
 
     """
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
-    
+    from pyphocorehelpers.gui.Qt.widget_positioning_helpers import WidgetPositioningHelpers, DesiredWidgetLocation, WidgetGeometryInfo
 
     print(f'Middle-click any epoch to adjust the Attached Raster Window to that epoch.')
     
@@ -2794,6 +2795,10 @@ def build_attached_raster_viewer_widget(paginated_multi_decoder_decoded_epochs_w
 
 
     _out_ripple_rasters.setWindowTitle(f'Template Rasters <Controlled by DecodedEpochSlices window>')
+    ## Align the windows:
+    target_window = paginated_multi_decoder_decoded_epochs_window.window()
+    a_controlled_widget = _out_ripple_rasters.root_dockAreaWindow
+    WidgetPositioningHelpers.align_window_edges(target_window, a_controlled_widget.window(), relative_position='above', resize_to_main=(1.0, None)) # resize to same width, no change to height
 
     return _out_ripple_rasters, update_attached_raster_viewer_epoch_callback
 
