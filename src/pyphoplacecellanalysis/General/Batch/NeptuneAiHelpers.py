@@ -134,6 +134,22 @@ def clean_quotes(text: str) -> str:
     return text.strip("'\"")
 
 
+def flatten_context_nested_dict(_context_figures_dict):
+    """ not super general or great
+    
+    from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import flatten_context_nested_dict
+    """
+    _flattened_context_path_dict= {}
+    _flat_out_path_items = []
+    ## Do care about the Contexts, but nothing beyond that:
+    for k, v in _context_figures_dict.items():
+        # _flattened_context_path_dict[k] = flatten_dict(v)
+        _flattened_context_path_dict[k] = list(flatten_dict(v).values())
+        if len(_flattened_context_path_dict[k]) > 0:
+            ## only returning the first item, that's not great
+            _flat_out_path_items.append(_flattened_context_path_dict[k][0])
+
+    return _flattened_context_path_dict, _flat_out_path_items
 
 
 # ==================================================================================================================== #
