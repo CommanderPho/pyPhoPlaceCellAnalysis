@@ -1502,7 +1502,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         return custom_curr_unit_marginal_list
 
     @classmethod
-    def build_custom_marginal_over_long_short(cls, filter_epochs_decoder_result, debug_print=False):
+    def build_custom_marginal_over_long_short(cls, filter_epochs_decoder_result: DecodedFilterEpochsResult, debug_print=False) -> List[DynamicContainer]:
         """ only works for the all-directional coder with the four items
         
         Usage:
@@ -6518,32 +6518,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                         # Recover the proper title:
                         assert title is not None, f"title: {title}"
                         print(f'title: {title}')
-
-                        # # `flexitext` version:
-                        # text_formatter = FormattedFigureText()
-                        # fig.suptitle('')
-                        # text_formatter.setup_margins(fig) # , top_margin=0.740
-                        # title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, title, va="bottom", xycoords="figure fraction")
-                        # footer_text_obj = flexitext((text_formatter.left_margin * 0.1), (text_formatter.bottom_margin * 0.25),
-                        # 							text_formatter._build_footer_string(active_context=sub_context),
-                        # 							va="top", xycoords="figure fraction")
-
-                        # # Add epoch indicators
-                        # for ax in (axes if isinstance(axes, Iterable) else [axes]):
-                        # 	PlottingHelpers.helper_matplotlib_add_long_short_epoch_indicator_regions(ax=ax, t_split=t_split)
-                            
-                            # # `flexitext` version:
-                            # text_formatter = FormattedFigureText()
-                            # ax.set_title('')
-                            # fig.suptitle('')
-                            # text_formatter.setup_margins(fig)
-                            # title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin,
-                            # 						title,
-                            # 						va="bottom", xycoords="figure fraction")
-                            # footer_text_obj = flexitext((text_formatter.left_margin * 0.1), (text_formatter.bottom_margin * 0.25),
-                            # 							text_formatter._build_footer_string(active_context=sub_context),
-                            # 							va="top", xycoords="figure fraction")
-                    
+                        
                         if ((perform_write_to_file_callback is not None) and (sub_context is not None)):
                             if save_figure:
                                 perform_write_to_file_callback(sub_context, fig)
