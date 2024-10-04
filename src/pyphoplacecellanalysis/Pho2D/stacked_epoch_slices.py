@@ -20,7 +20,7 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes  # for stacked_epoc
 
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore
 
-from neuropy.core.epoch import Epoch
+from neuropy.core.epoch import Epoch, TimeColumnAliasesProtocol
 from neuropy.utils.dynamic_container import DynamicContainer, override_dict, overriding_dict_with, get_dict_subset
 from neuropy.utils.matplotlib_helpers import set_ax_emphasis_color
 
@@ -33,8 +33,6 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 
 from pyphocorehelpers.indexing_helpers import Paginator
-from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
-from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphocorehelpers.exception_helpers import ExceptionPrintingContext
 
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import build_scrollable_graphics_layout_widget_ui, build_scrollable_graphics_layout_widget_with_nested_viewbox_ui
@@ -46,6 +44,7 @@ from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedFigur
 from neuropy.core.user_annotations import UserAnnotationsManager # used in `interactive_good_epoch_selections`
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import SelectionsObject # used in `interactive_good_epoch_selections`, `PhoPaginatedMultiDecoderDecodedEpochsWindow`
 from pyphoplacecellanalysis.GUI.Qt.Widgets.ThinButtonBar.ThinButtonBarWidget import ThinButtonBarWidget
+from pyphocorehelpers.gui.Qt.widget_positioning_helpers import WidgetPositioningHelpers, DesiredWidgetLocation, WidgetGeometryInfo
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
 
@@ -2677,6 +2676,81 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         
         return _out_ripple_rasters, update_attached_raster_viewer_epoch_callback
 
+    @function_attributes(short_name=None, tags=['yellow-blue', 'matplotlib', 'attached'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-04 07:23', related_items=[])
+    def build_attached_yellow_blue_track_identity_marginal_window(self, directional_merged_decoders_result, global_session, ripple_decoding_time_bin_size) -> RenderPlots:
+        """ Attaches a stack of yellow-blue trackID marginal plots to the right side of the window. Currently they do not update.
+        
+        yellow_blue_trackID_marginals_plot_tuple = paginated_multi_decoder_decoded_epochs_window.build_attached_yellow_blue_track_identity_marginal_window(directional_merged_decoders_result, global_session, ripple_decoding_time_bin_size)
+        """
+        ## INPUTS: paginated_multi_decoder_decoded_epochs_window, directional_merged_decoders_result
+
+        # directional_merged_decoders_result # all_directional_ripple_filter_epochs_decoder_result, ripple_track_identity_marginals_tuple
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
+        
+        target_dict = {'save_figure': False, 'included_any_context_neuron_ids': None, 'single_plot_fixed_height': 35.0, 'max_num_lap_epochs': 25, 'max_num_ripple_epochs': 45, 'size': (8, 55), 'dpi': 72,
+                        'constrained_layout': True, 'scrollable_figure': False, 'skip_plotting_measured_positions': True, 'skip_plotting_most_likely_positions': True}
+
+        # Extract variables from the `target_dict` dictionary to the local workspace
+        save_figure = target_dict['save_figure']
+        included_any_context_neuron_ids = target_dict['included_any_context_neuron_ids']
+        single_plot_fixed_height = target_dict['single_plot_fixed_height']
+        max_num_lap_epochs = target_dict['max_num_lap_epochs']
+        max_num_ripple_epochs = target_dict['max_num_ripple_epochs']
+        size = target_dict['size']
+        dpi = target_dict['dpi']
+        constrained_layout = target_dict['constrained_layout']
+        scrollable_figure = target_dict['scrollable_figure']
+        skip_plotting_measured_positions = target_dict['skip_plotting_measured_positions']
+        skip_plotting_most_likely_positions = target_dict['skip_plotting_most_likely_positions']
+
+        all_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = deepcopy(directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result) # DecodedFilterEpochsResult
+        active_decoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
+        # long_short_marginals: List[NDArray] = [x.p_x_given_n for x in DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(all_directional_ripple_filter_epochs_decoder_result)] # these work if I want all of them
+
+        first_controller = list(self.pagination_controllers.values())[0]
+        included_page_data_indicies, (curr_page_active_filter_epochs, curr_page_epoch_labels, curr_page_time_bin_containers, curr_page_posterior_containers) = first_controller.plots_data.paginator.get_page_data(page_idx=first_controller.current_page_idx)
+        # curr_page_epoch_labels # these actually do seem correct to pass in as `included_epoch_indicies`
+        curr_page_epoch_labels = [int(v.removeprefix('Epoch[').removesuffix(']')) for v in curr_page_epoch_labels] # ['Epoch[70]' 'Epoch[72]'] -> [70, 72]
+        # print(curr_page_epoch_labels)
+        # Ripple Track-identity (Long/Short) Marginal:
+        ## INPUTS: all_directional_ripple_filter_epochs_decoder_result, global_session, ripple_decoding_time_bin_size
+        _main_context = {'decoded_epochs': 'Ripple', 'Marginal': 'TrackID', 't_bin': ripple_decoding_time_bin_size}
+        global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(global_session.replay))
+        # global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
+        out_plot_tuple = plot_decoded_epoch_slices(
+            global_replays, all_directional_ripple_filter_epochs_decoder_result,
+            global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+            name='TrackIdentity_Marginal_Ripples',
+            active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
+            single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_ripple_epochs,
+            size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
+            included_epoch_indicies=curr_page_epoch_labels # [70, 72]
+            # _mod_plot_kwargs=dict(final_context=_main_context)
+        )
+
+        # Post-plot call:
+        assert len(out_plot_tuple) == 4
+        params, plots_data, plots, ui = out_plot_tuple # [2] corresponds to 'plots' in params, plots_data, plots, ui = laps_plots_tuple
+        # post_hoc_append to collector
+        mw = ui.mw # MatplotlibTimeSynchronizedWidget
+
+        ## Align the windows:
+        # target_window = paginated_multi_decoder_decoded_epochs_window.window()
+        target_window = first_controller.ui.mw
+        a_controlled_widget = mw
+        WidgetPositioningHelpers.align_window_edges(target_window, a_controlled_widget.window(), relative_position='right_of', resize_to_main=(None, 1.0)) # resize to same height, no change to width
+        
+        yellow_blue_attached_render_plot = RenderPlots(name='yellow_blue_attached_widget', params=params, plots_data=plots_data, plots=plots, ui=ui)
+
+        # TODO: hold a reference to it? Update function for changing pages?
+        
+        return yellow_blue_attached_render_plot
+
+
+
+
+
 
     def export_current_epoch_marginal_and_raster_images(self, directional_merged_decoders_result, root_export_path: Path, active_context: Optional[IdentifyingContext]=None):
         """ Export Marginal Pseudo2D posteriors and rasters for middle-clicked epochs
@@ -2704,7 +2778,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             root_export_path = root_export_path,
         )
         print(f"exported to '{epoch_specific_folder}'")
-        return epoch_specific_folder
+        return epoch_specific_folder, (out_image_save_tuple_dict, _out_rasters_save_paths, merged_img_save_path)
 
 # ==================================================================================================================== #
 # General Functions                                                                                                    #
