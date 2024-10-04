@@ -424,15 +424,12 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
         if progress_print:
             print(f'Running batch_extended_computations(...) with included_computation_filter_names: "{included_computation_filter_names}"')
 
-
-
     
     ## Specify the computations and the requirements to validate them.
 
     ## Hardcoded comp_specifiers
     _comp_specifiers = list(curr_active_pipeline.get_merged_computation_function_validators().values())
     ## Execution order is currently determined by `_comp_specifiers` order and not the order the `include_includelist` lists them (which is good) but the `curr_active_pipeline.registered_merged_computation_function_dict` has them registered in *REVERSE* order for the specific computation function called, so we need to reverse these
-
 
     ## apply arbitrary sort:
     _comp_specifier_dict = {_comp_specifier.short_name:_comp_specifier for _comp_specifier in _comp_specifiers}
