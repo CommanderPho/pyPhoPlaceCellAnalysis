@@ -1,11 +1,17 @@
+from __future__ import annotations # prevents having to specify types for typehinting as strings
+from typing import TYPE_CHECKING
 import builtins
 from copy import deepcopy
-from typing import Dict, List, Optional, Tuple
+from pathlib import Path
 from matplotlib.backend_bases import MouseButton
 from neuropy.utils.result_context import IdentifyingContext
 import numpy as np
 import pandas as pd
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing_extensions import TypeAlias
 from nptyping import NDArray
+import neuropy.utils.type_aliases as types
+
 from attrs import define, field, Factory
 from benedict import benedict # https://github.com/fabiocaccamo/python-benedict#usage
 
@@ -2103,7 +2109,6 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         decoder_names: List[str] = track_templates.get_decoder_names()
         controlling_pagination_item_name: str = decoder_names[0] # first item # 'long_LR'
         # controlled_pagination_controller_names_list = decoder_names[1:]
-
         pagination_controller_dict = {}
         for i, (a_name, a_decoder) in enumerate(track_templates.get_decoders_dict().items()):
             is_controlling_widget: bool = (a_name == controlling_pagination_item_name)
@@ -2585,6 +2590,125 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             else:
                 a_pagination_controller.params.on_middle_click_item_callbacks.pop('copy_epoch_times_to_clipboard_callback', None)
 
+    @function_attributes(short_name=None, tags=['spike_raster', 'attached'], input_requires=[], output_provides=[], uses=['_build_attached_raster_viewer', '_apply_xticks_to_pyqtgraph_plotitem'], used_by=[], creation_date='2024-09-25 15:50', related_items=[])
+    def build_attached_raster_viewer_widget(self, track_templates, active_spikes_df: pd.DataFrame, filtered_epochs_df: pd.DataFrame) -> Tuple["RankOrderRastersDebugger", Callable]:
+        """ Plots a synchronized raster_viewer_widget for the epochs in 
+        Usage:
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
+            
+            __out_ripple_rasters, update_attached_raster_viewer_epoch_callback = paginated_multi_decoder_decoded_epochs_window.build_attached_raster_viewer_widget(track_templates=track_templates, active_spikes_df=active_spikes_df, filtered_epochs_df=long_like_during_post_delta_only_filter_epochs_df) # Long-like-during-post-delta
+
+        """
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
+        from pyphocorehelpers.gui.Qt.widget_positioning_helpers import WidgetPositioningHelpers, DesiredWidgetLocation, WidgetGeometryInfo
+
+        print(f'Middle-click any epoch to adjust the Attached Raster Window to that epoch.')
+        
+        _out_ripple_rasters: RankOrderRastersDebugger = _build_attached_raster_viewer(self, track_templates=track_templates, active_spikes_df=active_spikes_df, filtered_ripple_simple_pf_pearson_merged_df=filtered_epochs_df)
+
+        ## Enable programmatically updating the rasters viewer to the clicked epoch index when middle clicking on a posterior.
+        @function_attributes(short_name=None, tags=['callback', 'raster'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-29 17:13', related_items=[])
+        def update_attached_raster_viewer_epoch_callback(self, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time):
+            """ Enable programmatically updating the rasters viewer to the clicked epoch index when middle clicking on a posterior. 
+            called when the user middle-clicks an epoch 
+            
+            captures: _out_ripple_rasters
+            """
+            print(f'update_attached_raster_viewer_epoch_callback(clicked_data_index: {clicked_data_index}, clicked_epoch_is_selected: {clicked_epoch_is_selected}, clicked_epoch_start_stop_time: {clicked_epoch_start_stop_time})')
+            _did_update_selected_epoch: bool = False
+            if clicked_epoch_start_stop_time is not None:
+                if len(clicked_epoch_start_stop_time) == 2:
+                    start_t, end_t = clicked_epoch_start_stop_time
+                    print(f'start_t: {start_t}')
+                    try:
+                        _out_ripple_rasters.programmatically_update_epoch_IDX_from_epoch_start_time(start_t)
+                        _did_update_selected_epoch = True
+                    except Exception as e:
+                        print(f'could not update selected epoch: {e}.')
+                        # raise e
+
+            if _did_update_selected_epoch:
+                ## update the grid to match the epoch bins
+                print(f'_did_update_selected_epoch: True, clicked_data_index: {clicked_data_index}')
+                included_page_data_indicies, (curr_page_active_filter_epochs, curr_page_epoch_labels, curr_page_time_bin_containers, curr_page_posterior_containers) = self.plots_data.paginator.get_page_data(page_idx=self.current_page_idx)
+                # page_rel_clicked_ax_index = included_page_data_indicies.index(clicked_data_index)
+                page_rel_clicked_ax_index = clicked_data_index-included_page_data_indicies[0]
+                print(f'\tpage_rel_clicked_ax_index: {page_rel_clicked_ax_index}')
+                # [clicked_ax]
+                # self.plots.axs
+                a_binning_container = curr_page_time_bin_containers[page_rel_clicked_ax_index] # BinningContainer 
+                curr_epoch_bin_edges: NDArray = deepcopy(a_binning_container.edges)
+                # curr_epoch_bin_edges
+                
+                ## Get the plot to modify on the raster_plot_widget
+                # a_render_plots_container = _out_ripple_rasters.plots['all_separate_plots']['Long_LR'] # RenderPlots
+                for a_decoder_name, a_render_plots_container in _out_ripple_rasters.plots['all_separate_plots'].items():         
+                    plot_item = a_render_plots_container['root_plot']
+                    # Define custom ticks at desired x-values
+                    # Each tick is a tuple of (position, label)
+                    # custom_ticks = [(pos, str(pos)) for pos in curr_epoch_bin_edges]
+                    custom_ticks = [(pos, '') for pos in curr_epoch_bin_edges]
+                    _apply_xticks_to_pyqtgraph_plotitem(plot_item=plot_item, custom_ticks=custom_ticks)
+                    # Update the PlotItem and its scene
+                    plot_item.update()
+                    plot_item.scene().update()
+
+                    
+                print(f'done.')
+
+
+        for a_name, a_pagination_controller in self.pagination_controllers.items():
+            # a_pagination_controller.params.debug_print = True
+            if not a_pagination_controller.params.has_attr('on_middle_click_item_callbacks'):
+                a_pagination_controller.params['on_middle_click_item_callbacks'] = {}
+            a_pagination_controller.params.on_middle_click_item_callbacks['update_attached_raster_viewer_epoch_callback'] = update_attached_raster_viewer_epoch_callback
+
+
+        _out_ripple_rasters.setWindowTitle(f'Template Rasters <Controlled by DecodedEpochSlices window>')
+        ## Align the windows:
+        target_window = self.window()
+        a_controlled_widget = _out_ripple_rasters.root_dockAreaWindow
+        WidgetPositioningHelpers.align_window_edges(target_window, a_controlled_widget.window(), relative_position='above', resize_to_main=(1.0, None)) # resize to same width, no change to height
+
+        ## Store raster viewer internally
+        self.ui.attached_ripple_rasters_widget = None
+        self.ui.attached_ripple_rasters_widget = _out_ripple_rasters
+        self.ui.update_attached_raster_viewer_epoch_callback = update_attached_raster_viewer_epoch_callback
+        
+        return _out_ripple_rasters, update_attached_raster_viewer_epoch_callback
+
+
+    def export_current_epoch_marginal_and_raster_images(self, directional_merged_decoders_result, root_export_path: Path, active_context: Optional[IdentifyingContext]=None):
+        """ Export Marginal Pseudo2D posteriors and rasters for middle-clicked epochs
+        """
+        from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
+        # root_export_path = Path(r"E:\Dropbox (Personal)\Active\Kamran Diba Lab\Pho-Kamran-Meetings\2024-05-01 - Pseudo2D Again\array_as_image").resolve() # Apogee
+        # root_export_path = Path('/media/halechr/MAX/cloud/University of Michigan Dropbox/Pho Hale/Pho Diba Paper 2023/array_as_image').resolve() # Lab
+        # root_export_path = Path(r"E:\Dropbox (Personal)\Active\Kamran Diba Lab\Pho-Kamran-Meetings\2024-09-25 - Time bin considerations\array_as_image").resolve() # Apogee
+        # root_export_path: Path = Path(r"/media/halechr/MAX/cloud/University of Michigan Dropbox/Pho Hale/Pho Diba Paper 2023/array_as_image").resolve() # Lab
+
+        if (not hasattr(self.ui, 'attached_ripple_rasters_widget') or (self.ui.attached_ripple_rasters_widget is None)):
+            raise ValueError(f"self.ui.attached_ripple_rasters_widget is None! Is there an attached raster_widget yet?")
+        
+        if active_context is None:
+            active_context = IdentifyingContext('display_fn', 'export_current_epoch_marginal_and_raster_images')
+        
+        ## get the ripple name from the context of the first controller, all four will be the same.
+        epoch_id_identifier_str: str = list(self.pagination_controllers.values())[0].params.active_identifying_figure_ctx.epochs
+        
+        
+        epoch_specific_folder, (out_image_save_tuple_dict, _out_rasters_save_paths, merged_img_save_path) = PosteriorExporting._perform_export_current_epoch_marginal_and_raster_images(_out_ripple_rasters=self.ui.attached_ripple_rasters_widget, directional_merged_decoders_result=directional_merged_decoders_result, 
+            # filtered_decoder_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict, epoch_id_identifier_str='ripple',
+            filtered_decoder_filter_epochs_decoder_result_dict=self.decoder_filter_epochs_decoder_result_dict, epoch_id_identifier_str=epoch_id_identifier_str,
+            active_session_context=active_context, 
+            root_export_path = root_export_path,
+        )
+        print(f"exported to '{epoch_specific_folder}'")
+        return epoch_specific_folder
+
+# ==================================================================================================================== #
+# General Functions                                                                                                    #
+# ==================================================================================================================== #
 
 def interactive_good_epoch_selections(annotations_man: UserAnnotationsManager, curr_active_pipeline) -> dict:
     """Allows the user to interactively select good epochs and generate hardcoded user_annotation entries from the results:
@@ -2756,89 +2880,6 @@ def _build_attached_raster_viewer(paginated_multi_decoder_decoded_epochs_window:
         a_pagination_controller.params.on_middle_click_item_callbacks['update_attached_raster_viewer_epoch_callback'] = update_attached_raster_viewer_epoch_callback
 
     return _out_ripple_rasters
-
-
-@function_attributes(short_name=None, tags=['spike_raster', 'attached'], input_requires=[], output_provides=[], uses=['_build_attached_raster_viewer'], used_by=[], creation_date='2024-09-25 15:50', related_items=[])
-def build_attached_raster_viewer_widget(paginated_multi_decoder_decoded_epochs_window: PhoPaginatedMultiDecoderDecodedEpochsWindow, track_templates, active_spikes_df: pd.DataFrame, filtered_ripple_simple_pf_pearson_merged_df: pd.DataFrame):
-    """ Plots a synchronized raster_viewer_widget for the epochs in 
-    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
-    from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import build_attached_raster_viewer_widget
-
-    _out_ripple_rasters, update_attached_raster_viewer_epoch_callback = build_attached_raster_viewer_widget(paginated_multi_decoder_decoded_epochs_window=paginated_multi_decoder_decoded_epochs_window, track_templates=track_templates, active_spikes_df=active_spikes_df, filtered_ripple_simple_pf_pearson_merged_df=filtered_ripple_simple_pf_pearson_merged_df)
-
-    """
-    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
-    from pyphocorehelpers.gui.Qt.widget_positioning_helpers import WidgetPositioningHelpers, DesiredWidgetLocation, WidgetGeometryInfo
-
-    print(f'Middle-click any epoch to adjust the Attached Raster Window to that epoch.')
-    
-    _out_ripple_rasters: RankOrderRastersDebugger = _build_attached_raster_viewer(paginated_multi_decoder_decoded_epochs_window, track_templates=track_templates, active_spikes_df=active_spikes_df, filtered_ripple_simple_pf_pearson_merged_df=filtered_ripple_simple_pf_pearson_merged_df)
-
-    ## Enable programmatically updating the rasters viewer to the clicked epoch index when middle clicking on a posterior.
-    @function_attributes(short_name=None, tags=['callback', 'raster'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-29 17:13', related_items=[])
-    def update_attached_raster_viewer_epoch_callback(self, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time):
-        """ Enable programmatically updating the rasters viewer to the clicked epoch index when middle clicking on a posterior. 
-        called when the user middle-clicks an epoch 
-        
-        captures: _out_ripple_rasters
-        """
-        print(f'update_attached_raster_viewer_epoch_callback(clicked_data_index: {clicked_data_index}, clicked_epoch_is_selected: {clicked_epoch_is_selected}, clicked_epoch_start_stop_time: {clicked_epoch_start_stop_time})')
-        _did_update_selected_epoch: bool = False
-        if clicked_epoch_start_stop_time is not None:
-            if len(clicked_epoch_start_stop_time) == 2:
-                start_t, end_t = clicked_epoch_start_stop_time
-                print(f'start_t: {start_t}')
-                try:
-                    _out_ripple_rasters.programmatically_update_epoch_IDX_from_epoch_start_time(start_t)
-                    _did_update_selected_epoch = True
-                except Exception as e:
-                    print(f'could not update selected epoch: {e}.')
-                    # raise e
-
-        if _did_update_selected_epoch:
-            ## update the grid to match the epoch bins
-            print(f'_did_update_selected_epoch: True, clicked_data_index: {clicked_data_index}')
-            included_page_data_indicies, (curr_page_active_filter_epochs, curr_page_epoch_labels, curr_page_time_bin_containers, curr_page_posterior_containers) = self.plots_data.paginator.get_page_data(page_idx=self.current_page_idx)
-            # page_rel_clicked_ax_index = included_page_data_indicies.index(clicked_data_index)
-            page_rel_clicked_ax_index = clicked_data_index-included_page_data_indicies[0]
-            print(f'\tpage_rel_clicked_ax_index: {page_rel_clicked_ax_index}')
-            # [clicked_ax]
-            # self.plots.axs
-            a_binning_container = curr_page_time_bin_containers[page_rel_clicked_ax_index] # BinningContainer 
-            curr_epoch_bin_edges: NDArray = deepcopy(a_binning_container.edges)
-            # curr_epoch_bin_edges
-            
-            ## Get the plot to modify on the raster_plot_widget
-            # a_render_plots_container = _out_ripple_rasters.plots['all_separate_plots']['Long_LR'] # RenderPlots
-            for a_decoder_name, a_render_plots_container in _out_ripple_rasters.plots['all_separate_plots'].items():         
-                plot_item = a_render_plots_container['root_plot']
-                # Define custom ticks at desired x-values
-                # Each tick is a tuple of (position, label)
-                # custom_ticks = [(pos, str(pos)) for pos in curr_epoch_bin_edges]
-                custom_ticks = [(pos, '') for pos in curr_epoch_bin_edges]
-                _apply_xticks_to_pyqtgraph_plotitem(plot_item=plot_item, custom_ticks=custom_ticks)
-                # Update the PlotItem and its scene
-                plot_item.update()
-                plot_item.scene().update()
-
-                
-            print(f'done.')
-
-
-    for a_name, a_pagination_controller in paginated_multi_decoder_decoded_epochs_window.pagination_controllers.items():
-        # a_pagination_controller.params.debug_print = True
-        if not a_pagination_controller.params.has_attr('on_middle_click_item_callbacks'):
-            a_pagination_controller.params['on_middle_click_item_callbacks'] = {}
-        a_pagination_controller.params.on_middle_click_item_callbacks['update_attached_raster_viewer_epoch_callback'] = update_attached_raster_viewer_epoch_callback
-
-
-    _out_ripple_rasters.setWindowTitle(f'Template Rasters <Controlled by DecodedEpochSlices window>')
-    ## Align the windows:
-    target_window = paginated_multi_decoder_decoded_epochs_window.window()
-    a_controlled_widget = _out_ripple_rasters.root_dockAreaWindow
-    WidgetPositioningHelpers.align_window_edges(target_window, a_controlled_widget.window(), relative_position='above', resize_to_main=(1.0, None)) # resize to same width, no change to height
-
-    return _out_ripple_rasters, update_attached_raster_viewer_epoch_callback
 
 
 @function_attributes(short_name=None, tags=['ui', 'buttons'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-25 16:03', related_items=[])
