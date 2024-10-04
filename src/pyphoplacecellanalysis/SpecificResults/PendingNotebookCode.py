@@ -47,8 +47,92 @@ from pyphocorehelpers.DataStructure.general_parameter_containers import Visualiz
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 
+# ==================================================================================================================== #
+# 2024-10-04 - Parsing `ProgrammaticDisplayFunctionTesting` output folder                                              #
+# ==================================================================================================================== #
+from pyphocorehelpers.assertion_helpers import Assert
 
+@function_attributes(short_name=None, tags=['ProgrammaticDisplayFunctionTesting', 'parse', 'filesystem'], input_requires=[], output_provides=[], uses=[], used_by=['parse_ProgrammaticDisplayFunctionTesting_image_folder'], creation_date='2024-10-04 12:21', related_items=[])
+def parse_image_path(programmatic_display_function_testing_path: Path, file_path: Path, debug_print=False) -> Tuple[IdentifyingContext, str, datetime]:
+    """ Parses `"C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting"` 
+    "C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/2023-04-11/kdiba/gor01/one/2006-6-09_1-22-43/kdiba_gor01_one_2006-6-09_1-22-43_batch_plot_test_long_only_[45].png"
+    Write a function that parses the following path structure: "./2023-04-11/kdiba/gor01/one/2006-6-09_1-22-43/kdiba_gor01_one_2006-6-09_1-22-43_batch_plot_test_long_only_[45].png"
+    Into the following variable names: `/image_export_day_date/format_name/animal/exper_name/session_name/image_name`
+    """
+    test_relative_image_path = file_path.relative_to(programmatic_display_function_testing_path) # .resolve() ## RESOLVE MESSES UP SYMLINKS!
+    if debug_print:
+        print(f'{test_relative_image_path = }')
 
+    # Split the path into components
+    # parts = file_path.strip("./").split(os.sep)
+    # Convert to a list of path components
+    parts = test_relative_image_path.parts
+    if debug_print:
+        print(f'parts: {parts}')
+    
+    if len(parts) < 6:
+        raise ValueError(f'parsed path should have at least 6 parts, but this one only has: {len(parts)}.\nparts: {parts}')
+    
+    if len(parts) > 6:
+        joined_final_part: str = '/'.join(parts[5:]) # return anything after that back into a str
+        parts = parts[:5] + (joined_final_part, )
+        
+    Assert.len_equals(parts, 6)
+
+    # Assign the variables from the path components
+    image_export_day_date = parts[0]      # "./2023-04-11"
+    format_name = parts[1]                # "kdiba"
+    animal = parts[2]                     # "gor01"
+    exper_name = parts[3]                 # "one"
+    session_name = parts[4]               # "2006-6-09_1-22-43"
+    image_name = parts[5]                 # "kdiba_gor01_one_2006-6-09_1-22-43_batch_plot_test_long_only_[45].png"
+
+    session_context = IdentifyingContext(format_name=format_name, animal=animal, exper_name=exper_name, session_name=session_name)
+    # Parse image_export_day_date as a date (YYYY-mm-dd)
+    image_export_day_date: datetime = datetime.strptime(image_export_day_date, "%Y-%m-%d")
+    
+    # return image_export_day_date, format_name, animal, exper_name, session_name, image_name
+    return session_context, image_name, image_export_day_date, file_path
+
+@function_attributes(short_name=None, tags=['ProgrammaticDisplayFunctionTesting', 'filesystem', 'images', 'load'], input_requires=[], output_provides=[], uses=['parse_image_path'], used_by=[], creation_date='2024-10-04 12:21', related_items=[])
+def parse_ProgrammaticDisplayFunctionTesting_image_folder(programmatic_display_function_testing_path: Path):
+    """
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import parse_ProgrammaticDisplayFunctionTesting_image_folder
+
+        programmatic_display_function_testing_path: Path = Path('/home/halechr/repos/Spike3D/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting').resolve()
+        programmatic_display_function_outputs_df, programmatic_display_function_outputs_tuples = parse_ProgrammaticDisplayFunctionTesting_image_folder(programmatic_display_function_testing_path=programmatic_display_function_testing_path)
+        programmatic_display_function_outputs_df
+
+    """
+    # programmatic_display_function_outputs_dict: Dict[IdentifyingContext, List] = {}
+    programmatic_display_function_outputs_tuples: List[Tuple[IdentifyingContext, str, datetime]] = []
+
+    Assert.path_exists(programmatic_display_function_testing_path)
+
+    # Recursively enumerate all files in the directory
+    def enumerate_files(directory: Path):
+        return [file for file in directory.rglob('*') if file.is_file()]
+
+    # Example usage
+    all_files = enumerate_files(programmatic_display_function_testing_path)
+
+    for test_image_path in all_files:
+        try:
+            # image_export_day_date, format_name, animal, exper_name, session_name, image_name = parse_image_path(programmatic_display_function_testing_path, test_image_path)
+            # session_context, image_name, image_export_day_date = parse_image_path(programmatic_display_function_testing_path, test_image_path)
+            # print(image_export_day_date, format_name, animal, exper_name, session_name, image_name)
+            programmatic_display_function_outputs_tuples.append(parse_image_path(programmatic_display_function_testing_path, test_image_path))
+        except ValueError as e:
+            # couldn't parse, skipping
+            pass
+        except Exception as e:
+            raise e
+
+    programmatic_display_function_outputs_df: pd.DataFrame = pd.DataFrame.from_records(programmatic_display_function_outputs_tuples, columns=['context', 'image_name', 'export_date', 'file_path'])
+    # Sort by columns: 'context' (ascending), 'image_name' (ascending), 'export_date' (descending)
+    programmatic_display_function_outputs_df = programmatic_display_function_outputs_df.sort_values(['context', 'image_name', 'export_date'], ascending=[True, True, False], key=lambda s: s.apply(str) if s.name in ['context'] else s).reset_index(drop=True)
+    
+    return programmatic_display_function_outputs_df, programmatic_display_function_outputs_tuples
 
 # ==================================================================================================================== #
 # 2024-08-21 Plotting Generated Transition Matrix Sequences                                                            #
