@@ -323,42 +323,42 @@ class TrialByTrialActivityWindow:
 
         # Plots only the first data-series ('long_LR')
         app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array, (lblTitle, lblFooter) = cls._plot_trial_to_trial_reliability_image_array(active_one_step_decoder=active_one_step_decoder, z_scored_tuning_map_matrix=active_z_scored_tuning_map_matrix, drop_below_threshold=drop_below_threshold)
+        additional_heatmaps_data = {}
+        additional_img_items_dict = {}
+        
+        # Extract the heatmaps from the other decoders
+        ## INPUTS: directional_active_lap_pf_results_dicts
+
+        # MATPLOTLIB way
+        # additional_cmap_names['long_LR'] = 'Reds'
+        # additional_cmap_names['long_RL'] = 'Purples'
+        # additional_cmap_names['short_LR'] = 'Greens'
+        # additional_cmap_names['short_RL'] = 'Oranges'
+        # additional_cmap_names['maze_all'] = 'Greys'
+        # additional_cmaps = {k: create_transparent_colormap(cmap_name=v, lower_bound_alpha=0.1) for k, v in additional_cmap_names.items()}
+
+        # additional_cmap_names = dict(zip(TrackTemplates.get_decoder_names(), ['red', 'purple', 'green', 'orange'])) # {'long_LR': 'red', 'long_RL': 'purple', 'short_LR': 'green', 'short_RL': 'orange'}
+        long_epoch_config = long_short_display_config_manager.long_epoch_config.as_pyqtgraph_kwargs()
+        short_epoch_config = long_short_display_config_manager.short_epoch_config.as_pyqtgraph_kwargs()
+
+        color_dict = {'long_LR': long_epoch_config['brush'].color(), 'long_RL': apply_LR_to_RL_adjustment(long_epoch_config['brush'].color()),
+                        'short_LR': short_epoch_config['brush'].color(), 'short_RL': apply_LR_to_RL_adjustment(short_epoch_config['brush'].color())}
+        additional_cmap_names = {k: ColorFormatConverter.qColor_to_hexstring(v) for k, v in color_dict.items()}
+
+        ## new
+        additional_cmap_names = {'long_LR': 'royalblue', 'long_RL': 'blue',
+                        'short_LR': 'crimson', 'short_RL': 'red'}
+        # additional_cmap_names = {k: ColorFormatConverter.qColor_to_hexstring(v) for k, v in color_dict.items()}
+
+        # plot_trial_to_trial_reliability_all_decoders_image_stack
+
+        additional_cmaps = {k: ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=0.1) for k, v in additional_cmap_names.items()}
+
+        # additional_cmaps = {name: pg.ColorMap(np.array([0.0, 1.0]), np.array([pg.mkColor(color).getRgb()[:3] + (0,), pg.mkColor(color).getRgb()[:3] + (255,)], dtype=np.ubyte)) for name, color in additional_cmap_names.items()}
+
+        additional_legend_entries = list(zip(directional_active_lap_pf_results_dicts.keys(), additional_cmap_names.values() )) # ['red', 'purple', 'green', 'orange']
 
         if is_overlaid_heatmaps_mode:
-            # Extract the heatmaps from the other decoders
-            ## INPUTS: directional_active_lap_pf_results_dicts
-            additional_heatmaps_data = {}
-            additional_cmap_names = {}
-            # MATPLOTLIB way
-            # additional_cmap_names['long_LR'] = 'Reds'
-            # additional_cmap_names['long_RL'] = 'Purples'
-            # additional_cmap_names['short_LR'] = 'Greens'
-            # additional_cmap_names['short_RL'] = 'Oranges'
-            # additional_cmap_names['maze_all'] = 'Greys'
-            # additional_cmaps = {k: create_transparent_colormap(cmap_name=v, lower_bound_alpha=0.1) for k, v in additional_cmap_names.items()}
-
-            # additional_cmap_names = dict(zip(TrackTemplates.get_decoder_names(), ['red', 'purple', 'green', 'orange'])) # {'long_LR': 'red', 'long_RL': 'purple', 'short_LR': 'green', 'short_RL': 'orange'}
-
-            long_epoch_config = long_short_display_config_manager.long_epoch_config.as_pyqtgraph_kwargs()
-            short_epoch_config = long_short_display_config_manager.short_epoch_config.as_pyqtgraph_kwargs()
-
-            color_dict = {'long_LR': long_epoch_config['brush'].color(), 'long_RL': apply_LR_to_RL_adjustment(long_epoch_config['brush'].color()),
-                            'short_LR': short_epoch_config['brush'].color(), 'short_RL': apply_LR_to_RL_adjustment(short_epoch_config['brush'].color())}
-            additional_cmap_names = {k: ColorFormatConverter.qColor_to_hexstring(v) for k, v in color_dict.items()}
-
-            ## new
-            additional_cmap_names = {'long_LR': 'royalblue', 'long_RL': 'blue',
-                            'short_LR': 'crimson', 'short_RL': 'red'}
-            # additional_cmap_names = {k: ColorFormatConverter.qColor_to_hexstring(v) for k, v in color_dict.items()}
-
-            # plot_trial_to_trial_reliability_all_decoders_image_stack
-
-            additional_cmaps = {k: ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=0.1) for k, v in additional_cmap_names.items()}
-
-            # additional_cmaps = {name: pg.ColorMap(np.array([0.0, 1.0]), np.array([pg.mkColor(color).getRgb()[:3] + (0,), pg.mkColor(color).getRgb()[:3] + (255,)], dtype=np.ubyte)) for name, color in additional_cmap_names.items()}
-
-            additional_legend_entries = list(zip(directional_active_lap_pf_results_dicts.keys(), additional_cmap_names.values() )) # ['red', 'purple', 'green', 'orange']
-
             enable_stacked_long_and_short: bool = False # not currently working, they have to be overlayed exactly on top of each other
             additional_decoder_y_offsets = {'long_LR': 0, 'long_RL': 0,
                             'short_LR': 1, 'short_RL': 1}
@@ -374,7 +374,7 @@ class TrialByTrialActivityWindow:
             # Overlay additional heatmaps if provided
             ## INPUTS: additional_heatmaps, additional_cmaps, plot_array
             ## UPDATES: plot_array
-            additional_img_items_dict = {}
+
 
             if additional_heatmaps_data:
                 for i, (decoder_name, heatmap_matrix) in enumerate(additional_heatmaps_data.items()):
@@ -424,6 +424,9 @@ class TrialByTrialActivityWindow:
                 # legend_layout.addItem(legend_text, row=0, col=i)  # Place all labels in a single row
                 legend_layout.addItem(legend_text, row=i, col=0)  # Place all labels in a single columns
 
+        else:
+            legend_layout = None
+            
         # END if is_overlaid_heatmaps_mode                
         parent_root_widget.setWindowTitle('TrialByTrialActivity - trial_to_trial_reliability_all_decoders_image_stack')
 
