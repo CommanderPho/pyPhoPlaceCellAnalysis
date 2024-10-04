@@ -447,7 +447,7 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
                 ## get any required overriding kwargs
                     # Set `_comp_specifier.computation_fn_kwargs` if they're provided in computation_kwargs_dict
                 if computation_kwargs_dict is not None:
-                    a_computation_kwargs_list = ((computation_kwargs_dict.get(_comp_specifier.short_name, None) or computation_kwargs_dict.get(_comp_specifier.name, None)))
+                    a_computation_kwargs_list = ((computation_kwargs_dict.get(_comp_specifier.short_name, None) or computation_kwargs_dict.get(_comp_specifier.computation_fn_name, None)))
                     if a_computation_kwargs_list is not None:
                         _comp_specifier.computation_fn_kwargs = deepcopy(a_computation_kwargs_list)
                 
