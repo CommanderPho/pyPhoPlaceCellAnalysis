@@ -180,12 +180,12 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
     # sigStageChanged = QtCore.Signal(object) # Emitted when the pipeline stage changes
     
     
-    def __init__(self, name="pipeline", session_data_type='kdiba', basedir=None, outputs_specifier: Optional[OutputsSpecifier]=None, load_function: Callable = None, post_load_functions: List[Callable] = [], parent=None, **kwargs):
+    def __init__(self, name="pipeline", session_data_type='kdiba', basedir=None, outputs_specifier: Optional[OutputsSpecifier]=None, load_function: Callable = None, post_load_functions: List[Callable] = []): # , parent=None, **kwargs
         """ 
         Captures:
             pipeline_module_logger (from module)
         """
-        super(NeuropyPipeline, self).__init__(parent, **kwargs)
+        # super(NeuropyPipeline, self).__init__(parent, **kwargs)
         self.pipeline_name = name
         self.session_data_type = None
         self._stage = None
