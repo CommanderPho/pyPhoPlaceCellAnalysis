@@ -43,15 +43,14 @@ from pyphoplacecellanalysis.GUI.Qt.Widgets.ThinButtonBar.ThinButtonBarWidget imp
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
 
+if TYPE_CHECKING:
+    ## typehinting only imports here
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
 
 """ 
 These functions help render a vertically stacked column of subplots that represent (potentially non-contiguous) slices of a time range. 
 
-
-
-
 """
-
 # ==================================================================================================================== #
 # Stacked Epoch Slices View                                                                                            #
 # ==================================================================================================================== #
@@ -994,6 +993,16 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         assert np.shape(self.plots_data.epoch_slices)[0] == len(self.is_selected), f"Selection length must be the same as the number of epoch_slices, otherwise we do not know what we are selecting! np.shape(self.plots_data.epoch_slices): {np.shape(self.plots_data.epoch_slices)}, len(self.params.is_selected): {len(self.params.is_selected)}"
         return self.plots_data.epoch_slices[self.is_selected] # returns an S x 2 array of epoch start/end times that are currently selected.
 
+    # plots_data passthroughs: ___________________________________________________________________________________________ #
+    @property
+    def epoch_slices(self) -> NDArray:
+        return self.plots_data.epoch_slices
+
+    @property
+    def filter_epochs_decoder_result(self) -> DecodedFilterEpochsResult:
+        return self.plots_data.filter_epochs_decoder_result
+
+    # UI properties ______________________________________________________________________________________________________ #
     @property
     def thin_button_bar_widget(self) -> ThinButtonBarWidget: 
         return self.ui.mw.ui.thin_button_bar_widget
@@ -1001,7 +1010,13 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     @property
     def paginator_controller_widget(self) -> PaginationControlWidget:
         return self.ui.mw.ui.paginator_controller_widget
-    
+
+    @property
+    def paginator(self) -> Paginator:
+        return self.plots_data.paginator
+
+
+    # INIT METHODS _______________________________________________________________________________________________________ #
 
     @classmethod
     def init_from_decoder_data(cls, active_filter_epochs, filter_epochs_decoder_result: DecodedFilterEpochsResult, xbin, global_pos_df, included_epoch_indicies=None, a_name:str = 'DecodedEpochSlicesPaginationController', active_context=None, max_subplots_per_page=20, debug_print=False, params_kwargs: Optional[Dict]=None, **kwargs):
@@ -1028,6 +1043,10 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                                                                 name=a_name, debug_print=False, debug_test_max_num_slices=max_subplots_per_page, params_kwargs=params_kwargs, **kwargs)
 
         new_obj = cls(params, plots_data, plots, ui)
+        
+        epochs_name: str = kwargs.get('epochs_name', None)
+        if epochs_name is not None:
+            new_obj.params.epochs_name = epochs_name
         
         new_obj.params.debug_print = debug_print
         new_obj.ui.print = builtins.print # the print function to use
@@ -1734,7 +1753,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         return self.ui._contents
     
     @property
-    def pagination_controllers(self) -> Dict[str, DecodedEpochSlicesPaginatedFigureController]:
+    def pagination_controllers(self) -> Dict[types.DecoderName, DecodedEpochSlicesPaginatedFigureController]:
         return self.contents.pagination_controllers
 
     @property
@@ -1753,7 +1772,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         
 
     @property
-    def paginated_widgets(self) -> Dict[str, MatplotlibTimeSynchronizedWidget]:
+    def paginated_widgets(self) -> Dict[types.DecoderName, MatplotlibTimeSynchronizedWidget]:
         """ the list of plotting child widgets. """
         return {a_decoder_name:a_pagination_controller.ui.mw for a_decoder_name, a_pagination_controller in self.contents.pagination_controllers.items()}
 
@@ -1783,6 +1802,14 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         """The global_thin_button_bar_widget property."""
         return self.global_thin_button_bar_widget.ui.paginator_controller_widget
  
+
+    # Pass-through properties ____________________________________________________________________________________________ #
+    @property
+    def decoder_filter_epochs_decoder_result_dict(self) -> Dict[types.DecoderName, DecodedFilterEpochsResult]:
+        """The global_thin_button_bar_widget property."""
+        return self.get_children_props(prop_path='plots_data.filter_epochs_decoder_result')
+ 
+
     # ==================================================================================================================== #
     # Initializers                                                                                                         #
     # ==================================================================================================================== #
@@ -1790,6 +1817,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
     def __init__(self, title='PhoPaginatedMultiDecoderDecodedEpochsWindow', *args, **kwargs):
         super(PhoPaginatedMultiDecoderDecodedEpochsWindow, self).__init__(*args, **kwargs)
         self.ui._contents = None
+        self.ui.attached_ripple_rasters_widget = None
+        
         # self.setup()
         # self.buildUI()
 
@@ -2067,7 +2096,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
         ## Extract params_kwargs
         params_kwargs = kwargs.pop('params_kwargs', {})
-        params_kwargs = dict(skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, isPaginatorControlWidgetBackedMode=True) | params_kwargs
+        params_kwargs = dict(skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, isPaginatorControlWidgetBackedMode=True, epochs_name=epochs_name) | params_kwargs
         # print(f'params_kwargs: {params_kwargs}')
         max_subplots_per_page: int = kwargs.pop('max_subplots_per_page', params_kwargs.pop('max_subplots_per_page', 8)) # kwargs overrides params_kwargs
         
@@ -2498,7 +2527,16 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
     #     # return [getattr(child, prop_name) for child in self.findChildren(QWidget)]
     #     return {a_name:getattr(a_pagination_controller, prop_name) for a_name, a_pagination_controller in self.pagination_controllers.items()}
 
+    @function_attributes(short_name=None, tags=['USEFUL', 'children', 'simplification'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-04 05:18', related_items=[])
     def get_children_props(self, prop_path):
+        """ 
+        paginated_multi_decoder_decoded_epochs_window.get_children_props(prop_path='plots_data.epoch_slices')
+        paginated_multi_decoder_decoded_epochs_window.get_children_props(prop_path='plots_data.filter_epochs_decoder_result')
+        
+        paginated_multi_decoder_decoded_epochs_window.get_children_props(prop_path='plots')
+        paginated_multi_decoder_decoded_epochs_window.get_children_props(prop_path='plots.axs')
+        
+        """
         def get_nested_prop(obj, prop_path):
             attrs = prop_path.split(".")
             for attr in attrs:
