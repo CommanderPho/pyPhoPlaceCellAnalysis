@@ -51,88 +51,151 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 # 2024-10-04 - Parsing `ProgrammaticDisplayFunctionTesting` output folder                                              #
 # ==================================================================================================================== #
 from pyphocorehelpers.assertion_helpers import Assert
+from pyphocorehelpers.indexing_helpers import partition_df_dict, partition
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any, NewType
+from typing_extensions import TypeAlias
+from nptyping import NDArray
+import neuropy.utils.type_aliases as types
 
-@function_attributes(short_name=None, tags=['ProgrammaticDisplayFunctionTesting', 'parse', 'filesystem'], input_requires=[], output_provides=[], uses=[], used_by=['parse_ProgrammaticDisplayFunctionTesting_image_folder'], creation_date='2024-10-04 12:21', related_items=[])
-def parse_image_path(programmatic_display_function_testing_path: Path, file_path: Path, debug_print=False) -> Tuple[IdentifyingContext, str, datetime]:
-    """ Parses `"C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting"` 
-    "C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/2023-04-11/kdiba/gor01/one/2006-6-09_1-22-43/kdiba_gor01_one_2006-6-09_1-22-43_batch_plot_test_long_only_[45].png"
-    Write a function that parses the following path structure: "./2023-04-11/kdiba/gor01/one/2006-6-09_1-22-43/kdiba_gor01_one_2006-6-09_1-22-43_batch_plot_test_long_only_[45].png"
-    Into the following variable names: `/image_export_day_date/format_name/animal/exper_name/session_name/image_name`
+ContextDescStr = NewType('ContextDescStr', str) # like '2023-07-11_kdiba_gor01_one'
+ImageNameStr = NewType('ImageNameStr', str) # like '2006-6-07_11-26-53/kdiba_gor01_one_2006-6-07_11-26-53_maze1__display_1d_placefield_validations.pdf'
+
+class ProgrammaticDisplayFunctionTestingFolderImageLoading:
+    """ 
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import ProgrammaticDisplayFunctionTestingFolderImageLoading
+    
     """
-    test_relative_image_path = file_path.relative_to(programmatic_display_function_testing_path) # .resolve() ## RESOLVE MESSES UP SYMLINKS!
-    if debug_print:
-        print(f'{test_relative_image_path = }')
 
-    # Split the path into components
-    # parts = file_path.strip("./").split(os.sep)
-    # Convert to a list of path components
-    parts = test_relative_image_path.parts
-    if debug_print:
-        print(f'parts: {parts}')
-    
-    if len(parts) < 6:
-        raise ValueError(f'parsed path should have at least 6 parts, but this one only has: {len(parts)}.\nparts: {parts}')
-    
-    if len(parts) > 6:
-        joined_final_part: str = '/'.join(parts[5:]) # return anything after that back into a str
-        parts = parts[:5] + (joined_final_part, )
+    @function_attributes(short_name=None, tags=['ProgrammaticDisplayFunctionTesting', 'parse', 'filesystem'], input_requires=[], output_provides=[], uses=[], used_by=['parse_ProgrammaticDisplayFunctionTesting_image_folder'], creation_date='2024-10-04 12:21', related_items=[])
+    @classmethod
+    def parse_image_path(cls, programmatic_display_function_testing_path: Path, file_path: Path, debug_print=False) -> Tuple[IdentifyingContext, str, datetime]:
+        """ Parses `"C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting"` 
+        "C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/2023-04-11/kdiba/gor01/one/2006-6-09_1-22-43/kdiba_gor01_one_2006-6-09_1-22-43_batch_plot_test_long_only_[45].png"
+        Write a function that parses the following path structure: "./2023-04-11/kdiba/gor01/one/2006-6-09_1-22-43/kdiba_gor01_one_2006-6-09_1-22-43_batch_plot_test_long_only_[45].png"
+        Into the following variable names: `/image_export_day_date/format_name/animal/exper_name/session_name/image_name`
+        """
+        test_relative_image_path = file_path.relative_to(programmatic_display_function_testing_path) # .resolve() ## RESOLVE MESSES UP SYMLINKS!
+        if debug_print:
+            print(f'{test_relative_image_path = }')
+
+        # Split the path into components
+        # parts = file_path.strip("./").split(os.sep)
+        # Convert to a list of path components
+        parts = test_relative_image_path.parts
+        if debug_print:
+            print(f'parts: {parts}')
         
-    Assert.len_equals(parts, 6)
+        if len(parts) < 6:
+            raise ValueError(f'parsed path should have at least 6 parts, but this one only has: {len(parts)}.\nparts: {parts}')
+        
+        if len(parts) > 6:
+            joined_final_part: str = '/'.join(parts[5:]) # return anything after that back into a str
+            parts = parts[:5] + (joined_final_part, )
+            
+        Assert.len_equals(parts, 6)
 
-    # Assign the variables from the path components
-    image_export_day_date = parts[0]      # "./2023-04-11"
-    format_name = parts[1]                # "kdiba"
-    animal = parts[2]                     # "gor01"
-    exper_name = parts[3]                 # "one"
-    session_name = parts[4]               # "2006-6-09_1-22-43"
-    image_name = parts[5]                 # "kdiba_gor01_one_2006-6-09_1-22-43_batch_plot_test_long_only_[45].png"
+        # Assign the variables from the path components
+        image_export_day_date = parts[0]      # "./2023-04-11"
+        format_name = parts[1]                # "kdiba"
+        animal = parts[2]                     # "gor01"
+        exper_name = parts[3]                 # "one"
+        session_name = parts[4]               # "2006-6-09_1-22-43"
+        image_name = parts[5]                 # "kdiba_gor01_one_2006-6-09_1-22-43_batch_plot_test_long_only_[45].png"
 
-    session_context = IdentifyingContext(format_name=format_name, animal=animal, exper_name=exper_name, session_name=session_name)
-    # Parse image_export_day_date as a date (YYYY-mm-dd)
-    image_export_day_date: datetime = datetime.strptime(image_export_day_date, "%Y-%m-%d")
-    
-    # return image_export_day_date, format_name, animal, exper_name, session_name, image_name
-    return session_context, image_name, image_export_day_date, file_path
+        session_context = IdentifyingContext(format_name=format_name, animal=animal, exper_name=exper_name, session_name=session_name)
+        # Parse image_export_day_date as a date (YYYY-mm-dd)
+        image_export_day_date: datetime = datetime.strptime(image_export_day_date, "%Y-%m-%d")
+        
+        # return image_export_day_date, format_name, animal, exper_name, session_name, image_name
+        return session_context, image_name, image_export_day_date, file_path
 
-@function_attributes(short_name=None, tags=['ProgrammaticDisplayFunctionTesting', 'filesystem', 'images', 'load'], input_requires=[], output_provides=[], uses=['parse_image_path'], used_by=[], creation_date='2024-10-04 12:21', related_items=[])
-def parse_ProgrammaticDisplayFunctionTesting_image_folder(programmatic_display_function_testing_path: Path):
-    """
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import parse_ProgrammaticDisplayFunctionTesting_image_folder
 
-        programmatic_display_function_testing_path: Path = Path('/home/halechr/repos/Spike3D/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting').resolve()
-        programmatic_display_function_outputs_df, programmatic_display_function_outputs_tuples = parse_ProgrammaticDisplayFunctionTesting_image_folder(programmatic_display_function_testing_path=programmatic_display_function_testing_path)
-        programmatic_display_function_outputs_df
+    @function_attributes(short_name=None, tags=['ProgrammaticDisplayFunctionTesting', 'filesystem', 'images', 'load'], input_requires=[], output_provides=[], uses=['parse_image_path'], used_by=[], creation_date='2024-10-04 12:21', related_items=[])
+    @classmethod
+    def parse_ProgrammaticDisplayFunctionTesting_image_folder(cls, programmatic_display_function_testing_path: Path, save_csv: bool = True):
+        """
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import ProgrammaticDisplayFunctionTestingFolderImageLoading
 
-    """
-    # programmatic_display_function_outputs_dict: Dict[IdentifyingContext, List] = {}
-    programmatic_display_function_outputs_tuples: List[Tuple[IdentifyingContext, str, datetime]] = []
+            programmatic_display_function_testing_path: Path = Path('/home/halechr/repos/Spike3D/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting').resolve()
+            programmatic_display_function_outputs_df, programmatic_display_function_outputs_tuples, csv_out_path = ProgrammaticDisplayFunctionTestingFolderImageLoading.parse_ProgrammaticDisplayFunctionTesting_image_folder(programmatic_display_function_testing_path=programmatic_display_function_testing_path)
+            programmatic_display_function_outputs_df
 
-    Assert.path_exists(programmatic_display_function_testing_path)
+        """
+        # programmatic_display_function_outputs_dict: Dict[IdentifyingContext, List] = {}
+        programmatic_display_function_outputs_tuples: List[Tuple[IdentifyingContext, str, datetime]] = []
 
-    # Recursively enumerate all files in the directory
-    def enumerate_files(directory: Path):
-        return [file for file in directory.rglob('*') if file.is_file()]
+        Assert.path_exists(programmatic_display_function_testing_path)
 
-    # Example usage
-    all_files = enumerate_files(programmatic_display_function_testing_path)
+        # Recursively enumerate all files in the directory
+        def enumerate_files(directory: Path):
+            return [file for file in directory.rglob('*') if file.is_file()]
 
-    for test_image_path in all_files:
-        try:
-            # image_export_day_date, format_name, animal, exper_name, session_name, image_name = parse_image_path(programmatic_display_function_testing_path, test_image_path)
-            # session_context, image_name, image_export_day_date = parse_image_path(programmatic_display_function_testing_path, test_image_path)
-            # print(image_export_day_date, format_name, animal, exper_name, session_name, image_name)
-            programmatic_display_function_outputs_tuples.append(parse_image_path(programmatic_display_function_testing_path, test_image_path))
-        except ValueError as e:
-            # couldn't parse, skipping
-            pass
-        except Exception as e:
-            raise e
+        # Example usage
+        all_files = enumerate_files(programmatic_display_function_testing_path)
 
-    programmatic_display_function_outputs_df: pd.DataFrame = pd.DataFrame.from_records(programmatic_display_function_outputs_tuples, columns=['context', 'image_name', 'export_date', 'file_path'])
-    # Sort by columns: 'context' (ascending), 'image_name' (ascending), 'export_date' (descending)
-    programmatic_display_function_outputs_df = programmatic_display_function_outputs_df.sort_values(['context', 'image_name', 'export_date'], ascending=[True, True, False], key=lambda s: s.apply(str) if s.name in ['context'] else s).reset_index(drop=True)
-    
-    return programmatic_display_function_outputs_df, programmatic_display_function_outputs_tuples
+        for test_image_path in all_files:
+            try:
+                # image_export_day_date, format_name, animal, exper_name, session_name, image_name = parse_image_path(programmatic_display_function_testing_path, test_image_path)
+                # session_context, image_name, image_export_day_date = parse_image_path(programmatic_display_function_testing_path, test_image_path)
+                # print(image_export_day_date, format_name, animal, exper_name, session_name, image_name)
+                programmatic_display_function_outputs_tuples.append(cls.parse_image_path(programmatic_display_function_testing_path, test_image_path))
+            except ValueError as e:
+                # couldn't parse, skipping
+                pass
+            except Exception as e:
+                raise e
+
+        programmatic_display_function_outputs_df: pd.DataFrame = pd.DataFrame.from_records(programmatic_display_function_outputs_tuples, columns=['context', 'image_name', 'export_date', 'file_path'])
+        # Sort by columns: 'context' (ascending), 'image_name' (ascending), 'export_date' (descending)
+        programmatic_display_function_outputs_df = programmatic_display_function_outputs_df.sort_values(['context', 'image_name', 'export_date'], ascending=[True, True, False], key=lambda s: s.apply(str) if s.name in ['context'] else s).reset_index(drop=True)
+        if save_csv:
+            csv_out_path = programmatic_display_function_testing_path.joinpath('../../PhoDibaPaper2024Book/data').resolve().joinpath('programmatic_display_function_image_paths.csv')
+            programmatic_display_function_outputs_df.to_csv(csv_out_path)
+
+        return programmatic_display_function_outputs_df, programmatic_display_function_outputs_tuples, csv_out_path
+
+
+    # @classmethod
+    # def load_saved_ProgrammaticDisplayFunctionTesting_csv_and_build_widget(cls, programmatic_display_function_outputs_df: pd.DataFrame):
+    @classmethod
+    def build_ProgrammaticDisplayFunctionTesting_browsing_widget(cls, programmatic_display_function_outputs_df: pd.DataFrame):
+        """
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import parse_ProgrammaticDisplayFunctionTesting_image_folder
+
+            programmatic_display_function_testing_path: Path = Path('/home/halechr/repos/Spike3D/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting').resolve()
+            programmatic_display_function_outputs_df, programmatic_display_function_outputs_tuples, csv_out_path = ProgrammaticDisplayFunctionTestingFolderImageLoading.parse_ProgrammaticDisplayFunctionTesting_image_folder(programmatic_display_function_testing_path=programmatic_display_function_testing_path)
+            programmatic_display_function_outputs_df
+
+        """
+        from pyphocorehelpers.gui.Jupyter.JupyterImageNavigatorWidget import ImageNavigator, ContextSidebar, build_context_images_navigator_widget
+
+        # Assert.path_exists(in_path)
+
+        # _final_out_dict_dict: Dict[ContextDescStr, Dict[ImageNameStr, List[Tuple[str, str]]]] = {}
+        _final_out_dict_dict: Dict[ContextDescStr, Dict[ImageNameStr, Dict[datetime, Path]]] = {}
+        for ctx, a_ctx_df in partition_df_dict(programmatic_display_function_outputs_df, partitionColumn='context').items():
+            _final_out_dict_dict[ctx] = {}
+            for an_img_name, an_img_df in partition_df_dict(a_ctx_df, partitionColumn='image_name').items():
+                # _final_out_dict_dict[ctx][an_img_name] = list(zip(an_img_df['export_date'].values, an_img_df['file_path'].values)) #partition_df_dict(an_img_df, partitionColumn='image_name') 
+                _final_out_dict_dict[ctx][an_img_name] = {datetime.strptime(k, "%Y-%m-%d"):Path(v).resolve() for k, v in dict(zip(an_img_df['export_date'].values, an_img_df['file_path'].values)).items() if v.endswith('.png')}
+
+        """
+        {'2023-07-11_kdiba_gor01_one': {'2006-6-07_11-26-53/kdiba_gor01_one_2006-6-07_11-26-53_maze1__display_1d_placefield_validations.pdf': [('2023-07-11',
+            'C:\\Users\\pho\\repos\\Spike3DWorkEnv\\Spike3D\\EXTERNAL\\Screenshots\\ProgrammaticDisplayFunctionTesting\\2023-07-11\\2023-07-11\\kdiba\\gor01\\one\\2006-6-07_11-26-53\\kdiba_gor01_one_2006-6-07_11-26-53_maze1__display_1d_placefield_validations.pdf')],
+        '2006-6-07_11-26-53/kdiba_gor01_one_2006-6-07_11-26-53_maze2__display_1d_placefield_validations.pdf': [('2023-07-11',
+            'C:\\Users\\pho\\repos\\Spike3DWorkEnv\\Spike3D\\EXTERNAL\\Screenshots\\ProgrammaticDisplayFunctionTesting\\2023-07-11\\2023-07-11\\kdiba\\gor01\\one\\2006-6-07_11-26-53\\kdiba_gor01_one_2006-6-07_11-26-53_maze2__display_1d_placefield_validations.pdf')],
+            ...
+        """
+        ## INPUTS: _final_out_dict_dict: Dict[ContextDescStr, Dict[ImageNameStr, Dict[datetime, Path]]]
+        context_tabs_dict = {curr_context_desc_str:build_context_images_navigator_widget(curr_context_images_dict, curr_context_desc_str=curr_context_desc_str, max_num_widget_debug=2) for curr_context_desc_str, curr_context_images_dict in list(_final_out_dict_dict.items())}
+        sidebar = ContextSidebar(context_tabs_dict)
+        
+
+        return sidebar, context_tabs_dict, _final_out_dict_dict
+
+
+
+
 
 # ==================================================================================================================== #
 # 2024-08-21 Plotting Generated Transition Matrix Sequences                                                            #
