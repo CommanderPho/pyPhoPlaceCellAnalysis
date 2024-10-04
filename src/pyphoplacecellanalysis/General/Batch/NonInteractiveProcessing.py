@@ -361,7 +361,7 @@ def batch_evaluate_required_computations(curr_active_pipeline, include_includeli
 
 @function_attributes(short_name='batch_extended_computations', tags=['batch', 'automated', 'session', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
 def batch_extended_computations(curr_active_pipeline, include_includelist=None, included_computation_filter_names=None, include_global_functions=False, fail_on_exception=False, progress_print=True, debug_print=False,
-                                force_recompute:bool=False, force_recompute_override_computations_includelist=None, dry_run:bool=False):
+                                force_recompute:bool=False, force_recompute_override_computations_includelist=None, computation_kwargs_dict=None, dry_run:bool=False):
     """ performs the remaining required global computations
 
     force_recompute:bool=False
@@ -376,6 +376,8 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
     
     The whole function is only called if  ((_comp_specifier.short_name in include_includelist) or (_comp_specifier.computation_fn_name in include_includelist)) is true.
     
+    
+    computation_kwargs_dict={'rank_order_shuffle_analysis':({'num_shuffles': 500, 'skip_laps': False} | dict(minimum_inclusion_fr_Hz=2.0, included_qclu_values=[1,2,4,5,6,7]))}
     """
     #TODO 2023-09-08 07:48: - [ ] Currently only executes functions with a valid `validate_computation_test` set and silently skips functions that don't exist or are missing a validator.
     #TODO 2023-08-31 11:05: - [X] Do local computations first for all valid filter_epochs, then do global
@@ -424,6 +426,7 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
 
 
 
+    
     ## Specify the computations and the requirements to validate them.
 
     ## Hardcoded comp_specifiers
@@ -444,6 +447,13 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
     for _comp_specifier in _comp_specifiers:
         if (not _comp_specifier.is_global) or include_global_functions:
             if (_comp_specifier.short_name in include_includelist) or (_comp_specifier.computation_fn_name in include_includelist):
+                ## get any required overriding kwargs
+                    # Set `_comp_specifier.computation_fn_kwargs` if they're provided in computation_kwargs_dict
+                if computation_kwargs_dict is not None:
+                    a_computation_kwargs_list = ((computation_kwargs_dict.get(_comp_specifier.short_name, None) or computation_kwargs_dict.get(_comp_specifier.name, None)))
+                    if a_computation_kwargs_list is not None:
+                        _comp_specifier.computation_fn_kwargs = deepcopy(a_computation_kwargs_list)
+                
                 if (not _comp_specifier.is_global):
                     # Not Global-only, need to compute for all `included_computation_filter_names`:
                     for a_computation_filter_name in included_computation_filter_names:
