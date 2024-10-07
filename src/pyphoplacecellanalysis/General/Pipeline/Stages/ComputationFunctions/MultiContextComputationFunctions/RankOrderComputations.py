@@ -2508,6 +2508,25 @@ def validate_has_rank_order_results(curr_active_pipeline, computation_filter_nam
     ripple_result_tuple: Optional[DirectionalRankOrderResult] = rank_order_results.ripple_most_likely_result_tuple
     laps_result_tuple: Optional[DirectionalRankOrderResult] = rank_order_results.laps_most_likely_result_tuple
 
+
+    param_typed_parameters = curr_active_pipeline.global_computation_results.computation_config
+    if param_typed_parameters is not None:
+        rank_order_shuffle_analysis = param_typed_parameters.get('rank_order_shuffle_analysis', None)
+        if rank_order_shuffle_analysis is not None:
+            ## has valid rank_order_shuffle_analysis config:
+            if (rank_order_shuffle_analysis.minimum_inclusion_fr_Hz != results_minimum_inclusion_fr_Hz):
+                print(f'minimum_inclusion_fr_Hz differs! results_value: {results_minimum_inclusion_fr_Hz}, params_val: {rank_order_shuffle_analysis.minimum_inclusion_fr_Hz}')
+                return False
+            
+            # if (rank_order_shuffle_analysis.num_shuffles != rank_order_results.num_shuffles):
+            #     print(f'num_shuffles differs! results_value: {rank_order_results.num_shuffles}, params_val: {rank_order_shuffle_analysis.num_shuffles}')
+            #     return False
+            
+            if (set(rank_order_shuffle_analysis.included_qclu_values) != set(results_included_qclu_values)):
+                print(f'included_qclu_values differs! results_value: {results_included_qclu_values}, params_val: {rank_order_shuffle_analysis.included_qclu_values}')
+                return False
+            
+
     ## TODO: make sure result is for the current minimimum:
 
     ## TODO: require same `included_qclu_values` values
@@ -2615,6 +2634,12 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
                 ['RankOrder'].even_laps
 
 
+        ## Unpack:        
+        minimum_inclusion_fr_Hz = global_computation_results.computation_config['rank_order_shuffle_analysis'].minimum_inclusion_fr_Hz
+        included_qclu_values = global_computation_results.computation_config['rank_order_shuffle_analysis'].included_qclu_values
+        num_shuffles = global_computation_results.computation_config['rank_order_shuffle_analysis'].num_shuffles
+        
+        
         """
         if include_includelist is not None:
             print(f'WARN: perform_rank_order_shuffle_analysis(...): include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
@@ -2634,6 +2659,13 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
                                                                                                    is_global=True)
 
         global_computation_results.computed_data['RankOrder'].included_qclu_values = included_qclu_values
+
+
+        ## Update the `global_computation_results.computation_config`
+        global_computation_results.computation_config['rank_order_shuffle_analysis'].minimum_inclusion_fr_Hz = minimum_inclusion_fr_Hz
+        global_computation_results.computation_config['rank_order_shuffle_analysis'].included_qclu_values = included_qclu_values
+        global_computation_results.computation_config['rank_order_shuffle_analysis'].num_shuffles = num_shuffles
+            
 
         ## Laps Rank-Order Analysis:
         if not skip_laps:
