@@ -20,6 +20,7 @@ source '/home/halechr/repos/Spike3D/.venv/bin/activate'
 # Set Matplotlib backend to 'Agg' to prevent GUI issues
 export MPLBACKEND=Agg
 export PYVISTA_OFF_SCREEN=true
+export QT_QPA_PLATFORM=offscreen
 
 {% if should_use_virtual_framebuffer %}
 # Load Xvfb module if available
