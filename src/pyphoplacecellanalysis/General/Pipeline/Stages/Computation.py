@@ -1009,6 +1009,12 @@ class PipelineWithComputedPipelineStageMixin:
         """The global_computation_results property, accessed through the stage."""
         return self.stage.global_computation_results
     
+    @property
+    def global_computation_config(self):
+        """The global_computation_results.config property, accessed through the stage."""
+        return self.stage.global_computation_results.computation_config
+
+
 
     # @property
     # def active_completed_global_computation_result_names(self):
