@@ -1,0 +1,20 @@
+@define(slots=False, eq=False, repr=False)
+class {{ class_name }}(object):
+    """ Docstring for {{ class_name }}. 
+	"""
+{% for key, value in fields_dict | dictsort %}
+	{{ key|e }} = field({{ value|e }})
+{% endfor %}
+
+
+
+extended_computations_include_includelist = {{extended_computations_include_includelist|default('None')}}
+force_recompute_override_computations_includelist = {{force_recompute_override_computations_includelist|default('[]')}}
+force_recompute_override_computation_kwargs_dict = {{force_recompute_override_computation_kwargs_dict|default('dict()')}}
+should_force_reload_all = {{should_force_reload_all|default('False')}}
+should_freeze_pipeline_updates = {{should_freeze_pipeline_updates|default('False')}}
+should_symlink_output_pickles = {{should_symlink_output_pickles|default('False')}}
+
+
+# custom_user_completion_functions = {{custom_user_completion_functions|default('[]')}}
+{{custom_user_completion_function_template_code|default('custom_user_completion_functions = []')}}
