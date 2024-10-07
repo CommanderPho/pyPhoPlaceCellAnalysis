@@ -4994,7 +4994,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
     
 
     @function_attributes(short_name='directional_decoders_decode_continuous', tags=['directional_pf', 'laps', 'epoch', 'session', 'pf1D', 'pf2D', 'continuous'], input_requires=[], output_provides=[], uses=['DirectionalDecodersContinuouslyDecodedResult'], used_by=[], creation_date='2024-01-17 09:05', related_items=[],
-        requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders'], provides_global_keys=['DirectionalDecodersDecoded'],
+        requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders'], provides_global_keys=['DirectionalDecodersDecoded'],
         # validate_computation_test=DirectionalDecodersContinuouslyDecodedResult.validate_has_directional_decoded_continuous_epochs,
         validate_computation_test=_workaround_validate_has_directional_decoded_continuous_epochs,
         is_global=True, computation_precidence=(1002.0))
@@ -5155,7 +5155,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         return global_computation_results
 
     @function_attributes(short_name='directional_decoders_evaluate_epochs', tags=['directional-decoders', 'epochs', 'decode', 'score', 'weighted-correlation', 'radon-transform', 'multiple-decoders', 'main-computation-function'], input_requires=[], output_provides=[], uses=['_perform_compute_custom_epoch_decoding', '_compute_all_df_score_metrics'], used_by=[], creation_date='2024-02-16 12:49', related_items=['DecoderDecodedEpochsResult'],
-                         requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders'], provides_global_keys=['DirectionalDecodersEpochsEvaluations'],
+                         requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders'], provides_global_keys=['DirectionalDecodersEpochsEvaluations'],
                          validate_computation_test=_workaround_validate_has_directional_decoded_epochs_evaluations,
                         is_global=True, computation_precidence=(1002.1))
     def _decode_and_evaluate_epochs_using_directional_decoders(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, should_skip_radon_transform=False):
@@ -5211,9 +5211,18 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         # directional_decoders_decode_result = global_computation_results.computed_data.get('DirectionalDecodersDecoded', DirectionalDecodersContinuouslyDecodedResult(pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict, continuously_decoded_result_cache_dict=continuously_decoded_result_cache_dict))
         
         # spikes_df = curr_active_pipeline.sess.spikes_df
-        rank_order_results = global_computation_results.computed_data['RankOrder'] # : "RankOrderComputationsContainer"
-        minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+        # rank_order_results = global_computation_results.computed_data['RankOrder'] # : "RankOrderComputationsContainer"
+        # minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
         # included_qclu_values: List[int] = rank_order_results.included_qclu_values
+        
+        if global_computation_results.computation_config is None:
+            raise NotImplementedError(f'global_computation_results.computation_config is None!')
+        
+        minimum_inclusion_fr_Hz = global_computation_results.computation_config['rank_order_shuffle_analysis'].minimum_inclusion_fr_Hz
+        # included_qclu_values = global_computation_results.computation_config['rank_order_shuffle_analysis'].included_qclu_values
+        # num_shuffles = global_computation_results.computation_config['rank_order_shuffle_analysis'].num_shuffles
+        
+
         directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
         track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
         # print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
@@ -5324,7 +5333,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
 
     @function_attributes(short_name='directional_decoders_epoch_heuristic_scoring', tags=['heuristic', 'directional-decoders', 'epochs', 'filter', 'score', 'weighted-correlation', 'radon-transform', 'multiple-decoders', 'main-computation-function'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-12 17:23', related_items=[],
-        requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=[],
+        requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=[],
         validate_computation_test=_workaround_validate_has_directional_decoded_epochs_heuristic_scoring, 
                         is_global=True, computation_precidence=1002.2)
     def _decoded_epochs_heuristic_scoring(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
@@ -5350,9 +5359,14 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
         from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring
 
-        # spikes_df = curr_active_pipeline.sess.spikes_df
-        rank_order_results = global_computation_results.computed_data['RankOrder'] # : "RankOrderComputationsContainer"
-        minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+        if global_computation_results.computation_config is None:
+            raise NotImplementedError(f'global_computation_results.computation_config is None!')
+
+        minimum_inclusion_fr_Hz: float = global_computation_results.computation_config['rank_order_shuffle_analysis'].minimum_inclusion_fr_Hz
+        # included_qclu_values: List[int] = global_computation_results.computation_config['rank_order_shuffle_analysis'].included_qclu_values
+
+        # rank_order_results = global_computation_results.computed_data['RankOrder'] # : "RankOrderComputationsContainer"
+        # minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
         # included_qclu_values: List[int] = rank_order_results.included_qclu_values
         directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
         track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
@@ -5453,7 +5467,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
 
     @function_attributes(short_name='directional_train_test_split', tags=['train-test-split', 'global_computation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-09 06:09', related_items=[],
-                        requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders'], provides_global_keys=['TrainTestSplit'],
+                        requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders'], provides_global_keys=['TrainTestSplit'],
                         validate_computation_test=_workaround_validate_has_directional_train_test_split_result, 
                         is_global=True, computation_precidence=(1002.3))
     def _split_train_test_laps_data(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False,
@@ -5469,15 +5483,19 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                 ['DirectionalDecodersEpochsEvaluations']['continuously_decoded_result_cache_dict']
                 a_train_test_result = global_computation_results.computed_data['TrainTestSplit']
         """
-        # spikes_df = curr_active_pipeline.sess.spikes_df
-        rank_order_results = global_computation_results.computed_data['RankOrder'] # : "RankOrderComputationsContainer"
-        minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+        if global_computation_results.computation_config is None:
+            raise NotImplementedError(f'global_computation_results.computation_config is None!')
+
+        minimum_inclusion_fr_Hz: float = global_computation_results.computation_config['rank_order_shuffle_analysis'].minimum_inclusion_fr_Hz
+        # included_qclu_values: List[int] = global_computation_results.computation_config['rank_order_shuffle_analysis'].included_qclu_values
+
+        # rank_order_results = global_computation_results.computed_data['RankOrder'] # : "RankOrderComputationsContainer"
+        # minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
         # included_qclu_values: List[int] = rank_order_results.included_qclu_values
         directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
         track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
         # print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
         # print(f'included_qclu_values: {included_qclu_values}')
-
 
         test_data_portion: float = 1.0 - training_data_portion # test data portion is 1/6 of the total duration
         print(f'training_data_portion: {training_data_portion}, test_data_portion: {test_data_portion}')
@@ -5494,7 +5512,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
 
     @function_attributes(short_name='trial_by_trial_metrics', tags=['trial_by_trial', 'global_computation'], input_requires=["owning_pipeline_reference.computation_results[global_epoch_name].computed_data['pf1D_dt']"], output_provides=[], uses=['TrialByTrialActivity','TrialByTrialActivityResult'], used_by=[], creation_date='2024-05-28 00:00', related_items=[],
-                        requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders'], provides_global_keys=['TrialByTrialActivity'],
+                        requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders'], provides_global_keys=['TrialByTrialActivity'],
                         validate_computation_test=_workaround_validate_has_directional_trial_by_trial_activity_result, 
                         is_global=True, computation_precidence=(1002.4))
     def _build_trial_by_trial_activity_metrics(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
@@ -5527,9 +5545,14 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
         from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
 
-        # spikes_df = curr_active_pipeline.sess.spikes_df
-        rank_order_results = global_computation_results.computed_data['RankOrder'] # : "RankOrderComputationsContainer"
-        minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+        if global_computation_results.computation_config is None:
+            raise NotImplementedError(f'global_computation_results.computation_config is None!')
+
+        minimum_inclusion_fr_Hz: float = global_computation_results.computation_config['rank_order_shuffle_analysis'].minimum_inclusion_fr_Hz
+        included_qclu_values: List[int] = global_computation_results.computation_config['rank_order_shuffle_analysis'].included_qclu_values
+
+        # rank_order_results = global_computation_results.computed_data['RankOrder'] # : "RankOrderComputationsContainer"
+        # minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
         # included_qclu_values: List[int] = rank_order_results.included_qclu_values
         directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
         track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
@@ -5578,7 +5601,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
     
 
     @function_attributes(short_name='extended_pf_peak_information', tags=['trial_by_trial', 'global_computation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-28 00:00', related_items=[],
-                        requires_global_keys=['DirectionalLaps', 'RankOrder', 'jonathan_firing_rate_analysis', 'RatemapPeaksAnalysis'],# provides_global_keys=['jonathan_firing_rate_analysis'],
+                        requires_global_keys=['DirectionalLaps', 'jonathan_firing_rate_analysis', 'RatemapPeaksAnalysis'],# provides_global_keys=['jonathan_firing_rate_analysis'],
                         validate_computation_test=_workaround_validate_has_extended_pf_peak_info_result, 
                         is_global=True, computation_precidence=(1005.4))
     def _add_extended_pf_peak_information(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
@@ -5591,8 +5614,15 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             global_computation_results.computed_data['jonathan_firing_rate_analysis'].neuron_replay_stats_df
 
         """
-        rank_order_results = global_computation_results.computed_data['RankOrder'] # : "RankOrderComputationsContainer"
-        minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+                
+        if global_computation_results.computation_config is None:
+            raise NotImplementedError(f'global_computation_results.computation_config is None!')
+        
+        minimum_inclusion_fr_Hz: float = global_computation_results.computation_config['rank_order_shuffle_analysis'].minimum_inclusion_fr_Hz
+        # included_qclu_values: List[int] = global_computation_results.computation_config['rank_order_shuffle_analysis'].included_qclu_values
+        
+        # rank_order_results = global_computation_results.computed_data['RankOrder'] # : "RankOrderComputationsContainer"
+        # minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
         # included_qclu_values: List[int] = rank_order_results.included_qclu_values
         directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
         track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
