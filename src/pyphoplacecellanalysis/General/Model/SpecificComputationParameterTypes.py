@@ -109,7 +109,7 @@ class long_short_rate_remapping_Parameters(HDF_SerializationMixin, AttrsBasedCla
 class long_short_inst_spike_rate_groups_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for long_short_inst_spike_rate_groups_Parameters. 
     """
-    instantaneous_time_bin_size_seconds: Optional[float] = serialized_attribute_field(default=None)
+    instantaneous_time_bin_size_seconds: Optional[float] = serialized_attribute_field(default=0.01)
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""

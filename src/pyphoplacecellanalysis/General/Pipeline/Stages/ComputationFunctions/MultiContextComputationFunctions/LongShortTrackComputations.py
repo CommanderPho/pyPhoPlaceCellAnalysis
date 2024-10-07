@@ -1389,7 +1389,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
     @function_attributes(short_name='long_short_inst_spike_rate_groups', tags=['long_short', 'LxC', 'SxC', 'Figure2','replay', 'decoding', 'computation'], input_requires=['global_computation_results.computed_data.jonathan_firing_rate_analysis', 'global_computation_results.computed_data.long_short_fr_indicies_analysis'], output_provides=['global_computation_results.computed_data.long_short_endcap'], uses=[], used_by=[], creation_date='2023-08-21 16:52', related_items=[],
         requires_global_keys=['jonathan_firing_rate_analysis', 'long_short_fr_indicies_analysis'], provides_global_keys=['long_short_inst_spike_rate_groups'],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': curr_active_pipeline.global_computation_results.computed_data['long_short_inst_spike_rate_groups'], is_global=True)
-    def _perform_long_short_instantaneous_spike_rate_groups_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, instantaneous_time_bin_size_seconds: Optional[float]=None):
+    def _perform_long_short_instantaneous_spike_rate_groups_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, instantaneous_time_bin_size_seconds: Optional[float]=0.01):
         """ Must be performed after `_perform_jonathan_replay_firing_rate_analyses`
         
         Factoring out of `InstantaneousSpikeRateGroupsComputation`
@@ -1405,31 +1405,30 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.SpikeAnalysis import SpikeRateTrends # for `_perform_long_short_instantaneous_spike_rate_groups_analysis`
         from neuropy.utils.dynamic_container import DynamicContainer
 
+
         if instantaneous_time_bin_size_seconds is None:
             instantaneous_time_bin_size_seconds = 0.01 # set to default
 
-
-        if global_computation_results.computation_config is None:
-            # Create a DynamicContainer-backed computation_config
-            print(f'_perform_long_short_instantaneous_spike_rate_groups_analysis is lacking a required computation config parameter! creating a new curr_active_pipeline.global_computation_results.computation_config')
-            global_computation_results.computation_config = DynamicContainer(instantaneous_time_bin_size_seconds=0.01)
-        else:
-            print(f'have an existing `global_computation_results.computation_config`: {global_computation_results.computation_config}')	
+        # if global_computation_results.computation_config is None:
+        #     # Create a DynamicContainer-backed computation_config
+        #     print(f'_perform_long_short_instantaneous_spike_rate_groups_analysis is lacking a required computation config parameter! creating a new curr_active_pipeline.global_computation_results.computation_config')
+        #     global_computation_results.computation_config.long_short_inst_spike_rate_groups_Parameters.instantaneous_time_bin_size_seconds = 0.01
+        # else:
+        #     print(f'have an existing `global_computation_results.computation_config`: {global_computation_results.computation_config}')	
+            
 
         # Could also use `owning_pipeline_reference.global_computation_results.computation_config`
-        assert (global_computation_results.computation_config is not None), f"requires `global_computation_results.computation_config.instantaneous_time_bin_size_seconds`"
-        assert ('instantaneous_time_bin_size_seconds' in global_computation_results.computation_config)
+        assert (global_computation_results.computation_config is not None), f"requires `global_computation_results.computation_config.long_short_inst_spike_rate_groups_Parameters`"
+        assert (global_computation_results.computation_config.get('long_short_inst_spike_rate_groups_Parameters', None) is not None), f"requires `global_computation_results.computation_config.long_short_inst_spike_rate_groups_Parameters`"
         ## TODO: get from active_configs or something similar
-        if global_computation_results.computation_config.instantaneous_time_bin_size_seconds is None:
-            print(f'global_computation_results.computation_config.instantaneous_time_bin_size_seconds is None!')
-            global_computation_results.computation_config.instantaneous_time_bin_size_seconds = 0.01 # 20ms
-            print(f'TEMP TODO: overriding since it is None.')
+
+        # if global_computation_results.computation_config.instantaneous_time_bin_size_seconds is None:
+        #     print(f'global_computation_results.computation_config.instantaneous_time_bin_size_seconds is None!')
+        #     global_computation_results.computation_config.instantaneous_time_bin_size_seconds = 0.01 # 20ms
+        #     print(f'TEMP TODO: overriding since it is None.')
             
-        instantaneous_time_bin_size_seconds: float = global_computation_results.computation_config.instantaneous_time_bin_size_seconds # 0.01 # 10ms
+        global_computation_results.computation_config.long_short_inst_spike_rate_groups_Parameters.instantaneous_time_bin_size_seconds = instantaneous_time_bin_size_seconds # 0.01 # 10ms
         
-
-        
-
         ## INPUTS: instantaneous_time_bin_size_seconds
         sess = owning_pipeline_reference.sess 
         # Get the provided context or use the session context:
