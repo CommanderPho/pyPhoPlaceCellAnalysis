@@ -314,6 +314,8 @@ class BatchSessionCompletionHandler:
         NOTE: returns `was_updated`, not `is_valid` or something similar.
         
         """
+        from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters
+        
         if not LongShortPipelineTests(curr_active_pipeline=curr_active_pipeline).validate():
             print(f'ERROR!! Pipeline is invalid according to LongShortPipelineTests!!')
             return False
@@ -334,6 +336,13 @@ class BatchSessionCompletionHandler:
         #     # long_epoch_context.filter_name = long_epoch_name
         #     # was_updated = True
         #     raise NotImplementedError("2023-11-29 - This shouldn't happen since we previously called `cls._post_fix_filtered_contexts(curr_active_pipeline)`!!")
+        
+        ## Add `curr_active_pipeline.global_computation_results.computation_config` as needed:
+        if curr_active_pipeline.global_computation_results.computation_config is None:
+            print('global_computation_results.computation_config is None! Making new one!')
+            curr_active_pipeline.global_computation_results.computation_config = ComputationKWargParameters.init_from_pipeline(curr_active_pipeline=curr_active_pipeline)
+            print(f'\tdone. Pipeline needs resave!')
+            was_updated = was_updated | True
 
         return was_updated
 
