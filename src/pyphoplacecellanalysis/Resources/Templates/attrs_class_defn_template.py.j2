@@ -1,8 +1,27 @@
 @define(slots=False, eq=False, repr=False)
+{% if should_build_hdf_class|default('False') %}
+class {{ class_name }}(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
+{% else %}
 class {{ class_name }}(object):
+{% endif %}
     """ Docstring for {{ class_name }}. 
     """
+{% if should_build_hdf_class|default('False') %}
+{%for var_tuple in fields_tuples_list|default('[]')%}
+    {{ var_tuple[0] }}: {{ var_tuple[1] }} = non_serialized_field(default={{ var_tuple[2] }})
+{%endfor%}
+{% else %}
 {%for var_tuple in fields_tuples_list|default('[]')%}
     {{ var_tuple[0] }}: {{ var_tuple[1] }} = field(default={{ var_tuple[2] }})
 {%endfor%}
+{% endif %}
 
+{% if should_build_hdf_class|default('False') %}
+
+    # HDFMixin Conformances ______________________________________________________________________________________________ #
+
+    def to_hdf(self, file_path, key: str, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path"""
+        super().to_hdf(file_path, key=key, **kwargs)
+
+{% endif %}
