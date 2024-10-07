@@ -3252,9 +3252,9 @@ class TrainTestSplitResult(ComputedResult):
     training_data_portion: float = serialized_attribute_field(default=None, is_computable=False, repr=True)
     test_data_portion: float = serialized_attribute_field(default=None, is_computable=False, repr=False)
 
-    test_epochs_dict: Dict[str, pd.DataFrame] = serialized_field(default=None)
-    train_epochs_dict: Dict[str, pd.DataFrame] = serialized_field(default=None)
-    train_lap_specific_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = serialized_field(default=None)
+    test_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = serialized_field(default=None)
+    train_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = serialized_field(default=None)
+    train_lap_specific_pf1D_Decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = serialized_field(default=None)
 
 
 def _workaround_validate_has_directional_train_test_split_result(curr_active_pipeline, computation_filter_name='maze') -> bool:
