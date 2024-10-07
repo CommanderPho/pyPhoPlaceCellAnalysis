@@ -277,6 +277,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
     # ==================================================================================================================== #
     # Specific Context Computation Helpers                                                                                 #
     # ==================================================================================================================== #
+    @function_attributes(short_name=None, tags=['compute'], input_requires=[], output_provides=[], uses=['find_registered_computation_functions', 'cls._execute_computation_functions'], used_by=['perform_action_for_all_contexts'], creation_date='2024-10-07 15:07', related_items=[])
     def perform_registered_computations_single_context(self, previous_computation_result=None, computation_functions_name_includelist=None, computation_functions_name_excludelist=None, fail_on_exception:bool=False, progress_logger_callback=None, are_global:bool=False, debug_print=False):
         """ Executes all registered computations for a single filter
         
@@ -508,7 +509,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                 self.computation_results[a_select_config_name] = self.rerun_failed_computations_single_context(previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)    
 
 
-    @function_attributes(short_name=None, tags=['action', 'computation'], input_requires=[], output_provides=[], uses=['perform_registered_computations_single_context'], used_by=['perform_computations'], creation_date='2023-07-21 18:22', related_items=[])
+    @function_attributes(short_name=None, tags=['action', 'computation'], input_requires=[], output_provides=[], uses=['perform_registered_computations_single_context', 'cls._build_initial_computationResult'], used_by=['perform_computations'], creation_date='2023-07-21 18:22', related_items=[])
     def perform_action_for_all_contexts(self, action: EvaluationActions, enabled_filter_names=None, active_computation_params: Optional[DynamicParameters]=None, overwrite_extant_results=False, computation_functions_name_includelist=None, computation_functions_name_excludelist=None,
                                                  fail_on_exception:bool=False, progress_logger_callback=None, are_global:bool=False, debug_print=False):
         """ Aims to generalize the `evaluate_computations_for_single_params(...)` function's functionality (such as looping over each context and passing/updating appropriate results, to all three of the computation functions:
@@ -644,7 +645,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                 print(f'done.')
 
 
-    @function_attributes(short_name=None, tags=['computation', 'specific'], input_requires=[], output_provides=[], uses=['run_specific_computations_single_context'], used_by=[], creation_date='2023-07-21 18:21', related_items=[])
+    @function_attributes(short_name=None, tags=['computation', 'specific'], input_requires=[], output_provides=[], uses=['run_specific_computations_single_context', 'cls._build_initial_computationResult'], used_by=[], creation_date='2023-07-21 18:21', related_items=[])
     def perform_specific_computation(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_includelist=None, computation_kwargs_list=None, fail_on_exception:bool=False, debug_print=False, progress_logger_callback=None):
         """ perform a specific computation (specified in computation_functions_name_includelist) in a minimally destructive manner using the previously recomputed results:
         Ideally would already have access to the:
@@ -723,7 +724,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
     ## Computation Helpers: 
     # perform_computations: The main computation function for the computation stage
-    @function_attributes(short_name=None, tags=['main', 'computation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-25 12:26', related_items=[])
+    @function_attributes(short_name=None, tags=['main', 'computation'], input_requires=[], output_provides=[], uses=['perform_action_for_all_contexts'], used_by=[], creation_date='2023-10-25 12:26', related_items=[])
     def perform_computations(self, active_computation_params: Optional[DynamicParameters]=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_includelist=None, computation_functions_name_excludelist=None, fail_on_exception:bool=False, debug_print=False, progress_logger_callback=None):
         """The main computation function for the pipeline.
 
@@ -754,7 +755,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
     # CLASS/STATIC METHODS                                                                                                 #
     # ==================================================================================================================== #
 
-
+    @function_attributes(short_name=None, tags=['computationResult'], input_requires=[], output_provides=[], uses=[], used_by=['cls.continue_computations_if_needed', 'perform_specific_computation', 'perform_action_for_all_contexts'], creation_date='2024-10-07 15:12', related_items=[])
     @classmethod
     def _build_initial_computationResult(cls, active_session, computation_config) -> ComputationResult:
         """Conceptually, a single computation consists of a specific active_session and a specific computation_config object
@@ -777,6 +778,8 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         
         return output_result
 
+    @function_attributes(short_name=None, tags=['compute', 'main'], input_requires=[], output_provides=[],
+                          uses=[], used_by=['perform_registered_computations_single_context', 'rerun_failed_computations_single_context', 'run_specific_computations_single_context'], creation_date='2024-10-07 15:08', related_items=[])
     @staticmethod
     def _execute_computation_functions(active_computation_functions, previous_computation_result=None, computation_kwargs_list=None, fail_on_exception:bool = False, progress_logger_callback=None, are_global:bool=False, debug_print=False) -> ComputationResult:
         """ actually performs the provided computations in active_computation_functions """
@@ -809,7 +812,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                 for i, f in enumerate(active_computation_functions):
                     if progress_logger_callback is not None:
                         progress_logger_callback(f'Executing [{i}/{total_num_funcs}]: {f}')
-                    previous_computation_result = f(previous_computation_result, **computation_kwargs_list[i])
+                    previous_computation_result = f(previous_computation_result, **computation_kwargs_list[i]) # call the function `f` directly here
                     # Log the computation copmlete time:
                     computation_times[computation_times_key_fn(f)] = datetime.now()
                 
@@ -829,7 +832,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                         progress_logger_callback(f'Executing [{i}/{total_num_funcs}]: {f}')
                     try:
                         # evaluate the function 'f' using the result provided from the previous output or the initial input
-                        temp_result = f(previous_computation_result, **computation_kwargs_list[i]) 
+                        temp_result = f(previous_computation_result, **computation_kwargs_list[i]) # call the function `f` directly here
                     except (TypeError, ValueError, NameError, AttributeError, KeyError, NotImplementedError) as e:
                         exception_info = sys.exc_info()
                         accumulated_errors[f] = CapturedException(e, exception_info, previous_computation_result)
@@ -896,7 +899,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                 print(f'No registered_computation_functions, skipping extended computations.')
             return previous_computation_result # just return the unaltered result
 
-
+    @function_attributes(short_name=None, tags=['compute'], input_requires=[], output_provides=[], uses=['cls._build_initial_computationResult'], used_by=[], creation_date='2024-10-07 15:11', related_items=[])
     @classmethod    
     def continue_computations_if_needed(cls, curr_active_pipeline, active_computation_params=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_includelist=None, computation_functions_name_excludelist=None, fail_on_exception:bool=False, debug_print=False):
         """ continues computations for a pipeline 
@@ -970,7 +973,7 @@ class PipelineWithComputedPipelineStageMixin:
     def computation_results(self):
         """The computation_results property, accessed through the stage."""
         return self.stage.computation_results
-
+    
     @property
     def active_completed_computation_result_names(self):
         """The this list of all computed configs."""
