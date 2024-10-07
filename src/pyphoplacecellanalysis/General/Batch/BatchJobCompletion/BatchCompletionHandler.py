@@ -442,6 +442,8 @@ class BatchSessionCompletionHandler:
         If `.global_computations_options.should_compute` then computations will be tried and saved out as needed. If an error occurs, those will not be saved.
 
         """
+        from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters
+        
         # self.session_computations_options.override_output_file
         # self.global_computations_options.override_file
 
@@ -458,17 +460,30 @@ class BatchSessionCompletionHandler:
                         raise e.exc
 
         # 2023-10-03 - Temporarily override the existing
+        ## Add 2024-10-07 - `curr_active_pipeline.global_computation_results.computation_config` as needed:
+        needs_build_global_computation_config: bool = True
+
         if curr_active_pipeline.global_computation_results.computation_config is None:
             # Create a DynamicContainer-backed computation_config
-            print(f'_perform_long_short_instantaneous_spike_rate_groups_analysis is lacking a required computation config parameter! creating a new curr_active_pipeline.global_computation_results.computation_config')
-            curr_active_pipeline.global_computation_results.computation_config = DynamicContainer(instantaneous_time_bin_size_seconds=0.01)
+            # print(f'_perform_long_short_instantaneous_spike_rate_groups_analysis is lacking a required computation config parameter! creating a new curr_active_pipeline.global_computation_results.computation_config')
+            # curr_active_pipeline.global_computation_results.computation_config = DynamicContainer(instantaneous_time_bin_size_seconds=0.01)
+            needs_build_global_computation_config = True
         else:
             print(f'have an existing `global_computation_results.computation_config`: {curr_active_pipeline.global_computation_results.computation_config}')
-            if curr_active_pipeline.global_computation_results.computation_config.instantaneous_time_bin_size_seconds is None:
-                print(f'\t curr_active_pipeline.global_computation_results.computation_config.instantaneous_time_bin_size_seconds is None, overriding with 0.01')
-                curr_active_pipeline.global_computation_results.computation_config.instantaneous_time_bin_size_seconds = 0.01
+            if isinstance(curr_active_pipeline.global_computation_results.computation_config, ComputationKWargParameters):
+               needs_build_global_computation_config = False ## it is okay
+            else:
+                 needs_build_global_computation_config = True
 
+            # if curr_active_pipeline.global_computation_results.computation_config.instantaneous_time_bin_size_seconds is None:
+            #     print(f'\t curr_active_pipeline.global_computation_results.computation_config.instantaneous_time_bin_size_seconds is None, overriding with 0.01')
+            #     curr_active_pipeline.global_computation_results.computation_config.instantaneous_time_bin_size_seconds = 0.01
 
+        if needs_build_global_computation_config:
+            print('global_computation_results.computation_config is None! Making new one!')
+            curr_active_pipeline.global_computation_results.computation_config = ComputationKWargParameters.init_from_pipeline(curr_active_pipeline=curr_active_pipeline)
+            print(f'\tdone. Pipeline needs resave!')
+        
         if self.global_computations_options.should_save == SavingOptions.ALWAYS:
             assert self.global_computations_options.should_compute, f"currently  SavingOptions.ALWAYS requires that self.global_computations_options.should_compute == True also but this is not the case!"
 

@@ -1420,13 +1420,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # Could also use `owning_pipeline_reference.global_computation_results.computation_config`
         assert (global_computation_results.computation_config is not None), f"requires `global_computation_results.computation_config.long_short_inst_spike_rate_groups_Parameters`"
         assert (global_computation_results.computation_config.get('long_short_inst_spike_rate_groups_Parameters', None) is not None), f"requires `global_computation_results.computation_config.long_short_inst_spike_rate_groups_Parameters`"
-        ## TODO: get from active_configs or something similar
 
-        # if global_computation_results.computation_config.instantaneous_time_bin_size_seconds is None:
-        #     print(f'global_computation_results.computation_config.instantaneous_time_bin_size_seconds is None!')
-        #     global_computation_results.computation_config.instantaneous_time_bin_size_seconds = 0.01 # 20ms
-        #     print(f'TEMP TODO: overriding since it is None.')
-            
         global_computation_results.computation_config.long_short_inst_spike_rate_groups_Parameters.instantaneous_time_bin_size_seconds = instantaneous_time_bin_size_seconds # 0.01 # 10ms
         
         ## INPUTS: instantaneous_time_bin_size_seconds
