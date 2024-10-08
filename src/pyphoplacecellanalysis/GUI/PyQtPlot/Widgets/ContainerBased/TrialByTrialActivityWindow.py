@@ -63,7 +63,7 @@ class TrialByTrialActivityWindow:
 
     @function_attributes(short_name=None, tags=['matplotlib', 'trial-to-trial-variability', 'laps'], input_requires=[], output_provides=[], uses=[], used_by=['plot_trial_to_trial_reliability_all_decoders_image_stack'], creation_date='2024-08-29 03:26', related_items=[])
     @classmethod
-    def _plot_trial_to_trial_reliability_image_array(cls, active_one_step_decoder, z_scored_tuning_map_matrix, active_neuron_IDs=None, max_num_columns=5, drop_below_threshold=0.0000001, app=None, parent_root_widget=None, root_render_widget=None, debug_print=False, defer_show:bool=False):
+    def _plot_trial_to_trial_reliability_image_array(cls, active_one_step_decoder, z_scored_tuning_map_matrix, active_neuron_IDs=None, max_num_columns=5, drop_below_threshold=0.0000001, cmap=None, app=None, parent_root_widget=None, root_render_widget=None, debug_print=False, defer_show:bool=False):
         """ plots the reliability across laps for each decoder
         
         ## Usage:
@@ -92,21 +92,27 @@ class TrialByTrialActivityWindow:
         # images = active_one_step_decoder.ratemap.normalized_tuning_curves # (78, 57, 6)	- (n_neurons, n_xbins, n_ybins)
         occupancy = active_one_step_decoder.ratemap.occupancy # (57, 6) - (n_xbins, n_ybins)
         # Need to go from (n_epochs, n_neurons, n_pos_bins) -> (n_neurons, n_xbins, n_ybins)
+        n_epochs, n_neurons, n_pos_bins = np.shape(z_scored_tuning_map_matrix)
         images = z_scored_tuning_map_matrix.transpose(1, 2, 0) # (71, 57, 22)
         xbin_edges=active_one_step_decoder.xbin
-        ybin_edges=active_one_step_decoder.ybin
+        assert (len(xbin_edges)-1) == n_pos_bins, f"n_pos_bins: {n_pos_bins}, len(xbin_edges): {len(xbin_edges)} "
+        # ybin_edges=active_one_step_decoder.ybin
+        ybin_edges = np.arange(n_epochs+1) - 0.5 # correct ybin_edges are n_epochs
+                
         # images=images
         # occupancy=occupancy
         root_render_widget, parent_root_widget, app = pyqtplot_common_setup(f'TrialByTrialActivityArray: {np.shape(images)}', app=app, parent_root_widget=parent_root_widget, root_render_widget=root_render_widget) ## 🚧 TODO: BUG: this makes a new QMainWindow to hold this item, which is inappropriate if it's to be rendered as a child of another control
 
         pg.setConfigOptions(imageAxisOrder='col-major') # this causes the placefields to be rendered horizontally, like they were in _temp_pyqtplot_plot_image_array
 
-        # cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
-        # cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
-        # cmap = pg.colormap.get('gray','matplotlib') # prepare a linear color map
-        cmap = ColormapHelpers.create_transparent_colormap(cmap_name='Reds', lower_bound_alpha=0.01) # prepare a linear color map
+        if cmap is None:
+            # cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
+            # cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
+            # cmap = pg.colormap.get('gray','matplotlib') # prepare a linear color map
+            cmap = ColormapHelpers.create_transparent_colormap(cmap_name='Reds', lower_bound_alpha=0.01) # prepare a linear color map
 
-        image_bounds_extent, x_range, y_range = pyqtplot_build_image_bounds_extent(xbin_edges, ybin_edges, margin=2.0, debug_print=debug_print)
+
+        image_bounds_extent, x_range, y_range = pyqtplot_build_image_bounds_extent(xbin_edges=xbin_edges, ybin_edges=ybin_edges, margin=2.0, debug_print=debug_print)
         # image_aspect_ratio, image_width_height_tuple = compute_data_aspect_ratio(x_range, y_range)
         # print(f'image_aspect_ratio: {image_aspect_ratio} - xScale/yScale: {float(image_width_height_tuple.width) / float(image_width_height_tuple.height)}')
 
@@ -315,6 +321,7 @@ class TrialByTrialActivityWindow:
     @classmethod
     def plot_trial_to_trial_reliability_all_decoders_image_stack(cls, directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity], active_one_step_decoder, drop_below_threshold=0.0000001, is_overlaid_heatmaps_mode: bool = True,
                                                                   app=None, parent_root_widget=None, root_render_widget=None, debug_print=False, defer_show:bool=False, name:str = 'TrialByTrialActivityWindow',
+                                                                  override_active_neuron_IDs=None,
                                                                    **param_kwargs):
         """ Calls `plot_trial_to_trial_reliability_image_array` for each decoder's reliability from lap-top-lap, overlaying the results as different color heatmaps
         
@@ -340,8 +347,8 @@ class TrialByTrialActivityWindow:
         print(f'directional_active_pf_neuron_IDS_dict: {directional_active_pf_neuron_IDS_dict}')
         active_neuron_IDs = deepcopy(list(directional_active_pf_neuron_IDS_dict.values())[0])
         assert np.allclose([list(v) for v in list(directional_active_pf_neuron_IDS_dict.values())], active_neuron_IDs), f"All neuron_IDs must be the same!"
-        
-
+        if override_active_neuron_IDs is not None:
+            active_neuron_IDs = active_neuron_IDs[np.isin(active_neuron_IDs, override_active_neuron_IDs)] # only get the allowed elements
         
         if is_overlaid_heatmaps_mode:
             ## first decoder:
@@ -360,13 +367,6 @@ class TrialByTrialActivityWindow:
             ])
             # active_z_scored_tuning_map_matrix = np.concatenate(active_z_scored_tuning_map_matrix)
 
-        # Plots only the first data-series ('long_LR')
-        app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array, (lblTitle, lblFooter) = cls._plot_trial_to_trial_reliability_image_array(active_one_step_decoder=active_one_step_decoder, z_scored_tuning_map_matrix=active_z_scored_tuning_map_matrix, active_neuron_IDs=active_neuron_IDs, drop_below_threshold=drop_below_threshold)
-        additional_heatmaps_data = {}
-        additional_img_items_dict = {}
-        
-        # Extract the heatmaps from the other decoders
-        ## INPUTS: directional_active_lap_pf_results_dicts
 
         # MATPLOTLIB way
         # additional_cmap_names['long_LR'] = 'Reds'
@@ -393,6 +393,15 @@ class TrialByTrialActivityWindow:
 
         additional_cmaps = {k: ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=0.1) for k, v in additional_cmap_names.items()}
         additional_legend_entries = list(zip(directional_active_lap_pf_results_dicts.keys(), additional_cmap_names.values() )) # ['red', 'purple', 'green', 'orange']
+
+        # Plots only the first data-series ('long_LR')
+        app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array, (lblTitle, lblFooter) = cls._plot_trial_to_trial_reliability_image_array(active_one_step_decoder=active_one_step_decoder, z_scored_tuning_map_matrix=active_z_scored_tuning_map_matrix, active_neuron_IDs=active_neuron_IDs, drop_below_threshold=drop_below_threshold, cmap=additional_cmaps['long_LR'])
+        additional_heatmaps_data = {}
+        additional_img_items_dict = {}
+        
+        # Extract the heatmaps from the other decoders
+        ## INPUTS: directional_active_lap_pf_results_dicts
+
 
         if is_overlaid_heatmaps_mode:
             enable_stacked_long_and_short: bool = False # not currently working, they have to be overlayed exactly on top of each other
