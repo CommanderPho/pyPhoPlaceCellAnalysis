@@ -1355,35 +1355,45 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         Requires: self.all_directional_laps_filter_epochs_decoder_result, self.all_directional_ripple_filter_epochs_decoder_result
 
         """
-        # Computes and initializes the marginal properties:
-        laps_epochs_df = deepcopy(self.all_directional_laps_filter_epochs_decoder_result.filter_epochs)
-        if not isinstance(laps_epochs_df, pd.DataFrame):
-            laps_epochs_df = laps_epochs_df.to_dataframe()
+        # Computes and initializes the marginal properties:        
+        if self.all_directional_laps_filter_epochs_decoder_result is not None:
+            (self.laps_directional_marginals_tuple, self.laps_track_identity_marginals_tuple, laps_non_marginalized_decoder_marginals_tuple), laps_marginals_df = self.all_directional_laps_filter_epochs_decoder_result.compute_marginals(epoch_idx_col_name='lap_idx', epoch_start_t_col_name='lap_start_t',
+																																								 additional_transfer_column_names=['start','stop','label','duration','lap_id','lap_dir'])
+        if self.all_directional_ripple_filter_epochs_decoder_result is not None:
+            (self.ripple_directional_marginals_tuple, self.ripple_track_identity_marginals_tuple, ripple_non_marginalized_decoder_marginals_tuple), ripple_marginals_df = self.all_directional_ripple_filter_epochs_decoder_result.compute_marginals(epoch_idx_col_name='ripple_idx', epoch_start_t_col_name='ripple_start_t',
+																																								 additional_transfer_column_names=['start','stop','label','duration'])
         
-        self.laps_directional_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_directional_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
-        laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = self.laps_directional_marginals_tuple
-        self.laps_track_identity_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
-        laps_track_identity_marginals, laps_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = self.laps_track_identity_marginals_tuple
+        ## OLD:
+        # laps_epochs_df = deepcopy(self.all_directional_laps_filter_epochs_decoder_result.filter_epochs)
+        # if not isinstance(laps_epochs_df, pd.DataFrame):
+        #     laps_epochs_df = laps_epochs_df.to_dataframe()
+        # self.laps_directional_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_directional_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
+        # self.laps_track_identity_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
 
-        ## Simple Scatterplot:
-        laps_marginals_df = pd.DataFrame(np.hstack((laps_directional_all_epoch_bins_marginal, laps_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
-        laps_marginals_df['lap_idx'] = laps_marginals_df.index.to_numpy()
-        laps_marginals_df['lap_start_t'] = laps_epochs_df['start'].to_numpy()
-        laps_marginals_df
+        # laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = self.laps_directional_marginals_tuple
+        # laps_track_identity_marginals, laps_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = self.laps_track_identity_marginals_tuple
 
-        ## Decode Ripples:
-        ripple_epochs_df = deepcopy(self.all_directional_ripple_filter_epochs_decoder_result.filter_epochs)
-        self.ripple_directional_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_directional_likelihoods(self.all_directional_ripple_filter_epochs_decoder_result)
-        ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir  = self.ripple_directional_marginals_tuple
-        self.ripple_track_identity_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(self.all_directional_ripple_filter_epochs_decoder_result)
-        ripple_track_identity_marginals, ripple_track_identity_all_epoch_bins_marginal, ripple_most_likely_track_identity_from_decoder, ripple_is_most_likely_track_identity_Long = self.ripple_track_identity_marginals_tuple
+        # ## Simple Scatterplot:
+        # laps_marginals_df = pd.DataFrame(np.hstack((laps_directional_all_epoch_bins_marginal, laps_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
+        # laps_marginals_df['lap_idx'] = laps_marginals_df.index.to_numpy()
+        # laps_marginals_df['lap_start_t'] = laps_epochs_df['start'].to_numpy()
+        # laps_marginals_df
 
-        ## Simple Scatterplot:
-        ## Ripple marginals_df:
-        ripple_marginals_df = pd.DataFrame(np.hstack((ripple_directional_all_epoch_bins_marginal, ripple_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
-        ripple_marginals_df['ripple_idx'] = ripple_marginals_df.index.to_numpy()
-        ripple_marginals_df['ripple_start_t'] = ripple_epochs_df['start'].to_numpy()
-        ripple_marginals_df
+        # ## Decode Ripples:
+        # ripple_epochs_df = deepcopy(self.all_directional_ripple_filter_epochs_decoder_result.filter_epochs)
+        # self.ripple_directional_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_directional_likelihoods(self.all_directional_ripple_filter_epochs_decoder_result)
+        # ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir  = self.ripple_directional_marginals_tuple
+        # self.ripple_track_identity_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(self.all_directional_ripple_filter_epochs_decoder_result)
+        # ripple_track_identity_marginals, ripple_track_identity_all_epoch_bins_marginal, ripple_most_likely_track_identity_from_decoder, ripple_is_most_likely_track_identity_Long = self.ripple_track_identity_marginals_tuple
+
+        # ## Simple Scatterplot:
+        # ## Ripple marginals_df:
+        # ripple_marginals_df = pd.DataFrame(np.hstack((ripple_directional_all_epoch_bins_marginal, ripple_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
+        # ripple_marginals_df['ripple_idx'] = ripple_marginals_df.index.to_numpy()
+        # ripple_marginals_df['ripple_start_t'] = ripple_epochs_df['start'].to_numpy()
+        # ripple_marginals_df
+        
+
 
     @classmethod
     def build_non_marginalized_raw_posteriors(cls, filter_epochs_decoder_result: DecodedFilterEpochsResult, debug_print=False):
