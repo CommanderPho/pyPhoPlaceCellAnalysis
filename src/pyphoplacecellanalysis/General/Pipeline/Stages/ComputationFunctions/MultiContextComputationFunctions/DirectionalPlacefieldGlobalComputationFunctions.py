@@ -1408,7 +1408,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         
         for a_p_x_given_n in filter_epochs_decoder_result.p_x_given_n_list:
             # an_array = all_directional_laps_filter_epochs_decoder_result.p_x_given_n_list[0] # .shape # (62, 4, 236)
-            curr_array_shape = np.shape(a_p_x_given_n)
+            curr_array_shape = np.shape(a_p_x_given_n) # .shape # (62, 4, 236) - (n_pos_bins, 4, n_epoch_t_bins[i])
             if debug_print:
                 print(f'a_p_x_given_n.shape: {curr_array_shape}')
 
@@ -1439,7 +1439,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         return custom_curr_unit_marginal_list
 
     @classmethod
-    def build_custom_marginal_over_direction(cls, filter_epochs_decoder_result, debug_print=False):
+    def build_custom_marginal_over_direction(cls, filter_epochs_decoder_result: DecodedFilterEpochsResult, debug_print=False):
         """ only works for the all-directional coder with the four items
         
         Usage:
@@ -3016,6 +3016,7 @@ MeasuredDecodedPositionComparison = attrs.make_class("MeasuredDecodedPositionCom
 @define(slots=False)
 class CustomDecodeEpochsResult(UnpackableMixin):
     """ 
+    """ Represents a custom decoding of an Epochs object
     
     Usage:
 
@@ -3116,7 +3117,7 @@ def _do_custom_decode_epochs(global_spikes_df: pd.DataFrame,  global_measured_po
     return CustomDecodeEpochsResult(measured_decoded_position_comparion=measured_decoded_position_comparion, decoder_result=decoder_result)
 
 
-@function_attributes(short_name=None, tags=['decode'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-05 11:59', related_items=[])
+@function_attributes(short_name=None, tags=['decode', 'general', 'epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-05 11:59', related_items=[])
 def _do_custom_decode_epochs_dict(global_spikes_df: pd.DataFrame, global_measured_position_df: pd.DataFrame, pf1D_Decoder_dict: Dict[str, BasePositionDecoder], epochs_to_decode_dict: Dict[str, pd.DataFrame], decoding_time_bin_size: float, decoder_and_epoch_keys_independent:bool=True) -> Union[Dict[decoder_name, CustomDecodeEpochsResult], Dict[epoch_split_key, Dict[decoder_name, CustomDecodeEpochsResult]]]:
     """
     Do a single position decoding for a set of epochs
@@ -3241,7 +3242,8 @@ def _show_sweep_result(output_full_directional_merged_decoders_result=None, glob
 
 @define(slots=False, repr=False)
 class TrainTestSplitResult(ComputedResult):
-    """ 
+    """ Represents a rigorous test of decoding performance by splitting the lap epochs into Train/Test periods
+    
     Usage:
     
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestSplitResult
@@ -3571,10 +3573,10 @@ class TrainTestLapsSplitting:
 
             a_training_test_names = [f"{a_modern_name}{a_suffix}" for a_suffix in training_test_suffixes] # ['long_LR_train', 'long_LR_test']
             a_train_epoch_name: str = a_training_test_names[0] # just the train epoch, like 'long_LR_train'
-            a_training_test_split_laps_df_dict: Dict[str,pd.DataFrame] = dict(zip(a_training_test_names, (a_laps_training_df, a_laps_test_df))) # analagoues to `directional_laps_results.split_directional_laps_dict`
+            a_training_test_split_laps_df_dict: Dict[str, pd.DataFrame] = dict(zip(a_training_test_names, (a_laps_training_df, a_laps_test_df))) # analagoues to `directional_laps_results.split_directional_laps_dict`
 
             # _temp_a_training_test_split_laps_valid_epoch_df_dict: Dict[str,Epoch] = {k:deepcopy(v).get_non_overlapping() for k, v in a_training_test_split_laps_df_dict.items()} ## NOTE: these lose the associated extra columns like 'lap_id', 'lap_dir', etc.
-            a_training_test_split_laps_epoch_obj_dict: Dict[str,Epoch] = {k:Epoch(deepcopy(v)).get_non_overlapping() for k, v in a_training_test_split_laps_df_dict.items()} ## NOTE: these lose the associated extra columns like 'lap_id', 'lap_dir', etc.
+            a_training_test_split_laps_epoch_obj_dict: Dict[str, Epoch] = {k:Epoch(deepcopy(v)).get_non_overlapping() for k, v in a_training_test_split_laps_df_dict.items()} ## NOTE: these lose the associated extra columns like 'lap_id', 'lap_dir', etc.
 
             train_test_split_laps_df_dict.update(a_training_test_split_laps_df_dict)
             train_test_split_laps_epoch_obj_dict.update(a_training_test_split_laps_epoch_obj_dict)
@@ -3714,9 +3716,9 @@ class TrainTestLapsSplitting:
         """ Draws the division of the train/test epochs using a matplotlib figure.
 
         Usage:
-            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import debug_draw_laps_train_test_split_epochs
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestLapsSplitting
 
-            fig, ax = debug_draw_laps_train_test_split_epochs(laps_df, laps_training_df, laps_test_df, fignum=0)
+            fig, ax = TrainTestLapsSplitting.debug_draw_laps_train_test_split_epochs(laps_df, laps_training_df, laps_test_df, fignum=0)
             fig.show()
         """
         from neuropy.core.epoch import Epoch, ensure_dataframe
@@ -3797,8 +3799,9 @@ class TrainTestLapsSplitting:
         Captures: `directional_laps_results` for purposes of xbin
 
         Usage:
-
-            fig, curr_ax = _show_decoding_result(test_measured_positions_dfs_dict, test_decoded_positions_df_dict, a_name = 'long_LR', epoch_IDX = 2, xbin=xbin)
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestLapsSplitting
+            
+            fig, curr_ax = TrainTestLapsSplitting._show_decoding_result(test_measured_positions_dfs_dict, test_decoded_positions_df_dict, a_name = 'long_LR', epoch_IDX = 2, xbin=xbin)
 
         """
         import matplotlib.pyplot as plt
@@ -5563,7 +5566,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                         validate_computation_test=_workaround_validate_has_directional_train_test_split_result, 
                         is_global=True, computation_precidence=(1002.3))
     def _split_train_test_laps_data(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False,
-                                    training_data_portion: float = 5.0/6.0, debug_output_hdf5_file_path = None):
+                                    training_data_portion: float = (5.0/6.0), debug_output_hdf5_file_path = None):
         """ Using the four 1D decoders, performs 1D Bayesian decoding for each of the known epochs (Laps, Ripple) from the neural activity during these peirods.
         
         Requires:
