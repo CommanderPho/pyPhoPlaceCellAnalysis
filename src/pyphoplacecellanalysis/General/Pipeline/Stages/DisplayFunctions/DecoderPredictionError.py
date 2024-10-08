@@ -1953,6 +1953,265 @@ class DecodedPositionsPlotDataProvider(PaginatedPlotDataProvider):
 
 
 
+
+# ==================================================================================================================== #
+# TrainTestSplitPlotDataProvider                                                                                       #
+# ==================================================================================================================== #
+# from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedPlotDataProvider
+
+
+
+## INPUTS: _remerged_laps_dfs_dict
+@define
+class TrainTestSplitPlotData:
+    # all_test_epochs_df: Dict = field()
+    # train_epochs_dict: Dict = field()
+    # test_epochs_dict: Dict = field()
+    # remerged_laps_dfs_dict: Dict = field()
+    decoder_name: str = field()
+    a_train_epochs: pd.DataFrame = field()
+    a_test_epochs: pd.DataFrame = field()
+    a_remerged_laps_dfs: pd.DataFrame = field()
+    # an_all_test_epochs_df: pd.DataFrame = field()
+    
+    # def get_single_epoch_data(self, epoch_idx: int, a_decoder_name: str='long_LR'):
+    #     ## INPUTS: all_test_epochs_df, train_epochs_dict, test_epochs_dict, _remerged_laps_dfs_dict
+    #     # epoch_idx: int = 0
+        
+    #     an_all_test_epochs_df = self.all_test_epochs_df[self.all_test_epochs_df['label'].astype(int) == epoch_idx]
+    #     # an_all_test_epochs_df
+    #     # train_epochs_dict
+    #     a_train_epochs = self.train_epochs_dict[a_decoder_name]
+    #     a_train_epochs = a_train_epochs[a_train_epochs['label'].astype(int) == epoch_idx]
+    #     a_test_epochs = self.test_epochs_dict[a_decoder_name]
+    #     a_test_epochs = [a_test_epochs['label'].astype(int) == epoch_idx]
+
+    #     a_remerged_laps_dfs = self.remerged_laps_dfs_dict[a_decoder_name]
+    #     a_remerged_laps_dfs = a_remerged_laps_dfs[a_remerged_laps_dfs['label'].astype(int) == epoch_idx]
+
+    #     ## OUTPUT: an_all_test_epochs_df, a_train_epochs, a_test_epochs, a_remerged_laps_dfs
+    #     return an_all_test_epochs_df, a_train_epochs, a_test_epochs, a_remerged_laps_dfs
+        
+    def get_single_epoch_data(self, epoch_start_t: float): # , epoch_idx: int
+        # from neuropy.core.epoch import find_data_indicies_from_epoch_times
+        ## INPUTS: all_test_epochs_df, train_epochs_dict, test_epochs_dict, _remerged_laps_dfs_dict
+        # epoch_idx: int = 0
+        # epoch_start_t
+        # found_epoch_idxs = find_data_indicies_from_epoch_times(self.a_remerged_laps_dfs, epoch_times=[epoch_start_t], not_found_action='skip_index', debug_print=True)
+        # assert len(found_epoch_idxs) > 0
+        # epoch_idx = found_epoch_idxs[0]
+        # print(f'epoch_idx: {epoch_idx}')
+        
+        # matching_epoch_times_slice
+        
+        # self.a_remerged_laps_dfs.epochs.find
+        # an_all_test_epochs_df = self.all_test_epochs_df[self.all_test_epochs_df['label'].astype(int) == epoch_idx]
+        # an_all_test_epochs_df
+        # train_epochs_dict
+        a_train_epochs = self.a_train_epochs
+        a_test_epochs = self.a_test_epochs
+        a_remerged_laps_dfs = self.a_remerged_laps_dfs
+        
+        # a_train_epochs = a_train_epochs[a_train_epochs['label'].astype(int) == epoch_idx]
+        # a_test_epochs = [a_test_epochs['label'].astype(int) == epoch_idx]
+        # a_remerged_laps_dfs = a_remerged_laps_dfs[a_remerged_laps_dfs['label'].astype(int) == epoch_idx]
+
+        a_train_epochs = a_train_epochs[np.isclose(a_train_epochs['start'], epoch_start_t)]
+        a_test_epochs = a_test_epochs[np.isclose(a_test_epochs['start'], epoch_start_t)]
+        a_remerged_laps_dfs = a_remerged_laps_dfs[np.isclose(a_remerged_laps_dfs['start'], epoch_start_t)]
+
+
+        ## OUTPUT: an_all_test_epochs_df, a_train_epochs, a_test_epochs, a_remerged_laps_dfs
+        return a_train_epochs, a_test_epochs, a_remerged_laps_dfs
+
+    @classmethod
+    def init_from_dicts(cls, all_test_epochs_df, train_epochs_dict, test_epochs_dict, remerged_laps_dfs_dict, a_decoder_name: str='long_LR'):
+        a_train_epochs = train_epochs_dict[a_decoder_name]
+        a_test_epochs = test_epochs_dict[a_decoder_name]
+        a_remerged_laps_dfs = remerged_laps_dfs_dict[a_decoder_name]
+        ## OUTPUT: an_all_test_epochs_df, a_train_epochs, a_test_epochs, a_remerged_laps_dfs
+        return cls(a_train_epochs=a_train_epochs, a_test_epochs=a_test_epochs, a_remerged_laps_dfs=a_remerged_laps_dfs, decoder_name=a_decoder_name) # an_all_test_epochs_df
+
+
+class TrainTestSplitPlotDataProvider(PaginatedPlotDataProvider):
+    """ Adds the most-likely and actual position points/lines to the posterior heatmap.
+
+    `.add_data_to_pagination_controller(...)` adds the result to the pagination controller
+
+    Data:
+        plots_data.decoded_position_curves_data
+    Plots:
+        plots['decoded_position_curves']
+        
+            _out_pagination_controller.plots_data.decoded_position_curves_data = decoded_position_curves_data
+        _out_pagination_controller.plots['radon_transform'] = {}
+
+
+    Usage:
+
+    from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import RadonTransformPlotDataProvider
+
+
+    """
+    plots_group_identifier_key: str = 'train_test_split' # _out_pagination_controller.plots['weighted_corr']
+    
+    provided_params: Dict[str, Any] = dict(enable_train_test_split_decoding_results=True) # , enable_actual_position_curve = False
+    provided_plots_data: Dict[str, Any] = {'train_test_split_data': None}
+    provided_plots: Dict[str, Any] = {'train_test_split': {}}
+
+    @classmethod
+    def get_provided_callbacks(cls) -> Dict[str, Dict]:
+        return {'on_render_page_callbacks': 
+                {'plot_train_test_decoded_and_actual_positions_data': cls._callback_update_curr_single_epoch_slice_plot}
+        }
+
+    
+    @classmethod
+    def decoder_build_single_decoded_position_curves_data(cls, all_test_epochs_df, train_epochs_dict, test_epochs_dict, remerged_laps_dfs_dict, a_decoder_name: str='long_LR'):
+        """ builds for a single decoder. """
+        # _obj = TrainTestSplitPlotData(all_test_epochs_df=all_test_epochs_df, train_epochs_dict=train_epochs_dict, test_epochs_dict=test_epochs_dict, remerged_laps_dfs_dict=_remerged_laps_dfs_dict)
+        return TrainTestSplitPlotData.init_from_dicts(all_test_epochs_df=all_test_epochs_df, train_epochs_dict=train_epochs_dict, test_epochs_dict=test_epochs_dict, remerged_laps_dfs_dict=remerged_laps_dfs_dict, a_decoder_name=a_decoder_name)
+
+    @classmethod
+    def _callback_update_curr_single_epoch_slice_plot(cls, curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", data_idx:int, curr_time_bins, *args, epoch_slice=None, curr_time_bin_container=None, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
+        """ 2023-05-30 - Based off of `_helper_update_decoded_single_epoch_slice_plot` to enable plotting radon transform lines on paged decoded epochs
+
+        Needs only: curr_time_bins, plots_data, i
+        Accesses: plots_data.epoch_slices[i,:], plots_data.global_pos_df, params.variable_name, params.xbin, params.enable_flat_line_drawing
+
+        Called with:
+
+        self.params, self.plots_data, self.plots, self.ui = a_callback(curr_ax, self.params, self.plots_data, self.plots, self.ui, curr_slice_idxs, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=self.params.debug_print)
+
+        """
+        from neuropy.utils.matplotlib_helpers import draw_epoch_regions
+
+        line_alpha = 0.8  # Faint line
+        # marker_alpha = 0.8  # More opaque markers
+        # plot_kwargs = dict(enable_flat_line_drawing=True, scalex=False, scaley=False, label=f'most-likely pos', linewidth=1, color='grey', alpha=line_alpha, # , linestyle='none', markerfacecolor='#e5ff00', markeredgecolor='#e5ff00'
+        #                         marker='+', markersize=3, animated=False) # , markerfacealpha=marker_alpha, markeredgealpha=marker_alpha
+        # plot_kwargs = dict(enable_flat_line_drawing=False, scalex=False, scaley=False, label=f'most-likely pos', linestyle='none', linewidth=1, color='#a6a6a6', alpha=line_alpha, # , linestyle='none', markerfacecolor='#e5ff00', markeredgecolor='#e5ff00'
+        #                         marker="_", markersize=9, animated=False)
+
+        debug_print = kwargs.pop('debug_print', True)
+        # debug_print = True # override 
+        
+        ## Extract the visibility:
+        should_enable_plot: bool = params.enable_train_test_split_decoding_results
+        
+        if debug_print:
+            print(f'{params.name}: _callback_update_curr_single_epoch_slice_plot(..., data_idx: {data_idx}, epoch_slice: {epoch_slice}, curr_time_bins: {curr_time_bins})')
+        
+        extant_plots = plots[cls.plots_group_identifier_key].get(data_idx, {})
+        # extant_epochs_collection = extant_plots.get('epochs_collection', None)
+        # extant_epoch_labels = extant_plots.get('epoch_labels', None)
+        extant_epochs_collection_dict = extant_plots.get('extant_epochs_collection_dict', {})
+        extant_epoch_labels_dict = extant_plots.get('extant_epoch_labels_dict', {})
+
+        # plot the radon transform line on the epoch:    
+        for k, v in extant_epochs_collection_dict.items():
+            if v is not None:
+                v.remove()
+        extant_epochs_collection_dict = {}
+        
+        for k, v in extant_epoch_labels_dict.items():
+            if v is not None:
+                v.remove()
+        extant_epoch_labels_dict = {}
+
+
+        # if (extant_epochs_collection is not None):
+        #     # already exists, clear the existing ones. 
+        #     # Let's assume we want to remove the 'Quadratic' line (line2)
+        #     if extant_epochs_collection is not None:
+        #         extant_epochs_collection.remove()
+
+        #     extant_epochs_collection = None
+            
+        #     # Is .clear() needed? Why doesn't it remove the heatmap as well?
+        #     # curr_ax.clear()
+            
+        # if extant_epoch_labels is not None:
+        #     extant_epoch_labels.remove()
+        #     extant_epoch_labels = None
+            
+        ## Plot the line plot. Could update this like I did for the text?        
+        if should_enable_plot:
+            # Most-likely Estimated Position Plots (grey line):
+            # time_window_centers = plots_data.decoded_position_curves_data[data_idx].time_bin_centers
+            # time_window_centers = deepcopy(curr_time_bin_container.centers)
+            # active_most_likely_positions_1D = plots_data.train_test_split_data[data_idx].line_y_most_likely
+            # an_all_test_epochs_df, a_train_epochs, a_test_epochs, a_remerged_laps_dfs = plots_data.train_test_split_data.get_single_epoch_data(epoch_idx=data_idx, decoder_name='long_LR')
+            # a_train_epochs, a_test_epochs, a_remerged_laps_dfs = plots_data.train_test_split_data.get_single_epoch_data(epoch_idx=data_idx)
+            a_train_epochs, a_test_epochs, a_remerged_laps_dfs = plots_data.train_test_split_data.get_single_epoch_data(epoch_start_t=epoch_slice[0])
+            if debug_print:
+                print(f'a_remerged_laps_dfs: {a_remerged_laps_dfs}')
+            # print(f'an_all_test_epochs_df: {an_all_test_epochs_df}')
+            # curr_epochs = a_remerged_laps_dfs[['start', 'stop']].values
+            
+            # if extant_epochs_collection is not None:
+            #     # extant_line.remove()
+            #     raise NotImplementedError()
+            #     # if extant_epochs_collection.axes is None:
+            #     #     # Re-add the line to the axis if necessary
+            #     #     curr_ax.add_artist(extant_epochs_collection)
+            
+            #     # extant_epochs_collection.set_data(time_window_centers, active_most_likely_positions_1D)
+            #     # most_likely_decoded_position_plot = extant_epochs_collection
+            # else:
+            # exception from below: `ValueError: x and y must have same first dimension, but have shapes (4,) and (213,)`
+            if (a_remerged_laps_dfs is not None):
+                # Most likely position plots:
+                # active_filter_epoch_obj = Epoch(a_remerged_laps_dfs)
+                
+                # most_likely_decoded_position_plot, = perform_plot_1D_single_most_likely_position_curve(curr_ax, time_window_centers, active_most_likely_positions_1D, **plot_kwargs)
+                # epochs_collection, epoch_labels = draw_epoch_regions(curr_active_pipeline.sess.epochs, ax, facecolor=('red','cyan'), alpha=0.1, edgecolors=None, labels_kwargs={'y_offset': -0.05, 'size': 14}, defer_render=True, debug_print=False)
+                # laps_epochs_collection, laps_epoch_labels = draw_epoch_regions(curr_active_pipeline.sess.laps.as_epoch_obj(), ax, facecolor='red', edgecolors='black', labels_kwargs={'y_offset': -16.0, 'size':8}, defer_render=True, debug_print=False)
+                # epochs_collection, epoch_labels = draw_epoch_regions(active_filter_epoch_obj, curr_ax, facecolor='orange', edgecolors=None, labels_kwargs=None, defer_render=False, debug_print=False)
+
+                train_epochs_collection, train_epoch_labels = draw_epoch_regions(Epoch(a_train_epochs), curr_ax, facecolor='green', edgecolors=None, labels_kwargs={'y_offset': -0.05, 'size': 14}, defer_render=True, debug_print=False)
+                test_epochs_collection, test_epoch_labels = draw_epoch_regions(Epoch(a_test_epochs), curr_ax, facecolor='orange', edgecolors='black', labels_kwargs={'y_offset': -0.05, 'size': 14}, defer_render=True, debug_print=False)
+                extant_epochs_collection_dict['train'] = train_epochs_collection
+                extant_epochs_collection_dict['test'] = test_epochs_collection
+                extant_epoch_labels_dict['train'] = train_epoch_labels
+                extant_epoch_labels_dict['test'] = test_epoch_labels
+                
+                # curr_ax.axhline(0, color='black')
+                # curr_ax.axvline(0, color'black')
+                
+                # curr_ax.fill_between(t, 1, where=s > 0, facecolor='green', alpha=.5)
+                # curr_ax.fill_between(t, -1, where=s < 0, facecolor='red', alpha=.5)
+
+            else:
+                extant_epochs_collection_dict = {}
+                extant_epoch_labels_dict = {}
+                                
+        else:
+            ## Remove the existing one
+            for k, v in extant_epochs_collection_dict.items():
+                if v is not None:
+                    v.remove()
+            extant_epochs_collection_dict = {}
+            
+            for k, v in extant_epoch_labels_dict.items():
+                if v is not None:
+                    v.remove()
+            extant_epoch_labels_dict = {}
+        
+        # Store the plot objects for future updates:
+        # plots[cls.plots_group_identifier_key][data_idx] = {'epochs_collection':epochs_collection, 'epoch_labels': epoch_labels}
+        plots[cls.plots_group_identifier_key][data_idx] = {'extant_epochs_collection_dict':extant_epochs_collection_dict, 'extant_epoch_labels_dict': extant_epoch_labels_dict}
+        
+        if debug_print:
+            print(f'\t success!')
+
+        # If you are in an interactive environment, you might need to refresh the figure.
+        # curr_ax.figure.canvas.draw()
+
+        return params, plots_data, plots, ui
+
+
+
 # ==================================================================================================================== #
 # Resume Top-level Functions                                                                                           #
 # ==================================================================================================================== #
