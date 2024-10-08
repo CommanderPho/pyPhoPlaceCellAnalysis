@@ -163,22 +163,18 @@ class TrialByTrialActivityWindow:
                 neuron_IDX = curr_included_unit_index
                 curr_cell_identifier_string = f'Cell[{neuron_IDX}]'
             else:
+                ## `has_active_neuron_IDs`
                 neuron_aclu = curr_included_unit_index
-                curr_cell_identifier_string = f'Cell[{neuron_aclu}]'
-                
-            curr_plot_identifier_string = f'pyqtplot_plot_image_array.{curr_cell_identifier_string}'
+                # curr_cell_identifier_string = f'Cell[{neuron_aclu}]'
+                curr_cell_identifier_string = cls.perform_build_single_cell_formatted_descriptor_string(active_one_step_decoder=active_one_step_decoder, aclu=neuron_aclu)
 
+
+            curr_plot_identifier_string = f'pyqtplot_plot_image_array.{curr_cell_identifier_string}'
             # # Pre-filter the data:
             image = _scale_current_placefield_to_acceptable_range(np.squeeze(images[a_linear_index,:,:]), occupancy=occupancy, drop_below_threshold=drop_below_threshold)
 
             # Build the image item:
             img_item = pg.ImageItem(image=image, levels=(0,1))
-            #     # Viewbox version:
-            #     # vb = layout.addViewBox(lockAspect=False)
-            #     # # Build the ImageItem (which I'm guessing is like pg.ImageView) to add the image
-            #     # imv = pg.ImageItem() # Create it with the current image
-            #     # vb.addItem(imv) # add the item to the view box: why do we need the wrapping view box?
-            #     # vb.autoRange()
             
             formatted_title: str = cls.build_formatted_title_string(title=curr_cell_identifier_string)   
             
@@ -190,7 +186,7 @@ class TrialByTrialActivityWindow:
 
             # Set the plot title:
             curr_plot.setTitle(formatted_title)    
-            set_small_title(curr_plot, title_row_fixed_height)
+            set_small_title(curr_plot, title_row_fixed_height) ## title set to a constant height here
             curr_plot.setMouseEnabled(x=False, y=False)
             ## Common formatting:    
         
@@ -288,16 +284,28 @@ class TrialByTrialActivityWindow:
         return f"<span style = 'font-size : 12px;' >{title}</span>"
     
 
-    def build_single_cell_formatted_descriptor_string(self, aclu) -> str:
-        from neuropy.utils.matplotlib_helpers import _build_neuron_identity_label
-        # normal (non-shared mode)
-        # neuron_IDX = curr_included_unit_index
-        # self.plots_data.plot_data_array
+    @classmethod
+    def perform_build_single_cell_formatted_descriptor_string(cls, active_one_step_decoder, aclu) -> str:
+        """ 
+        
+        cls.perform_build_single_cell_formatted_descriptor_string(active_one_step_decoder=override_active_one_step_decoder, aclu=aclu)
+        """
         # neuron_i: int = list(self.plots_data.active_one_step_decoder.included_neuron_IDs).index(aclu)
-        curr_extended_id_string: str = self.plots_data.active_one_step_decoder.ratemap.get_extended_neuron_id_string(neuron_id=aclu)
+        curr_extended_id_string: str = active_one_step_decoder.ratemap.get_extended_neuron_id_string(neuron_id=aclu)
         # final_title_str: str = f"aclu: {aclu}: {curr_extended_id_string}" # _build_neuron_identity_label(neuron_extended_id=curr_extended_id_string, brev_mode=None, formatted_max_value_string=None, use_special_overlayed_title=True)
         final_title_str: str = f"aclu: <span style = 'font-size : 10px;' >{aclu}</span>:\n<span style = 'font-size : 8px;' >{curr_extended_id_string}</span>"
         return final_title_str
+    
+
+    def build_single_cell_formatted_descriptor_string(self, aclu, override_active_one_step_decoder=None) -> str:
+        """ Builds a formatted title for each cell, like "aclu: 19, (shank 2, cluster 22)"
+        
+        self.build_single_cell_formatted_descriptor_string(aclu=neuron_ID, override_active_one_step_decoder=active_one_step_decoder)
+        
+        """
+        if override_active_one_step_decoder is None:
+            override_active_one_step_decoder = self.plots_data.active_one_step_decoder
+        return self.perform_build_single_cell_formatted_descriptor_string(active_one_step_decoder=override_active_one_step_decoder, aclu=aclu)
 
 
     @function_attributes(short_name=None, tags=['reliability', 'decoders', 'all', 'pyqtgraph', 'display', 'figure', 'main'], input_requires=[], output_provides=[], uses=['plot_trial_to_trial_reliability_image_array', 'create_transparent_colormap'], used_by=[], creation_date='2024-08-29 04:34', related_items=[])
@@ -459,7 +467,10 @@ class TrialByTrialActivityWindow:
         # END if is_overlaid_heatmaps_mode                
         parent_root_widget.setWindowTitle('TrialByTrialActivity - trial_to_trial_reliability_all_decoders_image_stack')
 
-
+        # self.plots_data.plot_data_array
+        # self.plots_data.active_one_step_decoder
+        # self.plots_data.active_one_step_decoder.active_neuron_IDs
+        
         _obj = cls()
         ## Build final .plots and .plots_data:
         _obj.plots = RenderPlots(name=name,
