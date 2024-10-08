@@ -255,6 +255,21 @@ class TrialByTrialActivity:
     def aclu_to_stability_score_dict(self) -> Dict[int, NDArray]:
         return dict(zip(self.neuron_ids, self.stability_score))
     
+
+    def sliced_by_neuron_id(self, included_neuron_ids: NDArray) -> "TrialByTrialActivity":
+        _obj = deepcopy(self)
+        assert np.all([(v in _obj.neuron_ids) for v in included_neuron_ids]), f"All included_neuron_ids must already exist in the object: included_neuron_ids: {included_neuron_ids}\n\t_obj.neuron_ids: {_obj.neuron_ids}"
+        n_aclus = len(included_neuron_ids)
+        # is_neuron_id_included = np.isin(included_neuron_ids, _obj.neuron_ids)
+        is_neuron_id_included = np.where(np.isin(included_neuron_ids, _obj.neuron_ids))[0]
+        _obj.z_scored_tuning_map_matrix = _obj.z_scored_tuning_map_matrix[:, is_neuron_id_included, :]
+        _obj.C_trial_by_trial_correlation_matrix = _obj.C_trial_by_trial_correlation_matrix[is_neuron_id_included, :, :]
+        _obj.aclu_to_matrix_IDX_map = dict(zip(included_neuron_ids, np.arange(n_aclus)))
+        _obj.neuron_ids = deepcopy(included_neuron_ids)
+        # z_scored_tuning_map_matrix = deepcopy(z_scored_tuning_map_matrix)
+        return _obj
+    
+
     def __repr__(self):
         """ 2024-01-11 - Renders only the fields and their sizes
         """
