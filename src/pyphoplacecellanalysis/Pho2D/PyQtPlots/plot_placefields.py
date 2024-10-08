@@ -211,7 +211,7 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
     # cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
     # cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
     # color_map = figure_format_config.get('color_map', 'viridis')
-    color_map = figure_format_config.get('color_map', pg.colormap.get('jet','matplotlib'))
+    color_map = figure_format_config.get('color_map', pg.colormap.get('viridis','matplotlib'))
     # color_map = figure_format_config.get('color_map', 'viridis')
     # color_bar_mode = figure_format_config.get('color_bar_mode', 'each')
     color_bar_mode = figure_format_config.get('color_bar_mode', None) # no colorbars rendered  
@@ -223,8 +223,6 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
     included_unit_neuron_IDs = figure_format_config.get('included_unit_neuron_IDs', None)
     scrollability_mode = figure_format_config.get('scrollability_mode', LayoutScrollability.SCROLLABLE) 
     
-    
-
     missing_aclu_string_formatter = figure_format_config.get('missing_aclu_string_formatter', None)
     # missing_aclu_string_formatter: a lambda function that takes the current aclu string and returns a modified string that reflects that this aclu value is missing from the current result (e.g. missing_aclu_string_formatter('3') -> '3 <shared>')
     if missing_aclu_string_formatter is None:
