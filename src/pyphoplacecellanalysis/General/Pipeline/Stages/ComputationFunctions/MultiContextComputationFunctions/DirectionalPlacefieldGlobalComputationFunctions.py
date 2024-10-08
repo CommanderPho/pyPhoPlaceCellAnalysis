@@ -3258,6 +3258,7 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
     """
     from neuropy.core.session.dataSession import Laps
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import PfND
+    # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import compute_weighted_correlations
     # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _check_result_laps_epochs_df_performance
 
     directional_train_test_split_result: TrainTestSplitResult = curr_active_pipeline.global_computation_results.computed_data.get('TrainTestSplit', None)
@@ -3293,6 +3294,9 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
 
     ## Due to a limitation of the merged pseudo2D decoder (`alt_directional_merged_decoders_result.all_directional_pf1D_Decoder`) that prevents `.get_by_id(...)` from working, we have to rebuild the pseudo2D decoder from the four pf1D decoders:
     # restricted_all_directional_decoder_pf1D_dict: Dict[str, BasePositionDecoder] = deepcopy(alt_directional_merged_decoders_result.all_directional_decoder_dict)
+
+
+
     _all_directional_decoder_pf1D_dict: Dict[str, BasePositionDecoder] = deepcopy(train_lap_specific_pf1D_Decoder_dict) # copy the dictionary
     # _all_directional_decoder_pf1D_dict = {k:v.get_by_id(included_neuron_ids) for k,v in _all_directional_decoder_pf1D_dict.items()}
     # _all_directional_decoder_pf1D_dict['long_LR']
@@ -3328,7 +3332,13 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
     #                                                                                                                                  epochs_to_decode_dict=test_epochs_dict, 
     #                                                                                                                                  decoding_time_bin_size=active_laps_decoding_time_bin_size,
     #                                                                                                                                  decoder_and_epoch_keys_independent=False)
-
+    # train_decoded_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {k:v.decoder_result for k, v in test_decoder_results_dict.items()}
+    # weighted_corr_data_dict = compute_weighted_correlations(train_decoded_results_dict, debug_print=True)
+    # # weighted_corr_data_dict
+    # train_decoded_wcorr_df = pd.concat(weighted_corr_data_dict)
+    # train_decoded_wcorr_df
+    # a_decoded_measured_diff_df: pd.DataFrame = test_decoder_results_dict['long_LR'].measured_decoded_position_comparion.decoded_measured_diff_df
+    # train_decoded_measured_diff_df_dict: Dict[types.DecoderName, pd.DataFrame] = {k:v.measured_decoded_position_comparion.decoded_measured_diff_df for k, v in test_decoder_results_dict.items()}
 
     ## Decoding of the test epochs (what matters) for `all_directional_pf1D_Decoder`:
     test_all_directional_decoder_result: CustomDecodeEpochsResult = _do_custom_decode_epochs(global_spikes_df=global_spikes_df, global_measured_position_df=global_measured_position_df,
