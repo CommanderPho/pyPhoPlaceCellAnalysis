@@ -181,7 +181,8 @@ class TrialByTrialActivityWindow:
             # # plot mode:
             curr_plot: pg.PlotItem = root_render_widget.addPlot(row=(curr_row + plots_start_row_idx), col=curr_col, title=formatted_title) # , name=curr_plot_identifier_string 
             curr_plot.setObjectName(curr_plot_identifier_string)
-            curr_plot.showAxes(False)
+            # curr_plot.showAxes(False)
+            curr_plot.showAxes(True)
             curr_plot.setDefaultPadding(0.0)  # plot without padding data range
 
             # Set the plot title:
@@ -281,19 +282,21 @@ class TrialByTrialActivityWindow:
     
     @classmethod
     def build_formatted_title_string(cls, title: str) -> str:
+        """ returns the title of the entire plot
+        """
         return f"<span style = 'font-size : 12px;' >{title}</span>"
     
 
     @classmethod
     def perform_build_single_cell_formatted_descriptor_string(cls, active_one_step_decoder, aclu) -> str:
-        """ 
+        """ Builds a formatted title for each cell, like "aclu: 19, (shank 2, cluster 22)"
         
         cls.perform_build_single_cell_formatted_descriptor_string(active_one_step_decoder=override_active_one_step_decoder, aclu=aclu)
         """
         # neuron_i: int = list(self.plots_data.active_one_step_decoder.included_neuron_IDs).index(aclu)
         curr_extended_id_string: str = active_one_step_decoder.ratemap.get_extended_neuron_id_string(neuron_id=aclu)
         # final_title_str: str = f"aclu: {aclu}: {curr_extended_id_string}" # _build_neuron_identity_label(neuron_extended_id=curr_extended_id_string, brev_mode=None, formatted_max_value_string=None, use_special_overlayed_title=True)
-        final_title_str: str = f"aclu: <span style = 'font-size : 10px;' >{aclu}</span>:\n<span style = 'font-size : 8px;' >{curr_extended_id_string}</span>"
+        final_title_str: str = f"aclu: <span style = 'font-size : 14px;' >{aclu}</span>:\n<span style = 'font-size : 11px;' >{curr_extended_id_string}</span>"
         return final_title_str
     
 
@@ -389,9 +392,6 @@ class TrialByTrialActivityWindow:
         # plot_trial_to_trial_reliability_all_decoders_image_stack
 
         additional_cmaps = {k: ColormapHelpers.create_transparent_colormap(color_literal_name=v, lower_bound_alpha=0.1) for k, v in additional_cmap_names.items()}
-
-        # additional_cmaps = {name: pg.ColorMap(np.array([0.0, 1.0]), np.array([pg.mkColor(color).getRgb()[:3] + (0,), pg.mkColor(color).getRgb()[:3] + (255,)], dtype=np.ubyte)) for name, color in additional_cmap_names.items()}
-
         additional_legend_entries = list(zip(directional_active_lap_pf_results_dicts.keys(), additional_cmap_names.values() )) # ['red', 'purple', 'green', 'orange']
 
         if is_overlaid_heatmaps_mode:
