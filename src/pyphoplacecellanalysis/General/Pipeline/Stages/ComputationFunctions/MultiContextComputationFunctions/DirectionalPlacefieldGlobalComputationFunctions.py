@@ -3279,7 +3279,7 @@ def _do_custom_decode_epochs_dict(global_spikes_df: pd.DataFrame, global_measure
 
 @function_attributes(short_name=None, tags=['TrainTestSplit', 'decode'], input_requires=[], output_provides=[],
                       uses=['_do_custom_decode_epochs', '_check_result_laps_epochs_df_performance', 'DirectionalPseudo2DDecodersResult'], used_by=[], creation_date='2024-10-08 02:35', related_items=[])
-def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_decoding_time_bin_size: float = 1.5, force_recompute_directional_train_test_split_result: bool = False, compute_separate_decoder_results: bool=True):
+def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_decoding_time_bin_size: float=1.5, force_recompute_directional_train_test_split_result: bool=False, compute_separate_decoder_results: bool=True, included_neuron_IDs=None):
     """ 
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _do_train_test_split_decode_and_evaluate
 
@@ -3326,6 +3326,12 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
     test_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = directional_train_test_split_result.test_epochs_dict
     train_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = directional_train_test_split_result.train_epochs_dict
     train_lap_specific_pf1D_Decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = directional_train_test_split_result.train_lap_specific_pf1D_Decoder_dict
+
+
+    if included_neuron_IDs is not None:
+        _alt_directional_train_test_split_result = directional_train_test_split_result.sliced_by_neuron_id(included_neuron_ids=included_neuron_IDs)
+        train_lap_specific_pf1D_Decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = _alt_directional_train_test_split_result.train_lap_specific_pf1D_Decoder_dict
+        
 
     # OUTPUTS: train_test_split_laps_df_dict
 
@@ -3474,6 +3480,17 @@ class TrainTestSplitResult(ComputedResult):
     train_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = serialized_field(default=None)
     train_lap_specific_pf1D_Decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = serialized_field(default=None)
 
+
+
+    def sliced_by_neuron_id(self, included_neuron_ids: NDArray) -> "TrainTestSplitResult":
+        """ refactored out of `self.filtered_by_frate(...)` and `TrackTemplates.determine_decoder_aclus_filtered_by_frate(...)`
+        Only `self.train_lap_specific_pf1D_Decoder_dict` is affected
+        
+        """
+        _obj = deepcopy(self) # temporary copy of the object
+        _obj.train_lap_specific_pf1D_Decoder_dict = {k:v.get_by_id(included_neuron_ids) for k, v in _obj.train_lap_specific_pf1D_Decoder_dict.items()}
+        return _obj
+    
 
 def _workaround_validate_has_directional_train_test_split_result(curr_active_pipeline, computation_filter_name='maze') -> bool:
     """
