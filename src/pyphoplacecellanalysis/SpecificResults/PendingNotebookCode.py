@@ -46,6 +46,183 @@ from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
+# ==================================================================================================================== #
+# 2024-10-08 - Reliability and Active Cell Testing                                                                     #
+# ==================================================================================================================== #
+
+@function_attributes(short_name=None, tags=['long_short', 'firing_rate'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-17 05:22', related_items=['determine_neuron_exclusivity_from_firing_rate'])
+def compute_all_cells_long_short_firing_rate_df(global_spikes_df: pd.DataFrame):
+    """ computes the firing rates for all cells (not just placecells or excitatory cells) for the long and short track periods, and then their differences
+    These firing rates are not spatially binned because they aren't just place cells.
+    
+    columns: ['LS_diff_firing_rate_Hz']: will be positive for Short-preferring cells and negative for Long-preferring ones.
+    
+    Usage:
+    
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_all_cells_long_short_firing_rate_df
+
+        df_combined = compute_all_cells_long_short_firing_rate_df(global_spikes_df=global_spikes_df)
+        df_combined
+
+        print(list(df_combined.columns)) # ['long_num_spikes_count', 'short_num_spikes_count', 'global_num_spikes_count', 'long_firing_rate_Hz', 'short_firing_rate_Hz', 'global_firing_rate_Hz', 'LS_diff_firing_rate_Hz', 'firing_rate_percent_diff']
+        
+    """
+    ## Needs to consider not only place cells but interneurons as well
+    # global_all_spikes_counts # 73 rows
+    # global_spikes_df.aclu.unique() # 108
+
+    ## Split into the pre- and post- delta epochs
+    # global_spikes_df['t_rel_seconds']
+    # global_spikes_df
+
+    # is_theta, is_ripple, maze_id, maze_relative_lap
+
+    ## Split on 'maze_id'
+    # partition
+
+    from pyphocorehelpers.indexing_helpers import partition_df, reorder_columns_relative
+    # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import add_spikes_df_placefield_inclusion_columns
+
+
+    ## INPUTS: global_spikes_df
+
+    ## Compute effective epoch duration by finding the earliest and latest spike in epoch.
+    def _add_firing_rates_from_computed_durations(a_df: pd.DataFrame):
+        spike_times = a_df['t_rel_seconds'].values
+        end_t = np.nanmax(spike_times)
+        start_t = np.nanmin(spike_times)
+        duration_t: float = end_t - start_t    
+        return duration_t, (start_t, end_t)
+
+
+    partitioned_dfs = dict(zip(*partition_df(global_spikes_df, partitionColumn='maze_id'))) # non-maze is also an option, right?
+    long_all_spikes_df: pd.DataFrame = partitioned_dfs[1]
+    short_all_spikes_df: pd.DataFrame = partitioned_dfs[2]
+    
+    ## sum total number of spikes over the entire duration
+    # Performed 1 aggregation grouped on column: 'aclu'
+    long_all_spikes_count_df = long_all_spikes_df.groupby(['aclu']).agg(num_spikes_count=('t_rel_seconds', 'count')).reset_index()[['aclu', 'num_spikes_count']].set_index('aclu')
+    # Performed 1 aggregation grouped on column: 'aclu'
+    short_all_spikes_count_df = short_all_spikes_df.groupby(['aclu']).agg(num_spikes_count=('t_rel_seconds', 'count')).reset_index()[['aclu', 'num_spikes_count']].set_index('aclu')
+
+    ## TODO: exclude replay periods
+
+    ## OUTPUTS: long_all_spikes_count_df, short_all_spikes_count_df
+        
+    long_duration_t, _long_start_end_tuple = _add_firing_rates_from_computed_durations(long_all_spikes_df)
+    long_all_spikes_count_df['firing_rate_Hz'] = long_all_spikes_count_df['num_spikes_count'] / long_duration_t
+
+    short_duration_t, _short_start_end_tuple = _add_firing_rates_from_computed_durations(short_all_spikes_df)
+    short_all_spikes_count_df['firing_rate_Hz'] = short_all_spikes_count_df['num_spikes_count'] / short_duration_t
+
+    global_duration_t: float = long_duration_t + short_duration_t
+    
+    ## OUTPUTS: long_all_spikes_count_df, short_all_spikes_count_df
+
+    # long_all_spikes_count_df
+    # short_all_spikes_count_df
+
+    # Performed 2 aggregations grouped on column: 't_rel_seconds'
+    # long_all_spikes_df[['t_rel_seconds']].agg(t_rel_seconds_min=('t_rel_seconds', 'min'), t_rel_seconds_max=('t_rel_seconds', 'max')).reset_index()
+
+    # short_all_spikes_df[['t_rel_seconds']].agg(t_rel_seconds_min=('t_rel_seconds', 'min'), t_rel_seconds_max=('t_rel_seconds', 'max')).reset_index()
+    # long_all_spikes_df = long_all_spikes_df.groupby(['t_rel_seconds']).agg(t_rel_seconds_min=('t_rel_seconds', 'min'), t_rel_seconds_max=('t_rel_seconds', 'max')).reset_index()
+
+    # Add prefixes to column names
+    df1_prefixed = long_all_spikes_count_df.add_prefix("long_")
+    df2_prefixed = short_all_spikes_count_df.add_prefix("short_")
+
+    # Combine along the index
+    df_combined = pd.concat([df1_prefixed, df2_prefixed], axis=1)
+
+    ## Move the "height" columns to the end
+    # df_combined = reorder_columns_relative(df_combined, column_names=list(filter(lambda column: column.endswith('_firing_rate_Hz'), existing_columns)), relative_mode='end')
+    # df_combined = reorder_columns_relative(df_combined, column_names=['long_firing_rate_Hz', 'short_firing_rate_Hz'], relative_mode='end')
+
+    df_combined = reorder_columns_relative(df_combined, column_names=['long_num_spikes_count', 'short_num_spikes_count', 'long_firing_rate_Hz', 'short_firing_rate_Hz'], relative_mode='end')
+    
+    # ['long_firing_rate_Hz', 'short_firing_rate_Hz', 'long_num_spikes_count', 'short_num_spikes_count', 'LS_diff_firing_rate_Hz', 'firing_rate_percent_diff']
+        
+    ## Compare the differnece between the two periods
+    df_combined['LS_diff_firing_rate_Hz'] = df_combined['long_firing_rate_Hz'] - df_combined['short_firing_rate_Hz']
+    
+    # Calculate the percent difference in firing rate
+    df_combined["firing_rate_percent_diff"] = (df_combined['LS_diff_firing_rate_Hz'] / df_combined["long_firing_rate_Hz"]) * 100
+
+    df_combined['global_num_spikes_count'] = df_combined['long_num_spikes_count'] + df_combined['short_num_spikes_count']
+    df_combined['global_firing_rate_Hz'] = df_combined['global_num_spikes_count'] / global_duration_t
+    
+    df_combined = reorder_columns_relative(df_combined, column_names=['long_num_spikes_count', 'short_num_spikes_count', 'global_num_spikes_count', 'long_firing_rate_Hz', 'short_firing_rate_Hz', 'global_firing_rate_Hz'], relative_mode='start')\
+        
+        
+    # df_combined["long_num_spikes_percent"] = (df_combined['long_num_spikes_count'] / df_combined["global_num_spikes_count"]) * 100
+    # df_combined["short_num_spikes_percent"] = (df_combined['short_num_spikes_count'] / df_combined["global_num_spikes_count"]) * 100
+    
+    # df_combined["firing_rate_percent_diff"] = (df_combined['LS_diff_firing_rate_Hz'] / df_combined["long_firing_rate_Hz"]) * 100
+    
+    
+    return df_combined
+
+@function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-08 10:37', related_items=['compute_all_cells_long_short_firing_rate_df'])
+def determine_neuron_exclusivity_from_firing_rate(df_combined: pd.DataFrame, firing_rate_required_diff_Hz: float = 1.0, maximum_opposite_period_firing_rate_Hz: float = 1.0):
+    """ 
+    firing_rate_required_diff_Hz: float = 1.0 # minimum difference required for a cell to be considered Long- or Short-"preferring"
+    maximum_opposite_period_firing_rate_Hz: float = 1.0 # maximum allowed firing rate in the opposite period to be considered exclusive
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_all_cells_long_short_firing_rate_df, determine_neuron_exclusivity_from_firing_rate
+
+        df_combined = compute_all_cells_long_short_firing_rate_df(global_spikes_df=global_spikes_df)
+        (LpC_df, SpC_df, LxC_df, SxC_df), (LpC_aclus, SpC_aclus, LxC_aclus, SxC_aclus) = determine_neuron_exclusivity_from_firing_rate(df_combined=df_combined, firing_rate_required_diff_Hz=firing_rate_required_diff_Hz, 
+																															   maximum_opposite_period_firing_rate_Hz=maximum_opposite_period_firing_rate_Hz)
+
+        ## Extract the aclus
+        print(f'LpC_aclus: {LpC_aclus}')
+        print(f'SpC_aclus: {SpC_aclus}')
+
+        print(f'LxC_aclus: {LxC_aclus}')
+        print(f'SxC_aclus: {SxC_aclus}')
+
+    """
+    # Sort by column: 'LS_diff_firing_rate_Hz' (ascending)
+    df_combined = df_combined.sort_values(['LS_diff_firing_rate_Hz'])
+    # df_combined = df_combined.sort_values(['firing_rate_percent_diff'])
+    df_combined
+
+    # df_combined['LS_diff_firing_rate_Hz']
+
+    # df_combined['firing_rate_percent_diff']
+
+    LpC_df = df_combined[df_combined['LS_diff_firing_rate_Hz'] > firing_rate_required_diff_Hz]
+    SpC_df = df_combined[df_combined['LS_diff_firing_rate_Hz'] < -firing_rate_required_diff_Hz]
+
+    LxC_df = LpC_df[LpC_df['short_firing_rate_Hz'] <= maximum_opposite_period_firing_rate_Hz]
+    SxC_df = SpC_df[SpC_df['long_firing_rate_Hz'] <= maximum_opposite_period_firing_rate_Hz]
+
+
+    ## Let's consider +/- 50% diff XxC cells
+    # LpC_df = df_combined[df_combined['firing_rate_percent_diff'] > 50.0]
+    # SpC_df = df_combined[df_combined['firing_rate_percent_diff'] < -50.0]
+
+    ## Extract the aclus"
+    LpC_aclus = LpC_df.index.values
+    SpC_aclus = SpC_df.index.values
+
+    print(f'LpC_aclus: {LpC_aclus}')
+    print(f'SpC_aclus: {SpC_aclus}')
+
+    LxC_aclus = LxC_df.index.values
+    SxC_aclus = SxC_df.index.values
+
+    print(f'LxC_aclus: {LxC_aclus}')
+    print(f'SxC_aclus: {SxC_aclus}')
+    
+    ## OUTPUTS: LpC_df, SpC_df, LxC_df, SxC_df
+
+    ## OUTPUTS: LpC_aclus, SpC_aclus, LxC_aclus, SxC_aclus
+    return (LpC_df, SpC_df, LxC_df, SxC_df), (LpC_aclus, SpC_aclus, LxC_aclus, SxC_aclus)
+
 
 # ==================================================================================================================== #
 # 2024-10-04 - Parsing `ProgrammaticDisplayFunctionTesting` output folder                                              #
