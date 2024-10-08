@@ -2662,9 +2662,9 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
 
 
         ## Update the `global_computation_results.computation_config`
-        global_computation_results.computation_config['rank_order_shuffle_analysis'].minimum_inclusion_fr_Hz = minimum_inclusion_fr_Hz
-        global_computation_results.computation_config['rank_order_shuffle_analysis'].included_qclu_values = included_qclu_values
-        global_computation_results.computation_config['rank_order_shuffle_analysis'].num_shuffles = num_shuffles
+        global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz = minimum_inclusion_fr_Hz
+        global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values = included_qclu_values
+        global_computation_results.computation_config.rank_order_shuffle_analysis.num_shuffles = num_shuffles
             
 
         ## Laps Rank-Order Analysis:

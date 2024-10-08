@@ -3590,8 +3590,8 @@ class TrainTestLapsSplitting:
 
         _written_HDF5_manifest_keys = []
 
-        train_test_split_laps_df_dict: Dict[str,pd.DataFrame] = {} # analagoues to `directional_laps_results.split_directional_laps_dict`
-        train_test_split_laps_epoch_obj_dict: Dict[str,Epoch] = {}
+        train_test_split_laps_df_dict: Dict[str, pd.DataFrame] = {} # analagoues to `directional_laps_results.split_directional_laps_dict`
+        train_test_split_laps_epoch_obj_dict: Dict[str, Epoch] = {}
 
         ## Per-Period Outputs
         split_train_test_lap_specific_configs = {}
@@ -5368,9 +5368,9 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         if global_computation_results.computation_config is None:
             raise NotImplementedError(f'global_computation_results.computation_config is None!')
         
-        minimum_inclusion_fr_Hz = global_computation_results.computation_config['rank_order_shuffle_analysis'].minimum_inclusion_fr_Hz
-        # included_qclu_values = global_computation_results.computation_config['rank_order_shuffle_analysis'].included_qclu_values
-        # num_shuffles = global_computation_results.computation_config['rank_order_shuffle_analysis'].num_shuffles
+        minimum_inclusion_fr_Hz = global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+        # included_qclu_values = global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
+        # num_shuffles = global_computation_results.computation_config.rank_order_shuffle_analysis.num_shuffles
         
 
         directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
@@ -5512,8 +5512,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         if global_computation_results.computation_config is None:
             raise NotImplementedError(f'global_computation_results.computation_config is None!')
 
-        minimum_inclusion_fr_Hz: float = global_computation_results.computation_config['rank_order_shuffle_analysis'].minimum_inclusion_fr_Hz
-        # included_qclu_values: List[int] = global_computation_results.computation_config['rank_order_shuffle_analysis'].included_qclu_values
+        minimum_inclusion_fr_Hz: float = global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+        # included_qclu_values: List[int] = global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
 
         # rank_order_results = global_computation_results.computed_data['RankOrder'] # : "RankOrderComputationsContainer"
         # minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
@@ -5636,8 +5636,9 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         if global_computation_results.computation_config is None:
             raise NotImplementedError(f'global_computation_results.computation_config is None!')
 
-        minimum_inclusion_fr_Hz: float = global_computation_results.computation_config['rank_order_shuffle_analysis'].minimum_inclusion_fr_Hz
-        # included_qclu_values: List[int] = global_computation_results.computation_config['rank_order_shuffle_analysis'].included_qclu_values
+        # minimum_inclusion_fr_Hz: float = global_computation_results.computation_config.get('rank_order_shuffle_analysis', {}).get('minimum_inclusion_fr_Hz', None)
+        minimum_inclusion_fr_Hz: float = global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+        # included_qclu_values: List[int] = global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
 
         # rank_order_results = global_computation_results.computed_data['RankOrder'] # : "RankOrderComputationsContainer"
         # minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
@@ -5698,8 +5699,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         if global_computation_results.computation_config is None:
             raise NotImplementedError(f'global_computation_results.computation_config is None!')
 
-        minimum_inclusion_fr_Hz: float = global_computation_results.computation_config['rank_order_shuffle_analysis'].minimum_inclusion_fr_Hz
-        included_qclu_values: List[int] = global_computation_results.computation_config['rank_order_shuffle_analysis'].included_qclu_values
+        minimum_inclusion_fr_Hz: float = global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+        included_qclu_values: List[int] = global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
 
         # rank_order_results = global_computation_results.computed_data['RankOrder'] # : "RankOrderComputationsContainer"
         # minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
@@ -5768,8 +5769,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         if global_computation_results.computation_config is None:
             raise NotImplementedError(f'global_computation_results.computation_config is None!')
         
-        minimum_inclusion_fr_Hz: float = global_computation_results.computation_config['rank_order_shuffle_analysis'].minimum_inclusion_fr_Hz
-        # included_qclu_values: List[int] = global_computation_results.computation_config['rank_order_shuffle_analysis'].included_qclu_values
+        minimum_inclusion_fr_Hz: float = global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+        # included_qclu_values: List[int] = global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
         
         # rank_order_results = global_computation_results.computed_data['RankOrder'] # : "RankOrderComputationsContainer"
         # minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
