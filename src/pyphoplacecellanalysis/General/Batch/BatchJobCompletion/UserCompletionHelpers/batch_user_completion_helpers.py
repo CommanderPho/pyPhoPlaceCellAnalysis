@@ -673,8 +673,9 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
         # `_decode_and_evaluate_epochs_using_directional_decoders` post compute ______________________________________________ #
 
         ## Recompute the epoch scores/metrics such as radon transform and wcorr:
-        (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict), merged_df_outputs_tuple, raw_dict_outputs_tuple = _compute_all_df_score_metrics(an_alt_dir_Pseudo2D_decoders_result, track_templates,
-                                                                                                                                                                                            decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict,
+        (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict), merged_df_outputs_tuple, raw_dict_outputs_tuple = _compute_all_df_score_metrics(directional_merged_decoders_result=an_alt_dir_Pseudo2D_decoders_result, track_templates=track_templates,
+                                                                                                                                                                                            decoder_laps_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict,
+                                                                                                                                                                                            decoder_ripple_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict,
                                                                                                                                                                                             spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df),
                                                                                                                                                                                             should_skip_radon_transform=True, suppress_exceptions=suppress_exceptions)
         
