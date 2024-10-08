@@ -403,7 +403,7 @@ class TrialByTrialActivity:
 
     ## MAIN CALL:
     @classmethod
-    def directional_compute_trial_by_trial_correlation_matrix(cls, active_pf_dt: PfND_TimeDependent, directional_lap_epochs_dict, included_neuron_IDs=None) -> Dict[str, "TrialByTrialActivity"]:
+    def directional_compute_trial_by_trial_correlation_matrix(cls, active_pf_dt: PfND_TimeDependent, directional_lap_epochs_dict, included_neuron_IDs=None) -> Dict[types.DecoderName, "TrialByTrialActivity"]:
         """ 
         
         2024-02-02 - 10pm - Have global version working but want seperate directional versions. Seperately do `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`:
@@ -443,7 +443,7 @@ class TrialByTrialActivity:
 
 
         """
-        directional_active_lap_pf_results_dicts: Dict[str, TrialByTrialActivity] = {}
+        directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity] = {}
 
         # # Cut spikes_df down to only the neuron_IDs that appear at least in one decoder:
         # if included_neuron_IDs is not None:
@@ -468,7 +468,7 @@ class TrialByTrialActivity:
         return directional_active_lap_pf_results_dicts
 
     @classmethod
-    def plot_napari_trial_by_trial_correlation_matrix(cls, directional_active_lap_pf_results_dicts: Dict[str, "TrialByTrialActivity"], include_trial_by_trial_correlation_matrix:bool=True):
+    def plot_napari_trial_by_trial_correlation_matrix(cls, directional_active_lap_pf_results_dicts: Dict[types.DecoderName, "TrialByTrialActivity"], include_trial_by_trial_correlation_matrix:bool=True):
         """ Produces 5 Napari windows to display the trial-by-trial correlation matricies for each of the decoders.
 
         aTbyT:TrialByTrialActivity = a_trial_by_trial_result.directional_active_lap_pf_results_dicts['long_LR']
