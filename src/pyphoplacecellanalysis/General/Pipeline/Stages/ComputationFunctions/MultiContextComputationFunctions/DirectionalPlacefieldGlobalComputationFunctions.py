@@ -1386,7 +1386,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         ripple_marginals_df
 
     @classmethod
-    def build_non_marginalized_raw_posteriors(cls, filter_epochs_decoder_result, debug_print=False):
+    def build_non_marginalized_raw_posteriors(cls, filter_epochs_decoder_result: DecodedFilterEpochsResult, debug_print=False):
         """ only works for the all-directional coder with the four items
         
         Usage:
@@ -1423,7 +1423,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                 print(f'np.shape(curr_unit_posterior_list.p_x_given_n): {np.shape(curr_unit_marginal_x.p_x_given_n)}')
             
             # y-axis marginal:
-            curr_unit_marginal_x.p_x_given_n = np.squeeze(np.sum(a_p_x_given_n, axis=0)) # sum over all x. Result should be [y_bins x time_bins]
+            curr_unit_marginal_x.p_x_given_n = np.squeeze(np.sum(a_p_x_given_n, axis=0)) # sum over all x. Result should be (4, n_epoch_t_bins[i])
             # curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=1, keepdims=True) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
 
             curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n / np.sum(curr_unit_marginal_x.p_x_given_n, axis=0, keepdims=True) # sum over all directions for each time_bin (so there's a normalized distribution at each timestep)
@@ -1648,6 +1648,33 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
         # most_likely_direction_from_decoder
         return track_identity_marginals, track_identity_all_epoch_bins_marginal, most_likely_track_identity_from_decoder, is_most_likely_track_identity_Long
+
+
+    @classmethod
+    def determine_non_marginalized_decoder_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result, debug_print=False):
+        """ 
+        
+        non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df = DirectionalPseudo2DDecodersResult.determine_non_marginalized_decoder_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
+        
+        
+        [(4, 47), (4, 31), (4, 33), ]
+        
+        """
+        non_marginalized_decoder_marginals = cls.build_non_marginalized_raw_posteriors(all_directional_laps_filter_epochs_decoder_result, debug_print=debug_print) # each P-x[i].shape: (4, n_epoch_t_bins[i])
+        
+        # gives the likelihood of [LR, RL] for each epoch using information from both Long/Short:
+        non_marginalized_decoder_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in non_marginalized_decoder_marginals], axis=0) # sum over all time-bins within the epoch to reach a consensus .shape: (4, )
+        # non_marginalized_decoder_all_epoch_bins_marginal.shape: [n_epochs, 4]
+        # Find the indicies via this method:
+        most_likely_decoder_idxs = np.argmax(non_marginalized_decoder_all_epoch_bins_marginal, axis=1) # consistent with 'lap_dir' columns. for LR_dir, values become more positive with time
+        # build the dataframe:
+        assert (np.shape(non_marginalized_decoder_all_epoch_bins_marginal)[1] == 4), f"shape of non_marginalized_decoder_all_epoch_bins_marginal must be 4 (corresponding to the 4 decoders) but instead np.shape(non_marginalized_decoder_all_epoch_bins_marginal): {np.shape(non_marginalized_decoder_all_epoch_bins_marginal)}"
+        non_marginalized_decoder_all_epoch_bins_decoder_probs_df: pd.DataFrame = pd.DataFrame(non_marginalized_decoder_all_epoch_bins_marginal, columns=['long_LR', 'long_RL', 'short_LR', 'short_RL'])
+
+        # most_likely_direction_from_decoder
+        return non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df
+
+
 
     @function_attributes(short_name=None, tags=['ground-truth', 'laps', 'validation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-05 19:23', related_items=['add_groundtruth_information()'])
     @classmethod
@@ -3034,7 +3061,6 @@ class MeasuredDecodedPositionComparison(UnpackableMixin, object):
     
 @define(slots=False)
 class CustomDecodeEpochsResult(UnpackableMixin):
-    """ 
     """ Represents a custom decoding of an Epochs object
     
     Usage:
