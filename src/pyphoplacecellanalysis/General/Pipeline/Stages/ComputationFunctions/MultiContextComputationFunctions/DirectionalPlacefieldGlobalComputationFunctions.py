@@ -4001,6 +4001,55 @@ class TrialByTrialActivityResult(ComputedResult):
         return _flat_z_scored_tuning_map_matrix, _flat_decoder_identity_arr
     
 
+    def build_separated_nan_filled_decoded_epoch_z_scored_tuning_map_matrix(self, enable_C_trial_by_trial_correlation_matrix: bool=False) -> Dict[types.DecoderName, TrialByTrialActivity]:
+        """ Builds a properly stacked `_flat_z_scored_tuning_map_matrix` from the decoder-split versions
+        
+        _flat_z_scored_tuning_map_matrix, _flat_decoder_identity_arr = a_trial_by_trial_result.build_combined_decoded_epoch_z_scored_tuning_map_matrix() # .shape: (n_epochs, n_neurons, n_pos_bins)
+        _flat_z_scored_tuning_map_matrix
+
+        """
+        # self.TrialByTrialActivityResult
+        ## INPUTS: directional_lap_epochs_dict: Dict[types.DecoderName, Epoch]
+        directional_lap_epochs_dict: Dict[types.DecoderName, Epoch] = self.directional_lap_epochs_dict
+        ## ensure the decoder-split versions are sorted, then add the ['decoder_name', 'decoder_relative_idx'] columns to them:
+        for k, v in directional_lap_epochs_dict.items():
+            v._df['decoder_name'] = k
+            # ensure each is sorted within its own decoder:
+            v._df = v._df.sort_values(['start', 'stop', 'label']).reset_index(drop=True)
+            v._df['decoder_relative_idx'] = deepcopy(v._df.index)
+
+        # all_combined_epochs_obj: pd.DataFrame = pd.concat((ensure_dataframe(long_LR_epochs_obj), ensure_dataframe(long_RL_epochs_obj), ensure_dataframe(short_LR_epochs_obj), ensure_dataframe(short_RL_epochs_obj)), axis='index')
+        all_combined_epochs_df: pd.DataFrame = pd.concat([ensure_dataframe(v) for v in directional_lap_epochs_dict.values()], axis='index')
+        # Sort by columns: 'start' (ascending), 'stop' (ascending), 'label' (ascending)
+        all_combined_epochs_df = all_combined_epochs_df.sort_values(['start', 'stop', 'label']).reset_index(drop=True)        
+        all_combined_epochs_df['full_idx'] = deepcopy(all_combined_epochs_df.index.values)
+        
+        # all_combined_epochs_obj
+        n_epochs: int = len(all_combined_epochs_df)
+        modified_directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity] = deepcopy(self.directional_active_lap_pf_results_dicts)
+        
+
+        decoder_epoch_matrix_idx_dict = {str(a_decoder_name):all_combined_epochs_df[all_combined_epochs_df['decoder_name'] == str(a_decoder_name)]['full_idx'].values for a_decoder_name, a_TbyT in modified_directional_active_lap_pf_results_dicts.items()}
+        # Builds a properly stacked `_flat_z_scored_tuning_map_matrix` from the decoder-split versions:
+        # INPUTS: a_trial_by_trial_result, all_combined_epochs_df        
+        for a_decoder_name, a_TbyT in modified_directional_active_lap_pf_results_dicts.items():
+            # z_scored_tuning_map_matrix: ('n_epochs', 'n_neurons', 'n_pos_bins')
+            _orig_z_scored_tuning_map_matrix = deepcopy(a_TbyT.z_scored_tuning_map_matrix)
+            _orig_n_epochs, _orig_n_neurons, _orig_n_pos_bins = np.shape(_orig_z_scored_tuning_map_matrix)
+            a_TbyT.z_scored_tuning_map_matrix = np.full(shape=(n_epochs, _orig_n_neurons, _orig_n_pos_bins), fill_value=np.nan) # fill with NaN
+            a_TbyT.z_scored_tuning_map_matrix[decoder_epoch_matrix_idx_dict[a_decoder_name], :, :] = _orig_z_scored_tuning_map_matrix ## assign the matrix to the rows
+            if enable_C_trial_by_trial_correlation_matrix:
+                # C_trial_by_trial_correlation_matrix: ('n_neurons', 'n_epochs', 'n_epochs')
+                _orig_C_trial_by_trial_correlation_matrix = deepcopy(a_TbyT.C_trial_by_trial_correlation_matrix)
+                a_TbyT.C_trial_by_trial_correlation_matrix = np.full(shape=(_orig_n_neurons, n_epochs, n_epochs), fill_value=np.nan) # fill with NaN
+                a_TbyT.C_trial_by_trial_correlation_matrix[:, np.squeeze(decoder_epoch_matrix_idx_dict[a_decoder_name]), np.squeeze(decoder_epoch_matrix_idx_dict[a_decoder_name])] = _orig_C_trial_by_trial_correlation_matrix ## assign the matrix to the rows
+            
+        ## OUTPUTS: z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix
+        return modified_directional_active_lap_pf_results_dicts
+    
+
+    
+
 
 def _workaround_validate_has_directional_trial_by_trial_activity_result(curr_active_pipeline, computation_filter_name='maze') -> bool:
     """ Validates `_build_trial_by_trial_activity_metrics`
