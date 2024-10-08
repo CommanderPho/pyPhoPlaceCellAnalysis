@@ -50,6 +50,70 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 # 2024-10-08 - Reliability and Active Cell Testing                                                                     #
 # ==================================================================================================================== #
 
+# appearing_or_disappearing_aclus, appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus
+def _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline, active_laps_decoding_time_bin_size: float = 0.25):
+    # Inputs: all_directional_pf1D_Decoder, alt_directional_merged_decoders_result
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestSplitResult, TrainTestLapsSplitting, CustomDecodeEpochsResult, decoder_name, epoch_split_key, get_proper_global_spikes_df, DirectionalPseudo2DDecodersResult
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _do_train_test_split_decode_and_evaluate
+    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import PfND
+    from neuropy.core.session.dataSession import Laps
+    # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _check_result_laps_epochs_df_performance
+
+    t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
+
+    def _add_extra_epochs_df_columns(epochs_df: pd.DataFrame):
+        """ captures: global_session, t_start, t_delta, t_end
+        """
+        epochs_df = epochs_df.sort_values(['start', 'stop', 'label']).reset_index(drop=True) # Sort by columns: 'start' (ascending), 'stop' (ascending), 'label' (ascending)
+        epochs_df = epochs_df.drop_duplicates(subset=['start', 'stop', 'label'])
+        epochs_df = epochs_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
+        epochs_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=epochs_df, global_session=deepcopy(global_session), replace_existing=True)
+        return epochs_df
+
+    directional_train_test_split_result: TrainTestSplitResult = curr_active_pipeline.global_computation_results.computed_data.get('TrainTestSplit', None)
+    force_recompute_directional_train_test_split_result: bool = False
+    if (directional_train_test_split_result is None) or force_recompute_directional_train_test_split_result:
+        ## recompute
+        print(f"'TrainTestSplit' not computed, recomputing...")
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_train_test_split'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+        directional_train_test_split_result: TrainTestSplitResult = curr_active_pipeline.global_computation_results.computed_data['TrainTestSplit']
+        assert directional_train_test_split_result is not None, f"faiiled even after recomputation"
+        print('\tdone.')
+
+    training_data_portion: float = directional_train_test_split_result.training_data_portion
+    test_data_portion: float = directional_train_test_split_result.test_data_portion
+    print(f'training_data_portion: {training_data_portion}, test_data_portion: {test_data_portion}')
+
+    test_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = directional_train_test_split_result.test_epochs_dict
+    train_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = directional_train_test_split_result.train_epochs_dict
+    train_lap_specific_pf1D_Decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = directional_train_test_split_result.train_lap_specific_pf1D_Decoder_dict
+    # OUTPUTS: train_test_split_laps_df_dict
+    
+    # MAIN _______________________________________________________________________________________________________________ #
+    
+    # active_laps_decoding_time_bin_size: float = 2.5
+    # active_laps_decoding_time_bin_size: float = 5.5
+    complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results = _do_train_test_split_decode_and_evaluate(curr_active_pipeline=curr_active_pipeline, active_laps_decoding_time_bin_size=active_laps_decoding_time_bin_size,
+                                                                                                                                                                                                                                                  force_recompute_directional_train_test_split_result=False, compute_separate_decoder_results=True)
+    (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = complete_decoded_context_correctness_tuple
+    print(f"percent_laps_track_identity_estimated_correctly: {round(percent_laps_track_identity_estimated_correctly*100.0, ndigits=3)}%")
+
+    if _out_separate_decoder_results is not None:
+        assert len(_out_separate_decoder_results) == 3, f"_out_separate_decoder_results: {_out_separate_decoder_results}"
+        test_decoder_results_dict, train_decoded_results_dict, train_decoded_measured_diff_df_dict = _out_separate_decoder_results
+        ## OUTPUTS: test_decoder_results_dict, train_decoded_results_dict
+    _remerged_laps_dfs_dict = {}
+    for a_decoder_name, a_test_epochs_df in test_epochs_dict.items():
+        a_train_epochs_df = train_epochs_dict[a_decoder_name]
+        a_train_epochs_df['test_train_epoch_type'] = 'train'
+        a_test_epochs_df['test_train_epoch_type'] = 'test'
+        _remerged_laps_dfs_dict[a_decoder_name] = pd.concat([a_train_epochs_df, a_test_epochs_df], axis='index')
+        _remerged_laps_dfs_dict[a_decoder_name] = _add_extra_epochs_df_columns(epochs_df=_remerged_laps_dfs_dict[a_decoder_name])
+
+
+
 @function_attributes(short_name=None, tags=['long_short', 'firing_rate'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-17 05:22', related_items=['determine_neuron_exclusivity_from_firing_rate'])
 def compute_all_cells_long_short_firing_rate_df(global_spikes_df: pd.DataFrame):
     """ computes the firing rates for all cells (not just placecells or excitatory cells) for the long and short track periods, and then their differences
