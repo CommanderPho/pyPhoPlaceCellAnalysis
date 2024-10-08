@@ -3298,22 +3298,8 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
 
     # OUTPUTS: test_epochs_dict, train_epochs_dict, train_lap_specific_pf1D_Decoder_dict
 
-    # ## Get test epochs:
-    # train_epoch_names: List[str] = [k for k in train_test_split_laps_df_dict.keys() if k.endswith('_train')]
-    # test_epoch_names: List[str] = [k for k in train_test_split_laps_df_dict.keys() if k.endswith('_test')]
-    # train_lap_specific_pf1D_Decoder_dict: Dict[str,BasePositionDecoder] = {k.split('_train', maxsplit=1)[0]:split_train_test_lap_specific_pf1D_Decoder_dict[k] for k in train_epoch_names} # the `k.split('_train', maxsplit=1)[0]` part just gets the original key like 'long_LR'
-    # test_epochs_dict: Dict[str,Epoch] = {k.split('_test', maxsplit=1)[0]:v for k,v in train_test_split_laps_epoch_obj_dict.items() if k.endswith('_test')} # the `k.split('_test', maxsplit=1)[0]` part just gets the original key like 'long_LR'
-
-    # a_training_test_split_laps_epoch_obj_dict[a_training_test_names[0]].to_hdf('output/laps_train_test_split.h5', f'{a_train_epoch_name}/laps_training_df')
-
-    ## Due to a limitation of the merged pseudo2D decoder (`alt_directional_merged_decoders_result.all_directional_pf1D_Decoder`) that prevents `.get_by_id(...)` from working, we have to rebuild the pseudo2D decoder from the four pf1D decoders:
-    # restricted_all_directional_decoder_pf1D_dict: Dict[str, BasePositionDecoder] = deepcopy(alt_directional_merged_decoders_result.all_directional_decoder_dict)
-
-
     # MERGED all_directional decoder _____________________________________________________________________________________ #
     _all_directional_decoder_pf1D_dict: Dict[str, BasePositionDecoder] = deepcopy(train_lap_specific_pf1D_Decoder_dict) # copy the dictionary
-    # _all_directional_decoder_pf1D_dict = {k:v.get_by_id(included_neuron_ids) for k,v in _all_directional_decoder_pf1D_dict.items()}
-    # _all_directional_decoder_pf1D_dict['long_LR']
     _all_directional_decoder_pf1D_dict: Dict[str, PfND] = {k:v.pf for k, v in deepcopy(train_lap_specific_pf1D_Decoder_dict).items()} # copy the dictionary
     all_directional_pf1D: PfND = PfND.build_merged_directional_placefields(_all_directional_decoder_pf1D_dict, debug_print=False) # `PfND.build_merged_directional_placefields`
     all_directional_pf1D_Decoder: BasePositionDecoder = BasePositionDecoder(all_directional_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
@@ -3321,22 +3307,9 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
     ## Get test_epochs that are applicable to any decoder:
     all_test_epochs_df: pd.DataFrame = pd.concat([v for v in test_epochs_dict.values()], axis='index')
     all_test_epochs_df = _add_extra_epochs_df_columns(epochs_df=ensure_dataframe(all_test_epochs_df))
-    # all_test_epochs_df = all_test_epochs_df.sort_values(['start', 'stop', 'label']).reset_index(drop=True) # Sort by columns: 'start' (ascending), 'stop' (ascending), 'label' (ascending)
-    # all_test_epochs_df = all_test_epochs_df.drop_duplicates(subset=['start', 'stop', 'label'])    
-    # all_test_epochs_df = all_test_epochs_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
-    # all_test_epochs_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=all_test_epochs_df, global_session=deepcopy(global_session), replace_existing=True)
-    # all_test_epochs_df
-
     ## OUTPUTS: alt_directional_merged_decoders_result, all_directional_pf1D_Decoder, all_test_epochs_df
 
-    # global_session = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name])
-    # _new_all_test_epochs_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=deepcopy(all_test_epochs_df), global_session=deepcopy(global_session), replace_existing=False)
-
-    # global_spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline)
-    # global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']) # computation_result.sess.position.to_dataframe(), ... Also the -1 sentinal values (when NaN isn't used) needs to be considered
-
     ## Decode Laps - DecodedFilterEpochsResult
-
     if compute_separate_decoder_results:    
         # INPUTS: flat_epochs_to_decode_dict, active_laps_decoding_time_bin_size
         test_epochs_dict = {k:_add_extra_epochs_df_columns(epochs_df=ensure_dataframe(v)) for k, v in test_epochs_dict.items()}
