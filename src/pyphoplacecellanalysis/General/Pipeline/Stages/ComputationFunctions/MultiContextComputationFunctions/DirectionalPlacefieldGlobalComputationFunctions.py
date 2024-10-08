@@ -4267,7 +4267,77 @@ class TrialByTrialActivityResult(ComputedResult):
         return modified_directional_active_lap_pf_results_dicts
     
 
+    @classmethod    
+    def determine_neuron_stability(cls, stability_df: pd.DataFrame, minimum_one_point_stability: float = 0.6, zero_point_stability: float = 0.1):
+        """ try to determine the LxC/SxC remapping cells from their stability 
+        """
+        from numpy import sort
+        
+        stability_df['long_best'] = stability_df[['long_LR', 'long_RL']].max(axis=1, skipna=True)
+        stability_df['short_best'] = stability_df[['short_LR', 'short_RL']].max(axis=1, skipna=True)
+        stability_df = stability_df.sort_values(['long_best'], ascending=True)
+
+        ## find effectively zero (unstable/no-pf) cells:    
+        unstable_long = (stability_df['long_best'] <= zero_point_stability)
+        unstable_short = (stability_df['short_best'] <= zero_point_stability)
+
+        ## NOTE that `stable_*` is not the negation of `unstable_*` because they require a minimum `one_point_stability`
+        stable_long = (stability_df['long_best'] >= minimum_one_point_stability)
+        stable_short = (stability_df['short_best'] >= minimum_one_point_stability)
+
+        # stable_long = np.logical_not(unstable_long)
+        # stable_short = np.logical_not(unstable_short)
+
+        # is_appearing = np.logical_and(unstable_long, np.logical_not(unstable_short))
+        is_appearing = np.logical_and(unstable_long, stable_short)
+        appearing_stability_df = stability_df[is_appearing]
+        appearing_aclus = appearing_stability_df.aclu.values
+
+        is_disappearing = np.logical_and(stable_long, unstable_short)
+        disappearing_stability_df = stability_df[is_disappearing]
+        disappearing_aclus = disappearing_stability_df.aclu.values
+
+        ## OUTPUTS: appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus
+        # appearing_aclus, disappearing_aclus
+        # appearing_stability_df
+        # disappearing_stability_df
+
+        # unstable_changing = np.logical_xor(unstable_long, unstable_short)
+        # unstable_changing
+
+        appearing_or_disappearing_aclus = (disappearing_aclus.tolist() + appearing_aclus.tolist())
+        appearing_or_disappearing_aclus = sort(appearing_or_disappearing_aclus)
+        # override_active_neuron_IDs.extend(appearing_aclus)
+        # override_active_neuron_IDs # [ 3 11 14 15 24 34 35 51 58 67 74 82]
+        return appearing_or_disappearing_aclus, appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus
+
+
+    def get_stability_df(self):
+        """ 
+        Usage:
+        
+            stability_df, stability_dict = a_trial_by_trial_result.get_stability_df()
+        
+        """
+        # directional_lap_epochs_dict: Dict[str, Epoch] = self.directional_lap_epochs_dict
+        stability_dict = {k:list(v.aclu_to_stability_score_dict.values()) for k,v in self.directional_active_lap_pf_results_dicts.items()}
+        stability_df: pd.DataFrame = pd.DataFrame({'aclu': self.any_decoder_neuron_IDs, **stability_dict})
+        return stability_df, stability_dict
     
+    def get_cell_stability_info(self, minimum_one_point_stability: float = 0.6, zero_point_stability: float = 0.1):
+        """ 
+        
+        Usage:
+            stability_df, stability_dict = a_trial_by_trial_result.get_stability_df()
+            appearing_or_disappearing_aclus, appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus = a_trial_by_trial_result.get_cell_stability_info(minimum_one_point_stability=0.6, zero_point_stability=0.1)
+            override_active_neuron_IDs = deepcopy(appearing_or_disappearing_aclus)
+            override_active_neuron_IDs
+
+
+        """
+        stability_df, stability_dict = self.get_stability_df()
+        return TrialByTrialActivityResult.determine_neuron_stability(stability_df=stability_df, minimum_one_point_stability=minimum_one_point_stability, zero_point_stability=zero_point_stability)
+        
 
 
 def _workaround_validate_has_directional_trial_by_trial_activity_result(curr_active_pipeline, computation_filter_name='maze') -> bool:
