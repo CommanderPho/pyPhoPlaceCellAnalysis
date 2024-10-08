@@ -3006,13 +3006,32 @@ from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
 from neuropy.core.epoch import Epoch, ensure_dataframe
 from neuropy.utils.efficient_interval_search import convert_PortionInterval_to_epochs_df
 
-DecodedContextCorrectnessArraysTuple = attrs.make_class("DecodedContextCorrectnessArraysTuple", {k:field() for k in ("is_decoded_track_correct", "is_decoded_dir_correct", "are_both_decoded_properties_correct")}, bases=(UnpackableMixin, object,))
-PercentDecodedContextCorrectnessTuple = attrs.make_class("PercentDecodedContextCorrectnessTuple", {k:field() for k in ("percent_laps_track_identity_estimated_correctly", "percent_laps_direction_estimated_correctly", "percent_laps_estimated_correctly")}, bases=(UnpackableMixin, object,))
-CompleteDecodedContextCorrectness = attrs.make_class("CompleteDecodedContextCorrectness", {k:field() for k in ("correctness_arrays_tuple", "percent_correct_tuple")}, bases=(UnpackableMixin, object,))
 
 # 2024-04-04 - Continued Decoder Error Assessment ____________________________________________________________________ #
-MeasuredDecodedPositionComparison = attrs.make_class("MeasuredDecodedPositionComparison", {k:field() for k in ("measured_positions_dfs_list", "decoded_positions_df_list", "decoded_measured_diff_df")}, bases=(UnpackableMixin, object,))
 
+@define(slots=False, repr=False, eq=False)
+class DecodedContextCorrectnessArraysTuple(UnpackableMixin, object):
+    is_decoded_track_correct: bool = field()
+    is_decoded_dir_correct: bool = field()
+    are_both_decoded_properties_correct: bool = field()
+    
+@define(slots=False, repr=False, eq=False)
+class PercentDecodedContextCorrectnessTuple(UnpackableMixin, object):
+    percent_laps_track_identity_estimated_correctly: float = field()
+    percent_laps_direction_estimated_correctly: float = field()
+    percent_laps_estimated_correctly: float = field()
+
+@define(slots=False, repr=False, eq=False)
+class CompleteDecodedContextCorrectness(UnpackableMixin, object):
+    correctness_arrays_tuple: Tuple = field()
+    percent_correct_tuple: Tuple = field()
+
+@define(slots=False, repr=False, eq=False)
+class MeasuredDecodedPositionComparison(UnpackableMixin, object):
+	measured_positions_dfs_list: List[pd.DataFrame] = field()
+	decoded_positions_df_list: List[pd.DataFrame] = field()
+	decoded_measured_diff_df: pd.DataFrame = field()
+    
 @define(slots=False)
 class CustomDecodeEpochsResult(UnpackableMixin):
     """ 
