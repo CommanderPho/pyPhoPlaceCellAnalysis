@@ -3243,19 +3243,24 @@ def _do_custom_decode_epochs_dict(global_spikes_df: pd.DataFrame, global_measure
 
 
 @function_attributes(short_name=None, tags=['TrainTestSplit', 'decode'], input_requires=[], output_provides=[],
-                      uses=['_check_result_laps_epochs_df_performance', 'DirectionalPseudo2DDecodersResult'], used_by=[], creation_date='2024-10-08 02:35', related_items=[])
-def _do_decode_and_test(curr_active_pipeline, active_laps_decoding_time_bin_size: float = 1.5):
+                      uses=['_do_custom_decode_epochs', '_check_result_laps_epochs_df_performance', 'DirectionalPseudo2DDecodersResult'], used_by=[], creation_date='2024-10-08 02:35', related_items=[])
+def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_decoding_time_bin_size: float = 1.5, force_recompute_directional_train_test_split_result: bool = False):
     """ 
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _do_decode_and_test
-    
-    
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _do_train_test_split_decode_and_evaluate
+
+    # active_laps_decoding_time_bin_size: float = 0.25
+    active_laps_decoding_time_bin_size: float = 2.5
+    complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, all_directional_laps_filter_epochs_decoder_result = _do_train_test_split_decode_and_evaluate(curr_active_pipeline=curr_active_pipeline, active_laps_decoding_time_bin_size=active_laps_decoding_time_bin_size, force_recompute_directional_train_test_split_result=False)
+
+    (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = complete_decoded_context_correctness_tuple
+    percent_laps_track_identity_estimated_correctly
+
     """
     from neuropy.core.session.dataSession import Laps
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import PfND
     # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _check_result_laps_epochs_df_performance
 
     directional_train_test_split_result: TrainTestSplitResult = curr_active_pipeline.global_computation_results.computed_data.get('TrainTestSplit', None)
-    force_recompute_directional_train_test_split_result: bool = True
     if (directional_train_test_split_result is None) or force_recompute_directional_train_test_split_result:
         ## recompute
         print(f"'TrainTestSplit' not computed, recomputing...")
@@ -3288,7 +3293,7 @@ def _do_decode_and_test(curr_active_pipeline, active_laps_decoding_time_bin_size
 
     ## Copy the default result:
     directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
-    alt_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = deepcopy(directional_merged_decoders_result)
+    # alt_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = deepcopy(directional_merged_decoders_result)
     # included_neuron_ids = deepcopy(alt_directional_merged_decoders_result.all_directional_pf1D_Decoder.neuron_IDs)
     # included_neuron_ids
 
@@ -3313,18 +3318,14 @@ def _do_decode_and_test(curr_active_pipeline, active_laps_decoding_time_bin_size
     # modified_decoder = alt_directional_merged_decoders_result.all_directional_pf1D_Decoder.get_by_id(included_aclus)
 
     ## Set the result:
-    ## sets `alt_directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result`, `alt_directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result``
-    alt_directional_merged_decoders_result.all_directional_pf1D_Decoder = all_directional_pf1D_Decoder
-    all_directional_pf1D_Decoder = alt_directional_merged_decoders_result.all_directional_pf1D_Decoder
+    # ## sets `alt_directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result`, `alt_directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result``
+    # alt_directional_merged_decoders_result.all_directional_pf1D_Decoder = all_directional_pf1D_Decoder
+    # all_directional_pf1D_Decoder = alt_directional_merged_decoders_result.all_directional_pf1D_Decoder
 
     ## OUTPUTS: alt_directional_merged_decoders_result, all_directional_pf1D_Decoder, all_test_epochs_df
     t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
     global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
-    # laps_obj: Laps = curr_active_pipeline.sess.laps
-    # laps_df = laps_obj.to_dataframe()
-    # laps_df = laps_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
-    # laps_df
     all_test_epochs_df = all_test_epochs_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
     
     # global_session = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name])
@@ -3354,20 +3355,22 @@ def _do_decode_and_test(curr_active_pipeline, active_laps_decoding_time_bin_size
     ## sets `alt_directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result`, `alt_directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result``
     ## Decode Laps - DecodedFilterEpochsResult
     # alt_directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result = all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df), filter_epochs=global_any_laps_epochs_obj, decoding_time_bin_size=laps_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
-    alt_directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result = test_all_directional_decoder_result.decoder_result # all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df), filter_epochs=global_any_laps_epochs_obj, decoding_time_bin_size=laps_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
+    # alt_directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result = test_all_directional_decoder_result.decoder_result # all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df), filter_epochs=global_any_laps_epochs_obj, decoding_time_bin_size=laps_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
 
     ## Post Compute Validations:
-    alt_directional_merged_decoders_result.perform_compute_marginals()
+    # alt_directional_merged_decoders_result.perform_compute_marginals()
 
     ## INPUTS: test_all_directional_decoder_result
     all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult = test_all_directional_decoder_result.decoder_result
     (laps_directional_marginals_tuple, laps_track_identity_marginals_tuple, laps_non_marginalized_decoder_marginals_tuple), laps_marginals_df = all_directional_laps_filter_epochs_decoder_result.compute_marginals(epoch_idx_col_name='lap_idx', epoch_start_t_col_name='lap_start_t',
                                                                                                                                                                     additional_transfer_column_names=['start','stop','label','duration','lap_id','lap_dir','maze_id','is_LR_dir'])
 
+    # non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df = laps_non_marginalized_decoder_marginals_tuple # to unpack
+    
+
     # all_directional_laps_filter_epochs_decoder_result.active_filter_epochs
-    all_directional_laps_filter_epochs_decoder_result.filter_epochs
-    epochs_non_marginalized_decoder_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_non_marginalized_decoder_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result, debug_print=False)
-    non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df = epochs_non_marginalized_decoder_marginals_tuple
+    # all_directional_laps_filter_epochs_decoder_result.filter_epochs
+
 
     # np.shape(non_marginalized_decoder_marginals) # (80, 2) (n_epochs, 2)
     # np.shape(non_marginalized_decoder_all_epoch_bins_marginal) # (n_epochs, 4)
@@ -3376,31 +3379,32 @@ def _do_decode_and_test(curr_active_pipeline, active_laps_decoding_time_bin_size
     # non_marginalized_decoder_all_epoch_bins_decoder_probs_df
 
     
-    result_laps_epochs_df: pd.DataFrame = deepcopy(laps_marginals_df)
+    # laps_marginals_df: pd.DataFrame = deepcopy(laps_marginals_df)
     # result_laps_epochs_df: pd.DataFrame = add_groundtruth_information(curr_active_pipeline, a_directional_merged_decoders_result=alt_directional_merged_decoders_result)
     # result_laps_epochs_df: pd.DataFrame = alt_directional_merged_decoders_result.add_groundtruth_information(curr_active_pipeline)
-    if 'is_most_likely_track_identity_Long' not in result_laps_epochs_df.columns:
-        result_laps_epochs_df['is_most_likely_track_identity_Long'] = (result_laps_epochs_df['P_Long'] >= 0.5)
-    if 'is_most_likely_direction_LR' not in result_laps_epochs_df.columns:
-        result_laps_epochs_df['is_most_likely_direction_LR'] = (result_laps_epochs_df['P_LR'] >= 0.5)
+    if 'is_most_likely_track_identity_Long' not in laps_marginals_df.columns:
+        laps_marginals_df['is_most_likely_track_identity_Long'] = (laps_marginals_df['P_Long'] >= 0.5)
+    if 'is_most_likely_direction_LR' not in laps_marginals_df.columns:
+        laps_marginals_df['is_most_likely_direction_LR'] = (laps_marginals_df['P_LR'] >= 0.5)
 
     ## ['is_LR_dir', ]
     # result_laps_epochs_df['is_LR_dir'] = (result_laps_epochs_df['lap_dir'] > 0)
-
 
     # laps_decoding_time_bin_size = alt_directional_merged_decoders_result.laps_decoding_time_bin_size
     # print(f'laps_decoding_time_bin_size: {laps_decoding_time_bin_size}')
 
     ## Uses only 'result_laps_epochs_df'
-    complete_decoded_context_correctness_tuple = _check_result_laps_epochs_df_performance(result_laps_epochs_df)
+    complete_decoded_context_correctness_tuple = _check_result_laps_epochs_df_performance(laps_marginals_df)
 
     # Unpack like:
-    (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = complete_decoded_context_correctness_tuple
+    # (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = complete_decoded_context_correctness_tuple
     # complete_decoded_context_correctness_tuple
     # percent_laps_track_identity_estimated_correctly
     # percent_laps_direction_estimated_correctly
     # percent_laps_estimated_correctly
-    return complete_decoded_context_correctness_tuple, result_laps_epochs_df
+    
+    ## OUTPUTS: all_directional_pf1D_Decoder
+    return complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, all_directional_laps_filter_epochs_decoder_result
 
 
 
