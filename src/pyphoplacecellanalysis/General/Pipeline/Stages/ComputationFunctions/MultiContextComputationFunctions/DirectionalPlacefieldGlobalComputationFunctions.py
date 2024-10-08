@@ -3958,6 +3958,49 @@ class TrialByTrialActivityResult(ComputedResult):
         return f"{type(self).__name__}({content}\n)"
     
 
+    def build_combined_decoded_epoch_z_scored_tuning_map_matrix(self) -> Tuple[NDArray, List[types.DecoderName]]:
+        """ Builds a properly stacked `_flat_z_scored_tuning_map_matrix` from the decoder-split versions
+        
+        _flat_z_scored_tuning_map_matrix, _flat_decoder_identity_arr = a_trial_by_trial_result.build_combined_decoded_epoch_z_scored_tuning_map_matrix() # .shape: (n_epochs, n_neurons, n_pos_bins)
+        _flat_z_scored_tuning_map_matrix
+
+        """
+        # self.TrialByTrialActivityResult
+        ## INPUTS: directional_lap_epochs_dict: Dict[types.DecoderName, Epoch]
+        directional_lap_epochs_dict: Dict[types.DecoderName, Epoch] = self.directional_lap_epochs_dict
+        ## ensure the decoder-split versions are sorted, then add the ['decoder_name', 'decoder_relative_idx'] columns to them:
+        for k, v in directional_lap_epochs_dict.items():
+            v._df['decoder_name'] = k
+            # ensure each is sorted within its own decoder:
+            v._df = v._df.sort_values(['start', 'stop', 'label']).reset_index(drop=True)
+            v._df['decoder_relative_idx'] = deepcopy(v._df.index)
+
+        # all_combined_epochs_obj: pd.DataFrame = pd.concat((ensure_dataframe(long_LR_epochs_obj), ensure_dataframe(long_RL_epochs_obj), ensure_dataframe(short_LR_epochs_obj), ensure_dataframe(short_RL_epochs_obj)), axis='index')
+        all_combined_epochs_df: pd.DataFrame = pd.concat([ensure_dataframe(v) for v in directional_lap_epochs_dict.values()], axis='index')
+        # Sort by columns: 'start' (ascending), 'stop' (ascending), 'label' (ascending)
+        all_combined_epochs_df = all_combined_epochs_df.sort_values(['start', 'stop', 'label']).reset_index(drop=True)
+        # all_combined_epochs_obj
+        
+        # Builds a properly stacked `_flat_z_scored_tuning_map_matrix` from the decoder-split versions:
+        # INPUTS: a_trial_by_trial_result, all_combined_epochs_df
+        _flat_z_scored_tuning_map_matrix = []
+        _flat_decoder_identity_arr: List[types.DecoderName] = []
+        # _flat_C_trial_by_trial_correlation_matrix = []
+        for a_row in all_combined_epochs_df.itertuples():
+            ## do I need `aclu_to_matrix_IDX_map` to properly map to the matrix indicies?
+            curr_decoder_name: str = str(a_row.decoder_name)
+            a_matrix_idx: int = int(a_row.decoder_relative_idx) ## direct
+            # curr_aclu_to_matrix_IDX_map = a_trial_by_trial_result.directional_active_lap_pf_results_dicts[curr_decoder_name].aclu_to_matrix_IDX_map
+            # a_matrix_idx: int = curr_aclu_to_matrix_IDX_map[int(a_row.decoder_relative_idx)] ## aclu-based        
+            a_matrix_out_row = self.directional_active_lap_pf_results_dicts[curr_decoder_name].z_scored_tuning_map_matrix[a_matrix_idx, :, :] # .shape (n_epochs, n_neurons, n_pos_bins) 
+            _flat_z_scored_tuning_map_matrix.append(a_matrix_out_row)
+            _flat_decoder_identity_arr.append(curr_decoder_name)
+            
+        _flat_z_scored_tuning_map_matrix = np.stack(_flat_z_scored_tuning_map_matrix, axis=0) # .shape (n_epochs, n_neurons, n_pos_bins)
+        ## OUTPUTS: _flat_z_scored_tuning_map_matrix
+        return _flat_z_scored_tuning_map_matrix, _flat_decoder_identity_arr
+    
+
 
 def _workaround_validate_has_directional_trial_by_trial_activity_result(curr_active_pipeline, computation_filter_name='maze') -> bool:
     """ Validates `_build_trial_by_trial_activity_metrics`
