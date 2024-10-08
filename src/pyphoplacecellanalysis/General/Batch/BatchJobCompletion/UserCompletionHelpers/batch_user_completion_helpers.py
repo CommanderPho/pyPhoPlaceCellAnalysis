@@ -1,6 +1,7 @@
 from copy import deepcopy
 import shutil
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from neuropy.analyses import Epoch
 from neuropy.core.epoch import ensure_dataframe
 from typing_extensions import TypeAlias
 from nptyping import NDArray
@@ -1856,246 +1857,288 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
 
 
 
-# @function_attributes(short_name=None, tags=['TrialByTrialActivityResult'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-08 16:07', related_items=[])
-# def compute_and_export_session_trial_by_trial_performance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-#                                                                              save_hdf:bool=True, save_across_session_hdf:bool=False) -> dict:
-#     """  Extracts peak information for the placefields for each neuron
-#     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import reload_exported_kdiba_session_position_info_mat_completion_function
+@function_attributes(short_name=None, tags=['TrialByTrialActivityResult'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-08 16:07', 
+                     requires_global_keys=['DirectionalLaps'], provides_global_keys=['DirectionalMergedDecoders'], related_items=[])
+def compute_and_export_session_trial_by_trial_performance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
+                                                                              active_laps_decoding_time_bin_size: float = 0.25, save_hdf:bool=True, save_across_session_hdf:bool=False) -> dict:
+    """  Extracts peak information for the placefields for each neuron
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_session_trial_by_trial_performance_completion_function
     
-#     Results can be extracted from batch output by 
+    Results can be extracted from batch output by 
+   
+    Unpacking:
     
-#     # Extracts the callback results 'compute_and_export_session_extended_placefield_peak_information_completion_function':
-#     extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('compute_and_export_session_extended_placefield_peak_information_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
+        callback_outputs = _across_session_results_extended_dict['compute_and_export_session_trial_by_trial_performance_completion_function']
+        a_trial_by_trial_result = callback_outputs['a_trial_by_trial_result']
+        subset_neuron_IDs_dict = callback_outputs['subset_neuron_IDs_dict']
+        subset_decode_results_dict = callback_outputs['subset_decode_results_dict']
+        subset_decode_results_track_id_correct_performance_dict = callback_outputs['subset_decode_results_track_id_correct_performance_dict']
+        subset_neuron_IDs_dict
 
 
-#     """
-#     import sys
-#     from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
-#     from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
-#     from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
-#     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult
+    """
+    import sys
+    from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
+    from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
+    from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult
 
-#     from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
-#     from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
-#     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrialByTrialActivityResult
-#     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _perform_run_rigorous_decoder_performance_assessment
+    from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
+    from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrialByTrialActivityResult
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _perform_run_rigorous_decoder_performance_assessment
 
-#     # Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation]
+    # Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation]
 
-#     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-#     print(f'compute_and_export_session_trial_by_trial_performance_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'compute_and_export_session_trial_by_trial_performance_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
     
-#     _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-#     # filtered_epochs_df, active_spikes_df = filter_and_update_epochs_and_spikes(curr_active_pipeline, global_epoch_name, track_templates, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1)
-#     # filtered_valid_epoch_times = filtered_epochs_df[['start', 'stop']].to_numpy()
+    _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    # filtered_epochs_df, active_spikes_df = filter_and_update_epochs_and_spikes(curr_active_pipeline, global_epoch_name, track_templates, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1)
+    # filtered_valid_epoch_times = filtered_epochs_df[['start', 'stop']].to_numpy()
 
-#     assert self.collected_outputs_path.exists()
-#     curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
-#     CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
-#     print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
+    assert self.collected_outputs_path.exists()
+    curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
+    CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
+    print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
 
-#     callback_outputs = {
-#         'json_output_path': None, #'t_end': t_end   
-#         'csv_output_path': None,
-#     }
-#     err = None
+    callback_outputs = {
+        'active_laps_decoding_time_bin_size': None,
+        'subset_decode_results_track_id_correct_performance_dict': None, #'t_end': t_end   
+        'subset_decode_results_dict': None,
+        'a_trial_by_trial_result': None, 'subset_neuron_IDs_dict': None,
+        'neuron_group_split_stability_dfs_tuple': None, 'neuron_group_split_stability_aclus_tuple': None,
+    }
+    err = None
 
-#     # active_csv_parent_output_path = curr_active_pipeline.get_output_path().resolve()
-#     active_export_parent_output_path = self.collected_outputs_path.resolve()
-
-#     try:
-#         rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
-#         minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
-#         included_qclu_values: List[int] = rank_order_results.included_qclu_values
-#         directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
-#         track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
-#         print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
-#         print(f'included_qclu_values: {included_qclu_values}')
+    callback_outputs['active_laps_decoding_time_bin_size'] = active_laps_decoding_time_bin_size
+    # callback_outputs['subset_decode_results_track_id_correct_performance_dict'] = _out_subset_decode_results_track_id_correct_performance_dict
     
-#         ## INPUTS: curr_active_pipeline, track_templates, global_epoch_name, (long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj)
-#         any_decoder_neuron_IDs: NDArray = deepcopy(track_templates.any_decoder_neuron_IDs)
-#         # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    # active_csv_parent_output_path = curr_active_pipeline.get_output_path().resolve()
+    # active_export_parent_output_path = self.collected_outputs_path.resolve()
 
-#         # ## Directional Trial-by-Trial Activity:
-#         if 'pf1D_dt' not in curr_active_pipeline.computation_results[global_epoch_name].computed_data:
-#             # if `KeyError: 'pf1D_dt'` recompute
-#             curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pfdt_computation'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+    try:
+        rank_order_results = curr_active_pipeline.global_computation_results.computed_data.get('RankOrder', None)
+        if rank_order_results is not None:
+            minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+            included_qclu_values: List[int] = rank_order_results.included_qclu_values
+        else:        
+            ## get from parameters:
+            minimum_inclusion_fr_Hz: float = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+            included_qclu_values: List[int] = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
+        
+        directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+        track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+        print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
+        print(f'included_qclu_values: {included_qclu_values}')
+    
+        ## INPUTS: curr_active_pipeline, track_templates, global_epoch_name, (long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj)
+        any_decoder_neuron_IDs: NDArray = deepcopy(track_templates.any_decoder_neuron_IDs)
+        # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
 
-#         active_pf_1D_dt: PfND_TimeDependent = deepcopy(curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf1D_dt'])
-#         # active_pf_2D_dt: PfND_TimeDependent = deepcopy(curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf2D_dt'])
+        # ## Directional Trial-by-Trial Activity:
+        if 'pf1D_dt' not in curr_active_pipeline.computation_results[global_epoch_name].computed_data:
+            # if `KeyError: 'pf1D_dt'` recompute
+            curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pfdt_computation'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
 
-#         active_pf_dt: PfND_TimeDependent = active_pf_1D_dt
-#         # Limit only to the placefield aclus:
-#         active_pf_dt = active_pf_dt.get_by_id(ids=any_decoder_neuron_IDs)
+        active_pf_1D_dt: PfND_TimeDependent = deepcopy(curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf1D_dt'])
+        # active_pf_2D_dt: PfND_TimeDependent = deepcopy(curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf2D_dt'])
 
-#         # active_pf_dt: PfND_TimeDependent = deepcopy(active_pf_2D_dt) # 2D
-#         long_LR_name, long_RL_name, short_LR_name, short_RL_name = track_templates.get_decoder_names()
+        active_pf_dt: PfND_TimeDependent = active_pf_1D_dt
+        # Limit only to the placefield aclus:
+        active_pf_dt = active_pf_dt.get_by_id(ids=any_decoder_neuron_IDs)
 
-#         directional_lap_epochs_dict = dict(zip((long_LR_name, long_RL_name, short_LR_name, short_RL_name), (long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj)))
-#         directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity] = TrialByTrialActivity.directional_compute_trial_by_trial_correlation_matrix(active_pf_dt=active_pf_dt, directional_lap_epochs_dict=directional_lap_epochs_dict, included_neuron_IDs=any_decoder_neuron_IDs)
+        # long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder = track_templates.get_decoders()
 
-#         ## OUTPUTS: directional_active_lap_pf_results_dicts
-#         a_trial_by_trial_result: TrialByTrialActivityResult = TrialByTrialActivityResult(any_decoder_neuron_IDs=any_decoder_neuron_IDs,
-#                                                                                         active_pf_dt=active_pf_dt,
-#                                                                                         directional_lap_epochs_dict=directional_lap_epochs_dict,
-#                                                                                         directional_active_lap_pf_results_dicts=directional_active_lap_pf_results_dicts,
-#                                                                                         is_global=True)  # type: Tuple[Tuple[Dict[str, Any], Dict[str, Any]], Dict[str, BasePositionDecoder], Any]
+        # Unpack all directional variables:
+        ## {"even": "RL", "odd": "LR"}
+        # long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
+        # Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
+        # (long_LR_context, long_RL_context, short_LR_context, short_RL_context) = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+        # long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj, global_any_laps_epochs_obj = [curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name, global_any_name)] # note has global also
 
-#         directional_lap_epochs_dict: Dict[str, Epoch] = directional_trial_by_trial_activity_result.directional_lap_epochs_dict
-#         stability_df, stability_dict = a_trial_by_trial_result.get_stability_df()
-#         # appearing_or_disappearing_aclus, appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus, (stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus) = a_trial_by_trial_result.get_cell_stability_info(minimum_one_point_stability=0.6, zero_point_stability=0.1)
-#         _neuron_group_split_stability_dfs_tuple, _neuron_group_split_stability_aclus_tuple = a_trial_by_trial_result.get_cell_stability_info(minimum_one_point_stability=0.6, zero_point_stability=0.1)
-#         appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df = _neuron_group_split_stability_dfs_tuple
-#         appearing_aclus, disappearing_aclus, appearing_or_disappearing_aclus, stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus = _neuron_group_split_stability_aclus_tuple
-#         override_active_neuron_IDs = deepcopy(appearing_or_disappearing_aclus)
-#         ## Compute the track_ID deoding performance for the merged_decoder with some cells left out:
-#         subset_neuron_IDs_dict: Dict[str, NDArray] = dict(any_decoder=any_decoder_neuron_IDs,
-#             stable_both=stable_both_aclus, stable_neither=stable_neither_aclus,
-#             stable_long=stable_long_aclus, stable_short=stable_short_aclus,
-#             appearing_or_disappearing=appearing_or_disappearing_aclus,
-#             appearing=appearing_aclus, disappearing=disappearing_aclus,
-#         )
+        # active_pf_dt: PfND_TimeDependent = deepcopy(active_pf_2D_dt) # 2D
+        ## Ancient Names:
+        long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
+        long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj = [curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)] # note has global also
+        long_LR_name, long_RL_name, short_LR_name, short_RL_name = track_templates.get_decoder_names() ## Modern Names
 
-#         _out_subset_decode_results_dict: Dict[str, Tuple] = {}
-#         _out_subset_decode_results_track_id_correct_performance_dict: Dict[str, float] = {}
-#         for a_subset_name, a_neuron_IDs_subset in subset_neuron_IDs_dict.items():
-#             has_valid_result: bool = False
-#             if len(a_neuron_IDs_subset) > 0:
-#                 try:
-#                     _out_subset_decode_results_dict[a_subset_name] = _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline=curr_active_pipeline, included_neuron_IDs=a_neuron_IDs_subset)
-#                     ## extract results:
-#                     complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results = _out_subset_decode_results_dict[a_subset_name]
-#                     (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = complete_decoded_context_correctness_tuple
-#                     _out_subset_decode_results_track_id_correct_performance_dict[a_subset_name] = float(percent_laps_track_identity_estimated_correctly)
-#                     has_valid_result = True
-#                 except ValueError as err:
-#                     # empty pfs: ValueError: need at least one array to concatenate
-#                     has_valid_result = False
-#                 except BaseException as err:
-#                     raise
+        directional_lap_epochs_dict = dict(zip((long_LR_name, long_RL_name, short_LR_name, short_RL_name), (long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj)))
+        directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity] = TrialByTrialActivity.directional_compute_trial_by_trial_correlation_matrix(active_pf_dt=active_pf_dt, directional_lap_epochs_dict=directional_lap_epochs_dict, included_neuron_IDs=any_decoder_neuron_IDs)
 
-#             if (not has_valid_result):
-#                 ## no result, initialize the key to empty/bad values:
-#                 _out_subset_decode_results_dict[a_subset_name] = None
-#                 _out_subset_decode_results_track_id_correct_performance_dict[a_subset_name] = np.nan
+        ## OUTPUTS: directional_active_lap_pf_results_dicts
+        a_trial_by_trial_result: TrialByTrialActivityResult = TrialByTrialActivityResult(any_decoder_neuron_IDs=any_decoder_neuron_IDs,
+                                                                                        active_pf_dt=active_pf_dt,
+                                                                                        directional_lap_epochs_dict=directional_lap_epochs_dict,
+                                                                                        directional_active_lap_pf_results_dicts=directional_active_lap_pf_results_dicts,
+                                                                                        is_global=True)  # type: Tuple[Tuple[Dict[str, Any], Dict[str, Any]], Dict[str, BasePositionDecoder], Any]
 
-#         _out_subset_decode_results_track_id_correct_performance_dict
+        directional_lap_epochs_dict: Dict[str, Epoch] = a_trial_by_trial_result.directional_lap_epochs_dict
+        stability_df, stability_dict = a_trial_by_trial_result.get_stability_df()
+        # appearing_or_disappearing_aclus, appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus, (stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus) = a_trial_by_trial_result.get_cell_stability_info(minimum_one_point_stability=0.6, zero_point_stability=0.1)
+        _neuron_group_split_stability_dfs_tuple, _neuron_group_split_stability_aclus_tuple = a_trial_by_trial_result.get_cell_stability_info(minimum_one_point_stability=0.6, zero_point_stability=0.1)
+        appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df = _neuron_group_split_stability_dfs_tuple
+        appearing_aclus, disappearing_aclus, appearing_or_disappearing_aclus, stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus = _neuron_group_split_stability_aclus_tuple
+        ## Compute the track_ID deoding performance for the merged_decoder with some cells left out:
+        subset_neuron_IDs_dict: Dict[str, NDArray] = dict(any_decoder=any_decoder_neuron_IDs,
+            stable_both=stable_both_aclus, stable_neither=stable_neither_aclus,
+            stable_long=stable_long_aclus, stable_short=stable_short_aclus,
+            appearing_or_disappearing=appearing_or_disappearing_aclus,
+            appearing=appearing_aclus, disappearing=disappearing_aclus,
+        )
+        
+        ## OUTPUTS: a_trial_by_trial_result
+        callback_outputs.update(dict(a_trial_by_trial_result=a_trial_by_trial_result,
+                                     subset_neuron_IDs_dict=subset_neuron_IDs_dict,
+                    neuron_group_split_stability_dfs_tuple=_neuron_group_split_stability_dfs_tuple, neuron_group_split_stability_aclus_tuple=_neuron_group_split_stability_aclus_tuple,
+        ))
+        
+        _out_subset_decode_results_dict: Dict[str, Tuple] = {}
+        _out_subset_decode_results_track_id_correct_performance_dict: Dict[str, float] = {}
+        for a_subset_name, a_neuron_IDs_subset in subset_neuron_IDs_dict.items():
+            has_valid_result: bool = False
+            if len(a_neuron_IDs_subset) > 0:
+                try:
+                    _out_subset_decode_results_dict[a_subset_name] = _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline=curr_active_pipeline, included_neuron_IDs=a_neuron_IDs_subset, active_laps_decoding_time_bin_size=active_laps_decoding_time_bin_size)
+                    ## extract results:
+                    complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results = _out_subset_decode_results_dict[a_subset_name]
+                    (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = complete_decoded_context_correctness_tuple
+                    _out_subset_decode_results_track_id_correct_performance_dict[a_subset_name] = float(percent_laps_track_identity_estimated_correctly)
+                    has_valid_result = True
+                except ValueError as err:
+                    # empty pfs: ValueError: need at least one array to concatenate
+                    has_valid_result = False
+                except BaseException as err:
+                    raise
 
-#         # ## OUTPUTS: `_out_subset_decode_results_track_id_correct_performance_dict`
-#         # {'any_decoder': 0.8351648351648352,
-#         #  'stable_both': 0.7692307692307693,
-#         #  'stable_neither': nan,
-#         #  'stable_long': 0.8131868131868132,
-#         #  'stable_short': 0.8241758241758241,
-#         #  'appearing_or_disappearing': 0.6593406593406593,
-#         #  'appearing': 0.7142857142857143,
-#         #  'disappearing': 0.6043956043956044}
+            if (not has_valid_result):
+                ## no result, initialize the key to empty/bad values:
+                _out_subset_decode_results_dict[a_subset_name] = None
+                _out_subset_decode_results_track_id_correct_performance_dict[a_subset_name] = np.nan
 
-#         for a_subset_name, a_neuron_IDs_subset in subset_neuron_IDs_dict.items():
-#             percent_laps_track_identity_estimated_correctly: float = (round(_out_subset_decode_results_track_id_correct_performance_dict[a_subset_name], ndigits=5) * 100.0)
-#             print(f'aclu subset: "{a_subset_name}"\n\ta_neuron_IDs_subset: {a_neuron_IDs_subset}\n\tpercent_laps_track_identity_estimated_correctly: {percent_laps_track_identity_estimated_correctly} %')
+        _out_subset_decode_results_track_id_correct_performance_dict
+
+        # ## OUTPUTS: `_out_subset_decode_results_track_id_correct_performance_dict`
+        # {'any_decoder': 0.8351648351648352,
+        #  'stable_both': 0.7692307692307693,
+        #  'stable_neither': nan,
+        #  'stable_long': 0.8131868131868132,
+        #  'stable_short': 0.8241758241758241,
+        #  'appearing_or_disappearing': 0.6593406593406593,
+        #  'appearing': 0.7142857142857143,
+        #  'disappearing': 0.6043956043956044}
+
+        callback_outputs['subset_decode_results_track_id_correct_performance_dict'] = _out_subset_decode_results_track_id_correct_performance_dict
+        callback_outputs['subset_decode_results_dict'] = _out_subset_decode_results_dict
+        
+        for a_subset_name, a_neuron_IDs_subset in subset_neuron_IDs_dict.items():
+            percent_laps_track_identity_estimated_correctly: float = (round(_out_subset_decode_results_track_id_correct_performance_dict[a_subset_name], ndigits=5) * 100.0)
+            print(f'aclu subset: "{a_subset_name}"\n\ta_neuron_IDs_subset: {a_neuron_IDs_subset}\n\tpercent_laps_track_identity_estimated_correctly: {percent_laps_track_identity_estimated_correctly} %')
             
 
-#         # aclu subset: "any_decoder"
-#         # 	a_neuron_IDs_subset: [  3   5   7   9  10  11  14  15  16  17  19  21  24  25  26  31  32  33  34  35  36  37  41  45  48  49  50  51  53  54  55  56  57  58  59  60  61  62  63  64  66  67  68  69  70  71  73  74  75  76  78  81  82  83  84  85  86  87  88  89  90  92  93  96  98 100 102 107 108]
-#         # 	percent_laps_track_identity_estimated_correctly: 86.02199999999999 %
-#         # aclu subset: "stable_both"
-#         # 	a_neuron_IDs_subset: [  5   7   9  10  17  25  26  31  33  36  41  45  48  49  50  54  55  56  59  61  62  64  66  69  71  75  76  78  83  84  86  88  89  90  92  93  96 107 108]
-#         # 	percent_laps_track_identity_estimated_correctly: 82.796 %
-#         # aclu subset: "stable_neither"
-#         # 	a_neuron_IDs_subset: [16 19 37 60 73 87]
-#         # 	percent_laps_track_identity_estimated_correctly: 58.065 %
-#         # aclu subset: "stable_long"
-#         # 	a_neuron_IDs_subset: [  5   7   9  10  17  25  26  31  32  33  35  36  41  45  48  49  50  53  54  55  56  59  61  62  64  66  68  69  71  74  75  76  78  82  83  84  86  88  89  90  92  93  96 107 108]
-#         # 	percent_laps_track_identity_estimated_correctly: 80.645 %
-#         # aclu subset: "stable_short"
-#         # 	a_neuron_IDs_subset: [  3   5   7   9  10  11  14  15  17  24  25  26  31  33  34  36  41  45  48  49  50  51  54  55  56  57  58  59  61  62  64  66  67  69  71  75  76  78  83  84  85  86  88  89  90  92  93  96 100 102 107 108]
-#         # 	percent_laps_track_identity_estimated_correctly: 82.796 %
-#         # aclu subset: "appearing_or_disappearing"
-#         # 	a_neuron_IDs_subset: [ 3 11 14 15 24 34 35 51 58 67 74 82]
-#         # 	percent_laps_track_identity_estimated_correctly: 75.26899999999999 %
-#         # aclu subset: "appearing"
-#         # 	a_neuron_IDs_subset: [ 3 11 14 15 24 34 51 58 67]
-#         # 	percent_laps_track_identity_estimated_correctly: 76.344 %
-#         # aclu subset: "disappearing"
-#         # 	a_neuron_IDs_subset: [35 74 82]
-#         # 	percent_laps_track_identity_estimated_correctly: 61.29 %
+        # aclu subset: "any_decoder"
+        # 	a_neuron_IDs_subset: [  3   5   7   9  10  11  14  15  16  17  19  21  24  25  26  31  32  33  34  35  36  37  41  45  48  49  50  51  53  54  55  56  57  58  59  60  61  62  63  64  66  67  68  69  70  71  73  74  75  76  78  81  82  83  84  85  86  87  88  89  90  92  93  96  98 100 102 107 108]
+        # 	percent_laps_track_identity_estimated_correctly: 86.02199999999999 %
+        # aclu subset: "stable_both"
+        # 	a_neuron_IDs_subset: [  5   7   9  10  17  25  26  31  33  36  41  45  48  49  50  54  55  56  59  61  62  64  66  69  71  75  76  78  83  84  86  88  89  90  92  93  96 107 108]
+        # 	percent_laps_track_identity_estimated_correctly: 82.796 %
+        # aclu subset: "stable_neither"
+        # 	a_neuron_IDs_subset: [16 19 37 60 73 87]
+        # 	percent_laps_track_identity_estimated_correctly: 58.065 %
+        # aclu subset: "stable_long"
+        # 	a_neuron_IDs_subset: [  5   7   9  10  17  25  26  31  32  33  35  36  41  45  48  49  50  53  54  55  56  59  61  62  64  66  68  69  71  74  75  76  78  82  83  84  86  88  89  90  92  93  96 107 108]
+        # 	percent_laps_track_identity_estimated_correctly: 80.645 %
+        # aclu subset: "stable_short"
+        # 	a_neuron_IDs_subset: [  3   5   7   9  10  11  14  15  17  24  25  26  31  33  34  36  41  45  48  49  50  51  54  55  56  57  58  59  61  62  64  66  67  69  71  75  76  78  83  84  85  86  88  89  90  92  93  96 100 102 107 108]
+        # 	percent_laps_track_identity_estimated_correctly: 82.796 %
+        # aclu subset: "appearing_or_disappearing"
+        # 	a_neuron_IDs_subset: [ 3 11 14 15 24 34 35 51 58 67 74 82]
+        # 	percent_laps_track_identity_estimated_correctly: 75.26899999999999 %
+        # aclu subset: "appearing"
+        # 	a_neuron_IDs_subset: [ 3 11 14 15 24 34 51 58 67]
+        # 	percent_laps_track_identity_estimated_correctly: 76.344 %
+        # aclu subset: "disappearing"
+        # 	a_neuron_IDs_subset: [35 74 82]
+        # 	percent_laps_track_identity_estimated_correctly: 61.29 %
 
-#         # stability_df
+        # stability_df
 
-#         # a_trial_by_trial_result
+        # a_trial_by_trial_result
 
-#         # # Time-dependent
-#         # long_pf1D_dt, short_pf1D_dt, global_pf1D_dt = long_results.pf1D_dt, short_results.pf1D_dt, global_results.pf1D_dt
-#         # # long_pf2D_dt, short_pf2D_dt, global_pf2D_dt = long_results.pf2D_dt, short_results.pf2D_dt, global_results.pf2D_dt
-#         # global_pf1D_dt: PfND_TimeDependent = global_results.pf1D_dt
-#         # # global_pf2D_dt: PfND_TimeDependent = global_results.pf2D_dt
-#         # _flat_z_scored_tuning_map_matrix, _flat_decoder_identity_arr = a_trial_by_trial_result.build_combined_decoded_epoch_z_scored_tuning_map_matrix() # .shape: (n_epochs, n_neurons, n_pos_bins) 
-#         # modified_directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity] = a_trial_by_trial_result.build_separated_nan_filled_decoded_epoch_z_scored_tuning_map_matrix()
-#         # # _flat_z_scored_tuning_map_matrix
+        # # Time-dependent
+        # long_pf1D_dt, short_pf1D_dt, global_pf1D_dt = long_results.pf1D_dt, short_results.pf1D_dt, global_results.pf1D_dt
+        # # long_pf2D_dt, short_pf2D_dt, global_pf2D_dt = long_results.pf2D_dt, short_results.pf2D_dt, global_results.pf2D_dt
+        # global_pf1D_dt: PfND_TimeDependent = global_results.pf1D_dt
+        # # global_pf2D_dt: PfND_TimeDependent = global_results.pf2D_dt
+        # _flat_z_scored_tuning_map_matrix, _flat_decoder_identity_arr = a_trial_by_trial_result.build_combined_decoded_epoch_z_scored_tuning_map_matrix() # .shape: (n_epochs, n_neurons, n_pos_bins) 
+        # modified_directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity] = a_trial_by_trial_result.build_separated_nan_filled_decoded_epoch_z_scored_tuning_map_matrix()
+        # # _flat_z_scored_tuning_map_matrix
 
-#         ## OUTPUTS: override_active_neuron_IDs
-#         print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
+        ## OUTPUTS: override_active_neuron_IDs
+        print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
 
-#         print(f'\t\t done (success).')
+        print(f'\t\t done (success).')
 
-#     except BaseException as e:
-#         exception_info = sys.exc_info()
-#         err = CapturedException(e, exception_info)
-#         print(f"WARN: on_complete_success_execution_session: encountered exception {err} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
-#         # if self.fail_on_exception:
-#         #     raise e.exc
-#         # _out_inst_fr_comps = None
-#         neuron_replay_stats_df = None
-#         pass
+    except BaseException as e:
+        exception_info = sys.exc_info()
+        err = CapturedException(e, exception_info)
+        print(f"WARN: on_complete_success_execution_session: encountered exception {err} while performing .compute_and_export_session_trial_by_trial_performance_completion_function(...) for curr_session_context: {curr_session_context}")
+        # if self.fail_on_exception:
+        #     raise e.exc
+        # _out_inst_fr_comps = None
+        neuron_replay_stats_df = None
+        pass
 
-#     if (neuron_replay_stats_df is not None):
-#         print(f'\t try saving to CSV...')
-#         # Save DataFrame to CSV
-#         csv_output_path = active_export_parent_output_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_neuron_replay_stats_df.csv').resolve()
-#         try:
+    # if (neuron_replay_stats_df is not None):
+    #     print(f'\t try saving to CSV...')
+    #     # Save DataFrame to CSV
+    #     csv_output_path = active_export_parent_output_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_neuron_replay_stats_df.csv').resolve()
+    #     try:
             
-#             neuron_replay_stats_df.to_csv(csv_output_path)
-#             print(f'\t saving to CSV: "{csv_output_path}" done.')
-#             callback_outputs['csv_output_path'] = csv_output_path
+    #         neuron_replay_stats_df.to_csv(csv_output_path)
+    #         print(f'\t saving to CSV: "{csv_output_path}" done.')
+    #         callback_outputs['csv_output_path'] = csv_output_path
 
-#         except BaseException as e:
-#             exception_info = sys.exc_info()
-#             err = CapturedException(e, exception_info)
-#             print(f"ERROR: encountered exception {err} while trying to save to CSV for {curr_session_context}")
-#             csv_output_path = None # set to None because it failed.
-#             if self.fail_on_exception:
-#                 raise err.exc
-#     else:
-#         csv_output_path = None
+    #     except BaseException as e:
+    #         exception_info = sys.exc_info()
+    #         err = CapturedException(e, exception_info)
+    #         print(f"ERROR: encountered exception {err} while trying to save to CSV for {curr_session_context}")
+    #         csv_output_path = None # set to None because it failed.
+    #         if self.fail_on_exception:
+    #             raise err.exc
+    # else:
+    #     csv_output_path = None
 
 
-#     ## standalone saving:
-#     if (neuron_replay_stats_df is not None):
-#         print(f'\t try saving to JSON...')
-#         # Save DataFrame to JSON
-#         json_output_path = active_export_parent_output_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_neuron_replay_stats_df.json').resolve()
-#         try:
-#             neuron_replay_stats_df.to_json(json_output_path, orient='records', lines=True) ## This actually looks pretty good!
-#             print(f'\t saving to JSON: "{json_output_path}" done.')
-#             callback_outputs['json_output_path'] = json_output_path
+    # ## standalone saving:
+    # if (neuron_replay_stats_df is not None):
+    #     print(f'\t try saving to JSON...')
+    #     # Save DataFrame to JSON
+    #     json_output_path = active_export_parent_output_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_neuron_replay_stats_df.json').resolve()
+    #     try:
+    #         neuron_replay_stats_df.to_json(json_output_path, orient='records', lines=True) ## This actually looks pretty good!
+    #         print(f'\t saving to JSON: "{json_output_path}" done.')
+    #         callback_outputs['json_output_path'] = json_output_path
 
-#         except BaseException as e:
-#             exception_info = sys.exc_info()
-#             err = CapturedException(e, exception_info)
-#             print(f"ERROR: encountered exception {err} while trying to save to json for {curr_session_context}")
-#             json_output_path = None # set to None because it failed.
-#             if self.fail_on_exception:
-#                 raise err.exc
-#     else:
-#         json_output_path = None
+    #     except BaseException as e:
+    #         exception_info = sys.exc_info()
+    #         err = CapturedException(e, exception_info)
+    #         print(f"ERROR: encountered exception {err} while trying to save to json for {curr_session_context}")
+    #         json_output_path = None # set to None because it failed.
+    #         if self.fail_on_exception:
+    #             raise err.exc
+    # else:
+    #     json_output_path = None
 
-#     across_session_results_extended_dict['compute_and_export_session_trial_by_trial_performance_completion_function'] = callback_outputs
+    across_session_results_extended_dict['compute_and_export_session_trial_by_trial_performance_completion_function'] = callback_outputs
     
-#     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-#     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
 
-#     return across_session_results_extended_dict
+    return across_session_results_extended_dict
+
+
+
 
 
 
@@ -2158,6 +2201,7 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
                                     'compute_and_export_session_extended_placefield_peak_information_completion_function': compute_and_export_session_extended_placefield_peak_information_completion_function,
                                     'compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function': compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function,
                                     'backup_previous_session_files_completion_function': backup_previous_session_files_completion_function,
+                                    'compute_and_export_session_trial_by_trial_performance_completion_function': compute_and_export_session_trial_by_trial_performance_completion_function,
                                     }
     else:
         # use the user one:
