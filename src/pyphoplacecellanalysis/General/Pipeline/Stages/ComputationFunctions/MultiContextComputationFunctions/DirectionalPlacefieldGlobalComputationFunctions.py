@@ -3244,7 +3244,7 @@ def _do_custom_decode_epochs_dict(global_spikes_df: pd.DataFrame, global_measure
 
 @function_attributes(short_name=None, tags=['TrainTestSplit', 'decode'], input_requires=[], output_provides=[],
                       uses=['_do_custom_decode_epochs', '_check_result_laps_epochs_df_performance', 'DirectionalPseudo2DDecodersResult'], used_by=[], creation_date='2024-10-08 02:35', related_items=[])
-def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_decoding_time_bin_size: float = 1.5, force_recompute_directional_train_test_split_result: bool = False):
+def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_decoding_time_bin_size: float = 1.5, force_recompute_directional_train_test_split_result: bool = False, compute_separate_decoder_results: bool=True):
     """ 
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _do_train_test_split_decode_and_evaluate
 
@@ -3260,6 +3260,20 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import PfND
     # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import compute_weighted_correlations
     # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _check_result_laps_epochs_df_performance
+    
+    t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
+    
+    def _add_extra_epochs_df_columns(epochs_df: pd.DataFrame):
+        """ captures: global_session, t_start, t_delta, t_end
+        """
+        epochs_df = epochs_df.sort_values(['start', 'stop', 'label']).reset_index(drop=True) # Sort by columns: 'start' (ascending), 'stop' (ascending), 'label' (ascending)
+        epochs_df = epochs_df.drop_duplicates(subset=['start', 'stop', 'label'])
+        epochs_df = epochs_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
+        epochs_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=epochs_df, global_session=deepcopy(global_session), replace_existing=True)
+        return epochs_df
+        
 
     directional_train_test_split_result: TrainTestSplitResult = curr_active_pipeline.global_computation_results.computed_data.get('TrainTestSplit', None)
     if (directional_train_test_split_result is None) or force_recompute_directional_train_test_split_result:
@@ -3296,7 +3310,7 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
     # restricted_all_directional_decoder_pf1D_dict: Dict[str, BasePositionDecoder] = deepcopy(alt_directional_merged_decoders_result.all_directional_decoder_dict)
 
 
-
+    # MERGED all_directional decoder _____________________________________________________________________________________ #
     _all_directional_decoder_pf1D_dict: Dict[str, BasePositionDecoder] = deepcopy(train_lap_specific_pf1D_Decoder_dict) # copy the dictionary
     # _all_directional_decoder_pf1D_dict = {k:v.get_by_id(included_neuron_ids) for k,v in _all_directional_decoder_pf1D_dict.items()}
     # _all_directional_decoder_pf1D_dict['long_LR']
@@ -3306,48 +3320,49 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
 
     ## Get test_epochs that are applicable to any decoder:
     all_test_epochs_df: pd.DataFrame = pd.concat([v for v in test_epochs_dict.values()], axis='index')
-    all_test_epochs_df = all_test_epochs_df.sort_values(['start', 'stop', 'label']).reset_index(drop=True) # Sort by columns: 'start' (ascending), 'stop' (ascending), 'label' (ascending)
-    all_test_epochs_df = all_test_epochs_df.drop_duplicates(subset=['start', 'stop', 'label'])
-    
+    all_test_epochs_df = _add_extra_epochs_df_columns(epochs_df=ensure_dataframe(all_test_epochs_df))
+    # all_test_epochs_df = all_test_epochs_df.sort_values(['start', 'stop', 'label']).reset_index(drop=True) # Sort by columns: 'start' (ascending), 'stop' (ascending), 'label' (ascending)
+    # all_test_epochs_df = all_test_epochs_df.drop_duplicates(subset=['start', 'stop', 'label'])    
+    # all_test_epochs_df = all_test_epochs_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
+    # all_test_epochs_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=all_test_epochs_df, global_session=deepcopy(global_session), replace_existing=True)
+    # all_test_epochs_df
+
     ## OUTPUTS: alt_directional_merged_decoders_result, all_directional_pf1D_Decoder, all_test_epochs_df
-    t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
-    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-    global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
-    all_test_epochs_df = all_test_epochs_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
-    
+
     # global_session = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name])
     # _new_all_test_epochs_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=deepcopy(all_test_epochs_df), global_session=deepcopy(global_session), replace_existing=False)
-    all_test_epochs_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=all_test_epochs_df, global_session=deepcopy(global_session), replace_existing=True)
-    all_test_epochs_df
 
-    global_spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline)
-    global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']) # computation_result.sess.position.to_dataframe(), ... Also the -1 sentinal values (when NaN isn't used) needs to be considered
+    # global_spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline)
+    # global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']) # computation_result.sess.position.to_dataframe(), ... Also the -1 sentinal values (when NaN isn't used) needs to be considered
 
     ## Decode Laps - DecodedFilterEpochsResult
-    
-    ## INPUTS: flat_epochs_to_decode_dict, active_laps_decoding_time_bin_size
-    ## Decoding of the test epochs (what matters):
-    # test_decoder_results_dict: Dict[types.DecoderName, CustomDecodeEpochsResult] = _do_custom_decode_epochs_dict(global_spikes_df=global_spikes_df, global_measured_position_df=global_measured_position_df,
-    #                                                                                                                                  pf1D_Decoder_dict=train_lap_specific_pf1D_Decoder_dict,
-    #                                                                                                                                  epochs_to_decode_dict=test_epochs_dict, 
-    #                                                                                                                                  decoding_time_bin_size=active_laps_decoding_time_bin_size,
-    #                                                                                                                                  decoder_and_epoch_keys_independent=False)
-    # train_decoded_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {k:v.decoder_result for k, v in test_decoder_results_dict.items()}
-    # weighted_corr_data_dict = compute_weighted_correlations(train_decoded_results_dict, debug_print=True)
-    # # weighted_corr_data_dict
-    # train_decoded_wcorr_df = pd.concat(weighted_corr_data_dict)
-    # train_decoded_wcorr_df
-    # a_decoded_measured_diff_df: pd.DataFrame = test_decoder_results_dict['long_LR'].measured_decoded_position_comparion.decoded_measured_diff_df
-    # train_decoded_measured_diff_df_dict: Dict[types.DecoderName, pd.DataFrame] = {k:v.measured_decoded_position_comparion.decoded_measured_diff_df for k, v in test_decoder_results_dict.items()}
+
+    if compute_separate_decoder_results:    
+        # INPUTS: flat_epochs_to_decode_dict, active_laps_decoding_time_bin_size
+        test_epochs_dict = {k:_add_extra_epochs_df_columns(epochs_df=ensure_dataframe(v)) for k, v in test_epochs_dict.items()}
+        # Decoding of the test epochs (what matters):
+        test_decoder_results_dict: Dict[types.DecoderName, CustomDecodeEpochsResult] = _do_custom_decode_epochs_dict(global_spikes_df=get_proper_global_spikes_df(curr_active_pipeline), global_measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']),
+                                                                                                                                        pf1D_Decoder_dict=train_lap_specific_pf1D_Decoder_dict,
+                                                                                                                                        epochs_to_decode_dict=deepcopy(test_epochs_dict), 
+                                                                                                                                        decoding_time_bin_size=active_laps_decoding_time_bin_size,
+                                                                                                                                        decoder_and_epoch_keys_independent=False)
+        train_decoded_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {k:v.decoder_result for k, v in test_decoder_results_dict.items()}
+        # weighted_corr_data_dict = compute_weighted_correlations(train_decoded_results_dict, debug_print=True)
+        # # weighted_corr_data_dict
+        # train_decoded_wcorr_df = pd.concat(weighted_corr_data_dict)
+        # train_decoded_wcorr_df
+        # a_decoded_measured_diff_df: pd.DataFrame = test_decoder_results_dict['long_LR'].measured_decoded_position_comparion.decoded_measured_diff_df
+        train_decoded_measured_diff_df_dict: Dict[types.DecoderName, pd.DataFrame] = {k:v.measured_decoded_position_comparion.decoded_measured_diff_df for k, v in test_decoder_results_dict.items()}
+        _out_separate_decoder_results = (test_decoder_results_dict, train_decoded_results_dict, train_decoded_measured_diff_df_dict)
+    else:
+        _out_separate_decoder_results = None
+
 
     ## Decoding of the test epochs (what matters) for `all_directional_pf1D_Decoder`:
-    test_all_directional_decoder_result: CustomDecodeEpochsResult = _do_custom_decode_epochs(global_spikes_df=global_spikes_df, global_measured_position_df=global_measured_position_df,
+    test_all_directional_decoder_result: CustomDecodeEpochsResult = _do_custom_decode_epochs(global_spikes_df=get_proper_global_spikes_df(curr_active_pipeline), global_measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']),
                                                             pf1D_Decoder=all_directional_pf1D_Decoder, epochs_to_decode_df=all_test_epochs_df,
                                                             decoding_time_bin_size=active_laps_decoding_time_bin_size)
     all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult = test_all_directional_decoder_result.decoder_result
-    
-    
-
     ## INPUTS: test_all_directional_decoder_result
     (laps_directional_marginals_tuple, laps_track_identity_marginals_tuple, laps_non_marginalized_decoder_marginals_tuple), laps_marginals_df = all_directional_laps_filter_epochs_decoder_result.compute_marginals(epoch_idx_col_name='lap_idx', epoch_start_t_col_name='lap_start_t',
                                                                                                                                                                     additional_transfer_column_names=['start','stop','label','duration','lap_id','lap_dir','maze_id','is_LR_dir'])
@@ -3374,7 +3389,7 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
     # percent_laps_estimated_correctly
     
     ## OUTPUTS: all_directional_pf1D_Decoder
-    return complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, all_directional_laps_filter_epochs_decoder_result
+    return complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results
 
 
 
@@ -4672,11 +4687,12 @@ def compute_weighted_correlations(decoder_decoded_epochs_result_dict: Dict[types
     weighted_corr_data_dict = {}
 
     # for a_name in track_templates.get_decoder_names():
-    for a_name, curr_results_obj in decoder_decoded_epochs_result_dict.items():            
-        weighted_corr_data = np.array([wcorr(a_P_x_given_n) for a_P_x_given_n in curr_results_obj.p_x_given_n_list]) # each `wcorr(a_posterior)` call returns a float
-        if debug_print:
-            print(f'a_name: "{a_name}"\n\tweighted_corr_data.shape: {np.shape(weighted_corr_data)}') # (84, ) - (n_epochs, )
-        weighted_corr_data_dict[a_name] = pd.DataFrame({'wcorr': weighted_corr_data})
+    for a_name, curr_results_obj in decoder_decoded_epochs_result_dict.items():
+        if curr_results_obj is not None:         
+            weighted_corr_data = np.array([wcorr(a_P_x_given_n) for a_P_x_given_n in curr_results_obj.p_x_given_n_list]) # each `wcorr(a_posterior)` call returns a float
+            if debug_print:
+                print(f'a_name: "{a_name}"\n\tweighted_corr_data.shape: {np.shape(weighted_corr_data)}') # (84, ) - (n_epochs, )
+            weighted_corr_data_dict[a_name] = pd.DataFrame({'wcorr': weighted_corr_data})
 
     ## end for
     return weighted_corr_data_dict
