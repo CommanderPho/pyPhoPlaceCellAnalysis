@@ -1487,4 +1487,99 @@ def main_complete_figure_generations(curr_active_pipeline, enable_default_neptun
     
     # plots
 
+# ==================================================================================================================== #
+# SpecificPrePostDeltaScatter                                                                                          #
+# ==================================================================================================================== #
 
+from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import plotly_pre_post_delta_scatter
+
+
+
+@metadata_attributes(short_name=None, tags=['plotly', 'scatter', 'notebook', 'figure', 'outputs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-08 15:10', related_items=[])
+class SpecificPrePostDeltaScatter:
+    """ not yet finished.
+    """
+    _generic_kwargs = {'fig_size_kwargs': None, 'is_dark_mode': False, 'histogram_bins': 25, 'num_sessions': 1}
+    
+    @classmethod
+    def _pre_post_delta_scatter_laps_per_time_bin(cls, all_sessions_laps_time_bin_df, t_delta_df, t_delta_dict, earliest_delta_aligned_t_start, latest_delta_aligned_t_end):
+        histogram_bins = 25
+        num_sessions = 1
+
+        # ==================================================================================================================== #
+        # Laps                                                                                                                 #
+        # ==================================================================================================================== #
+        # all_sessions_laps_time_bin_df
+        # all_sessions_simple_pearson_laps_df
+
+        # Define the legend groups you want to hide on startup
+        legend_groups_to_hide = ['0.030', '0.044', '0.050', '0.058'] # '0.025', 
+
+        # data_context = IdentifyingContext(epochs_name='laps', data_grain='per_epoch', title_prefix="Lap Per Epoch")
+        # concatenated_ripple_df = deepcopy(all_sessions_laps_df)
+        data_context = IdentifyingContext(epochs_name='laps', data_grain='per_time_bin', title_prefix="Lap Individual Time Bins")
+        concatenated_ripple_df = deepcopy(all_sessions_laps_time_bin_df)
+
+        # data_context = IdentifyingContext(epochs_name='PBE', data_grain='per_epoch', title_prefix="PBE Per Epoch")
+        # concatenated_ripple_df = deepcopy(all_sessions_ripple_df)
+        # data_context = IdentifyingContext(epochs_name='PBE', data_grain='per_time_bin', title_prefix="PBE Individual Time Bins")
+        # concatenated_ripple_df = deepcopy(all_sessions_ripple_time_bin_df)
+
+        # concatenated_ripple_df = deepcopy(all_sessions_simple_pearson_laps_df) # ['P_LR', 'P_RL', 'P_Long', 'P_Short', 'ripple_idx', 'ripple_start_t', 'P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL', 'most_likely_decoder_index', 'start', 'stop', 'label', 'duration', 'long_LR_pf_peak_x_pearsonr', 'long_RL_pf_peak_x_pearsonr', 'short_LR_pf_peak_x_pearsonr', 'short_RL_pf_peak_x_pearsonr', 'best_decoder_index', 'session_name', 'time_bin_size', 'delta_aligned_start_t', 'is_user_annotated_epoch', 'is_valid_epoch', 'custom_replay_name', 'epoch_idx', 'long_best_pf_peak_x_pearsonr', 'short_best_pf_peak_x_pearsonr', 'wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL', 'long_best_wcorr', 'short_best_wcorr', 'wcorr_abs_diff', 'pearsonr_abs_diff']
+        # concatenated_ripple_df = deepcopy(all_sessions_laps_time_bin_df) # ['P_LR', 'P_RL', 'P_Long', 'P_Short', 'ripple_idx', 'ripple_start_t', 'P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL', 'most_likely_decoder_index', 'start', 'stop', 'label', 'duration', 'long_LR_pf_peak_x_pearsonr', 'long_RL_pf_peak_x_pearsonr', 'short_LR_pf_peak_x_pearsonr', 'short_RL_pf_peak_x_pearsonr', 'best_decoder_index', 'session_name', 'time_bin_size', 'delta_aligned_start_t', 'is_user_annotated_epoch', 'is_valid_epoch', 'custom_replay_name', 'epoch_idx', 'long_best_pf_peak_x_pearsonr', 'short_best_pf_peak_x_pearsonr', 'wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL', 'long_best_wcorr', 'short_best_wcorr', 'wcorr_abs_diff', 'pearsonr_abs_diff']
+        # print(f'concatenated_ripple_df.columns: {list(concatenated_ripple_df.columns)}')
+        # concatenated_ripple_df
+
+        # variable_name = 'P_Long'
+        variable_name = 'P_Short' # Shows expected effect - short-only replay prior to delta and then split replays post-delta
+        # variable_name = 'P_LR'
+
+        y_baseline_level: float = 0.5 # for P(short), etc
+        # y_baseline_level: float = 0.0 # for wcorr, etc
+
+        # px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'color':"is_user_annotated_epoch", 'title': f"'{variable_name}'"} # , 'color': 'time_bin_size', 'range_y': [-1.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size', 'is_user_annotated_epoch':'user_sel'}
+        px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'title': f"{data_context.get_description(subset_includelist=['title_prefix'])} - '{variable_name}'"} # , 'color': 'time_bin_size', 'range_y': [-1.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size', 'is_user_annotated_epoch':'user_sel'}
+        px_scatter_kwargs['color'] = "time_bin_size"
+        # px_scatter_kwargs.pop('color')
+
+        concatenated_ripple_df['dummy_column_for_size'] = 1.0
+        px_scatter_kwargs['size'] = "dummy_column_for_size"
+        px_scatter_kwargs['size_max'] = 3
+        # px_scatter_kwargs['marker'] = dict(line=dict(width=0))
+        # Remove the white border around scatter points by setting line width to 0
+        # px_scatter_kwargs['line_width'] = 0  # <---- Correct way for Plotly Express
+
+        # px_scatter_kwargs.update(dict(marginal_x="histogram", marginal_y="rug"))
+
+        hist_kwargs = dict(color="time_bin_size")
+        # hist_kwargs = dict(color="is_user_annotated_epoch") # , histnorm='probability density'
+        # hist_kwargs.pop('color')
+        new_fig_laps, new_fig_laps_context = plotly_pre_post_delta_scatter(data_results_df=concatenated_ripple_df, out_scatter_fig=None, histogram_bins=histogram_bins,
+                                px_scatter_kwargs=px_scatter_kwargs, histogram_variable_name=variable_name, hist_kwargs=hist_kwargs, forced_range_y=None,
+                                time_delta_tuple=(earliest_delta_aligned_t_start, 0.0, latest_delta_aligned_t_end), legend_title_text=None, is_dark_mode=is_dark_mode)
+
+
+        new_fig_laps = new_fig_laps.update_layout(fig_size_kwargs)
+
+        if legend_groups_to_hide is not None:
+            # Collect all unique legend groups you want to hide
+            hidden_groups = set(legend_groups_to_hide)
+
+            # Iterate over traces and hide those in the specified legend groups
+            for trace in new_fig_laps.data:
+                if trace.legendgroup in hidden_groups:
+                    trace.visible = 'legendonly'
+                
+        # new_fig_laps.show()
+
+        _extras_output_dict = {}
+        if is_dark_mode:
+            _extras_output_dict["y_mid_line"] = new_fig_laps.add_hline(y=y_baseline_level, line=dict(color="rgba(0.8,0.8,0.8,.75)", width=2), row='all', col='all')
+        else:
+            _extras_output_dict["y_mid_line"] = new_fig_laps.add_hline(y=y_baseline_level, line=dict(color="rgba(0.2,0.2,0.2,.75)", width=2), row='all', col='all')
+
+
+        # fig_to_clipboard(new_fig_laps, **fig_size_kwargs)
+        new_fig_laps_context = new_fig_laps_context.adding_context_if_missing(**data_context.get_subset(subset_includelist=['epochs_name', 'data_grain']).to_dict(), num_sessions=num_sessions, plot_type='scatter+hist', comparison='pre-post-delta', variable_name=variable_name)
+        # figure_out_paths = save_plotly(a_fig=new_fig_laps, a_fig_context=new_fig_laps_context)
+        new_fig_laps
