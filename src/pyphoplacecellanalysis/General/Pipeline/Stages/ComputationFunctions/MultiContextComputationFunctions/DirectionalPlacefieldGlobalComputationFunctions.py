@@ -4287,6 +4287,12 @@ class TrialByTrialActivityResult(ComputedResult):
     @classmethod    
     def determine_neuron_stability(cls, stability_df: pd.DataFrame, minimum_one_point_stability: float = 0.6, zero_point_stability: float = 0.1):
         """ try to determine the LxC/SxC remapping cells from their stability 
+        
+        neuron_group_split_stability_dfs_tuple = self.determine_neuron_stability(stability_df=stability_df)
+        appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df = neuron_group_split_stability_dfs_tuple
+        neuron_group_split_stability_aclus_tuple = [sort(a_df.aclu.values) for a_df in neuron_group_split_stability_dfs_tuple]
+        appearing_aclus, disappearing_aclus, appearing_or_disappearing_aclus, stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus = neuron_group_split_stability_aclus_tuple
+        
         """
         from numpy import sort
         
@@ -4322,11 +4328,34 @@ class TrialByTrialActivityResult(ComputedResult):
         # unstable_changing = np.logical_xor(unstable_long, unstable_short)
         # unstable_changing
 
-        appearing_or_disappearing_aclus = (disappearing_aclus.tolist() + appearing_aclus.tolist())
-        appearing_or_disappearing_aclus = sort(appearing_or_disappearing_aclus)
+        is_appearing_or_disappearing = np.logical_or(is_appearing, is_disappearing)
+        appearing_or_disappearing_stability_df = stability_df[is_appearing_or_disappearing]
+        appearing_or_disappearing_aclus = sort(appearing_or_disappearing_stability_df.aclu.values)
+        
+
+        # appearing_or_disappearing_aclus = (disappearing_aclus.tolist() + appearing_aclus.tolist())
+        # appearing_or_disappearing_aclus = sort(appearing_or_disappearing_aclus)
         # override_active_neuron_IDs.extend(appearing_aclus)
         # override_active_neuron_IDs # [ 3 11 14 15 24 34 35 51 58 67 74 82]
-        return appearing_or_disappearing_aclus, appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus
+        
+        stable_both_stability_df = stability_df[np.logical_and(stable_long, stable_short)]
+        stable_both_aclus = stable_both_stability_df.aclu.values
+        
+        stable_neither_stability_df = stability_df[np.logical_and(unstable_long, unstable_short)]
+        stable_neither_aclus = stable_neither_stability_df.aclu.values
+        
+        stable_long_stability_df = stability_df[stable_long]
+        stable_long_aclus = stable_long_stability_df.aclu.values
+        
+        stable_short_stability_df = stability_df[stable_short]
+        stable_short_aclus = stable_short_stability_df.aclu.values
+
+        return (appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df)
+        # (appearing_aclus, disappearing_aclus, appearing_or_disappearing_aclus, stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus)
+    
+        # return appearing_or_disappearing_aclus, appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus, (stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus)
+    
+        # return appearing_or_disappearing_aclus, appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus, (stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus)
 
 
     def get_stability_df(self):
@@ -4353,9 +4382,12 @@ class TrialByTrialActivityResult(ComputedResult):
 
         """
         stability_df, stability_dict = self.get_stability_df()
-        return TrialByTrialActivityResult.determine_neuron_stability(stability_df=stability_df, minimum_one_point_stability=minimum_one_point_stability, zero_point_stability=zero_point_stability)
         
-
+        neuron_group_split_stability_dfs_tuple = TrialByTrialActivityResult.determine_neuron_stability(stability_df=stability_df, minimum_one_point_stability=minimum_one_point_stability, zero_point_stability=zero_point_stability)
+        appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df = neuron_group_split_stability_dfs_tuple
+        neuron_group_split_stability_aclus_tuple = [np.sort(a_df.aclu.values) for a_df in neuron_group_split_stability_dfs_tuple]
+        appearing_aclus, disappearing_aclus, appearing_or_disappearing_aclus, stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus = neuron_group_split_stability_aclus_tuple
+        return (neuron_group_split_stability_dfs_tuple, neuron_group_split_stability_aclus_tuple)
 
 def _workaround_validate_has_directional_trial_by_trial_activity_result(curr_active_pipeline, computation_filter_name='maze') -> bool:
     """ Validates `_build_trial_by_trial_activity_metrics`
@@ -4429,6 +4461,10 @@ def _check_result_laps_epochs_df_performance(result_laps_epochs_df: pd.DataFrame
     percent_laps_estimated_correctly = (np.sum(are_both_decoded_properties_correct) / n_laps)
     if debug_print:
         print(f'percent_laps_estimated_correctly: {percent_laps_estimated_correctly}')
+        
+    result_laps_epochs_df['is_decoded_track_correct'] = is_decoded_track_correct
+    result_laps_epochs_df['is_decoded_dir_correct'] = is_decoded_dir_correct
+    result_laps_epochs_df['are_both_decoded_properties_correct'] = are_both_decoded_properties_correct
 
     # return (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly)
     return CompleteDecodedContextCorrectness(DecodedContextCorrectnessArraysTuple(is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), PercentDecodedContextCorrectnessTuple(percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly))

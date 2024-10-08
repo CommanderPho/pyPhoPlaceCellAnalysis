@@ -51,7 +51,7 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 # ==================================================================================================================== #
 
 # appearing_or_disappearing_aclus, appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus
-def _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline, active_laps_decoding_time_bin_size: float = 0.25):
+def _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline, included_neuron_IDs, active_laps_decoding_time_bin_size: float = 0.25):
     # Inputs: all_directional_pf1D_Decoder, alt_directional_merged_decoders_result
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestSplitResult, TrainTestLapsSplitting, CustomDecodeEpochsResult, decoder_name, epoch_split_key, get_proper_global_spikes_df, DirectionalPseudo2DDecodersResult
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _do_train_test_split_decode_and_evaluate
@@ -93,9 +93,8 @@ def _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline, a
     
     # MAIN _______________________________________________________________________________________________________________ #
     
-    # active_laps_decoding_time_bin_size: float = 2.5
-    # active_laps_decoding_time_bin_size: float = 5.5
     complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results = _do_train_test_split_decode_and_evaluate(curr_active_pipeline=curr_active_pipeline, active_laps_decoding_time_bin_size=active_laps_decoding_time_bin_size,
+                                                                                                                                                                                                                                                  included_neuron_IDs=included_neuron_IDs,
                                                                                                                                                                                                                                                   force_recompute_directional_train_test_split_result=False, compute_separate_decoder_results=True)
     (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = complete_decoded_context_correctness_tuple
     print(f"percent_laps_track_identity_estimated_correctly: {round(percent_laps_track_identity_estimated_correctly*100.0, ndigits=3)}%")
@@ -104,14 +103,15 @@ def _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline, a
         assert len(_out_separate_decoder_results) == 3, f"_out_separate_decoder_results: {_out_separate_decoder_results}"
         test_decoder_results_dict, train_decoded_results_dict, train_decoded_measured_diff_df_dict = _out_separate_decoder_results
         ## OUTPUTS: test_decoder_results_dict, train_decoded_results_dict
-    _remerged_laps_dfs_dict = {}
-    for a_decoder_name, a_test_epochs_df in test_epochs_dict.items():
-        a_train_epochs_df = train_epochs_dict[a_decoder_name]
-        a_train_epochs_df['test_train_epoch_type'] = 'train'
-        a_test_epochs_df['test_train_epoch_type'] = 'test'
-        _remerged_laps_dfs_dict[a_decoder_name] = pd.concat([a_train_epochs_df, a_test_epochs_df], axis='index')
-        _remerged_laps_dfs_dict[a_decoder_name] = _add_extra_epochs_df_columns(epochs_df=_remerged_laps_dfs_dict[a_decoder_name])
-
+    # _remerged_laps_dfs_dict = {}
+    # for a_decoder_name, a_test_epochs_df in test_epochs_dict.items():
+    #     a_train_epochs_df = train_epochs_dict[a_decoder_name]
+    #     a_train_epochs_df['test_train_epoch_type'] = 'train'
+    #     a_test_epochs_df['test_train_epoch_type'] = 'test'
+    #     _remerged_laps_dfs_dict[a_decoder_name] = pd.concat([a_train_epochs_df, a_test_epochs_df], axis='index')
+    #     _remerged_laps_dfs_dict[a_decoder_name] = _add_extra_epochs_df_columns(epochs_df=_remerged_laps_dfs_dict[a_decoder_name])
+        
+    return (complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results) 
 
 
 @function_attributes(short_name=None, tags=['long_short', 'firing_rate'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-17 05:22', related_items=['determine_neuron_exclusivity_from_firing_rate'])
