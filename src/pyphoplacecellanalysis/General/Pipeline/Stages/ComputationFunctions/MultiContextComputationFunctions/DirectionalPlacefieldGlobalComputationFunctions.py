@@ -507,6 +507,41 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
             'short_LR': self.short_LR_decoder,
             'short_RL': self.short_RL_decoder,
         }
+    
+
+    def sliced_by_neuron_id(self, included_neuron_ids: NDArray) -> "TrackTemplates":
+        """ refactored out of `self.filtered_by_frate(...)` and `TrackTemplates.determine_decoder_aclus_filtered_by_frate(...)`
+        """
+        _obj = deepcopy(self) # temporary copy of the object
+        # assert np.all([(v in _obj.neuron_ids) for v in included_neuron_ids]), f"All included_neuron_ids must already exist in the object: included_neuron_ids: {included_neuron_ids}\n\t_obj.neuron_ids: {_obj.neuron_ids}"
+        # n_aclus = len(included_neuron_ids)
+        # is_neuron_id_included = np.isin(included_neuron_ids, _obj.neuron_ids)
+        # is_neuron_id_included = np.where(np.isin(included_neuron_ids, _obj.neuron_ids))[0]
+        # z_scored_tuning_map_matrix = deepcopy(z_scored_tuning_map_matrix)
+        
+        # filtered_decoder_list, filtered_direction_shared_aclus_list, is_aclu_included_list, individual_decoder_filtered_aclus_list = TrackTemplates.determine_decoder_aclus_filtered_by_frate(self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+        long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder = _obj.long_LR_decoder, _obj.long_RL_decoder, _obj.short_LR_decoder, _obj.short_RL_decoder
+        original_neuron_ids_list = [a_decoder.pf.ratemap.neuron_ids for a_decoder in (long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder)]
+        is_aclu_included_list = [np.where(np.isin(included_neuron_ids, a_decoder.pf.ratemap.neuron_ids))[0] for a_decoder in (long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder)]
+        individual_decoder_filtered_aclus_list = [np.array(a_decoder.pf.ratemap.neuron_ids)[np.where(np.isin(included_neuron_ids, a_decoder.pf.ratemap.neuron_ids))[0]] for a_decoder in (long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder)]
+
+        ## For a given run direction (LR/RL) let's require inclusion in either (OR) long v. short to be included.
+        filtered_included_LR_aclus = np.union1d(individual_decoder_filtered_aclus_list[0], individual_decoder_filtered_aclus_list[2])
+        filtered_included_RL_aclus = np.union1d(individual_decoder_filtered_aclus_list[1], individual_decoder_filtered_aclus_list[3])
+        # build the final shared aclus:
+        filtered_direction_shared_aclus_list = [filtered_included_LR_aclus, filtered_included_RL_aclus, filtered_included_LR_aclus, filtered_included_RL_aclus] # contains the shared aclus for that direction
+        # rebuild the is_aclu_included_list from the shared aclus
+        # is_aclu_included_list = [np.isin(an_original_neuron_ids, a_filtered_neuron_ids) for an_original_neuron_ids, a_filtered_neuron_ids in zip(original_neuron_ids_list, filtered_direction_shared_aclus_list)]
+        filtered_decoder_list = [a_decoder.get_by_id(a_filtered_aclus) for a_decoder, a_filtered_aclus in zip((long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder), filtered_direction_shared_aclus_list)]
+        long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder = filtered_decoder_list # unpack filtered decoders
+        
+        _obj = TrackTemplates.init_from_paired_decoders(LR_decoder_pair=(long_LR_decoder, short_LR_decoder), RL_decoder_pair=(long_RL_decoder, short_RL_decoder), rank_method=_obj.rank_method)
+        assert np.all(filtered_direction_shared_aclus_list[0] == _obj.shared_LR_aclus_only_neuron_IDs)
+        assert np.all(filtered_direction_shared_aclus_list[1] == _obj.shared_RL_aclus_only_neuron_IDs)
+        assert len(filtered_direction_shared_aclus_list[0]) == len(_obj.decoder_LR_pf_peak_ranks_list[0])
+        assert len(filtered_direction_shared_aclus_list[1]) == len(_obj.decoder_RL_pf_peak_ranks_list[0])
+        return _obj
+    
 
     @classmethod
     def init_from_paired_decoders(cls, LR_decoder_pair: Tuple[BasePositionDecoder, BasePositionDecoder], RL_decoder_pair: Tuple[BasePositionDecoder, BasePositionDecoder], rank_method:str='average') -> "TrackTemplates":
@@ -3333,7 +3368,7 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
 
     ## Decoding of the test epochs (what matters) for `all_directional_pf1D_Decoder`:
     test_all_directional_decoder_result: CustomDecodeEpochsResult = _do_custom_decode_epochs(global_spikes_df=get_proper_global_spikes_df(curr_active_pipeline), global_measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']),
-                                                            pf1D_Decoder=all_directional_pf1D_Decoder, epochs_to_decode_df=all_test_epochs_df,
+                                                            pf1D_Decoder=all_directional_pf1D_Decoder, epochs_to_decode_df=deepcopy(all_test_epochs_df),
                                                             decoding_time_bin_size=active_laps_decoding_time_bin_size)
     all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult = test_all_directional_decoder_result.decoder_result
     ## INPUTS: test_all_directional_decoder_result
