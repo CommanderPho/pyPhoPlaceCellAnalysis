@@ -63,7 +63,7 @@ class TrialByTrialActivityWindow:
 
     @function_attributes(short_name=None, tags=['matplotlib', 'trial-to-trial-variability', 'laps'], input_requires=[], output_provides=[], uses=[], used_by=['plot_trial_to_trial_reliability_all_decoders_image_stack'], creation_date='2024-08-29 03:26', related_items=[])
     @classmethod
-    def _plot_trial_to_trial_reliability_image_array(cls, active_one_step_decoder, z_scored_tuning_map_matrix, max_num_columns=5, drop_below_threshold=0.0000001, app=None, parent_root_widget=None, root_render_widget=None, debug_print=False, defer_show:bool=False):
+    def _plot_trial_to_trial_reliability_image_array(cls, active_one_step_decoder, z_scored_tuning_map_matrix, active_neuron_IDs=None, max_num_columns=5, drop_below_threshold=0.0000001, app=None, parent_root_widget=None, root_render_widget=None, debug_print=False, defer_show:bool=False):
         """ plots the reliability across laps for each decoder
         
         ## Usage:
@@ -111,8 +111,16 @@ class TrialByTrialActivityWindow:
         # print(f'image_aspect_ratio: {image_aspect_ratio} - xScale/yScale: {float(image_width_height_tuple.width) / float(image_width_height_tuple.height)}')
 
         # Compute Images:
-        included_unit_indicies = np.arange(np.shape(images)[0]) # include all unless otherwise specified
-        nMapsToShow = len(included_unit_indicies)
+        has_active_neuron_IDs: bool = False
+        if active_neuron_IDs is not None:
+            assert (len(active_neuron_IDs) == np.shape(images)[0]), f"np.shape(images)[0]: {np.shape(images)[0]} should equal len(active_neuron_IDs): {len(active_neuron_IDs)}\nactive_neuron_IDs: {active_neuron_IDs}"
+            included_unit_indicies = np.squeeze(np.array(active_neuron_IDs))
+            has_active_neuron_IDs = True
+        else:
+            print(f'WARNING: no active_neuron_IDs provided!')
+            included_unit_indicies = np.arange(np.shape(images)[0]) # include all unless otherwise specified
+            
+        nMapsToShow: int = len(included_unit_indicies)
 
         # Paging Management: Constrain the subplots values to just those that you need
         subplot_no_pagination_configuration, included_combined_indicies_pages, page_grid_sizes = compute_paginated_grid_config(nMapsToShow, max_num_columns=max_num_columns, max_subplots_per_page=None, data_indicies=included_unit_indicies, last_figure_subplots_same_layout=True)
@@ -138,7 +146,7 @@ class TrialByTrialActivityWindow:
         # root_render_widget.nextRow()
         
 
-
+        ## This page only:
         for (a_linear_index, curr_row, curr_col, curr_included_unit_index) in included_combined_indicies_pages[page_idx]:
             # Need to convert to page specific:
             curr_page_relative_linear_index = np.mod(a_linear_index, int(page_grid_sizes[page_idx].num_rows * page_grid_sizes[page_idx].num_columns))
@@ -151,8 +159,13 @@ class TrialByTrialActivityWindow:
             if debug_print:
                 print(f'a_linear_index: {a_linear_index}, curr_page_relative_linear_index: {curr_page_relative_linear_index}, curr_row: {curr_row}, curr_col: {curr_col}, curr_page_relative_row: {curr_page_relative_row}, curr_page_relative_col: {curr_page_relative_col}, curr_included_unit_index: {curr_included_unit_index}')
 
-            neuron_IDX = curr_included_unit_index
-            curr_cell_identifier_string = f'Cell[{neuron_IDX}]'
+            if not has_active_neuron_IDs:
+                neuron_IDX = curr_included_unit_index
+                curr_cell_identifier_string = f'Cell[{neuron_IDX}]'
+            else:
+                neuron_aclu = curr_included_unit_index
+                curr_cell_identifier_string = f'Cell[{neuron_aclu}]'
+                
             curr_plot_identifier_string = f'pyqtplot_plot_image_array.{curr_cell_identifier_string}'
 
             # # Pre-filter the data:
@@ -266,7 +279,7 @@ class TrialByTrialActivityWindow:
         if not defer_show:
             parent_root_widget.show()
             
-                    
+   
         return app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array, (lblTitle, lblFooter)
     
     
@@ -275,7 +288,19 @@ class TrialByTrialActivityWindow:
         return f"<span style = 'font-size : 12px;' >{title}</span>"
     
 
-    @function_attributes(short_name=None, tags=['reliability', 'decoders', 'all', 'pyqtgraph', 'display', 'figure'], input_requires=[], output_provides=[], uses=['plot_trial_to_trial_reliability_image_array', 'create_transparent_colormap'], used_by=[], creation_date='2024-08-29 04:34', related_items=[])
+    def build_single_cell_formatted_descriptor_string(self, aclu) -> str:
+        from neuropy.utils.matplotlib_helpers import _build_neuron_identity_label
+        # normal (non-shared mode)
+        # neuron_IDX = curr_included_unit_index
+        # self.plots_data.plot_data_array
+        # neuron_i: int = list(self.plots_data.active_one_step_decoder.included_neuron_IDs).index(aclu)
+        curr_extended_id_string: str = self.plots_data.active_one_step_decoder.ratemap.get_extended_neuron_id_string(neuron_id=aclu)
+        # final_title_str: str = f"aclu: {aclu}: {curr_extended_id_string}" # _build_neuron_identity_label(neuron_extended_id=curr_extended_id_string, brev_mode=None, formatted_max_value_string=None, use_special_overlayed_title=True)
+        final_title_str: str = f"aclu: <span style = 'font-size : 10px;' >{aclu}</span>:\n<span style = 'font-size : 8px;' >{curr_extended_id_string}</span>"
+        return final_title_str
+
+
+    @function_attributes(short_name=None, tags=['reliability', 'decoders', 'all', 'pyqtgraph', 'display', 'figure', 'main'], input_requires=[], output_provides=[], uses=['plot_trial_to_trial_reliability_image_array', 'create_transparent_colormap'], used_by=[], creation_date='2024-08-29 04:34', related_items=[])
     @classmethod
     def plot_trial_to_trial_reliability_all_decoders_image_stack(cls, directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity], active_one_step_decoder, drop_below_threshold=0.0000001, is_overlaid_heatmaps_mode: bool = True,
                                                                   app=None, parent_root_widget=None, root_render_widget=None, debug_print=False, defer_show:bool=False, name:str = 'TrialByTrialActivityWindow',
@@ -297,13 +322,16 @@ class TrialByTrialActivityWindow:
         from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
         
-
-        
-        
         ## Usage:
         
         directional_active_lap_pf_results_dicts = {k:v for k, v in directional_active_lap_pf_results_dicts.items() if k in TrackTemplates.get_decoder_names()}
+        directional_active_pf_neuron_IDS_dict = {k:v.neuron_ids for k, v in directional_active_lap_pf_results_dicts.items()}
+        print(f'directional_active_pf_neuron_IDS_dict: {directional_active_pf_neuron_IDS_dict}')
+        active_neuron_IDs = deepcopy(list(directional_active_pf_neuron_IDS_dict.values())[0])
+        assert np.allclose([list(v) for v in list(directional_active_pf_neuron_IDS_dict.values())], active_neuron_IDs), f"All neuron_IDs must be the same!"
+        
 
+        
         if is_overlaid_heatmaps_mode:
             ## first decoder:
             a_decoder_name = 'long_LR'
@@ -322,7 +350,7 @@ class TrialByTrialActivityWindow:
             # active_z_scored_tuning_map_matrix = np.concatenate(active_z_scored_tuning_map_matrix)
 
         # Plots only the first data-series ('long_LR')
-        app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array, (lblTitle, lblFooter) = cls._plot_trial_to_trial_reliability_image_array(active_one_step_decoder=active_one_step_decoder, z_scored_tuning_map_matrix=active_z_scored_tuning_map_matrix, drop_below_threshold=drop_below_threshold)
+        app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array, (lblTitle, lblFooter) = cls._plot_trial_to_trial_reliability_image_array(active_one_step_decoder=active_one_step_decoder, z_scored_tuning_map_matrix=active_z_scored_tuning_map_matrix, active_neuron_IDs=active_neuron_IDs, drop_below_threshold=drop_below_threshold)
         additional_heatmaps_data = {}
         additional_img_items_dict = {}
         
@@ -402,7 +430,8 @@ class TrialByTrialActivityWindow:
                             pass # do nothing, use the same bounds for each image
 
                         additional_img_item.setImage(additional_image, rect=shifted_curr_image_bounds_extent, autoLevels=False) # rect: [x, y, w, h] 
-                        additional_img_item.setOpacity(0.5)  # Set transparency for overlay
+                        # additional_img_item.setOpacity(0.5)  # Set transparency for overlay
+                        additional_img_item.setOpacity(1.0)  # Set transparency for pre-separated overlay
                         if isinstance(cmap, NDArray):
                             additional_img_item.setLookupTable(cmap, update=False)
                         else:
@@ -442,7 +471,9 @@ class TrialByTrialActivityWindow:
                                  additional_img_items_dict=additional_img_items_dict) # , ctrl_widgets={'slider': slider}
         _obj.plots_data = RenderPlotsData(name=name, 
                                           plot_data_array=plot_data_array,
-                                            color_dict=color_dict,
+                                          active_neuron_IDs=deepcopy(active_neuron_IDs),
+                                          active_one_step_decoder=deepcopy(active_one_step_decoder),
+                                          color_dict=color_dict,
                                             # **{k:v for k, v in _obj.plots_data.to_dict().items() if k not in ['name']},
                                             )
         _obj.ui = PhoUIContainer(name=name, app=app, root_render_widget=root_render_widget, parent_root_widget=parent_root_widget,
