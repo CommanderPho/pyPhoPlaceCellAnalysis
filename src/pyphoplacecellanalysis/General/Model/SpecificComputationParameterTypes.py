@@ -20,7 +20,21 @@ Generated programmatically from `pyphoplacecellanalysis.General.PipelineParamete
 class BaseGlobalComputationParameters(BaseConfig):
     """ Base class
     """
-    pass
+
+    def __repr__(self):
+        """ 2024-01-11 - Renders only the fields and their sizes  """
+        from pyphocorehelpers.print_helpers import strip_type_str_to_classname
+        attr_reprs = []
+        for a in self.__attrs_attrs__:
+            attr_type = strip_type_str_to_classname(type(getattr(self, a.name)))
+            if 'shape' in a.metadata:
+                shape = ', '.join(a.metadata['shape'])  # this joins tuple elements with a comma, creating a string without quotes
+                attr_reprs.append(f"{a.name}: {attr_type} | shape ({shape})")  # enclose the shape string with parentheses
+            else:
+                attr_reprs.append(f"{a.name}: {attr_type}")
+        content = ",\n\t".join(attr_reprs)
+        return f"{type(self).__name__}({content}\n)"
+    
 
 
 @define(slots=False, eq=False, repr=False)
