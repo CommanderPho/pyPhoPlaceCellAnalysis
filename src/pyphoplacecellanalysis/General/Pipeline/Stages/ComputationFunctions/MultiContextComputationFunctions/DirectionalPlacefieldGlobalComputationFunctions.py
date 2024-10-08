@@ -1792,14 +1792,11 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
 
         ## Laps:
-        laps_epochs_df = deepcopy(self.all_directional_laps_filter_epochs_decoder_result.filter_epochs)
-        if not isinstance(laps_epochs_df, pd.DataFrame):
-            laps_epochs_df = laps_epochs_df.to_dataframe()
-        
-        laps_directional_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_directional_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
-        laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = laps_directional_marginals_tuple
-        laps_track_identity_marginals = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
-        track_identity_marginals, track_identity_all_epoch_bins_marginal, most_likely_track_identity_from_decoder, is_most_likely_track_identity_Long = laps_track_identity_marginals
+        laps_epochs_df = ensure_dataframe(deepcopy(self.all_directional_laps_filter_epochs_decoder_result.filter_epochs))        
+        # laps_directional_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_directional_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
+        # laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = laps_directional_marginals_tuple
+        # laps_track_identity_marginals = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(self.all_directional_laps_filter_epochs_decoder_result)
+        # track_identity_marginals, track_identity_all_epoch_bins_marginal, most_likely_track_identity_from_decoder, is_most_likely_track_identity_Long = laps_track_identity_marginals
         laps_decoding_time_bin_size_str: str = f"{round(self.laps_decoding_time_bin_size, ndigits=5)}"
         
         ## Build the per-time-bin results:
@@ -1807,12 +1804,13 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         laps_time_bin_marginals_df: pd.DataFrame = self.laps_time_bin_marginals_df.copy()
         laps_time_bin_marginals_out_path = export_marginals_df_csv(laps_time_bin_marginals_df, data_identifier_str=f'(laps_time_bin_marginals_df)_tbin-{laps_decoding_time_bin_size_str}')
 
+        # laps_marginals_df: pd.DataFrame = pd.DataFrame(np.hstack((laps_directional_all_epoch_bins_marginal, track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
+        # laps_marginals_df['lap_idx'] = laps_marginals_df.index.to_numpy()
+        # laps_marginals_df['lap_start_t'] = laps_epochs_df['start'].to_numpy()
+        # laps_marginals_df
 
-        laps_marginals_df: pd.DataFrame = pd.DataFrame(np.hstack((laps_directional_all_epoch_bins_marginal, track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
-        laps_marginals_df['lap_idx'] = laps_marginals_df.index.to_numpy()
-        laps_marginals_df['lap_start_t'] = laps_epochs_df['start'].to_numpy()
-        laps_marginals_df
-        
+        (laps_directional_marginals_tuple, laps_track_identity_marginals_tuple, laps_non_marginalized_decoder_marginals_tuple), laps_marginals_df = self.all_directional_laps_filter_epochs_decoder_result.compute_marginals(epoch_idx_col_name='lap_idx', epoch_start_t_col_name='lap_start_t',
+                                                                                                                                                            additional_transfer_column_names=['start','stop','label','duration','lap_id','lap_dir','maze_id','is_LR_dir'])        
         
         # epoch_extracted_posteriors = [a_result['p_x_given_n'] for a_result in track_identity_marginals]
         # n_epoch_time_bins = [np.shape(a_posterior)[-1] for a_posterior in epoch_extracted_posteriors]
@@ -1826,10 +1824,10 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         ## Ripples:
         ripple_epochs_df = deepcopy(self.all_directional_ripple_filter_epochs_decoder_result.filter_epochs)
         all_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = self.all_directional_ripple_filter_epochs_decoder_result
-        ripple_marginals = DirectionalPseudo2DDecodersResult.determine_directional_likelihoods(all_directional_ripple_filter_epochs_decoder_result)
-        ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir  = ripple_marginals
-        ripple_track_identity_marginals = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(all_directional_ripple_filter_epochs_decoder_result)
-        ripple_track_identity_marginals, ripple_track_identity_all_epoch_bins_marginal, ripple_most_likely_track_identity_from_decoder, ripple_is_most_likely_track_identity_Long = ripple_track_identity_marginals
+        # ripple_marginals = DirectionalPseudo2DDecodersResult.determine_directional_likelihoods(all_directional_ripple_filter_epochs_decoder_result)
+        # ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir  = ripple_marginals
+        # ripple_track_identity_marginals = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(all_directional_ripple_filter_epochs_decoder_result)
+        # ripple_track_identity_marginals, ripple_track_identity_all_epoch_bins_marginal, ripple_most_likely_track_identity_from_decoder, ripple_is_most_likely_track_identity_Long = ripple_track_identity_marginals
         ripple_decoding_time_bin_size_str: str = f"{round(self.ripple_decoding_time_bin_size, ndigits=5)}"
 
         ## Build the per-time-bin results:
@@ -1839,11 +1837,18 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
 
         ## Ripple marginals_df:
-        ripple_marginals_df: pd.DataFrame = pd.DataFrame(np.hstack((ripple_directional_all_epoch_bins_marginal, ripple_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
-        ripple_marginals_df['ripple_idx'] = ripple_marginals_df.index.to_numpy()
-        ripple_marginals_df['ripple_start_t'] = ripple_epochs_df['start'].to_numpy()
-        ripple_marginals_df
+        # ripple_marginals_df: pd.DataFrame = pd.DataFrame(np.hstack((ripple_directional_all_epoch_bins_marginal, ripple_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
+        # ripple_marginals_df['ripple_idx'] = ripple_marginals_df.index.to_numpy()
+        # ripple_marginals_df['ripple_start_t'] = ripple_epochs_df['start'].to_numpy()
+        # ripple_marginals_df
 
+        ## INPUTS: all_directional_ripple_filter_epochs_decoder_result
+
+
+        (ripple_directional_marginals_tuple, ripple_track_identity_marginals_tuple, ripple_non_marginalized_decoder_marginals_tuple), ripple_marginals_df = all_directional_ripple_filter_epochs_decoder_result.compute_marginals(epoch_idx_col_name='ripple_idx', epoch_start_t_col_name='ripple_start_t',
+                                                                                                                                                                    additional_transfer_column_names=['start','stop','label','duration','ripple_idx','maze_id']) # ,'lap_dir','is_LR_dir',
+        ## OUTPUT: ripple_marginals_df
+        
         ripple_out_path = export_marginals_df_csv(ripple_marginals_df, data_identifier_str=f'(ripple_marginals_df)_tbin-{ripple_decoding_time_bin_size_str}')
 
         return (laps_marginals_df, laps_out_path, laps_time_bin_marginals_df, laps_time_bin_marginals_out_path), (ripple_marginals_df, ripple_out_path, ripple_time_bin_marginals_df, ripple_time_bin_marginals_out_path)
