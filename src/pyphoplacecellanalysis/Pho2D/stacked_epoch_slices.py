@@ -1041,9 +1041,6 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         disable_toolbar = params_kwargs.pop('disable_toolbar', True)
         kwargs['disable_toolbar'] = disable_toolbar
 
-        
-        
-
         params, plots_data, plots, ui = plot_decoded_epoch_slices(filter_epochs=deepcopy(active_filter_epochs), filter_epochs_decoder_result=deepcopy(filter_epochs_decoder_result), global_pos_df=global_pos_df, variable_name='lin_pos', xbin=xbin, included_epoch_indicies=included_epoch_indicies,
                                                                 name=a_name, debug_print=False, debug_test_max_num_slices=max_subplots_per_page, params_kwargs=params_kwargs, **kwargs)
 
@@ -1333,7 +1330,6 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         if self.params.debug_print:
             self.ui.print(f'\tincluded_page_data_indicies: {included_page_data_indicies}')
 
-
         ## retrieve update function via:
         if self.params.get('is_insets_view', False):
             ## insets view mode. try to get the duration/widget update function
@@ -1414,7 +1410,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                     self.ui.print(f'WARNING: exceeded data indicies (probably on last page). (for page_idx: {page_idx}, i: {i}, curr_ax: {curr_ax})')
                 curr_ax.set_visible(False)
 
-            except Exception as e:
+            except BaseException as e:
                 raise e
             
 
@@ -1563,8 +1559,6 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         # Update the selection rectangles for this ax if we have them:
         selection_artists_dict = self.plots.get('selection_artists_dict', {})
         a_selection_artists = selection_artists_dict.get(ax, {})
-        
-
 
         # Update the selection rectangles for this ax if we have them:
         a_selection_rect = a_selection_artists.get('rectangles', None)        
@@ -1638,7 +1632,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import RadonTransformPlotDataProvider
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import WeightedCorrelationPaginatedPlotDataProvider
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DecodedPositionsPlotDataProvider
-
+        # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import TrainTestSplitPlotDataProvider, TrainTestSplitPlotData
         # self: PaginatedFigureController
 
         # a_pagination_controller = self
