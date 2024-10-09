@@ -1401,6 +1401,9 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
         Requires: self.all_directional_laps_filter_epochs_decoder_result, self.all_directional_ripple_filter_epochs_decoder_result
 
+        Updates: 
+        (self.laps_directional_marginals_tuple, self.laps_track_identity_marginals_tuple
+        self.ripple_directional_marginals_tuple, self.ripple_track_identity_marginals_tuple
         """
         # Computes and initializes the marginal properties:        
         if self.all_directional_laps_filter_epochs_decoder_result is not None:
@@ -3176,7 +3179,7 @@ def _do_custom_decode_epochs_dict(global_spikes_df: pd.DataFrame, global_measure
 
 
 @function_attributes(short_name=None, tags=['TrainTestSplit', 'decode'], input_requires=[], output_provides=[],
-                      uses=['_do_custom_decode_epochs', '_check_result_laps_epochs_df_performance', 'DirectionalPseudo2DDecodersResult'], used_by=[], creation_date='2024-10-08 02:35', related_items=[])
+                      uses=['_do_custom_decode_epochs', '_check_result_laps_epochs_df_performance', 'DirectionalPseudo2DDecodersResult'], used_by=['_perform_run_rigorous_decoder_performance_assessment'], creation_date='2024-10-08 02:35', related_items=[])
 def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_decoding_time_bin_size: float=1.5, force_recompute_directional_train_test_split_result: bool=False, compute_separate_decoder_results: bool=True, included_neuron_IDs=None):
     """ 
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _do_train_test_split_decode_and_evaluate
