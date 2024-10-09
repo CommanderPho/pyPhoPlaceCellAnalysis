@@ -4503,9 +4503,15 @@ def get_proper_global_spikes_df(owning_pipeline_reference, minimum_inclusion_fr_
     # Get proper global_spikes_df:
     long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
     if minimum_inclusion_fr_Hz is None:
-        rank_order_results = owning_pipeline_reference.global_computation_results.computed_data['RankOrder'] # "RankOrderComputationsContainer"
-        minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
-        included_qclu_values: List[int] = rank_order_results.included_qclu_values
+        rank_order_results = owning_pipeline_reference.global_computation_results.computed_data.get('RankOrder', None) # "RankOrderComputationsContainer"
+        if rank_order_results is not None:
+            minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+            included_qclu_values: List[int] = rank_order_results.included_qclu_values
+        else:        
+            ## get from parameters:
+            minimum_inclusion_fr_Hz: float = owning_pipeline_reference.global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+            included_qclu_values: List[int] = owning_pipeline_reference.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
+        
 
     directional_laps_results: DirectionalLapsResult = owning_pipeline_reference.global_computation_results.computed_data['DirectionalLaps']
     track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
@@ -5975,7 +5981,18 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
         jonathan_firing_rate_analysis_result = global_computation_results.computed_data.jonathan_firing_rate_analysis # JonathanFiringRateAnalysisResult
         neuron_replay_stats_df: pd.DataFrame = deepcopy(jonathan_firing_rate_analysis_result.neuron_replay_stats_df)
-        neuron_replay_stats_df, all_pf2D_peaks_modified_columns = jonathan_firing_rate_analysis_result.add_peak_promenance_pf_peaks(curr_active_pipeline=owning_pipeline_reference, track_templates=track_templates)
+        
+        ## Requires: 
+        # owning_pipeline_reference.computation_results[global_context].computed_data['RatemapPeaksAnalysis']['PeakProminence2D']
+        try:
+            neuron_replay_stats_df, all_pf2D_peaks_modified_columns = jonathan_firing_rate_analysis_result.add_peak_promenance_pf_peaks(curr_active_pipeline=owning_pipeline_reference, track_templates=track_templates)
+        except KeyError as e:
+            # KeyError: 'RatemapPeaksAnalysis'
+            print(f"missing ['RatemapPeaksAnalysis']['PeakProminence2D']. skipping.")
+            pass
+        except BaseException as e:
+            raise e
+        
         neuron_replay_stats_df, all_pf1D_peaks_modified_columns = jonathan_firing_rate_analysis_result.add_directional_pf_maximum_peaks(track_templates=track_templates)
         # both_included_neuron_stats_df = deepcopy(neuron_replay_stats_df[neuron_replay_stats_df['LS_pf_peak_x_diff'].notnull()]).drop(columns=['track_membership', 'neuron_type'])
         global_computation_results.computed_data['jonathan_firing_rate_analysis'] = jonathan_firing_rate_analysis_result
