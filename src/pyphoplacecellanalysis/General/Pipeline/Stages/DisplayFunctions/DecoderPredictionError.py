@@ -787,6 +787,8 @@ def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_prin
     """
     # plots_data.active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_x_list
     # plots_data.active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list
+    should_render_time_bins: bool = params.setdefault('should_draw_time_bin_boundaries', True)
+    time_bin_edges_display_kwargs = params.setdefault('time_bin_edges_display_kwargs', dict(color='grey', alpha=0.5, linewidth=1.5))
 
     active_marginal_list = plots_data.active_marginal_fn(plots_data.filter_epochs_decoder_result)
     for i, curr_ax in enumerate(plots.axs):
@@ -802,6 +804,27 @@ def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_prin
             curr_most_likely_positions = None
 
         params, plots_data, plots, ui = _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, plots, ui, i, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=debug_print)
+        ## Add optional time bin edges if needed:
+        if should_render_time_bins:
+            time_bin_edge_lines = plots.get('time_bin_edge_lines', None)
+            
+            if time_bin_edge_lines is None:
+                plots.time_bin_edge_lines = {} ## initialize
+                
+            time_bin_edge_items = plots.time_bin_edge_lines.get(curr_ax, [])
+            for vline in time_bin_edge_items:
+                vline.remove() # remove existiung
+
+            plots.time_bin_edge_lines[curr_ax] = [] # cleared
+            time_bin_edges = curr_time_bin_container.edges
+            ## Add the grid-bin lines:
+            # Draw grid at specific time_bin_edges (vertical lines)
+            _temp_new_line_items = []
+            for edge in time_bin_edges:
+                _temp_new_line_items.append(curr_ax.axvline(x=edge, **time_bin_edges_display_kwargs, clip_on=True)) # clip_on=True means the axes wont be adjusted to fit the lines
+                
+            plots.time_bin_edge_lines[curr_ax] = _temp_new_line_items
+
         on_render_page_callbacks = params.get('on_render_page_callbacks', {})
         for a_callback_name, a_callback in on_render_page_callbacks.items():
             with ExceptionPrintingContext(suppress=params.get("should_suppress_callback_exceptions", True), exception_print_fn=(lambda formatted_exception_str: print(f'\t encountered exception in callback "{a_callback_name}": {formatted_exception_str}'))):
@@ -879,6 +902,8 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
         is_included_in_subset = np.isin(epochs_df.index, included_epoch_indicies)
         epochs_df = epochs_df[is_included_in_subset]
         filter_epochs_decoder_result = filter_epochs_decoder_result.filtered_by_epochs(included_epoch_indicies)
+
+
 
     # if 'label' not in epochs_df.columns:
     epochs_df['label'] = epochs_df.index.to_numpy() # integer ripple indexing

@@ -1332,6 +1332,9 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         if self.params.debug_print:
             self.ui.print(f'\tincluded_page_data_indicies: {included_page_data_indicies}')
 
+        should_render_time_bins: bool = self.params.setdefault('should_draw_time_bin_boundaries', True)
+        time_bin_edges_display_kwargs = self.params.setdefault('time_bin_edges_display_kwargs', dict(color='grey', alpha=0.5, linewidth=1.5))
+        
         ## retrieve update function via:
         if self.params.get('is_insets_view', False):
             ## insets view mode. try to get the duration/widget update function
@@ -1379,6 +1382,26 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                 
                 if _temp_fig is not None:
                     self.plots.fig = _temp_fig
+                    
+                if should_render_time_bins:
+                    time_bin_edge_lines = self.plots.get('time_bin_edge_lines', None)
+                    
+                    if time_bin_edge_lines is None:
+                        self.plots.time_bin_edge_lines = {} ## initialize
+                        
+                    time_bin_edge_items = self.plots.time_bin_edge_lines.get(curr_ax, [])
+                    for vline in time_bin_edge_items:
+                        vline.remove() # remove existiung
+
+                    self.plots.time_bin_edge_lines[curr_ax] = [] # cleared
+                    time_bin_edges = curr_time_bin_container.edges
+                    ## Add the grid-bin lines:
+                    # Draw grid at specific time_bin_edges (vertical lines)
+                    _temp_new_line_items = []
+                    for edge in time_bin_edges:
+                        _temp_new_line_items.append(curr_ax.axvline(x=edge, **time_bin_edges_display_kwargs))
+                        
+                    self.plots.time_bin_edge_lines[curr_ax] = _temp_new_line_items
 
                 ## Perform callback here:
                 on_render_page_callbacks = self.params.get('on_render_page_callbacks', {})
@@ -2672,8 +2695,9 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         
         return _out_ripple_rasters, update_attached_raster_viewer_epoch_callback
 
-    @function_attributes(short_name=None, tags=['yellow-blue', 'matplotlib', 'attached'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-04 07:23', related_items=[])
-    def build_attached_yellow_blue_track_identity_marginal_window(self, directional_merged_decoders_result, global_session, decoding_time_bin_size: float) -> RenderPlots:
+    @function_attributes(short_name=None, tags=['yellow-blue', 'matplotlib', 'attached'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices'], used_by=[], creation_date='2024-10-04 07:23', related_items=[])
+    def build_attached_yellow_blue_track_identity_marginal_window(self, directional_merged_decoders_result, global_session, 
+                                                                   filter_epochs=None, filter_epochs_decoder_result: DecodedFilterEpochsResult=None, name: str ='TrackIdentity_Marginal_Ripples', active_context: IdentifyingContext=None, **kwargs) -> RenderPlots:
         """ Attaches a stack of yellow-blue trackID marginal plots to the right side of the window. Currently they do not update.
         
         Uses: global_session.position, global_session.replay
@@ -2682,6 +2706,10 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         
         
         yellow_blue_trackID_marginals_plot_tuple = paginated_multi_decoder_decoded_epochs_window.build_attached_yellow_blue_track_identity_marginal_window(directional_merged_decoders_result, global_session, ripple_decoding_time_bin_size)
+
+
+        ## Caller should really pass {'single_plot_fixed_height': 35.0, 'max_num_lap_epochs': 25, 'max_num_ripple_epochs': 45, 'size': (8, 55), 'dpi': 72} with the same values it has so they line up.
+
         """
         ## INPUTS: paginated_multi_decoder_decoded_epochs_window, directional_merged_decoders_result
 
@@ -2689,23 +2717,48 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
         
-        target_dict = {'save_figure': False, 'included_any_context_neuron_ids': None, 'single_plot_fixed_height': 35.0, 'max_num_lap_epochs': 25, 'max_num_ripple_epochs': 45, 'size': (8, 55), 'dpi': 72,
-                        'constrained_layout': True, 'scrollable_figure': False, 'skip_plotting_measured_positions': True, 'skip_plotting_most_likely_positions': True}
+
+        debug_print = kwargs.get('debug_print', False)
+
+        ## Extract params_kwargs
+        params_kwargs = kwargs.pop('params_kwargs', {})
+        params_kwargs = dict(skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, isPaginatorControlWidgetBackedMode=True) | params_kwargs
+        # print(f'params_kwargs: {params_kwargs}')
+        max_subplots_per_page: int = kwargs.pop('max_subplots_per_page', params_kwargs.pop('max_subplots_per_page', 8)) # kwargs overrides params_kwargs
+        is_controlling_widget = False ## always false for YellowBlue plot
+        
+        curr_params_kwargs = deepcopy(params_kwargs)
+        curr_params_kwargs['is_controlled_widget'] = (not is_controlling_widget)
+        if ('disable_y_label' not in curr_params_kwargs):
+            # If user didn't provide an explicit 'disable_y_label' option, use the defaults which is to hide labels on all the but the controlling widget
+            if is_controlling_widget:
+                curr_params_kwargs['disable_y_label'] = False
+            else:
+                curr_params_kwargs['disable_y_label'] = True
+
+
+        # target_dict = {'save_figure': False, 'included_any_context_neuron_ids': None, 'single_plot_fixed_height': 35.0, 'max_num_lap_epochs': 25, 'max_num_ripple_epochs': 45, 'size': (8, 55), 'dpi': 72,
+        #                 'constrained_layout': True, 'scrollable_figure': False, 'skip_plotting_measured_positions': True, 'skip_plotting_most_likely_positions': True} | kwargs
 
         # Extract variables from the `target_dict` dictionary to the local workspace
-        save_figure = target_dict['save_figure']
-        included_any_context_neuron_ids = target_dict['included_any_context_neuron_ids']
-        single_plot_fixed_height = target_dict['single_plot_fixed_height']
-        max_num_lap_epochs = target_dict['max_num_lap_epochs']
-        max_num_ripple_epochs = target_dict['max_num_ripple_epochs']
-        size = target_dict['size']
-        dpi = target_dict['dpi']
-        constrained_layout = target_dict['constrained_layout']
-        scrollable_figure = target_dict['scrollable_figure']
-        skip_plotting_measured_positions = target_dict['skip_plotting_measured_positions']
-        skip_plotting_most_likely_positions = target_dict['skip_plotting_most_likely_positions']
-
-        all_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = deepcopy(directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result) # DecodedFilterEpochsResult
+        # save_figure = target_dict['save_figure']
+        # included_any_context_neuron_ids = target_dict['included_any_context_neuron_ids']
+        # single_plot_fixed_height = target_dict['single_plot_fixed_height']
+        # # max_num_lap_epochs = target_dict['max_num_lap_epochs']
+        # max_num_ripple_epochs = target_dict['max_num_ripple_epochs']
+        # size = target_dict['size']
+        # dpi = target_dict['dpi']
+        # constrained_layout = target_dict['constrained_layout']
+        # scrollable_figure = target_dict['scrollable_figure']
+        # skip_plotting_measured_positions = target_dict['skip_plotting_measured_positions']
+        # skip_plotting_most_likely_positions = target_dict['skip_plotting_most_likely_positions']
+        
+        # decoding_time_bin_size: float = kwargs.pop('decoding_time_bin_size', None) ## not yet used
+        
+        # curr_params_kwargs = kwargs.pop('params_kwargs', {})
+        # max_subplots_per_page = kwargs.pop('max_subplots_per_page', 10)
+        
+        
         active_decoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
         # long_short_marginals: List[NDArray] = [x.p_x_given_n for x in DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(all_directional_ripple_filter_epochs_decoder_result)] # these work if I want all of them
 
@@ -2717,37 +2770,98 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         # Ripple Track-identity (Long/Short) Marginal:
         ## INPUTS: all_directional_ripple_filter_epochs_decoder_result, global_session, ripple_decoding_time_bin_size
         # _main_context = {'decoded_epochs': 'Ripple', 'Marginal': 'TrackID', 't_bin': decoding_time_bin_size}
-        global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(global_session.replay))
-        # global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
-        out_plot_tuple = plot_decoded_epoch_slices(
-            global_replays, all_directional_ripple_filter_epochs_decoder_result,
-            global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
-            name='TrackIdentity_Marginal_Ripples',
-            active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
-            single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_ripple_epochs,
-            size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
-            included_epoch_indicies=curr_page_epoch_labels # [70, 72]
-            # _mod_plot_kwargs=dict(final_context=_main_context)
-        )
+        
+        # _main_context = IdentifyingContext(**{'decoded_epochs': 'Ripple', 'Marginal': 'TrackID', 't_bin': round(decoding_time_bin_size, ndigits=5)})
 
+        assert (filter_epochs is not None)
+        assert (filter_epochs_decoder_result is not None)
+        
+        # if filter_epochs is None:
+        #     global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(global_session.replay))
+        #     filter_epochs = global_replays
+            
+        # if filter_epochs_decoder_result is None:
+        #     all_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = deepcopy(directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result) # DecodedFilterEpochsResult
+        #     filter_epochs_decoder_result = all_directional_ripple_filter_epochs_decoder_result
+
+
+        # ==================================================================================================================== #
+        # `plot_decoded_epoch_slices` static mode                                                                              #
+        # ==================================================================================================================== #
+        # global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
+        # out_plot_tuple = plot_decoded_epoch_slices(
+        #     filter_epochs=filter_epochs, filter_epochs_decoder_result=filter_epochs_decoder_result,
+        #     global_pos_df=global_session.position.to_dataframe(),
+        #     # xbin=active_decoder.xbin, ## why are we passing the .xbin? Shouldn't this be time bins??
+        #     xbin=active_decoder.xbin, ## why are we passing the .xbin? Shouldn't this be time bins??
+        #     name=name,
+        #     active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
+        #     # single_plot_fixed_height=single_plot_fixed_height,
+        #     # debug_test_max_num_slices=max_num_ripple_epochs,
+        #     # size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
+        #     included_epoch_indicies=curr_page_epoch_labels, # [70, 72]
+        #     **target_dict,
+        #     # _mod_plot_kwargs=dict(final_context=_main_context)
+        # )
+
+        # # Post-plot call:
+        # assert len(out_plot_tuple) == 4
+        # params, plots_data, plots, ui = out_plot_tuple # [2] corresponds to 'plots' in params, plots_data, plots, ui = laps_plots_tuple
+        # # post_hoc_append to collector
+        # mw = ui.mw # MatplotlibTimeSynchronizedWidget
+        # yellow_blue_attached_render_plot = RenderPlots(name='yellow_blue_attached_widget', params=params, plots_data=plots_data, plots=plots, ui=ui)
+        
+        # ==================================================================================================================== #
+        # 2024-10-09 - `DecodedEpochSlicesPaginatedFigureController`-based mode                                                #
+        # ==================================================================================================================== #
+        a_yellow_blue_controller: DecodedEpochSlicesPaginatedFigureController = DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data(filter_epochs_decoder_result.filter_epochs, # filter_epochs_decoder_result.filter_epochs,
+                                                                                            filter_epochs_decoder_result=filter_epochs_decoder_result,
+                                                                                            xbin=active_decoder.xbin, global_pos_df=global_session.position.to_dataframe(),
+                                                                                            a_name=f'YellowBlueMarginalEpochSlices', active_context=active_context,
+                                                                                            max_subplots_per_page=max_subplots_per_page, debug_print=debug_print, included_epoch_indicies=curr_page_epoch_labels, params_kwargs=curr_params_kwargs) # , save_figure=save_figure
         # Post-plot call:
-        assert len(out_plot_tuple) == 4
-        params, plots_data, plots, ui = out_plot_tuple # [2] corresponds to 'plots' in params, plots_data, plots, ui = laps_plots_tuple
-        # post_hoc_append to collector
-        mw = ui.mw # MatplotlibTimeSynchronizedWidget
+        # Constrains each of the plotters at least to the minimum height:
+        # a_pagination_controller.params.all_plots_height
+        # resize to minimum height
+        a_widget = a_yellow_blue_controller.ui.mw # MatplotlibTimeSynchronizedWidget
+        screen = a_widget.screen()
+        screen_size = screen.size()
+
+        target_height = a_yellow_blue_controller.params.get('scrollAreaContents_MinimumHeight', None)
+        if target_height is None:
+            target_height = (a_yellow_blue_controller.params.all_plots_height + 30)
+        desired_final_height = int(min(target_height, screen_size.height())) # don't allow the height to exceed the screen height.
+        if debug_print:
+            print(f'target_height: {target_height}, {  desired_final_height = }')
+        # a_widget.size()
+        a_widget.setMinimumHeight(desired_final_height) # the 30 is for the control bar
+        mw = a_yellow_blue_controller.ui.mw # MatplotlibTimeSynchronizedWidget
+        yellow_blue_attached_render_plot = a_yellow_blue_controller
+        
 
         ## Align the windows:
         # target_window = paginated_multi_decoder_decoded_epochs_window.window()
         target_window = first_controller.ui.mw
         a_controlled_widget = mw
         WidgetPositioningHelpers.align_window_edges(target_window, a_controlled_widget.window(), relative_position='right_of', resize_to_main=(None, 1.0)) # resize to same height, no change to width
-        
-        yellow_blue_attached_render_plot = RenderPlots(name='yellow_blue_attached_widget', params=params, plots_data=plots_data, plots=plots, ui=ui)
-
         # TODO: hold a reference to it? Update function for changing pages?
         
+
+        # Finish Setup _______________________________________________________________________________________________________ #
+        
+        ## TODO: add to dock area?
+        
+
+        ## Gets the global bar and sets up pagination/control
+        global_thin_button_bar_widget: ThinButtonBarWidget = self.ui._contents.global_thin_button_bar_widget
+        global_paginator_controller_widget = global_thin_button_bar_widget.ui.paginator_controller_widget ## need paginator control widget
+        new_connections_dict = PhoPaginatedMultiDecoderDecodedEpochsWindow._perform_convert_decoder_pagination_controller_dict_to_controlled(a_controlling_pagination_controller_widget=global_paginator_controller_widget,
+                                                                                                                                    controlled_pagination_controllers_list=(a_yellow_blue_controller, ))
+
+
         return yellow_blue_attached_render_plot
 
+    @function_attributes(short_name=None, tags=['export', 'image', 'marginal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-09 16:29', related_items=[])
     def export_current_epoch_marginal_and_raster_images(self, directional_merged_decoders_result, root_export_path: Path, active_context: Optional[IdentifyingContext]=None):
         """ Export Marginal Pseudo2D posteriors and rasters for middle-clicked epochs
         """
@@ -2776,12 +2890,14 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         print(f"exported to '{epoch_specific_folder}'")
         return epoch_specific_folder, (out_image_save_tuple_dict, _out_rasters_save_paths, merged_img_save_path)
 
-
+    @function_attributes(short_name=None, tags=['multi-window', 'widget', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-09 14:19', related_items=[])
     @classmethod
-    def plot_full_paginated_decoded_epochs_window(cls, curr_active_pipeline, track_templates, active_spikes_df, active_decoder_decoded_epochs_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], directional_decoders_epochs_decode_result: "DecoderDecodedEpochsResult", 
+    def plot_full_paginated_decoded_epochs_window(cls, curr_active_pipeline, track_templates, active_spikes_df,
+                                                active_decoder_decoded_epochs_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], directional_decoders_epochs_decode_result: "DecoderDecodedEpochsResult", 
                                                 active_filter_epochs_df: pd.DataFrame, known_epochs_type='ripple', title='Long-like post-Delta Ripples Only'):
         """ 
-        
+        Plots 3 connected windows: the main decoded position posteriors, the track identity posteriors, and the rasters
+
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import co_filter_epochs_and_spikes
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
@@ -2789,25 +2905,24 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         ## INPUTS: curr_active_pipeline, track_templates, active_spikes_df, active_decoder_decoded_epochs_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], known_epochs_type='ripple', title='Long-like post-Delta Ripples Only'
         assert known_epochs_type in ['ripple', 'laps'], f"known_epochs_type: '{known_epochs_type}' should be either 'ripple' or 'laps'"
         _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        
+        
+
         active_spikes_df = get_proper_global_spikes_df(curr_active_pipeline)
         # active_filter_epochs_df = deepcopy(decoder_laps_filter_epochs_decoder_result_dict['long_LR'].filter_epochs)
         active_filter_epochs_df = deepcopy(active_decoder_decoded_epochs_result_dict['long_LR'].filter_epochs)
-        co_filter_epochs_and_spikes_kwargs = {'ripple': dict(epoch_id_key_name='ripple_epoch_id'),
+        _co_filter_epochs_and_spikes_kwargs_DICT = {'ripple': dict(epoch_id_key_name='ripple_epoch_id'),
             'laps': dict(epoch_id_key_name='lap_id')
         }
+        active_co_filter_epochs_and_spikes_kwargs = _co_filter_epochs_and_spikes_kwargs_DICT[known_epochs_type] # resolve for the specific known_epochs_type ('ripple'/'lap')
+        
         active_min_num_unique_aclu_inclusions_requirement: int = track_templates.min_num_unique_aclu_inclusions_requirement(curr_active_pipeline, required_min_percentage_of_active_cells=0.333333333)
-        active_filter_epochs_df, active_spikes_df = co_filter_epochs_and_spikes(active_spikes_df=active_spikes_df, active_epochs_df=active_filter_epochs_df, included_aclus=track_templates.any_decoder_neuron_IDs, min_num_unique_aclu_inclusions=active_min_num_unique_aclu_inclusions_requirement, **co_filter_epochs_and_spikes_kwargs[known_epochs_type], no_interval_fill_value=-1, add_unique_aclus_list_column=True, drop_non_epoch_spikes=True)
-        app, paginated_multi_decoder_decoded_epochs_window, pagination_controller_dict = PhoPaginatedMultiDecoderDecodedEpochsWindow.init_from_track_templates(curr_active_pipeline, track_templates,
-            decoder_decoded_epochs_result_dict=active_decoder_decoded_epochs_result_dict, epochs_name=known_epochs_type, title=title,
-            included_epoch_indicies=None, debug_print=False,
-            params_kwargs={'enable_per_epoch_action_buttons': False,
-                'skip_plotting_most_likely_positions': True, 'skip_plotting_measured_positions': True, 
-                'enable_decoded_most_likely_position_curve': False, 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': True,
-                # 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False,
-                # 'disable_y_label': True,
-                'isPaginatorControlWidgetBackedMode': True,
-                'enable_update_window_title_on_page_change': False, 'build_internal_callbacks': True,
-                # 'debug_print': True,
+        active_filter_epochs_df, active_spikes_df = co_filter_epochs_and_spikes(active_spikes_df=active_spikes_df, active_epochs_df=active_filter_epochs_df, included_aclus=track_templates.any_decoder_neuron_IDs, min_num_unique_aclu_inclusions=active_min_num_unique_aclu_inclusions_requirement, **active_co_filter_epochs_and_spikes_kwargs, no_interval_fill_value=-1, add_unique_aclus_list_column=True, drop_non_epoch_spikes=True)
+        
+        global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
+        directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders'] # DirectionalPseudo2DDecodersResult, pull from global computations
+
+        _shared_plotting_kwargs = {                # 'debug_print': True,
                 'max_subplots_per_page': 10,
                 'scrollable_figure': False,
                 # 'scrollable_figure': True,
@@ -2815,19 +2930,40 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                 'use_AnchoredCustomText': False,
                 'should_suppress_callback_exceptions': False,
                 # 'build_fn': 'insets_view',
+                'should_draw_time_bin_boundaries': True, 'time_bin_edges_display_kwargs': dict(color='grey', alpha=0.5, linewidth=1.5),   
+        }
+
+        # Build main Decoded Posterior Window ________________________________________________________________________________ #
+        ## uses `active_decoder_decoded_epochs_result_dict`
+        app, paginated_multi_decoder_decoded_epochs_window, pagination_controller_dict = PhoPaginatedMultiDecoderDecodedEpochsWindow.init_from_track_templates(curr_active_pipeline, track_templates,
+            decoder_decoded_epochs_result_dict=active_decoder_decoded_epochs_result_dict, epochs_name=known_epochs_type, title=title,
+            included_epoch_indicies=None, debug_print=False,
+            params_kwargs={'enable_per_epoch_action_buttons': False,
+                'skip_plotting_most_likely_positions': True, 'skip_plotting_measured_positions': True, 
+                'enable_decoded_most_likely_position_curve': False, 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False,
+                # 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False,
+                # 'disable_y_label': True,
+                'isPaginatorControlWidgetBackedMode': True,
+                'enable_update_window_title_on_page_change': False, 'build_internal_callbacks': True,
+                # 'debug_print': True,
+                **_shared_plotting_kwargs,            
         })
-
-
+        
         # Build Raster Widget ________________________________________________________________________________________________ #
         ripple_rasters_plot_tuple = paginated_multi_decoder_decoded_epochs_window.build_attached_raster_viewer_widget(track_templates=track_templates, active_spikes_df=active_spikes_df, filtered_epochs_df=active_filter_epochs_df) 
         # _out_ripple_rasters, update_attached_raster_viewer_epoch_callback = ripple_rasters_plot_tuple    
-        # Build Yellow-Blue Marginal Widget __________________________________________________________________________________ #
-        build_attached_yellow_blue_track_identity_marginal_window_kwargs = {'ripple': dict(decoding_time_bin_size=directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size),
-            'laps': dict(decoding_time_bin_size=directional_decoders_epochs_decode_result.laps_decoding_time_bin_size)
+        
+
+        # Build Yellow-Blue Marginal Widget __________________________________________________________________________________ #        
+        _build_attached_yellow_blue_track_identity_marginal_window_kwargs_DICT = {'ripple': dict(decoding_time_bin_size=directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size, name='TrackIdentity_Marginal_Ripples', filter_epochs_decoder_result=deepcopy(directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result)),
+            'laps': dict(decoding_time_bin_size=directional_decoders_epochs_decode_result.laps_decoding_time_bin_size, name='TrackIdentity_Marginal_Laps', filter_epochs_decoder_result=deepcopy(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)),
         }
-        global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
-        directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders'] # DirectionalPseudo2DDecodersResult, pull from global computations
-        yellow_blue_trackID_marginals_plot_tuple = paginated_multi_decoder_decoded_epochs_window.build_attached_yellow_blue_track_identity_marginal_window(directional_merged_decoders_result, global_session, **build_attached_yellow_blue_track_identity_marginal_window_kwargs[known_epochs_type])
+        active_build_attached_yellow_blue_track_identity_marginal_window_kwargs = _build_attached_yellow_blue_track_identity_marginal_window_kwargs_DICT[known_epochs_type] # resolve for the specific known_epochs_type ('ripple'/'lap')
+        yellow_blue_plot_context = IdentifyingContext(**{'decoded_epochs': known_epochs_type.title(), 'Marginal': 'TrackID', 't_bin': round(active_build_attached_yellow_blue_track_identity_marginal_window_kwargs['decoding_time_bin_size'], ndigits=5)})
+        
+
+        yellow_blue_trackID_marginals_plot_tuple = paginated_multi_decoder_decoded_epochs_window.build_attached_yellow_blue_track_identity_marginal_window(directional_merged_decoders_result, global_session=global_session, filter_epochs=deepcopy(active_filter_epochs_df), epochs_name=known_epochs_type, 
+                                                                                                                                                           **active_build_attached_yellow_blue_track_identity_marginal_window_kwargs, **_shared_plotting_kwargs, active_context=yellow_blue_plot_context)
 
         return (app, paginated_multi_decoder_decoded_epochs_window, pagination_controller_dict), ripple_rasters_plot_tuple, yellow_blue_trackID_marginals_plot_tuple
 
