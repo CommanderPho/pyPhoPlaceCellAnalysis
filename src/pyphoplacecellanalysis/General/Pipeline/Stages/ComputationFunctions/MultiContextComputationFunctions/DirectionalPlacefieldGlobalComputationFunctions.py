@@ -1706,81 +1706,6 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         print(f'percent_laps_estimated_correctly: {percent_laps_estimated_correctly}')
         return percent_laps_estimated_correctly
 
-    @classmethod
-    def _build_multiple_per_time_bin_marginals(cls, a_decoder_result: DecodedFilterEpochsResult, active_marginals_tuple: Tuple, columns_tuple: Tuple) -> pd.DataFrame:
-        """ 
-        
-        active_marginals=ripple_track_identity_marginals, columns=['P_LR', 'P_RL']
-        active_marginals=ripple_track_identity_marginals, columns=['P_Long', 'P_Short']
-        
-        _build_multiple_per_time_bin_marginals(a_decoder_result=a_decoder_result, active_marginals_tuple=(laps_directional_all_epoch_bins_marginal, laps_track_identity_all_epoch_bins_marginal), columns_tuple=(['P_LR', 'P_RL'], ['P_Long', 'P_Short']))
-        
-        """
-        filter_epochs_df = deepcopy(a_decoder_result.filter_epochs)
-        if not isinstance(filter_epochs_df, pd.DataFrame):
-            filter_epochs_df = filter_epochs_df.to_dataframe()
-            
-        filter_epochs_df['center_t'] = (filter_epochs_df['start'] + (filter_epochs_df['duration']/2.0))
-        
-        flat_time_bin_centers_column = np.concatenate([curr_epoch_time_bin_container.centers for curr_epoch_time_bin_container in a_decoder_result.time_bin_containers])
-        all_columns = []
-        all_epoch_extracted_posteriors = []
-        for active_marginals, active_columns in zip(active_marginals_tuple, columns_tuple):
-            epoch_extracted_posteriors = [a_result['p_x_given_n'] for a_result in active_marginals]
-            n_epoch_time_bins = [np.shape(a_posterior)[-1] for a_posterior in epoch_extracted_posteriors]
-            epoch_idx_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=i) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
-            all_columns.extend(active_columns)
-            # all_epoch_extracted_posteriors = np.hstack((all_epoch_extracted_posteriors, epoch_extracted_posteriors))
-            all_epoch_extracted_posteriors.append(np.hstack((epoch_extracted_posteriors)))
-            # all_epoch_extracted_posteriors.extend(epoch_extracted_posteriors)
-
-        all_epoch_extracted_posteriors = np.vstack(all_epoch_extracted_posteriors) # (4, n_time_bins) - (4, 5495)
-        epoch_time_bin_marginals_df = pd.DataFrame(all_epoch_extracted_posteriors.T, columns=all_columns)
-        epoch_time_bin_marginals_df['epoch_idx'] = epoch_idx_column
-        
-        if (len(flat_time_bin_centers_column) < len(epoch_time_bin_marginals_df)):
-            # 2024-01-25 - This fix DOES NOT HELP. The constructed size is the same as the existing `flat_time_bin_centers_column`.
-            
-            # bin errors are occuring:
-            print(f'encountering bin issue! flat_time_bin_centers_column: {np.shape(flat_time_bin_centers_column)}. len(epoch_time_bin_marginals_df): {len(epoch_time_bin_marginals_df)}. Attempting to fix.')
-            # find where the indicies are less than two bins
-            # miscentered_bin_indicies = np.where(n_epoch_time_bins < 2)
-            # replace those centers with just the center of the epoch
-            t_bin_centers_list = []
-            for epoch_idx, curr_epoch_time_bin_container in enumerate(a_decoder_result.time_bin_containers):
-                curr_epoch_n_time_bins = n_epoch_time_bins[epoch_idx]
-                if (curr_epoch_n_time_bins < 2):
-                    an_epoch_center = filter_epochs_df['center_t'].to_numpy()[epoch_idx]
-                    t_bin_centers_list.append([an_epoch_center]) # list containing only the single epoch center
-                else:
-                    t_bin_centers_list.append(curr_epoch_time_bin_container.centers) 
-
-            flat_time_bin_centers_column = np.concatenate(t_bin_centers_list)
-            print(f'\t fixed flat_time_bin_centers_column: {np.shape(flat_time_bin_centers_column)}')
-
-        epoch_time_bin_marginals_df['t_bin_center'] = deepcopy(flat_time_bin_centers_column) # ValueError: Length of values (3393) does not match length of index (3420)
-        # except ValueError:
-            # epoch_time_bin_marginals_df['t_bin_center'] = deepcopy(a_decoder_result.filter_epochs['center_t'].to_numpy()[miscentered_bin_indicies])
-        
-
-        return epoch_time_bin_marginals_df
-
-    @classmethod
-    def _build_per_time_bin_marginals(cls, a_decoder_result: DecodedFilterEpochsResult, active_marginals: List, columns=['P_Long', 'P_Short']) -> pd.DataFrame:
-        """ 
-        
-        active_marginals=ripple_track_identity_marginals, columns=['P_Long', 'P_Short']
-        active_marginals=ripple_track_identity_marginals, columns=['P_Long', 'P_Short']
-        
-        """
-        flat_time_bin_centers_column = np.concatenate([curr_epoch_time_bin_container.centers for curr_epoch_time_bin_container in a_decoder_result.time_bin_containers])
-        epoch_extracted_posteriors = [a_result['p_x_given_n'] for a_result in active_marginals]
-        n_epoch_time_bins = [np.shape(a_posterior)[-1] for a_posterior in epoch_extracted_posteriors]
-        epoch_idx_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=i) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
-        epoch_time_bin_marginals_df = pd.DataFrame(np.hstack((epoch_extracted_posteriors)).T, columns=columns)
-        epoch_time_bin_marginals_df['epoch_idx'] = epoch_idx_column
-        epoch_time_bin_marginals_df['t_bin_center'] = deepcopy(flat_time_bin_centers_column)
-        return epoch_time_bin_marginals_df
     
     @function_attributes(short_name=None, tags=['export', 'csv', 'marginal', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-08 19:01', related_items=[])
     def compute_and_export_marginals_df_csvs(self, parent_output_path: Path, active_context: IdentifyingContext):
@@ -5354,8 +5279,10 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         ## Decode Laps:
         if (laps_decoding_time_bin_size is not None):
             global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_any_name].computation_config.pf_params.computation_epochs) # global_any_name='maze_any' (? same as global_epoch_name?)
-            
-            directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result = all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df), filter_epochs=global_any_laps_epochs_obj, decoding_time_bin_size=laps_decoding_time_bin_size, debug_print=False)
+            global_any_laps_epochs_df = ensure_dataframe(global_any_laps_epochs_obj)    
+            global_any_laps_epochs_df = global_any_laps_epochs_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
+            global_any_laps_epochs_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=global_any_laps_epochs_df, global_session=deepcopy(global_session), replace_existing=True)
+            directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result = all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(owning_pipeline_reference)), filter_epochs=deepcopy(global_any_laps_epochs_df), decoding_time_bin_size=laps_decoding_time_bin_size, debug_print=False)
         else:
             print(f'skipping lap recomputation because laps_decoding_time_bin_size == None')
             should_validate_lap_decoding_performance = False
@@ -5363,13 +5290,13 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
         ## Decode Ripples (only uses the global_epoch_name's ripples):
         if (ripple_decoding_time_bin_size is not None):
-            global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(ensure_dataframe(deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name].replay)))
+            global_replays: pd.DataFrame = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(ensure_dataframe(deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name].replay)))
             min_possible_time_bin_size: float = find_minimum_time_bin_duration(global_replays['duration'].to_numpy())
             # ripple_decoding_time_bin_size: float = min(0.010, min_possible_time_bin_size) # 10ms # 0.002
-            
             if ripple_decoding_time_bin_size < min_possible_time_bin_size:
-                print(f'WARN: ripple_decoding_time_bin_size {ripple_decoding_time_bin_size} < min_possible_time_bin_size ({min_possible_time_bin_size}). This used to be enforced but continuing anyway.')
-            directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result = all_directional_pf1D_Decoder.decode_specific_epochs(deepcopy(owning_pipeline_reference.sess.spikes_df), global_replays, decoding_time_bin_size=ripple_decoding_time_bin_size)
+                print(f'WARN: ripple_decoding_time_bin_size {ripple_decoding_time_bin_size} < min_possible_time_bin_size ({min_possible_time_bin_size}). This used to be enforced but continuing anyway.') 
+            global_replays = global_replays.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
+            directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result = all_directional_pf1D_Decoder.decode_specific_epochs(deepcopy(get_proper_global_spikes_df(owning_pipeline_reference)), filter_epochs=deepcopy(global_replays), decoding_time_bin_size=ripple_decoding_time_bin_size)
         else:
             print(f'skipping ripple recomputation because ripple_decoding_time_bin_size == None')
 
