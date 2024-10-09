@@ -1026,7 +1026,9 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     # INIT METHODS _______________________________________________________________________________________________________ #
 
     @classmethod
-    def init_from_decoder_data(cls, active_filter_epochs, filter_epochs_decoder_result: DecodedFilterEpochsResult, xbin, global_pos_df, included_epoch_indicies=None, a_name:str = 'DecodedEpochSlicesPaginationController', active_context=None, max_subplots_per_page=20, debug_print=False, params_kwargs: Optional[Dict]=None, **kwargs):
+    def init_from_decoder_data(cls, active_filter_epochs, filter_epochs_decoder_result: DecodedFilterEpochsResult, xbin, global_pos_df, included_epoch_indicies=None, a_name:str = 'DecodedEpochSlicesPaginationController',
+                                active_marginal_fn=None, active_context=None, max_subplots_per_page=20, debug_print=False,
+                                params_kwargs: Optional[Dict]=None, **kwargs):
         """ new version (replacing `plot_paginated_decoded_epoch_slices`) calls `plot_decoded_epoch_slices` which produces the state variables (params, plots_data, plots, ui), a new instance of this object type is then initialized with those variables and then updated with any specific properties. """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices #, _helper_update_decoded_single_epoch_slice_plot #, _subfn_update_decoded_epoch_slices
         
@@ -1042,9 +1044,10 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         ## Pop Window-level params:
         disable_toolbar = params_kwargs.pop('disable_toolbar', True)
         kwargs['disable_toolbar'] = disable_toolbar
-
+        
         params, plots_data, plots, ui = plot_decoded_epoch_slices(filter_epochs=deepcopy(active_filter_epochs), filter_epochs_decoder_result=deepcopy(filter_epochs_decoder_result), global_pos_df=global_pos_df, variable_name='lin_pos', xbin=xbin, included_epoch_indicies=included_epoch_indicies,
-                                                                name=a_name, debug_print=False, debug_test_max_num_slices=max_subplots_per_page, params_kwargs=params_kwargs, **kwargs)
+                                                                  active_marginal_fn=active_marginal_fn,
+                                                                    name=a_name, debug_print=False, debug_test_max_num_slices=max_subplots_per_page, params_kwargs=params_kwargs, **kwargs)
 
         new_obj = cls(params, plots_data, plots, ui)
         
@@ -1055,7 +1058,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         new_obj.params.debug_print = debug_print
         new_obj.ui.print = builtins.print # the print function to use
 
-        new_obj.plots_data.paginator = new_obj._subfn_helper_build_paginator(active_filter_epochs, filter_epochs_decoder_result, max_subplots_per_page, new_obj.params.debug_print)  # assign the paginator
+        new_obj.plots_data.paginator = new_obj._subfn_helper_build_paginator(active_filter_epochs, filter_epochs_decoder_result, max_subplots_per_page, new_obj.params.debug_print, active_marginal_fn=active_marginal_fn)  # assign the paginator
         new_obj.params.active_identifying_figure_ctx = active_context # set context before calling `plot_paginated_decoded_epoch_slices` which will set the rest of the properties
 
         ## Resize the widget to meet the minimum height requirements:
@@ -1257,7 +1260,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
     # Other Methods ______________________________________________________________________________________________________ #
 
     @staticmethod
-    def _subfn_helper_build_paginator(active_filter_epochs, filter_epochs_decoder_result, max_subplots_per_page, debug_print) -> Paginator:
+    def _subfn_helper_build_paginator(active_filter_epochs, filter_epochs_decoder_result, max_subplots_per_page, debug_print, active_marginal_fn) -> Paginator:
         epoch_labels = filter_epochs_decoder_result.epoch_description_list.copy()
         if epoch_labels is None or len(epoch_labels) < active_filter_epochs.n_epochs:
             if 'label' not in active_filter_epochs._df.columns:
@@ -1271,7 +1274,10 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             filter_epochs_decoder_result.epoch_description_list = epoch_labels.copy() # assign the new labels
 
         time_bin_containers = np.array(filter_epochs_decoder_result.time_bin_containers.copy())
-        posterior_containers = filter_epochs_decoder_result.marginal_x_list
+        if active_marginal_fn is not None:
+            posterior_containers = active_marginal_fn(filter_epochs_decoder_result)
+        else:
+            posterior_containers = filter_epochs_decoder_result.marginal_x_list
 
         # Provide a tuple or list containing equally sized sequences of items:
         ## Build Epochs:
@@ -2818,6 +2824,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                                                                                             filter_epochs_decoder_result=filter_epochs_decoder_result,
                                                                                             xbin=active_decoder.xbin, global_pos_df=global_session.position.to_dataframe(),
                                                                                             a_name=f'YellowBlueMarginalEpochSlices', active_context=active_context,
+                                                                                            active_marginal_fn=lambda a_filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(a_filter_epochs_decoder_result), ## IMPORTANT: `active_marginal_fn` is what makes this a yellow-blue plot
                                                                                             max_subplots_per_page=max_subplots_per_page, debug_print=debug_print, included_epoch_indicies=curr_page_epoch_labels, params_kwargs=curr_params_kwargs) # , save_figure=save_figure
         # Post-plot call:
         # Constrains each of the plotters at least to the minimum height:

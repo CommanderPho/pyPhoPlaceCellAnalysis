@@ -790,7 +790,11 @@ def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_prin
     should_render_time_bins: bool = params.setdefault('should_draw_time_bin_boundaries', True)
     time_bin_edges_display_kwargs = params.setdefault('time_bin_edges_display_kwargs', dict(color='grey', alpha=0.5, linewidth=1.5))
 
-    active_marginal_list = plots_data.active_marginal_fn(plots_data.filter_epochs_decoder_result)
+    if plots_data.active_marginal_fn is not None:
+        active_marginal_list = plots_data.active_marginal_fn(plots_data.filter_epochs_decoder_result)
+    else:
+        active_marginal_list = plots_data.filter_epochs_decoder_result.marginal_x_list
+        
     for i, curr_ax in enumerate(plots.axs):
         curr_time_bin_container = plots_data.filter_epochs_decoder_result.time_bin_containers[i]
         curr_time_bins = curr_time_bin_container.centers
@@ -959,8 +963,6 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
     plots_data.filter_epochs_decoder_result = deepcopy(filter_epochs_decoder_result)
 
     # Select the desired marginal:
-    if active_marginal_fn is None:
-        active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_x_list
     plots_data.active_marginal_fn = active_marginal_fn
 
     # plots_data.active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list
