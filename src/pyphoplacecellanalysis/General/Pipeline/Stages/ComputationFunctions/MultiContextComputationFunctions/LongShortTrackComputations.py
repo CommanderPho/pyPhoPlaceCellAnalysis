@@ -1412,16 +1412,16 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # if global_computation_results.computation_config is None:
         #     # Create a DynamicContainer-backed computation_config
         #     print(f'_perform_long_short_instantaneous_spike_rate_groups_analysis is lacking a required computation config parameter! creating a new curr_active_pipeline.global_computation_results.computation_config')
-        #     global_computation_results.computation_config.long_short_inst_spike_rate_groups_Parameters.instantaneous_time_bin_size_seconds = 0.01
+        #     global_computation_results.computation_config.long_short_inst_spike_rate_groups.instantaneous_time_bin_size_seconds = 0.01
         # else:
         #     print(f'have an existing `global_computation_results.computation_config`: {global_computation_results.computation_config}')	
             
 
         # Could also use `owning_pipeline_reference.global_computation_results.computation_config`
-        assert (global_computation_results.computation_config is not None), f"requires `global_computation_results.computation_config.long_short_inst_spike_rate_groups_Parameters`"
-        assert (global_computation_results.computation_config.get('long_short_inst_spike_rate_groups_Parameters', None) is not None), f"requires `global_computation_results.computation_config.long_short_inst_spike_rate_groups_Parameters`"
+        assert (global_computation_results.computation_config is not None), f"requires `global_computation_results.computation_config.long_short_inst_spike_rate_groups`"
+        assert (global_computation_results.computation_config.get('long_short_inst_spike_rate_groups', None) is not None), f"requires `global_computation_results.computation_config.long_short_inst_spike_rate_groups`"
 
-        global_computation_results.computation_config.long_short_inst_spike_rate_groups_Parameters.instantaneous_time_bin_size_seconds = instantaneous_time_bin_size_seconds # 0.01 # 10ms
+        global_computation_results.computation_config.long_short_inst_spike_rate_groups.instantaneous_time_bin_size_seconds = instantaneous_time_bin_size_seconds # 0.01 # 10ms
         
         ## INPUTS: instantaneous_time_bin_size_seconds
         sess = owning_pipeline_reference.sess 
@@ -2037,13 +2037,14 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
         print(f'have an existing `global_computation_results.computation_config`: {curr_active_pipeline.global_computation_results.computation_config}')	
 
     # Could also use `owning_pipeline_reference.global_computation_results.computation_config`
+    
+    
     assert (curr_active_pipeline.global_computation_results.computation_config is not None), f"requires `global_computation_results.computation_config.instantaneous_time_bin_size_seconds`"
-    assert ('instantaneous_time_bin_size_seconds' in curr_active_pipeline.global_computation_results.computation_config)
+    assert (hasattr(curr_active_pipeline.global_computation_results.computation_config.long_short_inst_spike_rate_groups, 'instantaneous_time_bin_size_seconds'))
     ## TODO: get from active_configs or something similar
-    instantaneous_time_bin_size_seconds: float = curr_active_pipeline.global_computation_results.computation_config.instantaneous_time_bin_size_seconds # 0.01 # 10ms
+    instantaneous_time_bin_size_seconds: float = curr_active_pipeline.global_computation_results.computation_config.long_short_inst_spike_rate_groups.get('instantaneous_time_bin_size_seconds', None) # 0.01 # 10ms
 
     # Setting `instantaneous_time_bin_size_seconds = None` disables instantaneous computations
-
 
     ## Begin Original:
     active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06' # curr_sess_ctx # IdentifyingContext<('kdiba', 'gor01', 'one', '2006-6-07_11-26-53')>
@@ -2125,6 +2126,9 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
     # long_short_fr_indicies_analysis_results['x_frs_index'] = long_short_fr_indicies_analysis_results['replays_inst_frs_index'].copy()
     # long_short_fr_indicies_analysis_results['y_frs_index'] = long_short_fr_indicies_analysis_results['non_replays_inst_frs_index'].copy()
     # all_results_dict.update(dict(zip(['x_frs_index', 'y_frs_index'], [x_frs_index, y_frs_index]))) # append the indicies to the results dict
+    
+    curr_active_pipeline.global_computation_results.computation_config.long_short_inst_spike_rate_groups.instantaneous_time_bin_size_seconds = instantaneous_time_bin_size_seconds ## update the property with the used value after computation
+    
     return active_context, all_results_dict # TODO: add to computed_data instead
 
 @function_attributes(short_name=None, tags=['rr', 'rate_remapping', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-18 18:58', related_items=[])
