@@ -1860,7 +1860,7 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
 @function_attributes(short_name=None, tags=['TrialByTrialActivityResult'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-08 16:07', 
                      requires_global_keys=['DirectionalLaps'], provides_global_keys=['DirectionalMergedDecoders'], related_items=[])
 def compute_and_export_session_trial_by_trial_performance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-                                                                              active_laps_decoding_time_bin_size: float = 0.25, save_hdf:bool=True, save_across_session_hdf:bool=False) -> dict:
+                                                                              active_laps_decoding_time_bin_size: float = 0.25, minimum_one_point_stability: float = 0.6, zero_point_stability: float = 0.1, save_hdf:bool=True, save_across_session_hdf:bool=False) -> dict:
     """  Extracts peak information for the placefields for each neuron
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_session_trial_by_trial_performance_completion_function
     
@@ -1881,7 +1881,6 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
     from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
     from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
     from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import JonathanFiringRateAnalysisResult
 
     from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
     from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
@@ -1973,11 +1972,12 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
                                                                                         directional_active_lap_pf_results_dicts=directional_active_lap_pf_results_dicts,
                                                                                         is_global=True)  # type: Tuple[Tuple[Dict[str, Any], Dict[str, Any]], Dict[str, BasePositionDecoder], Any]
 
+        ## UNPACKING:
         directional_lap_epochs_dict: Dict[str, Epoch] = a_trial_by_trial_result.directional_lap_epochs_dict
         stability_df, stability_dict = a_trial_by_trial_result.get_stability_df()
         # appearing_or_disappearing_aclus, appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus, (stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus) = a_trial_by_trial_result.get_cell_stability_info(minimum_one_point_stability=0.6, zero_point_stability=0.1)
-        _neuron_group_split_stability_dfs_tuple, _neuron_group_split_stability_aclus_tuple = a_trial_by_trial_result.get_cell_stability_info(minimum_one_point_stability=0.6, zero_point_stability=0.1)
-        appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df = _neuron_group_split_stability_dfs_tuple
+        _neuron_group_split_stability_dfs_tuple, _neuron_group_split_stability_aclus_tuple = a_trial_by_trial_result.get_cell_stability_info(minimum_one_point_stability=minimum_one_point_stability, zero_point_stability=zero_point_stability)
+        # appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df = _neuron_group_split_stability_dfs_tuple
         appearing_aclus, disappearing_aclus, appearing_or_disappearing_aclus, stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus = _neuron_group_split_stability_aclus_tuple
         ## Compute the track_ID deoding performance for the merged_decoder with some cells left out:
         subset_neuron_IDs_dict: Dict[str, NDArray] = dict(any_decoder=any_decoder_neuron_IDs,
