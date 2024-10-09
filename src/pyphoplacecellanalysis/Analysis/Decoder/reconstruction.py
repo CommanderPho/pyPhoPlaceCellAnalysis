@@ -989,7 +989,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         
 
     @function_attributes(short_name=None, tags=['per_time_bin', 'marginals', 'IMPORTANT'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-09 07:06', related_items=[])
-    def build_per_time_bin_marginals_df(self, active_marginals_tuple: Tuple, columns_tuple: Tuple) -> pd.DataFrame:
+    def build_per_time_bin_marginals_df(self, active_marginals_tuple: Tuple, columns_tuple: Tuple, transfer_column_names_list: Optional[List[str]]=None) -> pd.DataFrame:
         """ Used to build the `per_time_bin` outputs (as opposed to the `per_epoch` outputs)
         
         active_marginals=ripple_track_identity_marginals, columns=['P_LR', 'P_RL']
@@ -997,13 +997,15 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         
         _build_multiple_per_time_bin_marginals(a_decoder_result=a_decoder_result, active_marginals_tuple=(laps_directional_all_epoch_bins_marginal, laps_track_identity_all_epoch_bins_marginal), columns_tuple=(['P_LR', 'P_RL'], ['P_Long', 'P_Short']))
         
-        
+        transfer_column_names_list: List[str] = ['maze_id', 'lap_dir', 'lap_id']
+                
         Creates Columns: ['center_t', ]
         Creates new df with columns: ['epoch_idx', 't_bin_center', 'epoch_idx']
         
         History: Extracted from `pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalPseudo2DDecodersResult._build_multiple_per_time_bin_marginals` on 2024-10-09 
         
         """
+        parent_epoch_label_col_name: str = 'label' # column in `filter_epochs_df` that can be used to index into the epochs
         filter_epochs_df = deepcopy(self.filter_epochs)
         if not isinstance(filter_epochs_df, pd.DataFrame):
             filter_epochs_df = filter_epochs_df.to_dataframe()
@@ -1011,12 +1013,19 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         filter_epochs_df['center_t'] = (filter_epochs_df['start'] + (filter_epochs_df['duration']/2.0))
         
         flat_time_bin_centers_column = np.concatenate([curr_epoch_time_bin_container.centers for curr_epoch_time_bin_container in self.time_bin_containers])
+        flat_time_bin_start_edge_column = np.concatenate([curr_epoch_time_bin_container.edges[:-1] for curr_epoch_time_bin_container in self.time_bin_containers])
+        flat_time_bin_stop_edge_column = np.concatenate([curr_epoch_time_bin_container.edges[1:] for curr_epoch_time_bin_container in self.time_bin_containers])
+        # flat_time_bin_start_stop_edges_columns = np.hstack([[curr_epoch_time_bin_container.edges[:-1], curr_epoch_time_bin_container.edges[1:]] for curr_epoch_time_bin_container in self.time_bin_containers]) # (2, n_flat_time_bins)
         all_columns = []
         all_epoch_extracted_posteriors = []
+        assert len(active_marginals_tuple) == len(columns_tuple)
+        
         for active_marginals, active_columns in zip(active_marginals_tuple, columns_tuple):
             epoch_extracted_posteriors = [a_result['p_x_given_n'] for a_result in active_marginals]
             n_epoch_time_bins = [np.shape(a_posterior)[-1] for a_posterior in epoch_extracted_posteriors]
-            epoch_idx_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=i) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
+            result_t_bin_idx_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=i) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
+            epoch_df_idx_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=filter_epochs_df.index[i]) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
+            epoch_label_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=filter_epochs_df[parent_epoch_label_col_name].values[i]) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
             all_columns.extend(active_columns)
             # all_epoch_extracted_posteriors = np.hstack((all_epoch_extracted_posteriors, epoch_extracted_posteriors))
             all_epoch_extracted_posteriors.append(np.hstack((epoch_extracted_posteriors)))
@@ -1024,7 +1033,9 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
 
         all_epoch_extracted_posteriors = np.vstack(all_epoch_extracted_posteriors) # (4, n_time_bins) - (4, 5495)
         epoch_time_bin_marginals_df = pd.DataFrame(all_epoch_extracted_posteriors.T, columns=all_columns)
-        epoch_time_bin_marginals_df['epoch_idx'] = epoch_idx_column
+        epoch_time_bin_marginals_df['result_t_bin_idx'] = result_t_bin_idx_column # a.k.a result label
+        epoch_time_bin_marginals_df['epoch_df_idx'] = epoch_df_idx_column
+        epoch_time_bin_marginals_df['parent_epoch_label'] = epoch_label_column
         
         if (len(flat_time_bin_centers_column) < len(epoch_time_bin_marginals_df)):
             # 2024-01-25 - This fix DOES NOT HELP. The constructed size is the same as the existing `flat_time_bin_centers_column`.
@@ -1046,11 +1057,22 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             flat_time_bin_centers_column = np.concatenate(t_bin_centers_list)
             print(f'\t fixed flat_time_bin_centers_column: {np.shape(flat_time_bin_centers_column)}')
 
-        epoch_time_bin_marginals_df['t_bin_center'] = deepcopy(flat_time_bin_centers_column) # ValueError: Length of values (3393) does not match length of index (3420)
+# epoch_label_column_name='label'
+        epoch_time_bin_marginals_df['label'] = epoch_time_bin_marginals_df.index.values.astype(int)
+        # epoch_time_bin_marginals_df['start'] = deepcopy(flat_time_bin_start_edge_column) # ValueError: Length of values (3393) does not match length of index (3420)
+        epoch_time_bin_marginals_df['start'] = deepcopy(flat_time_bin_start_edge_column) # ValueError: Length of values (3393) does not match length of index (3420)
+        epoch_time_bin_marginals_df['t_bin_center'] = deepcopy(flat_time_bin_centers_column)
+        epoch_time_bin_marginals_df['stop'] = deepcopy(flat_time_bin_stop_edge_column)
+
         # except ValueError:
             # epoch_time_bin_marginals_df['t_bin_center'] = deepcopy(a_decoder_result.filter_epochs['center_t'].to_numpy()[miscentered_bin_indicies])
         
-
+        ## add columns from parent df:
+        if transfer_column_names_list is not None:
+            for a_test_transfer_column_name in transfer_column_names_list:
+                # a_test_transfer_column_name: str = 'maze_id'
+                epoch_time_bin_marginals_df[a_test_transfer_column_name] = epoch_time_bin_marginals_df['epoch_df_idx'].map(lambda idx: filter_epochs_df.loc[idx, a_test_transfer_column_name])
+            
         return epoch_time_bin_marginals_df
     
 
