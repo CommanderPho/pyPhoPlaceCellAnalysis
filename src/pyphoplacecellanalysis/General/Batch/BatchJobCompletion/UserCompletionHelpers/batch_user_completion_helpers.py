@@ -1869,11 +1869,15 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
     Unpacking:
     
         callback_outputs = _across_session_results_extended_dict['compute_and_export_session_trial_by_trial_performance_completion_function']
-        a_trial_by_trial_result = callback_outputs['a_trial_by_trial_result']
+        a_trial_by_trial_result: TrialByTrialActivityResult = callback_outputs['a_trial_by_trial_result']
         subset_neuron_IDs_dict = callback_outputs['subset_neuron_IDs_dict']
         subset_decode_results_dict = callback_outputs['subset_decode_results_dict']
         subset_decode_results_track_id_correct_performance_dict = callback_outputs['subset_decode_results_track_id_correct_performance_dict']
-        subset_neuron_IDs_dict
+        directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity] = a_trial_by_trial_result.directional_active_lap_pf_results_dicts
+        _out_subset_decode_results_track_id_correct_performance_dict = callback_outputs['subset_decode_results_track_id_correct_performance_dict']
+        _out_subset_decode_results_dict = callback_outputs['subset_decode_results_dict']
+        (complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results)  = _out_subset_decode_results_dict['any_decoder'] ## get the result for all cells
+
 
 
     """
@@ -1886,6 +1890,9 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
     from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrialByTrialActivityResult
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _perform_run_rigorous_decoder_performance_assessment
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import co_filter_epochs_and_spikes
+    # from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 
     # Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation]
 
@@ -1907,6 +1914,7 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
         'subset_decode_results_dict': None,
         'a_trial_by_trial_result': None, 'subset_neuron_IDs_dict': None,
         'neuron_group_split_stability_dfs_tuple': None, 'neuron_group_split_stability_aclus_tuple': None,
+        'subset_decode_results_time_bin_marginals_df_dict': None
     }
     err = None
 
@@ -2036,6 +2044,40 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
             print(f'aclu subset: "{a_subset_name}"\n\ta_neuron_IDs_subset: {a_neuron_IDs_subset}\n\tpercent_laps_track_identity_estimated_correctly: {percent_laps_track_identity_estimated_correctly} %')
             
 
+
+        # ==================================================================================================================== #
+        # Process Outputs to get marginals                                                                                     #
+        # ==================================================================================================================== #
+        print(f'\t computing time_bin marginal for context: {curr_session_context}...')
+
+        #TODO 2024-10-09 09:08: - [ ] Could easily do for each set of cells by looping through `_out_subset_decode_results_dict` dict
+        callback_outputs['subset_decode_results_time_bin_marginals_df_dict'] = None
+        
+        (complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results)  = _out_subset_decode_results_dict['any_decoder'] ## get the result for all cells
+        
+
+        ## INPUTS: all_directional_laps_filter_epochs_decoder_result
+        transfer_column_names_list: List[str] = ['maze_id', 'lap_dir', 'lap_id']
+        TIME_OVERLAP_PREVENTION_EPSILON: float = 1e-12
+        (laps_directional_marginals_tuple, laps_track_identity_marginals_tuple, laps_non_marginalized_decoder_marginals_tuple), laps_marginals_df = all_directional_laps_filter_epochs_decoder_result.compute_marginals(epoch_idx_col_name='lap_idx', epoch_start_t_col_name='lap_start_t',
+                                                                                                                                                            additional_transfer_column_names=['start','stop','label','duration','lap_id','lap_dir','maze_id','is_LR_dir'])
+        laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = laps_directional_marginals_tuple
+        laps_track_identity_marginals, laps_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = laps_track_identity_marginals_tuple
+        non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df = laps_non_marginalized_decoder_marginals_tuple
+        laps_time_bin_marginals_df: pd.DataFrame = all_directional_laps_filter_epochs_decoder_result.build_per_time_bin_marginals_df(active_marginals_tuple=(laps_directional_marginals, laps_track_identity_marginals, non_marginalized_decoder_marginals),
+                                                                                                                                    columns_tuple=(['P_LR', 'P_RL'], ['P_Long', 'P_Short'], ['long_LR', 'long_RL', 'short_LR', 'short_RL']), transfer_column_names_list=transfer_column_names_list)
+        laps_time_bin_marginals_df['start'] = laps_time_bin_marginals_df['start'] + TIME_OVERLAP_PREVENTION_EPSILON ## ENSURE NON-OVERLAPPING
+
+        ## INPUTS: laps_time_bin_marginals_df
+        # active_min_num_unique_aclu_inclusions_requirement: int = track_templates.min_num_unique_aclu_inclusions_requirement(curr_active_pipeline, required_min_percentage_of_active_cells=0.33333333333333)
+        active_min_num_unique_aclu_inclusions_requirement = None # must be none for individual `time_bin` periods
+        filtered_laps_time_bin_marginals_df, active_spikes_df = co_filter_epochs_and_spikes(active_spikes_df=get_proper_global_spikes_df(curr_active_pipeline, minimum_inclusion_fr_Hz=curr_active_pipeline.global_computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz),
+                                                                        active_epochs_df=laps_time_bin_marginals_df, included_aclus=track_templates.any_decoder_neuron_IDs, min_num_unique_aclu_inclusions=active_min_num_unique_aclu_inclusions_requirement,
+                                                                        epoch_id_key_name='lap_individual_time_bin_id', no_interval_fill_value=-1, add_unique_aclus_list_column=True, drop_non_epoch_spikes=True)
+        callback_outputs['subset_decode_results_time_bin_marginals_df_dict'] = {'filtered_laps_time_bin_marginals_df': filtered_laps_time_bin_marginals_df,
+                                                                                # 'laps_marginals_df': laps_marginals_df,
+        }
+
         # aclu subset: "any_decoder"
         # 	a_neuron_IDs_subset: [  3   5   7   9  10  11  14  15  16  17  19  21  24  25  26  31  32  33  34  35  36  37  41  45  48  49  50  51  53  54  55  56  57  58  59  60  61  62  63  64  66  67  68  69  70  71  73  74  75  76  78  81  82  83  84  85  86  87  88  89  90  92  93  96  98 100 102 107 108]
         # 	percent_laps_track_identity_estimated_correctly: 86.02199999999999 %
@@ -2075,7 +2117,7 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
         # # _flat_z_scored_tuning_map_matrix
 
         ## OUTPUTS: override_active_neuron_IDs
-        print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
+
 
         print(f'\t\t done (success).')
 
