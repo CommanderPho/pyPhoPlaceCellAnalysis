@@ -31,6 +31,8 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
+from pyphoplacecellanalysis.Resources.icon_helpers import try_get_icon
 
 from pyphocorehelpers.indexing_helpers import Paginator
 from pyphocorehelpers.exception_helpers import ExceptionPrintingContext
@@ -1848,6 +1850,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         super(PhoPaginatedMultiDecoderDecodedEpochsWindow, self).__init__(*args, **kwargs)
         self.ui._contents = None
         self.ui.attached_ripple_rasters_widget = None
+        self.ui.attached_yellow_blue_marginals_viewer_widget = None
         
         # self.setup()
         # self.buildUI()
@@ -2703,7 +2706,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
     @function_attributes(short_name=None, tags=['yellow-blue', 'matplotlib', 'attached'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices'], used_by=[], creation_date='2024-10-04 07:23', related_items=[])
     def build_attached_yellow_blue_track_identity_marginal_window(self, directional_merged_decoders_result, global_session, 
-                                                                   filter_epochs=None, filter_epochs_decoder_result: DecodedFilterEpochsResult=None, name: str ='TrackIdentity_Marginal_Ripples', active_context: IdentifyingContext=None, **kwargs) -> RenderPlots:
+                                                                   filter_epochs=None, filter_epochs_decoder_result: DecodedFilterEpochsResult=None, name: str ='TrackIdentity_Marginal_Ripples', active_context: IdentifyingContext=None, 
+                                                                   enable_adding_to_embedded_dockarea: bool=False, **kwargs) -> RenderPlots:
         """ Attaches a stack of yellow-blue trackID marginal plots to the right side of the window. Currently they do not update.
         
         Uses: global_session.position, global_session.replay
@@ -2723,7 +2727,9 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
         
-
+        assert (filter_epochs is not None)
+        assert (filter_epochs_decoder_result is not None)
+        
         debug_print = kwargs.get('debug_print', False)
 
         ## Extract params_kwargs
@@ -2743,28 +2749,6 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                 curr_params_kwargs['disable_y_label'] = True
 
 
-        # target_dict = {'save_figure': False, 'included_any_context_neuron_ids': None, 'single_plot_fixed_height': 35.0, 'max_num_lap_epochs': 25, 'max_num_ripple_epochs': 45, 'size': (8, 55), 'dpi': 72,
-        #                 'constrained_layout': True, 'scrollable_figure': False, 'skip_plotting_measured_positions': True, 'skip_plotting_most_likely_positions': True} | kwargs
-
-        # Extract variables from the `target_dict` dictionary to the local workspace
-        # save_figure = target_dict['save_figure']
-        # included_any_context_neuron_ids = target_dict['included_any_context_neuron_ids']
-        # single_plot_fixed_height = target_dict['single_plot_fixed_height']
-        # # max_num_lap_epochs = target_dict['max_num_lap_epochs']
-        # max_num_ripple_epochs = target_dict['max_num_ripple_epochs']
-        # size = target_dict['size']
-        # dpi = target_dict['dpi']
-        # constrained_layout = target_dict['constrained_layout']
-        # scrollable_figure = target_dict['scrollable_figure']
-        # skip_plotting_measured_positions = target_dict['skip_plotting_measured_positions']
-        # skip_plotting_most_likely_positions = target_dict['skip_plotting_most_likely_positions']
-        
-        # decoding_time_bin_size: float = kwargs.pop('decoding_time_bin_size', None) ## not yet used
-        
-        # curr_params_kwargs = kwargs.pop('params_kwargs', {})
-        # max_subplots_per_page = kwargs.pop('max_subplots_per_page', 10)
-        
-        
         active_decoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
         # long_short_marginals: List[NDArray] = [x.p_x_given_n for x in DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(all_directional_ripple_filter_epochs_decoder_result)] # these work if I want all of them
 
@@ -2776,19 +2760,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         # Ripple Track-identity (Long/Short) Marginal:
         ## INPUTS: all_directional_ripple_filter_epochs_decoder_result, global_session, ripple_decoding_time_bin_size
         # _main_context = {'decoded_epochs': 'Ripple', 'Marginal': 'TrackID', 't_bin': decoding_time_bin_size}
-        
         # _main_context = IdentifyingContext(**{'decoded_epochs': 'Ripple', 'Marginal': 'TrackID', 't_bin': round(decoding_time_bin_size, ndigits=5)})
-
-        assert (filter_epochs is not None)
-        assert (filter_epochs_decoder_result is not None)
-        
-        # if filter_epochs is None:
-        #     global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(global_session.replay))
-        #     filter_epochs = global_replays
-            
-        # if filter_epochs_decoder_result is None:
-        #     all_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = deepcopy(directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result) # DecodedFilterEpochsResult
-        #     filter_epochs_decoder_result = all_directional_ripple_filter_epochs_decoder_result
 
 
         # ==================================================================================================================== #
@@ -2854,10 +2826,25 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         # TODO: hold a reference to it? Update function for changing pages?
         
 
+
+
         # Finish Setup _______________________________________________________________________________________________________ #
-        
+        a_win = a_yellow_blue_controller.ui.mw.window()
         ## TODO: add to dock area?
         
+        if enable_adding_to_embedded_dockarea:
+            from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, get_utility_dock_colors
+            print(f'moving yellow-blue marginals attached window into main window dock...')
+            yellowBlueMarginal_dock_name: str = 'yellowBlueMarginal'
+            self.contents.dock_configs[yellowBlueMarginal_dock_name] = CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False)
+            self.contents.dock_widgets[yellowBlueMarginal_dock_name] = self.add_display_dock(identifier=yellowBlueMarginal_dock_name, widget=a_win, dockSize=(430,780), dockAddLocationOpts=['right'],
+                                                                                      display_config=self.contents.dock_configs[yellowBlueMarginal_dock_name], autoOrientation=False)
+
+        else:
+            ## separate window        
+            icon = try_get_icon(icon_path=":/Render/Icons/graphics/yellow_blue_plot_icon.png")
+            if icon is not None:
+                a_win.setWindowIcon(icon)
 
         ## Gets the global bar and sets up pagination/control
         global_thin_button_bar_widget: ThinButtonBarWidget = self.ui._contents.global_thin_button_bar_widget
@@ -2866,6 +2853,11 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                                                                                                                                     controlled_pagination_controllers_list=(a_yellow_blue_controller, ))
 
 
+        ## Store yellow-blue viewer internally
+        self.ui.attached_yellow_blue_marginals_viewer_widget = None
+        self.ui.attached_yellow_blue_marginals_viewer_widget = a_yellow_blue_controller
+        # self.ui.connections['attached_yellow_blue_marginals_viewer_widget'] = new_connections_dict
+        
         return yellow_blue_attached_render_plot
 
     @function_attributes(short_name=None, tags=['export', 'image', 'marginal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-09 16:29', related_items=[])
