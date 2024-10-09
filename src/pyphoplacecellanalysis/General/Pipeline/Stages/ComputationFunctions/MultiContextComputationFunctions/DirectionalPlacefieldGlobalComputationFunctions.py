@@ -11,7 +11,8 @@ from datetime import datetime, date, timedelta
 
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, Iterable
 from typing_extensions import TypeAlias
-from nptyping import NDArray
+# from nptyping import NDArray
+from numpy.typing import NDArray  # Correct import for NDArray
 from typing import NewType
 import neuropy.utils.type_aliases as types
 # DecoderName = NewType('DecoderName', str)
@@ -57,8 +58,15 @@ if TYPE_CHECKING:
     from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportConfig
 
 
-DecodedMarginalResultTuple: TypeAlias = Tuple[List[DynamicContainer], NDArray[float], NDArray[int], NDArray[bool]] # used by 
+# DecodedMarginalResultTuple: TypeAlias = Tuple[List[DynamicContainer], NDArray[float], NDArray[int], NDArray[bool]] # used by 
+DecodedMarginalResultTuple: TypeAlias = Tuple[
+    List[DynamicContainer],
+    NDArray[np.float_],
+    NDArray[np.int_],
+    NDArray[np.bool_]
+]
 
+# DecodedMarginalResultTuple = NewType('DecodedMarginalResultTuple', Tuple[List[DynamicContainer], NDArray[float], NDArray[int], NDArray[bool]])
 
 # Assume a1 and a2 are your numpy arrays
 # def find_shift(a1, a2):
@@ -1340,11 +1348,14 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         the `*_time_bin_marginals_df` has a row per time bin instead of per epoch. 
         
         """
+        (self.laps_directional_marginals_tuple, self.laps_track_identity_marginals_tuple, laps_non_marginalized_decoder_marginals_tuple), laps_marginals_df = self.all_directional_laps_filter_epochs_decoder_result.compute_marginals(epoch_idx_col_name='lap_idx', epoch_start_t_col_name='lap_start_t',
+                                                                                                                                                            additional_transfer_column_names=['start','stop','label','duration','lap_id','lap_dir','maze_id','is_LR_dir'])
         laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = self.laps_directional_marginals_tuple
         laps_track_identity_marginals, laps_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = self.laps_track_identity_marginals_tuple
-
+        non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df = laps_non_marginalized_decoder_marginals_tuple
         laps_time_bin_marginals_df: pd.DataFrame = self._build_multiple_per_time_bin_marginals(a_decoder_result=self.all_directional_laps_filter_epochs_decoder_result,
-                                                                                                active_marginals_tuple=(laps_directional_marginals, laps_track_identity_marginals), columns_tuple=(['P_LR', 'P_RL'], ['P_Long', 'P_Short']))
+                                                                                                active_marginals_tuple=(laps_directional_marginals, laps_track_identity_marginals, non_marginalized_decoder_marginals), columns_tuple=(['P_LR', 'P_RL'], ['P_Long', 'P_Short'], ['long_LR', 'long_RL', 'short_LR', 'short_RL']))
+        ## #TODO 2024-10-08 19:37: - [ ] Add extra columns            
         return laps_time_bin_marginals_df
 
     @property
@@ -1352,13 +1363,16 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         """ same quantities computed by `compute_and_export_marginals_df_csvs(...)` 
         the `*_time_bin_marginals_df` has a row per time bin instead of per epoch. 
         """
+        (self.ripple_directional_marginals_tuple, self.ripple_track_identity_marginals_tuple, ripple_non_marginalized_decoder_marginals_tuple), ripple_marginals_df = self.all_directional_ripple_filter_epochs_decoder_result.compute_marginals(epoch_idx_col_name='ripple_idx', epoch_start_t_col_name='ripple_start_t',
+                                                                                                                                                                        additional_transfer_column_names=['start','stop','label','duration'])
         ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir  = self.ripple_directional_marginals_tuple
         ripple_track_identity_marginals, ripple_track_identity_all_epoch_bins_marginal, ripple_most_likely_track_identity_from_decoder, ripple_is_most_likely_track_identity_Long = self.ripple_track_identity_marginals_tuple
-
+        non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df = ripple_non_marginalized_decoder_marginals_tuple
         ## Build the per-time-bin results:
         ripple_time_bin_marginals_df: pd.DataFrame = self._build_multiple_per_time_bin_marginals(a_decoder_result=self.all_directional_ripple_filter_epochs_decoder_result,
-                                                                                                  active_marginals_tuple=(ripple_directional_marginals, ripple_track_identity_marginals), columns_tuple=(['P_LR', 'P_RL'], ['P_Long', 'P_Short']))
-
+                                                                                                  active_marginals_tuple=(ripple_directional_marginals, ripple_track_identity_marginals, non_marginalized_decoder_marginals), columns_tuple=(['P_LR', 'P_RL'], ['P_Long', 'P_Short'], ['long_LR', 'long_RL', 'short_LR', 'short_RL']))
+        ## #TODO 2024-10-08 19:37: - [ ] Add extra columns
+        
         return ripple_time_bin_marginals_df
 
 
@@ -1391,10 +1405,10 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         # Computes and initializes the marginal properties:        
         if self.all_directional_laps_filter_epochs_decoder_result is not None:
             (self.laps_directional_marginals_tuple, self.laps_track_identity_marginals_tuple, laps_non_marginalized_decoder_marginals_tuple), laps_marginals_df = self.all_directional_laps_filter_epochs_decoder_result.compute_marginals(epoch_idx_col_name='lap_idx', epoch_start_t_col_name='lap_start_t',
-																																								 additional_transfer_column_names=['start','stop','label','duration','lap_id','lap_dir'])
+                                                                                                                                                                 additional_transfer_column_names=['start','stop','label','duration','lap_id','lap_dir'])
         if self.all_directional_ripple_filter_epochs_decoder_result is not None:
             (self.ripple_directional_marginals_tuple, self.ripple_track_identity_marginals_tuple, ripple_non_marginalized_decoder_marginals_tuple), ripple_marginals_df = self.all_directional_ripple_filter_epochs_decoder_result.compute_marginals(epoch_idx_col_name='ripple_idx', epoch_start_t_col_name='ripple_start_t',
-																																								 additional_transfer_column_names=['start','stop','label','duration'])
+                                                                                                                                                                 additional_transfer_column_names=['start','stop','label','duration'])
 
         
 
@@ -1810,7 +1824,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         # laps_marginals_df
 
         (laps_directional_marginals_tuple, laps_track_identity_marginals_tuple, laps_non_marginalized_decoder_marginals_tuple), laps_marginals_df = self.all_directional_laps_filter_epochs_decoder_result.compute_marginals(epoch_idx_col_name='lap_idx', epoch_start_t_col_name='lap_start_t',
-                                                                                                                                                            additional_transfer_column_names=['start','stop','label','duration','lap_id','lap_dir','maze_id','is_LR_dir'])        
+                                                                                                                                                            additional_transfer_column_names=['start','stop','label','duration','lap_id','lap_dir','maze_id','is_LR_dir'])
         
         # epoch_extracted_posteriors = [a_result['p_x_given_n'] for a_result in track_identity_marginals]
         # n_epoch_time_bins = [np.shape(a_posterior)[-1] for a_posterior in epoch_extracted_posteriors]
@@ -3059,9 +3073,9 @@ class CompleteDecodedContextCorrectness(UnpackableMixin, object):
 
 @define(slots=False, repr=False, eq=False)
 class MeasuredDecodedPositionComparison(UnpackableMixin, object):
-	measured_positions_dfs_list: List[pd.DataFrame] = field()
-	decoded_positions_df_list: List[pd.DataFrame] = field()
-	decoded_measured_diff_df: pd.DataFrame = field()
+    measured_positions_dfs_list: List[pd.DataFrame] = field()
+    decoded_positions_df_list: List[pd.DataFrame] = field()
+    decoded_measured_diff_df: pd.DataFrame = field()
     
 @define(slots=False)
 class CustomDecodeEpochsResult(UnpackableMixin):
