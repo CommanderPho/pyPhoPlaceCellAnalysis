@@ -1877,8 +1877,8 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
         _out_subset_decode_results_track_id_correct_performance_dict = callback_outputs['subset_decode_results_track_id_correct_performance_dict']
         _out_subset_decode_results_dict = callback_outputs['subset_decode_results_dict']
         (complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results)  = _out_subset_decode_results_dict['any_decoder'] ## get the result for all cells
-
-
+        filtered_laps_time_bin_marginals_df: pd.DataFrame = callback_outputs['subset_decode_results_time_bin_marginals_df_dict']['filtered_laps_time_bin_marginals_df']
+        active_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = deepcopy({k:v.decoder_result for k, v in _out_separate_decoder_results[0].items()})
 
     """
     import sys
@@ -2078,6 +2078,7 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
                                                                                 # 'laps_marginals_df': laps_marginals_df,
         }
 
+        
         # aclu subset: "any_decoder"
         # 	a_neuron_IDs_subset: [  3   5   7   9  10  11  14  15  16  17  19  21  24  25  26  31  32  33  34  35  36  37  41  45  48  49  50  51  53  54  55  56  57  58  59  60  61  62  63  64  66  67  68  69  70  71  73  74  75  76  78  81  82  83  84  85  86  87  88  89  90  92  93  96  98 100 102 107 108]
         # 	percent_laps_track_identity_estimated_correctly: 86.02199999999999 %
