@@ -365,12 +365,13 @@ def stacked_epoch_slices_view_viewbox(epoch_slices, position_times_list, positio
 # ==================================================================================================================== #
 
 # Pieces of plotting for pagination __________________________________________________________________________________ #
-def _pagination_helper_plot_single_epoch_slice(curr_ax, params, plots_data, plots, ui, a_slice_idx, is_first_setup=True, debug_print=False):
+def _pagination_helper_plot_single_epoch_slice(curr_ax, params, plots_data, plots, ui, a_slice_idx: int, is_first_setup=True, debug_print=False):
     """ plots the data corresponding to `a_slice_idx` on the provided axes (`curr_ax`) 
     
     is_first_setup is True by default, and performs the axes initialization such as setting non-changing labels and such
     when calling to update the plot, set is_first_setup=False to skip this initialization and it will only update the stuff the changes every time
     
+    I guess ` plots_data.epoch_slices` is supposed to be updated prior to this call? Nah the slice index is absolute, so it's just never supposed to be reduced to a single page.
     """
     if debug_print:
         print(f'a_slice_idx: {a_slice_idx}')
@@ -1369,17 +1370,19 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                 if self.params.debug_print:
                     self.ui.print(f'i : {i}, curr_posterior.shape: {curr_posterior.shape}')
 
+                # self.plots_data.active_marginal_fn
+                curr_posterior_container
                 ## Clear the axis here:
                 curr_ax.clear()
 
                 # Update the axes appropriately:
-                _pagination_helper_plot_single_epoch_slice(curr_ax, self.params, self.plots_data, self.plots, self.ui, a_slice_idx=curr_slice_idx, is_first_setup=False, debug_print=self.params.debug_print) # calling with is_first_setup=False doesn't set the right-hand Epoch end time labels right
+                _pagination_helper_plot_single_epoch_slice(curr_ax, self.params, self.plots_data, self.plots, self.ui, a_slice_idx=curr_slice_idx, is_first_setup=False, debug_print=self.params.debug_print) # this is triggering an IndexError here!!
 
                 skip_plotting_measured_positions: bool = self.params.get('skip_plotting_measured_positions', False)
                 skip_plotting_most_likely_positions: bool = self.params.get('skip_plotting_most_likely_positions', False)
                 
                 ## NOTE: the actual heatmp is plotted using: 
-                _temp_fig, curr_ax = plot_1D_most_likely_position_comparsions(self.plots_data.global_pos_df, ax=curr_ax, time_window_centers=curr_time_bins, variable_name=self.params.variable_name, xbin=self.params.xbin,
+                _temp_fig, curr_ax = plot_1D_most_likely_position_comparsions(self.plots_data.global_pos_df, ax=curr_ax, time_window_centers=curr_time_bins, variable_name=self.params.variable_name, xbin=self.params.xbin, # is `self.params.xbin` the problem here? Because there are no positions at all?
                                                                 posterior=curr_posterior,
                                                                 active_most_likely_positions_1D=curr_most_likely_positions,
                                                                 enable_flat_line_drawing=self.params.enable_flat_line_drawing, debug_print=self.params.debug_print,
@@ -1440,7 +1443,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             except IndexError as e:
                 # Occurs when there are more plots on the page than there are data to plot for that page (happens on the last page)
                 if self.params.debug_print:
-                    self.ui.print(f'WARNING: exceeded data indicies (probably on last page). (for page_idx: {page_idx}, i: {i}, curr_ax: {curr_ax})')
+                    self.ui.print(f'WARNING: exceeded data indicies (probably on last page). (for page_idx: {page_idx}, i: {i}, curr_ax: {curr_ax}).\n\tIndexError: {e}')
                 curr_ax.set_visible(False)
 
             except BaseException as e:
@@ -2734,9 +2737,15 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
         ## Extract params_kwargs
         params_kwargs = kwargs.pop('params_kwargs', {})
-        params_kwargs = dict(skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, isPaginatorControlWidgetBackedMode=True) | params_kwargs
+        params_kwargs = dict(skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, isPaginatorControlWidgetBackedMode=True) | params_kwargs ## merge 
+        params_kwargs = {'max_subplots_per_page': 10, 'scrollable_figure': False, 'use_AnchoredCustomText': False,
+                'should_suppress_callback_exceptions': False, 'isPaginatorControlWidgetBackedMode': True,
+                'enable_update_window_title_on_page_change': False, 'build_internal_callbacks': True, 'debug_print': True,} | params_kwargs
+        
+        print(f'params_kwargs: {params_kwargs}')
+        
         # print(f'params_kwargs: {params_kwargs}')
-        max_subplots_per_page: int = kwargs.pop('max_subplots_per_page', params_kwargs.pop('max_subplots_per_page', 8)) # kwargs overrides params_kwargs
+        max_subplots_per_page: int = kwargs.pop('max_subplots_per_page', params_kwargs.pop('max_subplots_per_page', 10)) # kwargs overrides params_kwargs
         is_controlling_widget = False ## always false for YellowBlue plot
         
         curr_params_kwargs = deepcopy(params_kwargs)
@@ -2753,9 +2762,9 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         # long_short_marginals: List[NDArray] = [x.p_x_given_n for x in DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(all_directional_ripple_filter_epochs_decoder_result)] # these work if I want all of them
 
         first_controller = list(self.pagination_controllers.values())[0]
-        included_page_data_indicies, (curr_page_active_filter_epochs, curr_page_epoch_labels, curr_page_time_bin_containers, curr_page_posterior_containers) = first_controller.plots_data.paginator.get_page_data(page_idx=first_controller.current_page_idx)
+        # included_page_data_indicies, (curr_page_active_filter_epochs, curr_page_epoch_labels, curr_page_time_bin_containers, curr_page_posterior_containers) = first_controller.plots_data.paginator.get_page_data(page_idx=first_controller.current_page_idx)
         # curr_page_epoch_labels # these actually do seem correct to pass in as `included_epoch_indicies`
-        curr_page_epoch_labels = [int(v.removeprefix('Epoch[').removesuffix(']')) for v in curr_page_epoch_labels] # ['Epoch[70]' 'Epoch[72]'] -> [70, 72]
+        # curr_page_epoch_labels = [int(v.removeprefix('Epoch[').removesuffix(']')) for v in curr_page_epoch_labels] # ['Epoch[70]' 'Epoch[72]'] -> [70, 72]
         # print(curr_page_epoch_labels)
         # Ripple Track-identity (Long/Short) Marginal:
         ## INPUTS: all_directional_ripple_filter_epochs_decoder_result, global_session, ripple_decoding_time_bin_size
@@ -2797,7 +2806,11 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                                                                                             xbin=active_decoder.xbin, global_pos_df=global_session.position.to_dataframe(),
                                                                                             a_name=f'YellowBlueMarginalEpochSlices', active_context=active_context,
                                                                                             active_marginal_fn=lambda a_filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(a_filter_epochs_decoder_result), ## IMPORTANT: `active_marginal_fn` is what makes this a yellow-blue plot
-                                                                                            max_subplots_per_page=max_subplots_per_page, debug_print=debug_print, included_epoch_indicies=curr_page_epoch_labels, params_kwargs=curr_params_kwargs) # , save_figure=save_figure
+                                                                                            # active_marginal_fn=None,
+                                                                                            max_subplots_per_page=max_subplots_per_page, debug_print=debug_print,
+                                                                                            # included_epoch_indicies=curr_page_epoch_labels, ## This is what broke rendering on every page except the first one
+                                                                                            params_kwargs=curr_params_kwargs) # , save_figure=save_figure
+        
         # Post-plot call:
         # Constrains each of the plotters at least to the minimum height:
         # a_pagination_controller.params.all_plots_height
