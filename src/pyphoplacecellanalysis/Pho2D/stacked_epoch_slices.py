@@ -2621,7 +2621,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                 a_pagination_controller.params.on_middle_click_item_callbacks.pop('copy_epoch_times_to_clipboard_callback', None)
 
     @function_attributes(short_name=None, tags=['spike_raster', 'attached'], input_requires=[], output_provides=[], uses=['_build_attached_raster_viewer', '_apply_xticks_to_pyqtgraph_plotitem'], used_by=[], creation_date='2024-09-25 15:50', related_items=[])
-    def build_attached_raster_viewer_widget(self, track_templates, active_spikes_df: pd.DataFrame, filtered_epochs_df: pd.DataFrame) -> Tuple["RankOrderRastersDebugger", Callable]:
+    def build_attached_raster_viewer_widget(self, track_templates, active_spikes_df: pd.DataFrame, filtered_epochs_df: pd.DataFrame,  enable_adding_to_embedded_dockarea: bool=True) -> Tuple["RankOrderRastersDebugger", Callable]:
         """ Plots a synchronized raster_viewer_widget for the epochs in 
         Usage:
             from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
@@ -2705,12 +2705,25 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         self.ui.attached_ripple_rasters_widget = _out_ripple_rasters
         self.ui.update_attached_raster_viewer_epoch_callback = update_attached_raster_viewer_epoch_callback
         
+
+        if enable_adding_to_embedded_dockarea:
+            from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, get_utility_dock_colors
+
+            ## Transfer the four items or embed the whole window?
+            a_win = _out_ripple_rasters.root_dockAreaWindow
+            print(f'moving RankOrderRastersDebugger attached window into main window dock...')
+            rankOrderRastersDebugger_dock_name: str = 'RankOrderRastersDebugger'
+            self.contents.dock_configs[rankOrderRastersDebugger_dock_name] = CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False)
+            self.contents.dock_widgets[rankOrderRastersDebugger_dock_name] = self.add_display_dock(identifier=rankOrderRastersDebugger_dock_name, widget=a_win, dockSize=(430,780), dockAddLocationOpts=['top'],
+                                                                                      display_config=self.contents.dock_configs[rankOrderRastersDebugger_dock_name], autoOrientation=False)
+
         return _out_ripple_rasters, update_attached_raster_viewer_epoch_callback
+
 
     @function_attributes(short_name=None, tags=['yellow-blue', 'matplotlib', 'attached'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices'], used_by=[], creation_date='2024-10-04 07:23', related_items=[])
     def build_attached_yellow_blue_track_identity_marginal_window(self, directional_merged_decoders_result, global_session, 
                                                                    filter_epochs=None, filter_epochs_decoder_result: DecodedFilterEpochsResult=None, name: str ='TrackIdentity_Marginal_Ripples', active_context: IdentifyingContext=None, 
-                                                                   enable_adding_to_embedded_dockarea: bool=False, **kwargs) -> RenderPlots:
+                                                                   enable_adding_to_embedded_dockarea: bool=True, **kwargs) -> RenderPlots:
         """ Attaches a stack of yellow-blue trackID marginal plots to the right side of the window. Currently they do not update.
         
         Uses: global_session.position, global_session.replay
@@ -2727,7 +2740,6 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         ## INPUTS: paginated_multi_decoder_decoded_epochs_window, directional_merged_decoders_result
 
         # directional_merged_decoders_result # all_directional_ripple_filter_epochs_decoder_result, ripple_track_identity_marginals_tuple
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
         
         assert (filter_epochs is not None)
@@ -2773,39 +2785,14 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
 
         # ==================================================================================================================== #
-        # `plot_decoded_epoch_slices` static mode                                                                              #
-        # ==================================================================================================================== #
-        # global_session = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name]) # used for validate_lap_dir_estimations(...) 
-        # out_plot_tuple = plot_decoded_epoch_slices(
-        #     filter_epochs=filter_epochs, filter_epochs_decoder_result=filter_epochs_decoder_result,
-        #     global_pos_df=global_session.position.to_dataframe(),
-        #     # xbin=active_decoder.xbin, ## why are we passing the .xbin? Shouldn't this be time bins??
-        #     xbin=active_decoder.xbin, ## why are we passing the .xbin? Shouldn't this be time bins??
-        #     name=name,
-        #     active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
-        #     # single_plot_fixed_height=single_plot_fixed_height,
-        #     # debug_test_max_num_slices=max_num_ripple_epochs,
-        #     # size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
-        #     included_epoch_indicies=curr_page_epoch_labels, # [70, 72]
-        #     **target_dict,
-        #     # _mod_plot_kwargs=dict(final_context=_main_context)
-        # )
-
-        # # Post-plot call:
-        # assert len(out_plot_tuple) == 4
-        # params, plots_data, plots, ui = out_plot_tuple # [2] corresponds to 'plots' in params, plots_data, plots, ui = laps_plots_tuple
-        # # post_hoc_append to collector
-        # mw = ui.mw # MatplotlibTimeSynchronizedWidget
-        # yellow_blue_attached_render_plot = RenderPlots(name='yellow_blue_attached_widget', params=params, plots_data=plots_data, plots=plots, ui=ui)
-        
-        # ==================================================================================================================== #
         # 2024-10-09 - `DecodedEpochSlicesPaginatedFigureController`-based mode                                                #
         # ==================================================================================================================== #
         a_yellow_blue_controller: DecodedEpochSlicesPaginatedFigureController = DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data(filter_epochs_decoder_result.filter_epochs, # filter_epochs_decoder_result.filter_epochs,
                                                                                             filter_epochs_decoder_result=filter_epochs_decoder_result,
                                                                                             xbin=active_decoder.xbin, global_pos_df=global_session.position.to_dataframe(),
                                                                                             a_name=f'YellowBlueMarginalEpochSlices', active_context=active_context,
-                                                                                            active_marginal_fn=lambda a_filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(a_filter_epochs_decoder_result), ## IMPORTANT: `active_marginal_fn` is what makes this a yellow-blue plot
+                                                                                            # active_marginal_fn=lambda a_filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(a_filter_epochs_decoder_result), ## IMPORTANT: `active_marginal_fn` is what makes this a yellow-blue plot
+                                                                                            active_marginal_fn=lambda a_filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors(a_filter_epochs_decoder_result), ## IMPORTANT: `active_marginal_fn` is what makes this a yellow-blue plot
                                                                                             # active_marginal_fn=None,
                                                                                             max_subplots_per_page=max_subplots_per_page, debug_print=debug_print,
                                                                                             # included_epoch_indicies=curr_page_epoch_labels, ## This is what broke rendering on every page except the first one
@@ -2873,6 +2860,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         
         return yellow_blue_attached_render_plot
 
+
+
     @function_attributes(short_name=None, tags=['export', 'image', 'marginal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-09 16:29', related_items=[])
     def export_current_epoch_marginal_and_raster_images(self, directional_merged_decoders_result, root_export_path: Path, active_context: Optional[IdentifyingContext]=None):
         """ Export Marginal Pseudo2D posteriors and rasters for middle-clicked epochs
@@ -2935,7 +2924,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders'] # DirectionalPseudo2DDecodersResult, pull from global computations
 
         _shared_plotting_kwargs = {                # 'debug_print': True,
-                'max_subplots_per_page': 10,
+                'max_subplots_per_page': 3,
                 'scrollable_figure': False,
                 # 'scrollable_figure': True,
                 # 'posterior_heatmap_imshow_kwargs': dict(vmin=0.0075),
