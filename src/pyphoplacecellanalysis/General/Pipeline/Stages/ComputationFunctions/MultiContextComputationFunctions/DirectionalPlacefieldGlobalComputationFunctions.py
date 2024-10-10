@@ -1456,9 +1456,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
             
             # y-axis marginal:
             curr_unit_marginal_x.p_x_given_n = np.squeeze(np.sum(a_p_x_given_n, axis=0)) # sum over all x. Result should be (4, n_epoch_t_bins[i])
-            # curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=1, keepdims=True) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
-
-            curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n / np.sum(curr_unit_marginal_x.p_x_given_n, axis=0, keepdims=True) # sum over all directions for each time_bin (so there's a normalized distribution at each timestep)
+            curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n / np.sum(curr_unit_marginal_x.p_x_given_n, axis=0, keepdims=True) # sum over all four decoders for each time_bin (so there's a normalized distribution at each timestep)
 
             ## Ensures that the marginal posterior is at least 2D:
             if curr_unit_marginal_x.p_x_given_n.ndim == 0:

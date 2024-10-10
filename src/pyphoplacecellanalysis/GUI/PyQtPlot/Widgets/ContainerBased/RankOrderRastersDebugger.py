@@ -129,6 +129,7 @@ class RankOrderRastersDebugger:
     params: VisualizationParameters = field(init=False, repr=keys_only_repr)
 
     active_epoch_IDX: int = field(default=0, repr=True)
+    # active_epoch_time_bin_IDX: Optional[int] = field(default=None, repr=True)
 
     on_idx_changed_callback_function_dict: Dict[str, Callable] = field(default=Factory(dict), repr=False)
 
@@ -242,7 +243,7 @@ class RankOrderRastersDebugger:
     @property
     def attached_directional_template_pfs_debugger(self): #-> Optional[TemplateDebugger]:
         """The attached_directional_template_pfs_debugger property."""
-        return self.ui.controlled_references.get('directional_template_pfs_debugger', None)
+        return self.ui.controlled_references.get('directional_template_pfs_debugger', {}).get('obj', None)
  
 
     @classmethod
@@ -409,9 +410,8 @@ class RankOrderRastersDebugger:
                                            seperate_all_spots_dict=all_separate_data_all_spots, seperate_all_scatterplot_tooltips_kwargs_dict=all_separate_data_all_scatterplot_tooltips_kwargs, seperate_new_sorted_rasters_dict=all_separate_data_new_sorted_rasters, seperate_spikes_dfs_dict=all_separate_data_spikes_dfs,
                                            on_update_active_epoch=on_update_active_epoch, on_update_active_scatterplot_kwargs=on_update_active_scatterplot_kwargs, **{k:v for k, v in _obj.plots_data.to_dict().items() if k not in ['name']})
         # _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, ctrl_layout=ctrl_layout, **ctrl_widgets_dict, **info_labels_widgets_dict, on_valueChanged=valueChanged, logTextEdit=logTextEdit, dock_configs=dock_configs, controlled_references=None)
-        _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, **utility_controls_ui_dict, **info_labels_widgets_dict, dock_configs=dock_configs, controlled_references=None)
+        _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, **utility_controls_ui_dict, **info_labels_widgets_dict, dock_configs=dock_configs, controlled_references={})
         _obj.params = VisualizationParameters(name=name, is_laps=False, enable_show_spearman=True, enable_show_pearson=False, enable_show_Z_values=True, use_plaintext_title=False, **param_kwargs)
-
 
         ## Add Selected Spikes:
         # try:
@@ -1382,7 +1382,7 @@ class RankOrderRastersDebugger:
         return _out_directional_template_pfs_debugger, debug_update_paired_directional_template_pfs_debugger
 
 
-    @function_attributes(short_name=None, tags=['indicator-regions', 'highlight', 'selection'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-10 08:51', related_items=[])
+    @function_attributes(short_name=None, tags=['indicator-regions', 'highlight', 'selection'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-10 08:51', related_items=['clear_highlighting_indicator_regions'])
     def add_highlighting_indicator_regions(self, t_start: float, t_stop: float, identifier: str):
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.CustomLinearRegionItem import CustomLinearRegionItem
         from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import build_pyqtgraph_epoch_indicator_regions
@@ -1400,9 +1400,13 @@ class RankOrderRastersDebugger:
         # print(f'removed all extant')
         self.plots.epoch_indicator_regions[identifier] = {} # clear when done
         for a_decoder_name, a_root_plot in self.plots.root_plots.items():
-            self.plots.epoch_indicator_regions[identifier][a_root_plot], epoch_region_label = build_pyqtgraph_epoch_indicator_regions(a_root_plot, t_start=t_start, t_stop=t_stop, epoch_label=identifier, **dict(pen=pg.mkPen('#0b0049'), brush=pg.mkBrush('#0099ff42'), hoverBrush=pg.mkBrush('#fff400'), hoverPen=pg.mkPen('#00ff00')), movable=False)
+            self.plots.epoch_indicator_regions[identifier][a_root_plot], epoch_region_label = build_pyqtgraph_epoch_indicator_regions(a_root_plot, t_start=t_start, t_stop=t_stop, epoch_label="", **dict(pen=pg.mkPen('#0b0049'), brush=pg.mkBrush('#0099ff42'), hoverBrush=pg.mkBrush('#fff400'), hoverPen=pg.mkPen('#00ff00')), movable=False) # no label
     
-    @function_attributes(short_name=None, tags=['indicator-regions', 'highlight', 'selection'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-10 08:51', related_items=[])
+
+	# def select_epoch_time
+
+
+    @function_attributes(short_name=None, tags=['indicator-regions', 'highlight', 'selection'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-10 08:51', related_items=['add_highlighting_indicator_regions'])
     def clear_highlighting_indicator_regions(self):
         existing_indicator_regions_dict = self.plots.get('epoch_indicator_regions', None)
         if existing_indicator_regions_dict is not None:         
