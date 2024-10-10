@@ -58,7 +58,7 @@ __all__ = ['TemplateDebugger']
 # ==================================================================================================================== #
 # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import _debug_plot_directional_template_rasters, build_selected_spikes_df, add_selected_spikes_df_points_to_scatter_plot
 
-@metadata_attributes(short_name=None, tags=['gui', 'template'], input_requires=[], output_provides=[], uses=[], used_by=['_display_directional_template_debugger'], creation_date='2023-12-11 10:24', related_items=[])
+@metadata_attributes(short_name=None, tags=['gui', 'template'], input_requires=[], output_provides=[], uses=['visualize_heatmap_pyqtgraph'], used_by=['_display_directional_template_debugger'], creation_date='2023-12-11 10:24', related_items=[])
 @define(slots=False, repr=False)
 class TemplateDebugger:
     """ TemplateDebugger displays four 1D heatmaps colored by cell for the tuning curves of PfND. Each shows the same tuning curves but they are sorted according to four different templates (RL_odd, RL_even, LR_odd, LR_even)
@@ -142,7 +142,8 @@ class TemplateDebugger:
         _out_data = RenderPlotsData(name=figure_name, track_templates=deepcopy(track_templates), out_colors_heatmap_image_matrix_dicts={}, sorted_neuron_IDs_lists=None, sort_helper_neuron_id_to_neuron_colors_dicts=None, sort_helper_neuron_id_to_sort_IDX_dicts=None, sorted_pf_tuning_curves=None, sorted_pf_peak_location_list=None, active_pfs_img_extents_dict=None, unsorted_included_any_context_neuron_ids=None, ref_decoder_name=None)
         _out_plots = RenderPlots(name=figure_name, pf1D_heatmaps=None)
         _out_params = VisualizationParameters(name=figure_name, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, use_shared_aclus_only_templates=use_shared_aclus_only_templates,
-                                             debug_print=debug_print, debug_draw=debug_draw, use_incremental_sorting=use_incremental_sorting, enable_pf_peak_indicator_lines=enable_pf_peak_indicator_lines, included_any_context_neuron_ids=included_any_context_neuron_ids, **kwargs)
+                                             debug_print=debug_print, debug_draw=debug_draw, use_incremental_sorting=use_incremental_sorting, enable_pf_peak_indicator_lines=enable_pf_peak_indicator_lines, included_any_context_neuron_ids=included_any_context_neuron_ids,
+                                             solo_emphasized_aclus=None, **kwargs)
                 
         # build the window with the dock widget in it:
         root_dockAreaWindow, app = DockAreaWrapper.build_default_dockAreaWindow(title=f'Pho Directional Template Debugger: {figure_name}', defer_show=False)
@@ -159,7 +160,7 @@ class TemplateDebugger:
         _obj = cls(plots=_out_plots, plots_data=_out_data, ui=_out_ui, params=_out_params)
 
         _obj.buildUI_directional_template_debugger_data()
-        update_callback_fn = (lambda included_neuron_ids: _obj.update_directional_template_debugger_data(included_neuron_ids))
+        update_callback_fn = (lambda included_neuron_ids, **kwargs: _obj.update_directional_template_debugger_data(included_neuron_ids, **kwargs))
         _obj.ui.on_update_callback = update_callback_fn
 
         # _out_data, _out_plots, _out_ui = TemplateDebugger._subfn_buildUI_directional_template_debugger_data(included_any_context_neuron_ids, use_incremental_sorting=use_incremental_sorting, debug_print=debug_print, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, _out_data=_out_data, _out_plots=_out_plots, _out_ui=_out_ui, decoders_dict=decoders_dict)
@@ -407,6 +408,9 @@ class TemplateDebugger:
         sorted_pf_tuning_curves = _out_data.sorted_pf_tuning_curves
         sorted_pf_peak_location_list = _out_data.sorted_pf_peak_location_list
 
+
+        _out_data.included_any_context_neuron_ids = deepcopy(included_neuron_ids)
+
         ## Plot the placefield 1Ds as heatmaps and then wrap them in docks and add them to the window:
         assert _out_plots.pf1D_heatmaps is not None
         for i, (a_decoder_name, a_decoder) in enumerate(decoders_dict.items()):
@@ -443,18 +447,31 @@ class TemplateDebugger:
                 # a_line_item.deleteLater()
             _out_ui.order_location_lines_dict[a_decoder_name] = {} # clear the dictionary
             
+            custom_solo_emphasized_aclus = _out_params.get('solo_emphasized_aclus', None)
 
-            for cell_i, (aclu, a_color_vector) in enumerate(a_decoder_color_map.items()):                        
-                # text = _out_ui.text_items_dict[a_decoder_name][aclu] # pg.TextItem(f"{int(aclu)}", color=pg.mkColor(a_color_vector), anchor=(1,0)) # , angle=15
+            for cell_i, (aclu, a_color_vector) in enumerate(a_decoder_color_map.items()):
+                ## Apply emphasis/demphasis:
+                
+                ## default to full saturation/value scale:
+                saturation_scale = 1.0
+                value_scale_multiplier = 1.0
+                
+                if custom_solo_emphasized_aclus is not None:
+                    ## apply custom saturation/desaturation here
+                    if aclu not in custom_solo_emphasized_aclus:
+                        ## demphasize
+                        saturation_scale = 0.02
+                        value_scale_multiplier = 0.1
+
                 # Create a new text item:
-                text = pg.TextItem(f"{int(aclu)}", color=pg.mkColor(a_color_vector), anchor=(1,0))
+                text = pg.TextItem(f"{int(aclu)}", color=build_adjusted_color(pg.mkColor(a_color_vector), value_scale=value_scale_multiplier, saturation_scale=saturation_scale), anchor=(1,0))
                 text.setPos(-1.0, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
                 curr_win.addItem(text)
                 _out_ui.text_items_dict[a_decoder_name][aclu] = text # add the TextItem to the map
 
                 # modulate heatmap color for this row (`curr_data[i, :]`):
                 heatmap_base_color = pg.mkColor(a_color_vector)
-                out_colors_row = DataSeriesColorHelpers.qColorsList_to_NDarray([build_adjusted_color(heatmap_base_color, value_scale=v) for v in curr_data[cell_i, :]], is_255_array=False).T # (62, 4)
+                out_colors_row = DataSeriesColorHelpers.qColorsList_to_NDarray([build_adjusted_color(heatmap_base_color, value_scale=(v * value_scale_multiplier), saturation_scale=saturation_scale) for v in curr_data[cell_i, :]], is_255_array=False).T # (62, 4)
                 _temp_curr_out_colors_heatmap_image.append(out_colors_row)
 
                 # Add vertical lines
@@ -464,7 +481,7 @@ class TemplateDebugger:
                     line_height = 1.0
                     line = QtGui.QGraphicsLineItem(x_offset, y_offset, x_offset, (y_offset + line_height)) # (xstart, ystart, xend, yend)
                     # line.setPen(pg.mkPen('white', width=2))  # Set color and width of the line
-                    line.setPen(pg.mkPen(pg.mkColor(a_color_vector), width=2))  # Set color and width of the line
+                    line.setPen(pg.mkPen(build_adjusted_color(pg.mkColor(a_color_vector), value_scale=value_scale_multiplier, saturation_scale=saturation_scale), width=2))  # Set color and width of the line
                     curr_win.addItem(line)
                     _out_ui.order_location_lines_dict[a_decoder_name][aclu] = line # add to the map
                     # # Old update-based way:
@@ -502,6 +519,16 @@ class TemplateDebugger:
     # ==================================================================================================================== #
     # Events                                                                                                               #
     # ==================================================================================================================== #
+    def update_cell_emphasis(self, solo_emphasized_aclus: List):
+        """ updates the display of each cell to only emphasize the `solo_emphasized_aclus`, dimming all the others. 
+        """
+        self.params.solo_emphasized_aclus = solo_emphasized_aclus
+        self.update_directional_template_debugger_data(included_neuron_ids=self.params.included_any_context_neuron_ids)
+        
+    def reset_cell_emphasis(self):
+            """ resets the emphasis to normal (no special emphasis/demphasis) """
+            self.update_cell_emphasis(solo_emphasized_aclus=None)
+
 
 
 # ==================================================================================================================== #
