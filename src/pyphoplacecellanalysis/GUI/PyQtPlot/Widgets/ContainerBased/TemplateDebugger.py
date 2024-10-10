@@ -160,7 +160,7 @@ class TemplateDebugger:
         _obj = cls(plots=_out_plots, plots_data=_out_data, ui=_out_ui, params=_out_params)
 
         _obj.buildUI_directional_template_debugger_data()
-        update_callback_fn = (lambda included_neuron_ids, **kwargs: _obj.update_directional_template_debugger_data(included_neuron_ids, **kwargs))
+        update_callback_fn = (lambda included_neuron_ids, **kwargs: _obj.update_directional_template_debugger_data(included_neuron_ids, solo_emphasized_aclus=None, **kwargs))
         _obj.ui.on_update_callback = update_callback_fn
 
         # _out_data, _out_plots, _out_ui = TemplateDebugger._subfn_buildUI_directional_template_debugger_data(included_any_context_neuron_ids, use_incremental_sorting=use_incremental_sorting, debug_print=debug_print, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, _out_data=_out_data, _out_plots=_out_plots, _out_ui=_out_ui, decoders_dict=decoders_dict)
@@ -510,8 +510,9 @@ class TemplateDebugger:
         """Calls `_subfn_buildUI_directional_template_debugger_data` to build the UI and then updates the member variables."""
         self.plots_data, self.plots, self.ui = self._subfn_buildUI_directional_template_debugger_data(self.params.included_any_context_neuron_ids, self.params.use_incremental_sorting, self.params.debug_print, self.params.enable_cell_colored_heatmap_rows, self.plots_data, self.plots, self.ui, _out_params=self.params, decoders_dict=self.decoders_dict)
 
-    def update_directional_template_debugger_data(self, included_neuron_ids):
+    def update_directional_template_debugger_data(self, included_neuron_ids, solo_emphasized_aclus: Optional[List]=None):
         """Calls `_subfn_update_directional_template_debugger_data` to build the UI and then updates the member variables."""
+        self.params.solo_emphasized_aclus = solo_emphasized_aclus ## reset emphasis on update
         self.plots_data, self.plots, self.ui = self._subfn_update_directional_template_debugger_data(included_neuron_ids, self.params.use_incremental_sorting, self.params.debug_print, self.params.enable_cell_colored_heatmap_rows, self.plots_data, self.plots, self.ui, _out_params=self.params, decoders_dict=self.decoders_dict)
 
 
@@ -522,9 +523,8 @@ class TemplateDebugger:
     def update_cell_emphasis(self, solo_emphasized_aclus: List):
         """ updates the display of each cell to only emphasize the `solo_emphasized_aclus`, dimming all the others. 
         """
-        self.params.solo_emphasized_aclus = solo_emphasized_aclus
-        self.update_directional_template_debugger_data(included_neuron_ids=self.params.included_any_context_neuron_ids)
-        
+        self.update_directional_template_debugger_data(included_neuron_ids=self.params.included_any_context_neuron_ids, solo_emphasized_aclus=solo_emphasized_aclus)
+
     def reset_cell_emphasis(self):
             """ resets the emphasis to normal (no special emphasis/demphasis) """
             self.update_cell_emphasis(solo_emphasized_aclus=None)

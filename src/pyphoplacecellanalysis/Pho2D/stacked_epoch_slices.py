@@ -54,7 +54,9 @@ if TYPE_CHECKING:
     ## typehinting only imports here
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import TemplateDebugger
     
+
 
 """ 
 These functions help render a vertically stacked column of subplots that represent (potentially non-contiguous) slices of a time range. 
@@ -1836,6 +1838,25 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
     def global_paginator_controller_widget(self) -> PaginationControlWidget:
         """The global_thin_button_bar_widget property."""
         return self.global_thin_button_bar_widget.ui.paginator_controller_widget
+    
+
+    # Attached Widgets ___________________________________________________________________________________________________ #
+    @property
+    def attached_ripple_rasters_widget(self) -> Optional[RankOrderRastersDebugger]:
+        """The global_thin_button_bar_widget property."""
+        return self.ui.attached_ripple_rasters_widget
+    
+    @property
+    def attached_yellow_blue_marginals_viewer_widget(self) -> Optional[DecodedEpochSlicesPaginatedFigureController]:
+        """The attached_yellow_blue_marginals_viewer_widget property."""
+        return self.ui.attached_yellow_blue_marginals_viewer_widget
+    
+    @property
+    def attached_directional_template_pfs_debugger(self) -> Optional[TemplateDebugger]:
+        """The global_thin_button_bar_widget property."""
+        if self.ui.attached_ripple_rasters_widget is None:
+            return None
+        return self.ui.attached_ripple_rasters_widget.ui.controlled_references.get('directional_template_pfs_debugger', None)
  
 
     # Pass-through properties ____________________________________________________________________________________________ #
@@ -2952,8 +2973,10 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         
         # Build Raster Widget ________________________________________________________________________________________________ #
         ripple_rasters_plot_tuple = paginated_multi_decoder_decoded_epochs_window.build_attached_raster_viewer_widget(track_templates=track_templates, active_spikes_df=active_spikes_df, filtered_epochs_df=active_filter_epochs_df) 
-        # _out_ripple_rasters, update_attached_raster_viewer_epoch_callback = ripple_rasters_plot_tuple    
-        
+        _out_ripple_rasters, update_attached_raster_viewer_epoch_callback = ripple_rasters_plot_tuple    
+        ## Attach TemplateViewer to raster:
+        _out_directional_template_pfs_debugger, debug_update_paired_directional_template_pfs_debugger = _out_ripple_rasters.plot_attached_directional_templates_pf_debugger(curr_active_pipeline=curr_active_pipeline)
+        # Accessible via `directional_template_pfs_debugger = paginated_multi_decoder_decoded_epochs_window.ui.attached_ripple_rasters_widget.ui.controlled_references['directional_template_pfs_debugger']`
 
         # Build Yellow-Blue Marginal Widget __________________________________________________________________________________ #        
         _build_attached_yellow_blue_track_identity_marginal_window_kwargs_DICT = {'ripple': dict(decoding_time_bin_size=directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size, name='TrackIdentity_Marginal_Ripples', filter_epochs_decoder_result=deepcopy(directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result)),
