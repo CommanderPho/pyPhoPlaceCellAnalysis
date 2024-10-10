@@ -1373,7 +1373,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                     self.ui.print(f'i : {i}, curr_posterior.shape: {curr_posterior.shape}')
 
                 # self.plots_data.active_marginal_fn
-                curr_posterior_container
+                # curr_posterior_container
                 ## Clear the axis here:
                 curr_ax.clear()
 
@@ -2087,8 +2087,15 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             a_paginated_controller.programmatically_update_page_idx(updated_page_idx=page_idx, block_signals=False) # should ensure a_paginated_controller.current_page_idx is updated
             assert (a_paginated_controller.current_page_idx == page_idx), f"a_paginated_controller.current_page_idx: {a_paginated_controller.current_page_idx} does not equal the desired page index: {page_idx}"
             a_paginated_controller.perform_update_selections(defer_render=False) # update selections
+            
+        if self.attached_ripple_rasters_widget is not None:
+            self.attached_ripple_rasters_widget.clear_highlighting_indicator_regions()
+            
+        if self.attached_directional_template_pfs_debugger is not None:
+            self.attached_directional_template_pfs_debugger.reset_cell_emphasis()
 
         self.draw()
+        
         
     @function_attributes(short_name=None, tags=['data-overlays', 'add'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-12 00:00', related_items=['remove_data_overlays'])
     def add_data_overlays(self, decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, included_columns=None, defer_refresh=False):
@@ -2657,6 +2664,96 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         
         _out_ripple_rasters: RankOrderRastersDebugger = _build_attached_raster_viewer(self, track_templates=track_templates, active_spikes_df=active_spikes_df, filtered_ripple_simple_pf_pearson_merged_df=filtered_epochs_df)
 
+        ## Get the time bin within the clicked epoch
+        @function_attributes(short_name=None, tags=['callback'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-10 09:06', related_items=[])
+        def update_clicked_epoch_time_bin_selection_callback(self, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time):
+            """ gets the time_bin within the clicked epoch
+            
+            captures: attached_ripple_rasters_widget, attached_directional_template_pfs_debugger
+            """
+            from matplotlib.backend_bases import MouseButton, MouseEvent, LocationEvent, PickEvent
+            print(f'get_click_time_epoch_time_bin_callback(clicked_data_index: {clicked_data_index}, clicked_epoch_is_selected: {clicked_epoch_is_selected}, clicked_epoch_start_stop_time: {clicked_epoch_start_stop_time})')
+            print(f'\tevent: {event}\n\ttype(event): {type(event)}\n') # event: button_press_event: xy=(245, 359) xydata=(65.00700367785453, 156.55817377538108) button=3 dblclick=False inaxes=Axes(0.0296913,0.314173;0.944584x0.0753216)
+            # type(event): <class 'matplotlib.backend_bases.MouseEvent'>
+            if clicked_epoch_start_stop_time is not None:
+                if len(clicked_epoch_start_stop_time) == 2:
+                    start_t, end_t = clicked_epoch_start_stop_time
+                    print(f'clicked widget at {clicked_ax}. [{start_t}, {end_t}]')
+                    code_string: str = f"[{start_t}, {end_t}]"
+                    found_time_bin_idx = None
+                    event_dict = {} 
+                    if isinstance(event, MouseEvent):
+                        # matplotlib mouse event
+                        if event.inaxes:                   
+                            event_dict = {               
+                                'data_x':event.xdata,
+                                'data_y':event.ydata,
+                                'pixel_x':event.x,
+                                'pixel_y':event.y,
+                            }
+                            clicked_t_seconds: float = float(event.xdata)
+                            # print(f'clicked_t_seconds: {clicked_t_seconds}')
+                            ## find nearest time within the epoch
+                            clicked_epoch_start_stop_time = self.plots_data.epoch_slices[clicked_data_index]
+                            # print(f'clicked_epoch_start_stop_time: {clicked_epoch_start_stop_time}')
+                            included_page_data_indicies, (curr_page_active_filter_epochs, curr_page_epoch_labels, curr_page_time_bin_containers, curr_page_posterior_containers) = self.plots_data.paginator.get_page_data(page_idx=self.current_page_idx)
+                            # print(f'\tincluded_page_data_indicies: {included_page_data_indicies}')
+                            within_page_idx: int = clicked_data_index-included_page_data_indicies[0]
+                            # print(f'\twithin_page_idx: {within_page_idx}')
+                            # curr_slice_idx: int = included_page_data_indicies[within_page_idx]
+                            # curr_epoch_slice = curr_page_active_filter_epochs[within_page_idx]
+                            curr_time_bin_container = curr_page_time_bin_containers[within_page_idx]
+                            # curr_posterior_container = curr_page_posterior_containers[within_page_idx]
+                            # curr_time_bins = curr_time_bin_container.centers
+                            time_bin_edges = curr_time_bin_container.edges
+                            # print(f'\ttime_bin_edges: {time_bin_edges}')
+                            time_bin_start_ts = time_bin_edges[:-1]
+                            time_bin_stop_ts = time_bin_edges[1:]
+                            # epoch_time_bins_slices_df = pd.DataFrame({'start': time_bin_start_ts, 'stop': time_bin_stop_ts})
+                            # display(epoch_time_bins_slices_df)
+                            # found_time_bin_idx = find_data_indicies_from_epoch_times(epoch_time_bins_slices_df, epoch_times=np.array([clicked_t_seconds]), atol=0.0001, not_found_action='skip_index', debug_print=True)
+                            # print(f'\tfound_time_bin_idx: {found_time_bin_idx}')
+                            # found_time_bin_idx = None
+                            for i, (t_start, t_end) in enumerate(zip(time_bin_start_ts, time_bin_stop_ts)):
+                                if ((clicked_t_seconds >= t_start) and (clicked_t_seconds < t_end)) and (found_time_bin_idx is None):
+                                    ## found
+                                    found_time_bin_idx = i
+                                    print(f'found_time_bin_idx: {found_time_bin_idx}')
+                                    # break
+                            if found_time_bin_idx is not None:
+                                print(f'found_time_bin_idx: {found_time_bin_idx} for clicked time: {clicked_t_seconds}')
+                                found_time_bin_start_t = time_bin_start_ts[found_time_bin_idx]
+                                found_time_bin_stop_t = time_bin_stop_ts[found_time_bin_idx]
+                                _out_ripple_rasters.clear_highlighting_indicator_regions() ## only allow a single selection
+                                _out_ripple_rasters.add_highlighting_indicator_regions(t_start=found_time_bin_start_t, t_stop=found_time_bin_stop_t, identifier=f"TestTimeBinSelection[{clicked_data_index}, {found_time_bin_idx}]")
+                                active_time_bin_spikes_df: pd.DataFrame = deepcopy(_out_ripple_rasters.get_active_epoch_spikes_df().spikes.time_sliced(found_time_bin_start_t, found_time_bin_stop_t)) ## active spikes
+                                active_time_bin_unique_active_aclus = np.unique(active_time_bin_spikes_df['aclu'].to_numpy()) ## active time-bin aclus
+                                print(f'active_time_bin_unique_active_aclus: {active_time_bin_unique_active_aclus}')
+                                _out_ripple_rasters.attached_directional_template_pfs_debugger.update_cell_emphasis(active_time_bin_unique_active_aclus.tolist()) ## update the emphasis to the clicked bin only
+                                
+                            else:
+                                print(f'could not find time bin for clicked time: {clicked_t_seconds}')
+
+                        else:
+                            print('event out of axes!')
+                            
+                    else:
+                        event_dict = {               
+                            'scenePos':event.scenePos(),
+                            'screenPos':event.screenPos(),
+                            'pos':event.pos(),
+                            'lastPos':event.lastPos(),
+                        }
+                    code_string = f'idx {clicked_data_index}\n'
+
+                    # render the `event_dict`
+                    for k, v in event_dict.items():
+                        code_string += f'\n\t{k}: {v}'
+
+                    # print(code_string)
+                    # self.thin_button_bar_widget.label_message = f" {found_time_bin_idx} {code_string}"
+                    print(f'done.')
+                    
         ## Enable programmatically updating the rasters viewer to the clicked epoch index when middle clicking on a posterior.
         @function_attributes(short_name=None, tags=['callback', 'raster'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-29 17:13', related_items=[])
         def update_attached_raster_viewer_epoch_callback(self, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time):
@@ -2691,6 +2788,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                 curr_epoch_bin_edges: NDArray = deepcopy(a_binning_container.edges)
                 # curr_epoch_bin_edges
                 
+                _out_ripple_rasters.clear_highlighting_indicator_regions()
+                
                 ## Get the plot to modify on the raster_plot_widget
                 # a_render_plots_container = _out_ripple_rasters.plots['all_separate_plots']['Long_LR'] # RenderPlots
                 for a_decoder_name, a_render_plots_container in _out_ripple_rasters.plots['all_separate_plots'].items():         
@@ -2713,7 +2812,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             if not a_pagination_controller.params.has_attr('on_middle_click_item_callbacks'):
                 a_pagination_controller.params['on_middle_click_item_callbacks'] = {}
             a_pagination_controller.params.on_middle_click_item_callbacks['update_attached_raster_viewer_epoch_callback'] = update_attached_raster_viewer_epoch_callback
-
+            a_pagination_controller.params.on_middle_click_item_callbacks['get_click_time_epoch_time_bin_callback'] = update_clicked_epoch_time_bin_selection_callback
+            
 
         _out_ripple_rasters.setWindowTitle(f'Template Rasters <Controlled by DecodedEpochSlices window>')
         ## Align the windows:

@@ -239,8 +239,11 @@ class RankOrderRastersDebugger:
     def root_dockAreaWindow(self) -> "PhoDockAreaContainingWindow":
         return self.ui.root_dockAreaWindow
     
-    
-
+    @property
+    def attached_directional_template_pfs_debugger(self): #-> Optional[TemplateDebugger]:
+        """The attached_directional_template_pfs_debugger property."""
+        return self.ui.controlled_references.get('directional_template_pfs_debugger', None)
+ 
 
     @classmethod
     def init_from_rank_order_results(cls, rank_order_results: RankOrderComputationsContainer):
@@ -1349,7 +1352,7 @@ class RankOrderRastersDebugger:
 
             a_root_plot.setTitle(title=title_str)
 
-
+    @function_attributes(short_name=None, tags=['attached', 'templates', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-10 08:00', related_items=[])
     def plot_attached_directional_templates_pf_debugger(self, curr_active_pipeline):
         """ builds a _display_directional_template_debugger, attaches it to the provided rank_order_event_raster_debugger so it's updated on its callback, and then returns what it created. 
         
@@ -1378,6 +1381,41 @@ class RankOrderRastersDebugger:
         
         return _out_directional_template_pfs_debugger, debug_update_paired_directional_template_pfs_debugger
 
+
+    @function_attributes(short_name=None, tags=['indicator-regions', 'highlight', 'selection'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-10 08:51', related_items=[])
+    def add_highlighting_indicator_regions(self, t_start: float, t_stop: float, identifier: str):
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.CustomLinearRegionItem import CustomLinearRegionItem
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import build_pyqtgraph_epoch_indicator_regions
+    
+        epoch_indicator_regions = self.plots.get('epoch_indicator_regions', None)
+        if epoch_indicator_regions is None:
+            self.plots.epoch_indicator_regions = {} # Initialize
+
+        extant_indicator_regions_dict = self.plots.epoch_indicator_regions.get(identifier, {})
+        for a_root_plot, a_rect_item in extant_indicator_regions_dict.items():
+            ## remove the item
+            a_root_plot.removeItem(a_rect_item)
+            a_rect_item.deleteLater()
+            # a_root_plot.remove(a_rect_item)
+        # print(f'removed all extant')
+        self.plots.epoch_indicator_regions[identifier] = {} # clear when done
+        for a_decoder_name, a_root_plot in self.plots.root_plots.items():
+            self.plots.epoch_indicator_regions[identifier][a_root_plot], epoch_region_label = build_pyqtgraph_epoch_indicator_regions(a_root_plot, t_start=t_start, t_stop=t_stop, epoch_label=identifier, **dict(pen=pg.mkPen('#0b0049'), brush=pg.mkBrush('#0099ff42'), hoverBrush=pg.mkBrush('#fff400'), hoverPen=pg.mkPen('#00ff00')), movable=False)
+    
+    @function_attributes(short_name=None, tags=['indicator-regions', 'highlight', 'selection'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-10 08:51', related_items=[])
+    def clear_highlighting_indicator_regions(self):
+        existing_indicator_regions_dict = self.plots.get('epoch_indicator_regions', None)
+        if existing_indicator_regions_dict is not None:         
+            for identifier, extant_indicator_regions_dict in existing_indicator_regions_dict.items():
+                for a_root_plot, a_rect_item in extant_indicator_regions_dict.items():
+                    ## remove the item
+                    # a_root_plot.remove(a_rect_item)
+                    a_root_plot.removeItem(a_rect_item)
+                    a_rect_item.deleteLater()
+                    # print(f'removing {identifier} for {a_root_plot}...')
+            
+            self.plots.epoch_indicator_regions = {} # clear all
+            # print(f'done clearing')
 
 
 
