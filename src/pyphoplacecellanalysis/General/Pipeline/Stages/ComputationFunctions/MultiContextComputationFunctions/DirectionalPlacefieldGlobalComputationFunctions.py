@@ -6474,9 +6474,15 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             # Recover from the saved global result:
             directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
 
-            assert 'RankOrder' in global_computation_results.computed_data, f"as of 2023-11-30 - RankOrder is required to determine the appropriate 'minimum_inclusion_fr_Hz' to use. Previously None was used."
-            rank_order_results = global_computation_results.computed_data['RankOrder'] # RankOrderComputationsContainer
-            minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+            rank_order_results = global_computation_results.computed_data.get('RankOrder', None)
+            if rank_order_results is not None:
+                minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+                included_qclu_values: List[int] = rank_order_results.included_qclu_values
+            else:        
+                ## get from parameters:
+                minimum_inclusion_fr_Hz: float = global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+                included_qclu_values: List[int] = global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
+            
             assert minimum_inclusion_fr_Hz is not None
             if (use_shared_aclus_only_templates):
                 track_templates: TrackTemplates = directional_laps_results.get_shared_aclus_only_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # shared-only
