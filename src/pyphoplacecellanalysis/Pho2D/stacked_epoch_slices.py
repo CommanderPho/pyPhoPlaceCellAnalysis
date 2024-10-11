@@ -2702,7 +2702,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
         ## Get the time bin within the clicked epoch
         @function_attributes(short_name=None, tags=['callback'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-10 09:06', related_items=[])
-        def update_clicked_epoch_time_bin_selection_callback(self, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time):
+        def update_clicked_epoch_time_bin_selection_callback(a_pagination_controller, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time):
             """ gets the time_bin within the clicked epoch
             
             captures: attached_ripple_rasters_widget, attached_directional_template_pfs_debugger
@@ -2726,8 +2726,9 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                                 'pixel_y':event.y,
                             }
                             clicked_t_seconds: float = float(event.xdata)
-                            found_time_bin_idx, (found_time_bin_start_t, found_time_bin_stop_t) = self.try_get_clicked_epoch_time_bin_idx(clicked_data_index=clicked_data_index, clicked_t_seconds=clicked_t_seconds)
-                            self.plots_data.highlighted_epoch_time_bin_idx = {
+                            found_time_bin_idx, (found_time_bin_start_t, found_time_bin_stop_t) = a_pagination_controller.try_get_clicked_epoch_time_bin_idx(clicked_data_index=clicked_data_index, clicked_t_seconds=clicked_t_seconds)
+                            a_pagination_controller.plots_data.highlighted_epoch_time_bin_idx = {
+                                'clicked_data_index': clicked_data_index, 'clicked_epoch_start_stop_time': clicked_epoch_start_stop_time,
                                 'found_time_bin_idx': found_time_bin_idx, 'found_time_bin_start_t': found_time_bin_start_t, 'found_time_bin_stop_t': found_time_bin_stop_t,
                                 'active_time_bin_spikes_df': None, 'active_time_bin_unique_active_aclus': None,
                             }
@@ -2737,12 +2738,15 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                                 _out_ripple_rasters.add_highlighting_indicator_regions(t_start=found_time_bin_start_t, t_stop=found_time_bin_stop_t, identifier=f"TestTimeBinSelection[{clicked_data_index}, {found_time_bin_idx}]")
                                 active_time_bin_spikes_df: pd.DataFrame = deepcopy(_out_ripple_rasters.get_active_epoch_spikes_df().spikes.time_sliced(found_time_bin_start_t, found_time_bin_stop_t)) ## active spikes
                                 active_time_bin_unique_active_aclus = np.unique(active_time_bin_spikes_df['aclu'].to_numpy()) ## active time-bin aclus
-                                self.plots_data.highlighted_epoch_time_bin_idx['active_time_bin_spikes_df'] = deepcopy(active_time_bin_spikes_df)                                
-                                self.plots_data.highlighted_epoch_time_bin_idx['active_time_bin_unique_active_aclus'] = deepcopy(active_time_bin_unique_active_aclus)
+                                a_pagination_controller.plots_data.highlighted_epoch_time_bin_idx['active_time_bin_spikes_df'] = deepcopy(active_time_bin_spikes_df)                                
+                                a_pagination_controller.plots_data.highlighted_epoch_time_bin_idx['active_time_bin_unique_active_aclus'] = deepcopy(active_time_bin_unique_active_aclus)
                                                                 
                                 print(f'active_time_bin_unique_active_aclus: {active_time_bin_unique_active_aclus}')
-                                self.ui.print(f'active_time_bin_unique_active_aclus: {active_time_bin_unique_active_aclus}')
-                                # self.attached_directional_template_pfs_debugger
+                                print(f'a_pagination_controller.plots_data.highlighted_epoch_time_bin_idx: {a_pagination_controller.plots_data.highlighted_epoch_time_bin_idx}')
+                                a_pagination_controller.ui.print(f'active_time_bin_unique_active_aclus: {active_time_bin_unique_active_aclus}')
+                                a_pagination_controller.ui.print(f'a_pagination_controller.plots_data.highlighted_epoch_time_bin_idx: {a_pagination_controller.plots_data.highlighted_epoch_time_bin_idx}')
+
+                                # a_pagination_controller.attached_directional_template_pfs_debugger
                                 attached_directional_template_pfs_debugger = _out_ripple_rasters.attached_directional_template_pfs_debugger
                                 if attached_directional_template_pfs_debugger is not None:
                                     if isinstance(attached_directional_template_pfs_debugger, dict):
@@ -2750,6 +2754,9 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                                     attached_directional_template_pfs_debugger.update_cell_emphasis(active_time_bin_unique_active_aclus.tolist()) ## update the emphasis to the clicked bin only
                                 else:
                                     print(f'attached_directional_template_pfs_debugger is None!')
+                                    
+                                self.ui.highlighted_epoch_time_bin_idx = deepcopy(a_pagination_controller.plots_data.highlighted_epoch_time_bin_idx)
+                                
                                 print(f'done!')
                                 
                             else:
@@ -2766,7 +2773,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
         ## Enable programmatically updating the rasters viewer to the clicked epoch index when middle clicking on a posterior.
         @function_attributes(short_name=None, tags=['callback', 'raster'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-29 17:13', related_items=[])
-        def update_attached_raster_viewer_epoch_callback(self, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time):
+        def update_attached_raster_viewer_epoch_callback(a_pagination_controller, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time):
             """ Enable programmatically updating the rasters viewer to the clicked epoch index when middle clicking on a posterior. 
             called when the user middle-clicks an epoch 
             
@@ -2788,7 +2795,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             if _did_update_selected_epoch:
                 ## update the grid to match the epoch bins
                 print(f'_did_update_selected_epoch: True, clicked_data_index: {clicked_data_index}')
-                included_page_data_indicies, (curr_page_active_filter_epochs, curr_page_epoch_labels, curr_page_time_bin_containers, curr_page_posterior_containers) = self.plots_data.paginator.get_page_data(page_idx=self.current_page_idx)
+                included_page_data_indicies, (curr_page_active_filter_epochs, curr_page_epoch_labels, curr_page_time_bin_containers, curr_page_posterior_containers) = a_pagination_controller.plots_data.paginator.get_page_data(page_idx=a_pagination_controller.current_page_idx)
                 # page_rel_clicked_ax_index = included_page_data_indicies.index(clicked_data_index)
                 page_rel_clicked_ax_index = clicked_data_index-included_page_data_indicies[0]
                 print(f'\tpage_rel_clicked_ax_index: {page_rel_clicked_ax_index}')
@@ -2815,10 +2822,12 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
                     
                 print(f'done.')
-
+                
 
         for a_name, a_pagination_controller in self.pagination_controllers.items():
             # a_pagination_controller.params.debug_print = True
+            a_pagination_controller.plots_data.highlighted_epoch_time_bin_idx = {} ## initialize plots_data
+                
             if not a_pagination_controller.params.has_attr('on_middle_click_item_callbacks'):
                 a_pagination_controller.params['on_middle_click_item_callbacks'] = {}
             
@@ -3028,6 +3037,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         )
         print(f"exported to '{epoch_specific_folder}'")
         return epoch_specific_folder, (out_image_save_tuple_dict, _out_rasters_save_paths, merged_img_save_path)
+
 
     @function_attributes(short_name=None, tags=['multi-window', 'widget', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-09 14:19', related_items=[])
     @classmethod
