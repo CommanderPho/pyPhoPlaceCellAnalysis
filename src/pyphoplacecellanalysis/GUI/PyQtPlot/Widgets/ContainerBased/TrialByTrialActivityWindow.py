@@ -109,6 +109,7 @@ class TrialByTrialActivityWindow:
             # cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
             # cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
             # cmap = pg.colormap.get('gray','matplotlib') # prepare a linear color map
+            print(f'WARNING: no colormap provided for first decoder. Falling back to "Reds".')
             cmap = ColormapHelpers.create_transparent_colormap(cmap_name='Reds', lower_bound_alpha=0.01) # prepare a linear color map
 
 
@@ -317,6 +318,26 @@ class TrialByTrialActivityWindow:
         return self.perform_build_single_cell_formatted_descriptor_string(active_one_step_decoder=override_active_one_step_decoder, aclu=aclu)
 
 
+    def set_series_opacity(self, target_decoder_name: types.DecoderName, target_opacity: float = 0.1):
+        if 'long_LR' not in self.plots.additional_img_items_dict:
+            self.plots.additional_img_items_dict['long_LR'] = self.plots.img_item_array
+            
+        for an_img_item in self.plots.additional_img_items_dict[target_decoder_name]:
+            an_img_item.setOpacity(target_opacity)
+            
+    def restore_all_series_opacity(self, override_all_opacity: Optional[float] = None):
+        if 'long_LR' not in self.plots.additional_img_items_dict:
+            self.plots.additional_img_items_dict['long_LR'] = self.plots.img_item_array
+            
+        if override_all_opacity is None:
+            override_all_opacity = 1.0
+            
+        for a_decoder_name, an_img_item_arr in self.plots.additional_img_items_dict.items():
+            for an_img_item in an_img_item_arr:
+                an_img_item.setOpacity(override_all_opacity)
+
+
+        
     @function_attributes(short_name=None, tags=['reliability', 'decoders', 'all', 'pyqtgraph', 'display', 'figure', 'main'], input_requires=[], output_provides=[], uses=['plot_trial_to_trial_reliability_image_array', 'create_transparent_colormap'], used_by=[], creation_date='2024-08-29 04:34', related_items=[])
     @classmethod
     def plot_trial_to_trial_reliability_all_decoders_image_stack(cls, directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity], active_one_step_decoder, drop_below_threshold=0.0000001, is_overlaid_heatmaps_mode: bool = True,
@@ -385,8 +406,11 @@ class TrialByTrialActivityWindow:
         additional_cmap_names = {k: ColorFormatConverter.qColor_to_hexstring(v) for k, v in color_dict.items()}
 
         ## new
-        additional_cmap_names = {'long_LR': 'royalblue', 'long_RL': 'blue',
-                        'short_LR': 'crimson', 'short_RL': 'red'}
+        # additional_cmap_names = {'long_LR': 'royalblue', 'long_RL': 'blue',
+        #                 'short_LR': 'crimson', 'short_RL': 'red'}
+        
+        additional_cmap_names = {'long_LR': '#4169E1', 'long_RL': '#607B00',
+                        'short_LR': '#DC143C', 'short_RL': '#990099'}
         # additional_cmap_names = {k: ColorFormatConverter.qColor_to_hexstring(v) for k, v in color_dict.items()}
 
         # plot_trial_to_trial_reliability_all_decoders_image_stack
@@ -396,6 +420,9 @@ class TrialByTrialActivityWindow:
 
         # Plots only the first data-series ('long_LR')
         app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array, (lblTitle, lblFooter) = cls._plot_trial_to_trial_reliability_image_array(active_one_step_decoder=active_one_step_decoder, z_scored_tuning_map_matrix=active_z_scored_tuning_map_matrix, active_neuron_IDs=active_neuron_IDs, drop_below_threshold=drop_below_threshold, cmap=additional_cmaps['long_LR'])
+        
+        ## list of image items img_item_array
+        
         additional_heatmaps_data = {}
         additional_img_items_dict = {}
         
@@ -476,6 +503,8 @@ class TrialByTrialActivityWindow:
         # END if is_overlaid_heatmaps_mode                
         parent_root_widget.setWindowTitle('TrialByTrialActivity - trial_to_trial_reliability_all_decoders_image_stack')
 
+        additional_img_items_dict['long_LR'] = img_item_array # set first decoder to original image items
+
         # self.plots_data.plot_data_array
         # self.plots_data.active_one_step_decoder
         # self.plots_data.active_one_step_decoder.active_neuron_IDs
@@ -488,7 +517,7 @@ class TrialByTrialActivityWindow:
                                  legend_layout=legend_layout,
                                  other_components_array=other_components_array,
                                  img_item_array=img_item_array,
-                                 additional_img_items_dict=additional_img_items_dict) # , ctrl_widgets={'slider': slider}
+                                 additional_img_items_dict=additional_img_items_dict) # , ctrl_widgets={'slider': slider} # .plots.additional_img_items_dict
         _obj.plots_data = RenderPlotsData(name=name, 
                                           plot_data_array=plot_data_array,
                                           active_neuron_IDs=deepcopy(active_neuron_IDs),
