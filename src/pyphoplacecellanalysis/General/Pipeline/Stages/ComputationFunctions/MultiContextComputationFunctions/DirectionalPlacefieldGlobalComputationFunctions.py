@@ -1418,6 +1418,25 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
     # Low-level direct marginal computation functions ____________________________________________________________________ #
     @classmethod
+    def build_top_level_raw_posteriors(cls, filter_epochs_decoder_result: DecodedFilterEpochsResult, debug_print=False) -> List[DynamicContainer]:
+        """ only works for the all-directional coder with the four items
+        
+        NOTE OUTPUT WILL BE 3D!!
+        
+        
+        """
+        custom_curr_unit_marginal_list = []
+        
+        for a_p_x_given_n in filter_epochs_decoder_result.p_x_given_n_list:
+            curr_array_shape = np.shape(a_p_x_given_n) # .shape # (62, 4, 236) - (n_pos_bins, 4, n_epoch_t_bins[i])
+            assert curr_array_shape[1] == 4, f"only works with the all-directional decoder with ['long_LR', 'long_RL', 'short_LR', 'short_RL'] "
+            curr_unit_marginal_x = DynamicContainer(p_x_given_n=a_p_x_given_n, most_likely_positions_1D=None)            
+            custom_curr_unit_marginal_list.append(curr_unit_marginal_x)
+        return custom_curr_unit_marginal_list
+
+
+
+    @classmethod
     def build_non_marginalized_raw_posteriors(cls, filter_epochs_decoder_result: DecodedFilterEpochsResult, debug_print=False) -> List[DynamicContainer]:
         """ only works for the all-directional coder with the four items
         
@@ -1467,6 +1486,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                     print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_x.p_x_given_n.shape}')
             custom_curr_unit_marginal_list.append(curr_unit_marginal_x)
         return custom_curr_unit_marginal_list
+
 
     @classmethod
     def build_custom_marginal_over_direction(cls, filter_epochs_decoder_result: DecodedFilterEpochsResult, debug_print=False) -> List[DynamicContainer]:
