@@ -112,7 +112,7 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         return (self.selected_context is not None)
 
 
-
+    # __init__ fcn _______________________________________________________________________________________________________ #
     def __init__(self, debug_print=False, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self.ui = uic.loadUi(uiFile, self) # Load the .ui file
@@ -125,7 +125,6 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         self.show() # Show the GUI
 
     def initUI(self):
-
         # Connect the itemDoubleClicked signal to the on_tree_item_double_clicked slot
         self.treeWidget.itemDoubleClicked.connect(self.on_tree_item_double_clicked)
         # Enable mouse tracking to receive itemEntered events
@@ -141,6 +140,7 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
 
         # self.ui.displayContextSelectorWidget = None
         # self.ui.displayContextSelectorWidgetContainer.layout.add
+
 
     def get_display_function_items(self) -> Dict[str,DisplayFunctionItem]:
         assert self._curr_active_pipeline_ref is not None

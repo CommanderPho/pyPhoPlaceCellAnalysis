@@ -329,7 +329,7 @@ class PlottingHelpers:
 
                 long_epoch = curr_active_pipeline.filtered_epochs[long_epoch_name]
                 short_epoch = curr_active_pipeline.filtered_epochs[short_epoch_name]
-                long_epoch_indicator_region_items, short_epoch_indicator_region_items = _helper_add_long_short_session_indicator_regions(win, long_epoch, short_epoch)
+                long_epoch_indicator_region_items, short_epoch_indicator_region_items = PlottingHelpers.helper_pyqtgraph_add_long_short_session_indicator_regions(win, long_epoch, short_epoch)
 
                 long_epoch_linear_region, long_epoch_region_label = long_epoch_indicator_region_items
                 short_epoch_linear_region, short_epoch_region_label = short_epoch_indicator_region_items

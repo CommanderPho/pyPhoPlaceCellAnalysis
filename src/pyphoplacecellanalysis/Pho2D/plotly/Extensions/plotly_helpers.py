@@ -1087,3 +1087,4 @@ def plot_across_sessions_scatter_results(directory: Union[Path, str], concatenat
     all_figures.append((fig_laps, fig_ripples))
 
     return all_figures
+

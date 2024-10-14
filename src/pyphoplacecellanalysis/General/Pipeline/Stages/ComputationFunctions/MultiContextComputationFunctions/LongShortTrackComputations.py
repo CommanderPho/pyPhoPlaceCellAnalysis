@@ -629,7 +629,7 @@ class TruncationCheckingResults(ComputedResult):
         Integrate 'truncation_checking_aclus_dict' into `neuron_replay_stats_df` as a 'truncation_checking' column:
 
         """
-        from neuropy.utils.indexing_helpers import intersection_of_arrays, union_of_arrays
+        from neuropy.utils.indexing_helpers import union_of_arrays
 
         truncation_checking_result = self
         disappearing_endcap_aclus = truncation_checking_result.disappearing_endcap_aclus.to_numpy()
@@ -1450,7 +1450,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         return global_computation_results
 
 
-    @function_attributes(short_name='long_short_endcap_analysis', tags=['long_short_endcap_analysis'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-15 10:37', related_items=[],
+    @function_attributes(short_name='long_short_endcap_analysis', tags=['long_short_endcap_analysis', 'endcap'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-15 10:37', related_items=[],
                          requires_global_keys=['jonathan_firing_rate_analysis'], provides_global_keys=['long_short_endcap'],
                          validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.global_computation_results.computed_data['long_short_endcap']), is_global=True)
     def _perform_long_short_endcap_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
@@ -1629,7 +1629,7 @@ def constrain_to_laps(curr_active_pipeline):
     long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
 
     for a_name, a_sess, a_result in zip((long_epoch_name, short_epoch_name, global_epoch_name), (long_session, short_session, global_session), (long_results, short_results, global_results)):
-        # a_sess = estimate_session_laps(a_sess, should_plot_laps_2d=True)
+        # replace laps with estimates:
         a_sess = a_sess.replace_session_laps_with_estimates(should_plot_laps_2d=False)
         
         ## The filter the laps specifically for use in the placefields with non-overlapping, duration, constraints:
@@ -1645,7 +1645,7 @@ def constrain_to_laps(curr_active_pipeline):
         else:
             # Must recompute since the computation_epochs changed
             print(f'setting new computation epochs because laps changed.')
-            curr_active_pipeline.active_configs[a_name].computation_config.pf_params.computation_epochs = curr_laps_obj # TODO: does this change the config that's used for computations? I think it should. 
+            curr_active_pipeline.active_configs[a_name].computation_config.pf_params.computation_epochs = deepcopy(curr_laps_obj) # TODO: does this change the config that's used for computations? I think it should. 
             
             # Get existing placefields:
             curr_pf1D, curr_pf2D = a_result.pf1D, a_result.pf2D
@@ -1692,7 +1692,7 @@ def constrain_to_laps(curr_active_pipeline):
     return curr_active_pipeline, directional_lap_specific_configs
 
 
-@function_attributes(short_name=None, tags=['long_short', 'decoder', 'constrained', 'important'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-25 08:32', related_items=[])
+@function_attributes(short_name=None, tags=['long_short', 'decoder', 'constrained', 'important'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-14 00:00', related_items=[])
 def compute_long_short_constrained_decoders(curr_active_pipeline, long_epoch_name:str, short_epoch_name:str, enable_two_step_decoders:bool = False, recalculate_anyway:bool=True):
     """ 2023-04-14 - Computes both 1D & 2D Decoders constrained to each other's position bins 
     Usage:

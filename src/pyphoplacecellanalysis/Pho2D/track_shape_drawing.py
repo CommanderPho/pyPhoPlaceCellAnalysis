@@ -822,9 +822,9 @@ def get_track_length_dict(long_grid_bin_bounds, short_grid_bin_bounds) -> Tuple[
 def test_LinearTrackDimensions_2D_pyqtgraph(long_track_dims=None, short_track_dims=None):
     """ 
     Usage:
-        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import _test_LinearTrackDimensions_2D
-
-        app, w, cw, (long_track_dims, long_rect_items, long_rects), (short_track_dims, short_rect_items, short_rects) = test_LinearTrackDimensions_2D_pyqtgraph(long_track_dims, short_track_dims)
+        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import test_LinearTrackDimensions_2D_pyqtgraph
+        
+        app, w, cw, (ax0, ax1), (long_track_dims, long_rect_items, long_rects), (short_track_dims, short_rect_items, short_rects) = test_LinearTrackDimensions_2D_pyqtgraph(long_track_dims, short_track_dims)
 
     """
     import pyphoplacecellanalysis.External.pyqtgraph as pg
@@ -1200,7 +1200,7 @@ def convert_QGraphicsRectItem_list_to_napari_poly_verticies(a_rect_items):
     return [MidTrack, RightPlatform, LeftPlatform]
 
 
-
+@function_attributes(short_name=None, tags=['napari', 'plot'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-05 00:00', related_items=[])
 def add_napari_track_shapes_layer(viewer, long_rect_items, short_rect_items):
     """ 2024-02-05 - Plots the long and short track as Napari shape layers in the `viewer`
     
