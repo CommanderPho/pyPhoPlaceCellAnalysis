@@ -388,7 +388,7 @@ def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: floa
     _extras_output_dict["divider_line"] = vertical_divider_line
     return _extras_output_dict
 
-@function_attributes(short_name=None, tags=['plotly', 'histogram'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-28 07:01', related_items=[])
+@function_attributes(short_name=None, tags=['plotly', 'histogram'], input_requires=[], output_provides=[], uses=[], used_by=['plot_across_sessions_scatter_results'], creation_date='2024-05-28 07:01', related_items=[])
 def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, earliest_delta_aligned_t_start: float=0.0, latest_delta_aligned_t_end: float=666.0,
                                           enabled_time_bin_sizes=None, main_plot_mode: str = 'separate_row_per_session', variable_name: str = 'P_Short', is_dark_mode: bool=True,
                                           **build_fig_kwargs):
@@ -998,7 +998,7 @@ def _build_dash_app(final_dfs_dict, earliest_delta_aligned_t_start: float, lates
 
     return app
 
-@function_attributes(short_name=None, tags=['scatter', 'multi-session', 'plot', 'figure', 'plotly'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
+@function_attributes(short_name=None, tags=['scatter', 'multi-session', 'plot', 'figure', 'plotly', 'IMPORTANT'], input_requires=[], output_provides=[], uses=['_helper_build_figure'], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
 def plot_across_sessions_scatter_results(directory: Union[Path, str], concatenated_laps_df: pd.DataFrame, concatenated_ripple_df: pd.DataFrame,
                                           earliest_delta_aligned_t_start: float=0.0, latest_delta_aligned_t_end: float=666.0,
                                           enabled_time_bin_sizes=None, main_plot_mode: str = 'separate_row_per_session',
@@ -1048,6 +1048,7 @@ def plot_across_sessions_scatter_results(directory: Union[Path, str], concatenat
     all_figures = []
 
     ## delta_t aligned:
+    # num_unique_sessions: int = len(concatenated_laps_df['session_name'].unique())
     # Create a bubble chart for laps
     laps_num_unique_sessions: int = concatenated_laps_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
     laps_num_unique_time_bins: int = concatenated_laps_df.time_bin_size.nunique(dropna=True)
@@ -1056,6 +1057,7 @@ def plot_across_sessions_scatter_results(directory: Union[Path, str], concatenat
     fig_laps, figure_laps_context = _helper_build_figure(data_results_df=concatenated_laps_df, histogram_bins=25, earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end, enabled_time_bin_sizes=enabled_time_bin_sizes, main_plot_mode=main_plot_mode, title=laps_title, variable_name=variable_name, is_dark_mode=is_dark_mode)
 
     # Create a bubble chart for ripples
+    # num_unique_sessions: int = len(concatenated_ripple_df['session_name'].unique())
     ripple_num_unique_sessions: int = concatenated_ripple_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
     ripple_num_unique_time_bins: int = concatenated_ripple_df.time_bin_size.nunique(dropna=True)
     ripple_title_string_suffix: str = f'{ripple_num_unique_sessions} Sessions'

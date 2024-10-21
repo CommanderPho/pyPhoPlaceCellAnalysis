@@ -1890,7 +1890,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         """The global_thin_button_bar_widget property."""
         if self.ui.attached_ripple_rasters_widget is None:
             return None
-        return self.ui.attached_ripple_rasters_widget.ui.controlled_references.get('directional_template_pfs_debugger', None)
+        return self.ui.attached_ripple_rasters_widget.ui.controlled_references.get('directional_template_pfs_debugger', {}).get('obj', None)
  
 
     # Pass-through properties ____________________________________________________________________________________________ #
