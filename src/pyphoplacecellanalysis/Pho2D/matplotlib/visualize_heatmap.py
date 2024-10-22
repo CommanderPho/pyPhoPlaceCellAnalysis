@@ -80,9 +80,10 @@ from typing import Tuple
 import numpy as np
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
+from pyphoplacecellanalysis.External.pyqtgraph_extensions.CustomPlotWidget import CustomPlotWidget
 
 @function_attributes(short_name='heatmap_pyqtgraph', tags=['pyqtgraph', 'heatmap', 'app', 'window'], input_requires=[], output_provides=[], uses=[], used_by=['plot_kourosh_activity_style_figure'], creation_date='2023-06-21 15:27', related_items=[])
-def visualize_heatmap_pyqtgraph(data, win=None, show_value_labels=False, title="Simple Heatmap", show_xticks=False, show_yticks=False, show_colorbar=False, defer_show:bool = False) -> Tuple[pg.PlotWidget, pg.ImageItem]:
+def visualize_heatmap_pyqtgraph(data, win=None, show_value_labels=False, title="Simple Heatmap", show_xticks=False, show_yticks=False, show_colorbar=False, defer_show:bool = False) -> Tuple[CustomPlotWidget, pg.ImageItem]:
     """
     Creates a simple heatmap visualization of the given 2D numpy array data.
 
@@ -111,7 +112,8 @@ def visualize_heatmap_pyqtgraph(data, win=None, show_value_labels=False, title="
     # Create a new PlotWidget if win is not provided
     if win is None:
         app = pg.mkQApp()
-        win = pg.PlotWidget()
+        # win = pg.PlotWidget()
+        win = CustomPlotWidget()
         win.setWindowTitle(title)
         win.show()
         did_create_win = True
