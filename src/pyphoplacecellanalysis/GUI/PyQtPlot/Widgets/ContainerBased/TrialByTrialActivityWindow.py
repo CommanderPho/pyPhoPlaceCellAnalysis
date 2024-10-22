@@ -339,7 +339,7 @@ class TrialByTrialActivityWindow:
 
     @function_attributes(short_name=None, tags=['reliability', 'decoders', 'all', 'pyqtgraph', 'display', 'figure', 'main'], input_requires=[], output_provides=[], uses=['plot_trial_to_trial_reliability_image_array', 'create_transparent_colormap'], used_by=[], creation_date='2024-08-29 04:34', related_items=[])
     @classmethod
-    def plot_trial_to_trial_reliability_all_decoders_image_stack(cls, directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity], active_one_step_decoder, drop_below_threshold=0.0000001, is_overlaid_heatmaps_mode: bool = True,
+    def plot_trial_to_trial_reliability_all_decoders_image_stack(cls, directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity], active_one_step_decoder, drop_below_threshold=0.0000001,
                                                                   app=None, parent_root_widget=None, root_render_widget=None, debug_print=False, defer_show:bool=False, name:str = 'TrialByTrialActivityWindow',
                                                                   override_active_neuron_IDs=None,
                                                                    **param_kwargs):
@@ -370,23 +370,11 @@ class TrialByTrialActivityWindow:
         if override_active_neuron_IDs is not None:
             active_neuron_IDs = active_neuron_IDs[np.isin(active_neuron_IDs, override_active_neuron_IDs)] # only get the allowed elements
         
-        if is_overlaid_heatmaps_mode:
-            ## first decoder:
-            a_decoder_name = 'long_LR'
-            active_trial_by_trial_activity_obj = directional_active_lap_pf_results_dicts[a_decoder_name]
-            active_z_scored_tuning_map_matrix = active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix # shape (n_epochs, n_neurons, n_pos_bins),
-            print(f'np.shape(active_z_scored_tuning_map_matrix): {np.shape(active_z_scored_tuning_map_matrix)}')
-        
-
-        else:
-            ## MODE 2: Concatenates them before passing them along        
-            # active_z_scored_tuning_map_matrix = [[directional_active_lap_pf_results_dicts['long_LR'].z_scored_tuning_map_matrix, directional_active_lap_pf_results_dicts['short_LR'].z_scored_tuning_map_matrix],
-            #                                     [directional_active_lap_pf_results_dicts['long_RL'].z_scored_tuning_map_matrix, directional_active_lap_pf_results_dicts['short_RL'].z_scored_tuning_map_matrix]]
-            active_z_scored_tuning_map_matrix = np.vstack([np.vstack([directional_active_lap_pf_results_dicts['long_LR'].z_scored_tuning_map_matrix, directional_active_lap_pf_results_dicts['long_RL'].z_scored_tuning_map_matrix]),
-                                                 np.vstack([directional_active_lap_pf_results_dicts['short_LR'].z_scored_tuning_map_matrix, directional_active_lap_pf_results_dicts['short_RL'].z_scored_tuning_map_matrix]),
-            ])
-            # active_z_scored_tuning_map_matrix = np.concatenate(active_z_scored_tuning_map_matrix)
-
+        ## first decoder:
+        a_decoder_name = 'long_LR'
+        active_trial_by_trial_activity_obj = directional_active_lap_pf_results_dicts[a_decoder_name]
+        active_z_scored_tuning_map_matrix = active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix # shape (n_epochs, n_neurons, n_pos_bins),
+        print(f'np.shape(active_z_scored_tuning_map_matrix): {np.shape(active_z_scored_tuning_map_matrix)}')
 
         # MATPLOTLIB way
         # additional_cmap_names['long_LR'] = 'Reds'
@@ -428,79 +416,76 @@ class TrialByTrialActivityWindow:
         # Extract the heatmaps from the other decoders
         ## INPUTS: directional_active_lap_pf_results_dicts
 
+        enable_stacked_long_and_short: bool = False # not currently working, they have to be overlayed exactly on top of each other
+        additional_decoder_y_offsets = {'long_LR': 0, 'long_RL': 0,
+                        'short_LR': 1, 'short_RL': 1}
+        
+        for decoder_name, active_trial_by_trial_activity_obj in directional_active_lap_pf_results_dicts.items():  # Replace with actual decoder names
+            # if decoder_name != 'long_LR':
+            ## we already did 'long_LR', so skip that one    
+            # additional_heatmaps.append(active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix.transpose(1, 2, 0))
+            additional_heatmaps_data[decoder_name] = active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix.transpose(1, 2, 0)
+            # additional_cmaps[decoder_name] = pg.colormap.get('gray','matplotlib') # prepare a linear color map
 
-        if is_overlaid_heatmaps_mode:
-            enable_stacked_long_and_short: bool = False # not currently working, they have to be overlayed exactly on top of each other
-            additional_decoder_y_offsets = {'long_LR': 0, 'long_RL': 0,
-                            'short_LR': 1, 'short_RL': 1}
+
+        # Overlay additional heatmaps if provided
+        ## INPUTS: additional_heatmaps, additional_cmaps, plot_array
+        ## UPDATES: plot_array
+
+
+        if additional_heatmaps_data:
+            for i, (decoder_name, heatmap_matrix) in enumerate(additional_heatmaps_data.items()):
+                if decoder_name not in additional_img_items_dict:
+                    additional_img_items_dict[decoder_name] = []
+                cmap = additional_cmaps[decoder_name]
+                # Assuming heatmap_matrix is of shape (n_neurons, n_xbins, n_ybins)
+                for a_linear_index in range(len(plot_array)):
+                    curr_image_bounds_extent = plot_data_array[a_linear_index]['image_bounds_extent']
+                    # print(f'curr_image_bounds_extent[{a_linear_index}]: {curr_image_bounds_extent}')
+                    additional_image = np.squeeze(heatmap_matrix[a_linear_index, :, :])
+                    # additional_image = _scale_current_placefield_to_acceptable_range(additional_image, occupancy=occupancy, drop_below_threshold=drop_below_threshold)
+                    additional_image = _scale_current_placefield_to_acceptable_range(additional_image, occupancy=None, drop_below_threshold=None) # , occupancy=occupancy, drop_below_threshold=drop_below_threshold !! occupancy is not correct,it's the global one I think
+                    # print(f'\tadditional_image: {np.shape(additional_image)}')
+                    additional_img_item = pg.ImageItem(image=additional_image, levels=(0, 1))
+                    # Update the image:
+                    # additional_img_item.setImage(additional_image, autoLevels=False) # rect: [x, y, w, h] , rect=image_bounds_extent
+                    shifted_curr_image_bounds_extent = deepcopy(curr_image_bounds_extent)
+
+                    if enable_stacked_long_and_short:
+                        curr_item_y_offset = additional_decoder_y_offsets.get(decoder_name, 0)
+                        shifted_curr_image_bounds_extent[1] = curr_image_bounds_extent[1] + (curr_image_bounds_extent[3] * (curr_item_y_offset + 1)) # offset y = y + (h * (curr_item_y_offset + 1))
+                        shifted_curr_image_bounds_extent[3] = curr_image_bounds_extent[3] + (curr_image_bounds_extent[3] * curr_item_y_offset) # increase h = h + (h * (curr_item_y_offset))
+                    else:
+                        pass # do nothing, use the same bounds for each image
+
+                    additional_img_item.setImage(additional_image, rect=shifted_curr_image_bounds_extent, autoLevels=False) # rect: [x, y, w, h] 
+                    # additional_img_item.setOpacity(0.5)  # Set transparency for overlay
+                    additional_img_item.setOpacity(1.0)  # Set transparency for pre-separated overlay
+                    if isinstance(cmap, NDArray):
+                        additional_img_item.setLookupTable(cmap, update=False)
+                    else:
+                        additional_img_item.setLookupTable(cmap.getLookupTable(nPts=256), update=False)
+                        
+                    plot_array[a_linear_index].addItem(additional_img_item)
+                    additional_img_items_dict[decoder_name].append(additional_img_item)
+
+        ## Add the legend below all the rows:
+        root_render_widget.nextRow()
+        # Create a layout for the legend at the new row
+        # Add a layout for the legend at the bottom, spanning all columns
+        # legend_layout: pg.GraphicsLayout = root_render_widget.addLayout(row=root_render_widget.rowCount(), col=0, colspan=root_render_widget.columnCount())
+        legend_layout: pg.GraphicsLayout = root_render_widget.addLayout()  # Automatically places in the next available row
+        legend_entries_dict = {}
+        # Add labels for each entry in the legend
+        for i, (label, color) in enumerate(additional_legend_entries):
+            # legend_text = pg.LabelItem(label, color=color)
+            legend_text = SelectableLabelItem(label, color=color, is_selected=True)
+            legend_entries_dict[label] = legend_text
+            # legend_layout.addItem(legend_text, row=0, col=i)  # Place all labels in a single row
+            legend_layout.addItem(legend_text, row=i, col=0)  # Place all labels in a single columns
             
-            for decoder_name, active_trial_by_trial_activity_obj in directional_active_lap_pf_results_dicts.items():  # Replace with actual decoder names
-                # if decoder_name != 'long_LR':
-                ## we already did 'long_LR', so skip that one    
-                # additional_heatmaps.append(active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix.transpose(1, 2, 0))
-                additional_heatmaps_data[decoder_name] = active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix.transpose(1, 2, 0)
-                # additional_cmaps[decoder_name] = pg.colormap.get('gray','matplotlib') # prepare a linear color map
+        legend_layout.setMaximumWidth(100)
 
-
-            # Overlay additional heatmaps if provided
-            ## INPUTS: additional_heatmaps, additional_cmaps, plot_array
-            ## UPDATES: plot_array
-
-
-            if additional_heatmaps_data:
-                for i, (decoder_name, heatmap_matrix) in enumerate(additional_heatmaps_data.items()):
-                    if decoder_name not in additional_img_items_dict:
-                        additional_img_items_dict[decoder_name] = []
-                    cmap = additional_cmaps[decoder_name]
-                    # Assuming heatmap_matrix is of shape (n_neurons, n_xbins, n_ybins)
-                    for a_linear_index in range(len(plot_array)):
-                        curr_image_bounds_extent = plot_data_array[a_linear_index]['image_bounds_extent']
-                        # print(f'curr_image_bounds_extent[{a_linear_index}]: {curr_image_bounds_extent}')
-                        additional_image = np.squeeze(heatmap_matrix[a_linear_index, :, :])
-                        # additional_image = _scale_current_placefield_to_acceptable_range(additional_image, occupancy=occupancy, drop_below_threshold=drop_below_threshold)
-                        additional_image = _scale_current_placefield_to_acceptable_range(additional_image, occupancy=None, drop_below_threshold=None) # , occupancy=occupancy, drop_below_threshold=drop_below_threshold !! occupancy is not correct,it's the global one I think
-                        # print(f'\tadditional_image: {np.shape(additional_image)}')
-                        additional_img_item = pg.ImageItem(image=additional_image, levels=(0, 1))
-                        # Update the image:
-                        # additional_img_item.setImage(additional_image, autoLevels=False) # rect: [x, y, w, h] , rect=image_bounds_extent
-                        shifted_curr_image_bounds_extent = deepcopy(curr_image_bounds_extent)
-
-                        if enable_stacked_long_and_short:
-                            curr_item_y_offset = additional_decoder_y_offsets.get(decoder_name, 0)
-                            shifted_curr_image_bounds_extent[1] = curr_image_bounds_extent[1] + (curr_image_bounds_extent[3] * (curr_item_y_offset + 1)) # offset y = y + (h * (curr_item_y_offset + 1))
-                            shifted_curr_image_bounds_extent[3] = curr_image_bounds_extent[3] + (curr_image_bounds_extent[3] * curr_item_y_offset) # increase h = h + (h * (curr_item_y_offset))
-                        else:
-                            pass # do nothing, use the same bounds for each image
-
-                        additional_img_item.setImage(additional_image, rect=shifted_curr_image_bounds_extent, autoLevels=False) # rect: [x, y, w, h] 
-                        # additional_img_item.setOpacity(0.5)  # Set transparency for overlay
-                        additional_img_item.setOpacity(1.0)  # Set transparency for pre-separated overlay
-                        if isinstance(cmap, NDArray):
-                            additional_img_item.setLookupTable(cmap, update=False)
-                        else:
-                            additional_img_item.setLookupTable(cmap.getLookupTable(nPts=256), update=False)
-                            
-                        plot_array[a_linear_index].addItem(additional_img_item)
-                        additional_img_items_dict[decoder_name].append(additional_img_item)
-
-            ## Add the legend below all the rows:
-            root_render_widget.nextRow()
-            # Create a layout for the legend at the new row
-            # Add a layout for the legend at the bottom, spanning all columns
-            # legend_layout: pg.GraphicsLayout = root_render_widget.addLayout(row=root_render_widget.rowCount(), col=0, colspan=root_render_widget.columnCount())
-            legend_layout: pg.GraphicsLayout = root_render_widget.addLayout()  # Automatically places in the next available row
-            legend_entries_dict = {}
-            # Add labels for each entry in the legend
-            for i, (label, color) in enumerate(additional_legend_entries):
-                # legend_text = pg.LabelItem(label, color=color)
-                legend_text = SelectableLabelItem(label, color=color, is_selected=True)
-                legend_entries_dict[label] = legend_text
-                # legend_layout.addItem(legend_text, row=0, col=i)  # Place all labels in a single row
-                legend_layout.addItem(legend_text, row=i, col=0)  # Place all labels in a single columns
-                
-            legend_layout.setMaximumWidth(100)
-        else:
-            legend_layout = None
             
         # END if is_overlaid_heatmaps_mode                
         parent_root_widget.setWindowTitle('TrialByTrialActivity - trial_to_trial_reliability_all_decoders_image_stack')
