@@ -24,12 +24,26 @@ border-color: rgb(207, 207, 207);
 background-color: rgba(71, 65, 60, 180);
 color: rgb(244, 244, 244);
 border-color: rgb(0, 0, 0);
-QHeaderView::section { background-color: red };
+QHeaderView::section {
+    background-color: red;
+}
 /* Tooltip Specific Styling */
 QToolTip {
     background-color: rgb(14, 14, 14); /* Black background */
     color: rgb(211, 211, 211); /* Light grey text */
     border: 1px solid white; /* Optional: white border */
+}
+QWidget:link {
+    color: rgb(0, 255, 247);
+}
+QWidget:visited {
+    color: rgb(255, 170, 255);
+}
+QTextBrowser:link {
+	color: rgb(0, 255, 247);
+}
+QTextBrowser:visited {
+	color: rgb(255, 170, 255);
 }</string>
   </property>
   <layout class="QGridLayout" name="gridLayout" rowstretch="1,0">
@@ -62,6 +76,18 @@ QToolTip {
     background-color: rgb(0, 0, 0); /* Black background */
     color: rgb(211, 211, 211); /* Light grey text */
     border: 1px solid white; /* Optional: white border */
+}
+QWidget:link {
+    color: rgb(0, 255, 247);
+}
+QWidget:visited {
+    color: rgb(255, 170, 255);
+}
+QTextBrowser:link {
+	color: rgb(0, 255, 247);
+}
+QTextBrowser:visited {
+	color: rgb(255, 170, 255);
 }</string>
      </property>
      <layout class="QGridLayout" name="gridLayout_2" rowstretch="0" columnstretch="0">
@@ -265,6 +291,24 @@ QTreeWidget:item:!enabled {
                <normaloff>:/Render/Icons/Icon/Decode.png</normaloff>:/Render/Icons/Icon/Decode.png</iconset>
              </property>
             </item>
+            <item>
+             <property name="text">
+              <string>Trial-to-Trial Reliability</string>
+             </property>
+             <property name="toolTip">
+              <string notr="true"/>
+             </property>
+             <property name="statusTip">
+              <string notr="true"/>
+             </property>
+             <property name="whatsThis">
+              <string notr="true"/>
+             </property>
+             <property name="icon">
+              <iconset resource="../../../../Resources/ActionIcons.qrc">
+               <normaloff>:/Render/trial_to_trial_reliability</normaloff>:/Render/trial_to_trial_reliability</iconset>
+             </property>
+            </item>
            </widget>
           </item>
          </layout>
@@ -459,14 +503,213 @@ QTreeWidget:item:!enabled {
              </item>
              <item row="0" column="0">
               <widget class="QTextBrowser" name="textBrowser">
+               <property name="palette">
+                <palette>
+                 <active>
+                  <colorrole role="WindowText">
+                   <brush brushstyle="SolidPattern">
+                    <color alpha="255">
+                     <red>244</red>
+                     <green>244</green>
+                     <blue>244</blue>
+                    </color>
+                   </brush>
+                  </colorrole>
+                  <colorrole role="Button">
+                   <brush brushstyle="SolidPattern">
+                    <color alpha="180">
+                     <red>71</red>
+                     <green>65</green>
+                     <blue>60</blue>
+                    </color>
+                   </brush>
+                  </colorrole>
+                  <colorrole role="Text">
+                   <brush brushstyle="SolidPattern">
+                    <color alpha="255">
+                     <red>244</red>
+                     <green>244</green>
+                     <blue>244</blue>
+                    </color>
+                   </brush>
+                  </colorrole>
+                  <colorrole role="ButtonText">
+                   <brush brushstyle="SolidPattern">
+                    <color alpha="255">
+                     <red>244</red>
+                     <green>244</green>
+                     <blue>244</blue>
+                    </color>
+                   </brush>
+                  </colorrole>
+                  <colorrole role="Base">
+                   <brush brushstyle="NoBrush">
+                    <color alpha="255">
+                     <red>0</red>
+                     <green>0</green>
+                     <blue>0</blue>
+                    </color>
+                   </brush>
+                  </colorrole>
+                  <colorrole role="Window">
+                   <brush brushstyle="SolidPattern">
+                    <color alpha="180">
+                     <red>71</red>
+                     <green>65</green>
+                     <blue>60</blue>
+                    </color>
+                   </brush>
+                  </colorrole>
+                 </active>
+                 <inactive>
+                  <colorrole role="WindowText">
+                   <brush brushstyle="SolidPattern">
+                    <color alpha="255">
+                     <red>244</red>
+                     <green>244</green>
+                     <blue>244</blue>
+                    </color>
+                   </brush>
+                  </colorrole>
+                  <colorrole role="Button">
+                   <brush brushstyle="SolidPattern">
+                    <color alpha="180">
+                     <red>71</red>
+                     <green>65</green>
+                     <blue>60</blue>
+                    </color>
+                   </brush>
+                  </colorrole>
+                  <colorrole role="Text">
+                   <brush brushstyle="SolidPattern">
+                    <color alpha="255">
+                     <red>244</red>
+                     <green>244</green>
+                     <blue>244</blue>
+                    </color>
+                   </brush>
+                  </colorrole>
+                  <colorrole role="ButtonText">
+                   <brush brushstyle="SolidPattern">
+                    <color alpha="255">
+                     <red>244</red>
+                     <green>244</green>
+                     <blue>244</blue>
+                    </color>
+                   </brush>
+                  </colorrole>
+                  <colorrole role="Base">
+                   <brush brushstyle="NoBrush">
+                    <color alpha="255">
+                     <red>0</red>
+                     <green>0</green>
+                     <blue>0</blue>
+                    </color>
+                   </brush>
+                  </colorrole>
+                  <colorrole role="Window">
+                   <brush brushstyle="SolidPattern">
+                    <color alpha="180">
+                     <red>71</red>
+                     <green>65</green>
+                     <blue>60</blue>
+                    </color>
+                   </brush>
+                  </colorrole>
+                 </inactive>
+                 <disabled>
+                  <colorrole role="WindowText">
+                   <brush brushstyle="SolidPattern">
+                    <color alpha="255">
+                     <red>244</red>
+                     <green>244</green>
+                     <blue>244</blue>
+                    </color>
+                   </brush>
+                  </colorrole>
+                  <colorrole role="Button">
+                   <brush brushstyle="SolidPattern">
+                    <color alpha="180">
+                     <red>71</red>
+                     <green>65</green>
+                     <blue>60</blue>
+                    </color>
+                   </brush>
+                  </colorrole>
+                  <colorrole role="Text">
+                   <brush brushstyle="SolidPattern">
+                    <color alpha="255">
+                     <red>244</red>
+                     <green>244</green>
+                     <blue>244</blue>
+                    </color>
+                   </brush>
+                  </colorrole>
+                  <colorrole role="ButtonText">
+                   <brush brushstyle="SolidPattern">
+                    <color alpha="255">
+                     <red>244</red>
+                     <green>244</green>
+                     <blue>244</blue>
+                    </color>
+                   </brush>
+                  </colorrole>
+                  <colorrole role="Base">
+                   <brush brushstyle="NoBrush">
+                    <color alpha="255">
+                     <red>0</red>
+                     <green>0</green>
+                     <blue>0</blue>
+                    </color>
+                   </brush>
+                  </colorrole>
+                  <colorrole role="Window">
+                   <brush brushstyle="SolidPattern">
+                    <color alpha="180">
+                     <red>71</red>
+                     <green>65</green>
+                     <blue>60</blue>
+                    </color>
+                   </brush>
+                  </colorrole>
+                 </disabled>
+                </palette>
+               </property>
+               <property name="styleSheet">
+                <string notr="true">QWidget:link {
+    color: rgb(0, 255, 247);
+}
+QWidget:visited {
+    color: rgb(255, 170, 255);
+}
+QTextBrowser:link {
+	color: rgb(0, 255, 247);
+}
+QTextBrowser:visited {
+	color: rgb(255, 170, 255);
+}</string>
+               </property>
                <property name="documentTitle">
-                <string>Display Function</string>
+                <string notr="true">Display Function</string>
+               </property>
+               <property name="html">
+                <string notr="true">&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;title&gt;Display Function&lt;/title&gt;&lt;style type=&quot;text/css&quot;&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'MS Shell Dlg 2'; font-size:8.25pt; font-weight:400; font-style:normal;&quot;&gt;
+&lt;p style=&quot;-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;br /&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                </property>
                <property name="textInteractionFlags">
                 <set>Qt::LinksAccessibleByKeyboard|Qt::LinksAccessibleByMouse|Qt::TextBrowserInteraction|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
                </property>
                <property name="placeholderText">
-                <string>No Display Function Selected</string>
+                <string notr="true">No Display Function Selected</string>
+               </property>
+               <property name="searchPaths">
+                <stringlist notr="true"/>
+               </property>
+               <property name="openLinks">
+                <bool>false</bool>
                </property>
               </widget>
              </item>

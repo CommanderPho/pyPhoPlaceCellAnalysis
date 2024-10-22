@@ -1,6 +1,7 @@
 # LauncherWidget.py
 # Generated from c:\Users\pho\repos\Spike3DWorkEnv\pyPhoPlaceCellAnalysis\src\pyphoplacecellanalysis\GUI\Qt\MainApplicationWindows\LauncherWidget\LauncherWidget.ui automatically by PhoPyQtClassGenerator VSCode Extension
 import sys
+import subprocess
 import traceback
 import types
 import os
@@ -10,8 +11,8 @@ from functools import wraps
 from PyQt5 import QtGui, QtWidgets, uic
 from PyQt5.QtWidgets import QMessageBox, QToolTip, QStackedWidget, QHBoxLayout, QVBoxLayout, QSplitter, QFormLayout, QLabel, QFrame, QPushButton, QTableWidget, QTableWidgetItem, QTextBrowser
 from PyQt5.QtWidgets import QApplication, QFileSystemModel, QTreeView, QTreeWidget, QTreeWidgetItem, QWidget, QHeaderView, QMenu
-from PyQt5.QtGui import QPainter, QBrush, QPen, QColor, QFont, QIcon, QContextMenuEvent, QDesktopServices
-from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlot, QSize, QDir, QUrl
+from PyQt5.QtGui import QPainter, QBrush, QPen, QColor, QFont, QIcon, QContextMenuEvent
+from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlot, QSize, QDir, QUrl, QTimer
 
 
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore, QtGui
@@ -20,7 +21,9 @@ from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingS
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PipelineOwningMixin import PipelineOwningMixin
 from neuropy.utils.result_context import IdentifyingContext
 from pyphoplacecellanalysis.GUI.Qt.Widgets.IdentifyingContextSelector.IdentifyingContextSelectorWidget import IdentifyingContextSelectorWidget
-from pyphocorehelpers.programming_helpers import SourceCodeParsing
+# from pyphocorehelpers.programming_helpers import SourceCodeParsing
+from pyphocorehelpers.Filesystem.path_helpers import open_vscode_link
+from pyphocorehelpers.gui.Qt.widget_positioning_helpers import WidgetPositioningHelpers
 
 
 ## Define the .ui file path
@@ -43,13 +46,14 @@ icon_table = {'_display_spike_rasters_pyqtplot_2D':':/Icons/Icons/SpikeRaster2DI
 '_display_3d_interactive_tuning_curves_plotter':':/Icons/Icons/TuningMapDataExplorerIconWithLabel.ico',
 '_display_3d_interactive_spike_and_behavior_browser':':/Icons/Icons/InteractivePlaceCellDataExplorerIconWithLabel.ico',
 '_display_2d_placefield_result_plot_ratemaps_2D':':/Render/Icons/Icon/HeatmapUgly.png',
+# '_display_trial_to_trial_reliability':':/Render/Icons/graphics/TrialByTrialReliabilityImageArray.png',
+# '_display_directional_merged_pf_decoded_epochs':':/Render/Icons/graphics/yellow_blue_plot_icon.png',
+'_display_trial_to_trial_reliability':':/Graphics/Icons/graphics/TrialByTrialReliabilityImageArray.png',
+'_display_directional_merged_pf_decoded_epochs':':/Graphics/Icons/graphics/yellow_blue_plot_icon.png',
+'_display_directional_track_template_pf1Ds':':/Graphics/Icons/graphics/directional_track_template_pf1Ds.png',
+# '_display_directional_track_template_pf1Ds':':/Render/Icons/Icon/SimplePlot/Laps.png',
+'_display_long_short_laps':':/Graphics/Icons/graphics/long_short_laps.png',
 }
-
-def handle_link_clicked(url):
-    # Open the URL using the default system handler
-    if not isinstance(url, QUrl):
-        url = QUrl(url)
-    QDesktopServices.openUrl(url)
 
 
 class LauncherWidget(PipelineOwningMixin, QWidget):
@@ -165,7 +169,12 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         # Set context menu policy and connect the signal
         self.treeWidget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.treeWidget.customContextMenuRequested.connect(self.show_custom_context_menu)
-        
+
+        ## setup link handling:    
+        self.docPanelTextBrowser.setOpenLinks(False) 
+        self.docPanelTextBrowser.setOpenExternalLinks(False) # Disable automatic opening of external links
+        self.docPanelTextBrowser.anchorClicked.connect(self.handle_link_click) # Connect the link click handler
+    
 
     # ==================================================================================================================== #
     # Item Access Methods                                                                                                  #
@@ -275,6 +284,27 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         self._rebuild_tree()
         
         
+    # Handle link click
+    def handle_link_click(self, url: QUrl):
+        """ handle link (anchor) clicked events. Calls `open_vscode_link(...)` to open the link in vscode. """
+        a_link_str: str = url.toString()
+        print(f"Link clicked: {a_link_str}")
+        open_vscode_link(a_vscode_link_str=a_link_str, open_in_background=True)
+        # Refocus the widget after opening the link
+        # self.activateWindow()  # Ensure the window is activated
+        # self.raise_()  # Bring the window to the top
+        # Use QTimer to delay refocusing the widget
+        QTimer.singleShot(500, self.refocus_widget)
+        
+    def refocus_widget(self):
+        """ Brings the widget back into focus after a delay. """
+        print(f'.refocus_widget()')
+        WidgetPositioningHelpers.qt_win_to_foreground(self)
+        
+        # self.activateWindow()  # Ensure the window is activated
+        # self.raise_()  # Bring the window to the top
+    
+
     def update_fn_documentation_panel(self, a_fcn_name: str):
         a_disp_fn_item = self.get_display_function_item(a_fn_name=a_fcn_name)
         if self.debug_print:
@@ -282,8 +312,10 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         # tooltip_text = item.toolTip(column)
         if a_disp_fn_item is not None:
             # self.docPanelTextBrowser.setText(a_disp_fn_item.longform_description)
-            self.docPanelTextBrowser.setOpenExternalLinks(False)  # Disable automatic opening of external links
-            self.docPanelTextBrowser.anchorClicked.connect(handle_link_clicked)  # Connect the link click handler
+            # QTextBrowser
+            # self.docPanelTextBrowser.setOpenLinks(False) 
+            # self.docPanelTextBrowser.setOpenExternalLinks(False) # Disable automatic opening of external links
+            # self.docPanelTextBrowser.anchorClicked.connect(self.handle_link_click) # Connect the link click handler
             self.docPanelTextBrowser.setHtml(a_disp_fn_item.longform_description_formatted_html)
         else:
             print(f'\t WARN: a_disp_fn_item is None for key: "{a_fcn_name}"')
