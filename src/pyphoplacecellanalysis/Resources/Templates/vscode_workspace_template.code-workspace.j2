@@ -1,0 +1,39 @@
+{
+	"folders": [
+		{% for folder in folders %}
+		{
+			"path": "{{ folder.path }}",
+			"name": "{{ folder.name }}"
+		}{% if not loop.last %},{% endif %}
+		{% endfor %}
+	],
+	"settings": {
+		"python.defaultInterpreterPath": "{{ defaultInterpreterPath }}",
+		"python.testing.autoTestDiscoverOnSaveEnabled": false,
+		"python.terminal.executeInFileDir": true,
+		"python.terminal.focusAfterLaunch": true,
+		"python.terminal.launchArgs": [
+		],
+		"powershell.cwd": "gen_scripts",
+		"files.exclude": {
+			"**/EXTERNAL/": true,
+			"**/OLD/": true,
+			"**/output/": true,
+			"**/*.out": true,
+			"**/*.err": true,
+			"**/*.log": true,
+			"**/*.ico": true,
+			{% if is_platform_windows %}
+			"**/*.sh": true,
+			{% else %}
+			"**/*.ps1": true,
+			"**/*.cmd": true,
+			{% endif %}
+		}
+	},
+	"extensions": {
+		"recommendations": [
+			"jkearins.action-buttons-ext"
+		]
+	},
+}

@@ -549,7 +549,12 @@ def build_vscode_workspace(script_paths, python_executable=None):
     if python_executable is None:
         active_venv_path, python_executable, activate_script_path = get_running_python()
 
-    
+    is_platform_windows: bool = False
+    if (platform.system() == 'Windows'):
+        is_platform_windows = True
+    else:
+        is_platform_windows = False
+
     assert len(script_paths) > 0, f"script_paths is empty!"
     top_level_script_folders_path: Path = Path(script_paths[0]).resolve().parent.parent # parent of the parents
     script_folders: List[Path] = [top_level_script_folders_path] + [Path(a_path).parent.resolve() for a_path in script_paths]
@@ -561,43 +566,56 @@ def build_vscode_workspace(script_paths, python_executable=None):
     vscode_workspace_path = top_level_script_folders_path.joinpath('run_workspace.code-workspace').resolve()
     print(f'vscode_workspace_path: {vscode_workspace_path}')
 
-    # Define your VSCode workspace template
-    vscode_workspace_template = """
-    {
-        "folders": [
-            {% for folder in folders %}
-            {
-                "path": "{{ folder.path }}",
-                "name": "{{ folder.name }}"
-            }{% if not loop.last %},{% endif %}
-            {% endfor %}
-        ],
-        "settings": {
-            "python.defaultInterpreterPath": "{{ defaultInterpreterPath }}",
-            "python.testing.autoTestDiscoverOnSaveEnabled": false,
-            "python.terminal.executeInFileDir": true,
-            "python.terminal.focusAfterLaunch": true,
-            "python.terminal.launchArgs": [
-            ],
-            "powershell.cwd": "gen_scripts",
-            "files.exclude": {
-                "**/*.sh": true,
-                "**/EXTERNAL/": true,
-                "**/OLD/": true,
-                "**/output/": true,
-                "**/*.out": true,
-                "**/*.err": true,
-                "**/*.log": true,
-                "**/*.ico": true,
-            }
-        },
-        "extensions": {
-            "recommendations": [
-                "jkearins.action-buttons-ext"
-            ]
-        },
-    }
-    """
+    # Set up Jinja2 environment
+    template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
+    env = Environment(loader=FileSystemLoader(template_path))
+    template = env.get_template('vscode_workspace_template.code-workspace.j2')
+    # Render the template with the provided variables
+    powershell_script = template.render(
+        is_platform_windows=is_platform_windows,
+        # max_concurrent_jobs=max_concurrent_jobs,
+        # activate_path=activate_path,
+        # python_executable=python_executable
+    )
+    
+
+    # # Define your VSCode workspace template
+    # vscode_workspace_template = """
+    # {
+    #     "folders": [
+    #         {% for folder in folders %}
+    #         {
+    #             "path": "{{ folder.path }}",
+    #             "name": "{{ folder.name }}"
+    #         }{% if not loop.last %},{% endif %}
+    #         {% endfor %}
+    #     ],
+    #     "settings": {
+    #         "python.defaultInterpreterPath": "{{ defaultInterpreterPath }}",
+    #         "python.testing.autoTestDiscoverOnSaveEnabled": false,
+    #         "python.terminal.executeInFileDir": true,
+    #         "python.terminal.focusAfterLaunch": true,
+    #         "python.terminal.launchArgs": [
+    #         ],
+    #         "powershell.cwd": "gen_scripts",
+    #         "files.exclude": {
+    #             "**/*.sh": true,
+    #             "**/EXTERNAL/": true,
+    #             "**/OLD/": true,
+    #             "**/output/": true,
+    #             "**/*.out": true,
+    #             "**/*.err": true,
+    #             "**/*.log": true,
+    #             "**/*.ico": true,
+    #         }
+    #     },
+    #     "extensions": {
+    #         "recommendations": [
+    #             "jkearins.action-buttons-ext"
+    #         ]
+    #     },
+    # }
+    # """
 
 
     # """
@@ -621,7 +639,7 @@ def build_vscode_workspace(script_paths, python_executable=None):
     # """
 
     # Create Jinja template object
-    template = Template(vscode_workspace_template)
+    # template = Template(vscode_workspace_template)
 
     # Define folders as a list of dictionaries
     # folders = [
@@ -636,7 +654,8 @@ def build_vscode_workspace(script_paths, python_executable=None):
     # Define variables
     variables = {
         'folders': folders,
-        'defaultInterpreterPath': str(python_executable.as_posix())
+        'defaultInterpreterPath': str(python_executable.as_posix()),
+        'is_platform_windows': is_platform_windows,
     }
 
     # Render the template with variables
