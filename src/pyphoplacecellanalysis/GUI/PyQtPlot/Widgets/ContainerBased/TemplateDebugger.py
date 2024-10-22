@@ -290,21 +290,31 @@ class TemplateDebugger:
             a_scene: pg.GraphicsScene = view_box.scene()
             print(f'\t a_scene: {a_scene}')
             a_scene.setClickRadius(4.0)
+            # # mouse Clicked:
+            # sigMouseClickedCallback = sigMouseClickedCallbackDict.get(a_decoder_name, None)
+            # if sigMouseClickedCallback is not None:
+            #     print(f'\tdisconnecting sigMouseClickedCallback for {a_decoder_name}..')
+            #     view_box.scene().sigMouseClicked.disconnect(sigMouseClickedCallback) ## disconnect
+                    
+            # self.ui.connections['sigMouseClicked'][a_decoder_name] = view_box.scene().sigMouseClicked.connect(self.on_mouse_click)
+
             # mouse Clicked:
             sigMouseClickedCallback = sigMouseClickedCallbackDict.get(a_decoder_name, None)
             if sigMouseClickedCallback is not None:
                 print(f'\tdisconnecting sigMouseClickedCallback for {a_decoder_name}..')
-                view_box.scene().sigMouseClicked.disconnect(sigMouseClickedCallback) ## disconnect
+                curr_win.sigMouseClicked.disconnect(sigMouseClickedCallback) ## disconnect
                     
-            self.ui.connections['sigMouseClicked'][a_decoder_name] = view_box.scene().sigMouseClicked.connect(self.on_mouse_click)
+            self.ui.connections['sigMouseClicked'][a_decoder_name] = curr_win.sigMouseClicked.connect(self.on_mouse_click)
+
+
+
+            # ## mouse Moved:
+            # sigMouseMovedCallback = sigMouseMovedCallbackDict.get(a_decoder_name, None)
+            # if sigMouseMovedCallback is not None:
+            #     print(f'\tdisconnecting sigMouseMovedCallback for {a_decoder_name}..')
+            #     view_box.scene().sigMouseMoved.disconnect(sigMouseMovedCallback) ## disconnect
             
-            ## mouse Moved:
-            sigMouseMovedCallback = sigMouseMovedCallbackDict.get(a_decoder_name, None)
-            if sigMouseMovedCallback is not None:
-                print(f'\tdisconnecting sigMouseMovedCallback for {a_decoder_name}..')
-                view_box.scene().sigMouseMoved.disconnect(sigMouseMovedCallback) ## disconnect
-            
-            self.ui.connections['sigMouseMoved'][a_decoder_name] = view_box.scene().sigMouseMoved.connect(self.on_mouse_moved)
+            # self.ui.connections['sigMouseMoved'][a_decoder_name] = view_box.scene().sigMouseMoved.connect(self.on_mouse_moved)
             a_scene.setClickRadius(4.0)
             print(f'\t "{a_decoder_name}" connections done.')
             
@@ -312,6 +322,64 @@ class TemplateDebugger:
         for a_decoder_name, a_text_items_dict in self.ui.text_items_dict.items():
             for aclu, a_text_item in a_text_items_dict.items():
                 a_text_item.sigSelectedChanged.connect(self.on_change_selection)
+
+        # custom_on_mouse_clicked callback ___________________________________________________________________________________ #
+        def custom_on_mouse_clicked(self, custom_plot_widget, event):
+            debug_print: bool = False
+            if debug_print:
+                print(f'custom_on_mouse_clicked(event: {event})')
+            # if not isinstance(event, MouseClickEvent):
+            if not hasattr(event, 'scenePos'):
+                if debug_print:
+                    print(f'not MouseClickEvent. skipping.')
+                return
+            else:    
+                pos = event.scenePos() # 'QMouseEvent' object has no attribute 'scenePos'
+
+                if debug_print:
+                    print(f'\tscenePos: {pos}')
+                    print(f'\tscreenPos: {event.screenPos()}')
+                    print(f'\tpos: {event.pos()}')
+                    
+                item_data = custom_plot_widget.item_data
+                if debug_print:
+                    print(f'\titem_data: {item_data}')
+                found_decoder_idx = item_data.get('decoder_idx', None)
+                found_decoder_name = item_data.get('decoder_name', None)
+                
+                ## find the clicked decoder
+                # found_decoder_idx = None
+                # found_decoder_name = None
+                # for a_decoder_idx, (a_decoder_name, (a_win, an_img_item)) in enumerate(self.pf1D_heatmaps.items()):
+                #     if ((found_decoder_idx is None) and (found_decoder_name is None)):
+                #         if an_img_item.sceneBoundingRect().contains(pos):
+                #             ## found correct decoder here:
+                #             found_decoder_idx = a_decoder_idx
+                #             found_decoder_name = a_decoder_name
+                            
+                if ((found_decoder_idx is None) and (found_decoder_name is None)):
+                    print(f'WARNING: could not find correct decoder name/idx')
+                else:
+                    if debug_print:
+                        print(f'found valid decoder: found_decoder_name: "{found_decoder_name}", found_decoder_idx" {found_decoder_idx}')
+                    a_win, an_img_item = self.pf1D_heatmaps[found_decoder_name]
+                    mouse_point = a_win.getViewBox().mapSceneToView(pos)
+                    if debug_print:
+                        print(f"Clicked at: x={mouse_point.x()}, y={mouse_point.y()}")
+                    found_y_point: float = mouse_point.y()
+                    ## round down
+                    found_y_idx: int = int(found_y_point)
+                    if debug_print:
+                        print(f'found_y_idx: {found_y_idx}')
+                    found_aclu: int = self.plots_data.sorted_neuron_IDs_lists[found_decoder_idx][found_y_idx]
+                    print(f'found_aclu: {found_aclu}')
+                    prev_selected_aclus = self.get_any_decoder_selected_aclus().tolist()
+                    prev_selected_aclus.append(found_aclu)
+                    self.set_selected_aclus_for_all_decoders(any_selected_aclus=prev_selected_aclus)
+
+        self.params.on_mouse_clicked_callback_fn_dict = {
+            'custom_on_mouse_clicked': custom_on_mouse_clicked,
+        }
 
         print(f'done _build_internal_callback_functions()')
         
@@ -349,6 +417,8 @@ class TemplateDebugger:
         # pf_xbins_list = [a_decoder.pf.ratemap.xbin for a_decoder in decoders_dict.values()]
         img_extents_dict = {a_decoder_name:[a_decoder.pf.ratemap.xbin[0], 0, (a_decoder.pf.ratemap.xbin[-1]-a_decoder.pf.ratemap.xbin[0]), (float(len(sorted_neuron_IDs_lists[i]))-0.0)] for i, (a_decoder_name, a_decoder) in enumerate(decoders_dict.items()) } # these extents are  (x, y, w, h)
         
+        # ymin_ymax_tuple_dict = {a_decoder_name:[(float(cell_i), (float(cell_i) + line_height)) for a_decoder.] for i, (a_decoder_name, a_decoder) in enumerate(decoders_dict.items()) } # these extents are  (x, y, w, h)
+        
         # below uses `sorted_pf_tuning_curves`, `sort_helper_neuron_id_to_neuron_colors_dicts`
         _out_data.ref_decoder_name = ref_decoder_name
         _out_data.sorted_neuron_IDs_lists = sorted_neuron_IDs_lists
@@ -366,12 +436,14 @@ class TemplateDebugger:
     def _subfn_buildUI_directional_template_debugger_data(cls, included_any_context_neuron_ids, use_incremental_sorting: bool, debug_print: bool, enable_cell_colored_heatmap_rows: bool, _out_data: RenderPlotsData, _out_plots: RenderPlots, _out_ui: PhoUIContainer, _out_params: VisualizationParameters, decoders_dict: Dict):
         """ Builds UI """
         print(f'._subfn_buildUI_directional_template_debugger_data(...)')
+        line_height: float = 1.0
+        
         _out_data = cls._subfn_rebuild_sort_idxs(decoders_dict, _out_data, use_incremental_sorting=use_incremental_sorting, included_any_context_neuron_ids=included_any_context_neuron_ids)
         # Unpack the updated _out_data:
         sort_helper_neuron_id_to_neuron_colors_dicts = _out_data.sort_helper_neuron_id_to_neuron_colors_dicts
         sorted_pf_tuning_curves = _out_data.sorted_pf_tuning_curves
         sorted_pf_peak_location_list = _out_data.sorted_pf_peak_location_list
-
+        _out_data.active_pfs_ymin_ymax_tuple_list_dict = {}
         ## Plot the placefield 1Ds as heatmaps and then wrap them in docks and add them to the window:
         _out_plots.pf1D_heatmaps = {}
         _out_ui.text_items_dict = {}
@@ -391,6 +463,8 @@ class TemplateDebugger:
 
             # Adds aclu text labels with appropriate colors to y-axis: uses `sorted_shared_sort_neuron_IDs`:
             curr_win, curr_img = _out_plots.pf1D_heatmaps[a_decoder_name] # win, img
+            # curr_win.setObjectName(a_decoder_name)
+            curr_win.item_data = {'decoder_name': a_decoder_name, 'decoder_idx': i}
             if _out_params.debug_draw:
                 # Shows the axes if debug_print == true
                 curr_win.showAxes(True)
@@ -406,7 +480,20 @@ class TemplateDebugger:
 
             _out_ui.text_items_dict[a_decoder_name] = {} # new dict to hold these items.
             _out_ui.order_location_lines_dict[a_decoder_name] = {} # new dict to hold these items.
+
+            ## build selection helper:            
+            # a_decoder_color_map: Dict = sort_helper_neuron_id_to_neuron_colors_dicts[i] # 34 (n_neurons)
+            a_decoder_ymin_ymax_tuple_list = [(float(cell_i), (float(cell_i) + line_height)) for cell_i, (aclu, a_color_vector) in enumerate(a_decoder_color_map.items())]
+            _out_data.active_pfs_ymin_ymax_tuple_list_dict[a_decoder_name] = np.array(a_decoder_ymin_ymax_tuple_list)
             
+            # def _find_nearest_cell_idx(test_y_value: float):
+            #     """ captures: line_height, cell_i, """
+            #     y_offset = float(cell_i)
+            #     y_max = (y_offset + line_height)
+            #     is_in_curr_cell_range: bool = ((test_y_value >= y_offset) and (test_y_value < y_max))
+            #     return is_in_curr_cell_range
+        
+
             for cell_i, (aclu, a_color_vector) in enumerate(a_decoder_color_map.items()):
                 # anchor=(1,0) specifies the item's upper-right corner is what setPos specifies. We switch to right vs. left so that they are all aligned appropriately.
                 # text = pg.TextItem(f"{int(aclu)}", color=pg.mkColor(a_color_vector), anchor=(1,0)) # , angle=15
@@ -420,11 +507,21 @@ class TemplateDebugger:
                 out_colors_row = DataSeriesColorHelpers.qColorsList_to_NDarray([build_adjusted_color(heatmap_base_color, value_scale=v) for v in curr_data[cell_i, :]], is_255_array=False).T # (62, 4)
                 _temp_curr_out_colors_heatmap_image.append(out_colors_row)
                 
+                
+                
+                # def _find_nearest_cell_idx(test_y_value: float):
+                #     """ captures: line_height, cell_i, """
+                #     y_offset = float(cell_i)
+                #     y_max = (y_offset + line_height)
+                #     is_in_curr_cell_range: bool = ((test_y_value >= y_offset) and (test_y_value < y_max))
+                #     return is_in_curr_cell_range
+
+
                 # Add vertical lines
                 if _out_params.enable_pf_peak_indicator_lines:
                     x_offset = curr_pf_peak_locations[cell_i]
                     y_offset = float(cell_i) 
-                    line_height = 1.0
+                    
                     half_line_height = line_height / 2.0 # to compensate for middle
                     # line = QtGui.QGraphicsLineItem(x_offset, (y_offset - half_line_height), x_offset, (y_offset + half_line_height)) # (xstart, ystart, xend, yend)
                     line = QtGui.QGraphicsLineItem(x_offset, y_offset, x_offset, (y_offset + line_height)) # (xstart, ystart, xend, yend)
@@ -503,6 +600,8 @@ class TemplateDebugger:
             
             # Adds aclu text labels with appropriate colors to y-axis: uses `sorted_shared_sort_neuron_IDs`:
             curr_win, curr_img = _out_plots.pf1D_heatmaps[a_decoder_name] # win, img
+            curr_win.item_data = {'decoder_name': a_decoder_name, 'decoder_idx': i}
+            
             a_decoder_color_map: Dict = sort_helper_neuron_id_to_neuron_colors_dicts[i] # 34 (n_neurons)
 
             # Coloring the heatmap data for each row of the 1D heatmap:
@@ -635,12 +734,14 @@ class TemplateDebugger:
 
 
     # def on_mouse_click(self, event, decoder_name=None):
-    def on_mouse_click(self, event):
+    # def on_mouse_click(self, event):
+    def on_mouse_click(self, custom_plot_widget, event):
         print(f'self.on_mouse_click(...)')
+        print(f'\tcustom_plot_widget: {custom_plot_widget}')
         print(f'\tevent: {event}')
         on_mouse_clicked_callback_fn_dict = self.params.get('on_mouse_clicked_callback_fn_dict', {})
         for a_callback_name, a_callback_fn in on_mouse_clicked_callback_fn_dict.items():
-            a_callback_fn(event)
+            a_callback_fn(self, custom_plot_widget, event)
         print('\tend.')
         # pos = event.scenePos()
         # print(f'self.on_mouse_click(event: {event})')
@@ -651,13 +752,16 @@ class TemplateDebugger:
         #     print(f"Clicked at: x={mouse_point.x()}, y={mouse_point.y()}")
             
 
-    def on_mouse_moved(self, event_pos):
-        print(f'self.on_mouse_moved(...)')
-        print(f'\tevent_pos: {event_pos}')
+    def on_mouse_moved(self, custom_plot_widget, event_pos):
+        if self.params.debug_enabled:
+            print(f'self.on_mouse_moved(...)')
+            print(f'\tcustom_plot_widget: {custom_plot_widget}')
+            print(f'\tevent_pos: {event_pos}')
         on_mouse_moved_callback_fn_dict = self.params.get('on_mouse_moved_callback_fn_dict', {})
         for a_callback_name, a_callback_fn in on_mouse_moved_callback_fn_dict.items():
-            a_callback_fn(event_pos)            
-        print('\tend.')
+            a_callback_fn(self, custom_plot_widget, event_pos)
+        if self.params.debug_enabled:
+            print('\tend.')
         
 
 
