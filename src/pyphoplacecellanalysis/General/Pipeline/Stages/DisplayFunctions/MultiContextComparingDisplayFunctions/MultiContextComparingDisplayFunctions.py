@@ -146,13 +146,13 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
         
         ## OUTPUTS: directional_trial_by_trial_activity_result, directional_active_lap_pf_results_dicts
         long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
-        active_pf_dt = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computed_data['pf2D_dt']) # PfND_TimeDependent
-
+        # active_pf = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computed_data['pf2D_dt']) # PfND_TimeDependent
+        active_pf = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computed_data['pf2D'])
         ## Uses `plot_trial_to_trial_reliability_all_decoders_image_stack` to plot the reliability trial-by-trial indicators over time
         ## INPUTS: a_pf2D_dt, z_scored_tuning_map_matrix
         # directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity] = deepcopy(directional_trial_by_trial_activity_result.directional_active_lap_pf_results_dicts)
         modified_directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity] = directional_trial_by_trial_activity_result.build_separated_nan_filled_decoded_epoch_z_scored_tuning_map_matrix()
-        _a_trial_by_trial_window = TrialByTrialActivityWindow.plot_trial_to_trial_reliability_all_decoders_image_stack(directional_active_lap_pf_results_dicts=modified_directional_active_lap_pf_results_dicts, active_one_step_decoder=deepcopy(active_pf_dt), drop_below_threshold=drop_below_threshold, is_overlaid_heatmaps_mode=True)
+        _a_trial_by_trial_window = TrialByTrialActivityWindow.plot_trial_to_trial_reliability_all_decoders_image_stack(directional_active_lap_pf_results_dicts=modified_directional_active_lap_pf_results_dicts, active_one_step_decoder=deepcopy(active_pf), drop_below_threshold=drop_below_threshold)
 
 
         ## split mode:

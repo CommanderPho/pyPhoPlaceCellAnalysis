@@ -123,7 +123,10 @@ class TrialByTrialActivityWindow:
         
         # Get flat list of images:
         # images = active_one_step_decoder.ratemap.normalized_tuning_curves # (78, 57, 6)	- (n_neurons, n_xbins, n_ybins)
-        occupancy = active_one_step_decoder.ratemap.occupancy # (57, 6) - (n_xbins, n_ybins)
+        occupancy = deepcopy(active_one_step_decoder.ratemap.occupancy) # (57, 6) - (n_xbins, n_ybins)
+        # occupancy = None # to match the others
+        assert (np.sum(occupancy) > 0.0), f"occupancy is zero for the passed `active_one_step_decoder`. Did you pass an uncalculated pf_dt?"
+        
         # Need to go from (n_epochs, n_neurons, n_pos_bins) -> (n_neurons, n_xbins, n_ybins)
         n_epochs, n_neurons, n_pos_bins = np.shape(z_scored_tuning_map_matrix)
         images = z_scored_tuning_map_matrix.transpose(1, 2, 0) # (71, 57, 22)
@@ -131,9 +134,6 @@ class TrialByTrialActivityWindow:
         assert (len(xbin_edges)-1) == n_pos_bins, f"n_pos_bins: {n_pos_bins}, len(xbin_edges): {len(xbin_edges)} "
         # ybin_edges=active_one_step_decoder.ybin
         ybin_edges = np.arange(n_epochs+1) - 0.5 # correct ybin_edges are n_epochs
-                
-        # images=images
-        # occupancy=occupancy
         root_render_widget, parent_root_widget, app = pyqtplot_common_setup(f'TrialByTrialActivityArray: {np.shape(images)}', app=app, parent_root_widget=parent_root_widget, root_render_widget=root_render_widget) ## 🚧 TODO: BUG: this makes a new QMainWindow to hold this item, which is inappropriate if it's to be rendered as a child of another control
 
         pg.setConfigOptions(imageAxisOrder='col-major') # this causes the placefields to be rendered horizontally, like they were in _temp_pyqtplot_plot_image_array
@@ -201,7 +201,6 @@ class TrialByTrialActivityWindow:
 
             _curr_plot_data_dict = {'a_linear_index': a_linear_index,
              'curr_page_relative_row': curr_page_relative_row, 'curr_page_relative_col': curr_page_relative_col,
-            #   'curr_included_unit_index': curr_included_unit_index,
             }
             
             if not has_active_neuron_IDs:
@@ -231,12 +230,8 @@ class TrialByTrialActivityWindow:
             
 
             # # plot mode:
-            # curr_plot: pg.PlotItem = root_render_widget.addPlot(row=(curr_row + plots_start_row_idx), col=curr_col, title=formatted_title) # pg.PlotItem
-            # SelectablePlotItem version:
             curr_plot: SelectablePlotItem = SelectablePlotItem(title=formatted_title, is_selected=False)
-            root_render_widget.addItem(curr_plot, row=(curr_row + plots_start_row_idx), col=curr_col)
-            # curr_plot.sigSelectedChanged.connect(self.on_change_selection)
-            
+            root_render_widget.addItem(curr_plot, row=(curr_row + plots_start_row_idx), col=curr_col)            
             curr_plot.setObjectName(curr_plot_identifier_string)
             # curr_plot.showAxes(False)
             curr_plot.showAxes(True)
@@ -408,6 +403,12 @@ class TrialByTrialActivityWindow:
         # Plots only the first data-series ('long_LR')
         app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array, (lblTitle, lblFooter) = cls._plot_trial_to_trial_reliability_image_array(active_one_step_decoder=active_one_step_decoder, z_scored_tuning_map_matrix=active_z_scored_tuning_map_matrix, active_neuron_IDs=active_neuron_IDs, drop_below_threshold=drop_below_threshold, cmap=additional_cmaps['long_LR'])
         
+
+        occupancy = deepcopy(active_one_step_decoder.ratemap.occupancy)
+        # occupancy = None # previous
+        
+        assert (np.sum(occupancy) > 0.0), f"occupancy is zero for the passed `active_one_step_decoder`. Did you pass an uncalculated pf_dt?"
+        
         ## list of image items img_item_array
         
         additional_heatmaps_data = {}
@@ -416,58 +417,47 @@ class TrialByTrialActivityWindow:
         # Extract the heatmaps from the other decoders
         ## INPUTS: directional_active_lap_pf_results_dicts
 
-        enable_stacked_long_and_short: bool = False # not currently working, they have to be overlayed exactly on top of each other
-        additional_decoder_y_offsets = {'long_LR': 0, 'long_RL': 0,
-                        'short_LR': 1, 'short_RL': 1}
+        # enable_stacked_long_and_short: bool = False # not currently working, they have to be overlayed exactly on top of each other
+        # additional_decoder_y_offsets = {'long_LR': 0, 'long_RL': 0,
+        #                 'short_LR': 1, 'short_RL': 1}
         
         for decoder_name, active_trial_by_trial_activity_obj in directional_active_lap_pf_results_dicts.items():  # Replace with actual decoder names
-            # if decoder_name != 'long_LR':
-            ## we already did 'long_LR', so skip that one    
-            # additional_heatmaps.append(active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix.transpose(1, 2, 0))
-            additional_heatmaps_data[decoder_name] = active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix.transpose(1, 2, 0)
-            # additional_cmaps[decoder_name] = pg.colormap.get('gray','matplotlib') # prepare a linear color map
+            if decoder_name != 'long_LR':
+                ## we already did 'long_LR', so skip that one    
+                # additional_heatmaps.append(active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix.transpose(1, 2, 0))
+                additional_heatmaps_data[decoder_name] = active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix.transpose(1, 2, 0)
+                # additional_cmaps[decoder_name] = pg.colormap.get('gray','matplotlib') # prepare a linear color map
 
 
         # Overlay additional heatmaps if provided
         ## INPUTS: additional_heatmaps, additional_cmaps, plot_array
         ## UPDATES: plot_array
-
-
-        if additional_heatmaps_data:
-            for i, (decoder_name, heatmap_matrix) in enumerate(additional_heatmaps_data.items()):
-                if decoder_name not in additional_img_items_dict:
-                    additional_img_items_dict[decoder_name] = []
-                cmap = additional_cmaps[decoder_name]
-                # Assuming heatmap_matrix is of shape (n_neurons, n_xbins, n_ybins)
-                for a_linear_index in range(len(plot_array)):
-                    curr_image_bounds_extent = plot_data_array[a_linear_index]['image_bounds_extent']
-                    # print(f'curr_image_bounds_extent[{a_linear_index}]: {curr_image_bounds_extent}')
-                    additional_image = np.squeeze(heatmap_matrix[a_linear_index, :, :])
-                    # additional_image = _scale_current_placefield_to_acceptable_range(additional_image, occupancy=occupancy, drop_below_threshold=drop_below_threshold)
-                    additional_image = _scale_current_placefield_to_acceptable_range(additional_image, occupancy=None, drop_below_threshold=None) # , occupancy=occupancy, drop_below_threshold=drop_below_threshold !! occupancy is not correct,it's the global one I think
-                    # print(f'\tadditional_image: {np.shape(additional_image)}')
-                    additional_img_item = pg.ImageItem(image=additional_image, levels=(0, 1))
-                    # Update the image:
-                    # additional_img_item.setImage(additional_image, autoLevels=False) # rect: [x, y, w, h] , rect=image_bounds_extent
-                    shifted_curr_image_bounds_extent = deepcopy(curr_image_bounds_extent)
-
-                    if enable_stacked_long_and_short:
-                        curr_item_y_offset = additional_decoder_y_offsets.get(decoder_name, 0)
-                        shifted_curr_image_bounds_extent[1] = curr_image_bounds_extent[1] + (curr_image_bounds_extent[3] * (curr_item_y_offset + 1)) # offset y = y + (h * (curr_item_y_offset + 1))
-                        shifted_curr_image_bounds_extent[3] = curr_image_bounds_extent[3] + (curr_image_bounds_extent[3] * curr_item_y_offset) # increase h = h + (h * (curr_item_y_offset))
-                    else:
-                        pass # do nothing, use the same bounds for each image
-
-                    additional_img_item.setImage(additional_image, rect=shifted_curr_image_bounds_extent, autoLevels=False) # rect: [x, y, w, h] 
-                    # additional_img_item.setOpacity(0.5)  # Set transparency for overlay
-                    additional_img_item.setOpacity(1.0)  # Set transparency for pre-separated overlay
-                    if isinstance(cmap, NDArray):
-                        additional_img_item.setLookupTable(cmap, update=False)
-                    else:
-                        additional_img_item.setLookupTable(cmap.getLookupTable(nPts=256), update=False)
-                        
-                    plot_array[a_linear_index].addItem(additional_img_item)
-                    additional_img_items_dict[decoder_name].append(additional_img_item)
+        for i, (decoder_name, heatmap_matrix) in enumerate(additional_heatmaps_data.items()):
+            if decoder_name not in additional_img_items_dict:
+                additional_img_items_dict[decoder_name] = []
+            cmap = additional_cmaps[decoder_name]
+            # Assuming heatmap_matrix is of shape (n_neurons, n_xbins, n_ybins)
+            for a_linear_index in range(len(plot_array)):
+                curr_image_bounds_extent = plot_data_array[a_linear_index]['image_bounds_extent']
+                # print(f'curr_image_bounds_extent[{a_linear_index}]: {curr_image_bounds_extent}')
+                additional_image = np.squeeze(heatmap_matrix[a_linear_index, :, :])
+                additional_image = _scale_current_placefield_to_acceptable_range(additional_image, occupancy=deepcopy(occupancy), drop_below_threshold=drop_below_threshold)
+                # additional_image = _scale_current_placefield_to_acceptable_range(additional_image, occupancy=None, drop_below_threshold=None) # , occupancy=occupancy, drop_below_threshold=drop_below_threshold !! occupancy is not correct,it's the global one I think
+                # print(f'\tadditional_image: {np.shape(additional_image)}')
+                additional_img_item = pg.ImageItem(image=additional_image, levels=(0, 1))
+                # Update the image:
+                # additional_img_item.setImage(additional_image, autoLevels=False) # rect: [x, y, w, h] , rect=image_bounds_extent
+                shifted_curr_image_bounds_extent = deepcopy(curr_image_bounds_extent)
+                # use the same bounds for each image
+                additional_img_item.setImage(additional_image, rect=shifted_curr_image_bounds_extent, autoLevels=False) # rect: [x, y, w, h] 
+                additional_img_item.setOpacity(1.0)  # Set transparency for pre-separated overlay
+                if isinstance(cmap, NDArray):
+                    additional_img_item.setLookupTable(cmap, update=False)
+                else:
+                    additional_img_item.setLookupTable(cmap.getLookupTable(nPts=256), update=False)
+                    
+                plot_array[a_linear_index].addItem(additional_img_item)
+                additional_img_items_dict[decoder_name].append(additional_img_item)
 
         ## Add the legend below all the rows:
         root_render_widget.nextRow()
