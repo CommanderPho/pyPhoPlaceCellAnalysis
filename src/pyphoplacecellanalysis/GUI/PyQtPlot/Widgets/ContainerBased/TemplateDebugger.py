@@ -1,10 +1,11 @@
 from copy import deepcopy
 from pathlib import Path
-from typing import Optional, Dict, List, Tuple, Callable, Union
+from typing import Any, Optional, Dict, List, Tuple, Callable, Union
 from attrs import define, field, Factory
 from nptyping import NDArray
 import numpy as np
 import pandas as pd
+import neuropy.utils.type_aliases as types
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
@@ -35,11 +36,11 @@ from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
 import pyqtgraph as pg
 import pyqtgraph.exporters
+from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer # for context_nested_docks/single_context_nested_docks
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import paired_separately_sort_neurons, paired_incremental_sort_neurons # _display_directional_template_debugger
 from neuropy.utils.indexing_helpers import paired_incremental_sorting, union_of_arrays, intersection_of_arrays
-
 
 from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import UnitColoringMode, DataSeriesColorHelpers
 from pyphocorehelpers.gui.Qt.color_helpers import QColor, build_adjusted_color
@@ -48,7 +49,7 @@ from pyphoplacecellanalysis.Resources.icon_helpers import try_get_icon
 
 from pyphoplacecellanalysis.External.pyqtgraph import QtGui
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import pyqtplot_build_image_bounds_extent, pyqtplot_plot_image
-
+from pyphoplacecellanalysis.External.pyqtgraph_extensions.CustomPlotWidget import CustomPlotWidget
 
 __all__ = ['TemplateDebugger']
 
@@ -65,6 +66,15 @@ class TemplateDebugger:
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import TemplateDebugger
 
     _out = TemplateDebugger.init_templates_debugger(track_templates) # , included_any_context_neuron_ids
+
+
+    _out_ui.root_dockAreaWindow
+    _out_ui.dock_widgets[a_decoder_name]
+
+    ## Plots:
+    _out_plots.pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(curr_curves, title=title_str, show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True) # Sort to match first decoder (long_LR)
+    # Adds aclu text labels with appropriate colors to y-axis: uses `sorted_shared_sort_neuron_IDs`:
+    curr_win, curr_img = _out_plots.pf1D_heatmaps[a_decoder_name] # win, img
 
 
     """
@@ -86,6 +96,11 @@ class TemplateDebugger:
     def track_templates(self) -> TrackTemplates:
         return self.plots_data.track_templates
 
+    @property
+    def decoders_dict(self) -> Dict:
+        return self.track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
+
+
     # @property
     # def active_epoch_tuple(self) -> tuple:
     #     """ returns a namedtuple describing the single epoch corresponding to `self.active_epoch_IDX`. """
@@ -95,10 +110,31 @@ class TemplateDebugger:
     #     return curr_epoch
 
     @property
-    def decoders_dict(self) -> Dict:
-        return self.track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
+    def root_dockAreaWindow(self) -> PhoDockAreaContainingWindow:
+        return self.ui.root_dockAreaWindow
+
+    @property
+    def dock_widgets(self) -> Dict[types.DecoderName, Tuple[pg.PlotWidget, Dock]]:
+        return self.ui.dock_widgets
+    
+    @property
+    def pf1D_heatmaps(self) -> Dict[types.DecoderName, Tuple[pg.PlotWidget, pg.ImageItem]]:
+        """ 
+        curr_win, curr_img = _out_plots.pf1D_heatmaps[a_decoder_name] # win, img
+        
+        """
+        return self.plots.pf1D_heatmaps
+
+    @property
+    def order_location_lines_dict(self) -> Dict[types.DecoderName, Dict[types.aclu_index, pg.TextItem]]:
+        """ the white vertical lines that indicate the peak location of each place cell.
+        """
+        return self.ui.order_location_lines_dict
+    
 
 
+
+    @function_attributes(short_name=None, tags=['init', 'buildUI'], input_requires=[], output_provides=[], uses=['buildUI_directional_template_debugger_data'], used_by=[], creation_date='2024-10-21 19:22', related_items=[])
     @classmethod
     def init_templates_debugger(cls, track_templates: TrackTemplates, included_any_context_neuron_ids=None, use_incremental_sorting:bool=False, enable_pf_peak_indicator_lines:bool=True, **kwargs):
         """
@@ -157,16 +193,31 @@ class TemplateDebugger:
         
         root_dockAreaWindow.resize(900, 700)
 
+        ## Initialize Class here:
         _obj = cls(plots=_out_plots, plots_data=_out_data, ui=_out_ui, params=_out_params)
 
         _obj.buildUI_directional_template_debugger_data()
         update_callback_fn = (lambda included_neuron_ids, **kwargs: _obj.update_directional_template_debugger_data(included_neuron_ids, solo_emphasized_aclus=None, **kwargs))
         _obj.ui.on_update_callback = update_callback_fn
 
-        # _out_data, _out_plots, _out_ui = TemplateDebugger._subfn_buildUI_directional_template_debugger_data(included_any_context_neuron_ids, use_incremental_sorting=use_incremental_sorting, debug_print=debug_print, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, _out_data=_out_data, _out_plots=_out_plots, _out_ui=_out_ui, decoders_dict=decoders_dict)
-        # update_callback_fn = (lambda included_neuron_ids: TemplateDebugger._subfn_update_directional_template_debugger_data(included_neuron_ids, use_incremental_sorting=use_incremental_sorting, debug_print=debug_print, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, _out_data=_out_data, _out_plots=_out_plots, _out_ui=_out_ui, decoders_dict=decoders_dict))
-        # _out_ui.on_update_callback = update_callback_fn
+        # _obj.root_dockAreaWindow.scene().sigMouseClicked.connect(_obj.on_mouse_click)
+        # for a_decoder_name, (curr_win, curr_img) in _obj.pf1D_heatmaps.items():
+        #     # print(f'a_decoder_name: {a_decoder_name}')
+        #     curr_img.scene().sigMouseClicked.connect(lambda event, name=a_decoder_name: _obj.on_mouse_click(event, name))
+            
+        ## build on-clicked callback:
+        # for a_decoder_name, (curr_win, curr_img) in _obj.pf1D_heatmaps.items():
+        #     view_box: pg.ViewBox = curr_win.getViewBox()
+        #     a_scene: pg.GraphicsScene = view_box.scene()
+        #     a_scene.setClickRadius(4.0)
+        #     # a_scene.sigMouseClicked.connect(_obj.on_mouse_click)
+        #     # a_scene.sigMouseClicked.connect(lambda event, name=a_decoder_name: _obj.on_mouse_click(event, name))
+        #     # a_scene.sigMouseMoved.connect(lambda pos: print(f'Mouse moved at: {pos}')) # GOOD
+        #     # a_scene.sigMouseHover.connect(lambda hoverred_objects_list: print(f'Mouse hoverred hoverred_objects_list: {hoverred_objects_list}'))
+        #     # a_scene.setClickRadius(4.0)
+        # _obj._build_internal_callback_functions()
         
+        print(f'done init')
         return _obj
 
 
@@ -230,11 +281,52 @@ class TemplateDebugger:
             # .scene()
 
 
-    
+    def _build_internal_callback_functions(self):
+        """ 
+        view_box.scene().sigMouseMoved.connect(_test_on_mouse_moved)
+        
+        """
+        print(f'_build_internal_callback_functions()')
+        connections = self.ui.setdefault('connections', {})
+        sigMouseClickedCallbackDict = connections.setdefault('sigMouseClicked', {})
+        sigMouseMovedCallbackDict = connections.setdefault('sigMouseMoved', {})
+        # if (sigMouseClickedCallbackDict is not None) and (sigMouseMovedCallbackDict is not None):
+        #     print(f'sigMouseMovedCallback and sigMouseMovedCallback already exist! Skipping.')
+        # else:
+        for a_decoder_name, (curr_win, curr_img) in self.pf1D_heatmaps.items():
+            print(f'a_decoder_name: {a_decoder_name}')
+            print(f'\t curr_win: {curr_win}')
+            print(f'\t curr_img: {curr_img}')
+            view_box: pg.ViewBox = curr_win.getViewBox()
+            print(f'\t view_box: {view_box}')
+            a_scene: pg.GraphicsScene = view_box.scene()
+            print(f'\t a_scene: {a_scene}')
+            a_scene.setClickRadius(4.0)
+            # mouse Clicked:
+            sigMouseClickedCallback = sigMouseClickedCallbackDict.get(a_decoder_name, None)
+            if sigMouseClickedCallback is not None:
+                print(f'\tdisconnecting sigMouseClickedCallback for {a_decoder_name}..')
+                view_box.scene().sigMouseClicked.disconnect(sigMouseClickedCallback) ## disconnect
+                    
+            self.ui.connections['sigMouseClicked'][a_decoder_name] = view_box.scene().sigMouseClicked.connect(self.on_mouse_click)
+            
+            ## mouse Moved:
+            sigMouseMovedCallback = sigMouseMovedCallbackDict.get(a_decoder_name, None)
+            if sigMouseMovedCallback is not None:
+                print(f'\tdisconnecting sigMouseMovedCallback for {a_decoder_name}..')
+                view_box.scene().sigMouseMoved.disconnect(sigMouseMovedCallback) ## disconnect
+            
+            self.ui.connections['sigMouseMoved'][a_decoder_name] = view_box.scene().sigMouseMoved.connect(self.on_mouse_moved)
+            a_scene.setClickRadius(4.0)
+            print(f'\t "{a_decoder_name}" connections done.')
+            
+        print(f'done _build_internal_callback_functions()')
+        
 
     # ==================================================================================================================== #
     # Extracted Functions:                                                                                                 #
     # ==================================================================================================================== #
+    @function_attributes(short_name=None, tags=['rebuild'], input_requires=[], output_provides=[], uses=['paired_incremental_sort_neurons'], used_by=['_subfn_buildUI_directional_template_debugger_data', '_subfn_update_directional_template_debugger_data'], creation_date='2024-10-21 19:19', related_items=[])
     @classmethod
     def _subfn_rebuild_sort_idxs(cls, decoders_dict: Dict, _out_data: RenderPlotsData, use_incremental_sorting: bool, included_any_context_neuron_ids: NDArray) -> RenderPlotsData:
         """ captures decoders_dict
@@ -276,9 +368,11 @@ class TemplateDebugger:
         return _out_data
 
     # 2023-11-28 - New Sorting using `paired_incremental_sort_neurons` via `paired_incremental_sorting`
+    @function_attributes(short_name=None, tags=['buildUI'], input_requires=[], output_provides=[], uses=['visualize_heatmap_pyqtgraph'], used_by=[], creation_date='2024-10-21 19:20', related_items=[])
     @classmethod
     def _subfn_buildUI_directional_template_debugger_data(cls, included_any_context_neuron_ids, use_incremental_sorting: bool, debug_print: bool, enable_cell_colored_heatmap_rows: bool, _out_data: RenderPlotsData, _out_plots: RenderPlots, _out_ui: PhoUIContainer, _out_params: VisualizationParameters, decoders_dict: Dict):
         """ Builds UI """
+        print(f'._subfn_buildUI_directional_template_debugger_data(...)')
         _out_data = cls._subfn_rebuild_sort_idxs(decoders_dict, _out_data, use_incremental_sorting=use_incremental_sorting, included_any_context_neuron_ids=included_any_context_neuron_ids)
         # Unpack the updated _out_data:
         sort_helper_neuron_id_to_neuron_colors_dicts = _out_data.sort_helper_neuron_id_to_neuron_colors_dicts
@@ -347,16 +441,6 @@ class TemplateDebugger:
                     _out_ui.order_location_lines_dict[a_decoder_name][aclu] = line # add to the map
 
 
-            # for x_offset, height in vertical_lines:
-            #     line = pg.InfiniteLine(pos=(x_offset, 0), angle=90, movable=False)
-            #     line.setPen(pg.mkPen('r', width=2))  # Set color and width of the line
-            #     win.addItem(line)
-
-            #     # Adjust the height of the line if needed
-            #     # Note: This is a basic implementation. Adjust according to your coordinate system and needs.
-            #     line.setPos(pg.Point(x_offset, height / 2.0)) # Adjust the height of the line if needed
-                
-
             ## Build the colored heatmap:
             out_colors_heatmap_image_matrix = np.stack(_temp_curr_out_colors_heatmap_image, axis=0)
             if debug_print:
@@ -407,7 +491,6 @@ class TemplateDebugger:
         sort_helper_neuron_id_to_neuron_colors_dicts = _out_data.sort_helper_neuron_id_to_neuron_colors_dicts
         sorted_pf_tuning_curves = _out_data.sorted_pf_tuning_curves
         sorted_pf_peak_location_list = _out_data.sorted_pf_peak_location_list
-
 
         _out_data.included_any_context_neuron_ids = deepcopy(included_neuron_ids)
 
@@ -505,11 +588,12 @@ class TemplateDebugger:
 
         return _out_data, _out_plots, _out_ui
 
-
+    @function_attributes(short_name=None, tags=['buildUI'], input_requires=[], output_provides=[], uses=['_subfn_buildUI_directional_template_debugger_data'], used_by=[], creation_date='2024-10-21 19:18', related_items=[])
     def buildUI_directional_template_debugger_data(self):
         """Calls `_subfn_buildUI_directional_template_debugger_data` to build the UI and then updates the member variables."""
         self.plots_data, self.plots, self.ui = self._subfn_buildUI_directional_template_debugger_data(self.params.included_any_context_neuron_ids, self.params.use_incremental_sorting, self.params.debug_print, self.params.enable_cell_colored_heatmap_rows, self.plots_data, self.plots, self.ui, _out_params=self.params, decoders_dict=self.decoders_dict)
 
+    @function_attributes(short_name=None, tags=['update'], input_requires=[], output_provides=[], uses=['_subfn_update_directional_template_debugger_data'], used_by=[], creation_date='2024-10-21 19:21', related_items=[])
     def update_directional_template_debugger_data(self, included_neuron_ids, solo_emphasized_aclus: Optional[List]=None):
         """Calls `_subfn_update_directional_template_debugger_data` to build the UI and then updates the member variables."""
         self.params.solo_emphasized_aclus = solo_emphasized_aclus ## reset emphasis on update
@@ -526,8 +610,8 @@ class TemplateDebugger:
         self.update_directional_template_debugger_data(included_neuron_ids=self.params.included_any_context_neuron_ids, solo_emphasized_aclus=solo_emphasized_aclus)
 
     def reset_cell_emphasis(self):
-            """ resets the emphasis to normal (no special emphasis/demphasis) """
-            self.update_cell_emphasis(solo_emphasized_aclus=None)
+        """ resets the emphasis to normal (no special emphasis/demphasis) """
+        self.update_cell_emphasis(solo_emphasized_aclus=None)
 
 
 
@@ -535,25 +619,51 @@ class TemplateDebugger:
 # 2023-12-20 Mouse Tracking Diversion/Failed                                                                           #
 # ==================================================================================================================== #
 
-    def mouseMoved(self, a_decoder_name: str, evt):
-        """ captures `label` """
-        pos = evt[0]  ## using signal proxy turns original arguments into a tuple
-        print(f'mouseMoved(a_decoder_name: {a_decoder_name}, evt: {evt})')
+    # def mouseMoved(self, a_decoder_name: str, evt):
+    #     """ captures `label` """
+    #     pos = evt[0]  ## using signal proxy turns original arguments into a tuple
+    #     print(f'mouseMoved(a_decoder_name: {a_decoder_name}, evt: {evt})')
         
-        # a_plot_widget, an_image_item = self.plots['pf1D_heatmaps'][a_decoder_name] # (pyqtgraph.widgets.PlotWidget.PlotWidget, pyqtgraph.graphicsItems.ImageItem.ImageItem)
-        # # a_view_box = an_image_item.getViewBox()
-        # vb = a_plot_widget.vb
-        # if a_plot_widget.sceneBoundingRect().contains(pos):
-        #     mousePoint = vb.mapSceneToView(pos)
-        #     index = int(mousePoint.x())
-        #     print(f'\tmousePoint.x(): {mousePoint.x()}, \tindex: {index}')
-        #     # if index > 0 and index < len(data1):
-        #     #     print(f"<span style='font-size: 12pt'>x=%0.1f,   <span style='color: red'>y1=%0.1f</span>,   <span style='color: green'>y2=%0.1f</span>" % (mousePoint.x(), data1[index], data2[index]))
-        #         # if self.label is not None:
-        #         #     self.label.setText("<span style='font-size: 12pt'>x=%0.1f,   <span style='color: red'>y1=%0.1f</span>,   <span style='color: green'>y2=%0.1f</span>" % (mousePoint.x(), data1[index], data2[index]))
-        #     # self.vLine.setPos(mousePoint.x())
-        #     # self.hLine.setPos(mousePoint.y())
+    #     # a_plot_widget, an_image_item = self.plots['pf1D_heatmaps'][a_decoder_name] # (pyqtgraph.widgets.PlotWidget.PlotWidget, pyqtgraph.graphicsItems.ImageItem.ImageItem)
+    #     # # a_view_box = an_image_item.getViewBox()
+    #     # vb = a_plot_widget.vb
+    #     # if a_plot_widget.sceneBoundingRect().contains(pos):
+    #     #     mousePoint = vb.mapSceneToView(pos)
+    #     #     index = int(mousePoint.x())
+    #     #     print(f'\tmousePoint.x(): {mousePoint.x()}, \tindex: {index}')
+    #     #     # if index > 0 and index < len(data1):
+    #     #     #     print(f"<span style='font-size: 12pt'>x=%0.1f,   <span style='color: red'>y1=%0.1f</span>,   <span style='color: green'>y2=%0.1f</span>" % (mousePoint.x(), data1[index], data2[index]))
+    #     #         # if self.label is not None:
+    #     #         #     self.label.setText("<span style='font-size: 12pt'>x=%0.1f,   <span style='color: red'>y1=%0.1f</span>,   <span style='color: green'>y2=%0.1f</span>" % (mousePoint.x(), data1[index], data2[index]))
+    #     #     # self.vLine.setPos(mousePoint.x())
+    #     #     # self.hLine.setPos(mousePoint.y())
 
+
+    # def on_mouse_click(self, event, decoder_name=None):
+    def on_mouse_click(self, event):
+        print(f'self.on_mouse_click(...)')
+        print(f'\tevent: {event}')
+        on_mouse_clicked_callback_fn_dict = self.params.get('on_mouse_clicked_callback_fn_dict', {})
+        for a_callback_name, a_callback_fn in on_mouse_clicked_callback_fn_dict.items():
+            a_callback_fn(event)
+        print('\tend.')
+        # pos = event.scenePos()
+        # print(f'self.on_mouse_click(event: {event})')
+        # print(f'on_mouse_click(event: {event}, decoder_name: {decoder_name})')
+        
+        # if plot.sceneBoundingRect().contains(pos):
+        #     mouse_point = plot.vb.mapSceneToView(pos)
+        #     print(f"Clicked at: x={mouse_point.x()}, y={mouse_point.y()}")
+            
+
+    def on_mouse_moved(self, event_pos):
+        print(f'self.on_mouse_moved(...)')
+        print(f'\tevent_pos: {event_pos}')
+        on_mouse_moved_callback_fn_dict = self.params.get('on_mouse_moved_callback_fn_dict', {})
+        for a_callback_name, a_callback_fn in on_mouse_moved_callback_fn_dict.items():
+            a_callback_fn(event_pos)            
+        print('\tend.')
+        
 
 
     # ==================================================================================================================== #
