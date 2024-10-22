@@ -478,21 +478,11 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
         """ Does not modify self! Returns a copy! Filters the included neuron_ids by their `tuning_curve_unsmoothed_peak_firing_rates` (a property of their `.pf.ratemap`)
         minimum_inclusion_fr_Hz: float = 5.0
         modified_long_LR_decoder = filtered_by_frate(track_templates.long_LR_decoder, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, debug_print=True)
-
         Usage:
             minimum_inclusion_fr_Hz: float = 5.0
             filtered_decoder_list = [filtered_by_frate(a_decoder, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, debug_print=True) for a_decoder in (track_templates.long_LR_decoder, track_templates.long_RL_decoder, track_templates.short_LR_decoder, track_templates.short_RL_decoder)]
-
         """
-        # filtered_decoder_list, filtered_direction_shared_aclus_list, is_aclu_included_list, individual_decoder_filtered_aclus_list = TrackTemplates.determine_decoder_aclus_filtered_by_frate(self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
-        filtered_decoder_list, filtered_direction_shared_aclus_list = TrackTemplates.determine_decoder_aclus_filtered_by_frate_and_qclu(decoders_dict=self.get_decoders_dict(), minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=None)        
-        long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder = filtered_decoder_list # unpack
-        _obj = TrackTemplates.init_from_paired_decoders(LR_decoder_pair=(long_LR_decoder, short_LR_decoder), RL_decoder_pair=(long_RL_decoder, short_RL_decoder), rank_method=self.rank_method)
-        assert np.all(filtered_direction_shared_aclus_list[0] == _obj.shared_LR_aclus_only_neuron_IDs)
-        assert np.all(filtered_direction_shared_aclus_list[1] == _obj.shared_RL_aclus_only_neuron_IDs)
-        assert len(filtered_direction_shared_aclus_list[0]) == len(_obj.decoder_LR_pf_peak_ranks_list[0])
-        assert len(filtered_direction_shared_aclus_list[1]) == len(_obj.decoder_RL_pf_peak_ranks_list[0])
-        return _obj
+        return self.filtered_by_frate_and_qclu(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=None)
     
 
     @function_attributes(short_name=None, tags=['main', 'filter', 'qclu', 'frate'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-22 03:50', related_items=[])
@@ -6682,17 +6672,17 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             """
 
             # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper, PhoDockAreaContainingWindow
-            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import TemplateDebugger
+            # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import TemplateDebugger
             from neuropy.plotting.ratemaps import enumTuningMap2DPlotVariables
             import matplotlib.pyplot as plt
 
             import matplotlib as mpl
             import matplotlib.pyplot as plt
             from flexitext import flexitext ## flexitext for formatted matplotlib text
+            from neuropy.utils.matplotlib_helpers import FormattedFigureText, FigureMargins ## flexitext version
 
             from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
-            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
-            from neuropy.utils.matplotlib_helpers import FormattedFigureText
+            # from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
 
             from matplotlib.gridspec import GridSpec
             from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, perform_update_title_subtitle
@@ -6700,97 +6690,149 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import build_shared_sorted_neuron_color_maps
             from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter
             
-
             active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
-
-            fignum = kwargs.pop('fignum', None)
-            if fignum is not None:
-                print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
-
-            defer_render = kwargs.pop('defer_render', False)
-            debug_print: bool = kwargs.pop('debug_print', False)
-
-            enable_cell_colored_heatmap_rows: bool = kwargs.pop('enable_cell_colored_heatmap_rows', True)
-            use_shared_aclus_only_templates: bool = kwargs.pop('use_shared_aclus_only_templates', False)
-
-            figure_name: str = kwargs.pop('figure_name', 'directional_track_template_pf1Ds')
-            # _out_data = RenderPlotsData(name=figure_name, out_colors_heatmap_image_matrix_dicts={}, sorted_neuron_IDs_lists=None, sort_helper_neuron_id_to_neuron_colors_dicts=None, sort_helper_neuron_id_to_sort_IDX_dicts=None, sorted_pf_tuning_curves=None, unsorted_included_any_context_neuron_ids=None, ref_decoder_name=None)
-            # _out_plots = RenderPlots(name=figure_name, pf1D_heatmaps=None)
-
-            # Recover from the saved global result:
-            directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
-
-            rank_order_results = global_computation_results.computed_data.get('RankOrder', None)
-            if rank_order_results is not None:
-                minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
-                included_qclu_values: List[int] = rank_order_results.included_qclu_values
-            else:        
-                ## get from parameters:
-                minimum_inclusion_fr_Hz: float = global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
-                included_qclu_values: List[int] = global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
-        
-            assert minimum_inclusion_fr_Hz is not None
-            if (use_shared_aclus_only_templates):
-                track_templates: TrackTemplates = directional_laps_results.get_shared_aclus_only_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # shared-only
-            else:
-                track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only
-
-            ## {"even": "RL", "odd": "LR"}
-            long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
-            (long_LR_context, long_RL_context, short_LR_context, short_RL_context) = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
-
-            decoders_dict = track_templates.get_decoders_dict()
-            decoders_dict_keys = list(decoders_dict.keys())
-            decoder_context_dict = dict(zip(decoders_dict_keys, (long_LR_context, long_RL_context, short_LR_context, short_RL_context)))
-
-            # print(f'decoders_dict_keys: {decoders_dict_keys}')
-            plot_kwargs = {}
-            mosaic = [
-                    ["ax_pf_tuning_curve"],
-                    ["ax_pf_occupancy"],
-                ]
-            fig = plt.figure() # layout="constrained"
-            subfigures_dict = dict(zip(list(decoders_dict.keys()), fig.subfigures(nrows=1, ncols=4)))
-            # plt.subplots_adjust(top=0.88, bottom=0.11, left=0.125, right=0.9, hspace=0.2, wspace=0.2)
-            # plt.tight_layout()
-            
-            display_outputs = {}
-            
-            for a_name, a_subfigure in subfigures_dict.items():
-                axd = a_subfigure.subplot_mosaic(mosaic, sharex=True, height_ratios=[8, 1], gridspec_kw=dict(wspace=0, hspace=0.15))
-                a_decoder = decoders_dict[a_name]
-                active_context = decoder_context_dict[a_name]
-                active_display_ctx = active_context.adding_context('display_fn', display_fn_name='plot_ratemaps_1D')
-                # active_display_fn_identifying_ctx = curr_active_pipeline.build_display_context_for_filtered_session(filtered_session_name=a_name, display_fn_name='plot_directional_pf1Ds')
-                # active_display_fn_identifying_ctx
-                ax_pf_1D = a_decoder.pf.plot_ratemaps_1D(ax=axd["ax_pf_tuning_curve"], active_context=active_display_ctx)
-                active_display_ctx = active_context.adding_context('display_fn', display_fn_name='plot_occupancy_1D')
-                # active_display_ctx_string = active_display_ctx.get_description(separator='|')
+            if active_context is not None:
+                    display_context = active_context.adding_context('display_fn', display_fn_name='bidir_track_remap')
                 
-                display_outputs[a_name] = a_decoder.pf.plot_occupancy(fig=a_subfigure, ax=axd["ax_pf_occupancy"], active_context=active_display_ctx, **({} | plot_kwargs))
+            with mpl.rc_context({'savefig.transparent': True, 'ps.fonttype': 42, }): # 'figure.dpi': '220', 'figure.figsize': (10, 4), 
+                # Create a FigureCollector instance
+                with FigureCollector(name='directional_track_template_pf1Ds', base_context=display_context) as collector:
+                    fignum = kwargs.pop('fignum', None)
+                    if fignum is not None:
+                        print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
+
+                    defer_render = kwargs.pop('defer_render', False)
+                    debug_print: bool = kwargs.pop('debug_print', False)
+
+                    enable_cell_colored_heatmap_rows: bool = kwargs.pop('enable_cell_colored_heatmap_rows', True)
+                    use_shared_aclus_only_templates: bool = kwargs.pop('use_shared_aclus_only_templates', False)
+
+                    figure_name: str = kwargs.pop('figure_name', 'directional_track_template_pf1Ds')
+                    # _out_data = RenderPlotsData(name=figure_name, out_colors_heatmap_image_matrix_dicts={}, sorted_neuron_IDs_lists=None, sort_helper_neuron_id_to_neuron_colors_dicts=None, sort_helper_neuron_id_to_sort_IDX_dicts=None, sorted_pf_tuning_curves=None, unsorted_included_any_context_neuron_ids=None, ref_decoder_name=None)
+                    # _out_plots = RenderPlots(name=figure_name, pf1D_heatmaps=None)
+
+                    # Recover from the saved global result:
+                    directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
+
+                    rank_order_results = global_computation_results.computed_data.get('RankOrder', None)
+                    if rank_order_results is not None:
+                        minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+                        included_qclu_values: List[int] = rank_order_results.included_qclu_values
+                    else:        
+                        ## get from parameters:
+                        minimum_inclusion_fr_Hz: float = global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+                        included_qclu_values: List[int] = global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
                 
-                # plot_variable_name = ({'plot_variable': None} | kwargs)
-                plot_variable_name = plot_kwargs.get('plot_variable', enumTuningMap2DPlotVariables.OCCUPANCY).name
-                active_display_ctx = active_display_ctx.adding_context(None, plot_variable=plot_variable_name)
+                    assert minimum_inclusion_fr_Hz is not None
+                    if (use_shared_aclus_only_templates):
+                        track_templates: TrackTemplates = directional_laps_results.get_shared_aclus_only_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # shared-only
+                    else:
+                        track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only
 
-            return fig, subfigures_dict, display_outputs
+                    ## {"even": "RL", "odd": "LR"}
+                    long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
+                    (long_LR_context, long_RL_context, short_LR_context, short_RL_context) = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+
+                    decoders_dict = track_templates.get_decoders_dict()
+                    decoders_dict_keys = list(decoders_dict.keys())
+                    decoder_context_dict = dict(zip(decoders_dict_keys, (long_LR_context, long_RL_context, short_LR_context, short_RL_context)))
+
+                    # print(f'decoders_dict_keys: {decoders_dict_keys}')
+                    plot_kwargs = {}
+                    mosaic = [
+                            ["ax_pf_tuning_curve"],
+                            ["ax_pf_occupancy"],
+                        ]
+                    fig = plt.figure() # layout="constrained"
+                    # fig = collector.build_or_reuse_figure(fignum=fignum)
+                    subfigures_dict = dict(zip(list(decoders_dict.keys()), fig.subfigures(nrows=1, ncols=4)))
+                    # subfigures_dict = dict(zip(list(decoders_dict.keys()), collector.create_subfigures(fig=fig, nrows=1, ncols=4))) 
+                    # plt.subplots_adjust(top=0.88, bottom=0.11, left=0.125, right=0.9, hspace=0.2, wspace=0.2)
+                    # plt.tight_layout()                    
+                    display_outputs = {}
+                    all_subfigures = []
+                    all_axes_flat_list = []
+                    # all_axes_dicts = []
+                    all_axes_dicts = {}
+                    all_display_contexts = []
+                    for a_decoder_name, a_subfigure in subfigures_dict.items():
+                        axd = a_subfigure.subplot_mosaic(mosaic, sharex=True, height_ratios=[8, 1], gridspec_kw=dict(wspace=0, hspace=0.15))
+                        # axd = collector.subplot_mosaic(mosaic, sharex=True, height_ratios=[8, 1], gridspec_kw=dict(wspace=0, hspace=0.15), extant_fig=a_subfigure)
+                        a_decoder = decoders_dict[a_decoder_name]
+                        active_context = decoder_context_dict[a_decoder_name]
+                        active_display_ctx = active_context.adding_context('display_fn', display_fn_name='plot_ratemaps_1D')
+                        # active_display_fn_identifying_ctx = curr_active_pipeline.build_display_context_for_filtered_session(filtered_session_name=a_name, display_fn_name='plot_directional_pf1Ds')
+                        # active_display_fn_identifying_ctx
+                        ax_pf_1D = a_decoder.pf.plot_ratemaps_1D(ax=axd["ax_pf_tuning_curve"], active_context=active_display_ctx)
+                        active_display_ctx = active_context.adding_context('display_fn', display_fn_name='plot_occupancy_1D')
+                        # active_display_ctx_string = active_display_ctx.get_description(separator='|')
+                        all_display_contexts.append(active_display_ctx)
+                        all_axes_flat_list.append(ax_pf_1D)
+
+                        ## Occupancy:
+                        occupancy_ax = a_decoder.pf.plot_occupancy(fig=a_subfigure, ax=axd["ax_pf_occupancy"], active_context=active_display_ctx, use_flexitext_titles=False, skip_update_titles=True, **({} | plot_kwargs))[-1]
+                        # display_outputs[a_name] =                  
+                        # plot_variable_name = ({'plot_variable': None} | kwargs)
+                        plot_variable_name = plot_kwargs.get('plot_variable', enumTuningMap2DPlotVariables.OCCUPANCY).name
+                        active_display_ctx = active_display_ctx.adding_context(None, plot_variable=plot_variable_name)
+                        all_display_contexts.append(active_display_ctx)
+                        all_axes_flat_list.append(occupancy_ax)
+                        
+
+                        ## Setup titles:
+                        axd["ax_pf_tuning_curve"].set_title(a_decoder_name)
+                        axd["ax_pf_occupancy"].set_title('')
+                        
+                        # Clear the normal text:
+                        a_subfigure.suptitle('')
+                        
+                        ## end both plots:
+                        all_subfigures.append(a_subfigure)
+                        # all_axes_dicts.append(axd)
+                        all_axes_dicts[a_decoder_name] = axd
+                        # all_display_contexts.append(active_display_ctx)
+                        
+                    # a_decoder.pf
+                    collector.post_hoc_append(figs=[fig, *all_subfigures], axes=all_axes_dicts, contexts=all_display_contexts)
+                    # collector.post_hoc_append(figs=[fig, *all_subfigures], axes=all_axes_flat_list, contexts=all_display_contexts)
+                    
+                    a_decoder_name: str = 'long_LR'
+                    a_decoder = decoders_dict[a_decoder_name]
+                    if a_decoder.pf.ndim > 1:
+                        is_2D = True
+                    else:
+                        is_2D = False
+                    active_config = deepcopy(a_decoder.pf.config)
+                    # subtitle_string = '\n'.join([f'{active_config.str_for_display(is_2D=is_2D, normal_to_extras_line_sep="\n")}'])
+                    # subtitle_string = active_config.str_for_display(is_2D=is_2D, normal_to_extras_line_sep="\n")
+                    subtitle_string = active_config.str_for_display(is_2D=is_2D) # , normal_to_extras_line_sep=","
+                    # print(f'subtitle_string: {subtitle_string}')
+
+                    ## BUild figure titles:
+                    # INPUTS: main_fig
+                    fig.suptitle('')
+                    text_formatter = FormattedFigureText() # .init_from_margins(left_margin=0.01)
+                    # text_formatter.setup_margins(fig, left_margin=0.01) # , left_margin=0.1
+                    # text_formatter = FormattedFigureText.init_from_margins(left_margin=0.01) # , top_margin=0.9
+                    # text_formatter.setup_margins(fig, left_margin=0.01, top_margin=0.9)
+                    text_formatter.setup_margins(fig)
+                    for i, a_subfigure in enumerate(all_subfigures):
+                        text_formatter.setup_margins(a_subfigure)
+                        
+                    # active_config = deepcopy(self.config)
+                    # active_config.float_precision = 1
+                    title_string: str = f"directional_track_template_pf1Ds"
+                    # subtitle_string = '\n'.join([f'{active_config.str_for_display(is_2D)}'])
+                    # header_text_obj = flexitext(text_formatter.left_margin, 0.9, f'<size:22><weight:bold>{title_string}</></>\n<size:10>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
+                    header_text_obj = flexitext(0.01, 0.85, f'<size:20><weight:bold>{title_string}</></>\n<size:9>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
+                    footer_text_obj = text_formatter.add_flexitext_context_footer(active_context=active_context) # flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
+                    fig.canvas.manager.set_window_title(title_string) # sets the window's title
 
 
-            # decoders_dict = track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
+            return collector, (header_text_obj, footer_text_obj)
 
-            # # build the window with the dock widget in it:
-            # root_dockAreaWindow, app = DockAreaWrapper.build_default_dockAreaWindow(title=f'Pho Directional Template Debugger: {figure_name}', defer_show=False)
-            # _out_ui = PhoUIContainer(name=figure_name, app=app, root_dockAreaWindow=root_dockAreaWindow, text_items_dict=None, dock_widgets=None, dock_configs=None, on_update_callback=None)
-            # root_dockAreaWindow.resize(900, 700)
+            # return fig, subfigures_dict, display_outputs
 
-            # _out_data, _out_plots, _out_ui = TemplateDebugger._subfn_buildUI_directional_template_debugger_data(included_any_context_neuron_ids, use_incremental_sorting=use_incremental_sorting, debug_print=debug_print, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, _out_data=_out_data, _out_plots=_out_plots, _out_ui=_out_ui, decoders_dict=decoders_dict)
-            # update_callback_fn = (lambda included_neuron_ids: TemplateDebugger._subfn_update_directional_template_debugger_data(included_neuron_ids, use_incremental_sorting=use_incremental_sorting, debug_print=debug_print, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, _out_data=_out_data, _out_plots=_out_plots, _out_ui=_out_ui, decoders_dict=decoders_dict))
-            # _out_ui.on_update_callback = update_callback_fn
-
-            # Outputs: root_dockAreaWindow, app, epochs_editor, _out_pf1D_heatmaps, _out_dock_widgets
-            # graphics_output_dict = {'win': root_dockAreaWindow, 'app': app,  'ui': _out_ui, 'plots': _out_plots, 'data': _out_data}
-
-            graphics_output_dict = {'win': template_debugger.ui.root_dockAreaWindow, 'app': template_debugger.ui.app,  'ui': template_debugger.ui, 'plots': template_debugger.plots, 'data': template_debugger.plots_data, 'obj': template_debugger}
 
 
     @function_attributes(short_name='track_remapping_diagram', tags=['remapping'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['plot_bidirectional_track_remapping_diagram'], used_by=[], creation_date='2024-04-29 09:24', related_items=[], is_global=True)
