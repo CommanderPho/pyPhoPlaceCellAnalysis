@@ -58,16 +58,19 @@ class ProcessingScriptPhases(Enum):
             return False
         
     def get_custom_user_completion_functions_dict(self, extra_run_functions=None) -> Dict:
-        """ 
+        """ get the extra user_completion functions
+        
         """
-        from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import export_session_h5_file_completion_function, curr_runtime_context_header_template, export_rank_order_results_completion_function, figures_rank_order_results_completion_function, compute_and_export_marginals_dfs_completion_function, determine_session_t_delta_completion_function, perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function, compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function, reload_exported_kdiba_session_position_info_mat_completion_function
+        from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import export_session_h5_file_completion_function, curr_runtime_context_header_template, export_rank_order_results_completion_function, figures_rank_order_results_completion_function, compute_and_export_marginals_dfs_completion_function, determine_session_t_delta_completion_function, perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function, compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function, reload_exported_kdiba_session_position_info_mat_completion_function, compute_and_export_session_wcorr_shuffles_completion_function, compute_and_export_session_instantaneous_spike_rates_completion_function, compute_and_export_session_extended_placefield_peak_information_completion_function, compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function, backup_previous_session_files_completion_function, compute_and_export_session_trial_by_trial_performance_completion_function
 
         if self.value == ProcessingScriptPhases.figure_run.value:
+            # figure stage:
             phase_figure_custom_user_completion_functions_dict = {
                                     # "figures_rank_order_results_completion_function": figures_rank_order_results_completion_function,
                                     }
             return phase_figure_custom_user_completion_functions_dict
         else:
+            # run stage:
             phase_any_run_custom_user_completion_functions_dict = {
                 # "export_rank_order_results_completion_function": export_rank_order_results_completion_function, # ran 2024-04-28 12:57am
                 # "figures_rank_order_results_completion_function": figures_rank_order_results_completion_function,
@@ -78,6 +81,57 @@ class ProcessingScriptPhases(Enum):
                 # 'reload_exported_kdiba_session_position_info_mat_completion_function': reload_exported_kdiba_session_position_info_mat_completion_function,
                 # 'export_session_h5_file_completion_function': export_session_h5_file_completion_function,
                 }
+            
+            phase0_any_run_custom_user_completion_functions_dict = {
+                'backup_previous_session_files_completion_function': backup_previous_session_files_completion_function,
+                # "determine_session_t_delta_completion_function": determine_session_t_delta_completion_function,  # ran 2024-05-28 6am
+                'reload_exported_kdiba_session_position_info_mat_completion_function': reload_exported_kdiba_session_position_info_mat_completion_function,
+            }
+
+            # Unused:
+            # _phase_rank_order_results_run_custom_user_completion_functions_dict = {
+            #     "export_rank_order_results_completion_function": export_rank_order_results_completion_function, # ran 2024-09-26 3pm
+            #     'compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function': compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function, # ran 2024-07-16 5am 
+            #     'compute_and_export_session_wcorr_shuffles_completion_function': compute_and_export_session_wcorr_shuffles_completion_function,
+            # }
+            
+
+            phase1_any_run_custom_user_completion_functions_dict = {
+                # "compute_and_export_marginals_dfs_completion_function": compute_and_export_marginals_dfs_completion_function, # ran 2024-07-16 5am
+                # 'perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function': perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function, # ran 2024-09-26 3pm
+                # 'compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function': compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function, # ran 2024-09-26 3pm
+                # 'compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function': compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function, # ran 2024-07-16 5am 
+                # 'compute_and_export_session_instantaneous_spike_rates_completion_function': compute_and_export_session_instantaneous_spike_rates_completion_function,
+                # 'compute_and_export_session_extended_placefield_peak_information_completion_function': compute_and_export_session_extended_placefield_peak_information_completion_function,
+                # 'compute_and_export_session_trial_by_trial_performance_completion_function': compute_and_export_session_trial_by_trial_performance_completion_function, 
+                # 'export_session_h5_file_completion_function': export_session_h5_file_completion_function, # ran 2024-09-26 3pm
+            }
+
+            phase3_any_run_custom_user_completion_functions_dict = {                
+                "compute_and_export_marginals_dfs_completion_function": compute_and_export_marginals_dfs_completion_function, # ran 2024-07-16 5am
+                'perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function': perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function, # ran 2024-09-26 3pm
+                'compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function': compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function, # ran 2024-09-26 3pm
+                # **_phase_rank_order_results_run_custom_user_completion_functions_dict,
+                'compute_and_export_session_instantaneous_spike_rates_completion_function': compute_and_export_session_instantaneous_spike_rates_completion_function,
+                'compute_and_export_session_extended_placefield_peak_information_completion_function': compute_and_export_session_extended_placefield_peak_information_completion_function,
+                'compute_and_export_session_trial_by_trial_performance_completion_function': compute_and_export_session_trial_by_trial_performance_completion_function, 
+                'export_session_h5_file_completion_function': export_session_h5_file_completion_function, # ran 2024-09-26 3pm
+            }
+
+            if self.value == ProcessingScriptPhases.clean_run.value:
+                phase_any_run_custom_user_completion_functions_dict = phase_any_run_custom_user_completion_functions_dict | phase0_any_run_custom_user_completion_functions_dict
+            elif self.value == ProcessingScriptPhases.continued_run.value:
+                phase_any_run_custom_user_completion_functions_dict = phase_any_run_custom_user_completion_functions_dict | phase1_any_run_custom_user_completion_functions_dict
+            elif self.value == ProcessingScriptPhases.final_run.value:
+                phase_any_run_custom_user_completion_functions_dict = phase_any_run_custom_user_completion_functions_dict | phase3_any_run_custom_user_completion_functions_dict
+            elif self.value == ProcessingScriptPhases.figure_run.value:
+                phase_figures_custom_user_completion_functions_dict = {
+                    "figures_rank_order_results_completion_function": figures_rank_order_results_completion_function,
+                }
+                phase_any_run_custom_user_completion_functions_dict = phase_any_run_custom_user_completion_functions_dict | phase_figures_custom_user_completion_functions_dict
+            else:
+                raise NotImplementedError
+            
             if extra_run_functions is not None:
                 phase_any_run_custom_user_completion_functions_dict = (phase_any_run_custom_user_completion_functions_dict | extra_run_functions)
 
