@@ -35,6 +35,20 @@ class BaseGlobalComputationParameters(BaseConfig):
         content = ",\n\t".join(attr_reprs)
         return f"{type(self).__name__}({content}\n)"
     
+    def values_only_repr(self, attr_separator_str: str=",\n", sub_attr_additive_seperator_str:str='\t'):
+        attr_reprs = []
+        for a in self.__attrs_attrs__:
+            attr_value = getattr(self, a.name)
+            if hasattr(attr_value, 'values_only_repr'):
+                _new_attr_sep_str: str = f"{attr_separator_str}{sub_attr_additive_seperator_str}"
+                # attr_value = attr_value.values_only_repr(attr_separator_str=attr_separator_str, sub_attr_additive_seperator_str=sub_attr_additive_seperator_str)
+                attr_value = attr_value.values_only_repr(attr_separator_str=_new_attr_sep_str, sub_attr_additive_seperator_str=sub_attr_additive_seperator_str)
+            attr_reprs.append(f"{a.name}: {attr_value}")
+            
+        content = attr_separator_str.join(attr_reprs)
+        # return f"{type(self).__name__}({content}\n)"
+        return content
+    
 
 
 @define(slots=False, eq=False, repr=False)
