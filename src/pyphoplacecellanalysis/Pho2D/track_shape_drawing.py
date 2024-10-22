@@ -1848,8 +1848,11 @@ def _plot_track_remapping_diagram(a_dir_decoder_aclu_MAX_peak_maps_df: pd.DataFr
     return fig, ax, (_output_dict, _output_by_aclu_dict)
 
 
-@function_attributes(short_name='bidir_track_remap', tags=['figure', 'remap'], input_requires=[], output_provides=[], uses=['_get_directional_pf_peaks_dfs', '_plot_track_remapping_diagram'], used_by=[], creation_date='2024-04-29 10:23', related_items=[])
-def plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds, active_context=None, perform_write_to_file_callback=None, defer_render: bool=False, enable_interactivity:bool=True, is_dark_mode:bool=True, aclus_y_offset_mode: AclusYOffsetMode = AclusYOffsetMode.RandomJitter, **kwargs):    
+@function_attributes(short_name='bidir_track_remap', tags=['figure', 'remap', 'track'], input_requires=[], output_provides=[], uses=['_get_directional_pf_peaks_dfs', '_plot_track_remapping_diagram', 'build_shared_sorted_neuron_color_maps'], used_by=[], creation_date='2024-04-29 10:23', related_items=[])
+def plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds, active_context=None, perform_write_to_file_callback=None, defer_render: bool=False,
+                                                enable_interactivity:bool=True, is_dark_mode:bool=True, aclus_y_offset_mode: AclusYOffsetMode = AclusYOffsetMode.RandomJitter,
+                                                use_separate_plot_for_each_direction:bool=True, use_unique_aclu_colors:bool=False, drop_aclu_if_missing_long_or_short:bool=False,
+                                                **kwargs):   
     """ 
     Usage:
     
@@ -1870,12 +1873,7 @@ def plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds,
     from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, perform_update_title_subtitle
     from pyphoplacecellanalysis.Pho2D.track_shape_drawing import _plot_track_remapping_diagram
     from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import build_shared_sorted_neuron_color_maps
-    from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter
-
-    use_separate_plot_for_each_direction: bool = True
-
-    use_unique_aclu_colors: bool = False
-
+    
     if active_context is not None:
             display_context = active_context.adding_context('display_fn', display_fn_name='bidir_track_remap')
         
@@ -1908,9 +1906,6 @@ def plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds,
 
 
             # BEGIN FUNCTION BODY
-            drop_aclu_if_missing_long_or_short = True
-            # LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df = _get_directional_pf_peaks_dfs(track_templates, drop_aclu_if_missing_long_or_short=drop_aclu_if_missing_long_or_short)
-            # drop_aclu_if_missing_long_or_short =False
             (LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df), AnyDir_decoder_aclu_MAX_peak_maps_df = track_templates.get_directional_pf_maximum_peaks_dfs(drop_aclu_if_missing_long_or_short=drop_aclu_if_missing_long_or_short)
 
 
@@ -1922,26 +1917,20 @@ def plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds,
             if use_unique_aclu_colors:
                 unit_colors_map, _unit_colors_ndarray_map = build_shared_sorted_neuron_color_maps(neuron_IDs_lists, return_255_array=False)
                 # _by_LR = LR_only_decoder_aclu_MAX_peak_maps_df.sort_values(by=['long_LR'], inplace=False)
-                _by_ANY: pd.DataFrame = AnyDir_decoder_aclu_MAX_peak_maps_df.sort_values(by=['long_LR', 'long_RL'], inplace=False)
+                _by_ANY: pd.DataFrame = AnyDir_decoder_aclu_MAX_peak_maps_df.sort_values(by=['long_LR', 'long_RL'], inplace=False) ## sort by peak location on Long track
                 long_peak_sorted_unit_colors_ndarray_map = dict(zip(_by_ANY.index.to_numpy(), list(_unit_colors_ndarray_map.values())))
                 unit_id_colors_map = long_peak_sorted_unit_colors_ndarray_map
 
             else:
-                # long_peak_sorted_unit_colors_ndarray_map = dict(zip(_by_ANY.index.to_numpy(), list(_unit_colors_ndarray_map.values())))
                 unit_id_colors_map = None
 
-
-            # long_peak_sorted_unit_colors_ndarray_map_LR = dict(zip(_by_LR.index.to_numpy(), list(_unit_colors_ndarray_map.values())))
-            # long_peak_sorted_unit_colors_ndarray_map_RL = dict(zip(sorted_neuron_IDs_lists[1], list(_unit_colors_ndarray_map.values())))
-            # long_peak_sorted_unit_colors_ndarray_map_LR
-            # long_peak_sorted_unit_colors_ndarray_map_RL
-
-
-            ## Make a single figure for both LR/RL remapping cells:
+            
             # kwargs = dict(draw_point_aclu_labels=True, enable_interactivity=False, enable_adjust_overlapping_text=False, unit_id_colors_map=_unit_colors_ndarray_map)
             kwargs = dict(draw_point_aclu_labels=True, enable_interactivity=enable_interactivity, enable_adjust_overlapping_text=False, unit_id_colors_map=unit_id_colors_map, is_dark_mode=is_dark_mode, aclus_y_offset_mode=aclus_y_offset_mode)
 
+            ## Either way, make a single figure for both LR/RL remapping cells:
             if use_separate_plot_for_each_direction:
+                ## Make two separate axes for LR/RL remapping cells:
                 fig, axs = collector.subplots(nrows=2, ncols=1, sharex=True, sharey=True, num='Track Remapping', figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True)
                 assert len(axs) == 2, f"{len(axs)}"
                 ax_dict = {'ax_LR': axs[0], 'ax_RL': axs[1]}
@@ -1953,6 +1942,7 @@ def plot_bidirectional_track_remapping_diagram(track_templates, grid_bin_bounds,
 
                 setup_common_after_creation(collector, fig=fig, axes=[ax_LR, ax_RL], sub_context=display_context.adding_context('subplot', subplot_name='Track Remapping'))
             else:
+                ## plot both LR/RL cells on a single combined axes:
                 fig, axs = collector.subplots(nrows=1, ncols=1, sharex=True, sharey=True, num='Track Remapping', figsize=kwargs.pop('figsize', (10, 4)), dpi=kwargs.pop('dpi', None), constrained_layout=True, clear=True)
                 # assert len(axs) == 1, f"{len(axs)}"
                 ax = axs
