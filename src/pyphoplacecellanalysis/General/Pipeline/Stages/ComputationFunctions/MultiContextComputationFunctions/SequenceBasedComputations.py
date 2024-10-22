@@ -256,10 +256,17 @@ class WCorrShuffle(ComputedResult):
             directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']
         
         if track_templates is None:
-            directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'] # used to get track_templates
-            rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder'] # only used for `rank_order_results.minimum_inclusion_fr_Hz`
-            minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
-            track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+            directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'] # used to get track_templates            
+            rank_order_results = curr_active_pipeline.global_computation_results.computed_data.get('RankOrder', None)
+            if rank_order_results is not None:
+                minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+                included_qclu_values: List[int] = rank_order_results.included_qclu_values
+            else:        
+                ## get from parameters:
+                minimum_inclusion_fr_Hz: float = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+                included_qclu_values: List[int] = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
+            
+            track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
 
         directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(curr_active_pipeline, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=False)
 
@@ -725,9 +732,16 @@ class WCorrShuffle(ComputedResult):
                 ## recover them from `curr_active_pipeline`
                 if self.curr_active_pipeline is not None:
                     directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'] # used to get track_templates
-                    rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder'] # only used for `rank_order_results.minimum_inclusion_fr_Hz`
-                    minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
-                    track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+                    rank_order_results = curr_active_pipeline.global_computation_results.computed_data.get('RankOrder', None)
+                    if rank_order_results is not None:
+                        minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+                        included_qclu_values: List[int] = rank_order_results.included_qclu_values
+                    else:        
+                        ## get from parameters:
+                        minimum_inclusion_fr_Hz: float = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+                        included_qclu_values: List[int] = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
+                    
+                    track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
                     self.track_templates = deepcopy(track_templates)
                 else:
                     raise NotImplementedError(f"cannot compute because self.track_templates is missing and no track_templates were provided as kwargs!")
@@ -783,9 +797,16 @@ class WCorrShuffle(ComputedResult):
                 ## recover them from `curr_active_pipeline`
                 if self.curr_active_pipeline is not None:
                     directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'] # used to get track_templates
-                    rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder'] # only used for `rank_order_results.minimum_inclusion_fr_Hz`
-                    minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
-                    track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+                    rank_order_results = curr_active_pipeline.global_computation_results.computed_data.get('RankOrder', None)
+                    if rank_order_results is not None:
+                        minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+                        included_qclu_values: List[int] = rank_order_results.included_qclu_values
+                    else:        
+                        ## get from parameters:
+                        minimum_inclusion_fr_Hz: float = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+                        included_qclu_values: List[int] = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
+                    
+                    track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
                     self.track_templates = deepcopy(track_templates)
                 else:
                     raise NotImplementedError(f"cannot compute because self.track_templates is missing and no track_templates were provided as kwargs!")
@@ -1218,9 +1239,16 @@ class WCorrShuffle(ComputedResult):
             ## recover them from `curr_active_pipeline`
             if self.curr_active_pipeline is not None:
                 directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'] # used to get track_templates
-                rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder'] # only used for `rank_order_results.minimum_inclusion_fr_Hz`
-                minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
-                track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
+                rank_order_results = curr_active_pipeline.global_computation_results.computed_data.get('RankOrder', None)
+                if rank_order_results is not None:
+                    minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+                    included_qclu_values: List[int] = rank_order_results.included_qclu_values
+                else:        
+                    ## get from parameters:
+                    minimum_inclusion_fr_Hz: float = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+                    included_qclu_values: List[int] = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
+                
+                track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
                 self.track_templates = deepcopy(track_templates)
             else:
                 raise NotImplementedError(f"cannot compute because self.track_templates is missing and no track_templates were provided as kwargs!")

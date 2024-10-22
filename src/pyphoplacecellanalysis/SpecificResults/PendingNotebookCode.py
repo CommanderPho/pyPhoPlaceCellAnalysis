@@ -1456,7 +1456,7 @@ def compute_diba_quiescent_style_replay_events(curr_active_pipeline, spikes_df, 
     
     directional_laps_results: DirectionalLapsResult = deepcopy(curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'])
     modified_directional_laps_results = directional_laps_results.filtered_by_included_aclus(qclu_included_aclus)
-    active_track_templates: TrackTemplates = deepcopy(modified_directional_laps_results.get_templates(minimum_inclusion_fr_Hz)) # Here is where the firing rate matters
+    active_track_templates: TrackTemplates = deepcopy(modified_directional_laps_results.get_templates(minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)) # Here is where the firing rate matters
     # active_track_templates
 
     any_decoder_neuron_IDs = deepcopy(active_track_templates.any_decoder_neuron_IDs)
