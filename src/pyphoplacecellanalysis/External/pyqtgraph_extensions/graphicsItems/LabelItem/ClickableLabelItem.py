@@ -5,11 +5,13 @@ from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import QApplication, QVBoxLayout, QWidget
 # import pyqtgraph as pg
 import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph_extensions.mixins.SelectableItemMixin import SelectableItemMixin
+
 
 __all__ = ['SelectableLabelItem']
 
 
-class SelectableLabelItem(pg.LabelItem):
+class SelectableLabelItem(SelectableItemMixin, pg.LabelItem):
     """ A PlotItem subclass that can be selected/deselected via left-click
     
     
@@ -29,32 +31,33 @@ class SelectableLabelItem(pg.LabelItem):
         self.init_UI()
 
     def init_UI(self):
-        self.setFlag(self.ItemIsSelectable, True)
-        self.setFlag(self.ItemIsFocusable, True)
-        self.perform_update_selected(new_is_selected=self.is_selected, force_update=True)
+        self.init_UI_SelectableItemMixin(is_selected=self.is_selected)
+        # self.setFlag(self.ItemIsSelectable, True)
+        # self.setFlag(self.ItemIsFocusable, True)
+        # self.perform_update_selected(new_is_selected=self.is_selected, force_update=True)
 
 
-    def mousePressEvent(self, ev):
-        """ enables togglging selection status on a mousePress event. """
-        if ev.button() == QtCore.Qt.LeftButton:
-            self.perform_update_selected(new_is_selected=(not self.is_selected))
-            ev.accept()
-        else:
-            super().mousePressEvent(ev)
+    # def mousePressEvent(self, ev):
+    #     """ enables togglging selection status on a mousePress event. """
+    #     if ev.button() == QtCore.Qt.LeftButton:
+    #         self.perform_update_selected(new_is_selected=(not self.is_selected))
+    #         ev.accept()
+    #     else:
+    #         super().mousePressEvent(ev)
             
 
-    def perform_update_selected(self, new_is_selected:bool, force_update:bool=False):
-        """ programmatically updates the internal `self.is_selected` property and calls update/signals if change occured. 
+    # def perform_update_selected(self, new_is_selected:bool, force_update:bool=False):
+    #     """ programmatically updates the internal `self.is_selected` property and calls update/signals if change occured. 
         
-        """
-        was_selected: bool = deepcopy(self.is_selected)
-        did_selected_status_change: bool = (was_selected != new_is_selected)
+    #     """
+    #     was_selected: bool = deepcopy(self.is_selected)
+    #     did_selected_status_change: bool = (was_selected != new_is_selected)
         
-        if (did_selected_status_change or force_update):
-            # emit changed signal
-            self.is_selected = new_is_selected
-            self.sigSelectedChanged.emit(self, new_is_selected)
-            self.updateSelection()
+    #     if (did_selected_status_change or force_update):
+    #         # emit changed signal
+    #         self.is_selected = new_is_selected
+    #         self.sigSelectedChanged.emit(self, new_is_selected)
+    #         self.updateSelection()
         
 
     def updateSelection(self):
