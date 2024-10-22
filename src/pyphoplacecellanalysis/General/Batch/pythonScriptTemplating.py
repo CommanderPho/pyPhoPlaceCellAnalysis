@@ -571,76 +571,7 @@ def build_vscode_workspace(script_paths, python_executable=None):
     env = Environment(loader=FileSystemLoader(template_path))
     template = env.get_template('vscode_workspace_template.code-workspace.j2')
     # Render the template with the provided variables
-    powershell_script = template.render(
-        is_platform_windows=is_platform_windows,
-        # max_concurrent_jobs=max_concurrent_jobs,
-        # activate_path=activate_path,
-        # python_executable=python_executable
-    )
     
-
-    # # Define your VSCode workspace template
-    # vscode_workspace_template = """
-    # {
-    #     "folders": [
-    #         {% for folder in folders %}
-    #         {
-    #             "path": "{{ folder.path }}",
-    #             "name": "{{ folder.name }}"
-    #         }{% if not loop.last %},{% endif %}
-    #         {% endfor %}
-    #     ],
-    #     "settings": {
-    #         "python.defaultInterpreterPath": "{{ defaultInterpreterPath }}",
-    #         "python.testing.autoTestDiscoverOnSaveEnabled": false,
-    #         "python.terminal.executeInFileDir": true,
-    #         "python.terminal.focusAfterLaunch": true,
-    #         "python.terminal.launchArgs": [
-    #         ],
-    #         "powershell.cwd": "gen_scripts",
-    #         "files.exclude": {
-    #             "**/*.sh": true,
-    #             "**/EXTERNAL/": true,
-    #             "**/OLD/": true,
-    #             "**/output/": true,
-    #             "**/*.out": true,
-    #             "**/*.err": true,
-    #             "**/*.log": true,
-    #             "**/*.ico": true,
-    #         }
-    #     },
-    #     "extensions": {
-    #         "recommendations": [
-    #             "jkearins.action-buttons-ext"
-    #         ]
-    #     },
-    # }
-    # """
-
-
-    # """
-    #             "actionButtons": {
-    #             "commands": [
-    #                 {
-    #                     "cwd": "${workspaceFolder}", /* Terminal initial folder */
-    #                     "name": "Run Powershell Batch Script",
-    #                     "color": "#33FF33",
-    #                     "singleInstance": true,
-    #                     "command": "powershell.exe -File run_scripts.ps1", /* This is executed in the terminal */
-    #                     "terminalName": "Powershell Batch Run Terminal",
-    #                     "tooltip": "Runs 'run_scripts.ps1' in powershell to batch process the sesse the eyetrackapp GUI",
-    #                 },
-    #             ],
-    #             "defaultColor": "white",
-    #             "reloadButton": "↻",
-    #             "loadNpmCommands": false
-    #         },
-
-    # """
-
-    # Create Jinja template object
-    # template = Template(vscode_workspace_template)
-
     # Define folders as a list of dictionaries
     # folders = [
     #     {'path': '/path/to/your/project1', 'name': 'Project1'},

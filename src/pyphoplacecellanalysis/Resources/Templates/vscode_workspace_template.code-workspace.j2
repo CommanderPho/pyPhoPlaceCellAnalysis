@@ -29,7 +29,27 @@
 			"**/*.ps1": true,
 			"**/*.cmd": true,
 			{% endif %}
-		}
+		},
+		{% if is_platform_windows %}
+		{% raw %}
+		"actionButtons": {
+			"commands": [
+				{
+					"cwd": "${workspaceFolder}",
+					"name": "Run Powershell Batch Script",
+					"color": "#33FF33",
+					"singleInstance": true,
+					"command": "powershell.exe -File run_scripts.ps1", 
+					"terminalName": "Powershell Batch Run Terminal",
+					"tooltip": "Runs powershell script",
+				}
+			],
+			"defaultColor": "white",
+			"reloadButton": "reload",
+			"loadNpmCommands": false
+		},
+		{% endraw %}
+		{% endif %}
 	},
 	"extensions": {
 		"recommendations": [
