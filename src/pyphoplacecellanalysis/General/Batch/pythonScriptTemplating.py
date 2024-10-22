@@ -580,6 +580,16 @@ def build_vscode_workspace(script_paths, python_executable=None):
             "python.terminal.launchArgs": [
             ],
             "powershell.cwd": "gen_scripts",
+            "files.exclude": {
+                "**/*.sh": true,
+                "**/EXTERNAL/": true,
+                "**/OLD/": true,
+                "**/output/": true,
+                "**/*.out": true,
+                "**/*.err": true,
+                "**/*.log": true,
+                "**/*.ico": true,
+            }
         },
         "extensions": {
             "recommendations": [
