@@ -1659,3 +1659,54 @@ class PipelineWithComputedPipelineStageMixin:
         return sucessfully_updated_keys, successfully_loaded_keys, failed_loaded_keys, found_split_paths
     
 
+    def get_all_parameters(self):
+        from neuropy.core.session.Formats.BaseDataSessionFormats import ParametersContainer
+        from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
+        from pyphoplacecellanalysis.General.PipelineParameterClassTemplating import GlobalComputationParametersAttrsClassTemplating
+        from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters, merged_directional_placefields_Parameters, rank_order_shuffle_analysis_Parameters, directional_decoders_decode_continuous_Parameters, directional_decoders_evaluate_epochs_Parameters, directional_train_test_split_Parameters, long_short_decoding_analyses_Parameters, long_short_rate_remapping_Parameters, long_short_inst_spike_rate_groups_Parameters, wcorr_shuffle_analysis_Parameters, perform_specific_epochs_decoding_Parameters, DEP_ratemap_peaks_Parameters, ratemap_peaks_prominence2d_Parameters
+
+        preprocessing_parameters: ParametersContainer = deepcopy(self.active_sess_config)
+        preprocessing_parameters
+
+        ## Add `curr_active_pipeline.global_computation_results.computation_config` as needed:
+        if self.global_computation_results.computation_config is None:
+            print('global_computation_results.computation_config is None! Making new one!')
+            curr_global_param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters.init_from_pipeline(curr_active_pipeline=self)
+            self.global_computation_results.computation_config = curr_global_param_typed_parameters
+            print(f'\tdone. Pipeline needs resave!')
+        else:
+            curr_global_param_typed_parameters: ComputationKWargParameters = self.global_computation_results.computation_config
+            
+
+        params_class_type_dict = deepcopy(ComputationKWargParameters.__annotations__)
+        registered_merged_computation_function_default_kwargs_dict, code_str, nested_classes_dict, (imports_dict, imports_list, imports_string) = GlobalComputationParametersAttrsClassTemplating.main_generate_params_classes(curr_active_pipeline=self)
+        code_str, nested_classes_dict, imports_dict = GlobalComputationParametersAttrsClassTemplating._subfn_build_attrs_parameters_classes(registered_merged_computation_function_default_kwargs_dict=registered_merged_computation_function_default_kwargs_dict, 
+                                                                                                                params_defn_save_path=None, should_build_hdf_class=True, print_defns=False)
+        nested_classes_dict
+
+
+        params_class_type_list = [merged_directional_placefields_Parameters, rank_order_shuffle_analysis_Parameters, directional_decoders_decode_continuous_Parameters, directional_decoders_evaluate_epochs_Parameters, directional_train_test_split_Parameters, long_short_decoding_analyses_Parameters, long_short_rate_remapping_Parameters, long_short_inst_spike_rate_groups_Parameters, wcorr_shuffle_analysis_Parameters, perform_specific_epochs_decoding_Parameters, DEP_ratemap_peaks_Parameters, ratemap_peaks_prominence2d_Parameters]
+        # params_class_type_dict = dict(zip({k.removeprefix('_') for k in imports_dict.keys()}, params_class_type_list))
+        # params_class_type_dict = dict(zip({k for k in imports_dict.keys()}, params_class_type_list))
+        params_class_type_dict = dict(zip(imports_list, params_class_type_list))
+        # params_class_type_dict
+
+        ## Convert to the new native types
+        ## INPUTS: registered_merged_computation_function_default_kwargs_dict, params_class_type_dict
+        _out_param_typed_parameters_dict = {}
+        for k, v_dict in registered_merged_computation_function_default_kwargs_dict.items():
+            a_type = params_class_type_dict[k]
+            _out_param_typed_parameters_dict[k.removeprefix('_')] = a_type(**v_dict)
+        # _out_param_typed_parameters_dict
+
+        ## OUTPUTS: _out_param_typed_parameters_dict
+        # param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters(**_out_param_typed_parameters_dict)
+        param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters(**_out_param_typed_parameters_dict)
+        param_typed_parameters
+
+        ## OUTPUTS: param_typed_parameters
+        return {
+            'preprocessing_parameters': preprocessing_parameters,
+            'curr_global_param_typed_parameters': curr_global_param_typed_parameters,
+            'param_typed_parameters': param_typed_parameters,
+        }
