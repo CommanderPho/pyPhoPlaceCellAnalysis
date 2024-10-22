@@ -62,7 +62,7 @@ class CustomPlotWidget(pg.PlotWidget):
         
     def mouse_clicked(self, mouseClickEvent):
         # mouseClickEvent is a pyqtgraph.GraphicsScene.mouseEvents.MouseClickEvent
-        print('clicked plot 0x{:x}, event: {}'.format(id(self), mouseClickEvent))
+        # print('clicked plot 0x{:x}, event: {}'.format(id(self), mouseClickEvent))
         self.sigMouseClicked.emit(self, mouseClickEvent) # pass self
         
     def mouse_moved(self, evt):

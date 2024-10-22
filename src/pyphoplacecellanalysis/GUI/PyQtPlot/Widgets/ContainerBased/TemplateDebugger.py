@@ -269,12 +269,13 @@ class TemplateDebugger:
             # .scene()
 
 
-    def _build_internal_callback_functions(self):
+    def _build_internal_callback_functions(self, debug_print: bool = False):
         """ 
         view_box.scene().sigMouseMoved.connect(_test_on_mouse_moved)
         
         """
-        print(f'_build_internal_callback_functions()')
+        if debug_print:
+            print(f'_build_internal_callback_functions()')
         connections = self.ui.setdefault('connections', {})
         sigMouseClickedCallbackDict = connections.setdefault('sigMouseClicked', {})
         sigMouseMovedCallbackDict = connections.setdefault('sigMouseMoved', {})
@@ -282,13 +283,16 @@ class TemplateDebugger:
         #     print(f'sigMouseMovedCallback and sigMouseMovedCallback already exist! Skipping.')
         # else:
         for a_decoder_name, (curr_win, curr_img) in self.pf1D_heatmaps.items():
-            print(f'a_decoder_name: {a_decoder_name}')
-            print(f'\t curr_win: {curr_win}')
-            print(f'\t curr_img: {curr_img}')
+            if debug_print:
+                print(f'a_decoder_name: {a_decoder_name}')
+                print(f'\t curr_win: {curr_win}')
+                print(f'\t curr_img: {curr_img}')
             view_box: pg.ViewBox = curr_win.getViewBox()
-            print(f'\t view_box: {view_box}')
+            if debug_print:
+                print(f'\t view_box: {view_box}')
             a_scene: pg.GraphicsScene = view_box.scene()
-            print(f'\t a_scene: {a_scene}')
+            if debug_print:
+                print(f'\t a_scene: {a_scene}')
             a_scene.setClickRadius(4.0)
             # # mouse Clicked:
             # sigMouseClickedCallback = sigMouseClickedCallbackDict.get(a_decoder_name, None)
@@ -301,7 +305,8 @@ class TemplateDebugger:
             # mouse Clicked:
             sigMouseClickedCallback = sigMouseClickedCallbackDict.get(a_decoder_name, None)
             if sigMouseClickedCallback is not None:
-                print(f'\tdisconnecting sigMouseClickedCallback for {a_decoder_name}..')
+                if debug_print:
+                    print(f'\tdisconnecting sigMouseClickedCallback for {a_decoder_name}..')
                 curr_win.sigMouseClicked.disconnect(sigMouseClickedCallback) ## disconnect
                     
             self.ui.connections['sigMouseClicked'][a_decoder_name] = curr_win.sigMouseClicked.connect(self.on_mouse_click)
@@ -316,7 +321,8 @@ class TemplateDebugger:
             
             # self.ui.connections['sigMouseMoved'][a_decoder_name] = view_box.scene().sigMouseMoved.connect(self.on_mouse_moved)
             a_scene.setClickRadius(4.0)
-            print(f'\t "{a_decoder_name}" connections done.')
+            if debug_print:
+                print(f'\t "{a_decoder_name}" connections done.')
             
         ## add selection changed callbacks
         for a_decoder_name, a_text_items_dict in self.ui.text_items_dict.items():
@@ -324,64 +330,12 @@ class TemplateDebugger:
                 a_text_item.sigSelectedChanged.connect(self.on_change_selection)
 
         # custom_on_mouse_clicked callback ___________________________________________________________________________________ #
-        def custom_on_mouse_clicked(self, custom_plot_widget, event):
-            debug_print: bool = False
-            if debug_print:
-                print(f'custom_on_mouse_clicked(event: {event})')
-            # if not isinstance(event, MouseClickEvent):
-            if not hasattr(event, 'scenePos'):
-                if debug_print:
-                    print(f'not MouseClickEvent. skipping.')
-                return
-            else:    
-                pos = event.scenePos() # 'QMouseEvent' object has no attribute 'scenePos'
-
-                if debug_print:
-                    print(f'\tscenePos: {pos}')
-                    print(f'\tscreenPos: {event.screenPos()}')
-                    print(f'\tpos: {event.pos()}')
-                    
-                item_data = custom_plot_widget.item_data
-                if debug_print:
-                    print(f'\titem_data: {item_data}')
-                found_decoder_idx = item_data.get('decoder_idx', None)
-                found_decoder_name = item_data.get('decoder_name', None)
-                
-                ## find the clicked decoder
-                # found_decoder_idx = None
-                # found_decoder_name = None
-                # for a_decoder_idx, (a_decoder_name, (a_win, an_img_item)) in enumerate(self.pf1D_heatmaps.items()):
-                #     if ((found_decoder_idx is None) and (found_decoder_name is None)):
-                #         if an_img_item.sceneBoundingRect().contains(pos):
-                #             ## found correct decoder here:
-                #             found_decoder_idx = a_decoder_idx
-                #             found_decoder_name = a_decoder_name
-                            
-                if ((found_decoder_idx is None) and (found_decoder_name is None)):
-                    print(f'WARNING: could not find correct decoder name/idx')
-                else:
-                    if debug_print:
-                        print(f'found valid decoder: found_decoder_name: "{found_decoder_name}", found_decoder_idx" {found_decoder_idx}')
-                    a_win, an_img_item = self.pf1D_heatmaps[found_decoder_name]
-                    mouse_point = a_win.getViewBox().mapSceneToView(pos)
-                    if debug_print:
-                        print(f"Clicked at: x={mouse_point.x()}, y={mouse_point.y()}")
-                    found_y_point: float = mouse_point.y()
-                    ## round down
-                    found_y_idx: int = int(found_y_point)
-                    if debug_print:
-                        print(f'found_y_idx: {found_y_idx}')
-                    found_aclu: int = self.plots_data.sorted_neuron_IDs_lists[found_decoder_idx][found_y_idx]
-                    print(f'found_aclu: {found_aclu}')
-                    prev_selected_aclus = self.get_any_decoder_selected_aclus().tolist()
-                    prev_selected_aclus.append(found_aclu)
-                    self.set_selected_aclus_for_all_decoders(any_selected_aclus=prev_selected_aclus)
 
         self.params.on_mouse_clicked_callback_fn_dict = {
-            'custom_on_mouse_clicked': custom_on_mouse_clicked,
+            'custom_on_mouse_clicked': self.custom_on_mouse_clicked,
         }
-
-        print(f'done _build_internal_callback_functions()')
+        if debug_print:
+            print(f'done _build_internal_callback_functions()')
         
 
     # ==================================================================================================================== #
@@ -736,13 +690,16 @@ class TemplateDebugger:
     # def on_mouse_click(self, event, decoder_name=None):
     # def on_mouse_click(self, event):
     def on_mouse_click(self, custom_plot_widget, event):
-        print(f'self.on_mouse_click(...)')
-        print(f'\tcustom_plot_widget: {custom_plot_widget}')
-        print(f'\tevent: {event}')
+        debug_print: bool = self.params.debug_enabled and False
+        if debug_print:
+            print(f'self.on_mouse_click(...)')
+            print(f'\tcustom_plot_widget: {custom_plot_widget}')
+            print(f'\tevent: {event}')
         on_mouse_clicked_callback_fn_dict = self.params.get('on_mouse_clicked_callback_fn_dict', {})
         for a_callback_name, a_callback_fn in on_mouse_clicked_callback_fn_dict.items():
             a_callback_fn(self, custom_plot_widget, event)
-        print('\tend.')
+        if debug_print:
+            print('\tend.')
         # pos = event.scenePos()
         # print(f'self.on_mouse_click(event: {event})')
         # print(f'on_mouse_click(event: {event}, decoder_name: {decoder_name})')
@@ -763,6 +720,49 @@ class TemplateDebugger:
         if self.params.debug_enabled:
             print('\tend.')
         
+    @classmethod
+    def custom_on_mouse_clicked(cls, self, custom_plot_widget, event):
+        """ callback on mouse clicked """
+        debug_print: bool = False
+        if debug_print:
+            print(f'custom_on_mouse_clicked(event: {event})')
+        if not hasattr(event, 'scenePos'):
+            if debug_print:
+                print(f'not MouseClickEvent. skipping.')
+            return
+        else:    
+            pos = event.scenePos() # 'QMouseEvent' object has no attribute 'scenePos'
+            if debug_print:
+                print(f'\tscenePos: {pos}')
+                print(f'\tscreenPos: {event.screenPos()}')
+                print(f'\tpos: {event.pos()}')
+                
+            item_data = custom_plot_widget.item_data
+            if debug_print:
+                print(f'\titem_data: {item_data}')
+            found_decoder_idx = item_data.get('decoder_idx', None)
+            found_decoder_name = item_data.get('decoder_name', None)
+                        
+            if ((found_decoder_idx is None) and (found_decoder_name is None)):
+                print(f'WARNING: could not find correct decoder name/idx')
+            else:
+                if debug_print:
+                    print(f'found valid decoder: found_decoder_name: "{found_decoder_name}", found_decoder_idx" {found_decoder_idx}')
+                a_win, an_img_item = self.pf1D_heatmaps[found_decoder_name]
+                mouse_point = a_win.getViewBox().mapSceneToView(pos)
+                if debug_print:
+                    print(f"Clicked at: x={mouse_point.x()}, y={mouse_point.y()}")
+                found_y_point: float = mouse_point.y()
+                ## round down
+                found_y_idx: int = int(found_y_point)
+                if debug_print:
+                    print(f'found_y_idx: {found_y_idx}')
+                found_aclu: int = self.plots_data.sorted_neuron_IDs_lists[found_decoder_idx][found_y_idx]
+                if debug_print:
+                    print(f'found_aclu: {found_aclu}')
+                prev_selected_aclus = self.get_any_decoder_selected_aclus().tolist()
+                prev_selected_aclus.append(found_aclu)
+                self.set_selected_aclus_for_all_decoders(any_selected_aclus=prev_selected_aclus)
 
 
     # ==================================================================================================================== #
@@ -772,9 +772,9 @@ class TemplateDebugger:
     def on_change_selection(self, a_text_item, new_is_selected: bool):
         """ called when one of the aclu subplots selection changes 
         """
-        print(f'on_change_selection(a_text_item: {a_text_item}, new_is_selected: {new_is_selected})')
-
-        # plot_data_array
+        if self.params.debug_enabled:
+            print(f'on_change_selection(a_text_item: {a_text_item}, new_is_selected: {new_is_selected})')
+        pass
 
     @function_attributes(short_name=None, tags=['selection', 'aclu'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-22 01:11', related_items=[])
     def get_selected_aclus(self, return_only_selected_aclus: bool=True):
@@ -810,19 +810,13 @@ class TemplateDebugger:
     
     @function_attributes(short_name=None, tags=['selection', 'aclu'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-22 08:44', related_items=[])
     def synchronize_selected_aclus_between_decoders_if_needed(self):
-        """ 
+        """ Synchronizes all common selections across each decoder
         
         """
         synchronize_selected_aclus_across_decoders: bool = self.params.setdefault('synchronize_selected_aclus_across_decoders', True)
         curr_selected_aclus_dict = self.get_selected_aclus(return_only_selected_aclus=True) # 'long_LR': [45, 24, 18, 35, 32], 'long_RL': [], 'short_LR': [], 'short_RL': []}
         if synchronize_selected_aclus_across_decoders:
             any_decoder_selectioned_aclus = union_of_arrays(*list(curr_selected_aclus_dict.values()))
-            # any_decoder_selectioned_aclus
-            # for a_decoder_name, a_decoder_selections in curr_selected_aclus_dict.items():
-            #     # select missing selections
-            #     curr_missing_selections = any_decoder_selectioned_aclus[np.isin(any_decoder_selectioned_aclus, a_decoder_selections)]
-            #     # curr_missing_selections
-
             for a_decoder_name, a_text_items_dict in self.ui.text_items_dict.items():
                 for aclu in any_decoder_selectioned_aclus:
                     a_text_item = a_text_items_dict.get(aclu, None)
@@ -838,6 +832,8 @@ class TemplateDebugger:
             _out.set_selected_aclus_for_all_decoders(any_selected_aclus=[18, 24, 31, 32, 35, 45])
         
         """
+        if any_selected_aclus is None:
+            any_selected_aclus = [] # no selections 
         if not isinstance(any_selected_aclus, NDArray):
             any_selected_aclus = np.array(any_selected_aclus)
 
@@ -847,6 +843,8 @@ class TemplateDebugger:
                 a_text_item.perform_update_selected(new_is_selected=(aclu in any_selected_aclus))
                     
 
+    def clear_selected_aclus_for_all_decoders(self):
+        self.set_selected_aclus_for_all_decoders(any_selected_aclus=None)
 
 
     # ==================================================================================================================== #
