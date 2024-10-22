@@ -51,7 +51,7 @@ def handle_link_clicked(url):
         url = QUrl(url)
     QDesktopServices.openUrl(url)
 
-    
+
 class LauncherWidget(PipelineOwningMixin, QWidget):
     """ a programmatic launcher widget that displays a tree that can be programmatically updated.
     
@@ -138,12 +138,17 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
     def initUI(self):
         # Connect the itemDoubleClicked signal to the on_tree_item_double_clicked slot
         self.treeWidget.itemDoubleClicked.connect(self.on_tree_item_double_clicked)
+        self.treeWidget.itemClicked.connect(self.on_tree_item_single_clicked)
         # Enable mouse tracking to receive itemEntered events
         self.treeWidget.setMouseTracking(True)
 
         # Signal: itemEntered - fired when mouse hovers over an item
         self.treeWidget.itemEntered.connect(self.on_tree_item_hovered)
-
+        # self.treeWidget.selectionChanged
+        # self.treeWidget.itemSelectionChanged.connect(self.on_tree_item_selection_changed) # not working
+        
+        # self.treeWidget.selectedItems
+        # self.treeWidget.selection
         self.displayContextSelectorWidget.sigContextChanged.connect(self.on_selected_context_changed)
 
         # self.displayContextSelectorWidget._owning_pipeline = self.curr_active_pipeline
@@ -270,12 +275,37 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         self._rebuild_tree()
         
         
-        
+    def update_fn_documentation_panel(self, a_fcn_name: str):
+        a_disp_fn_item = self.get_display_function_item(a_fn_name=a_fcn_name)
+        if self.debug_print:
+            print(f'\ta_disp_fn_item: {a_disp_fn_item}')
+        # tooltip_text = item.toolTip(column)
+        if a_disp_fn_item is not None:
+            # self.docPanelTextBrowser.setText(a_disp_fn_item.longform_description)
+            self.docPanelTextBrowser.setOpenExternalLinks(False)  # Disable automatic opening of external links
+            self.docPanelTextBrowser.anchorClicked.connect(handle_link_clicked)  # Connect the link click handler
+            self.docPanelTextBrowser.setHtml(a_disp_fn_item.longform_description_formatted_html)
+        else:
+            print(f'\t WARN: a_disp_fn_item is None for key: "{a_fcn_name}"')
+            
+
     # ==================================================================================================================== #
     # Events                                                                                                               #
     # ==================================================================================================================== #
+    @pyqtExceptionPrintingSlot(object)
+    def on_tree_item_single_clicked(self, item, column):
+        if self.debug_print:
+            print(f"Item single-clicked: {item}, column: {column}\n\t", item.text(column))
+        item_data = item.data(column, 0) # ItemDataRole 
+        if self.debug_print:
+            print(f'\titem_data: {item_data}')
+        assert item_data is not None, f"item_Data is None"
+        assert isinstance(item_data, str), f"item_data is not a string! type(item_data): {type(item_data)}, item_data: {item_data}"
+        a_fcn_name: str = item_data
+        self.update_fn_documentation_panel(a_fcn_name=a_fcn_name)
+
+
     # Define a function to be executed when a tree widget item is double-clicked
-    # @QtCore.Slot(object, int)
     @pyqtExceptionPrintingSlot(object)
     def on_tree_item_double_clicked(self, item, column):
         if self.debug_print:
@@ -303,19 +333,23 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         assert item_data is not None
         assert isinstance(item_data, str)
         a_fcn_name: str = item_data
-        a_disp_fn_item = self.get_display_function_item(a_fn_name=a_fcn_name)
-        if self.debug_print:
-            print(f'\ta_disp_fn_item: {a_disp_fn_item}')
-        # tooltip_text = item.toolTip(column)
-        if a_disp_fn_item is not None:
-            # self.docPanelTextBrowser.setText(a_disp_fn_item.longform_description)
-            self.docPanelTextBrowser.setOpenExternalLinks(False)  # Disable automatic opening of external links
-            self.docPanelTextBrowser.anchorClicked.connect(handle_link_clicked)  # Connect the link click handler
-            self.docPanelTextBrowser.setHtml(a_disp_fn_item.longform_description_formatted_html)
-
-        else:
-            print(f'\t WARN: a_disp_fn_item is None for key: "{a_fcn_name}"')
+        # self.update_fn_documentation_panel(a_fcn_name=a_fcn_name) ## do no do for selection mode
         
+
+    @pyqtExceptionPrintingSlot(object, int)
+    def on_tree_item_selection_changed(self, item, column):
+        """ called when selection changes for the tree """
+        if self.debug_print:
+            print(f"on_tree_item_selection_changed: {item}, column: {column}\n\t", item.text(column))
+        item_data = item.data(column, 0) # ItemDataRole 
+        if self.debug_print:
+            print(f'\titem_data: {item_data}')
+        assert item_data is not None
+        assert isinstance(item_data, str)
+        a_fcn_name: str = item_data
+        self.update_fn_documentation_panel(a_fcn_name=a_fcn_name)
+        
+
 
     @pyqtExceptionPrintingSlot(object, object)
     def on_selected_context_changed(self, new_key: str, new_context: IdentifyingContext):

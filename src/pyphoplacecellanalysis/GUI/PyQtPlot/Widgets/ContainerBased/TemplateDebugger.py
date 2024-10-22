@@ -60,7 +60,7 @@ __all__ = ['TemplateDebugger']
 # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import _debug_plot_directional_template_rasters, build_selected_spikes_df, add_selected_spikes_df_points_to_scatter_plot
 
 @metadata_attributes(short_name=None, tags=['gui', 'template'], input_requires=[], output_provides=[], uses=['visualize_heatmap_pyqtgraph'], used_by=['_display_directional_template_debugger'], creation_date='2023-12-11 10:24', related_items=[])
-@define(slots=False, repr=False)
+@define(slots=False, repr=False, eq=False)
 class TemplateDebugger:
     """ TemplateDebugger displays four 1D heatmaps colored by cell for the tuning curves of PfND. Each shows the same tuning curves but they are sorted according to four different templates (RL_odd, RL_even, LR_odd, LR_even)
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import TemplateDebugger
