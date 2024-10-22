@@ -36,6 +36,12 @@ class BaseGlobalComputationParameters(BaseConfig):
         return f"{type(self).__name__}({content}\n)"
     
     def values_only_repr(self, attr_separator_str: str=",\n", sub_attr_additive_seperator_str:str='\t'):
+        """ renders only the field names and their values
+        
+        _out_str: str = param_typed_parameters.values_only_repr(attr_separator_str=",\n", sub_attr_additive_seperator_str='\t')
+        print(_out_str)
+
+        """
         attr_reprs = []
         for a in self.__attrs_attrs__:
             attr_value = getattr(self, a.name)
