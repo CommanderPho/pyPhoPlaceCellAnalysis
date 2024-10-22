@@ -5,7 +5,7 @@ from typing import Callable, Optional, List, Dict, Union
 import numpy as np
 from attrs import define, field, Factory
 
-from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
+from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum, NeuronExtendedIdentity
 from neuropy.utils.result_context import IdentifyingContext
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters # to replace simple PlacefieldComputationParameters
@@ -191,7 +191,8 @@ def get_neuron_identities(active_placefields, debug_print=False):
     
     pf_sort_ind, pf_colors, pf_colormap, pf_listed_colormap = build_units_colormap(good_placefield_neuronIDs)
     
-    pf_neuron_identities = [NeuronIdentity.init_from_NeuronExtendedIdentityTuple(an_extended_identity, a_color=pf_colors[:, neuron_IDX]) for (neuron_IDX, an_extended_identity) in enumerate(good_placefield_tuple_neuronIDs)]
+    # pf_neuron_identities = [NeuronIdentity.init_from_NeuronExtendedIdentityTuple(an_extended_identity, a_color=pf_colors[:, neuron_IDX]) for (neuron_IDX, an_extended_identity) in enumerate(good_placefield_tuple_neuronIDs)]
+    pf_neuron_identities = [NeuronIdentity.init_from_NeuronExtendedIdentity(an_extended_identity, a_color=pf_colors[:, neuron_IDX]) for (neuron_IDX, an_extended_identity) in enumerate(good_placefield_tuple_neuronIDs)]
     return pf_neuron_identities, pf_sort_ind, pf_colors, pf_colormap, pf_listed_colormap
     
 def add_neuron_identity_info_if_needed(computation_result, active_config):
