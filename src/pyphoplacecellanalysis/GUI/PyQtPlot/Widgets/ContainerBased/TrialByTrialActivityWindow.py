@@ -35,7 +35,7 @@ from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.External.pyqtgraph_extensions.PlotItem.SelectablePlotItem import SelectablePlotItem
-
+from pyphoplacecellanalysis.External.pyqtgraph_extensions.graphicsItems.LabelItem.ClickableLabelItem import SelectableLabelItem
 
 @define(slots=False, eq=False)
 class TrialByTrialActivityWindow:
@@ -65,13 +65,34 @@ class TrialByTrialActivityWindow:
     def plot_array(self) -> List[SelectablePlotItem]:
         return self.plots.plot_array
 
-    def __attrs_post_init__(self):
-        ## add selection changed callbacks
-        for a_linear_index, a_plot_item in enumerate(self.plot_array):
-	        a_plot_item.sigSelectedChanged.connect(self.on_change_selection)
+    # def __attrs_post_init__(self):
+    #     ## add selection changed callbacks
+    #     self.build_internal_callbacks()
     
-        
 
+    # ==================================================================================================================== #
+    # Class Methods                                                                                                        #
+    # ==================================================================================================================== #
+    
+    @classmethod
+    def build_formatted_title_string(cls, title: str) -> str:
+        """ returns the title of the entire plot
+        """
+        return f"<span style = 'font-size : 12px;' >{title}</span>"
+    
+
+    @classmethod
+    def perform_build_single_cell_formatted_descriptor_string(cls, active_one_step_decoder, aclu) -> str:
+        """ Builds a formatted title for each cell, like "aclu: 19, (shank 2, cluster 22)"
+        
+        cls.perform_build_single_cell_formatted_descriptor_string(active_one_step_decoder=override_active_one_step_decoder, aclu=aclu)
+        """
+        # neuron_i: int = list(self.plots_data.active_one_step_decoder.included_neuron_IDs).index(aclu)
+        curr_extended_id_string: str = active_one_step_decoder.ratemap.get_extended_neuron_id_string(neuron_id=aclu)
+        # final_title_str: str = f"aclu: {aclu}: {curr_extended_id_string}" # _build_neuron_identity_label(neuron_extended_id=curr_extended_id_string, brev_mode=None, formatted_max_value_string=None, use_special_overlayed_title=True)
+        final_title_str: str = f"aclu: <span style = 'font-size : 14px;' >{aclu}</span>:\n<span style = 'font-size : 11px;' >{curr_extended_id_string}</span>"
+        return final_title_str
+    
 
     @function_attributes(short_name=None, tags=['matplotlib', 'trial-to-trial-variability', 'laps'], input_requires=[], output_provides=[], uses=[], used_by=['plot_trial_to_trial_reliability_all_decoders_image_stack'], creation_date='2024-08-29 03:26', related_items=[])
     @classmethod
@@ -178,17 +199,27 @@ class TrialByTrialActivityWindow:
             if debug_print:
                 print(f'a_linear_index: {a_linear_index}, curr_page_relative_linear_index: {curr_page_relative_linear_index}, curr_row: {curr_row}, curr_col: {curr_col}, curr_page_relative_row: {curr_page_relative_row}, curr_page_relative_col: {curr_page_relative_col}, curr_included_unit_index: {curr_included_unit_index}')
 
+            _curr_plot_data_dict = {'a_linear_index': a_linear_index,
+             'curr_page_relative_row': curr_page_relative_row, 'curr_page_relative_col': curr_page_relative_col,
+            #   'curr_included_unit_index': curr_included_unit_index,
+            }
+            
             if not has_active_neuron_IDs:
                 neuron_IDX = curr_included_unit_index
                 curr_cell_identifier_string = f'Cell[{neuron_IDX}]'
+                _curr_plot_data_dict['neuron_IDX'] = neuron_IDX
+                _curr_plot_data_dict['neuron_aclu'] = None
             else:
                 ## `has_active_neuron_IDs`
                 neuron_aclu = curr_included_unit_index
                 # curr_cell_identifier_string = f'Cell[{neuron_aclu}]'
                 curr_cell_identifier_string = cls.perform_build_single_cell_formatted_descriptor_string(active_one_step_decoder=active_one_step_decoder, aclu=neuron_aclu)
+                _curr_plot_data_dict['neuron_IDX'] = None
+                _curr_plot_data_dict['neuron_aclu'] = neuron_aclu
 
-
+            _curr_plot_data_dict['curr_cell_identifier_string'] = curr_cell_identifier_string
             curr_plot_identifier_string = f'pyqtplot_plot_image_array.{curr_cell_identifier_string}'
+            _curr_plot_data_dict['curr_plot_identifier_string'] = curr_plot_identifier_string
             # # Pre-filter the data:
             image = _scale_current_placefield_to_acceptable_range(np.squeeze(images[a_linear_index,:,:]), occupancy=occupancy, drop_below_threshold=drop_below_threshold)
 
@@ -196,7 +227,9 @@ class TrialByTrialActivityWindow:
             img_item = pg.ImageItem(image=image, levels=(0,1))
             
             formatted_title: str = cls.build_formatted_title_string(title=curr_cell_identifier_string)   
+            _curr_plot_data_dict['formatted_title'] = formatted_title
             
+
             # # plot mode:
             # curr_plot: pg.PlotItem = root_render_widget.addPlot(row=(curr_row + plots_start_row_idx), col=curr_col, title=formatted_title) # pg.PlotItem
             # SelectablePlotItem version:
@@ -260,7 +293,7 @@ class TrialByTrialActivityWindow:
             img_item_array.append(img_item)
             plot_array.append(curr_plot)
             other_components_array.append({'color_bar':bar}) # note this is a list of Dicts, one for every image
-            plot_data_array.append({'image_bounds_extent': image_bounds_extent, 'x_range': x_range, 'y_range': y_range}) # note this is a list of Dicts, one for every image
+            plot_data_array.append({'image_bounds_extent': deepcopy(image_bounds_extent), 'x_range': deepcopy(x_range), 'y_range': deepcopy(y_range)} | _curr_plot_data_dict) # note this is a list of Dicts, one for every image
 
 
         # Post images loop:
@@ -303,59 +336,6 @@ class TrialByTrialActivityWindow:
    
         return app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array, (lblTitle, lblFooter)
     
-    
-    @classmethod
-    def build_formatted_title_string(cls, title: str) -> str:
-        """ returns the title of the entire plot
-        """
-        return f"<span style = 'font-size : 12px;' >{title}</span>"
-    
-
-    @classmethod
-    def perform_build_single_cell_formatted_descriptor_string(cls, active_one_step_decoder, aclu) -> str:
-        """ Builds a formatted title for each cell, like "aclu: 19, (shank 2, cluster 22)"
-        
-        cls.perform_build_single_cell_formatted_descriptor_string(active_one_step_decoder=override_active_one_step_decoder, aclu=aclu)
-        """
-        # neuron_i: int = list(self.plots_data.active_one_step_decoder.included_neuron_IDs).index(aclu)
-        curr_extended_id_string: str = active_one_step_decoder.ratemap.get_extended_neuron_id_string(neuron_id=aclu)
-        # final_title_str: str = f"aclu: {aclu}: {curr_extended_id_string}" # _build_neuron_identity_label(neuron_extended_id=curr_extended_id_string, brev_mode=None, formatted_max_value_string=None, use_special_overlayed_title=True)
-        final_title_str: str = f"aclu: <span style = 'font-size : 14px;' >{aclu}</span>:\n<span style = 'font-size : 11px;' >{curr_extended_id_string}</span>"
-        return final_title_str
-    
-
-    def build_single_cell_formatted_descriptor_string(self, aclu, override_active_one_step_decoder=None) -> str:
-        """ Builds a formatted title for each cell, like "aclu: 19, (shank 2, cluster 22)"
-        
-        self.build_single_cell_formatted_descriptor_string(aclu=neuron_ID, override_active_one_step_decoder=active_one_step_decoder)
-        
-        """
-        if override_active_one_step_decoder is None:
-            override_active_one_step_decoder = self.plots_data.active_one_step_decoder
-        return self.perform_build_single_cell_formatted_descriptor_string(active_one_step_decoder=override_active_one_step_decoder, aclu=aclu)
-
-
-    def set_series_opacity(self, target_decoder_name: types.DecoderName, target_opacity: float = 0.1):
-        if 'long_LR' not in self.plots.additional_img_items_dict:
-            self.plots.additional_img_items_dict['long_LR'] = self.plots.img_item_array
-            
-        for an_img_item in self.plots.additional_img_items_dict[target_decoder_name]:
-            an_img_item.setOpacity(target_opacity)
-            
-    def restore_all_series_opacity(self, override_all_opacity: Optional[float] = None):
-        if 'long_LR' not in self.plots.additional_img_items_dict:
-            self.plots.additional_img_items_dict['long_LR'] = self.plots.img_item_array
-            
-        if override_all_opacity is None:
-            override_all_opacity = 1.0
-            
-        for a_decoder_name, an_img_item_arr in self.plots.additional_img_items_dict.items():
-            for an_img_item in an_img_item_arr:
-                an_img_item.setOpacity(override_all_opacity)
-
-    def on_change_selection(self, a_plot_item, new_is_selected: bool):
-        print(f'on_change_selection(a_plot_item: {a_plot_item}, new_is_selected: {new_is_selected})')
-
 
     @function_attributes(short_name=None, tags=['reliability', 'decoders', 'all', 'pyqtgraph', 'display', 'figure', 'main'], input_requires=[], output_provides=[], uses=['plot_trial_to_trial_reliability_image_array', 'create_transparent_colormap'], used_by=[], creation_date='2024-08-29 04:34', related_items=[])
     @classmethod
@@ -455,11 +435,11 @@ class TrialByTrialActivityWindow:
                             'short_LR': 1, 'short_RL': 1}
             
             for decoder_name, active_trial_by_trial_activity_obj in directional_active_lap_pf_results_dicts.items():  # Replace with actual decoder names
-                if decoder_name != 'long_LR':
-                    ## we already did 'long_LR', so skip that one    
-                    # additional_heatmaps.append(active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix.transpose(1, 2, 0))
-                    additional_heatmaps_data[decoder_name] = active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix.transpose(1, 2, 0)
-                    # additional_cmaps[decoder_name] = pg.colormap.get('gray','matplotlib') # prepare a linear color map
+                # if decoder_name != 'long_LR':
+                ## we already did 'long_LR', so skip that one    
+                # additional_heatmaps.append(active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix.transpose(1, 2, 0))
+                additional_heatmaps_data[decoder_name] = active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix.transpose(1, 2, 0)
+                # additional_cmaps[decoder_name] = pg.colormap.get('gray','matplotlib') # prepare a linear color map
 
 
             # Overlay additional heatmaps if provided
@@ -507,15 +487,18 @@ class TrialByTrialActivityWindow:
             root_render_widget.nextRow()
             # Create a layout for the legend at the new row
             # Add a layout for the legend at the bottom, spanning all columns
-            # legend_layout = root_render_widget.addLayout(row=root_render_widget.rowCount(), col=0, colspan=root_render_widget.columnCount())
-            legend_layout = root_render_widget.addLayout()  # Automatically places in the next available row
-
+            # legend_layout: pg.GraphicsLayout = root_render_widget.addLayout(row=root_render_widget.rowCount(), col=0, colspan=root_render_widget.columnCount())
+            legend_layout: pg.GraphicsLayout = root_render_widget.addLayout()  # Automatically places in the next available row
+            legend_entries_dict = {}
             # Add labels for each entry in the legend
             for i, (label, color) in enumerate(additional_legend_entries):
-                legend_text = pg.LabelItem(label, color=color)
+                # legend_text = pg.LabelItem(label, color=color)
+                legend_text = SelectableLabelItem(label, color=color, is_selected=True)
+                legend_entries_dict[label] = legend_text
                 # legend_layout.addItem(legend_text, row=0, col=i)  # Place all labels in a single row
                 legend_layout.addItem(legend_text, row=i, col=0)  # Place all labels in a single columns
-
+                
+            legend_layout.setMaximumWidth(100)
         else:
             legend_layout = None
             
@@ -524,16 +507,13 @@ class TrialByTrialActivityWindow:
 
         additional_img_items_dict['long_LR'] = img_item_array # set first decoder to original image items
 
-        # self.plots_data.plot_data_array
-        # self.plots_data.active_one_step_decoder
-        # self.plots_data.active_one_step_decoder.active_neuron_IDs
-        
         _obj = cls()
         ## Build final .plots and .plots_data:
         _obj.plots = RenderPlots(name=name,
                                  root_render_widget=root_render_widget,
                                  plot_array=plot_array,
                                  legend_layout=legend_layout,
+                                 legend_entries_dict=legend_entries_dict,
                                  other_components_array=other_components_array,
                                  img_item_array=img_item_array,
                                  additional_img_items_dict=additional_img_items_dict) # , ctrl_widgets={'slider': slider} # .plots.additional_img_items_dict
@@ -547,6 +527,103 @@ class TrialByTrialActivityWindow:
         _obj.ui = PhoUIContainer(name=name, app=app, root_render_widget=root_render_widget, parent_root_widget=parent_root_widget,
                                  lblTitle=lblTitle, lblFooter=lblFooter, controlled_references=None) # , **utility_controls_ui_dict, **info_labels_widgets_dict
         _obj.params = VisualizationParameters(name=name, use_plaintext_title=False, **param_kwargs)
-
-        # return app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array, additional_img_items_dict, legend_layout
+        _obj.build_internal_callbacks()
         return _obj
+
+
+    # ==================================================================================================================== #
+    # Instance Methods                                                                                                     #
+    # ==================================================================================================================== #
+    def build_single_cell_formatted_descriptor_string(self, aclu, override_active_one_step_decoder=None) -> str:
+        """ Builds a formatted title for each cell, like "aclu: 19, (shank 2, cluster 22)"
+        
+        self.build_single_cell_formatted_descriptor_string(aclu=neuron_ID, override_active_one_step_decoder=active_one_step_decoder)
+        
+        """
+        if override_active_one_step_decoder is None:
+            override_active_one_step_decoder = self.plots_data.active_one_step_decoder
+        return self.perform_build_single_cell_formatted_descriptor_string(active_one_step_decoder=override_active_one_step_decoder, aclu=aclu)
+
+    def build_internal_callbacks(self):
+        ## add selection changed callbacks
+        for a_linear_index, a_plot_item in enumerate(self.plot_array):
+            a_plot_item.sigSelectedChanged.connect(self.on_change_selection)
+
+        for a_decoder_name, a_label_item in self.plots.legend_entries_dict.items():
+            a_label_item.sigSelectedChanged.connect(self.on_change_series_legend_selection)
+
+
+    @function_attributes(short_name=None, tags=['opacity', 'series'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-12 00:00', related_items=[])
+    def set_series_opacity(self, target_decoder_name: types.DecoderName, target_opacity: float = 0.1):
+        if 'long_LR' not in self.plots.additional_img_items_dict:
+            self.plots.additional_img_items_dict['long_LR'] = self.plots.img_item_array
+            
+        for an_img_item in self.plots.additional_img_items_dict[target_decoder_name]:
+            an_img_item.setOpacity(target_opacity)
+            
+    @function_attributes(short_name=None, tags=['opacity', 'series'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-12 00:00', related_items=[])
+    def restore_all_series_opacity(self, override_all_opacity: Optional[float] = None):
+        if 'long_LR' not in self.plots.additional_img_items_dict:
+            self.plots.additional_img_items_dict['long_LR'] = self.plots.img_item_array
+            
+        if override_all_opacity is None:
+            override_all_opacity = 1.0
+            
+        for a_decoder_name, an_img_item_arr in self.plots.additional_img_items_dict.items():
+            for an_img_item in an_img_item_arr:
+                an_img_item.setOpacity(override_all_opacity)
+
+    def on_change_series_legend_selection(self, a_selectable_label, new_is_selected: bool):
+        """ called when one of the aclu subplots selection changes 
+        """
+        print(f'on_change_series_legend_selection(a_selectable_label: {a_selectable_label}, new_is_selected: {new_is_selected})')
+        self.update_all_series_opacities_from_legend()
+        # a_decoder_name: str = str(a_selectable_label.text)
+        # self.set_series_opacity(target_decoder_name=a_decoder_name, target_opacity=0.1)
+        
+    def update_all_series_opacities_from_legend(self):
+        """ uses the legend label's selected status to determine the opacity for the data series. """
+        for a_decoder_name, an_img_item_arr in self.plots.additional_img_items_dict.items():
+            a_label_item = self.plots.legend_entries_dict[a_decoder_name]
+            if a_label_item.is_selected:
+                curr_desired_opacity: float = 1.0
+            else:
+                curr_desired_opacity: float = 0.1
+            for an_img_item in an_img_item_arr:
+                an_img_item.setOpacity(curr_desired_opacity)
+                
+
+    @function_attributes(short_name=None, tags=['selection', 'aclu'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-22 01:11', related_items=[])
+    def on_change_selection(self, a_plot_item, new_is_selected: bool):
+        """ called when one of the aclu subplots selection changes 
+        """
+        print(f'on_change_selection(a_plot_item: {a_plot_item}, new_is_selected: {new_is_selected})')
+
+        # plot_data_array
+
+    @function_attributes(short_name=None, tags=['selection', 'aclu'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-22 01:11', related_items=[])
+    def get_selected_aclus(self, return_only_selected_aclus: bool=True):
+        """ gets the user-selected aclus """
+        # is_aclu_selected = []
+        selected_aclus_list = []
+        is_aclu_selected_dict = {}
+
+        for a_linear_index, a_plot_item in enumerate(self.plot_array):
+            # is_aclu_selected.append(a_plot_item.is_selected)
+            curr_plot_data_dict = self.plots_data.plot_data_array[a_linear_index]
+            neuron_aclu = curr_plot_data_dict.get('neuron_aclu', None)
+            assert neuron_aclu is not None
+            
+            if return_only_selected_aclus:
+                if a_plot_item.is_selected:
+                    selected_aclus_list.append(neuron_aclu)
+            else:
+                is_aclu_selected_dict[neuron_aclu] = a_plot_item.is_selected
+            # curr_image_bounds_extent = plot_data_array[a_linear_index]['image_bounds_extent']
+                    
+        if return_only_selected_aclus:
+            return selected_aclus_list
+        else:
+            ## return map from aclu to is_selected
+            return is_aclu_selected_dict
+        
