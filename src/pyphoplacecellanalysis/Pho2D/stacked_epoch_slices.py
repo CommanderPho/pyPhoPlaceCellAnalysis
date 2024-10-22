@@ -2929,8 +2929,13 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         ## INPUTS: all_directional_ripple_filter_epochs_decoder_result, global_session, ripple_decoding_time_bin_size
         # _main_context = {'decoded_epochs': 'Ripple', 'Marginal': 'TrackID', 't_bin': decoding_time_bin_size}
         # _main_context = IdentifyingContext(**{'decoded_epochs': 'Ripple', 'Marginal': 'TrackID', 't_bin': round(decoding_time_bin_size, ndigits=5)})
-
-
+        correct_num_filter_epochs: int = np.shape(filter_epochs)[0] ## correct
+        # np.shape(filter_epochs_decoder_result.filter_epochs) ## incorrect
+        # filter_epochs_decoder_result.filtered_by_epochs(filter_epochs)
+        filter_epochs_decoder_result = deepcopy(filter_epochs_decoder_result).filtered_by_epoch_times(included_epoch_start_times=filter_epochs['start'].to_numpy())
+        post_filter_num_filter_epochs: int = np.shape(filter_epochs_decoder_result.filter_epochs)[0]
+        assert post_filter_num_filter_epochs == correct_num_filter_epochs, f"post_filter_num_filter_epochs: {post_filter_num_filter_epochs}, correct_num_filter_epochs: {correct_num_filter_epochs}"
+        
         # ==================================================================================================================== #
         # 2024-10-09 - `DecodedEpochSlicesPaginatedFigureController`-based mode                                                #
         # ==================================================================================================================== #
@@ -3112,7 +3117,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         active_build_attached_yellow_blue_track_identity_marginal_window_kwargs = _build_attached_yellow_blue_track_identity_marginal_window_kwargs_DICT[known_epochs_type] # resolve for the specific known_epochs_type ('ripple'/'lap')
         yellow_blue_plot_context = IdentifyingContext(**{'decoded_epochs': known_epochs_type.title(), 'Marginal': 'TrackID', 't_bin': round(active_build_attached_yellow_blue_track_identity_marginal_window_kwargs['decoding_time_bin_size'], ndigits=5)})
         
-
+        # directional_merged_decoders_result.filtered_by_epoch_times()
         yellow_blue_trackID_marginals_plot_tuple = paginated_multi_decoder_decoded_epochs_window.build_attached_yellow_blue_track_identity_marginal_window(directional_merged_decoders_result, global_session=global_session, filter_epochs=deepcopy(active_filter_epochs_df), epochs_name=known_epochs_type, 
                                                                                                                                                            **active_build_attached_yellow_blue_track_identity_marginal_window_kwargs, **_shared_plotting_kwargs, active_context=yellow_blue_plot_context)
 
