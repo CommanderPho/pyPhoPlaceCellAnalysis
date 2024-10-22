@@ -11,6 +11,7 @@ from neuropy.utils.result_context import IdentifyingContext
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters # to replace simple PlacefieldComputationParameters
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.programming_helpers import SourceCodeParsing
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import ComputedPipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import PipelineStage
@@ -46,12 +47,18 @@ class DisplayFunctionItem:
     short_name: str = field()
     docs: str = field()
     icon_path: Optional[str] = field()
+    vscode_jump_link: Optional[str] = field()
 
 
     @classmethod
     def init_from_fn_object(cls, a_fn, icon_path=None):
         _obj = cls(name=a_fn.__name__, fn_callable=a_fn, is_global=getattr(a_fn,'is_global', False), short_name=(getattr(a_fn,'short_name', a_fn.__name__) or a_fn.__name__),
-            docs=a_fn.__doc__, icon_path=icon_path)
+            docs=a_fn.__doc__, icon_path=icon_path, vscode_jump_link=SourceCodeParsing.build_vscode_jump_link(a_fcn_handle=a_fn))
+        
+        ## try to get the jump link:
+        # vscode_jump_link: str = SourceCodeParsing.build_vscode_jump_link(a_fcn_handle=a_fn)
+        # _obj.vscode_jump_link = vscode_jump_link
+        
         return _obj
 
     @property
@@ -76,7 +83,10 @@ class DisplayFunctionItem:
 
         if has_good_str_value(self.docs):
             out_str_arr.append(f"docs: {self.docs}")
-
+            
+        if has_good_str_value(self.vscode_jump_link):
+            out_str_arr.append(f"link: {self.vscode_jump_link}")
+            
         out_str = '\n'.join(out_str_arr)
         return out_str
     
@@ -97,7 +107,13 @@ class DisplayFunctionItem:
 
         if has_good_str_value(self.docs):
             out_str_arr.append(f"<b style='color:white;'>docs</b>: {self.docs}")
-
+            
+        if has_good_str_value(self.vscode_jump_link):
+            # Create the HTML-formatted link
+            # html_link: str = f'<a href="{self.vscode_jump_link}">Open display fcn in VSCode</a>'
+            html_link: str = f'<a href="{self.vscode_jump_link}">{self.vscode_jump_link}</a>'
+            out_str_arr.append(f"<b style='color:white;'>link</b>: {html_link}")
+            
         out_str = '<br>'.join(out_str_arr) # linebreaks with HTML's <br>
         return out_str
     

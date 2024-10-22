@@ -67,12 +67,12 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwningMixin, PipelineOwningMi
 
     def __init__(self, parent=None): # owning_pipeline=None, enable_multi_context_select:bool=False
         super().__init__(parent=parent) # Call the inherited classes __init__ method
-        self.ui = uic.loadUi(uiFile, self) # Load the .ui file
-
         ## Set member properties:
         self._enable_multi_context_select = False
         self._owning_pipeline = None
-        
+        self._last_context_table_rows = None
+        self.ui = uic.loadUi(uiFile, self) # Load the .ui file
+
         self.initUI()
         # self.show() # Show the GUI
 
@@ -220,6 +220,9 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwningMixin, PipelineOwningMi
         """The indicies of the currently selected contexts (in the multi-context checkbox list).
             e.g. [0, 1]
         """
+        if self.check_table_ctrl is None:
+            ## pre-init, probably during the `self.ui = uic.loadUi(uiFile, self)` phase which for some reason tries to resolve all of the properties
+            return None
         return self.check_table_ctrl.getCheckedRows()
 
     @property

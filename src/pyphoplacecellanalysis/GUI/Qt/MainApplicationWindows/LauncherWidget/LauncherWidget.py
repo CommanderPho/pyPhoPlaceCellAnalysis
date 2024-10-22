@@ -9,9 +9,10 @@ from functools import wraps
 
 from PyQt5 import QtGui, QtWidgets, uic
 from PyQt5.QtWidgets import QMessageBox, QToolTip, QStackedWidget, QHBoxLayout, QVBoxLayout, QSplitter, QFormLayout, QLabel, QFrame, QPushButton, QTableWidget, QTableWidgetItem, QTextBrowser
-from PyQt5.QtWidgets import QApplication, QFileSystemModel, QTreeView, QWidget, QHeaderView
-from PyQt5.QtGui import QPainter, QBrush, QPen, QColor, QFont, QIcon
-from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlot, QSize, QDir
+from PyQt5.QtWidgets import QApplication, QFileSystemModel, QTreeView, QTreeWidget, QTreeWidgetItem, QWidget, QHeaderView, QMenu
+from PyQt5.QtGui import QPainter, QBrush, QPen, QColor, QFont, QIcon, QContextMenuEvent, QDesktopServices
+from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlot, QSize, QDir, QUrl
+
 
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore, QtGui
 from pyphoplacecellanalysis.General.Pipeline.Stages.Display import Plot, DisplayFunctionItem
@@ -19,6 +20,8 @@ from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingS
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PipelineOwningMixin import PipelineOwningMixin
 from neuropy.utils.result_context import IdentifyingContext
 from pyphoplacecellanalysis.GUI.Qt.Widgets.IdentifyingContextSelector.IdentifyingContextSelectorWidget import IdentifyingContextSelectorWidget
+from pyphocorehelpers.programming_helpers import SourceCodeParsing
+
 
 ## Define the .ui file path
 path = os.path.dirname(os.path.abspath(__file__))
@@ -42,6 +45,13 @@ icon_table = {'_display_spike_rasters_pyqtplot_2D':':/Icons/Icons/SpikeRaster2DI
 '_display_2d_placefield_result_plot_ratemaps_2D':':/Render/Icons/Icon/HeatmapUgly.png',
 }
 
+def handle_link_clicked(url):
+    # Open the URL using the default system handler
+    if not isinstance(url, QUrl):
+        url = QUrl(url)
+    QDesktopServices.openUrl(url)
+
+    
 class LauncherWidget(PipelineOwningMixin, QWidget):
     """ a programmatic launcher widget that displays a tree that can be programmatically updated.
     
@@ -124,6 +134,7 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         self.initUI()
         self.show() # Show the GUI
 
+
     def initUI(self):
         # Connect the itemDoubleClicked signal to the on_tree_item_double_clicked slot
         self.treeWidget.itemDoubleClicked.connect(self.on_tree_item_double_clicked)
@@ -140,8 +151,20 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
 
         # self.ui.displayContextSelectorWidget = None
         # self.ui.displayContextSelectorWidgetContainer.layout.add
+        
+        # ## Enable custom context menu:
+        # self.treeWidget.setContextMenuPolicy(Qt.CustomContextMenu)
+        # self.setContextMenuPolicy(Qt.CustomContextMenu)
+        # self.treeWidget.customContextMenuRequested.connect(self.contextMenuEvent)
+        # self.customContextMenuRequested.connect(self.contextMenuEvent)
+        # Set context menu policy and connect the signal
+        self.treeWidget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.treeWidget.customContextMenuRequested.connect(self.show_custom_context_menu)
+        
 
-
+    # ==================================================================================================================== #
+    # Item Access Methods                                                                                                  #
+    # ==================================================================================================================== #
     def get_display_function_items(self) -> Dict[str,DisplayFunctionItem]:
         assert self._curr_active_pipeline_ref is not None
         return {a_fn_name:DisplayFunctionItem.init_from_fn_object(a_fn, icon_path=icon_table.get(a_fn_name, None)) for a_fn_name, a_fn in self.curr_active_pipeline.registered_display_function_dict.items()}
@@ -149,96 +172,6 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
     def get_display_function_item(self, a_fn_name: str) -> Optional[DisplayFunctionItem]:
         return self.get_display_function_items().get(a_fn_name, None)
     
-
-    def _perform_get_display_function_code(self, a_fcn_name: str):
-        """ gets the actual display function to be executed"""
-        a_disp_fn_item = self.get_display_function_item(a_fn_name=a_fcn_name) #display_function_items[item_data]
-        if self.debug_print:
-            print(f'\ta_disp_fn_item: {a_disp_fn_item}')
-        assert a_disp_fn_item is not None, f'\t WARN: a_disp_fn_item is None for key: "{a_fcn_name}"'
-        # a_fn_handle = self.curr_active_pipeline.plot.__getattr__(item_data) # find matching item in the pipleine's .plot attributes
-        # a_fn_handle = self.curr_active_pipeline.plot.__getattr__(a_disp_fn_item.fn_callable)
-        a_fn_handle = self.curr_active_pipeline.plot.__getattr__(a_disp_fn_item.name)
-        return a_fn_handle
-    
-
-
-    def _perform_execute_display_function(self, a_fcn_name: str, *args, **kwargs):
-        """ gets the display function to execute and executes it """
-        a_fn_handle = self._perform_get_display_function_code(a_fcn_name=a_fcn_name)
-        assert a_fn_handle is not None
-        # args = []
-        # kwargs = {}
-        a_disp_fn_item = self.get_display_function_item(a_fn_name=a_fcn_name)
-        assert a_disp_fn_item is not None, f"a_disp_fn_item is None! for a_fn_name='{a_fcn_name}'"
-        if a_disp_fn_item.is_global:
-            return self.curr_active_pipeline.display(display_function=a_fcn_name, active_session_configuration_context=None, *args, **kwargs)
-        else:
-            # non-global, needs a context:
-            current_selected_context = self.displayContextSelectorWidget.current_selected_context
-            if current_selected_context is not None:
-                # args = list(args) ## convert to list if a tuple
-                # args.insert(0, current_selected_context)
-                return self.curr_active_pipeline.display(display_function=a_fcn_name, active_session_configuration_context=current_selected_context, *args, **kwargs)
-            else:
-                return None
-
-        # return a_fn_handle(*args, **kwargs)
-    
-
-
-
-
-    # Define a function to be executed when a tree widget item is double-clicked
-    # @QtCore.Slot(object, int)
-    @pyqtExceptionPrintingSlot(object)
-    def on_tree_item_double_clicked(self, item, column):
-        if self.debug_print:
-            print(f"Item double-clicked: {item}, column: {column}\n\t", item.text(column))
-        # print(f'\titem.data: {item.data}')
-        # raise NotImplementedError
-        # item_data = item.data(column, 0) # ItemDataRole 
-        item_data = item.data(column, 0) # ItemDataRole 
-        if self.debug_print:
-            print(f'\titem_data: {item_data}')
-        assert item_data is not None, f"item_Data is None"
-        assert isinstance(item_data, str), f"item_data is not a string! type(item_data): {type(item_data)}, item_data: {item_data}"
-        a_fcn_name: str = item_data
-        return self._perform_execute_display_function(a_fcn_name=a_fcn_name)
-
-
-    @pyqtExceptionPrintingSlot(object, int)
-    def on_tree_item_hovered(self, item, column):
-        if self.debug_print:
-            print(f"Item hovered: {item}, column: {column}\n\t", item.text(column))
-        # print(f'\titem.data: {item.data}')
-        # raise NotImplementedError
-        # item_data = item.data(column, 0) # ItemDataRole 
-        item_data = item.data(column, 0) # ItemDataRole 
-        if self.debug_print:
-            print(f'\titem_data: {item_data}')
-        assert item_data is not None
-        assert isinstance(item_data, str)
-        a_fcn_name: str = item_data
-
-        a_disp_fn_item = self.get_display_function_item(a_fn_name=a_fcn_name)
-        if self.debug_print:
-            print(f'\ta_disp_fn_item: {a_disp_fn_item}')
-        # tooltip_text = item.toolTip(column)
-        if a_disp_fn_item is not None:
-            # self.docPanelTextBrowser.setText(a_disp_fn_item.longform_description)
-            self.docPanelTextBrowser.setHtml(a_disp_fn_item.longform_description_formatted_html)
-
-        else:
-            print(f'\t WARN: a_disp_fn_item is None for key: "{a_fcn_name}"')
-        
-
-    @pyqtExceptionPrintingSlot(object, object)
-    def on_selected_context_changed(self, new_key: str, new_context: IdentifyingContext):
-        print(f'on_selected_context_changed(new_key: {new_key}, new_context: {new_context})')
-        self.update_local_display_items_are_enabled()
-        
-
     def update_local_display_items_are_enabled(self):
         """ sets the local display items as disabled if no context is selected. 
         """
@@ -251,15 +184,14 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
             it += 1  # Move to the next item in the iterator
             
 
-    def build_for_pipeline(self, curr_active_pipeline):
-        self._curr_active_pipeline_ref = curr_active_pipeline
-        curr_active_pipeline.reload_default_display_functions()
+    def _rebuild_tree(self):
+        """ rebuilds the entire tree using the items provided by `self.get_display_function_items()`
         
-        self.displayContextSelectorWidget.build_for_pipeline(curr_active_pipeline)
-
+        """
         self.ui.displayFunctionTreeItem_global_fns = None
         self.ui.displayFunctionTreeItem_non_global_fns = None
-
+        
+        should_use_nice_display_names: bool = False # currently broken
 
         # Add root item
         displayFunctionTreeItem = QtWidgets.QTreeWidgetItem(["Display Functions"])
@@ -272,6 +204,8 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         self.ui.displayFunctionTreeItem_global_fns = QtWidgets.QTreeWidgetItem(["Global Functions"])
         self.ui.displayFunctionTreeItem_non_global_fns = QtWidgets.QTreeWidgetItem(["Non-Global Functions"])
 
+        self.treeWidget.clear() ## clear all existing items
+        
         # self.treeWidget.addTopLevelItem(displayFunctionTreeItem_prefab_fns)
         self.treeWidget.addTopLevelItem(self.ui.displayFunctionTreeItem_global_fns)
         self.treeWidget.addTopLevelItem(self.ui.displayFunctionTreeItem_non_global_fns)
@@ -285,10 +219,6 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
             #     active_name = a_fcn_name
 
             # active_name: str = a_disp_fn_item.name
-
-
-            should_use_nice_display_names: bool = False # currently broken
-
             if should_use_nice_display_names:
                 active_name: str = a_disp_fn_item.best_display_name
             else:
@@ -330,6 +260,180 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         self.ui.displayFunctionTreeItem_global_fns.setExpanded(True)
         self.ui.displayFunctionTreeItem_non_global_fns.setExpanded(True)
         
+
+
+    def build_for_pipeline(self, curr_active_pipeline):
+        self._curr_active_pipeline_ref = curr_active_pipeline
+        curr_active_pipeline.reload_default_display_functions()
+        
+        self.displayContextSelectorWidget.build_for_pipeline(curr_active_pipeline)
+        self._rebuild_tree()
+        
+        
+        
+    # ==================================================================================================================== #
+    # Events                                                                                                               #
+    # ==================================================================================================================== #
+    # Define a function to be executed when a tree widget item is double-clicked
+    # @QtCore.Slot(object, int)
+    @pyqtExceptionPrintingSlot(object)
+    def on_tree_item_double_clicked(self, item, column):
+        if self.debug_print:
+            print(f"Item double-clicked: {item}, column: {column}\n\t", item.text(column))
+        # print(f'\titem.data: {item.data}')
+        # raise NotImplementedError
+        # item_data = item.data(column, 0) # ItemDataRole 
+        item_data = item.data(column, 0) # ItemDataRole 
+        if self.debug_print:
+            print(f'\titem_data: {item_data}')
+        assert item_data is not None, f"item_Data is None"
+        assert isinstance(item_data, str), f"item_data is not a string! type(item_data): {type(item_data)}, item_data: {item_data}"
+        a_fcn_name: str = item_data
+        return self._perform_execute_display_function(a_fcn_name=a_fcn_name)
+
+
+    @pyqtExceptionPrintingSlot(object, int)
+    def on_tree_item_hovered(self, item, column):
+        """ called when hovering a tree item """
+        if self.debug_print:
+            print(f"Item hovered: {item}, column: {column}\n\t", item.text(column))
+        item_data = item.data(column, 0) # ItemDataRole 
+        if self.debug_print:
+            print(f'\titem_data: {item_data}')
+        assert item_data is not None
+        assert isinstance(item_data, str)
+        a_fcn_name: str = item_data
+        a_disp_fn_item = self.get_display_function_item(a_fn_name=a_fcn_name)
+        if self.debug_print:
+            print(f'\ta_disp_fn_item: {a_disp_fn_item}')
+        # tooltip_text = item.toolTip(column)
+        if a_disp_fn_item is not None:
+            # self.docPanelTextBrowser.setText(a_disp_fn_item.longform_description)
+            self.docPanelTextBrowser.setOpenExternalLinks(False)  # Disable automatic opening of external links
+            self.docPanelTextBrowser.anchorClicked.connect(handle_link_clicked)  # Connect the link click handler
+            self.docPanelTextBrowser.setHtml(a_disp_fn_item.longform_description_formatted_html)
+
+        else:
+            print(f'\t WARN: a_disp_fn_item is None for key: "{a_fcn_name}"')
+        
+
+    @pyqtExceptionPrintingSlot(object, object)
+    def on_selected_context_changed(self, new_key: str, new_context: IdentifyingContext):
+        print(f'on_selected_context_changed(new_key: {new_key}, new_context: {new_context})')
+        self.update_local_display_items_are_enabled()
+        
+
+    ## Custom context menu:
+    def show_custom_context_menu(self, position: QPoint):
+        """ used for tree item's context menus """
+        # Get the item at the clicked position
+        print(f"show_custom_context_menu(): position: {position}")
+        # Get the item at the clicked position
+        item = self.treeWidget.itemAt(position)
+        if item is not None:
+            item_data = item.data(0, 0) # ItemDataRole 
+            assert item_data is not None
+            assert isinstance(item_data, str)
+            a_fcn_name: str = item_data
+            a_disp_fn_item = self.get_display_function_item(a_fn_name=a_fcn_name)
+            assert a_disp_fn_item is not None, f"a_disp_fn_item is None for a_fcn_name: {a_fcn_name}"
+            menu = QtWidgets.QMenu(self)
+            # action_edit = menu.addAction("Edit")
+            # action_delete = menu.addAction("Delete")
+            
+            # action_edit.triggered.connect(lambda: self.edit_item(item))
+            # action_delete.triggered.connect(lambda: self.delete_item(item))
+        
+            action_run_item = menu.addAction(f"Run {item.text(0)}")
+            action_show_code_jumplink = menu.addAction("Show Code in Editor...")
+            
+            # action1.triggered.connect(lambda: print(f"Run Action triggered for {item.text(0)}"))
+            action_run_item.triggered.connect(lambda: self._perform_execute_display_function(a_fcn_name=a_fcn_name))
+            # action_show_code_jumplink.triggered.connect(lambda: print("Show Code in Editor action triggered"))
+            action_show_code_jumplink.triggered.connect(lambda: self._perform_get_display_function_code_jumplink(a_fcn_name=a_fcn_name))
+            
+            menu.exec_(self.treeWidget.viewport().mapToGlobal(position))
+            
+
+
+
+    # @pyqtExceptionPrintingSlot(object)
+    # def contextMenuEvent(self, event: QContextMenuEvent):
+    #     print(f'contextMenuEvent(event: {event})')
+    #     # Create the context menu
+    #     menu = QMenu(self)
+    #     # Add actions
+    #     action1 = menu.addAction("Action 1")
+    #     action2 = menu.addAction("Action 2")
+    #     # Connect actions
+    #     action1.triggered.connect(self.action1_triggered)
+    #     action2.triggered.connect(self.action2_triggered)
+    #     # Show the menu at the global position
+    #     menu.exec_(event.globalPos())
+
+
+    def action1_triggered(self):
+        print("Action 1 selected")
+
+    def action2_triggered(self):
+        print("Action 2 selected")
+
+
+        
+    # ==================================================================================================================== #
+    # Display Item Actions                                                                                                 #
+    # ==================================================================================================================== #
+    
+
+
+    def _perform_get_display_function_code(self, a_fcn_name: str):
+        """ gets the actual display function to be executed"""
+        a_disp_fn_item = self.get_display_function_item(a_fn_name=a_fcn_name) #display_function_items[item_data]
+        if self.debug_print:
+            print(f'\ta_disp_fn_item: {a_disp_fn_item}')
+        assert a_disp_fn_item is not None, f'\t WARN: a_disp_fn_item is None for key: "{a_fcn_name}"'
+        # a_fn_handle = self.curr_active_pipeline.plot.__getattr__(item_data) # find matching item in the pipleine's .plot attributes
+        # a_fn_handle = self.curr_active_pipeline.plot.__getattr__(a_disp_fn_item.fn_callable)
+        a_fn_handle = self.curr_active_pipeline.plot.__getattr__(a_disp_fn_item.name)
+        return a_fn_handle
+    
+
+    def _perform_get_display_function_code_jumplink(self, a_fcn_name: str):
+        """ gets the display function vscode jumplink """
+        a_disp_fn_item = self.get_display_function_item(a_fn_name=a_fcn_name)
+        assert a_disp_fn_item is not None
+        vscode_jump_link: str = a_disp_fn_item.vscode_jump_link
+        assert vscode_jump_link is not None, f"vscode_jump_link is None for a_disp_fn_item: {a_disp_fn_item}!"
+        # a_fn_handle = self._perform_get_display_function_code(a_fcn_name=a_fcn_name)
+        # a_fn_handle = a_disp_fn_item.fn_callable
+        # assert a_fn_handle is not None
+        # vscode_jump_link: str = SourceCodeParsing.build_vscode_jump_link(a_fcn_handle=a_fn_handle) # <function Plot.__getattr__.<locals>.display_wrapper at 0x000002199E176EE0>
+        print(f'vscode_jump_link: {vscode_jump_link}')
+        return vscode_jump_link
+    
+    def _perform_execute_display_function(self, a_fcn_name: str, *args, **kwargs):
+        """ gets the display function to execute and executes it """
+        a_fn_handle = self._perform_get_display_function_code(a_fcn_name=a_fcn_name)
+        assert a_fn_handle is not None
+        # args = []
+        # kwargs = {}
+        a_disp_fn_item = self.get_display_function_item(a_fn_name=a_fcn_name)
+        assert a_disp_fn_item is not None, f"a_disp_fn_item is None! for a_fn_name='{a_fcn_name}'"
+        if a_disp_fn_item.is_global:
+            return self.curr_active_pipeline.display(display_function=a_fcn_name, active_session_configuration_context=None, *args, **kwargs)
+        else:
+            # non-global, needs a context:
+            current_selected_context = self.displayContextSelectorWidget.current_selected_context
+            if current_selected_context is not None:
+                # args = list(args) ## convert to list if a tuple
+                # args.insert(0, current_selected_context)
+                return self.curr_active_pipeline.display(display_function=a_fcn_name, active_session_configuration_context=current_selected_context, *args, **kwargs)
+            else:
+                return None
+
+        # return a_fn_handle(*args, **kwargs)
+        
+
 
 
 ## Start Qt event loop

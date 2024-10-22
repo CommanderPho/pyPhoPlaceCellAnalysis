@@ -34,6 +34,7 @@ from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
 from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+from pyphoplacecellanalysis.External.pyqtgraph_extensions.PlotItem.SelectablePlotItem import SelectablePlotItem
 
 
 @define(slots=False, eq=False)
@@ -57,8 +58,19 @@ class TrialByTrialActivityWindow:
 
     # Plot Convenience Accessors _________________________________________________________________________________________ #
     @property
-    def root_render_widget(self):
+    def root_render_widget(self) -> pg.GraphicsLayoutWidget:
         return self.ui.root_render_widget
+
+    @property
+    def plot_array(self) -> List[SelectablePlotItem]:
+        return self.plots.plot_array
+
+    def __attrs_post_init__(self):
+        ## add selection changed callbacks
+        for a_linear_index, a_plot_item in enumerate(self.plot_array):
+	        a_plot_item.sigSelectedChanged.connect(self.on_change_selection)
+    
+        
 
 
     @function_attributes(short_name=None, tags=['matplotlib', 'trial-to-trial-variability', 'laps'], input_requires=[], output_provides=[], uses=[], used_by=['plot_trial_to_trial_reliability_all_decoders_image_stack'], creation_date='2024-08-29 03:26', related_items=[])
@@ -186,7 +198,12 @@ class TrialByTrialActivityWindow:
             formatted_title: str = cls.build_formatted_title_string(title=curr_cell_identifier_string)   
             
             # # plot mode:
-            curr_plot: pg.PlotItem = root_render_widget.addPlot(row=(curr_row + plots_start_row_idx), col=curr_col, title=formatted_title) # , name=curr_plot_identifier_string 
+            # curr_plot: pg.PlotItem = root_render_widget.addPlot(row=(curr_row + plots_start_row_idx), col=curr_col, title=formatted_title) # pg.PlotItem
+            # SelectablePlotItem version:
+            curr_plot: SelectablePlotItem = SelectablePlotItem(title=formatted_title, is_selected=False)
+            root_render_widget.addItem(curr_plot, row=(curr_row + plots_start_row_idx), col=curr_col)
+            # curr_plot.sigSelectedChanged.connect(self.on_change_selection)
+            
             curr_plot.setObjectName(curr_plot_identifier_string)
             # curr_plot.showAxes(False)
             curr_plot.showAxes(True)
@@ -336,8 +353,10 @@ class TrialByTrialActivityWindow:
             for an_img_item in an_img_item_arr:
                 an_img_item.setOpacity(override_all_opacity)
 
+    def on_change_selection(self, a_plot_item, new_is_selected: bool):
+        print(f'on_change_selection(a_plot_item: {a_plot_item}, new_is_selected: {new_is_selected})')
 
-        
+
     @function_attributes(short_name=None, tags=['reliability', 'decoders', 'all', 'pyqtgraph', 'display', 'figure', 'main'], input_requires=[], output_provides=[], uses=['plot_trial_to_trial_reliability_image_array', 'create_transparent_colormap'], used_by=[], creation_date='2024-08-29 04:34', related_items=[])
     @classmethod
     def plot_trial_to_trial_reliability_all_decoders_image_stack(cls, directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity], active_one_step_decoder, drop_below_threshold=0.0000001, is_overlaid_heatmaps_mode: bool = True,
@@ -528,7 +547,6 @@ class TrialByTrialActivityWindow:
         _obj.ui = PhoUIContainer(name=name, app=app, root_render_widget=root_render_widget, parent_root_widget=parent_root_widget,
                                  lblTitle=lblTitle, lblFooter=lblFooter, controlled_references=None) # , **utility_controls_ui_dict, **info_labels_widgets_dict
         _obj.params = VisualizationParameters(name=name, use_plaintext_title=False, **param_kwargs)
-
 
         # return app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array, additional_img_items_dict, legend_layout
         return _obj

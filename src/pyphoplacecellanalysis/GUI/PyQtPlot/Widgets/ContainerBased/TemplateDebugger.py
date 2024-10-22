@@ -49,7 +49,7 @@ from pyphoplacecellanalysis.Resources.icon_helpers import try_get_icon
 
 from pyphoplacecellanalysis.External.pyqtgraph import QtGui
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import pyqtplot_build_image_bounds_extent, pyqtplot_plot_image
-from pyphoplacecellanalysis.External.pyqtgraph_extensions.CustomPlotWidget import CustomPlotWidget
+from pyphoplacecellanalysis.External.pyqtgraph_extensions.PlotWidget.CustomPlotWidget import CustomPlotWidget
 
 __all__ = ['TemplateDebugger']
 
@@ -109,6 +109,8 @@ class TemplateDebugger:
     #     curr_epoch = list(curr_epoch_df.itertuples(name='EpochTuple'))[0]
     #     return curr_epoch
 
+    # Plot Properties ____________________________________________________________________________________________________ #
+    
     @property
     def root_dockAreaWindow(self) -> PhoDockAreaContainingWindow:
         return self.ui.root_dockAreaWindow
@@ -133,7 +135,8 @@ class TemplateDebugger:
     
 
 
-
+    # Initializer ________________________________________________________________________________________________________ #
+    
     @function_attributes(short_name=None, tags=['init', 'buildUI'], input_requires=[], output_provides=[], uses=['buildUI_directional_template_debugger_data'], used_by=[], creation_date='2024-10-21 19:22', related_items=[])
     @classmethod
     def init_templates_debugger(cls, track_templates: TrackTemplates, included_any_context_neuron_ids=None, use_incremental_sorting:bool=False, enable_pf_peak_indicator_lines:bool=True, **kwargs):
@@ -199,24 +202,8 @@ class TemplateDebugger:
         _obj.buildUI_directional_template_debugger_data()
         update_callback_fn = (lambda included_neuron_ids, **kwargs: _obj.update_directional_template_debugger_data(included_neuron_ids, solo_emphasized_aclus=None, **kwargs))
         _obj.ui.on_update_callback = update_callback_fn
-
-        # _obj.root_dockAreaWindow.scene().sigMouseClicked.connect(_obj.on_mouse_click)
-        # for a_decoder_name, (curr_win, curr_img) in _obj.pf1D_heatmaps.items():
-        #     # print(f'a_decoder_name: {a_decoder_name}')
-        #     curr_img.scene().sigMouseClicked.connect(lambda event, name=a_decoder_name: _obj.on_mouse_click(event, name))
-            
         ## build on-clicked callback:
-        # for a_decoder_name, (curr_win, curr_img) in _obj.pf1D_heatmaps.items():
-        #     view_box: pg.ViewBox = curr_win.getViewBox()
-        #     a_scene: pg.GraphicsScene = view_box.scene()
-        #     a_scene.setClickRadius(4.0)
-        #     # a_scene.sigMouseClicked.connect(_obj.on_mouse_click)
-        #     # a_scene.sigMouseClicked.connect(lambda event, name=a_decoder_name: _obj.on_mouse_click(event, name))
-        #     # a_scene.sigMouseMoved.connect(lambda pos: print(f'Mouse moved at: {pos}')) # GOOD
-        #     # a_scene.sigMouseHover.connect(lambda hoverred_objects_list: print(f'Mouse hoverred hoverred_objects_list: {hoverred_objects_list}'))
-        #     # a_scene.setClickRadius(4.0)
-        # _obj._build_internal_callback_functions()
-        
+        _obj._build_internal_callback_functions()        
         print(f'done init')
         return _obj
 
@@ -475,6 +462,7 @@ class TemplateDebugger:
         # end `for i, (a_decoder_name, a_heatmap)`
 
         return _out_data, _out_plots, _out_ui
+
 
     @classmethod
     def _subfn_update_directional_template_debugger_data(cls, included_neuron_ids, use_incremental_sorting: bool, debug_print: bool, enable_cell_colored_heatmap_rows: bool, _out_data: RenderPlotsData, _out_plots: RenderPlots, _out_ui: PhoUIContainer, _out_params: VisualizationParameters, decoders_dict: Dict):
