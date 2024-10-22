@@ -50,6 +50,7 @@ from pyphoplacecellanalysis.Resources.icon_helpers import try_get_icon
 from pyphoplacecellanalysis.External.pyqtgraph import QtGui
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import pyqtplot_build_image_bounds_extent, pyqtplot_plot_image
 from pyphoplacecellanalysis.External.pyqtgraph_extensions.PlotWidget.CustomPlotWidget import CustomPlotWidget
+from pyphoplacecellanalysis.External.pyqtgraph_extensions.graphicsItems.SelectableTextItem import SelectableTextItem
 
 __all__ = ['TemplateDebugger']
 
@@ -307,6 +308,11 @@ class TemplateDebugger:
             a_scene.setClickRadius(4.0)
             print(f'\t "{a_decoder_name}" connections done.')
             
+        ## add selection changed callbacks
+        for a_decoder_name, a_text_items_dict in self.ui.text_items_dict.items():
+            for aclu, a_text_item in a_text_items_dict.items():
+                a_text_item.sigSelectedChanged.connect(self.on_change_selection)
+
         print(f'done _build_internal_callback_functions()')
         
 
@@ -403,7 +409,8 @@ class TemplateDebugger:
             
             for cell_i, (aclu, a_color_vector) in enumerate(a_decoder_color_map.items()):
                 # anchor=(1,0) specifies the item's upper-right corner is what setPos specifies. We switch to right vs. left so that they are all aligned appropriately.
-                text = pg.TextItem(f"{int(aclu)}", color=pg.mkColor(a_color_vector), anchor=(1,0)) # , angle=15
+                # text = pg.TextItem(f"{int(aclu)}", color=pg.mkColor(a_color_vector), anchor=(1,0)) # , angle=15
+                text = SelectableTextItem(f"{int(aclu)}", color=pg.mkColor(a_color_vector), anchor=(1,0))
                 text.setPos(-1.0, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
                 curr_win.addItem(text)
                 _out_ui.text_items_dict[a_decoder_name][aclu] = text # add the TextItem to the map
@@ -535,7 +542,7 @@ class TemplateDebugger:
                         value_scale_multiplier = 0.1
 
                 # Create a new text item:
-                text = pg.TextItem(f"{int(aclu)}", color=build_adjusted_color(pg.mkColor(a_color_vector), value_scale=value_scale_multiplier, saturation_scale=saturation_scale), anchor=(1,0))
+                text = SelectableTextItem(f"{int(aclu)}", color=build_adjusted_color(pg.mkColor(a_color_vector), value_scale=value_scale_multiplier, saturation_scale=saturation_scale), anchor=(1,0))
                 text.setPos(-1.0, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
                 curr_win.addItem(text)
                 _out_ui.text_items_dict[a_decoder_name][aclu] = text # add the TextItem to the map
@@ -657,6 +664,86 @@ class TemplateDebugger:
     # ==================================================================================================================== #
     # Other Functions                                                                                                      #
     # ==================================================================================================================== #
+    @function_attributes(short_name=None, tags=['selection', 'aclu'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-22 01:11', related_items=[])
+    def on_change_selection(self, a_text_item, new_is_selected: bool):
+        """ called when one of the aclu subplots selection changes 
+        """
+        print(f'on_change_selection(a_text_item: {a_text_item}, new_is_selected: {new_is_selected})')
+
+        # plot_data_array
+
+    @function_attributes(short_name=None, tags=['selection', 'aclu'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-22 01:11', related_items=[])
+    def get_selected_aclus(self, return_only_selected_aclus: bool=True):
+        """ gets the user-selected aclus """
+        # is_aclu_selected = []
+        selected_aclus_list_dict = {}
+        is_aclu_selected_decoder_dict = {}
+        for a_decoder_name, a_text_items_dict in self.ui.text_items_dict.items():
+            is_aclu_selected_decoder_dict[a_decoder_name] = {}
+            selected_aclus_list_dict[a_decoder_name] = []
+            for aclu, a_text_item in a_text_items_dict.items():
+                if return_only_selected_aclus:
+                    if a_text_item.is_selected:
+                        selected_aclus_list_dict[a_decoder_name].append(aclu)
+                else:
+                    is_aclu_selected_decoder_dict[a_decoder_name][aclu] = a_text_item.is_selected
+
+        if return_only_selected_aclus:
+            return selected_aclus_list_dict
+        else:
+            ## return map from aclu to is_selected
+            return is_aclu_selected_decoder_dict
+        
+    @function_attributes(short_name=None, tags=['selection', 'aclu'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-22 08:43', related_items=[])
+    def get_any_decoder_selected_aclus(self) -> NDArray:
+        """ gets the user-selected aclus for any decoder
+        
+        _out.get_any_decoder_selected_aclus()
+        
+        """
+        curr_selected_aclus_dict = self.get_selected_aclus(return_only_selected_aclus=True) # 'long_LR': [45, 24, 18, 35, 32], 'long_RL': [], 'short_LR': [], 'short_RL': []}
+        return union_of_arrays(*list(curr_selected_aclus_dict.values()))
+    
+    @function_attributes(short_name=None, tags=['selection', 'aclu'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-22 08:44', related_items=[])
+    def synchronize_selected_aclus_between_decoders_if_needed(self):
+        """ 
+        
+        """
+        synchronize_selected_aclus_across_decoders: bool = self.params.setdefault('synchronize_selected_aclus_across_decoders', True)
+        curr_selected_aclus_dict = self.get_selected_aclus(return_only_selected_aclus=True) # 'long_LR': [45, 24, 18, 35, 32], 'long_RL': [], 'short_LR': [], 'short_RL': []}
+        if synchronize_selected_aclus_across_decoders:
+            any_decoder_selectioned_aclus = union_of_arrays(*list(curr_selected_aclus_dict.values()))
+            # any_decoder_selectioned_aclus
+            # for a_decoder_name, a_decoder_selections in curr_selected_aclus_dict.items():
+            #     # select missing selections
+            #     curr_missing_selections = any_decoder_selectioned_aclus[np.isin(any_decoder_selectioned_aclus, a_decoder_selections)]
+            #     # curr_missing_selections
+
+            for a_decoder_name, a_text_items_dict in self.ui.text_items_dict.items():
+                for aclu in any_decoder_selectioned_aclus:
+                    a_text_item = a_text_items_dict.get(aclu, None)
+                    if a_text_item is not None:
+                        # set the selection
+                        a_text_item.perform_update_selected(new_is_selected=True)
+                        
+
+    def set_selected_aclus_for_all_decoders(self, any_selected_aclus: NDArray):
+        """ forcibly sets the selections across all decoders to only the `any_selected_aclus`
+        
+        Usage:
+            _out.set_selected_aclus_for_all_decoders(any_selected_aclus=[18, 24, 31, 32, 35, 45])
+        
+        """
+        if not isinstance(any_selected_aclus, NDArray):
+            any_selected_aclus = np.array(any_selected_aclus)
+
+        for a_decoder_name, a_text_items_dict in self.ui.text_items_dict.items():
+            for aclu, a_text_item in a_text_items_dict.items():
+                # set the selection
+                a_text_item.perform_update_selected(new_is_selected=(aclu in any_selected_aclus))
+                    
+
+
 
     # ==================================================================================================================== #
     # Core Component Building Classmethods                                                                                 #

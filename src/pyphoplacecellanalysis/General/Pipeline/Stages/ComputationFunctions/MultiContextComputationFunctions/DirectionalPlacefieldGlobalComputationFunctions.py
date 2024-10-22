@@ -6692,8 +6692,15 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             
             active_context = kwargs.pop('active_context', owning_pipeline_reference.sess.get_context())
             if active_context is not None:
-                    display_context = active_context.adding_context('display_fn', display_fn_name='bidir_track_remap')
+                    display_context = active_context.adding_context('display_fn', display_fn_name='directional_track_template_pf1Ds')
                 
+            def _perform_write_to_file_callback(final_context, fig):
+                if save_figure:
+                    return owning_pipeline_reference.output_figure(final_context, fig)
+                else:
+                    pass # do nothing, don't save
+
+
             with mpl.rc_context({'savefig.transparent': True, 'ps.fonttype': 42, }): # 'figure.dpi': '220', 'figure.figsize': (10, 4), 
                 # Create a FigureCollector instance
                 with FigureCollector(name='directional_track_template_pf1Ds', base_context=display_context) as collector:
@@ -6827,11 +6834,10 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                     header_text_obj = flexitext(0.01, 0.85, f'<size:20><weight:bold>{title_string}</></>\n<size:9>{subtitle_string}</>', va="bottom", xycoords="figure fraction") # , wrap=False
                     footer_text_obj = text_formatter.add_flexitext_context_footer(active_context=active_context) # flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
                     fig.canvas.manager.set_window_title(title_string) # sets the window's title
-
-
-            return collector, (header_text_obj, footer_text_obj)
-
-            # return fig, subfigures_dict, display_outputs
+                    if ((_perform_write_to_file_callback is not None) and (display_context is not None)):
+                        _perform_write_to_file_callback(display_context, fig)
+                        
+            return collector
 
 
 
