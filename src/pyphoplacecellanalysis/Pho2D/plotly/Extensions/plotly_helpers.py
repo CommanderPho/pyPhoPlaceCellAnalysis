@@ -200,7 +200,6 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
             # shared_color_key: 'time_bin_size'
             
 
-
     # get the pre-delta epochs
     pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
     post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
@@ -209,14 +208,14 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     # Build Figure                                                                                                         #
     # ==================================================================================================================== #
     # creating subplots
-    fig = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=[pre_delta_label, main_title, post_delta_label])
+    fig = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=[pre_delta_label, main_title, post_delta_label]) ## figure created here?
     already_added_legend_entries = set()  # Keep track of trace names that are already added
 
     # Pre-Delta Histogram ________________________________________________________________________________________________ #
     # adding first histogram
-    pre_delta_fig = px.histogram(pre_delta_df, y=histogram_variable_name, **common_plot_kwargs, **hist_kwargs, title=pre_delta_label)
-    print(f'len(pre_delta_fig.data): {len(pre_delta_fig.data)}')
-    for a_trace in pre_delta_fig.data:
+    _tmp_pre_delta_fig = px.histogram(pre_delta_df, y=histogram_variable_name, **common_plot_kwargs, **hist_kwargs, title=pre_delta_label) # create a temporary disposable figure to extract the histogram traces out of
+    print(f'len(_tmp_pre_delta_fig.data): {len(_tmp_pre_delta_fig.data)}')
+    for a_trace in _tmp_pre_delta_fig.data:
         a_trace_name = a_trace.name
         a_trace.legendgroup = a_trace_name ## set the legend group so they can all be toggled together
         if a_trace_name in already_added_legend_entries:
@@ -232,7 +231,8 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     # Scatter Plot _______________________________________________________________________________________________________ #
     # adding scatter plot
     if out_scatter_fig is not None:
-        for a_trace in out_scatter_fig.data:
+        _tmp_scatter_fig = out_scatter_fig ## set the extant subfigure
+        for a_trace in _tmp_scatter_fig.data:
             a_trace.legendgroup = a_trace_name ## set the legend group so they can all be toggled together
             # Update marker properties to remove the white border
             a_trace.marker.line.width = 0 
@@ -243,9 +243,9 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     else:
         ## Create a new scatter plot:
         assert px_scatter_kwargs is not None
-        out_scatter_fig = px.scatter(data_results_df, **common_plot_kwargs, **px_scatter_kwargs)
+        _tmp_scatter_fig = px.scatter(data_results_df, **common_plot_kwargs, **px_scatter_kwargs) # create a temporary disposable figure to extract the scatter traces out of
 
-        for i, a_trace in enumerate(out_scatter_fig.data):
+        for i, a_trace in enumerate(_tmp_scatter_fig.data):
             a_trace_name = a_trace.name
             a_trace.legendgroup = a_trace_name ## set the legend group so they can all be toggled together
             if a_trace_name in already_added_legend_entries:
@@ -276,9 +276,9 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
 
     # Post-Delta Histogram _______________________________________________________________________________________________ #
     # adding the second histogram
-    post_delta_fig = px.histogram(post_delta_df, y=histogram_variable_name, **common_plot_kwargs, **hist_kwargs, title=post_delta_label)
+    _tmp_post_delta_fig = px.histogram(post_delta_df, y=histogram_variable_name, **common_plot_kwargs, **hist_kwargs, title=post_delta_label)  # create a temporary disposable figure to extract the histogram traces out of
 
-    for a_trace in post_delta_fig.data:
+    for a_trace in _tmp_post_delta_fig.data:
         a_trace_name = a_trace.name
         a_trace.legendgroup = a_trace_name ## set the legend group so they can all be toggled together
         if a_trace_name in already_added_legend_entries:
@@ -293,13 +293,10 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
 
 
     # fig.update_layout(yaxis=dict(range=forced_range_y))
-
-
     if forced_range_y is not None:
         fig.update_layout(yaxis=dict(range=forced_range_y))
 
     fig.update_layout(yaxis=dict(range=forced_range_y), barmode='overlay')
-
 
     # Epoch Shapes
     if time_delta_tuple is not None:
@@ -313,7 +310,6 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
 
 
     # figure_context_dict['n_tbin'] = num_unique_time_bins
-
     figure_context = IdentifyingContext(**figure_context_dict)
 
     # Update layout to add a title to the legend
