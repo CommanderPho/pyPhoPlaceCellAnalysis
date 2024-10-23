@@ -4,7 +4,7 @@ from typing import Optional
 from attrs import define, field, Factory, astuple, asdict
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_attribute_field, serialized_field, non_serialized_field
 from neuropy.utils.mixins.HDF5_representable import HDF_SerializationMixin
-from pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs import BaseConfig
+from neuropy.core.parameters import BaseConfig
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.function_helpers import get_fn_kwargs_with_defaults, get_decorated_function_attributes, fn_best_name
 from pyphocorehelpers.print_helpers import strip_type_str_to_classname

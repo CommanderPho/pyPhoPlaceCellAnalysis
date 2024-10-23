@@ -10,43 +10,13 @@ from matplotlib.colors import ListedColormap # used in PlottingConfig
 from neuropy.core.session.Formats.SessionSpecifications import SessionConfig
 from neuropy.core.epoch import NamedTimerange
 from neuropy.utils.dynamic_container import DynamicContainer
+from neuropy.core.parameters import BaseConfig
 
 from pyphocorehelpers.mixins.gettable_mixin import GetAccessibleMixin
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
 # Old class Names: VideoOutputModeConfig, PlottingConfig, InteractivePlaceCellConfig
 
-@define(slots=False)
-class BaseConfig(GetAccessibleMixin):
-    """ 2023-10-24 - Base class to enable successful unpickling from old pre-attrs-based classes (based on `DynamicParameters`) to attrs-based classes.`
-
-    """
-
-    ## For serialization/pickling:
-    def __getstate__(self):
-        # Copy the object's state from self.__dict__ which contains
-        # all our instance attributes (_mapping and _keys_at_init). Always use the dict.copy()
-        # method to avoid modifying the original state.
-        state = self.__dict__.copy()
-        # Remove the unpicklable entries.
-        # del state['file']
-        return state
-
-    def __setstate__(self, state):
-        # Restore instance attributes (i.e., _mapping and _keys_at_init).
-        if ('_mapping' in state) and ('_keys_at_init' in state):
-            # unpickling from the old DynamicParameters-based ComputationResult
-            print(f'unpickling from old DynamicParameters-based computationResult')
-            self.__dict__.update(state['_mapping'])
-        else:
-             # typical update
-            self.__dict__.update(state)
-
-
-    def get(self, attribute_name, default=None):
-        """ Use the getattr built-in function to retrieve attributes """
-        # If the attribute doesn't exist, return the default value
-        return getattr(self, attribute_name, default)
     
 
 

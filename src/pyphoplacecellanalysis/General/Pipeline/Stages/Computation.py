@@ -1663,7 +1663,7 @@ class PipelineWithComputedPipelineStageMixin:
         """ gets all user-parameters from the pipeline
         
         """
-        from neuropy.core.session.Formats.BaseDataSessionFormats import ParametersContainer
+        from neuropy.core.parameters import ParametersContainer
         from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
         from pyphoplacecellanalysis.General.PipelineParameterClassTemplating import GlobalComputationParametersAttrsClassTemplating
         from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters, merged_directional_placefields_Parameters, rank_order_shuffle_analysis_Parameters, directional_decoders_decode_continuous_Parameters, directional_decoders_evaluate_epochs_Parameters, directional_train_test_split_Parameters, long_short_decoding_analyses_Parameters, long_short_rate_remapping_Parameters, long_short_inst_spike_rate_groups_Parameters, wcorr_shuffle_analysis_Parameters, perform_specific_epochs_decoding_Parameters, DEP_ratemap_peaks_Parameters, ratemap_peaks_prominence2d_Parameters
