@@ -198,8 +198,6 @@ class ratemap_peaks_prominence2d_Parameters(HDF_SerializationMixin, AttrsBasedCl
         
 
 
-
-
 @define(slots=False)
 class ComputationKWargParameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ the base class
@@ -269,3 +267,25 @@ class ComputationKWargParameters(HDF_SerializationMixin, AttrsBasedClassHelperMi
         return param_typed_parameters
 
         ## OUTPUTS: param_typed_parameters
+
+
+    # HDFMixin Conformances ______________________________________________________________________________________________ #
+    def to_hdf(self, file_path, key: str, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path"""
+        # get_serialized_dataset_fields = self.get_serialized_dataset_fields(serialization_format='hdf')
+        # self.merged_directional_placefields.to_hdf(file_path=file_path, key=f"{key}/merged_directional_placefields")
+        # self.rank_order_shuffle_analysis.to_hdf(file_path=file_path, key=f"{key}/rank_order_shuffle_analysis")
+        self.merged_directional_placefields.to_hdf(file_path, key=f'{key}/merged_directional_placefields')
+        self.rank_order_shuffle_analysis.to_hdf(file_path, key=f'{key}/rank_order_shuffle_analysis')
+        self.directional_decoders_decode_continuous.to_hdf(file_path=file_path, key=f"{key}/directional_decoders_decode_continuous")
+        self.directional_decoders_evaluate_epochs.to_hdf(file_path=file_path, key=f"{key}/directional_decoders_evaluate_epochs")
+        self.directional_train_test_split.to_hdf(file_path, key=f'{key}/directional_train_test_split')
+        self.long_short_decoding_analyses.to_hdf(file_path, key=f'{key}/long_short_decoding_analyses')
+        self.long_short_rate_remapping.to_hdf(file_path, key=f'{key}/long_short_rate_remapping')
+        self.long_short_inst_spike_rate_groups.to_hdf(file_path, key=f'{key}/long_short_inst_spike_rate_groups')
+        self.wcorr_shuffle_analysis.to_hdf(file_path, key=f'{key}/wcorr_shuffle_analysis')
+        self.perform_specific_epochs_decoding.to_hdf(file_path, key=f'{key}/perform_specific_epochs_decoding')
+        self.DEP_ratemap_peaks.to_hdf(file_path, key=f'{key}/DEP_ratemap_peaks')
+        self.ratemap_peaks_prominence2d.to_hdf(file_path, key=f'{key}/ratemap_peaks_prominence2d')
+        # super().to_hdf(file_path, key=key, **kwargs)
+        
