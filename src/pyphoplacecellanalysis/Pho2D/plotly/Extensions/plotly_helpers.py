@@ -1,6 +1,7 @@
 from copy import deepcopy
 from pathlib import Path
 from typing import Optional, Union, List, Tuple
+from attrs import define, field, Factory
 import numpy as np
 import pandas as pd
 import plotly.subplots as sp
@@ -73,7 +74,23 @@ def plotly_helper_save_figures(figures_folder: Optional[Path]=None, figure_save_
 
     return _perform_save_all_extensions, save_fn_dict
 
-
+@define(slots=False, eq=False)
+class PlotlyFigureContainer:
+    fig = field()
+    
+    @classmethod
+    def add_trace_with_legend_handling(cls, fig, trace, row, col, already_added_legend_entries):
+        """ Adds a trace to the figure while managing legend entries to avoid duplicates. """
+        trace_name = trace.name
+        trace.legendgroup = trace_name  # Set the legend group so all related traces can be toggled together
+        if trace_name in already_added_legend_entries:
+            # For already added trace categories, set showlegend to False
+            trace.showlegend = False
+        else:
+            # For the first trace of each category, keep showlegend as True
+            already_added_legend_entries.add(trace_name)
+            trace.showlegend = True  # This is usually true by default, can be omitted
+        fig.add_trace(trace, row=row, col=col)
 
 
 @function_attributes(short_name=None, tags=['plotly', 'scatter'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-27 09:07', related_items=[])
@@ -216,17 +233,20 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     _tmp_pre_delta_fig = px.histogram(pre_delta_df, y=histogram_variable_name, **common_plot_kwargs, **hist_kwargs, title=pre_delta_label) # create a temporary disposable figure to extract the histogram traces out of
     print(f'len(_tmp_pre_delta_fig.data): {len(_tmp_pre_delta_fig.data)}')
     for a_trace in _tmp_pre_delta_fig.data:
-        a_trace_name = a_trace.name
-        a_trace.legendgroup = a_trace_name ## set the legend group so they can all be toggled together
-        if a_trace_name in already_added_legend_entries:
-            # For already added trace categories, set showlegend to False
-            a_trace.showlegend = False
-        else:
-            # For the first trace of each category, keep showlegend as True
-            already_added_legend_entries.add(a_trace_name)
-            a_trace.showlegend = True  # This is usually true by default, can be omitted
+        # a_trace_name = a_trace.name
+        # a_trace.legendgroup = a_trace_name ## set the legend group so they can all be toggled together
+        # if a_trace_name in already_added_legend_entries:
+        #     # For already added trace categories, set showlegend to False
+        #     a_trace.showlegend = False
+        # else:
+        #     # For the first trace of each category, keep showlegend as True
+        #     already_added_legend_entries.add(a_trace_name)
+        #     a_trace.showlegend = True  # This is usually true by default, can be omitted
 
-        fig.add_trace(a_trace, row=1, col=1)
+        # fig.add_trace(a_trace, row=1, col=1)
+        PlotlyFigureContainer.add_trace_with_legend_handling(fig=fig, trace=a_trace, row=1, col=1, already_added_legend_entries=already_added_legend_entries)
+
+
 
     # Scatter Plot _______________________________________________________________________________________________________ #
     # adding scatter plot
@@ -246,16 +266,15 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
         _tmp_scatter_fig = px.scatter(data_results_df, **common_plot_kwargs, **px_scatter_kwargs) # create a temporary disposable figure to extract the scatter traces out of
 
         for i, a_trace in enumerate(_tmp_scatter_fig.data):
-            a_trace_name = a_trace.name
-            a_trace.legendgroup = a_trace_name ## set the legend group so they can all be toggled together
-            if a_trace_name in already_added_legend_entries:
-                # For already added trace categories, set showlegend to False
-                a_trace.showlegend = False
-            else:
-                # For the first trace of each category, keep showlegend as True
-                already_added_legend_entries.add(a_trace_name)
-                a_trace.showlegend = True  # This is usually true by default, can be omitted
-
+            # a_trace_name = a_trace.name
+            # a_trace.legendgroup = a_trace_name ## set the legend group so they can all be toggled together
+            # if a_trace_name in already_added_legend_entries:
+            #     # For already added trace categories, set showlegend to False
+            #     a_trace.showlegend = False
+            # else:
+            #     # For the first trace of each category, keep showlegend as True
+            #     already_added_legend_entries.add(a_trace_name)
+            #     a_trace.showlegend = True  # This is usually true by default, can be omitted
 
             # Update marker properties to remove the white border
             a_trace.marker.line.width = 0 
@@ -268,8 +287,9 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
                 # a_trace.showlegend = False
             # print(f'a_trace: {a_trace}')
             # a_trace = fig.add_trace(a_trace, row=1, col=2)
-            fig.add_trace(a_trace, row=1, col=2)
-
+            # fig.add_trace(a_trace, row=1, col=2)
+            PlotlyFigureContainer.add_trace_with_legend_handling(fig=fig, trace=a_trace, row=1, col=2, already_added_legend_entries=already_added_legend_entries)
+            
         # if forced_range_y is not None:
         #     fig.update_layout(yaxis=dict(range=forced_range_y))
 
@@ -279,18 +299,18 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     _tmp_post_delta_fig = px.histogram(post_delta_df, y=histogram_variable_name, **common_plot_kwargs, **hist_kwargs, title=post_delta_label)  # create a temporary disposable figure to extract the histogram traces out of
 
     for a_trace in _tmp_post_delta_fig.data:
-        a_trace_name = a_trace.name
-        a_trace.legendgroup = a_trace_name ## set the legend group so they can all be toggled together
-        if a_trace_name in already_added_legend_entries:
-            # For already added trace categories, set showlegend to False
-            a_trace.showlegend = False
-        else:
-            # For the first trace of each category, keep showlegend as True
-            a_trace.showlegend = True  # This is usually true by default, can be omitted
-            already_added_legend_entries.add(a_trace_name)
+        # a_trace_name = a_trace.name
+        # a_trace.legendgroup = a_trace_name ## set the legend group so they can all be toggled together
+        # if a_trace_name in already_added_legend_entries:
+        #     # For already added trace categories, set showlegend to False
+        #     a_trace.showlegend = False
+        # else:
+        #     # For the first trace of each category, keep showlegend as True
+        #     a_trace.showlegend = True  # This is usually true by default, can be omitted
+        #     already_added_legend_entries.add(a_trace_name)
 
-        fig.add_trace(a_trace, row=1, col=3)
-
+        # fig.add_trace(a_trace, row=1, col=3)
+        PlotlyFigureContainer.add_trace_with_legend_handling(fig=fig, trace=a_trace, row=1, col=3, already_added_legend_entries=already_added_legend_entries)
 
     # fig.update_layout(yaxis=dict(range=forced_range_y))
     if forced_range_y is not None:
