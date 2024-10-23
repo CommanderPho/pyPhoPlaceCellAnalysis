@@ -1658,15 +1658,17 @@ class PipelineWithComputedPipelineStageMixin:
 
         return sucessfully_updated_keys, successfully_loaded_keys, failed_loaded_keys, found_split_paths
     
-
+    @function_attributes(short_name=None, tags=['parameters', 'computaton'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-23 06:29', related_items=[])
     def get_all_parameters(self):
+        """ gets all user-parameters from the pipeline
+        
+        """
         from neuropy.core.session.Formats.BaseDataSessionFormats import ParametersContainer
         from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
         from pyphoplacecellanalysis.General.PipelineParameterClassTemplating import GlobalComputationParametersAttrsClassTemplating
         from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters, merged_directional_placefields_Parameters, rank_order_shuffle_analysis_Parameters, directional_decoders_decode_continuous_Parameters, directional_decoders_evaluate_epochs_Parameters, directional_train_test_split_Parameters, long_short_decoding_analyses_Parameters, long_short_rate_remapping_Parameters, long_short_inst_spike_rate_groups_Parameters, wcorr_shuffle_analysis_Parameters, perform_specific_epochs_decoding_Parameters, DEP_ratemap_peaks_Parameters, ratemap_peaks_prominence2d_Parameters
 
         preprocessing_parameters: ParametersContainer = deepcopy(self.active_sess_config)
-        preprocessing_parameters
 
         ## Add `curr_active_pipeline.global_computation_results.computation_config` as needed:
         if self.global_computation_results.computation_config is None:
@@ -1677,36 +1679,42 @@ class PipelineWithComputedPipelineStageMixin:
         else:
             curr_global_param_typed_parameters: ComputationKWargParameters = self.global_computation_results.computation_config
             
+        ## Ensured that we have a valid `curr_global_param_typed_parameters` that was created with the kwarg defaults if it didn't exist.
+        #TODO 2024-10-23 06:45: - [ ] What about when a config was created and then later new kwarg values were added to a computation function, or the default values were updated?
+        _master_params_dict = {}
+        _master_params_dict['preprocessing'] = preprocessing_parameters.to_dict()
+        _master_params_dict.update(curr_global_param_typed_parameters.to_dict())
+        
+        # if self.global_computation_results.computation_config is not None:
+        #     curr_global_param_typed_parameters: ComputationKWargParameters = deepcopy(self.global_computation_results.computation_config)
+        #     _master_params_dict.update(curr_global_param_typed_parameters.to_dict())
+        #     ## TODO: are we sure we have all the parameters just from a global config? do we need to capture the default kwarg values that haven't been assigned or something?
+        # else:
+        #     print(f'WARNING: no global config so using kwarg defaults...')
+        #     ## only the default kwarg values:
+        #     registered_merged_computation_function_default_kwargs_dict, code_str, nested_classes_dict, (imports_dict, imports_list, imports_string) = GlobalComputationParametersAttrsClassTemplating.main_generate_params_classes(curr_active_pipeline=self)
+        #     # registered_merged_computation_function_default_kwargs_dict
+        #     _master_params_dict.update(registered_merged_computation_function_default_kwargs_dict)
 
-        params_class_type_dict = deepcopy(ComputationKWargParameters.__annotations__)
-        registered_merged_computation_function_default_kwargs_dict, code_str, nested_classes_dict, (imports_dict, imports_list, imports_string) = GlobalComputationParametersAttrsClassTemplating.main_generate_params_classes(curr_active_pipeline=self)
-        code_str, nested_classes_dict, imports_dict = GlobalComputationParametersAttrsClassTemplating._subfn_build_attrs_parameters_classes(registered_merged_computation_function_default_kwargs_dict=registered_merged_computation_function_default_kwargs_dict, 
-                                                                                                                params_defn_save_path=None, should_build_hdf_class=True, print_defns=False)
-        nested_classes_dict
+        # _master_params_dict
+        # {'merged_directional_placefields': {'laps_decoding_time_bin_size': 0.25, 'ripple_decoding_time_bin_size': 0.025, 'should_validate_lap_decoding_performance': False},
+        #  'rank_order_shuffle_analysis': {'num_shuffles': 500, 'minimum_inclusion_fr_Hz': 5.0, 'included_qclu_values': [1, 2], 'skip_laps': False},
+        #  'directional_decoders_decode_continuous': {'time_bin_size': None},
+        #  'directional_decoders_evaluate_epochs': {'should_skip_radon_transform': False},
+        #  'directional_train_test_split': {'training_data_portion': 0.8333333333333334, 'debug_output_hdf5_file_path': None},
+        #  'long_short_decoding_analyses': {'decoding_time_bin_size': None, 'perform_cache_load': False, 'always_recompute_replays': False, 'override_long_epoch_name': None, 'override_short_epoch_name': None},
+        #  'long_short_rate_remapping': {'decoding_time_bin_size': None, 'perform_cache_load': False, 'always_recompute_replays': False},
+        #  'long_short_inst_spike_rate_groups': {'instantaneous_time_bin_size_seconds': 0.01},
+        #  'wcorr_shuffle_analysis': {'num_shuffles': 1024, 'drop_previous_result_and_compute_fresh': False},
+        #  '_perform_specific_epochs_decoding': {'decoder_ndim': 2, 'filter_epochs': 'ripple', 'decoding_time_bin_size': 0.02},
+        #  '_DEP_ratemap_peaks': {'peak_score_inclusion_percent_threshold': 0.25},
+        #  'ratemap_peaks_prominence2d': {'step': 0.01, 'peak_height_multiplier_probe_levels': (0.5, 0.9), 'minimum_included_peak_height': 0.2, 'uniform_blur_size': 3, 'gaussian_blur_sigma': 3}}
 
+        return _master_params_dict
 
-        params_class_type_list = [merged_directional_placefields_Parameters, rank_order_shuffle_analysis_Parameters, directional_decoders_decode_continuous_Parameters, directional_decoders_evaluate_epochs_Parameters, directional_train_test_split_Parameters, long_short_decoding_analyses_Parameters, long_short_rate_remapping_Parameters, long_short_inst_spike_rate_groups_Parameters, wcorr_shuffle_analysis_Parameters, perform_specific_epochs_decoding_Parameters, DEP_ratemap_peaks_Parameters, ratemap_peaks_prominence2d_Parameters]
-        # params_class_type_dict = dict(zip({k.removeprefix('_') for k in imports_dict.keys()}, params_class_type_list))
-        # params_class_type_dict = dict(zip({k for k in imports_dict.keys()}, params_class_type_list))
-        params_class_type_dict = dict(zip(imports_list, params_class_type_list))
-        # params_class_type_dict
-
-        ## Convert to the new native types
-        ## INPUTS: registered_merged_computation_function_default_kwargs_dict, params_class_type_dict
-        _out_param_typed_parameters_dict = {}
-        for k, v_dict in registered_merged_computation_function_default_kwargs_dict.items():
-            a_type = params_class_type_dict[k]
-            _out_param_typed_parameters_dict[k.removeprefix('_')] = a_type(**v_dict)
-        # _out_param_typed_parameters_dict
-
-        ## OUTPUTS: _out_param_typed_parameters_dict
-        # param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters(**_out_param_typed_parameters_dict)
-        param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters(**_out_param_typed_parameters_dict)
-        param_typed_parameters
-
-        ## OUTPUTS: param_typed_parameters
-        return {
-            'preprocessing_parameters': preprocessing_parameters,
-            'curr_global_param_typed_parameters': curr_global_param_typed_parameters,
-            'param_typed_parameters': param_typed_parameters,
-        }
+        # ## OUTPUTS: param_typed_parameters
+        # return {
+        #     'preprocessing_parameters': preprocessing_parameters,
+        #     'curr_global_param_typed_parameters': curr_global_param_typed_parameters,
+        #     'param_typed_parameters': param_typed_parameters,
+        # }
