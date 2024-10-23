@@ -94,7 +94,8 @@ class PlotlyFigureContainer:
 
 
 @function_attributes(short_name=None, tags=['plotly', 'scatter'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-27 09:07', related_items=[])
-def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig=None, histogram_bins:int=25, px_scatter_kwargs=None,
+def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig=None, histogram_bins:int=25,
+                                   common_plot_kwargs=None, px_scatter_kwargs=None,
                                    histogram_variable_name='P_Long', hist_kwargs=None,
                                    forced_range_y=[0.0, 1.0], time_delta_tuple=None, is_dark_mode: bool = True, **kwargs):
     """ Plots a scatter plot of a variable pre/post delta, with a histogram on each end corresponding to the pre/post delta distribution
@@ -154,8 +155,16 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     else:
         figure_context_dict['n_unique_t_bin_sizes'] = num_unique_time_bin_sizes
 
+    ## Initialize the plotting kwargs as needed if empty:
+    if hist_kwargs is None:
+        hist_kwargs = {}
+
     if px_scatter_kwargs is None:
         px_scatter_kwargs = {}
+        
+    # common_plot_kwargs = dict(color="time_bin_size")
+    if common_plot_kwargs is None:
+        common_plot_kwargs = {}
         
     # if ('color' in px_scatter_kwargs):
     #     if ('color' == 'time_bin_size'):
@@ -171,7 +180,6 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     else:
         main_title: str = f"Across Sessions {px_scatter_kwargs.get('title', 'UNKNOWN')} ({num_unique_sessions} Sessions)"
 
-
     if num_unique_time_bin_sizes > 1:
         main_title = main_title + f" - {num_unique_time_bin_sizes} Time Bin Sizes"
         figure_context_dict['n_tbin'] = num_unique_time_bin_sizes
@@ -182,15 +190,48 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     figure_context_dict['title'] = main_title
     print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bin_sizes}')
 
-    # common_plot_kwargs = dict(color="time_bin_size")
-    common_plot_kwargs = dict() # color=None
-    
-    if hist_kwargs is None:
-        hist_kwargs = {}
     hist_kwargs = dict(opacity=0.5, range_y=[0.0, 1.0], nbins=histogram_bins, barmode='overlay') | hist_kwargs
     # print(f'hist_kwargs: {hist_kwargs}')
 
+    def _subfn_build_categorical_color_kwargs(shared_color_key: str):
+        """ captures: data_results_df, 
+        
+        kwargs_update_dict = _subfn_build_categorical_color_kwargs(shared_color_key=shared_color_key)
+        common_plot_kwargs.update(kwargs_update_dict)
+        """
+        ## duplicate the `shared_color_key` column by adding the "_col_" prefix
+        categorical_color_shared_color_key: str = f"_col_{shared_color_key}"
+        print(f'categorical_color_shared_color_key: "{categorical_color_shared_color_key}"')
+        data_results_df[categorical_color_shared_color_key] = deepcopy(data_results_df[shared_color_key])
+        data_results_df[categorical_color_shared_color_key] = data_results_df[categorical_color_shared_color_key].map(lambda x: f'{x:.3f}').astype(str) # string type
+        category_orders = {shared_color_key: [f'{v:.3f}' for v in sorted(data_results_df[categorical_color_shared_color_key].astype(float).unique())]} # should this be `categorical_color_shared_color_key` or `shared_color_key`
+        color_sequence = px.colors.qualitative.Plotly # `color_discrete_sequence`
+        # color_sequence = px.colors.color_continuous_scale() # `color_continuous_scale`
+        kwargs_update_dict = dict(category_orders=category_orders, color_discrete_sequence=color_sequence,
+                                    # color=shared_color_key,
+                                    color=categorical_color_shared_color_key, ## override color to be `categorical_color_shared_color_key` instead of `shared_color_key`
+                                    )
+        return kwargs_update_dict
+    
+
+
     ## Build legends:
+    if 'color' in common_plot_kwargs:
+        ## have color
+        if ('color' not in hist_kwargs):
+            hist_kwargs['color'] = common_plot_kwargs['color']
+        else:
+            is_different: bool = (hist_kwargs['color'] != common_plot_kwargs['color'])
+            if is_different:
+                print(f"WARNING: is_different: common_plot_kwargs['color']: {common_plot_kwargs['color']}, hist_kwargs['color']: {hist_kwargs['color']}")
+        if ('color' not in px_scatter_kwargs):
+            px_scatter_kwargs['color'] = common_plot_kwargs['color']
+        else:
+            is_different: bool = (px_scatter_kwargs['color'] != common_plot_kwargs['color'])
+            if is_different:
+                print(f"WARNING: is_different: common_plot_kwargs['color']: {common_plot_kwargs['color']}, px_scatter_kwargs['color']: {px_scatter_kwargs['color']}")   
+
+
     if (('color' in hist_kwargs) and ('color' in px_scatter_kwargs)):
         if (hist_kwargs['color'] == px_scatter_kwargs['color']):
             # if the value is the same
@@ -201,19 +242,26 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
             # Convert shared_color_key to string to treat it as categorical
             # data_results_df[shared_color_key] = [f"{v:.3f}" for v in data_results_df[shared_color_key].values]
             
-            # Sort based on numeric values, then convert to strings
-            category_orders = {shared_color_key: [f'{v:.3f}' for v in sorted(data_results_df[shared_color_key].astype(float).unique())]}
-
-            # Standardize formatting of 'time_bin_size' to 3 decimal places
-            data_results_df['time_bin_size'] = data_results_df['time_bin_size'].map(lambda x: f'{x:.3f}')
-            # data_results_df[shared_color_key] = data_results_df[shared_color_key].astype(str) # convert to categorical
-            # Define consistent category orders and color sequence
-            # category_orders = {shared_color_key: sorted(data_results_df[shared_color_key].unique())} # category_orders: {'time_bin_size': ['0.025', '0.030', '0.044', '0.050', '0.058', '0.250', '1.500']},
-            color_sequence = px.colors.qualitative.Plotly
-            print(f'category_orders: {category_orders},\ncolor_sequence: {color_sequence}\n')
-            common_plot_kwargs.update(dict(category_orders=category_orders, color_discrete_sequence=color_sequence,
-                                        color=shared_color_key,
-                                        ))
+            print(f'shared_color_key: "{shared_color_key}"')
+            # # Sort based on numeric values, then convert to strings
+            # ## duplicate the `shared_color_key` column by adding the "_col_" prefix
+            # categorical_color_shared_color_key: str = f"_col_{shared_color_key}"
+            # print(f'categorical_color_shared_color_key: "{categorical_color_shared_color_key}"')
+            # data_results_df[categorical_color_shared_color_key] = deepcopy(data_results_df[shared_color_key])
+            # data_results_df[categorical_color_shared_color_key] = data_results_df[categorical_color_shared_color_key].map(lambda x: f'{x:.3f}').astype(str) # string type
+            # category_orders = {shared_color_key: [f'{v:.3f}' for v in sorted(data_results_df[categorical_color_shared_color_key].astype(float).unique())]} # should this be `categorical_color_shared_color_key` or `shared_color_key`
+            # # Define consistent category orders and color sequence
+            # # category_orders = {shared_color_key: sorted(data_results_df[shared_color_key].unique())} # category_orders: {'time_bin_size': ['0.025', '0.030', '0.044', '0.050', '0.058', '0.250', '1.500']},
+            # color_sequence = px.colors.qualitative.Plotly # `color_discrete_sequence`
+            # # color_sequence = px.colors.color_continuous_scale() # `color_continuous_scale`
+            # print(f'category_orders: {category_orders},\ncolor_sequence: {color_sequence}\n')
+            # common_plot_kwargs.update(dict(category_orders=category_orders, color_discrete_sequence=color_sequence,
+            #                             # color=shared_color_key,
+            #                             color=categorical_color_shared_color_key, ## override color to be `categorical_color_shared_color_key` instead of `shared_color_key`
+            #                             ))
+            a_kwargs_update_dict = _subfn_build_categorical_color_kwargs(shared_color_key=shared_color_key)
+            common_plot_kwargs.update(a_kwargs_update_dict)
+        
             # shared_color_key: 'time_bin_size'
             
 
@@ -233,17 +281,6 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     _tmp_pre_delta_fig = px.histogram(pre_delta_df, y=histogram_variable_name, **common_plot_kwargs, **hist_kwargs, title=pre_delta_label) # create a temporary disposable figure to extract the histogram traces out of
     print(f'len(_tmp_pre_delta_fig.data): {len(_tmp_pre_delta_fig.data)}')
     for a_trace in _tmp_pre_delta_fig.data:
-        # a_trace_name = a_trace.name
-        # a_trace.legendgroup = a_trace_name ## set the legend group so they can all be toggled together
-        # if a_trace_name in already_added_legend_entries:
-        #     # For already added trace categories, set showlegend to False
-        #     a_trace.showlegend = False
-        # else:
-        #     # For the first trace of each category, keep showlegend as True
-        #     already_added_legend_entries.add(a_trace_name)
-        #     a_trace.showlegend = True  # This is usually true by default, can be omitted
-
-        # fig.add_trace(a_trace, row=1, col=1)
         PlotlyFigureContainer.add_trace_with_legend_handling(fig=fig, trace=a_trace, row=1, col=1, already_added_legend_entries=already_added_legend_entries)
 
 
@@ -253,41 +290,22 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     if out_scatter_fig is not None:
         _tmp_scatter_fig = out_scatter_fig ## set the extant subfigure
         for a_trace in _tmp_scatter_fig.data:
-            a_trace.legendgroup = a_trace_name ## set the legend group so they can all be toggled together
             # Update marker properties to remove the white border
             a_trace.marker.line.width = 0 
             a_trace.marker.opacity = 0.5
-            fig.add_trace(a_trace, row=1, col=2)
+            PlotlyFigureContainer.add_trace_with_legend_handling(fig=fig, trace=a_trace, row=1, col=2, already_added_legend_entries=already_added_legend_entries)
             # if forced_range_y is not None:
             #     fig.update_layout(yaxis=dict(range=forced_range_y))
     else:
         ## Create a new scatter plot:
         assert px_scatter_kwargs is not None
-        _tmp_scatter_fig = px.scatter(data_results_df, **common_plot_kwargs, **px_scatter_kwargs) # create a temporary disposable figure to extract the scatter traces out of
-
+        _tmp_scatter_fig = px.scatter(data_results_df, **common_plot_kwargs, **px_scatter_kwargs, ) # create a temporary disposable figure to extract the scatter traces out of
         for i, a_trace in enumerate(_tmp_scatter_fig.data):
-            # a_trace_name = a_trace.name
-            # a_trace.legendgroup = a_trace_name ## set the legend group so they can all be toggled together
-            # if a_trace_name in already_added_legend_entries:
-            #     # For already added trace categories, set showlegend to False
-            #     a_trace.showlegend = False
-            # else:
-            #     # For the first trace of each category, keep showlegend as True
-            #     already_added_legend_entries.add(a_trace_name)
-            #     a_trace.showlegend = True  # This is usually true by default, can be omitted
-
             # Update marker properties to remove the white border
             a_trace.marker.line.width = 0 
             a_trace.marker.opacity = 0.5
             # a_trace.marker.size = 10
-            
-            # is_first_item: bool = (i == 0)
-            # if (not is_first_item):
-            #     a_trace['showlegend'] = False
-                # a_trace.showlegend = False
-            # print(f'a_trace: {a_trace}')
-            # a_trace = fig.add_trace(a_trace, row=1, col=2)
-            # fig.add_trace(a_trace, row=1, col=2)
+            # category_orders: Any | None = None, labels: Any | None = None, orientation: Any | None = None, color_discrete_sequence: Any | None = None, color_discrete_map: Any | None = None, color_continuous_scale: Any | None = None, range_color: Any | None = None, color_continuous_midpoint: Any | None = None, symbol_sequence: Any | None = None, symbol_map: Any | None = None,
             PlotlyFigureContainer.add_trace_with_legend_handling(fig=fig, trace=a_trace, row=1, col=2, already_added_legend_entries=already_added_legend_entries)
             
         # if forced_range_y is not None:
@@ -297,19 +315,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     # Post-Delta Histogram _______________________________________________________________________________________________ #
     # adding the second histogram
     _tmp_post_delta_fig = px.histogram(post_delta_df, y=histogram_variable_name, **common_plot_kwargs, **hist_kwargs, title=post_delta_label)  # create a temporary disposable figure to extract the histogram traces out of
-
     for a_trace in _tmp_post_delta_fig.data:
-        # a_trace_name = a_trace.name
-        # a_trace.legendgroup = a_trace_name ## set the legend group so they can all be toggled together
-        # if a_trace_name in already_added_legend_entries:
-        #     # For already added trace categories, set showlegend to False
-        #     a_trace.showlegend = False
-        # else:
-        #     # For the first trace of each category, keep showlegend as True
-        #     a_trace.showlegend = True  # This is usually true by default, can be omitted
-        #     already_added_legend_entries.add(a_trace_name)
-
-        # fig.add_trace(a_trace, row=1, col=3)
         PlotlyFigureContainer.add_trace_with_legend_handling(fig=fig, trace=a_trace, row=1, col=3, already_added_legend_entries=already_added_legend_entries)
 
     # fig.update_layout(yaxis=dict(range=forced_range_y))
@@ -335,8 +341,9 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     # Update layout to add a title to the legend
     legend_title_text = kwargs.get('legend_title_text', None)
     if legend_title_text is None:
-        legend_key: str = px_scatter_kwargs.get('color', None)
-        legend_title_text = legend_key
+        # legend_key: str = px_scatter_kwargs.get('color', None)
+        legend_key: str = common_plot_kwargs.get('color', None)
+        legend_title_text = legend_key.removeprefix('_col_')
 
     if legend_title_text is not None:
         fig.update_layout(
