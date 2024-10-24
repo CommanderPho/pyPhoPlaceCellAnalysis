@@ -569,12 +569,18 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
     ## Perfrom the computations:
 
+    rank_order_results = curr_active_pipeline.global_computation_results.computed_data.get('RankOrder', None)
+    if rank_order_results is not None:
+        minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+        included_qclu_values: List[int] = rank_order_results.included_qclu_values
+    else:        
+        ## get from parameters:
+        minimum_inclusion_fr_Hz: float = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+        included_qclu_values: List[int] = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
+        
     # DirectionalMergedDecoders: Get the result after computation:
-    rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder'] # : "RankOrderComputationsContainer"
-    minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
-    # included_qclu_values: List[int] = rank_order_results.included_qclu_values
     directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'] # : "DirectionalLapsResult"
-    track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference? : "TrackTemplates"
+    track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference? : "TrackTemplates"
 
     ## Copy the default result:
     directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
