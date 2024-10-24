@@ -104,6 +104,7 @@ class GlobalComputationParametersAttrsClassTemplating:
 
         return _defn_lines, _flat_fields_tuples_list, _base_variable_name_only_values_dict, _base_variable_name_only_types_dict
 
+
     @function_attributes(short_name=None, tags=['jninja2', 'template'], input_requires=[], output_provides=[], uses=['cls._build_kwargs_class_defns'], used_by=[], creation_date='2024-10-07 12:03', related_items=[])
     @classmethod
     def _subfn_build_attrs_parameters_classes(cls, registered_merged_computation_function_default_kwargs_dict, params_defn_save_path=None, print_defns: bool = True, **render_kwargs):

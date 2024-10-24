@@ -473,6 +473,12 @@ def plot_stacked_histograms(data_results_df: pd.DataFrame, data_type: str, sessi
     figsize = kwargs.pop('figsize', (12, 2))
     descriptor_str: str = '|'.join([data_type, session_spec, time_bin_duration_str])
     figure_identifier: str = f"{descriptor_str}_PrePostDelta"
+    if data_type.find('epoch') != -1: # data_type.endswith('epoch'):
+        title_indicator: str = 'epochs'
+    else:
+        assert data_type.find('time-bin') != -1, f"data_type: {data_type} does not contain either expected grainularity descriptor (epochs or time-bin)"   
+        # assert data_type.endswith('time-bin'), f"data_type: {data_type}"    
+        title_indicator: str = 'time bins'
 
     fig = plt.figure(num=figure_identifier, clear=True, figsize=figsize, layout=layout, **kwargs) # layout="constrained", 
     fig.suptitle(f'{descriptor_str}')
@@ -503,9 +509,10 @@ def plot_stacked_histograms(data_results_df: pd.DataFrame, data_type: str, sessi
     for time_bin_size in time_bin_sizes:
         df_tbs = pre_delta_df[pre_delta_df['time_bin_size']==time_bin_size]
         df_tbs[column_name].hist(ax=ax_dict['epochs_pre_delta'], alpha=0.5, label=str(time_bin_size), **histogram_kwargs) 
-    
+
+
     ax_dict['epochs_pre_delta'].set_ylabel(f"{column_name}") # only set on the leftmost subplot
-    ax_dict['epochs_pre_delta'].set_title(f'pre-$\Delta$ time bins')
+    ax_dict['epochs_pre_delta'].set_title(f'pre-$\Delta$ {title_indicator}')
     ax_dict['epochs_pre_delta'].legend()
 
     # plot post-delta histogram:
@@ -514,7 +521,7 @@ def plot_stacked_histograms(data_results_df: pd.DataFrame, data_type: str, sessi
         df_tbs = post_delta_df[post_delta_df['time_bin_size']==time_bin_size]
         df_tbs[column_name].hist(ax=ax_dict['epochs_post_delta'], alpha=0.5, label=str(time_bin_size), **histogram_kwargs) 
     
-    ax_dict['epochs_post_delta'].set_title(f'post-$\Delta$ time bins')
+    ax_dict['epochs_post_delta'].set_title(f'post-$\Delta$ {title_indicator}')
     if len(time_bin_sizes) > 1:
         ax_dict['epochs_post_delta'].legend()
     

@@ -97,7 +97,7 @@ class PlotlyFigureContainer:
 def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig=None, histogram_bins:int=25,
                                    common_plot_kwargs=None, px_scatter_kwargs=None,
                                    histogram_variable_name='P_Long', hist_kwargs=None,
-                                   forced_range_y=[0.0, 1.0], time_delta_tuple=None, is_dark_mode: bool = True, **kwargs):
+                                   forced_range_y=[0.0, 1.0], time_delta_tuple=None, is_dark_mode: bool = True, figure_sup_huge_title_text: str=None, **kwargs):
     """ Plots a scatter plot of a variable pre/post delta, with a histogram on each end corresponding to the pre/post delta distribution
 
     px_scatter_kwargs: only used if out_scatter_fig is None
@@ -202,9 +202,13 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
         ## duplicate the `shared_color_key` column by adding the "_col_" prefix
         categorical_color_shared_color_key: str = f"_col_{shared_color_key}"
         print(f'categorical_color_shared_color_key: "{categorical_color_shared_color_key}"')
+        # data_results_df[shared_color_key].dtype != str:
         data_results_df[categorical_color_shared_color_key] = deepcopy(data_results_df[shared_color_key])
-        data_results_df[categorical_color_shared_color_key] = data_results_df[categorical_color_shared_color_key].map(lambda x: f'{x:.3f}').astype(str) # string type
-        category_orders = {shared_color_key: [f'{v:.3f}' for v in sorted(data_results_df[categorical_color_shared_color_key].astype(float).unique())]} # should this be `categorical_color_shared_color_key` or `shared_color_key`
+        # data_results_df[categorical_color_shared_color_key] = data_results_df[categorical_color_shared_color_key].map(lambda x: f'{x:.3f}').astype(str) # string type
+        # category_orders = {shared_color_key: [f'{v:.3f}' for v in sorted(data_results_df[categorical_color_shared_color_key].astype(float).unique())]} # should this be `categorical_color_shared_color_key` or `shared_color_key`
+        data_results_df[categorical_color_shared_color_key] = data_results_df[categorical_color_shared_color_key].map(lambda x: f'{x}').astype(str) # string type
+        category_orders = {shared_color_key: [f'{v}' for v in sorted(data_results_df[categorical_color_shared_color_key].astype(float).unique())]} # should this be `categorical_color_shared_color_key` or `shared_color_key`
+        
         color_sequence = px.colors.qualitative.Plotly # `color_discrete_sequence`
         # color_sequence = px.colors.color_continuous_scale() # `color_continuous_scale`
         kwargs_update_dict = dict(category_orders=category_orders, color_discrete_sequence=color_sequence,
@@ -365,6 +369,25 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     fig.update_xaxes(title_text="# Events", row=1, col=3)
 
     fig.update_yaxes(title_text="Probability of Short Track", row=1, col=1)
+
+    # Add Bold/Readible Title to indicate the epochs being plotted _______________________________________________________ #
+    # Adjust margins to create space outside the subplot
+    # new_fig_ripples = new_fig_ripples.update_layout(
+    #     margin=dict(t=100, l=100)  # Increase top and left margins
+    # )
+
+    if figure_sup_huge_title_text is not None:
+        ## Adds a very bold and readible "PBEs" label to the top of the figure. The positioning is a nightmare, so hopefully it keeps working.
+        fig = fig.add_annotation(
+            text=figure_sup_huge_title_text,
+            # x=0.11, y=1.2,
+            x=0.11, y=1.25,
+            xref="paper", yref="paper",
+            showarrow=False,
+            font=dict(size=40),
+            xanchor='left', yanchor='top',
+            # row='all', col=2,
+        )
 
     return fig, figure_context
 
