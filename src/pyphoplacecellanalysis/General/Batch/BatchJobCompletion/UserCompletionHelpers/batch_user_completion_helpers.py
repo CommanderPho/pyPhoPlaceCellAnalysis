@@ -638,7 +638,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
         laps_all_epoch_bins_marginals_df: pd.DataFrame = an_alt_dir_Pseudo2D_decoders_result.laps_all_epoch_bins_marginals_df.copy()
         
         ## Ripples:
-        ripple_time_bin_marginals_df: pd.DataFrame = an_alt_dir_Pseudo2D_decoders_result.ripple_time_bin_marginals_df.copy()
+        ripple_time_bin_marginals_df: pd.DataFrame = an_alt_dir_Pseudo2D_decoders_result.ripple_time_bin_marginals_df.copy() ## calling .copy() is triggering an issue with the @property `ripple_time_bin_marginals_df`
         ripple_all_epoch_bins_marginals_df: pd.DataFrame = an_alt_dir_Pseudo2D_decoders_result.ripple_all_epoch_bins_marginals_df.copy()
 
         session_name = curr_session_name
