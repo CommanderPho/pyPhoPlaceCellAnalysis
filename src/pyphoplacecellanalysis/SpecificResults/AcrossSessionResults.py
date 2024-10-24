@@ -2277,7 +2277,7 @@ def load_across_sessions_exported_h5_files(collected_outputs_directory=None, cut
 
 
 @function_attributes(short_name=None, tags=['across_sessions'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-15 08:47', related_items=[])
-def load_across_sessions_exported_files(cuttoff_date: Optional[datetime] = None, debug_print: bool = False):
+def load_across_sessions_exported_files(cuttoff_date: Optional[datetime] = None, collected_outputs_directory: Optional[Path]=None, debug_print: bool = False):
     """
     #TODO 2024-10-23 05:12: - [ ] I think it needs to be updated to use the modern `_new_process_csv_files`-based approach
     
@@ -2310,20 +2310,30 @@ def load_across_sessions_exported_files(cuttoff_date: Optional[datetime] = None,
     # collected_outputs_directory = r'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs' # APOGEE
     # collected_outputs_directory = '/home/halechr/cloud/turbo/Data/Output/collected_outputs' # GL
 
-    known_collected_outputs_paths = [Path(v).resolve() for v in ['/Users/pho/data/collected_outputs',
-                                                                '/Volumes/SwapSSD/Data/collected_outputs', r"K:/scratch/collected_outputs", '/Users/pho/Dropbox (University of Michigan)/MED-DibaLabDropbox/Data/Pho/Outputs/output/collected_outputs', r'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs',
-                                                                '/home/halechr/cloud/turbo/Data/Output/collected_outputs',
-                                                                '/home/halechr/cloud/turbo/Pho/Output/collected_outputs',
-                                                                # '/home/halechr/FastData/collected_outputs/',
-                                                                ]]
-    collected_outputs_directory = find_first_extant_path(known_collected_outputs_paths)
+    if collected_outputs_directory is None:
+        known_collected_outputs_paths = [Path(v).resolve() for v in ['/Users/pho/data/collected_outputs',
+                                                                    '/Volumes/SwapSSD/Data/collected_outputs', r"K:/scratch/collected_outputs", '/Users/pho/Dropbox (University of Michigan)/MED-DibaLabDropbox/Data/Pho/Outputs/output/collected_outputs', r'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs',
+                                                                    '/home/halechr/cloud/turbo/Data/Output/collected_outputs',
+                                                                    '/home/halechr/cloud/turbo/Pho/Output/collected_outputs',
+                                                                    '/home/halechr/FastData/collected_outputs/',
+                                                                    ]]
+        collected_outputs_directory = find_first_extant_path(known_collected_outputs_paths)
+
     assert collected_outputs_directory.exists(), f"collected_outputs_directory: {collected_outputs_directory} does not exist! Is the right computer's config commented out above?"
     # fullwidth_path_widget(scripts_output_path, file_name_label='Scripts Output Path:')
     print(f'collected_outputs_directory: {collected_outputs_directory}')
     
     ## sessions' t_delta:
     # t_delta_csv_path = collected_outputs_directory.joinpath('../2024-01-18_GL_t_split_df.csv').resolve() # GL
-    t_delta_csv_path = collected_outputs_directory.joinpath('../2024-09-25_GL_t_split_df.csv').resolve()
+    # t_delta_csv_path = collected_outputs_directory.joinpath('../2024-09-25_GL_t_split_df.csv').resolve()
+    known_t_delta_csv_paths = [Path(v).resolve() for v in [collected_outputs_directory.joinpath('../2024-09-25_GL_t_split_df.csv'),
+                                                            collected_outputs_directory.joinpath('2024-09-25_GL_t_split_df.csv').resolve(),
+                                                            collected_outputs_directory.joinpath('../2024-01-18_GL_t_split_df.csv').resolve()
+                                                            ]]
+    t_delta_csv_path = find_first_extant_path(known_t_delta_csv_paths)
+
+    # t_delta_csv_path = collected_outputs_directory.joinpath('../2024-09-25_GL_t_split_df.csv').resolve()
+
     Assert.path_exists(t_delta_csv_path)
     sessions_t_delta_tuple = build_session_t_delta(t_delta_csv_path=t_delta_csv_path)
     t_delta_df, t_delta_dict, (earliest_delta_aligned_t_start, latest_delta_aligned_t_end) = sessions_t_delta_tuple ## UNPACK
