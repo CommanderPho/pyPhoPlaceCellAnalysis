@@ -434,6 +434,7 @@ def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: floa
     _extras_output_dict["divider_line"] = vertical_divider_line
     return _extras_output_dict
 
+
 @function_attributes(short_name=None, tags=['plotly', 'histogram'], input_requires=[], output_provides=[], uses=[], used_by=['plot_across_sessions_scatter_results'], creation_date='2024-05-28 07:01', related_items=[])
 def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, earliest_delta_aligned_t_start: float=0.0, latest_delta_aligned_t_end: float=666.0,
                                           enabled_time_bin_sizes=None, main_plot_mode: str = 'separate_row_per_session', variable_name: str = 'P_Short', is_dark_mode: bool=True,
