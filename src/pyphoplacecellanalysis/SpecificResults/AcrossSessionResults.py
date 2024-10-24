@@ -2279,7 +2279,7 @@ def load_across_sessions_exported_h5_files(collected_outputs_directory=None, cut
 @function_attributes(short_name=None, tags=['across_sessions'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-15 08:47', related_items=[])
 def load_across_sessions_exported_files(cuttoff_date: Optional[datetime] = None, collected_outputs_directory: Optional[Path]=None, debug_print: bool = False):
     """
-    #TODO 2024-10-23 05:12: - [ ] I think it needs to be updated to use the modern `_new_process_csv_files`-based approach
+    #TODO 2024-10-23 05:12: - [ ] updated to use the modern `_new_process_csv_files`-based approach
     
     from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import load_across_sessions_exported_files
 
@@ -2752,6 +2752,8 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
     # Sort by columns: 'session' (ascending), 'custom_replay_name' (ascending) and 3 other columns
     parsed_csv_files_df = parsed_csv_files_df.sort_values(['session', 'file_type', 'custom_replay_name', 'decoding_time_bin_size_str', 'export_datetime'], ascending=[True, True, True, True, False]).reset_index(drop=True) # ensures all are sorted ascending except for export_datetime, which are sorted decending so the first value is the most recent.
 
+
+
     excluded_or_outdated_files_list = []
     for index, row in parsed_csv_files_df.iterrows():
         session_str = str(row['session'])
@@ -2790,39 +2792,56 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
             if debug_print:
                 print(f'WARN: curr_session_t_delta is None for session_str = "{session_str}"') # fails for 'kdiba_gor01_one_2006-6-09_1-22-43_None'
 
-
+        
         basic_marginals_file_types = ['laps_marginals_df', 'ripple_marginals_df', 'laps_time_bin_marginals_df', 'ripple_time_bin_marginals_df',]
         #TODO 2024-09-27 09:43: - [ ] the 4 basic marginals return two tuples ('session_id_str', 'custom_replay_name') while all the others return 3-tuples ('session_id_str', 'custom_replay_name', time_bin_size)
         ## Basic marginals: final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict
         _is_file_valid = True # shouldn't mark unknown files as invalid
-        # Process each file type with its corresponding details
-        if file_type == 'laps_marginals_df':
-            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **common_additional_columns_dict)
-        elif file_type == 'ripple_marginals_df':
-            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **common_additional_columns_dict)
-        elif file_type == 'laps_time_bin_marginals_df':
-            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', **common_additional_columns_dict)
-        elif file_type == 'ripple_time_bin_marginals_df':
-            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', **common_additional_columns_dict)
-        elif file_type == 'laps_simple_pf_pearson_merged_df':
-            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_simple_pearson_laps_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **additional_columns_dict)
-        elif file_type == 'ripple_simple_pf_pearson_merged_df':
-            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_simple_pearson_ripple_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **additional_columns_dict)
-        elif file_type == 'laps_weighted_corr_merged_df':
-            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_wcorr_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **additional_columns_dict)
-        elif file_type == 'ripple_weighted_corr_merged_df':
-            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_wcorr_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **additional_columns_dict)
-        elif file_type == 'laps_all_scores_merged_df':
-            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_all_scores_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **additional_columns_dict)
-        elif file_type == 'ripple_all_scores_merged_df':
-            _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_all_scores_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **additional_columns_dict)
-        else:
-            print(f'WARN: File type {file_type} not implemented.')
-            # _is_file_valid = False # shouldn't mark unknown files as invalid
-            # File type neuron_replay_stats_df not implemented.
-            # File type laps_marginals_df not implemented.
-            # continue
+        
+
+        if file_type in basic_marginals_file_types:
+            # # Invalid files will have the form:
+            # ## 2024-10-24 19:42 - actually ANY tbin value is bad for these basic files.
+            # known_bad_file_patterns = ["(ripple_marginals_df)_tbin-0.025.csv",
+            #     "(ripple_time_bin_marginals_df)_tbin-0.025.csv",
+            #     "(laps_time_bin_marginals_df)_tbin-0.25.csv",
+            #     "(laps_marginals_df)_tbin-0.25.csv",
+            # ]            
+            file_name: str = Path(row['path']).stem
+            if file_name.find('_tbin-') != -1:
+                # found an invalid export from the old  `compute_and_export_marginals_dfs_completion_function`
+                _is_file_valid = False
             
+        if _is_file_valid:
+            # Process each file type with its corresponding details
+            if file_type == 'laps_marginals_df':
+                _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **common_additional_columns_dict)
+            elif file_type == 'ripple_marginals_df':
+                _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **common_additional_columns_dict)
+            elif file_type == 'laps_time_bin_marginals_df':
+                _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', **common_additional_columns_dict)
+            elif file_type == 'ripple_time_bin_marginals_df':
+                _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', **common_additional_columns_dict)
+            elif file_type == 'laps_simple_pf_pearson_merged_df':
+                _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_simple_pearson_laps_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **additional_columns_dict)
+            elif file_type == 'ripple_simple_pf_pearson_merged_df':
+                _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_simple_pearson_ripple_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **additional_columns_dict)
+            elif file_type == 'laps_weighted_corr_merged_df':
+                _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_wcorr_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **additional_columns_dict)
+            elif file_type == 'ripple_weighted_corr_merged_df':
+                _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_wcorr_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **additional_columns_dict)
+            elif file_type == 'laps_all_scores_merged_df':
+                _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_all_scores_dict, session_name, curr_session_t_delta, time_key='lap_start_t', **additional_columns_dict)
+            elif file_type == 'ripple_all_scores_merged_df':
+                _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_ripple_all_scores_dict, session_name, curr_session_t_delta, time_key='ripple_start_t', **additional_columns_dict)
+            else:
+                print(f'WARN: File type {file_type} not implemented.')
+                # _is_file_valid = False # shouldn't mark unknown files as invalid
+                # File type neuron_replay_stats_df not implemented.
+                # File type laps_marginals_df not implemented.
+                # continue
+
+
         if (not _is_file_valid):
             excluded_or_outdated_files_list.append(row['path']) ## mark file for exclusion/removal
         else:
