@@ -141,36 +141,39 @@ def figures_rank_order_results_completion_function(self, global_data_root_parent
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['marginal', 'across-sessions', 'CSV'], input_requires=[], output_provides=[], uses=['directional_merged_decoders_result.compute_and_export_marginals_df_csvs'], used_by=[], creation_date='2024-04-27 21:22', related_items=[])
-def compute_and_export_marginals_dfs_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
-    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-    print(f'compute_and_export_marginals_dfs_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+# @function_attributes(short_name=None, tags=['DEPRICATED', 'marginal', 'across-sessions', 'CSV'], input_requires=[], output_provides=[], uses=['directional_merged_decoders_result.compute_and_export_marginals_df_csvs'], used_by=[], creation_date='2024-04-27 21:22', related_items=[])
+# def compute_and_export_marginals_dfs_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
+#     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+#     print(f'compute_and_export_marginals_dfs_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
     
-    assert self.collected_outputs_path.exists()
-    curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
-    CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
-    print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
+#     raise NotImplementedError('DEPRICATED 2024-10-24.')
+#     assert self.collected_outputs_path.exists()
+#     curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
+#     CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
+#     print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
 
-    from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations
-    curr_active_pipeline.reload_default_computation_functions()
-    batch_extended_computations(curr_active_pipeline, include_includelist=['merged_directional_placefields'], include_global_functions=True, fail_on_exception=True, force_recompute=False)
-    directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
+#     from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations
+#     curr_active_pipeline.reload_default_computation_functions()
+#     batch_extended_computations(curr_active_pipeline, include_includelist=['merged_directional_placefields'], include_global_functions=True, fail_on_exception=True, force_recompute=False)
+#     directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
 
-    active_context = curr_active_pipeline.get_session_context()
-    _out = directional_merged_decoders_result.compute_and_export_marginals_df_csvs(parent_output_path=self.collected_outputs_path, active_context=active_context)
-    print(f'successfully exported marginals_df_csvs to "{self.collected_outputs_path}"!')
-    # (laps_marginals_df, laps_out_path), (ripple_marginals_df, ripple_out_path) = _out
-    (laps_marginals_df, laps_out_path, laps_time_bin_marginals_df, laps_time_bin_marginals_out_path), (ripple_marginals_df, ripple_out_path, ripple_time_bin_marginals_df, ripple_time_bin_marginals_out_path) = _out
-    print(f'\tlaps_out_path: {laps_out_path}\n\tripple_out_path: {ripple_out_path}\n\tdone.')
+#     active_context = curr_active_pipeline.get_session_context()
+#     _out = directional_merged_decoders_result.compute_and_export_marginals_df_csvs(parent_output_path=self.collected_outputs_path, active_context=active_context)
+#     print(f'successfully exported marginals_df_csvs to "{self.collected_outputs_path}"!')
+#     # (laps_marginals_df, laps_out_path), (ripple_marginals_df, ripple_out_path) = _out
+#     (laps_marginals_df, laps_out_path, laps_time_bin_marginals_df, laps_time_bin_marginals_out_path), (ripple_marginals_df, ripple_out_path, ripple_time_bin_marginals_df, ripple_time_bin_marginals_out_path) = _out
+#     print(f'\tlaps_out_path: {laps_out_path}\n\tripple_out_path: {ripple_out_path}\n\tdone.')
 
-    # add to output dict
-    # across_session_results_extended_dict['compute_and_export_marginals_dfs_completion_function'] = _out
+#     # add to output dict
+#     # across_session_results_extended_dict['compute_and_export_marginals_dfs_completion_function'] = _out
 
-    print(f'>>\t done with {curr_session_context}')
-    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+#     print(f'>>\t done with {curr_session_context}')
+#     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+#     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
 
-    return across_session_results_extended_dict
+#     return across_session_results_extended_dict
+
+
 
 @function_attributes(short_name=None, tags=['export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def determine_computation_datetimes_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
@@ -2240,7 +2243,7 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
         custom_user_completion_functions_dict = {
                                     "export_rank_order_results_completion_function": export_rank_order_results_completion_function,
                                     "figures_rank_order_results_completion_function": figures_rank_order_results_completion_function,
-                                    "compute_and_export_marginals_dfs_completion_function": compute_and_export_marginals_dfs_completion_function,
+                                    # "compute_and_export_marginals_dfs_completion_function": compute_and_export_marginals_dfs_completion_function,
                                     'determine_session_t_delta_completion_function': determine_session_t_delta_completion_function,
                                     'perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function': perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function,
                                     'compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function': compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function,

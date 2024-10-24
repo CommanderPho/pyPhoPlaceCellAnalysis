@@ -2712,6 +2712,16 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
     # We now have the correct and parsed filepaths for each of the exported .csvs, now we need to actually load them and concatenate them toggether across sessions.
     # Extract each of the separate files from the sessions:
 
+    
+    DOCUMENTATION ON NaNs
+    `*(ripple_marginals_df)_tbin-0.025.csv` - has the time_bin_size in the filename, but no 'time_bin_size' column 
+    Conclusion, only look at the non-basic exported .CSVs, NOT `basic_marginals_file_types = ['laps_marginals_df', 'ripple_marginals_df', 'laps_time_bin_marginals_df', 'ripple_time_bin_marginals_df',]`
+        - the basic ones don't have a `time_bin_size` column, and only seem to be exported for tbin=0.025 based on the filename. Strangely these basics values don't even seem to be computed for other time bins.
+        - 
+        
+        - # strangely ripple_simple_pf_pearson_merged_df and ripple_all_scores_merged_df for the same session at the same time_bin_size can have different numbers of rows... I for sure don't get this. I'm guessing it has to do with NaNs or something?
+        
+        
     Usage:  
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import _new_process_csv_files
         ## NEW `parsed_csv_files_df1-based approach 2024-07-11 - 
@@ -2758,7 +2768,7 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
         ## Setup:
         common_additional_columns_dict = {'custom_replay_name': custom_replay_name} # skip ['time_bin_size'] override for `common_additional_columns_dict`, so we can use it for 'laps_marginals_df', 'laps_time_bin_marginals_df', ... which already have good time_bin_size columns
         additional_columns_dict = deepcopy(common_additional_columns_dict)
-        additional_columns_dict['time_bin_size'] = try_convert_to_float(decoding_time_bin_size_str, default_val=np.nan)
+        additional_columns_dict['time_bin_size'] = try_convert_to_float(decoding_time_bin_size_str, default_val=np.nan) #TODO 2024-10-24 18:53: - [ ] NaN time_bin_sizes can get introduced here, if the string can't be parsed into a float.
 
         export_datetime = row['export_datetime']
         if cuttoff_date is not None:
@@ -2850,6 +2860,8 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
         (all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df),
         excluded_or_outdated_files_list,
     )
+
+
 
 @function_attributes(short_name=None, tags=['archive', 'cleanup', 'filesystem'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-02 11:30', related_items=[])
 def archive_old_files(collected_outputs_directory: Path, excluded_or_outdated_files_list: List[Path], is_dry_run: bool=False):
