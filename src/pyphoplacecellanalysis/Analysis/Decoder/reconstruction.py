@@ -1014,10 +1014,6 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         
         # self.num_filter_epochs: 664
         flat_time_bin_centers_column = np.concatenate([curr_epoch_time_bin_container.centers for curr_epoch_time_bin_container in self.time_bin_containers]) # 4343
-        # flat_time_bin_start_edge_column = np.concatenate([curr_epoch_time_bin_container.edges[:-1] for curr_epoch_time_bin_container in self.time_bin_containers]) # 4742
-        # flat_time_bin_stop_edge_column = np.concatenate([curr_epoch_time_bin_container.edges[1:] for curr_epoch_time_bin_container in self.time_bin_containers]) # 4742
-        # flat_time_bin_start_stop_edges_columns = np.hstack([[curr_epoch_time_bin_container.edges[:-1], curr_epoch_time_bin_container.edges[1:]] for curr_epoch_time_bin_container in self.time_bin_containers]) # (2, n_flat_time_bins)
-        
         half_time_bin_size: float = self.time_bin_containers[0].edge_info.step / 2.0
         flat_time_bin_start_edge_column = flat_time_bin_centers_column - half_time_bin_size
         flat_time_bin_stop_edge_column = flat_time_bin_centers_column + half_time_bin_size
@@ -1064,10 +1060,8 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             print(f'\t fixed flat_time_bin_centers_column: {np.shape(flat_time_bin_centers_column)}')
 
         epoch_time_bin_marginals_df['label'] = epoch_time_bin_marginals_df.index.values.astype(int)
-        # epoch_time_bin_marginals_df['start'] = deepcopy(flat_time_bin_start_edge_column) # ValueError: Length of values (3393) does not match length of index (3420)
-        epoch_time_bin_marginals_df['start'] = deepcopy(flat_time_bin_start_edge_column) # ValueError: Length of values (3393) does not match length of index (3420)
-        epoch_time_bin_marginals_df['t_bin_center'] = deepcopy(flat_time_bin_centers_column) ## this one works, the start and stop don't sadly because they're the wrong size. I think it has to do with double-accumulating the start/stop edges for every epoch, which is why `ValueError: Length of values (4742) does not match length of index (4342)`
-        # is 
+        epoch_time_bin_marginals_df['start'] = deepcopy(flat_time_bin_start_edge_column) 
+        epoch_time_bin_marginals_df['t_bin_center'] = deepcopy(flat_time_bin_centers_column) 
         epoch_time_bin_marginals_df['stop'] = deepcopy(flat_time_bin_stop_edge_column)
 
         # except ValueError:
