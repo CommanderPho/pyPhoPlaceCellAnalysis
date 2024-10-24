@@ -97,12 +97,15 @@ class PlotlyFigureContainer:
 def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig=None, histogram_bins:int=25,
                                    common_plot_kwargs=None, px_scatter_kwargs=None,
                                    histogram_variable_name='P_Long', hist_kwargs=None,
-                                   forced_range_y=[0.0, 1.0], time_delta_tuple=None, is_dark_mode: bool = True, figure_sup_huge_title_text: str=None, **kwargs):
+                                   forced_range_y=[0.0, 1.0], time_delta_tuple=None, is_dark_mode: bool = True, figure_sup_huge_title_text: str=None, is_top_supertitle: bool = False, curr_fig_width=1800,
+                                    **kwargs):
     """ Plots a scatter plot of a variable pre/post delta, with a histogram on each end corresponding to the pre/post delta distribution
 
     px_scatter_kwargs: only used if out_scatter_fig is None
     time_delta_tuple=(earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end)
 
+    `curr_fig_width` is only used to get the properly sized annotations/titles
+    
 
     Usage:
 
@@ -360,7 +363,8 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
             itemsizing='constant',
             # traceorder='normal',  # Ensures legend follows trace (category) order
             traceorder='grouped',  # Group traces with the same legendgroup
-        )
+        ),
+        # paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)' # Set Background Colors to Transparent
     )
 
 
@@ -368,26 +372,70 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     fig.update_xaxes(title_text="Delta-aligned Event Time (seconds)", row=1, col=2)
     fig.update_xaxes(title_text="# Events", row=1, col=3)
 
-    fig.update_yaxes(title_text="Probability of Short Track", row=1, col=1)
+    fig.update_yaxes(title_text="Probability of Short Track", row=1, col=1, range=[0, 1], # Set the desired range
+                    autorange=False,      # Disable autorange
+                    fixedrange=True       # Prevent zooming/panning (optional)
+                )
 
-    # Add Bold/Readible Title to indicate the epochs being plotted _______________________________________________________ #
-    # Adjust margins to create space outside the subplot
-    # new_fig_ripples = new_fig_ripples.update_layout(
-    #     margin=dict(t=100, l=100)  # Increase top and left margins
-    # )
+    # Add Bold/Readible Title to indicate the epochs being plotted _______________________________________________________ #    
+    
 
     if figure_sup_huge_title_text is not None:
         ## Adds a very bold and readible "PBEs" label to the top of the figure. The positioning is a nightmare, so hopefully it keeps working.
-        fig = fig.add_annotation(
-            text=figure_sup_huge_title_text,
-            # x=0.11, y=1.2,
-            x=0.11, y=1.25,
-            xref="paper", yref="paper",
-            showarrow=False,
-            font=dict(size=40),
-            xanchor='left', yanchor='top',
-            # row='all', col=2,
-        )
+        if is_top_supertitle:
+            fig = fig.update_layout(
+                margin=dict(l=80, r=80, t=100, b=(80-10)),
+                # paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)' # Set Background Colors to Transparent
+            )                    
+            fig = fig.add_annotation(
+                text=figure_sup_huge_title_text,
+                # x=0.11, y=1.2,
+                x=0.11, y=1.25,
+                xref="paper", yref="paper",
+                showarrow=False,
+                font=dict(size=40),
+                xanchor='left', yanchor='top',
+            )
+
+        else:
+            ## left-vertical supertitle position
+            # NOTE: These values are tweaked perfectly for width=1080, but even minor changes in width will mess them up (e.g. width=1200 is enough to substantially ruin them)
+            suptitle_kwarg_fig_width_dict = {1080: {'annotation_kwargs': dict(x=-0.11, ), 'line_x_pos': -0.078},
+								 1800: {'annotation_kwargs': dict(x=-0.057, ), 'line_x_pos': -0.04},
+            }
+            
+            fig = fig.update_layout(
+                margin=dict(l=(80+30), r=80, t=(100-60), b=(80-10)),  # Increase left margin to 60 pixels 
+            )
+            # Add a vertical text caption along the left side of the figure
+            annotation_kwargs = suptitle_kwarg_fig_width_dict[curr_fig_width]['annotation_kwargs']
+            fig = fig.add_annotation(
+                text=figure_sup_huge_title_text,
+                **annotation_kwargs, # Position at the very left of the figure
+                y=0.5,              # Center vertically
+                xref="paper",
+                yref="paper",
+                showarrow=False,
+                # font=dict(size=40),
+                font=dict(size=25),
+                textangle=-90,      # Rotate text 90 degrees counterclockwise
+                xanchor='center', # xanchor='center', 
+                yanchor='middle',
+            )
+            # Add a vertical line that separates the super title from the rest of the figure
+            line_x_pos: float = suptitle_kwarg_fig_width_dict[curr_fig_width]['line_x_pos']
+            fig = fig.add_shape(
+                type="line",
+                x0=line_x_pos,
+                y0=-0.5,  # 5% below the bottom
+                x1=line_x_pos,
+                y1=1.5,   # 5% above the top
+                xref="paper",
+                yref="paper",
+                line=dict(color="Black", width=2)
+            )
+
+
 
     return fig, figure_context
 
@@ -584,7 +632,10 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
                 row_index: int = a_session_i + 1 # 1-indexed
                 a_session_pre_delta_df: pd.DataFrame = pre_delta_df[pre_delta_df['session_name'] == a_session_name]
                 __sub_subfn_plot_histogram(fig, histogram_data_df=a_session_pre_delta_df, hist_title="Pre-delta", row=row_index, col=histogram_col_idx)
-                fig.update_yaxes(title_text=f"{a_session_name}", row=row_index, col=1)
+                fig.update_yaxes(title_text=f"{a_session_name}", row=row_index, col=1, range=[0, 1], # Set the desired range
+                    autorange=False,      # Disable autorange
+                    fixedrange=True       # Prevent zooming/panning (optional)
+                )
 
         else:
             __sub_subfn_plot_histogram(fig, histogram_data_df=pre_delta_df, hist_title="Pre-delta", row=1, col=histogram_col_idx)
@@ -609,8 +660,11 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
                     # fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
 
                 fig.update_xaxes(title_text="Delta-Relative Time (seconds)", row=row_index, col=scatter_column)
-                #  fig.update_yaxes(title_text=f"{a_session_name}", row=row_index, col=scatter_column)
-                fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+                #  fig.update_yaxes(title_text=f"{a_session_name}", row=row_index, col=scatter_column, # Set the desired range
+                #     autorange=False,      # Disable autorange
+                #     fixedrange=True       # Prevent zooming/panning (optional)
+                # )
+                fig.update_layout(yaxis=dict(range=[0.0, 1.0], autorange=False, fixedrange=True))
 
             #  fig.update_xaxes(matches='x')
 
@@ -623,7 +677,7 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
                 # a_trace['visible'] = 'legendonly'
                 # a_trace['visible'] = 'legendonly' # 'legendonly', # this trace will be hidden initially
                 fig.add_trace(a_trace, row=1, col=scatter_column)
-                fig.update_layout(yaxis=dict(range=[0.0, 1.0]))
+                fig.update_layout(yaxis=dict(range=[0.0, 1.0], autorange=False, fixedrange=True))
 
             # Update xaxis properties
             fig.update_xaxes(title_text="Delta-Relative Time (seconds)", row=1, col=scatter_column)
@@ -679,9 +733,12 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
         required_figure_height = 700
 
     fig.update_layout(title_text=scatter_title, width=2048, height=required_figure_height)
-    fig.update_layout(yaxis=dict(range=[0.0, 1.0])) # , template='plotly_dark'
+    fig.update_layout(yaxis=dict(range=[0.0, 1.0], autorange=False, fixedrange=True)) # , template='plotly_dark'
     # Update y-axis range for all created figures
-    fig.update_yaxes(range=[0.0, 1.0])
+    fig.update_yaxes(range=[0.0, 1.0], # Set the desired range
+                    autorange=False,      # Disable autorange
+                    fixedrange=True       # Prevent zooming/panning (optional)
+                )
 
     # Add a footer
     fig.update_layout(
