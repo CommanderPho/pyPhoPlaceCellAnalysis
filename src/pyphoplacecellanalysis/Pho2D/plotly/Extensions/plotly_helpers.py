@@ -26,7 +26,7 @@ import base64
 
 # from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import add_copy_button
 @function_attributes(short_name=None, tags=['plotly', 'interactive', 'clipboard', 'save', 'metadata', 'USEFUL'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-25 07:30', related_items=[])
-def add_copy_button(fig: go.Figure):
+def add_copy_save_action_buttons(fig: go.Figure):
     """
     Adds buttons to copy the Plotly figure to the clipboard as an image
     and download it with a specified filename inferred from the figure's title.
@@ -36,7 +36,7 @@ def add_copy_button(fig: go.Figure):
         
     Usage:
     
-        from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import add_copy_button
+        from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import add_copy_save_action_buttons
 
         # Example usage
         fig = go.Figure(data=[go.Scatter(y=[2, 1, 4, 3])])
@@ -248,7 +248,8 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     data_context = data_context.adding_context_if_missing(num_sessions=num_unique_sessions)        
     figure_context_dict['num_unique_sessions'] = num_unique_sessions
 
-    dataframe_name = data_context.get('dataframe_name', None)
+    dataframe_name = data_context.to_dict().get('dataframe_name', None) ## TODO: dataframe_name
+    
     
     ## Extract the unique time bin sizes:
     num_unique_time_bin_sizes: int = data_results_df.time_bin_size.nunique(dropna=True)
