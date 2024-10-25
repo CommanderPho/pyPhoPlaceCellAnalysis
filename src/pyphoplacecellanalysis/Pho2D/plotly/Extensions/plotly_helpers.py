@@ -7,6 +7,7 @@ import pandas as pd
 import plotly.subplots as sp
 import plotly.express as px
 import plotly.graph_objs as go
+import plotly.io as pio
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from plotly import graph_objs as go
 from typing_extensions import TypeAlias
@@ -19,6 +20,51 @@ from neuropy.utils.result_context import IdentifyingContext
 
 from pyphocorehelpers.Filesystem.path_helpers import sanitize_filename_for_Windows
 
+import ipywidgets as widgets
+from IPython.display import display, Javascript
+import base64
+
+
+def add_copy_button(fig: go.Figure):
+    """
+    Adds a button to copy the Plotly figure to the clipboard as an image.
+    
+    Args:
+        fig (go.Figure): The Plotly figure to be copied to the clipboard.
+    """
+    button = widgets.Button(description="Copy to Clipboard")
+
+    def on_button_click(b):
+        # Convert the figure to a PNG image
+        png_bytes = pio.to_image(fig, format='png')
+        encoded_image = base64.b64encode(png_bytes).decode('utf-8')
+
+        # JavaScript code to copy the image to the clipboard using the canvas element
+        js_code = f'''
+            const img = new Image();
+            img.src = 'data:image/png;base64,{encoded_image}';
+            img.onload = function() {{
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                canvas.toBlob(function(blob) {{
+                    const item = new ClipboardItem({{ 'image/png': blob }});
+                    navigator.clipboard.write([item]).then(function() {{
+                        console.log('Image copied to clipboard');
+                    }}).catch(function(error) {{
+                        console.error('Error copying image to clipboard: ', error);
+                    }});
+                }});
+            }};
+        '''
+
+        display(Javascript(js_code))
+
+    button.on_click(on_button_click)
+    display(button)
+    
 
 @function_attributes(short_name=None, tags=['plotly', 'export', 'save'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-27 17:59', related_items=[])
 def plotly_helper_save_figures(figures_folder: Optional[Path]=None, figure_save_extension: Union[str, List[str], Tuple[str]]='.png'):
@@ -486,6 +532,7 @@ def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: floa
 @function_attributes(short_name=None, tags=['plotly', 'histogram'], input_requires=[], output_provides=[], uses=[], used_by=['plot_across_sessions_scatter_results'], creation_date='2024-05-28 07:01', related_items=[])
 def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, earliest_delta_aligned_t_start: float=0.0, latest_delta_aligned_t_end: float=666.0,
                                           enabled_time_bin_sizes=None, main_plot_mode: str = 'separate_row_per_session', variable_name: str = 'P_Short', is_dark_mode: bool=True,
+                                          px_scatter_kwargs=None, px_histogram_kwargs=None,
                                           **build_fig_kwargs):
     """ factored out of the subfunction in plot_across_sessions_scatter_results
     adds scatterplots as well
@@ -543,7 +590,7 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
     enable_histograms: bool = True
     enable_scatter_plot: bool = True
     enable_epoch_shading_shapes: bool = True
-    px_histogram_kwargs = {'nbins': histogram_bins, 'barmode': barmode, 'opacity': 0.5, 'range_y': [0.0, 1.0], 'histnorm': 'probability density'} #, 'histnorm': 'probability density'
+    px_histogram_kwargs = {'nbins': histogram_bins, 'barmode': barmode, 'opacity': 0.5, 'range_y': [0.0, 1.0], 'histnorm': 'probability density'} | (px_histogram_kwargs or {}) #, 'histnorm': 'probability density'
 
     if (main_plot_mode == 'default'):
         # main_plot_mode: str = 'default'
@@ -557,7 +604,7 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
         # sp_make_subplots_kwargs = {'rows': 1, 'cols': 3, 'column_widths': [0.1, 0.8, 0.1], 'horizontal_spacing': 0.01, 'shared_yaxes': True, 'column_titles': column_titles}
         sp_make_subplots_kwargs = {'rows': 1, 'cols': num_cols, 'column_widths': column_widths, 'horizontal_spacing': 0.01, 'shared_yaxes': True, 'column_titles': list(np.array(column_titles)[is_col_included])}
         # px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'color': 'session_name', 'size': 'time_bin_size', 'title': scatter_title, 'range_y': [0.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}
-        px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'color': 'time_bin_size', 'title': scatter_title, 'range_y': [0.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}
+        px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'color': 'time_bin_size', 'title': scatter_title, 'range_y': [0.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}} | (px_scatter_kwargs or {})
 
         # px_histogram_kwargs = {'nbins': histogram_bins, 'barmode': barmode, 'opacity': 0.5, 'range_y': [0.0, 1.0], 'histnorm': 'probability'}
 
@@ -592,7 +639,7 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
                                     }
         px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'color': 'time_bin_size', 'range_y': [0.0, 1.0],
                             'height': (num_unique_sessions*200), 'width': 1024,
-                            'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}
+                            'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size'}}  | (px_scatter_kwargs or {})
         # px_histogram_kwargs = {'nbins': histogram_bins, 'barmode': barmode, 'opacity': 0.5, 'range_y': [0.0, 1.0], 'histnorm': 'probability'}
     else:
         raise ValueError(f'main_plot_mode is not a known mode: main_plot_mode: "{main_plot_mode}", known modes: known_main_plot_modes: {known_main_plot_modes}')
