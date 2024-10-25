@@ -191,7 +191,7 @@ class PlotlyFigureContainer:
 
 
 @function_attributes(short_name=None, tags=['plotly', 'scatter'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-27 09:07', related_items=[])
-def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig=None, histogram_bins:int=25,
+def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: Optional[IdentifyingContext]=None, out_scatter_fig=None, histogram_bins:int=25,
                                    common_plot_kwargs=None, px_scatter_kwargs=None,
                                    histogram_variable_name='P_Long', hist_kwargs=None,
                                    forced_range_y=[0.0, 1.0], time_delta_tuple=None, is_dark_mode: bool = True, figure_sup_huge_title_text: str=None, is_top_supertitle: bool = False, curr_fig_width=1800,
@@ -232,6 +232,10 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
         pre_delta_label: str = 'Pre-delta'
         post_delta_label: str = 'Post-delta'
 
+    # figure_context_dict ________________________________________________________________________________________________ #
+    data_context = data_context.adding_context_if_missing(variable_name=histogram_variable_name)
+    # figure_context = deepcopy(data_context).adding_context_if_missing(**data_context.get_subset(subset_includelist=['epochs_name', 'data_grain']).to_dict(), plot_type='scatter+hist', comparison='pre-post-delta', variable_name=histogram_variable_name)
+    
     figure_context_dict = {'histogram_variable_name': histogram_variable_name}
 
     # unique_sessions = data_results_df['session_name'].unique()
@@ -240,8 +244,8 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
         num_unique_sessions: int = data_results_df['session_name'].nunique(dropna=True)
     else:
         num_unique_sessions: int = 1
-    
-        
+
+    data_context = data_context.adding_context_if_missing(num_sessions=num_unique_sessions)        
     figure_context_dict['num_unique_sessions'] = num_unique_sessions
 
     ## Extract the unique time bin sizes:
@@ -319,7 +323,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     
 
 
-    ## Build legends:
+    # Build legends: _____________________________________________________________________________________________________ #
     if 'color' in common_plot_kwargs:
         ## have color
         if ('color' not in hist_kwargs):
@@ -438,10 +442,16 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
     else:
         _extras_output_dict = {}
 
-
+    # Set Figure Metadata ________________________________________________________________________________________________ #
     # figure_context_dict['n_tbin'] = num_unique_time_bins
     figure_context = IdentifyingContext(**figure_context_dict)
+    figure_context = figure_context.adding_context_if_missing(**data_context.get_subset(subset_includelist=['epochs_name', 'data_grain']).to_dict(), plot_type='scatter+hist', comparison='pre-post-delta', variable_name=histogram_variable_name)
+    
+    fig.update_layout(meta={'figure_context': figure_context,
+                            'preferred_filename': 'custom_figure_metadata_name'})  # Set custom metadata for preferred filename
 
+
+    # Build Legend and Titles ____________________________________________________________________________________________ #
     # Update layout to add a title to the legend
     legend_title_text = kwargs.get('legend_title_text', None)
     if legend_title_text is None:
@@ -474,9 +484,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
                     fixedrange=True       # Prevent zooming/panning (optional)
                 )
 
-    # Add Bold/Readible Title to indicate the epochs being plotted _______________________________________________________ #    
-    
-
+    # Add Bold/Readible Title to indicate the epochs being plotted _______________________________________________________ #
     if figure_sup_huge_title_text is not None:
         ## Adds a very bold and readible "PBEs" label to the top of the figure. The positioning is a nightmare, so hopefully it keeps working.
         if is_top_supertitle:
@@ -532,9 +540,8 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, out_scatter_fig
                 line=dict(color="Black", width=2)
             )
 
-
-
     return fig, figure_context
+
 
 @function_attributes(short_name=None, tags=['plotly', 'helper', 'epoch', 'track'], input_requires=[], output_provides=[], uses=[], used_by=['_helper_build_figure'], creation_date='2024-03-01 13:58', related_items=[])
 def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: float, t_split:float, t_end: float, is_dark_mode: bool = True):
