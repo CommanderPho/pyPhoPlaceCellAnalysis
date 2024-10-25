@@ -2808,9 +2808,9 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
             #     "(laps_marginals_df)_tbin-0.25.csv",
             # ]            
             file_name: str = Path(row['path']).stem
-            if file_name.find('_tbin-') != -1:
-                # found an invalid export from the old  `compute_and_export_marginals_dfs_completion_function`
-                _is_file_valid = False
+            # if file_name.find('_tbin-') != -1:
+            #     # found an invalid export from the old  `compute_and_export_marginals_dfs_completion_function`
+            #     _is_file_valid = False
             
         if _is_file_valid:
             # Process each file type with its corresponding details

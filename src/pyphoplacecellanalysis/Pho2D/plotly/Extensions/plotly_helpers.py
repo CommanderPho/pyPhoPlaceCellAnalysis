@@ -248,6 +248,8 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     data_context = data_context.adding_context_if_missing(num_sessions=num_unique_sessions)        
     figure_context_dict['num_unique_sessions'] = num_unique_sessions
 
+    dataframe_name = data_context.get('dataframe_name', None)
+    
     ## Extract the unique time bin sizes:
     num_unique_time_bin_sizes: int = data_results_df.time_bin_size.nunique(dropna=True)
     unique_time_bin_sizes: NDArray = np.unique(data_results_df.time_bin_size.to_numpy())
@@ -445,10 +447,13 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     # Set Figure Metadata ________________________________________________________________________________________________ #
     # figure_context_dict['n_tbin'] = num_unique_time_bins
     figure_context = IdentifyingContext(**figure_context_dict)
+    print(f"figure_context: {figure_context.get_initialization_code_string()}")
     figure_context = figure_context.adding_context_if_missing(**data_context.get_subset(subset_includelist=['epochs_name', 'data_grain']).to_dict(), plot_type='scatter+hist', comparison='pre-post-delta', variable_name=histogram_variable_name)
+    print(f"figure_context: {figure_context.get_initialization_code_string()}")
+    preferred_filename: str = sanitize_filename_for_Windows(figure_context.get_subset(subset_excludelist=[]).get_description())
     
-    fig.update_layout(meta={'figure_context': figure_context,
-                            'preferred_filename': 'custom_figure_metadata_name'})  # Set custom metadata for preferred filename
+    fig.update_layout(meta={'figure_context': figure_context.to_dict(),
+                            'preferred_filename': preferred_filename})  # Set custom metadata for preferred filename
 
 
     # Build Legend and Titles ____________________________________________________________________________________________ #
