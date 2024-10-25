@@ -33,6 +33,16 @@ def add_copy_button(fig: go.Figure):
     
     Args:
         fig (go.Figure): The Plotly figure to be copied to the clipboard.
+        
+    Usage:
+    
+        from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import add_copy_button
+
+        # Example usage
+        fig = go.Figure(data=[go.Scatter(y=[2, 1, 4, 3])])
+        fig = fig.update_layout(title='Custom Figure Title', meta={'preferred_filename': 'custom_figure_metadata_name'})  # Set custom metadata for preferred filename
+        add_copy_button(fig)
+
     """
     # Infer filename from custom metadata if available, otherwise fall back to the figure's title
     preferred_filename = fig.layout.meta.get('preferred_filename') if fig.layout.meta else None
@@ -42,9 +52,10 @@ def add_copy_button(fig: go.Figure):
         title = fig.layout.title.text if fig.layout.title and fig.layout.title.text else "figure"
         filename = f"{title.replace(' ', '_')}.png"
 
-        
+
     button_copy = widgets.Button(description="Copy to Clipboard", icon='copy')
     button_download = widgets.Button(description="Download Image", icon='save')
+    filename_label = widgets.Label(value=preferred_filename if preferred_filename else "No custom filename")
 
     def on_copy_button_click(b):
         # Convert the figure to a PNG image
@@ -94,7 +105,16 @@ def add_copy_button(fig: go.Figure):
     button_copy.on_click(on_copy_button_click)
     button_download.on_click(on_download_button_click)
     
-    display(widgets.HBox([button_copy, button_download]))
+
+    # Create an output widget to hold the figure
+    output_fig = widgets.Output()
+    with output_fig:
+        fig.show()
+    # display(widgets.HBox([widgets.HBox([button_copy, button_download]), output_fig]))
+    
+    # Display buttons with filename label to the right of the buttons
+    display(widgets.VBox([widgets.HBox([button_copy, button_download, filename_label]), output_fig]))
+    
 
 
 @function_attributes(short_name=None, tags=['plotly', 'export', 'save'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-27 17:59', related_items=[])
