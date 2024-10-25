@@ -24,17 +24,29 @@ import ipywidgets as widgets
 from IPython.display import display, Javascript
 import base64
 
-
+# from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import add_copy_button
+@function_attributes(short_name=None, tags=['plotly', 'interactive', 'clipboard', 'save', 'metadata', 'USEFUL'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-25 07:30', related_items=[])
 def add_copy_button(fig: go.Figure):
     """
-    Adds a button to copy the Plotly figure to the clipboard as an image.
+    Adds buttons to copy the Plotly figure to the clipboard as an image
+    and download it with a specified filename inferred from the figure's title.
     
     Args:
         fig (go.Figure): The Plotly figure to be copied to the clipboard.
     """
-    button = widgets.Button(description="Copy to Clipboard")
+    # Infer filename from custom metadata if available, otherwise fall back to the figure's title
+    preferred_filename = fig.layout.meta.get('preferred_filename') if fig.layout.meta else None
+    if preferred_filename:
+        filename = f"{preferred_filename}.png"
+    else:
+        title = fig.layout.title.text if fig.layout.title and fig.layout.title.text else "figure"
+        filename = f"{title.replace(' ', '_')}.png"
 
-    def on_button_click(b):
+        
+    button_copy = widgets.Button(description="Copy to Clipboard", icon='copy')
+    button_download = widgets.Button(description="Download Image", icon='save')
+
+    def on_copy_button_click(b):
         # Convert the figure to a PNG image
         png_bytes = pio.to_image(fig, format='png')
         encoded_image = base64.b64encode(png_bytes).decode('utf-8')
@@ -62,9 +74,28 @@ def add_copy_button(fig: go.Figure):
 
         display(Javascript(js_code))
 
-    button.on_click(on_button_click)
-    display(button)
+    def on_download_button_click(b):
+        # Convert the figure to a PNG image
+        png_bytes = pio.to_image(fig, format='png')
+        encoded_image = base64.b64encode(png_bytes).decode('utf-8')
+
+        # JavaScript code to trigger download with a specific filename
+        js_code = f'''
+            const link = document.createElement('a');
+            link.href = 'data:image/png;base64,{encoded_image}';
+            link.download = '{filename}';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        '''
+
+        display(Javascript(js_code))
+
+    button_copy.on_click(on_copy_button_click)
+    button_download.on_click(on_download_button_click)
     
+    display(widgets.HBox([button_copy, button_download]))
+
 
 @function_attributes(short_name=None, tags=['plotly', 'export', 'save'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-27 17:59', related_items=[])
 def plotly_helper_save_figures(figures_folder: Optional[Path]=None, figure_save_extension: Union[str, List[str], Tuple[str]]='.png'):
