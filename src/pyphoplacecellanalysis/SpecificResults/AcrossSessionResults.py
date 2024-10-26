@@ -2283,7 +2283,8 @@ def load_across_sessions_exported_h5_files(collected_outputs_directory=None, cut
 
 @function_attributes(short_name=None, tags=['across_sessions'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-15 08:47', related_items=[])
 def load_across_sessions_exported_files(cuttoff_date: Optional[datetime] = None, collected_outputs_directory: Optional[Path]=None, debug_print: bool = False):
-	"""
+	""" Discovers all exported CSV files in collected_outputs, parses their filenames to determine the most recent one for each session, and builds joined dataframes from these values.
+	
 	#TODO 2024-10-23 05:12: - [ ] updated to use the modern `_new_process_csv_files`-based approach
 	
 	from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import load_across_sessions_exported_files
@@ -2401,6 +2402,8 @@ def load_across_sessions_exported_files(cuttoff_date: Optional[datetime] = None,
 			if 'time_bin_size' not in a_df:
 				print('Uh-oh! time_bin_size is missing! This must be old exports!')
 				print(f'\tTry to determine the time_bin_size from the filenames: {csv_sessions}')
+				raise DeprecationWarning('Uh-oh! time_bin_size is missing! This must be old exports!')
+				raise NotImplementedError('NO LOONGER DOING THIS')
 				## manual correction UwU
 				# time_bin_size: float = 0.025
 				# print(f'WARNING! MANUAL OVERRIDE TIME BIN SIZE SET: time_bin_size = {time_bin_size}. Assigning to dataframes....')
@@ -2565,6 +2568,9 @@ def _concat_all_dicts_to_dfs(final_sessions_loaded_laps_dict, final_sessions_loa
 	all_sessions_wcorr_ripple_df: pd.DataFrame = PandasHelpers.safe_concat(list(final_sessions_loaded_ripple_wcorr_dict.values()), axis='index', ignore_index=True)
 
 	# `*_all_scores_*`: __________________________________________________________________________________________________ #
+	# test_df_list = list(final_sessions_loaded_ripple_all_scores_dict.values())
+	# [np.shape(df) for df in test_df_list]
+	# {k:np.shape(df) for k, df in final_sessions_loaded_ripple_all_scores_dict.items()}
 	# all_sessions_all_score_laps_df: pd.DataFrame = PandasHelpers.safe_concat(list(final_sessions_loaded_laps_all_scores_dict.values()), axis='index', ignore_index=True)
 	all_sessions_all_scores_ripple_df: pd.DataFrame = PandasHelpers.safe_concat(list(final_sessions_loaded_ripple_all_scores_dict.values()), axis='index', ignore_index=True)
 
@@ -2756,8 +2762,6 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
 	
 	# Sort by columns: 'session' (ascending), 'custom_replay_name' (ascending) and 3 other columns
 	parsed_csv_files_df = parsed_csv_files_df.sort_values(['session', 'file_type', 'custom_replay_name', 'decoding_time_bin_size_str', 'export_datetime'], ascending=[True, True, True, True, False]).reset_index(drop=True) # ensures all are sorted ascending except for export_datetime, which are sorted decending so the first value is the most recent.
-
-
 
 	excluded_or_outdated_files_list = []
 	for index, row in parsed_csv_files_df.iterrows():
