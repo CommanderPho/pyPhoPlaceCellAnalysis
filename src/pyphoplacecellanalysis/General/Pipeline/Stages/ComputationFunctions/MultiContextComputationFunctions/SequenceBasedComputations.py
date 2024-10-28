@@ -1214,7 +1214,7 @@ class WCorrShuffle(ComputedResult):
         return fig
 
 
-    @function_attributes(short_name=None, tags=['export', 'csv'], input_requires=[], output_provides=['*-(ripple_wcorr_shuffle_all_df)*.csv'], uses=[], used_by=[], creation_date='2024-07-12 05:12', related_items=[])
+    @function_attributes(short_name=None, tags=['export', 'csv'], input_requires=['global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz', 'global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values'], output_provides=['*-(ripple_wcorr_shuffle_all_df)*.csv'], uses=[], used_by=[], creation_date='2024-07-12 05:12', related_items=[])
     def export_csvs(self, parent_output_path: Path, active_context: IdentifyingContext, session_name: str, curr_active_pipeline=None, **additional_selections_context):
         """ export as separate .csv files. 
 
@@ -1377,7 +1377,8 @@ class SequenceBasedComputationsGlobalComputationFunctions(AllFunctionEnumerating
     _computationPrecidence = 1005
     _is_global = True
 
-    @function_attributes(short_name='wcorr_shuffle_analysis', tags=['directional_pf', 'laps', 'wcorr', 'session', 'pf1D'], input_requires=['DirectionalLaps', 'RankOrder'], output_provides=['SequenceBased'], uses=['SequenceBasedComputationsContainer', 'WCorrShuffle'], used_by=[], creation_date='2024-05-27 14:31', related_items=[],
+    @function_attributes(short_name='wcorr_shuffle_analysis', tags=['directional_pf', 'laps', 'wcorr', 'session', 'pf1D'],
+                        input_requires=['DirectionalLaps', 'RankOrder', 'global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz', 'global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values'], output_provides=['SequenceBased'], uses=['SequenceBasedComputationsContainer', 'WCorrShuffle'], used_by=[], creation_date='2024-05-27 14:31', related_items=[],
         requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders', 'RankOrder', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=['SequenceBased'],
         validate_computation_test=validate_has_sequence_based_results, is_global=True)
     def perform_wcorr_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=1024, drop_previous_result_and_compute_fresh:bool=False):
