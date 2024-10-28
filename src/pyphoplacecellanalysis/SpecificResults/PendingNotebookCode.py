@@ -342,7 +342,7 @@ ContextDescStr = NewType('ContextDescStr', str) # like '2023-07-11_kdiba_gor01_o
 ImageNameStr = NewType('ImageNameStr', str) # like '2006-6-07_11-26-53/kdiba_gor01_one_2006-6-07_11-26-53_maze1__display_1d_placefield_validations.pdf'
 
 class ProgrammaticDisplayFunctionTestingFolderImageLoading:
-	""" 
+	""" Loads image from the folder
 	from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import ProgrammaticDisplayFunctionTestingFolderImageLoading
 	
 	"""
@@ -881,33 +881,7 @@ def plot_replay_wcorr_histogram(df: pd.DataFrame, plot_var_name: str, all_shuffl
 # ---------------------------------------------------------------------------- #
 #      2024-06-25 - Diba 2009-style Replay Detection via Quiescent Period      #
 # ---------------------------------------------------------------------------- #
-@function_attributes(short_name=None, tags=['pure', 'pkl'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-28 13:23', related_items=[])
-def helper_perform_pickle_pipeline(a_curr_active_pipeline, custom_save_filenames, custom_save_filepaths, enable_save_pipeline_pkl, enable_save_global_computations_pkl, enable_save_h5):
-	""" Pickles the pipelines as needed
-
-	from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import helper_perform_pickle_pipeline
-	custom_save_filepaths = helper_perform_pickle_pipeline(a_curr_active_pipeline=_temp_curr_active_pipeline, custom_save_filenames=custom_save_filenames, custom_save_filepaths=custom_save_filepaths, enable_save_pipeline_pkl=True, enable_save_global_computations_pkl=False, enable_save_h5=False)
-
-	"""
-	from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
-	
-	try:
-		if enable_save_pipeline_pkl:
-			custom_save_filepaths['pipeline_pkl'] = a_curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, active_pickle_filename=custom_save_filenames['pipeline_pkl'])
-
-		if enable_save_global_computations_pkl:
-			custom_save_filepaths['global_computation_pkl'] = a_curr_active_pipeline.save_global_computation_results(override_global_pickle_filename=custom_save_filenames['global_computation_pkl'])
-
-		if enable_save_h5:
-			custom_save_filepaths['pipeline_h5'] = a_curr_active_pipeline.export_pipeline_to_h5(override_filename=custom_save_filenames['pipeline_h5'])
-		
-		print(f'custom_save_filepaths: {custom_save_filepaths}')
-
-	except BaseException as e:
-		print(f'failed pickling in `helper_perform_pickle_pipeline(...)` with error: {e}')
-		pass
-	
-	return custom_save_filepaths
+from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import helper_perform_pickle_pipeline
 
 
 @function_attributes(short_name=None, tags=['replay', 'epochs'], input_requires=[], output_provides=[], uses=[], used_by=['overwrite_replay_epochs_and_recompute'], creation_date='2024-06-26 21:10', related_items=[])
@@ -972,8 +946,11 @@ def replace_replay_epochs(curr_active_pipeline, new_replay_epochs: Epoch):
 	return did_change, _backup_session_replay_epochs, _backup_session_configs
 
 
+@function_attributes(short_name=None, tags=['dataframe', 'filename', 'metadata'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 12:40', related_items=[])
 def _get_custom_suffix_for_replay_filename(new_replay_epochs: Epoch, *extras_strings) -> str:
-	"""
+	""" Uses metadata stored in the replays dataframe to determine an appropriate filename
+	
+	
 	from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _get_custom_suffix_for_replay_filename
 	custom_suffix = _get_custom_suffix_for_replay_filename(new_replay_epochs=new_replay_epochs)
 
@@ -1176,9 +1153,6 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
 		# custom_save_filepaths['ripple_csv_out_path'] = ripple_out_path
 
 		# END Normal data Export _____________________________________________________________________________________________ #
-
-
-
 
 		## Long/Short Stuff:
 		# curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['long_short_decoding_analyses','long_short_fr_indicies_analyses','jonathan_firing_rate_analysis',
@@ -1481,16 +1455,18 @@ def compute_diba_quiescent_style_replay_events(curr_active_pipeline, spikes_df, 
 	return (qclu_included_aclus, active_track_templates, active_spikes_df, quiescent_periods), (new_replay_epochs_df, new_replay_epochs)
 
 @function_attributes(short_name=None, tags=['MAIN', 'ALT_REPLAYS', 'replay'], input_requires=[], output_provides=[], uses=['compute_diba_quiescent_style_replay_events', 'try_load_neuroscope_EVT_file_epochs', 'try_load_neuroscope_EVT_file_epochs'], used_by=['compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function'], creation_date='2024-07-03 06:12', related_items=[])
-def compute_all_replay_epoch_variations(curr_active_pipeline, included_qclu_values = [1,2,4,6,7,9], minimum_inclusion_fr_Hz=5.0) -> Dict[str, Epoch]:
+def compute_all_replay_epoch_variations(curr_active_pipeline, included_qclu_values = [1,2,4,6,7,9], minimum_inclusion_fr_Hz=5.0, suppress_exceptions: bool = True) -> Dict[str, Epoch]:
 	""" Computes alternative replays (such as loading them from Diba-exported files, computing using the quiescent periods before the event, etc)
 	
-	from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_all_replay_epoch_variations
+	suppress_exceptions: bool - allows some alternative replay computations to fail
+	
+	Usage:
+		from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_all_replay_epoch_variations
 
-	replay_epoch_variations = compute_all_replay_epoch_variations(curr_active_pipeline)
-	replay_epoch_variations
+		replay_epoch_variations = compute_all_replay_epoch_variations(curr_active_pipeline)
+		replay_epoch_variations
 
 	"""
-	# 
 	from neuropy.core.epoch import Epoch, ensure_Epoch, ensure_dataframe
 	from pyphocorehelpers.exception_helpers import ExceptionPrintingContext
 	from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
@@ -1498,9 +1474,6 @@ def compute_all_replay_epoch_variations(curr_active_pipeline, included_qclu_valu
 	# print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
 	# print(f'compute_all_replay_epoch_variations(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
 	
-	suppress_exceptions: bool = True # allow some alternative replay computations to fail
-
-
 	# ==================================================================================================================== #
 	# Compute Alternative Replays: `replay_epoch_variations`                                                               #
 	# ==================================================================================================================== #
@@ -1512,16 +1485,18 @@ def compute_all_replay_epoch_variations(curr_active_pipeline, included_qclu_valu
 	#     replay_epoch_variations.update({
 	#         'initial_loaded': ensure_Epoch(deepcopy(curr_active_pipeline.sess.replay_backup), metadata={'epochs_source': 'initial_loaded'}),
 	#     })
-		
+	
 	with ExceptionPrintingContext(suppress=suppress_exceptions, exception_print_fn=(lambda formatted_exception_str: print(f'\t"normal_computed" failed with error: {formatted_exception_str}. Skipping.'))):
 		## Get the estimation parameters:
-		replay_estimation_parameters = curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays
+		replay_estimation_parameters = deepcopy(curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays)
 		assert replay_estimation_parameters is not None
 
 		## get the epochs computed normally:
 		replay_epoch_variations.update({
-			'normal_computed': ensure_Epoch(deepcopy(curr_active_pipeline.sess.replay), metadata={'epochs_source': 'normal_computed', 'minimum_inclusion_fr_Hz': replay_estimation_parameters['min_inclusion_fr_active_thresh'], 'min_num_active_neurons': replay_estimation_parameters['min_num_unique_aclu_inclusions'],
-																								  'included_qclu_values': included_qclu_values
+			'normal_computed': ensure_Epoch(deepcopy(curr_active_pipeline.sess.replay), metadata={'epochs_source': 'normal_computed',
+																						  'minimum_inclusion_fr_Hz': replay_estimation_parameters['min_inclusion_fr_active_thresh'],
+																						  'min_num_active_neurons': replay_estimation_parameters['min_num_unique_aclu_inclusions'],
+																							'included_qclu_values': deepcopy(included_qclu_values)
 																							}),
 		})
 
