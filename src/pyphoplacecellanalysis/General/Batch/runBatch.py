@@ -1092,7 +1092,7 @@ def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False,
     return active_batch_run
 
 
-@function_attributes(short_name='run_specific_batch', tags=['batch', 'automated', 'load', 'main', 'pipeline'], input_requires=[], output_provides=[], uses=['batch_load_session'], used_by=[], creation_date='2023-03-28 04:46')
+@function_attributes(short_name='run_specific_batch', tags=['batch', 'automated', 'load', 'main', 'pipeline'], input_requires=[], output_provides=[], uses=['batch_load_session'], used_by=['python_template.py.j2'], creation_date='2023-03-28 04:46')
 def run_specific_batch(global_data_root_parent_path: Path, curr_session_context: IdentifyingContext, curr_session_basedir: Path, existing_task_logger: Optional[logging.Logger]=None, force_reload:bool=True, post_run_callback_fn:Optional[Callable]=None, saving_mode=PipelineSavingScheme.OVERWRITE_IN_PLACE, **kwargs):
     """ For a specific session (identified by the session context) - calls batch_load_session(...) to get the curr_active_pipeline.
             - Then calls `post_run_callback_fn(...)

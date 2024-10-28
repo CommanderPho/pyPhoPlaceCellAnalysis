@@ -586,7 +586,7 @@ class BatchSessionCompletionHandler:
 
 
     ## Main function that's called with the complete pipeline:
-    @function_attributes(short_name=None, tags=['replay'], input_requires=['filtered_sessions[*].replay'], output_provides=[], uses=[], used_by=[], creation_date='2024-07-02 11:44', related_items=[])  
+    @function_attributes(short_name=None, tags=['IMPORTANT', 'callback', 'replay'], input_requires=['filtered_sessions[*].replay'], output_provides=[], uses=['self.completion_functions'], used_by=['run_specific_batch'], creation_date='2024-07-02 11:44', related_items=[])  
     def on_complete_success_execution_session(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline) -> PipelineCompletionResult:
         """ called when the execute_session completes like:
             `post_run_callback_fn_output = post_run_callback_fn(curr_session_context, curr_session_basedir, curr_active_pipeline)`
