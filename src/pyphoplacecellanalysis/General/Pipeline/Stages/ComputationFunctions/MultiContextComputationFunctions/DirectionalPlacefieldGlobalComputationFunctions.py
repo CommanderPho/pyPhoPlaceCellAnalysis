@@ -398,11 +398,7 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
 		# OUTPUTS: LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df
 		return (LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df), AnyDir_decoder_aclu_MAX_peak_maps_df
 
-			
-
-
 	## WARNING 2024-02-07 - The following all use .peak_tuning_curve_center_of_masses: .get_decoder_aclu_peak_maps, get_decoder_aclu_peak_map_dict, get_decoder_aclu_peak_map_dict
-
 	@function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-06 00:00', related_items=[])
 	def get_long_short_decoder_shifts(self):
 		""" uses `find_shift` """
@@ -474,34 +470,6 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
 		return f"{type(self).__name__}({content}\n)"
 
 
-	def filtered_by_frate(self, minimum_inclusion_fr_Hz: float = 5.0) -> "TrackTemplates":
-		""" Does not modify self! Returns a copy! Filters the included neuron_ids by their `tuning_curve_unsmoothed_peak_firing_rates` (a property of their `.pf.ratemap`)
-		minimum_inclusion_fr_Hz: float = 5.0
-		modified_long_LR_decoder = filtered_by_frate(track_templates.long_LR_decoder, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, debug_print=True)
-		Usage:
-			minimum_inclusion_fr_Hz: float = 5.0
-			filtered_decoder_list = [filtered_by_frate(a_decoder, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, debug_print=True) for a_decoder in (track_templates.long_LR_decoder, track_templates.long_RL_decoder, track_templates.short_LR_decoder, track_templates.short_RL_decoder)]
-		"""
-		return self.filtered_by_frate_and_qclu(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=None)
-	
-
-	@function_attributes(short_name=None, tags=['main', 'filter', 'qclu', 'frate'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-22 03:50', related_items=[])
-	def filtered_by_frate_and_qclu(self, minimum_inclusion_fr_Hz:Optional[float]=None, included_qclu_values:Optional[List]=None) -> "TrackTemplates":
-		""" Does not modify self! Returns a copy! Filters the included neuron_ids by their `tuning_curve_unsmoothed_peak_firing_rates` (a property of their `.pf.ratemap`)
-		Usage:
-			filtered_track_templates = track_templates.filtered_by_frate_and_qclu(minimum_inclusion_fr_Hz=5.0, included_qclu_values=[1, 2])
-		"""
-		filtered_decoder_list, filtered_direction_shared_aclus_list = TrackTemplates.determine_decoder_aclus_filtered_by_frate_and_qclu(decoders_dict=self.get_decoders_dict(), minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)        
-		long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder = filtered_decoder_list # unpack
-		_obj = TrackTemplates.init_from_paired_decoders(LR_decoder_pair=(long_LR_decoder, short_LR_decoder), RL_decoder_pair=(long_RL_decoder, short_RL_decoder), rank_method=self.rank_method)
-		assert np.all(filtered_direction_shared_aclus_list[0] == _obj.shared_LR_aclus_only_neuron_IDs)
-		assert np.all(filtered_direction_shared_aclus_list[1] == _obj.shared_RL_aclus_only_neuron_IDs)
-		assert len(filtered_direction_shared_aclus_list[0]) == len(_obj.decoder_LR_pf_peak_ranks_list[0])
-		assert len(filtered_direction_shared_aclus_list[1]) == len(_obj.decoder_RL_pf_peak_ranks_list[0])
-		return _obj
-
-
-
 	def get_decoders(self) -> Tuple[BasePositionDecoder, BasePositionDecoder, BasePositionDecoder, BasePositionDecoder]:
 		"""
 		long_LR_one_step_decoder_1D, long_RL_one_step_decoder_1D, short_LR_one_step_decoder_1D, short_RL_one_step_decoder_1D = directional_laps_results.get_decoders()
@@ -527,7 +495,7 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
 			'short_RL': self.short_RL_decoder,
 		}
 	
-
+	# Slicing/Filtering by Neuron Properties _____________________________________________________________________________ #
 	def sliced_by_neuron_id(self, included_neuron_ids: NDArray) -> "TrackTemplates":
 		""" refactored out of `self.filtered_by_frate(...)` and `TrackTemplates.determine_decoder_aclus_filtered_by_frate(...)`
 		"""
@@ -558,7 +526,37 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
 		assert len(filtered_direction_shared_aclus_list[0]) == len(_obj.decoder_LR_pf_peak_ranks_list[0])
 		assert len(filtered_direction_shared_aclus_list[1]) == len(_obj.decoder_RL_pf_peak_ranks_list[0])
 		return _obj
+
+
+	def filtered_by_frate(self, minimum_inclusion_fr_Hz: float = 5.0) -> "TrackTemplates":
+		""" Does not modify self! Returns a copy! Filters the included neuron_ids by their `tuning_curve_unsmoothed_peak_firing_rates` (a property of their `.pf.ratemap`)
+		minimum_inclusion_fr_Hz: float = 5.0
+		modified_long_LR_decoder = filtered_by_frate(track_templates.long_LR_decoder, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, debug_print=True)
+		Usage:
+			minimum_inclusion_fr_Hz: float = 5.0
+			filtered_decoder_list = [filtered_by_frate(a_decoder, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, debug_print=True) for a_decoder in (track_templates.long_LR_decoder, track_templates.long_RL_decoder, track_templates.short_LR_decoder, track_templates.short_RL_decoder)]
+		"""
+		return self.filtered_by_frate_and_qclu(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=None)
 	
+
+	@function_attributes(short_name=None, tags=['main', 'filter', 'qclu', 'frate'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-22 03:50', related_items=[])
+	def filtered_by_frate_and_qclu(self, minimum_inclusion_fr_Hz:Optional[float]=None, included_qclu_values:Optional[List]=None) -> "TrackTemplates":
+		""" Does not modify self! Returns a copy! Filters the included neuron_ids by their `tuning_curve_unsmoothed_peak_firing_rates` (a property of their `.pf.ratemap`)
+		Usage:
+			filtered_track_templates = track_templates.filtered_by_frate_and_qclu(minimum_inclusion_fr_Hz=5.0, included_qclu_values=[1, 2])
+		"""
+		filtered_decoder_list, filtered_direction_shared_aclus_list = TrackTemplates.determine_decoder_aclus_filtered_by_frate_and_qclu(decoders_dict=self.get_decoders_dict(), minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)        
+		long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder = filtered_decoder_list # unpack
+		_obj = TrackTemplates.init_from_paired_decoders(LR_decoder_pair=(long_LR_decoder, short_LR_decoder), RL_decoder_pair=(long_RL_decoder, short_RL_decoder), rank_method=self.rank_method)
+		assert np.all(filtered_direction_shared_aclus_list[0] == _obj.shared_LR_aclus_only_neuron_IDs)
+		assert np.all(filtered_direction_shared_aclus_list[1] == _obj.shared_RL_aclus_only_neuron_IDs)
+		assert len(filtered_direction_shared_aclus_list[0]) == len(_obj.decoder_LR_pf_peak_ranks_list[0])
+		assert len(filtered_direction_shared_aclus_list[1]) == len(_obj.decoder_RL_pf_peak_ranks_list[0])
+		return _obj
+
+
+
+	# Init/ClassMethods __________________________________________________________________________________________________ #
 
 	@classmethod
 	def init_from_paired_decoders(cls, LR_decoder_pair: Tuple[BasePositionDecoder, BasePositionDecoder], RL_decoder_pair: Tuple[BasePositionDecoder, BasePositionDecoder], rank_method:str='average') -> "TrackTemplates":
@@ -667,8 +665,6 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
 
 		"""
 		return TrackTemplates._perform_determine_decoder_aclus_filtered_by_qclu_and_frate(decoders_dict=self.get_decoders_dict(), minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
-
-
 
 	@classmethod
 	def determine_active_min_num_unique_aclu_inclusions_requirement(cls, min_num_unique_aclu_inclusions: int, total_num_cells: int, required_min_percentage_of_active_cells: float = 0.3, debug_print=False) -> int:
@@ -1482,7 +1478,6 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 		""" only works for the all-directional coder with the four items
 		
 		NOTE OUTPUT WILL BE 3D!!
-		
 		
 		"""
 		custom_curr_unit_marginal_list = []
@@ -5288,7 +5283,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 												ripple_decoding_time_bin_size: float = 0.025, # 25ms
 												should_validate_lap_decoding_performance: bool = False,
 											):
-		"""
+		""" Merges the computed directional placefields into a Pseudo2D decoder, with the pseudo last axis corresponding to the decoder index.
+		
 
 		Requires:
 			['sess']
@@ -5835,63 +5831,6 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 		return global_computation_results
 
 
-	# @function_attributes(short_name='directional_decoders_filter_epochs', tags=['directional-decoders', 'epochs', 'filter', 'score', 'weighted-correlation', 'radon-transform', 'multiple-decoders', 'main-computation-function'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-12 17:23', related_items=[],
-	#     requires_global_keys=['DirectionalLaps', 'RankOrder', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded'], provides_global_keys=['DirectionalDecodersEpochsEvaluations'],
-	#     validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['firing_rate_trends'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['extended_stats']['time_binned_position_df']), is_global=True)
-	# def _filter_decoded_epochs_by_user_annotations(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, should_skip_radon_transform=False):
-	#     """ Using the four 1D decoders, performs 1D Bayesian decoding for each of the known epochs (Laps, Ripple) from the neural activity during these peirods.
-		
-	#     Requires:
-	#         ['sess']
-
-	#     Provides:
-	#         global_computation_results.computed_data['pf1D_Decoder_dict']
-	#             ['DirectionalDecodersEpochsEvaluations']['directional_lap_specific_configs']
-	#             ['DirectionalDecodersEpochsEvaluations']['continuously_decoded_result_cache_dict']
-
-
-	#             from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
-
-	#             directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']
-	#             pos_bin_size: float = directional_decoders_epochs_decode_result.pos_bin_size
-	#             ripple_decoding_time_bin_size = directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size
-	#             laps_decoding_time_bin_size = directional_decoders_epochs_decode_result.laps_decoding_time_bin_size
-	#             decoder_laps_filter_epochs_decoder_result_dict = directional_decoders_epochs_decode_result.decoder_laps_filter_epochs_decoder_result_dict
-	#             decoder_ripple_filter_epochs_decoder_result_dict = directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict
-	#             decoder_laps_radon_transform_df_dict = directional_decoders_epochs_decode_result.decoder_laps_radon_transform_df_dict
-	#             decoder_ripple_radon_transform_df_dict = directional_decoders_epochs_decode_result.decoder_ripple_radon_transform_df_dict
-
-	#             # New items:
-	#             decoder_laps_radon_transform_extras_dict = directional_decoders_epochs_decode_result.decoder_laps_radon_transform_extras_dict
-	#             decoder_ripple_radon_transform_extras_dict = directional_decoders_epochs_decode_result.decoder_ripple_radon_transform_extras_dict
-
-	#             # Weighted correlations:
-	#             laps_weighted_corr_merged_df = directional_decoders_epochs_decode_result.laps_weighted_corr_merged_df
-	#             ripple_weighted_corr_merged_df = directional_decoders_epochs_decode_result.ripple_weighted_corr_merged_df
-	#             decoder_laps_weighted_corr_df_dict = directional_decoders_epochs_decode_result.decoder_laps_weighted_corr_df_dict
-	#             decoder_ripple_weighted_corr_df_dict = directional_decoders_epochs_decode_result.decoder_ripple_weighted_corr_df_dict
-
-	#             # Pearson's correlations:
-	#             laps_simple_pf_pearson_merged_df = directional_decoders_epochs_decode_result.laps_simple_pf_pearson_merged_df
-	#             ripple_simple_pf_pearson_merged_df = directional_decoders_epochs_decode_result.ripple_simple_pf_pearson_merged_df
-
-				
-	#     Should call:
-		
-	#     _perform_compute_custom_epoch_decoding
-
-
-	#     """
-	#     from neuropy.core.epoch import TimeColumnAliasesProtocol
-	#     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
-	#     # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import HeuristicReplayScoring
-	#     from neuropy.core.epoch import find_data_indicies_from_epoch_times
-
-	#     raise NotImplementedError("2024-03-09- TODO!")
-
-	#     return global_computation_results
-
-
 	@function_attributes(short_name='directional_train_test_split', tags=['train-test-split', 'global_computation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-09 06:09', related_items=[],
 						requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders'], provides_global_keys=['TrainTestSplit'],
 						validate_computation_test=_workaround_validate_has_directional_train_test_split_result, 
@@ -5912,13 +5851,9 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 		if global_computation_results.computation_config is None:
 			raise NotImplementedError(f'global_computation_results.computation_config is None!')
 
-		# minimum_inclusion_fr_Hz: float = global_computation_results.computation_config.get('rank_order_shuffle_analysis', {}).get('minimum_inclusion_fr_Hz', None)
 		minimum_inclusion_fr_Hz: float = global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
 		included_qclu_values: List[int] = global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
 
-		# rank_order_results = global_computation_results.computed_data['RankOrder'] # : "RankOrderComputationsContainer"
-		# minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
-		# included_qclu_values: List[int] = rank_order_results.included_qclu_values
 		directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
 		track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
 		# print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
@@ -5986,9 +5921,6 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 		minimum_inclusion_fr_Hz: float = global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
 		included_qclu_values: List[int] = global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
 
-		# rank_order_results = global_computation_results.computed_data['RankOrder'] # : "RankOrderComputationsContainer"
-		# minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
-		# included_qclu_values: List[int] = rank_order_results.included_qclu_values
 		directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
 		track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
 		# long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder = track_templates.get_decoders()
