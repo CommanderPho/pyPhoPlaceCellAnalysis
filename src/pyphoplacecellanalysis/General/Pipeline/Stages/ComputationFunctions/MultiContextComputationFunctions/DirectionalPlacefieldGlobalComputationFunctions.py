@@ -5307,6 +5307,10 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 		from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
 		from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
 		
+		minimum_inclusion_fr_Hz: float = global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+		included_qclu_values: List[int] = global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
+		# included_aclus = owning_pipeline_reference.determine_good_aclus_by_qclu(included_qclu_values=included_qclu_values, debug_print=True)
+		
 
 		t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
 		long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
@@ -5318,11 +5322,11 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 		# Unwrap the naturally produced directional placefields:
 		long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
 		# Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
-		(long_LR_context, long_RL_context, short_LR_context, short_RL_context) = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
-		long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj, global_any_laps_epochs_obj = [owning_pipeline_reference.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name, global_any_name)] # note has global also
-		(long_LR_session, long_RL_session, short_LR_session, short_RL_session) = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)] # sessions are correct at least, seems like just the computation parameters are messed up
+		# (long_LR_context, long_RL_context, short_LR_context, short_RL_context) = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+		# long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj, global_any_laps_epochs_obj = [owning_pipeline_reference.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name, global_any_name)] # note has global also
+		# (long_LR_session, long_RL_session, short_LR_session, short_RL_session) = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)] # sessions are correct at least, seems like just the computation parameters are messed up
 		(long_LR_results, long_RL_results, short_LR_results, short_RL_results) = [owning_pipeline_reference.computation_results[an_epoch_name].computed_data for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
-		(long_LR_computation_config, long_RL_computation_config, short_LR_computation_config, short_RL_computation_config) = [owning_pipeline_reference.computation_results[an_epoch_name].computation_config for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+		# (long_LR_computation_config, long_RL_computation_config, short_LR_computation_config, short_RL_computation_config) = [owning_pipeline_reference.computation_results[an_epoch_name].computation_config for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
 		(long_LR_pf1D, long_RL_pf1D, short_LR_pf1D, short_RL_pf1D) = (long_LR_results.pf1D, long_RL_results.pf1D, short_LR_results.pf1D, short_RL_results.pf1D)
 	   
 		# Unpack all directional variables:
@@ -5330,31 +5334,37 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
 		# Use the four epochs to make to a pseudo-y:
 		all_directional_decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
-		all_directional_decoder_dict = dict(zip(all_directional_decoder_names, [deepcopy(long_LR_pf1D), deepcopy(long_RL_pf1D), deepcopy(short_LR_pf1D), deepcopy(short_RL_pf1D)]))
-		all_directional_pf1D = PfND.build_merged_directional_placefields(all_directional_decoder_dict, debug_print=False)
+		all_directional_pf_dict = dict(zip(all_directional_decoder_names, [deepcopy(long_LR_pf1D), deepcopy(long_RL_pf1D), deepcopy(short_LR_pf1D), deepcopy(short_RL_pf1D)]))
+		# all_directional_decoder_dict = {a_name:a_decoder.get_by_id(ids=included_aclus) for a_name, a_decoder in all_directional_decoder_dict.items()} # slice by included aclus
+		all_directional_pf_dict, filtered_direction_shared_aclus_list = PfND.determine_pf_aclus_filtered_by_frate_and_qclu(pf_dict=all_directional_pf_dict, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
+		
+
+		all_directional_pf1D = PfND.build_merged_directional_placefields(all_directional_pf_dict, debug_print=False)
 		all_directional_pf1D_Decoder = BasePositionDecoder(all_directional_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
 
 		## Combine the non-directional PDFs and renormalize to get the directional PDF:
 		# Inputs: long_LR_pf1D, long_RL_pf1D
 		long_directional_decoder_names = ['long_LR', 'long_RL']
-		long_directional_decoder_dict = dict(zip(long_directional_decoder_names, [deepcopy(long_LR_pf1D), deepcopy(long_RL_pf1D)]))
+		# long_directional_decoder_dict = dict(zip(long_directional_decoder_names, [deepcopy(long_LR_pf1D), deepcopy(long_RL_pf1D)]))
+		long_directional_decoder_dict = {k:deepcopy(all_directional_pf_dict[k]) for k in long_directional_decoder_names}
 		long_directional_pf1D = PfND.build_merged_directional_placefields(long_directional_decoder_dict, debug_print=False)
 		long_directional_pf1D_Decoder = BasePositionDecoder(long_directional_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
 
 		# Inputs: short_LR_pf1D, short_RL_pf1D
 		short_directional_decoder_names = ['short_LR', 'short_RL']
-		short_directional_decoder_dict = dict(zip(short_directional_decoder_names, [deepcopy(short_LR_pf1D), deepcopy(short_RL_pf1D)]))
+		# short_directional_decoder_dict = dict(zip(short_directional_decoder_names, [deepcopy(short_LR_pf1D), deepcopy(short_RL_pf1D)]))
+		short_directional_decoder_dict = {k:deepcopy(all_directional_pf_dict[k]) for k in short_directional_decoder_names}
 		short_directional_pf1D = PfND.build_merged_directional_placefields(short_directional_decoder_dict, debug_print=False)
 		short_directional_pf1D_Decoder = BasePositionDecoder(short_directional_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
 		# takes 6.3 seconds
 
 		## Get or update the global directional_merged_decoders_result:
-		directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = global_computation_results.computed_data.get('DirectionalMergedDecoders', DirectionalPseudo2DDecodersResult(all_directional_decoder_dict=all_directional_decoder_dict, all_directional_pf1D_Decoder=all_directional_pf1D_Decoder, 
+		directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = global_computation_results.computed_data.get('DirectionalMergedDecoders', DirectionalPseudo2DDecodersResult(all_directional_decoder_dict=all_directional_pf_dict, all_directional_pf1D_Decoder=all_directional_pf1D_Decoder, 
 													  long_directional_decoder_dict=long_directional_decoder_dict, long_directional_pf1D_Decoder=long_directional_pf1D_Decoder, 
 													  short_directional_decoder_dict=short_directional_decoder_dict, short_directional_pf1D_Decoder=short_directional_pf1D_Decoder))
 
 
-		directional_merged_decoders_result.__dict__.update(all_directional_decoder_dict=all_directional_decoder_dict, all_directional_pf1D_Decoder=all_directional_pf1D_Decoder, 
+		directional_merged_decoders_result.__dict__.update(all_directional_decoder_dict=all_directional_pf_dict, all_directional_pf1D_Decoder=all_directional_pf1D_Decoder, 
 													  long_directional_decoder_dict=long_directional_decoder_dict, long_directional_pf1D_Decoder=long_directional_pf1D_Decoder, 
 													  short_directional_decoder_dict=short_directional_decoder_dict, short_directional_pf1D_Decoder=short_directional_pf1D_Decoder)
 		
@@ -5370,7 +5380,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 			global_any_laps_epochs_df = ensure_dataframe(global_any_laps_epochs_obj)    
 			global_any_laps_epochs_df = global_any_laps_epochs_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
 			global_any_laps_epochs_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=global_any_laps_epochs_df, global_session=deepcopy(global_session), replace_existing=True)
-			directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result = all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(owning_pipeline_reference)), filter_epochs=deepcopy(global_any_laps_epochs_df), decoding_time_bin_size=laps_decoding_time_bin_size, debug_print=False)
+			directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result = all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(owning_pipeline_reference, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)),
+																																			   filter_epochs=deepcopy(global_any_laps_epochs_df), decoding_time_bin_size=laps_decoding_time_bin_size, debug_print=False)
 		else:
 			print(f'skipping lap recomputation because laps_decoding_time_bin_size == None')
 			should_validate_lap_decoding_performance = False
@@ -5384,7 +5395,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 			if ripple_decoding_time_bin_size < min_possible_time_bin_size:
 				print(f'WARN: ripple_decoding_time_bin_size {ripple_decoding_time_bin_size} < min_possible_time_bin_size ({min_possible_time_bin_size}). This used to be enforced but continuing anyway.') 
 			global_replays = global_replays.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
-			directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result = all_directional_pf1D_Decoder.decode_specific_epochs(deepcopy(get_proper_global_spikes_df(owning_pipeline_reference)), filter_epochs=deepcopy(global_replays), decoding_time_bin_size=ripple_decoding_time_bin_size)
+			directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result = all_directional_pf1D_Decoder.decode_specific_epochs(deepcopy(get_proper_global_spikes_df(owning_pipeline_reference, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)), filter_epochs=deepcopy(global_replays), decoding_time_bin_size=ripple_decoding_time_bin_size)
 		else:
 			print(f'skipping ripple recomputation because ripple_decoding_time_bin_size == None')
 
