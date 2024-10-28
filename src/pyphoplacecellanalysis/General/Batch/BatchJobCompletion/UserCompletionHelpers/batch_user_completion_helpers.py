@@ -372,18 +372,27 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
 	assert self.collected_outputs_path.exists()
 	curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
+	_, _, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
 
 	# active_context = curr_active_pipeline.get_session_context()
 	if additional_session_context is not None:
 		if isinstance(additional_session_context, dict):
 			additional_session_context = IdentifyingContext(**additional_session_context)
 		active_context = (curr_active_pipeline.get_session_context() | additional_session_context)
-		session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=(IdentifyingContext._get_session_context_keys() + list(additional_session_context.keys())))
-		CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}-{additional_session_context.get_description()}"
+		if len(custom_suffix) == 0:
+			session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=(IdentifyingContext._get_session_context_keys() + list(additional_session_context.keys())))
+			CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}-{additional_session_context.get_description()}"
+		else:
+			session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=(IdentifyingContext._get_session_context_keys() + list(additional_session_context.keys()))) + f'|{custom_suffix}'
+			CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}-{additional_session_context.get_description()}-{custom_suffix}"
 	else:
 		active_context = curr_active_pipeline.get_session_context()
 		session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
-		CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
+		if len(custom_suffix) == 0:
+			CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
+		else:
+			session_ctxt_key:str = session_ctxt_key + custom_suffix
+			CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}-{custom_suffix}"
 
 	print(f'\tactive_context: {active_context}')    
 	print(f'\tsession_ctxt_key: {session_ctxt_key}')
@@ -396,7 +405,8 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 			# desired_shared_decoding_time_bin_sizes = np.array([0.025, 0.030, 0.044, 0.050, 0.058, 0.072, 0.086, 0.100, 0.250, 1.5]) ####### <<<------ Default sweep is defined here
 			# desired_shared_decoding_time_bin_sizes = np.array([0.025, 0.030, 0.044, 0.050, 0.058, 0.072, 0.086, 0.100]) ####### <<<------ Default sweep is defined here
 			# desired_shared_decoding_time_bin_sizes = np.array([0.025, 0.030, 0.044, 0.050, 0.058, 0.072, 0.086, 0.100])
-			desired_shared_decoding_time_bin_sizes = np.array([0.025, 0.030, 0.044, 0.050, 0.058,])
+			# desired_shared_decoding_time_bin_sizes = np.array([0.025, 0.030, 0.044, 0.050, 0.058,])
+			desired_shared_decoding_time_bin_sizes = np.array([0.025, 0.058,])
 
 		# Shared time bin sizes
 		custom_all_param_sweep_options, param_sweep_option_n_values = parameter_sweeps(desired_shared_decoding_time_bin_size=desired_shared_decoding_time_bin_sizes, use_single_time_bin_per_epoch=[False], minimum_event_duration=[desired_shared_decoding_time_bin_sizes[-1]]) # with Ripples
@@ -2400,7 +2410,6 @@ def save_custom_session_files_completion_function(self, global_data_root_parent_
 	print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
 
 	return across_session_results_extended_dict
-
 
 
 @function_attributes(short_name=None, tags=['backup', 'versioning', 'copy'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-25 06:22', related_items=[])

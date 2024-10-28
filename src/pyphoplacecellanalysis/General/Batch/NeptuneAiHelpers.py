@@ -1129,12 +1129,19 @@ class PhoDibaProjectsNeptuner(object):
         return new
 
 
-    def get_most_recent_session_runs(self, oldest_included_run_date:str='2024-08-01', n_recent_results: int = 1, **kwargs): #Tuple[Dict[RunID,AutoValueConvertingNeptuneRun], pd.DataFrame, Dict[str, str]]:
+    def get_most_recent_session_runs(self, utility_oldest_included_run_date: Optional[str]=None, utility_n_recent_results: Optional[int]=2,
+                                     main_oldest_included_run_date: Optional[str]=None, main_n_recent_results: Optional[int]=None,
+                                     oldest_included_run_date:str='2024-08-01', n_recent_results: int = 1, **kwargs): #Tuple[Dict[RunID,AutoValueConvertingNeptuneRun], pd.DataFrame, Dict[str, str]]:
             """ Main accessor method
             
             """
-            self.main_run_collected_results = self.main_neptune_project.get_most_recent_session_runs(oldest_included_run_date=oldest_included_run_date, n_recent_results=n_recent_results, **kwargs) # : NeptuneRunCollectedResults
-            self.utility_run_collected_results = self.utility_neptune_project.get_most_recent_session_runs(oldest_included_run_date=oldest_included_run_date, n_recent_results=n_recent_results, **kwargs) # : NeptuneRunCollectedResults
+            utility_oldest_included_run_date = utility_oldest_included_run_date or oldest_included_run_date
+            utility_n_recent_results = utility_n_recent_results or n_recent_results
+            self.main_run_collected_results = self.main_neptune_project.get_most_recent_session_runs(oldest_included_run_date=utility_oldest_included_run_date, n_recent_results=utility_n_recent_results, **kwargs) # : NeptuneRunCollectedResults
+            
+            main_oldest_included_run_date = main_oldest_included_run_date or oldest_included_run_date
+            main_n_recent_results = main_n_recent_results or n_recent_results
+            self.utility_run_collected_results = self.utility_neptune_project.get_most_recent_session_runs(oldest_included_run_date=main_oldest_included_run_date, n_recent_results=main_n_recent_results, **kwargs) # : NeptuneRunCollectedResults
             
 
     def try_get_figures(self, fig_input_key: str):
