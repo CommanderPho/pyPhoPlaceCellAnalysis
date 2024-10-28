@@ -177,9 +177,9 @@ def helper_perform_pickle_pipeline(a_curr_active_pipeline, custom_save_filenames
 	return custom_save_filepaths
 
 
-@function_attributes(short_name=None, tags=['dataframe', 'filename', 'metadata'], input_requires=[], output_provides=[], uses=[], used_by=['save_custom_parameters_pipeline'], creation_date='2024-10-28 12:40', related_items=[])
+@function_attributes(short_name=None, tags=['dataframe', 'filename', 'metadata'], input_requires=[], output_provides=[], uses=[], used_by=['_get_custom_filenames_from_computation_metadata'], creation_date='2024-10-28 12:40', related_items=[])
 def _get_custom_suffix_for_filename_from_computation_metadata(*extras_strings, minimum_inclusion_fr_Hz=None, included_qclu_values=None) -> str:
-	""" Uses metadata stored in the replays dataframe to determine an appropriate filename
+	""" Uses passed parameters to determine an appropriate filename suffix
 	
 	
 	from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _get_custom_suffix_for_filename_from_computation_metadata
@@ -195,33 +195,48 @@ def _get_custom_suffix_for_filename_from_computation_metadata(*extras_strings, m
 		custom_suffix_string_parts.append(f"frateThresh_{minimum_inclusion_fr_Hz:.1f}")
 	if included_qclu_values is not None:
 		custom_suffix_string_parts.append(f"qclu_{included_qclu_values}")
-
 	custom_suffix = '-'.join([custom_suffix, *custom_suffix_string_parts, *extras_strings])
-	
 	return custom_suffix
 
-@function_attributes(short_name=None, tags=['save', 'save_custom'], input_requires=[], output_provides=[], uses=['_get_custom_suffix_for_filename_from_computation_metadata', 'helper_perform_pickle_pipeline'], used_by=[], creation_date='2024-10-28 14:08', related_items=[])
-def save_custom_parameters_pipeline(a_curr_active_pipeline, replay_suffix: str='_withNormalComputedReplays', minimum_inclusion_fr_Hz=None, included_qclu_values=None, enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=False, enable_save_h5: bool = False, saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE):
-	""" Saves a pipeline with custom parameters
 
-    Usage:   
-        custom_save_filepaths = curr_active_pipeline.custom_save_pipeline_as(enable_save_pipeline_pkl=False, enable_save_global_computations_pkl=True, enable_save_h5=False)
-        custom_save_filepaths
+@function_attributes(short_name=None, tags=['dataframe', 'filename', 'metadata'], input_requires=[], output_provides=[], uses=[], used_by=['save_custom_parameters_pipeline', 'get_custom_pipeline_filenames_from_parameters'], creation_date='2024-10-28 12:40', related_items=[])
+def _get_custom_filenames_from_computation_metadata(replay_suffix: str='_withNormalComputedReplays', minimum_inclusion_fr_Hz=None, included_qclu_values=None) -> Dict[str, str]:
+	""" Uses parameters stored in the pipeline to determine an appropriate filename
+	
+	
+	from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _get_custom_filenames_from_computation_metadata
 
-    """
+	custom_save_filepaths, custom_save_filenames, custom_suffix = _get_custom_filenames_from_computation_metadata(replay_suffix=replay_suffix, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
+	print(f'custom_save_filenames: {custom_save_filenames}')
+	print(f'custom_suffix: "{custom_suffix}"')
+
+	"""
 	custom_suffix: str = replay_suffix
-	custom_suffix += _get_custom_suffix_for_filename_from_computation_metadata(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
-	 # '_withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2, 4, 6, 7, 9]'
-
+	custom_suffix += _get_custom_suffix_for_filename_from_computation_metadata(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # '_withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2, 4, 6, 7, 9]'
 	## INPUTS: custom_suffix
 	custom_save_filenames = {
 		'pipeline_pkl':f'loadedSessPickle{custom_suffix}.pkl',
 		'global_computation_pkl':f"global_computation_results{custom_suffix}.pkl",
 		'pipeline_h5':f'pipeline{custom_suffix}.h5',
 	}
-	print(f'custom_save_filenames: {custom_save_filenames}')
+	# print(f'custom_save_filenames: {custom_save_filenames}')
 	custom_save_filepaths = {k:v for k, v in custom_save_filenames.items()}
+	return custom_save_filepaths, custom_save_filenames, custom_suffix
 
+
+
+
+@function_attributes(short_name=None, tags=['save', 'save_custom'], input_requires=[], output_provides=[], uses=['_get_custom_suffix_for_filename_from_computation_metadata', 'helper_perform_pickle_pipeline'], used_by=[], creation_date='2024-10-28 14:08', related_items=[])
+def save_custom_parameters_pipeline(a_curr_active_pipeline, replay_suffix: str='_withNormalComputedReplays', minimum_inclusion_fr_Hz=None, included_qclu_values=None, enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=False, enable_save_h5: bool = False, saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE):
+	""" Saves a pipeline with custom parameters
+
+	Usage:   
+		custom_save_filepaths = curr_active_pipeline.custom_save_pipeline_as(enable_save_pipeline_pkl=False, enable_save_global_computations_pkl=True, enable_save_h5=False)
+		custom_save_filepaths
+
+	"""	
+	custom_save_filepaths, custom_save_filenames, custom_suffix = _get_custom_filenames_from_computation_metadata(replay_suffix=replay_suffix, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
+	print(f'custom_save_filenames: {custom_save_filenames}')
 	## Pickle again after recomputing:
 	custom_save_filepaths = helper_perform_pickle_pipeline(a_curr_active_pipeline=a_curr_active_pipeline, custom_save_filenames=custom_save_filenames, custom_save_filepaths=custom_save_filepaths,
 															enable_save_pipeline_pkl=enable_save_pipeline_pkl, enable_save_global_computations_pkl=enable_save_global_computations_pkl, enable_save_h5=enable_save_h5, saving_mode=saving_mode)
@@ -230,7 +245,7 @@ def save_custom_parameters_pipeline(a_curr_active_pipeline, replay_suffix: str='
 
 
 
-    
+	
 
 class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, FilteredPipelineMixin, PipelineWithComputedPipelineStageMixin, PipelineWithDisplayPipelineStageMixin, PipelineWithDisplaySavingMixin, HDF_SerializationMixin, object):
     """ 

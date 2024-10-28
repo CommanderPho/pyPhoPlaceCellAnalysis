@@ -1718,3 +1718,31 @@ class PipelineWithComputedPipelineStageMixin:
         #     'curr_global_param_typed_parameters': curr_global_param_typed_parameters,
         #     'param_typed_parameters': param_typed_parameters,
         # }
+        
+    def get_custom_pipeline_filenames_from_parameters(self) -> Tuple:
+        """ gets the custom suffix from the pipeline's parameters 
+        
+        custom_save_filepaths, custom_save_filenames, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
+        
+        """
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _get_custom_filenames_from_computation_metadata, _get_custom_suffix_for_filename_from_computation_metadata
+        
+        all_params_dict = self.get_all_parameters()
+
+        # preprocessing_parameters = all_params_dict['preprocessing']
+        rank_order_shuffle_analysis_parameters = all_params_dict['rank_order_shuffle_analysis']
+        minimum_inclusion_fr_Hz = deepcopy(rank_order_shuffle_analysis_parameters['minimum_inclusion_fr_Hz']) # 5.0
+        included_qclu_values = deepcopy(rank_order_shuffle_analysis_parameters['included_qclu_values']) # [1, 2, 4, 6, 7, 9]
+        
+        ## TODO: Ideally would use the value passed in self.get_all_parameters():
+        active_replay_epoch_parameters = deepcopy(self.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays)
+        epochs_source: str = active_replay_epoch_parameters.get('epochs_source', '_withNormalComputedReplays')
+
+        custom_suffix: str = epochs_source
+        # custom_suffix += _get_custom_suffix_for_filename_from_computation_metadata(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
+        custom_save_filepaths, custom_save_filenames, custom_suffix = _get_custom_filenames_from_computation_metadata(replay_suffix=epochs_source, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
+        # print(f'custom_save_filenames: {custom_save_filenames}')
+        # print(f'custom_suffix: "{custom_suffix}"')
+        
+        return custom_save_filepaths, custom_save_filenames, custom_suffix
+    
