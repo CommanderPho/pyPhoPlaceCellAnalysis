@@ -310,7 +310,7 @@ class LoadableSessionInput:
         filtered_neuron_identities = filtered_neuron_identities[['aclu', 'shank', 'cluster', 'qclu']]
         filtered_neuron_identities = filtered_neuron_identities[np.isin(filtered_neuron_identities.qclu, included_qclu_values)] # drop [6, 7], which are said to have double fields - 80 remain
         if debug_print:
-            print(f"post (qclu != [6, 7]) filtering {len(filtered_neuron_identities)}")
+            print(f"post (qclu in {included_qclu_values}) filtering {len(filtered_neuron_identities)}")
         return filtered_neuron_identities.aclu.to_numpy()
     
 

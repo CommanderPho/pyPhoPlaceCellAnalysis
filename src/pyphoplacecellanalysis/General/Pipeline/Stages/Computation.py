@@ -1074,9 +1074,10 @@ class PipelineWithComputedPipelineStageMixin:
             remaining_comp_specifiers_dict, found_matching_validators, provided_global_keys = curr_active_pipeline.find_matching_validators(probe_fn_names=['long_short_decoding_analyses','long_short_fr_indicies_analyses'])
             provided_global_keys
         """
+        self.reload_default_computation_functions()
         return SpecificComputationValidator.find_matching_validators(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), probe_fn_names=probe_fn_names)
 
-    def find_immediate_dependencies(self, provided_global_keys: List[str], debug_print=False):
+    def find_immediate_dependencies(self, provided_global_keys: List[str], skip_reload_computation_fcns: bool = False, debug_print=False):
         """
         Usage:
 
@@ -1084,7 +1085,52 @@ class PipelineWithComputedPipelineStageMixin:
         provided_global_keys
 
         """
+        if not skip_reload_computation_fcns:
+            self.reload_default_computation_functions()
         return SpecificComputationValidator.find_immediate_dependencies(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), provided_global_keys=provided_global_keys)
+
+
+    def find_downstream_dependencies(self, provided_local_keys: List[str]=None, provided_global_keys: List[str]=None, debug_print=False):
+        """
+        Usage:
+
+        remaining_comp_specifiers_dict, dependent_validators, provided_global_keys = SpecificComputationValidator.find_immediate_dependencies(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict, provided_global_keys=provided_global_keys)
+        provided_global_keys
+
+        """
+        from neuropy.utils.indexing_helpers import flatten
+        
+        self.reload_default_computation_functions()
+        _comp_specifiers_dict: Dict[str, SpecificComputationValidator] = self.get_merged_computation_function_validators()
+        validators = deepcopy(_comp_specifiers_dict) # { ... }  # Your validators here
+        dependent_validators = {}
+        for a_name, a_validator in validators.items():
+            if provided_global_keys is not None:
+                for a_changed_key in provided_global_keys:
+                    if (a_changed_key in a_validator.results_specification.requires_global_keys):
+                        dependent_validators[a_name] = a_validator
+            if provided_local_keys is not None:
+                for a_changed_key in provided_local_keys:
+                    if (a_changed_key in a_validator.results_specification.requires_local_keys):
+                        dependent_validators[a_name] = a_validator
+
+        # dependent_validators_names = [k for k, v in dependent_validators.items()]
+        provided_global_keys = list(set(flatten([v.provides_global_keys for v in dependent_validators.values()]))) # ['DirectionalMergedDecoders', 'DirectionalDecodersEpochsEvaluations', 'TrainTestSplit', 'TrialByTrialActivity']
+        ## OUTPUT: dependent_validators_provides, dependent_validators
+
+        ## loop until no changes
+        max_num_iterations: int = 5
+        curr_iter: int = 0
+        _prev_provided_global_keys = []
+        while ((curr_iter < max_num_iterations) and (provided_global_keys != _prev_provided_global_keys)):
+            _prev_provided_global_keys = provided_global_keys    
+            curr_order_remaining_comp_specifiers_dict, curr_order_dependent_validators, curr_order_provided_global_keys = self.find_immediate_dependencies(provided_global_keys=provided_global_keys, skip_reload_computation_fcns=True, debug_print=debug_print)
+            dependent_validators.update(curr_order_dependent_validators)
+            provided_global_keys = list(set(provided_global_keys + curr_order_provided_global_keys))
+            curr_iter = curr_iter + 1
+
+        return dependent_validators, provided_global_keys
+
 
     def find_provided_result_keys(self, probe_fn_names: List[str]) -> List[str]:
         """ returns a list of computed properties that the specified functions provide. 
@@ -1093,6 +1139,7 @@ class PipelineWithComputedPipelineStageMixin:
         provided_global_keys
 
         """
+        self.reload_default_computation_functions()
         return SpecificComputationValidator.find_provided_result_keys(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), probe_fn_names=probe_fn_names)
     
 
@@ -1103,6 +1150,7 @@ class PipelineWithComputedPipelineStageMixin:
             [v.computation_fn_name for v in found_validators_dict]
 
         """
+        self.reload_default_computation_functions()
         return SpecificComputationValidator.find_validators_providing_results(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), probe_provided_result_keys=probe_provided_result_keys, return_flat_list=return_flat_list)
 
 
