@@ -2352,6 +2352,56 @@ def export_session_h5_file_completion_function(self, global_data_root_parent_pat
 
 	return across_session_results_extended_dict
 
+@function_attributes(short_name=None, tags=['save_custom', 'versioning', 'backup', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 14:25', related_items=[])
+def save_custom_session_files_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
+	""" Saves a copy of this pipeline's files (pkl, HDF5) with custom suffix derived from parameters
+	
+	from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import backup_previous_session_files_completion_function
+	
+	Results can be extracted from batch output by 
+	
+	# Extracts the callback results 'determine_session_t_delta_completion_function':
+	extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('determine_session_t_delta_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
+
+	"""
+	import sys
+	from datetime import timedelta, datetime
+	from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
+
+	custom_save_filepaths, custom_save_filenames, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
+	
+	print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+	print(f'save_custom_session_files_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+	
+	print(f'custom_save_filenames: {custom_save_filenames}')
+	print(f'custom_suffix: "{custom_suffix}"')
+	
+	was_write_good: bool = False
+	try:
+		custom_save_filepaths = curr_active_pipeline.custom_save_pipeline_as(enable_save_pipeline_pkl=True, enable_save_global_computations_pkl=True, enable_save_h5=True)
+		was_write_good = True
+
+	except BaseException as e:
+		exception_info = sys.exc_info()
+		err = CapturedException(e, exception_info)
+		print(f"ERROR: encountered exception {err} while trying to backup the pipeline for {curr_session_context}")
+		if self.fail_on_exception:
+			raise err.exc
+
+	callback_outputs = {
+	 'desired_suffix': custom_suffix,
+	#  'session_files_dict': _existing_session_files_dict, 'successfully_copied_files_dict':_successful_copies_dict,
+	 'session_files_dict': custom_save_filepaths, 'successfully_copied_files_dict': custom_save_filepaths,
+	 'was_write_good': was_write_good,
+	}
+	across_session_results_extended_dict['save_custom_session_files_completion_function'] = callback_outputs
+	
+	print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+	print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+
+	return across_session_results_extended_dict
+
+
 
 @function_attributes(short_name=None, tags=['backup', 'versioning', 'copy'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-25 06:22', related_items=[])
 def backup_previous_session_files_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, desired_suffix: str = 'Pre2024-07-16') -> dict:
@@ -2669,6 +2719,7 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
 									'compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function': compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function,
 									'backup_previous_session_files_completion_function': backup_previous_session_files_completion_function,
 									'compute_and_export_session_trial_by_trial_performance_completion_function': compute_and_export_session_trial_by_trial_performance_completion_function,
+									'save_custom_session_files_completion_function': save_custom_session_files_completion_function,
 									}
 	else:
 		# use the user one:
