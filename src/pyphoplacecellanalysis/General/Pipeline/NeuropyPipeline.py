@@ -205,10 +205,7 @@ def save_custom_parameters_pipeline(a_curr_active_pipeline, replay_suffix: str='
 	""" Saves a pipeline with custom parameters
 
     Usage:   
-        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import save_custom_parameters_pipeline
-
-        custom_save_filepaths = save_custom_parameters_pipeline(curr_active_pipeline, replay_suffix='_withNormalComputedReplays', minimum_inclusion_fr_Hz=None, included_qclu_values=None, 
-                                                                enable_save_pipeline_pkl=False, enable_save_global_computations_pkl=True, enable_save_h5=False)
+        custom_save_filepaths = curr_active_pipeline.custom_save_pipeline_as(enable_save_pipeline_pkl=False, enable_save_global_computations_pkl=True, enable_save_h5=False)
         custom_save_filepaths
 
     """
@@ -1042,5 +1039,25 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         """
         raise NotImplementedError
 
+
+    @function_attributes(short_name=None, tags=['save', 'custom_save', 'export'], input_requires=[], output_provides=[], uses=['save_custom_parameters_pipeline', 'self.get_all_parameters'], used_by=[], creation_date='2024-10-28 14:04', related_items=[])
+    def custom_save_pipeline_as(self, saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE,
+                                 enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=False, enable_save_h5: bool = False):
+        """ uses the pipeline's parameters to determine proper save names 
+        """
+        all_params_dict = self.get_all_parameters()
+
+        # preprocessing_parameters = all_params_dict['preprocessing']
+        rank_order_shuffle_analysis_parameters = all_params_dict['rank_order_shuffle_analysis']
+        minimum_inclusion_fr_Hz = deepcopy(rank_order_shuffle_analysis_parameters['minimum_inclusion_fr_Hz']) # 5.0
+        included_qclu_values = deepcopy(rank_order_shuffle_analysis_parameters['included_qclu_values']) # [1, 2, 4, 6, 7, 9]
+        
+        ## TODO: Ideally would use the value passed in self.get_all_parameters():
+        active_replay_epoch_parameters = deepcopy(self.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays)
+        epochs_source: str = active_replay_epoch_parameters.get('epochs_source', '_withNormalComputedReplays')
+
+        custom_save_filepaths = save_custom_parameters_pipeline(self, replay_suffix=epochs_source, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values, 
+                                                                saving_mode=saving_mode, enable_save_pipeline_pkl=enable_save_pipeline_pkl, enable_save_global_computations_pkl=enable_save_global_computations_pkl, enable_save_h5=enable_save_h5)
+        return custom_save_filepaths
 
 
