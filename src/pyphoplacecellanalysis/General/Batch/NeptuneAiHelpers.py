@@ -28,11 +28,14 @@ from pyphocorehelpers.assertion_helpers import Assert
 from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata
 
 from neuropy.utils.indexing_helpers import get_nested_value, flatten_dict
+from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path
 
 # SessionDescriptorString: TypeAlias = str # an integer index that is an aclu
 SessionDescriptorString = NewType('SessionDescriptorString', str) # session_descriptor_string
-RunID = NewType('RunID', str) # session_descriptor_string
+RunID = NewType('RunID', str) # like 'LS2023-1485'
 NeptuneKeyPath = NewType('NeptuneKeyPath', str) # a path that indexes in to the Neptune.ai resource
+NeptuneProjectName = NewType('NeptuneProjectName', str) # like 'run' or 'utility'
+
 
 # from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import SessionDescriptorString, RunID
 
@@ -93,6 +96,7 @@ class KnownNeptuneProjects:
     """
     @staticmethod
     def get_PhoDibaBatchProcessing_neptune_kwargs():
+        """ # the one with logs and stuff """
         return dict(
             project="commander.pho/PhoDibaBatchProcessing",
             api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxOGIxODU2My1lZTNhLTQ2ZWMtOTkzNS02ZTRmNzM5YmNjNjIifQ==",
@@ -101,10 +105,31 @@ class KnownNeptuneProjects:
 
     @staticmethod
     def get_PhoDibaLongShortUpdated_neptune_kwargs():
+        """ # the one with images and stuff """
         return dict(
             project="commander.pho/PhoDibaLongShortUpdated",
             api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxOGIxODU2My1lZTNhLTQ2ZWMtOTkzNS02ZTRmNzM5YmNjNjIifQ==",
         )
+
+
+    @classmethod
+    def get_PhoDibaBatchProcessing_neptuner(cls) -> "Neptuner":
+        """# the one with logs and stuff """
+        neptune_kwargs = cls.get_PhoDibaBatchProcessing_neptune_kwargs() # the one with images and stuff
+        PhoDibaBatchProcessing_neptuner = Neptuner(project_name=neptune_kwargs['project'], api_token=neptune_kwargs['api_token'])
+        # project_main_name: str = neptuner.project_name.split('/')[-1] # 'PhoDibaLongShortUpdated'
+        return PhoDibaBatchProcessing_neptuner
+
+
+    @classmethod
+    def get_PhoDibaLongShortUpdated_neptuner(cls):
+        """ # the one with images and stuff """
+        neptune_kwargs = cls.get_PhoDibaLongShortUpdated_neptune_kwargs() # the one with images and stuff
+        PhoDibaLongShortUpdated_neptuner = Neptuner(project_name=neptune_kwargs['project'], api_token=neptune_kwargs['api_token'])
+        # project_main_name: str = neptuner.project_name.split('/')[-1] # 'PhoDibaLongShortUpdated'
+        return PhoDibaLongShortUpdated_neptuner
+
+
 
 
 
@@ -996,6 +1021,166 @@ class Neptuner(object):
 
 
 
+
+
+@define(slots=False, repr=False, eq=False)
+class PhoDibaProjectsNeptuner(object):
+    """An object to combine the two separate Neptuner objects, maintaining access to the two different neptune.ai projects and intellegently allowing access to both figures and logs.
+      
+    Usage:
+        from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import PhoDibaProjectsNeptuner, Neptuner, AutoValueConvertingNeptuneRun, set_environment_variables, SessionDescriptorString, RunID, NeptuneRunCollectedResults, KnownNeptuneProjects
+
+        combined_neptuner: PhoDibaProjectsNeptuner = PhoDibaProjectsNeptuner()
+        combined_neptuner.get_most_recent_session_runs(oldest_included_run_date='2024-10-15', n_recent_results=16)
+
+    
+    """
+    main_neptune_project: Neptuner = field(init=False, metadata={'comment': 'the one with images and stuff'})
+    utility_neptune_project: Neptuner = field(init=False, metadata={'comment': 'the one with logs and stuff'})
+    
+    main_run_collected_results: NeptuneRunCollectedResults = field(init=False)
+    utility_run_collected_results: NeptuneRunCollectedResults = field(init=False)
+    
+    
+    root_output_path: Path = field(init=False)
+    figures_output_path: Path = field(init=False)
+    logs_output_path: Path = field(init=False)
+    
+    # project_name: str = field(default="commander.pho/PhoDibaLongShortUpdated")
+    # api_token: str = field(default="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxOGIxODU2My1lZTNhLTQ2ZWMtOTkzNS02ZTRmNzM5YmNjNjIifQ==")
+    # project: neptune.Project = field(init=False)
+    # run: AutoValueConvertingNeptuneRun = field(init=False)
+
+    # outputs = field(init=False)
+    # figures = field(init=False)
+    
+    @property
+    def main_run(self):
+        """the one with images and stuff"""
+        return self.main_neptune_project.run
+
+    @property
+    def utility_run(self):
+        """The main_run property."""
+        return self.utility_neptune_project.run
+    
+
+    @property
+    def projects_neptuner_dict(self) -> Dict[NeptuneProjectName, Neptuner]:
+        return {'main': self.main_neptune_project, 'utility': self.utility_neptune_project}
+
+    @property
+    def projects_run_collected_results_dict(self) -> Dict[NeptuneProjectName, NeptuneRunCollectedResults]:
+        return {'main': self.main_run_collected_results, 'utility': self.utility_run_collected_results}
+
+    @property
+    def projects_resolved_run_structure_dict(self) -> Dict[NeptuneProjectName, Dict[IdentifyingContext, Dict[RunID, Dict]]]:
+        """ lists the actual structure """
+        run_structure_dict_dict = {}
+        for a_name, a_run_collected_results in self.projects_run_collected_results_dict.items():
+            run_structure_dict_dict[a_name] = a_run_collected_results.get_resolved_structure()
+        return run_structure_dict_dict
+
+
+
+    # @property
+    # def projects_run_dict(self) -> Dict[str, Neptuner]:
+    #     return {'main': self.main_neptune_project.run, 'utility': self.utility_run_collected_results.run}
+    
+    @property
+    def context_indexed_run_logs(self) -> Dict[IdentifyingContext, str]:
+        """The main_run property."""
+        return self.utility_run_collected_results.context_indexed_run_logs # get the IdentifyingContext indexed item
+
+
+    def __attrs_post_init__(self):
+        self.main_neptune_project = KnownNeptuneProjects.get_PhoDibaLongShortUpdated_neptuner() # the one with images and stuff
+        self.utility_neptune_project = KnownNeptuneProjects.get_PhoDibaBatchProcessing_neptuner() # the one with logs and stuff
+        
+        self.root_output_path = find_first_extant_path(path_list=[Path(r"C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/EXTERNAL/PhoDibaPaper2024Book/data/neptune").resolve(),
+                                        Path("/home/halechr/repos/Spike3D/EXTERNAL/PhoDibaPaper2024Book/data").resolve(),
+                                        Path('EXTERNAL/PhoDibaPaper2024Book/data/neptune').resolve(),
+        ])
+        self.root_output_path.mkdir(exist_ok=True)
+
+        self.figures_output_path = self.root_output_path.joinpath('figs').resolve()
+        self.figures_output_path.mkdir(exist_ok=True, parents=True)
+
+        self.logs_output_path = self.root_output_path.joinpath('logs').resolve()
+        self.logs_output_path.mkdir(exist_ok=True, parents=True)
+
+
+        
+    def stop(self):
+        for a_neptuner in (self.main_neptune_project, self.utility_neptune_project):
+            a_neptuner.stop()
+
+
+    def run_with_pipeline(self, curr_active_pipeline):
+        """ starts a new run with the provided pipeline. """
+        for a_neptuner in (self.main_neptune_project, self.utility_neptune_project):
+            a_neptuner.run_with_pipeline(curr_active_pipeline=curr_active_pipeline)
+
+    @classmethod
+    def init_with_pipeline(cls, curr_active_pipeline):
+        """ creates a new Neptuner object corresponding to a particular session and starts a run. """
+        new = cls()
+        new.run_with_pipeline(curr_active_pipeline=curr_active_pipeline)
+        return new
+
+
+    def get_most_recent_session_runs(self, oldest_included_run_date:str='2024-08-01', n_recent_results: int = 1, **kwargs): #Tuple[Dict[RunID,AutoValueConvertingNeptuneRun], pd.DataFrame, Dict[str, str]]:
+            """ Main accessor method
+            
+            """
+            self.main_run_collected_results = self.main_neptune_project.get_most_recent_session_runs(oldest_included_run_date=oldest_included_run_date, n_recent_results=n_recent_results, **kwargs) # : NeptuneRunCollectedResults
+            self.utility_run_collected_results = self.utility_neptune_project.get_most_recent_session_runs(oldest_included_run_date=oldest_included_run_date, n_recent_results=n_recent_results, **kwargs) # : NeptuneRunCollectedResults
+            
+
+    def try_get_figures(self, fig_input_key: str):
+        """ tries to download the figures with the fig_input_key """
+        _context_figures_dict = self.main_run_collected_results.download_uploaded_figure_files(neptune_project_figures_output_path=self.figures_output_path, fig_input_key=fig_input_key, debug_print=False)
+        # _context_figures_dict
+        ## INPUTS: _context_figures_dict
+        _flattened_context_path_dict, _flat_out_path_items = flatten_context_nested_dict(_context_figures_dict)
+        # OUTPUTS: _flattened_context_path_dict
+        return _flattened_context_path_dict
+
+    def try_get_run_logs(self):
+        """ tries to get the log files, downloading them as needed """
+        _context_log_files_dict = self.utility_run_collected_results.download_uploaded_log_files(neptune_logs_output_path=self.logs_output_path)
+        context_indexed_run_logs: Dict[IdentifyingContext, str] = self.utility_run_collected_results.context_indexed_run_logs # get the IdentifyingContext indexed item
+        
+        self.logs_output_path.mkdir(exist_ok=True, parents=True)
+        _out_log_paths = self.utility_run_collected_results._perform_export_log_files_to_separate_files(context_indexed_run_logs=context_indexed_run_logs, neptune_logs_output_path=self.logs_output_path)
+        _out_log_paths
+
+        return _context_log_files_dict, context_indexed_run_logs, _out_log_paths
+
+
+    def save_run_history_CSVs(self, TODAY_DAY_DATE: str):
+        # a_run_collected_results: NeptuneRunCollectedResults = self.utility_run_collected_results
+        csv_output_paths = {}
+        most_recent_runs_table_df_dict = {}
+        
+        for a_name, a_run_collected_results in self.projects_run_collected_results_dict.items():
+            context_indexed_runs_list_dict: Dict[IdentifyingContext, List[AutoValueConvertingNeptuneRun]] = a_run_collected_results.context_indexed_runs_list_dict
+            ## INPUTS: neptuner, run_logs, most_recent_runs_table_df
+
+            most_recent_runs_table_df: pd.DataFrame = a_run_collected_results.most_recent_runs_table_df
+            most_recent_runs_session_descriptor_string_to_context_map: Dict[SessionDescriptorString, IdentifyingContext] = a_run_collected_results.most_recent_runs_session_descriptor_string_to_context_map
+            ## INPUTS: most_recent_runs_session_descriptor_string_to_context_map, run_logs
+            # context_indexed_run_logs: Dict[IdentifyingContext, str] = a_run_collected_results.context_indexed_run_logs # get the IdentifyingContext indexed item
+            ## INPUTS: most_recent_runs_table_df
+            most_recent_runs_context_indexed_run_extra_data: Dict[IdentifyingContext, Dict] = a_run_collected_results.most_recent_runs_context_indexed_run_extra_data
+            # most_recent_runs_context_indexed_run_extra_data # SessionTuple(format_name='kdiba', animal='pin01', exper_name='one', session_name='11-02_17-46-44', session_descriptor_string='kdiba_pin01_one_11-02_17-46-44_sess', id='LS2023-1335', hostname='gl3126.arc-ts.umich.edu', creation_time=Timestamp('2024-08-29 16:39:16.613000'), running_time=8735.629, ping_time=Timestamp('2024-09-24 08:38:06.626000'), monitoring_time=1543, size=28686905.0, tags='11-02_17-46-44,one,kdiba,pin01', entrypoint='figures_kdiba_pin01_one_11-02_17-46-44.py')
+            csv_output_paths[a_name] = f'output/{TODAY_DAY_DATE}_{a_name}_most_recent_neptune_runs_csv.csv'
+            most_recent_runs_table_df.to_csv(csv_output_paths[a_name])
+            most_recent_runs_table_df_dict[a_name] = most_recent_runs_table_df_dict
+            
+            ## OUTPUTS: most_recent_runs_session_descriptor_string_to_context_map, context_indexed_run_logs, most_recent_runs_context_indexed_run_extra_data
+
+        return most_recent_runs_table_df_dict, csv_output_paths
 
 
 # ==================================================================================================================== #
