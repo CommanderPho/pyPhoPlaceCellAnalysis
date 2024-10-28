@@ -450,7 +450,7 @@ def plot_histograms_across_sessions(data_results_df: pd.DataFrame, data_type: st
 
 
 
-@function_attributes(short_name=None, tags=['histogram', 'stacked', 'multi-session', 'plot', 'figure', 'matplotlib', 'good'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
+@function_attributes(short_name=None, tags=['matplotlib', 'histogram', 'stacked', 'multi-session', 'plot', 'figure', 'good'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
 def plot_stacked_histograms(data_results_df: pd.DataFrame, data_type: str, session_spec: str, time_bin_duration_str: str, column_name:str='P_Long', **kwargs) -> None:
     """ plots a colorful stacked histogram for each of the many time-bin sizes
     
@@ -458,7 +458,6 @@ def plot_stacked_histograms(data_results_df: pd.DataFrame, data_type: str, sessi
     
     y_baseline_level: float = 0.5 # for P(short), etc
     # y_baseline_level: float = 0.0 # for wcorr, etc
-    
     
     if is_dark_mode:
         _extras_output_dict["y_mid_line"] = new_fig_ripples.add_hline(y=y_baseline_level, line=dict(color="rgba(0.8,0.8,0.8,.75)", width=2), row='all', col='all')
