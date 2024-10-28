@@ -149,6 +149,90 @@ class LoadedObjectPersistanceState:
         return len(curr_diff) > 0
 
 
+# Pipeline Pickling Helpers __________________________________________________________________________________________ #
+@function_attributes(short_name=None, tags=['pure', 'pkl'], input_requires=[], output_provides=[], uses=[], used_by=['save_custom_parameters_pipeline'], creation_date='2024-06-28 13:23', related_items=[])
+def helper_perform_pickle_pipeline(a_curr_active_pipeline, custom_save_filenames, custom_save_filepaths, enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=False, enable_save_h5: bool=False, saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE):
+	""" Pickles the pipelines as needed
+
+	from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import helper_perform_pickle_pipeline
+	custom_save_filepaths = helper_perform_pickle_pipeline(a_curr_active_pipeline=_temp_curr_active_pipeline, custom_save_filenames=custom_save_filenames, custom_save_filepaths=custom_save_filepaths, enable_save_pipeline_pkl=True, enable_save_global_computations_pkl=False, enable_save_h5=False)
+
+	"""	
+	try:
+		if enable_save_pipeline_pkl:
+			custom_save_filepaths['pipeline_pkl'] = a_curr_active_pipeline.save_pipeline(saving_mode=saving_mode, active_pickle_filename=custom_save_filenames['pipeline_pkl'])
+
+		if enable_save_global_computations_pkl:
+			custom_save_filepaths['global_computation_pkl'] = a_curr_active_pipeline.save_global_computation_results(override_global_pickle_filename=custom_save_filenames['global_computation_pkl'])
+
+		if enable_save_h5:
+			custom_save_filepaths['pipeline_h5'] = a_curr_active_pipeline.export_pipeline_to_h5(override_filename=custom_save_filenames['pipeline_h5'])
+		
+		print(f'custom_save_filepaths: {custom_save_filepaths}')
+
+	except BaseException as e:
+		print(f'failed pickling in `helper_perform_pickle_pipeline(...)` with error: {e}')
+		pass
+	
+	return custom_save_filepaths
+
+
+@function_attributes(short_name=None, tags=['dataframe', 'filename', 'metadata'], input_requires=[], output_provides=[], uses=[], used_by=['save_custom_parameters_pipeline'], creation_date='2024-10-28 12:40', related_items=[])
+def _get_custom_suffix_for_filename_from_computation_metadata(*extras_strings, minimum_inclusion_fr_Hz=None, included_qclu_values=None) -> str:
+	""" Uses metadata stored in the replays dataframe to determine an appropriate filename
+	
+	
+	from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _get_custom_suffix_for_filename_from_computation_metadata
+	custom_suffix = _get_custom_suffix_for_filename_from_computation_metadata(new_replay_epochs=new_replay_epochs)
+
+	print(f'custom_suffix: "{custom_suffix}"')
+
+	"""
+	custom_suffix_string_parts = []
+	custom_suffix: str = ''
+	
+	if minimum_inclusion_fr_Hz is not None:
+		custom_suffix_string_parts.append(f"frateThresh_{minimum_inclusion_fr_Hz:.1f}")
+	if included_qclu_values is not None:
+		custom_suffix_string_parts.append(f"qclu_{included_qclu_values}")
+
+	custom_suffix = '-'.join([custom_suffix, *custom_suffix_string_parts, *extras_strings])
+	
+	return custom_suffix
+
+@function_attributes(short_name=None, tags=['save', 'save_custom'], input_requires=[], output_provides=[], uses=['_get_custom_suffix_for_filename_from_computation_metadata', 'helper_perform_pickle_pipeline'], used_by=[], creation_date='2024-10-28 14:08', related_items=[])
+def save_custom_parameters_pipeline(a_curr_active_pipeline, replay_suffix: str='_withNormalComputedReplays', minimum_inclusion_fr_Hz=None, included_qclu_values=None, enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=False, enable_save_h5: bool = False, saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE):
+	""" Saves a pipeline with custom parameters
+
+    Usage:   
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import save_custom_parameters_pipeline
+
+        custom_save_filepaths = save_custom_parameters_pipeline(curr_active_pipeline, replay_suffix='_withNormalComputedReplays', minimum_inclusion_fr_Hz=None, included_qclu_values=None, 
+                                                                enable_save_pipeline_pkl=False, enable_save_global_computations_pkl=True, enable_save_h5=False)
+        custom_save_filepaths
+
+    """
+	custom_suffix: str = replay_suffix
+	custom_suffix += _get_custom_suffix_for_filename_from_computation_metadata(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
+	 # '_withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2, 4, 6, 7, 9]'
+
+	## INPUTS: custom_suffix
+	custom_save_filenames = {
+		'pipeline_pkl':f'loadedSessPickle{custom_suffix}.pkl',
+		'global_computation_pkl':f"global_computation_results{custom_suffix}.pkl",
+		'pipeline_h5':f'pipeline{custom_suffix}.h5',
+	}
+	print(f'custom_save_filenames: {custom_save_filenames}')
+	custom_save_filepaths = {k:v for k, v in custom_save_filenames.items()}
+
+	## Pickle again after recomputing:
+	custom_save_filepaths = helper_perform_pickle_pipeline(a_curr_active_pipeline=a_curr_active_pipeline, custom_save_filenames=custom_save_filenames, custom_save_filepaths=custom_save_filepaths,
+															enable_save_pipeline_pkl=enable_save_pipeline_pkl, enable_save_global_computations_pkl=enable_save_global_computations_pkl, enable_save_h5=enable_save_h5, saving_mode=saving_mode)
+
+	return custom_save_filepaths, custom_suffix
+
+
+
     
 
 class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, FilteredPipelineMixin, PipelineWithComputedPipelineStageMixin, PipelineWithDisplayPipelineStageMixin, PipelineWithDisplaySavingMixin, HDF_SerializationMixin, object):
