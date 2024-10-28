@@ -27,9 +27,10 @@ class SpecificComputationResultsSpecification:
 
     """
     provides_global_keys: List[str] = field(default=Factory(list), repr=True) 
-    # provides_local_keys: List[str] = field(default=Factory(list), repr=True)
+    provides_local_keys: List[str] = field(default=Factory(list), repr=True)
     requires_global_keys: List[str] = field(default=Factory(list), repr=True)
-    # requires_local_keys: List[str] = field(default=Factory(list), repr=True)
+    requires_local_keys: List[str] = field(default=Factory(list), repr=True)
+    
     
     def has_provided_keys(self, global_computation_results):
         """ check if the provided_global_keys are in the global_computation_results already.
@@ -143,6 +144,9 @@ class SpecificComputationValidator:
             # ensure the alternative non-import syntax isn't used simultaneously
             assert not (hasattr(a_fn, 'provides_global_keys') and (a_fn.provides_global_keys is not None))
             assert not (hasattr(a_fn, 'requires_global_keys') and (a_fn.requires_global_keys is not None))
+            assert not (hasattr(a_fn, 'output_provides') and (a_fn.output_provides is not None))
+            assert not (hasattr(a_fn, 'input_requires') and (a_fn.input_requires is not None))
+
             results_specification = a_fn.results_specification
             
         else:
@@ -153,6 +157,11 @@ class SpecificComputationValidator:
                 results_specification.provides_global_keys = list(a_fn.provides_global_keys)
             if hasattr(a_fn, 'requires_global_keys') and (a_fn.requires_global_keys is not None):
                 results_specification.requires_global_keys = list(a_fn.requires_global_keys)
+            if hasattr(a_fn, 'output_provides') and (a_fn.output_provides is not None):
+                results_specification.provides_local_keys = list(a_fn.output_provides)                
+            if hasattr(a_fn, 'input_requires') and (a_fn.input_requires is not None):
+                results_specification.requires_local_keys = list(a_fn.input_requires)
+
 
         assert (hasattr(a_fn, 'computation_precidence') and (a_fn.computation_precidence is not None))
         computation_precidence = a_fn.computation_precidence
@@ -181,8 +190,8 @@ class SpecificComputationValidator:
         return self._perform_try_validate_is_computation_valid(self, curr_active_pipeline, **kwargs)
 
 
-    def try_computation_if_needed(self, curr_active_pipeline, **kwargs):
-        return self._perform_try_computation_if_needed(self, curr_active_pipeline, **kwargs)
+    def try_computation_if_needed(self, curr_active_pipeline, computation_filter_name:str, **kwargs):
+        return self._perform_try_computation_if_needed(self, curr_active_pipeline, computation_filter_name=computation_filter_name, **kwargs)
 
 
     def try_remove_provided_keys(self, curr_active_pipeline, **kwargs):
