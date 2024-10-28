@@ -1154,6 +1154,61 @@ class PipelineWithComputedPipelineStageMixin:
         return SpecificComputationValidator.find_validators_providing_results(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), probe_provided_result_keys=probe_provided_result_keys, return_flat_list=return_flat_list)
 
 
+    @function_attributes(short_name=None, tags=['parameters', 'update'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 18:45', related_items=[])
+    def apply_changed_parameters(self, minimum_inclusion_fr_Hz=5.0, included_qclu_values = [1, 2, 4, 9], is_dry_run: bool=True):
+        """ Applies the changed parameters to the pipeline and recomputes as needed.
+
+        Usage:
+            minimum_inclusion_fr_Hz = 5.0
+            included_qclu_values = [1, 2, 4, 9]
+
+            (dependent_validators, provided_global_keys), old_new_values_change_dict = curr_active_pipeline.apply_changed_parameters(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values,
+                                                                                                                                    is_dry_run=False)
+            old_new_values_change_dict
+
+        """
+        original_minimum_inclusion_fr_Hz: float = deepcopy(self.global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz)
+        original_included_qclu_values: List[int] = deepcopy(self.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values)
+
+
+        ## Determine which computations need to be re-ran after changing a config properity:
+        did_change_list = []
+        old_new_values_change_dict = {}
+        if minimum_inclusion_fr_Hz != original_minimum_inclusion_fr_Hz:
+            did_change_list.append('global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz')
+            old_new_values_change_dict['global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz'] = {'old': original_minimum_inclusion_fr_Hz, 'new': minimum_inclusion_fr_Hz}
+            
+        if included_qclu_values != original_included_qclu_values:
+            did_change_list.append('global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values')
+            old_new_values_change_dict['global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values'] = {'old': original_included_qclu_values, 'new': included_qclu_values}    
+        
+        did_any_change: bool = (len(did_change_list) > 0)
+        if is_dry_run:
+            print(f'did_change_list: {did_change_list}')
+            print(f'did_any_change: {did_any_change}')
+        
+        dependent_validators, provided_global_keys = self.find_downstream_dependencies(provided_local_keys=did_change_list, provided_global_keys=None)
+        # provided_global_keys: ['SequenceBased', 'TrainTestSplit', 'TrialByTrialActivity', 'DirectionalDecodersEpochsEvaluations', 'DirectionalDecodersDecoded', 'DirectionalMergedDecoders', 'RankOrder']
+        
+        if (not is_dry_run):
+            ## Apply the changes:
+            self.global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz = minimum_inclusion_fr_Hz
+            self.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values = included_qclu_values
+
+            ## recompute:
+            for k, v in dependent_validators.items():
+                v.try_remove_provided_keys(curr_active_pipeline=self)
+                v.try_computation_if_needed(curr_active_pipeline=self, computation_filter_name=None)
+                # remaining_comp_specifiers_dict, dependent_validators, provided_global_keys = SpecificComputationValidator.find_immediate_dependencies(remaining_comp_specifiers_dict=v, provided_global_keys=provided_global_keys)
+                # provided_global_keys
+        else:
+            ## dry_run:
+            print(f'provided_global_keys: {provided_global_keys}')
+            print(f'is_dry_run == True mode, so recomputations will not be performed.')
+
+        return (dependent_validators, provided_global_keys), old_new_values_change_dict
+
+
     def reload_default_computation_functions(self):
         """ reloads/re-registers the default display functions after adding a new one """
         self.stage.reload_default_computation_functions()
@@ -1767,6 +1822,7 @@ class PipelineWithComputedPipelineStageMixin:
         #     'param_typed_parameters': param_typed_parameters,
         # }
         
+    @function_attributes(short_name=None, tags=['parameters', 'filenames', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 16:10', related_items=[])
     def get_custom_pipeline_filenames_from_parameters(self) -> Tuple:
         """ gets the custom suffix from the pipeline's parameters 
         
