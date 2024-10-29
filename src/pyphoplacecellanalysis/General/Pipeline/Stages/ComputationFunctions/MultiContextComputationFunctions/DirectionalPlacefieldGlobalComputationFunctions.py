@@ -5971,7 +5971,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
 		## OUTPUTS: directional_active_lap_pf_results_dicts
 		a_trial_by_trial_result: TrialByTrialActivityResult = TrialByTrialActivityResult(any_decoder_neuron_IDs=any_decoder_neuron_IDs,
-																					 active_pf_dt=active_pf_dt,
+																					 active_pf_dt=deepcopy(active_pf_dt),
 																					 directional_lap_epochs_dict=directional_lap_epochs_dict,
 																					 directional_active_lap_pf_results_dicts=directional_active_lap_pf_results_dicts,
 																					 is_global=True)  # type: Tuple[Tuple[Dict[str, Any], Dict[str, Any]], Dict[str, BasePositionDecoder], Any]
