@@ -2,6 +2,8 @@ import plotly.graph_objs as go
 import ipywidgets as widgets
 from ipywidgets import interact, interactive, interactive_output, Output
 from IPython.display import display, clear_output  # Imports for display and clearing output  # Import for the display function
+from pyphocorehelpers.programming_helpers import copy_to_clipboard
+
 
 class PlotlyInteractivePlacementWidget:
 	""" an interactive widget with sliders and controls that allow you to test Plotly annotations parameters in real time
@@ -14,7 +16,7 @@ class PlotlyInteractivePlacementWidget:
 		interactive_plot.run()
 		
 	"""    
-	def __init__(self):
+	def __init__(self, base_fig=None):
 		# Set up widgets for interactive adjustment
 		self.x_widget = widgets.FloatSlider(min=0, max=1, step=0.01, value=0.5, description="X Position")
 		self.y_widget = widgets.FloatSlider(min=-0.5, max=1.5, step=0.01, value=-0.1, description="Y Position")
@@ -36,8 +38,13 @@ class PlotlyInteractivePlacementWidget:
 		self.reset_button.on_click(self.reset_values)
 		
 		# Initialize the figure widget
-		self.fig = go.FigureWidget()
-		self.fig.add_scatter(x=[1, 2, 3], y=[4, 5, 6])
+		if base_fig is not None:
+			print(f'using passed figure')
+			self.fig = go.FigureWidget(data=base_fig.data, layout=base_fig.layout)		
+		else:
+			print(f'no passed figure, generating a default figure.')
+			self.fig = go.FigureWidget()
+			self.fig.add_scatter(x=[1, 2, 3], y=[4, 5, 6])
 		
 		# Set initial layout
 		self.update_plot()
@@ -132,7 +139,9 @@ class PlotlyInteractivePlacementWidget:
 			'yanchor': self.yanchor_widget.value
 		}
 		print(kwargs)
-	
+		copy_to_clipboard(str(kwargs)) ## to clipboard
+		
+
 	def reset_values(self, b=None):
 		"""Reset all widgets to their default values."""
 		self.x_widget.value = 0.5
@@ -150,6 +159,9 @@ class PlotlyInteractivePlacementWidget:
 		self.margin_left_widget.value = 50
 		self.margin_right_widget.value = 50
 
-# Instantiate and run the interactive plot
-interactive_plot = PlotlyInteractivePlacementWidget()
-interactive_plot.run()
+
+if __name__ == "__main__":
+	# Instantiate and run the interactive plot
+	interactive_plot = PlotlyInteractivePlacementWidget()
+	interactive_plot.run()
+
