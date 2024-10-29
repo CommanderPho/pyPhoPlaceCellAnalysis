@@ -1693,7 +1693,36 @@ class DataFrameFilter:
 		return self.time_bin_size_widget.value
 	@time_bin_size.setter
 	def time_bin_size(self, value):
+		# Combine all DataFrames to get unique options
+		# combined_df = self.all_sessions_ripple_df.append(self.all_sessions_laps_df, ignore_index=True)
+		# replay_name_options = sorted(combined_df['custom_replay_name'].unique())
+		# time_bin_size_options = sorted(combined_df['time_bin_size'].unique())
+
+		# Set default initial_time_bin_sizes if not provided
+		if value is None:
+			# Default to selecting all options or the first option
+			# initial_time_bin_sizes = (time_bin_size_options[0],)
+			value = tuple() # empty tuple
+			pass
+		else:
+			# Ensure initial_time_bin_sizes is a tuple
+			if isinstance(value, (float, int)):
+				value = (value,)
+			elif isinstance(value, list):
+				value = tuple(value)
+			elif isinstance(value, tuple):
+				pass  # already a tuple
+			else:
+				raise ValueError("initial_time_bin_sizes must be a float, int, list, or tuple")
+
 		self.time_bin_size_widget.value = value
+		
+
+	@property
+	def filter_context(self) -> IdentifyingContext:
+		"""The time_bin_size property."""
+		return IdentifyingContext(time_bin_sizes=self.time_bin_size, custom_suffix=self.replay_name)
+	
 
 	def __attrs_post_init__(self):
 		# This method runs after the generated __init__
@@ -1725,13 +1754,13 @@ class DataFrameFilter:
 		# )
 	
 		# Use SelectMultiple widget for time_bin_size
-        self.time_bin_size_widget = widgets.SelectMultiple(
-            options=time_bin_size_options,
-            description='Time Bin Size:',
-            disabled=False,
-            layout=widgets.Layout(width='200px', height='100px'),
-            style={'description_width': 'initial'}
-        )
+		self.time_bin_size_widget = widgets.SelectMultiple(
+			options=time_bin_size_options,
+			description='Time Bin Size:',
+			disabled=False,
+			layout=widgets.Layout(width='200px', height='100px'),
+			style={'description_width': 'initial'}
+		)
 	
 		# Set up observers to handle changes in widget values
 		self.replay_name_widget.observe(self._on_widget_change, names='value')
@@ -1744,35 +1773,45 @@ class DataFrameFilter:
 		# Update filtered DataFrames when widget values change
 		self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
 
-	def update_filtered_dataframes(self, replay_name, time_bin_size):
+	def update_filtered_dataframes(self, replay_name, time_bin_sizes):
 		""" Perform filtering on each DataFrame
 		"""
+		if not time_bin_sizes:
+			print("Please select at least one Time Bin Size.")
+			return
+		
+		# Convert time_bin_sizes to a list if it's not already
+		if isinstance(time_bin_sizes, (float, int)):
+			time_bin_sizes = [time_bin_sizes]
+		elif isinstance(time_bin_sizes, tuple):
+			time_bin_sizes = list(time_bin_sizes)
+		
 		# Filter ripple DataFrames using deepcopy
 		self.filtered_all_sessions_ripple_df = deepcopy(
 			self.all_sessions_ripple_df[
 				(self.all_sessions_ripple_df['custom_replay_name'] == replay_name) &
-				(self.all_sessions_ripple_df['time_bin_size'] == time_bin_size)
+				(self.all_sessions_ripple_df['time_bin_size'].isin(time_bin_sizes))
 			]
 		)
 
 		self.filtered_all_sessions_ripple_time_bin_df = deepcopy(
 			self.all_sessions_ripple_time_bin_df[
 				(self.all_sessions_ripple_time_bin_df['custom_replay_name'] == replay_name) &
-				(self.all_sessions_ripple_time_bin_df['time_bin_size'] == time_bin_size)
+				(self.all_sessions_ripple_time_bin_df['time_bin_size'].isin(time_bin_sizes))
 			]
 		)
 
 		self.filtered_all_sessions_MultiMeasure_ripple_df = deepcopy(
 			self.all_sessions_MultiMeasure_ripple_df[
 				(self.all_sessions_MultiMeasure_ripple_df['custom_replay_name'] == replay_name) &
-				(self.all_sessions_MultiMeasure_ripple_df['time_bin_size'] == time_bin_size)
+				(self.all_sessions_MultiMeasure_ripple_df['time_bin_size'].isin(time_bin_sizes))
 			]
 		)
 
 		self.filtered_all_sessions_all_scores_ripple_df = deepcopy(
 			self.all_sessions_all_scores_ripple_df[
 				(self.all_sessions_all_scores_ripple_df['custom_replay_name'] == replay_name) &
-				(self.all_sessions_all_scores_ripple_df['time_bin_size'] == time_bin_size)
+				(self.all_sessions_all_scores_ripple_df['time_bin_size'].isin(time_bin_sizes))
 			]
 		)
 
@@ -1780,26 +1819,26 @@ class DataFrameFilter:
 		self.filtered_all_sessions_laps_df = deepcopy(
 			self.all_sessions_laps_df[
 				(self.all_sessions_laps_df['custom_replay_name'] == replay_name) &
-				(self.all_sessions_laps_df['time_bin_size'] == time_bin_size)
+				(self.all_sessions_laps_df['time_bin_size'].isin(time_bin_sizes))
 			]
 		)
 
 		self.filtered_all_sessions_laps_time_bin_df = deepcopy(
 			self.all_sessions_laps_time_bin_df[
 				(self.all_sessions_laps_time_bin_df['custom_replay_name'] == replay_name) &
-				(self.all_sessions_laps_time_bin_df['time_bin_size'] == time_bin_size)
+				(self.all_sessions_laps_time_bin_df['time_bin_size'].isin(time_bin_sizes))
 			]
 		)
 
 		self.filtered_all_sessions_MultiMeasure_laps_df = deepcopy(
 			self.all_sessions_MultiMeasure_laps_df[
 				(self.all_sessions_MultiMeasure_laps_df['custom_replay_name'] == replay_name) &
-				(self.all_sessions_MultiMeasure_laps_df['time_bin_size'] == time_bin_size)
+				(self.all_sessions_MultiMeasure_laps_df['time_bin_size'].isin(time_bin_sizes))
 			]
 		)
 		
 		# Provide feedback to the user
-		print(f"DataFrames filtered with Replay Name: '{replay_name}' and Time Bin Size: {time_bin_size}")
+		print(f"DataFrames filtered with Replay Name: '{replay_name}' and Time Bin Sizes: {time_bin_sizes}")
 		n_records: int = len(self.filtered_all_sessions_all_scores_ripple_df)
 		print(f'n_rows: {n_records}')
 		# self.update_calling_namespace_locals()
