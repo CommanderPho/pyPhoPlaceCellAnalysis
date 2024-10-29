@@ -203,7 +203,7 @@ class TrialByTrialActivityWindow:
              'curr_page_relative_row': curr_page_relative_row, 'curr_page_relative_col': curr_page_relative_col,
             }
             
-            if not has_active_neuron_IDs:
+            if (not has_active_neuron_IDs):
                 neuron_IDX = curr_included_unit_index
                 curr_cell_identifier_string = f'Cell[{neuron_IDX}]'
                 _curr_plot_data_dict['neuron_IDX'] = neuron_IDX
@@ -360,7 +360,7 @@ class TrialByTrialActivityWindow:
         directional_active_lap_pf_results_dicts = {k:v for k, v in directional_active_lap_pf_results_dicts.items() if k in TrackTemplates.get_decoder_names()}
         directional_active_pf_neuron_IDS_dict = {k:v.neuron_ids for k, v in directional_active_lap_pf_results_dicts.items()}
         print(f'directional_active_pf_neuron_IDS_dict: {directional_active_pf_neuron_IDS_dict}')
-        active_neuron_IDs = deepcopy(list(directional_active_pf_neuron_IDS_dict.values())[0])
+        active_neuron_IDs = deepcopy(list(directional_active_pf_neuron_IDS_dict.values())[0]) ## gets the first aclus:
         assert np.allclose([list(v) for v in list(directional_active_pf_neuron_IDS_dict.values())], active_neuron_IDs), f"All neuron_IDs must be the same!"
         if override_active_neuron_IDs is not None:
             active_neuron_IDs = active_neuron_IDs[np.isin(active_neuron_IDs, override_active_neuron_IDs)] # only get the allowed elements
