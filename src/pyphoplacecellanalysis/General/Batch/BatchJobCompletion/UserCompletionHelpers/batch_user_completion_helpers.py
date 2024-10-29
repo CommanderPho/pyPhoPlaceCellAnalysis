@@ -373,7 +373,19 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 	assert self.collected_outputs_path.exists()
 	curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
 	_, _, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
+	if len(custom_suffix) > 0:
+		if additional_session_context is not None:
+			if isinstance(additional_session_context, dict):
+				additional_session_context = IdentifyingContext(**additional_session_context)
 
+			## easiest to update as dict:	
+			additional_session_context = additional_session_context.to_dict()
+			additional_session_context['custom_suffix'] = additional_session_context.get('custom_suffix', '') + custom_suffix
+			additional_session_context = IdentifyingContext(**additional_session_context)
+			
+		else:
+			additional_session_context = IdentifyingContext(custom_suffix=custom_suffix)
+	
 	# active_context = curr_active_pipeline.get_session_context()
 	if additional_session_context is not None:
 		if isinstance(additional_session_context, dict):
