@@ -2102,7 +2102,7 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
 	figure_out_paths = save_plotly(a_fig=new_fig, a_fig_context=new_fig_context)
 
 	if enable_custom_widget_buttons:
-		new_fig = add_copy_save_action_buttons(new_fig)
+		_extras_output_dict['out_widget'] = add_copy_save_action_buttons(new_fig)
 	
 	return new_fig, new_fig_context, _extras_output_dict, figure_out_paths
 
