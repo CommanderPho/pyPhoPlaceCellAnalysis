@@ -1,7 +1,7 @@
 import plotly.graph_objs as go
 import ipywidgets as widgets
-from ipywidgets import interact, interactive
-from IPython.display import display  # Import for the display function
+from ipywidgets import interact, interactive, Output
+from IPython.display import display, clear_output  # Imports for display and clearing output  # Import for the display function
 
 class PlotlyInteractivePlacementWidget:
 	""" an interactive widget with sliders and controls that allow you to test Plotly annotations parameters in real time
@@ -36,6 +36,9 @@ class PlotlyInteractivePlacementWidget:
 		self.reset_button = widgets.Button(description="Reset Values")
 		self.reset_button.on_click(self.reset_values)
 	
+		# Output widget to capture the plot
+		self.output = Output()
+	
 
 	def update_plot(self, x=0.5, y=-0.1, xref='paper', yref='paper', font_size=10, text="This is a footer label",
 					showarrow=False, textangle=0, xanchor='center', yanchor='middle',
@@ -59,7 +62,10 @@ class PlotlyInteractivePlacementWidget:
 			],
 			margin=dict(t=margin_top, b=margin_bottom, l=margin_left, r=margin_right)  # Set margins dynamically
 		)
-		fig.show()
+		with self.output:
+			clear_output(wait=True)
+			fig.show()
+
 
 	def run(self):
 		# Use the interact function to create the interactive UI
@@ -80,29 +86,7 @@ class PlotlyInteractivePlacementWidget:
 		# 	margin_left=self.margin_left_widget,
 		# 	margin_right=self.margin_right_widget
 		# )
-			
-		# ui = widgets.VBox([
-		# 	interact(
-		# 		self.update_plot,
-		# 		x=self.x_widget,
-		# 		y=self.y_widget,
-		# 		xref=self.xref_widget,
-		# 		yref=self.yref_widget,
-		# 		font_size=self.font_size_widget,
-		# 		text=self.text_widget,
-		# 		showarrow=self.showarrow_widget,
-		# 		textangle=self.textangle_widget,
-		# 		xanchor=self.xanchor_widget,
-		# 		yanchor=self.yanchor_widget,
-		# 		margin_top=self.margin_top_widget,
-		# 		margin_bottom=self.margin_bottom_widget,
-		# 		margin_left=self.margin_left_widget,
-		# 		margin_right=self.margin_right_widget
-		# 	),
-		# 	self.print_button,
-		# 	self.reset_button  # Added the new button here
-		# ])
-		# display(ui)
+
 		
 		# Create interactive plot without directly displaying it
 		interactive_plot = interactive(
@@ -140,11 +124,13 @@ class PlotlyInteractivePlacementWidget:
 			self.margin_left_widget,
 			self.margin_right_widget,
 			self.print_button,
-			self.reset_button
+			self.reset_button,
+            self.output  # Output widget for displaying the plot
 		])
 
 		display(ui)
-		display(interactive_plot.children[-1])  # Display the actual plot/output element
+		# display(interactive_plot.children[-1])  # Display the actual plot/output element
+		# display(interactive_plot.children[-1])  # Ensure this line is removed because it outputs separately
 
 
 	def print_annotations_kwargs(self, b=None):
