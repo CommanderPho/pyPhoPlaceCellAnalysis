@@ -30,11 +30,11 @@ class PlotlyInteractivePlacementWidget:
 		self.margin_bottom_widget = widgets.IntSlider(min=0, max=200, step=10, value=100, description="Bottom Margin")
 		self.margin_left_widget = widgets.IntSlider(min=0, max=200, step=10, value=50, description="Left Margin")
 		self.margin_right_widget = widgets.IntSlider(min=0, max=200, step=10, value=50, description="Right Margin")
-		# self.print_button = widgets.Button(description="Print Annotation Kwargs")
-		# self.print_button.on_click(self.print_annotations_kwargs)
-		# # New button widget
-		# self.reset_button = widgets.Button(description="Reset Values")
-		# self.reset_button.on_click(self.reset_values)
+		self.print_button = widgets.Button(description="Print Annotation Kwargs")
+		self.print_button.on_click(self.print_annotations_kwargs)
+		# New button widget
+		self.reset_button = widgets.Button(description="Reset Values")
+		self.reset_button.on_click(self.reset_values)
 	
 
 	def update_plot(self, x=0.5, y=-0.1, xref='paper', yref='paper', font_size=10, text="This is a footer label",
@@ -63,23 +63,23 @@ class PlotlyInteractivePlacementWidget:
 
 	def run(self):
 		# Use the interact function to create the interactive UI
-		interact(
-			self.update_plot,
-			x=self.x_widget,
-			y=self.y_widget,
-			xref=self.xref_widget,
-			yref=self.yref_widget,
-			font_size=self.font_size_widget,
-			text=self.text_widget,
-			showarrow=self.showarrow_widget,
-			textangle=self.textangle_widget,
-			xanchor=self.xanchor_widget,
-			yanchor=self.yanchor_widget,
-			margin_top=self.margin_top_widget,
-			margin_bottom=self.margin_bottom_widget,
-			margin_left=self.margin_left_widget,
-			margin_right=self.margin_right_widget
-		)
+		# interact(
+		# 	self.update_plot,
+		# 	x=self.x_widget,
+		# 	y=self.y_widget,
+		# 	xref=self.xref_widget,
+		# 	yref=self.yref_widget,
+		# 	font_size=self.font_size_widget,
+		# 	text=self.text_widget,
+		# 	showarrow=self.showarrow_widget,
+		# 	textangle=self.textangle_widget,
+		# 	xanchor=self.xanchor_widget,
+		# 	yanchor=self.yanchor_widget,
+		# 	margin_top=self.margin_top_widget,
+		# 	margin_bottom=self.margin_bottom_widget,
+		# 	margin_left=self.margin_left_widget,
+		# 	margin_right=self.margin_right_widget
+		# )
 			
 		# ui = widgets.VBox([
 		# 	interact(
@@ -103,6 +103,49 @@ class PlotlyInteractivePlacementWidget:
 		# 	self.reset_button  # Added the new button here
 		# ])
 		# display(ui)
+		
+		# Create interactive plot without directly displaying it
+		interactive_plot = interactive(
+			self.update_plot,
+			x=self.x_widget,
+			y=self.y_widget,
+			xref=self.xref_widget,
+			yref=self.yref_widget,
+			font_size=self.font_size_widget,
+			text=self.text_widget,
+			showarrow=self.showarrow_widget,
+			textangle=self.textangle_widget,
+			xanchor=self.xanchor_widget,
+			yanchor=self.yanchor_widget,
+			margin_top=self.margin_top_widget,
+			margin_bottom=self.margin_bottom_widget,
+			margin_left=self.margin_left_widget,
+			margin_right=self.margin_right_widget
+		)
+
+		# Manually creating VBox layout with all widgets and control buttons
+		ui = widgets.VBox([
+			self.x_widget,
+			self.y_widget,
+			self.xref_widget,
+			self.yref_widget,
+			self.font_size_widget,
+			self.text_widget,
+			self.showarrow_widget,
+			self.textangle_widget,
+			self.xanchor_widget,
+			self.yanchor_widget,
+			self.margin_top_widget,
+			self.margin_bottom_widget,
+			self.margin_left_widget,
+			self.margin_right_widget,
+			self.print_button,
+			self.reset_button
+		])
+
+		display(ui)
+		display(interactive_plot.children[-1])  # Display the actual plot/output element
+
 
 	def print_annotations_kwargs(self, b=None):
 		kwargs = {
