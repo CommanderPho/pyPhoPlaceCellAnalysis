@@ -478,7 +478,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
 	# BEGIN BLOCK 2 - modernizing from `_perform_compute_custom_epoch_decoding`  ________________________________________________________________________________________________________ #
 	from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _compute_lap_and_ripple_epochs_decoding_for_decoder, _perform_compute_custom_epoch_decoding, _compute_all_df_score_metrics
-	from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
+	from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df, co_filter_epochs_and_spikes
 
 	# Uses: session_ctxt_key, all_param_sweep_options
 	# output_alt_directional_merged_decoders_result: Dict[Tuple, Dict[types.DecoderName, DirectionalPseudo2DDecodersResult]] = {} # empty dict
@@ -552,7 +552,8 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 		(decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict), merged_df_outputs_tuple, raw_dict_outputs_tuple = _compute_all_df_score_metrics(directional_merged_decoders_result=an_alt_dir_Pseudo2D_decoders_result, track_templates=track_templates,
 																																															decoder_laps_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict,
 																																															decoder_ripple_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict,
-																																															spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df),
+																																															# spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df),
+																																															spikes_df=get_proper_global_spikes_df(curr_active_pipeline, minimum_inclusion_fr_Hz=curr_active_pipeline.global_computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values),
 																																															should_skip_radon_transform=True, suppress_exceptions=suppress_exceptions)
 		
 		laps_radon_transform_merged_df, ripple_radon_transform_merged_df, laps_weighted_corr_merged_df, ripple_weighted_corr_merged_df, laps_simple_pf_pearson_merged_df, ripple_simple_pf_pearson_merged_df = merged_df_outputs_tuple ## Here is where `ripple_weighted_corr_merged_df` is being returned (badly)
@@ -796,7 +797,8 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 @function_attributes(short_name=None, tags=['TrialByTrialActivityResult'], input_requires=[], output_provides=[], uses=['TrialByTrialActivity.directional_compute_trial_by_trial_correlation_matrix', ''], used_by=[], creation_date='2024-10-08 16:07', 
 					 requires_global_keys=['DirectionalLaps'], provides_global_keys=['DirectionalMergedDecoders'], related_items=[])
 def compute_and_export_session_trial_by_trial_performance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-																			  active_laps_decoding_time_bin_size: float = 0.25, minimum_one_point_stability: float = 0.6, zero_point_stability: float = 0.1, save_hdf:bool=True, save_across_session_hdf:bool=False) -> dict:
+																			  active_laps_decoding_time_bin_size: float = 0.25, minimum_one_point_stability: float = 0.6, zero_point_stability: float = 0.1, save_hdf:bool=True, save_across_session_hdf:bool=False,
+ 																			  additional_session_context: Optional[IdentifyingContext]=None) -> dict:
 	"""  Computes the trial-by-trial deoding performance
 	from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_session_trial_by_trial_performance_completion_function
 	
@@ -826,8 +828,8 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
 	from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
 	from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrialByTrialActivityResult
 	from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _perform_run_rigorous_decoder_performance_assessment
-	from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
-	from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import co_filter_epochs_and_spikes
+	from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df, co_filter_epochs_and_spikes
+
 	# from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 
 	# Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation]
@@ -841,7 +843,29 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
 
 	assert self.collected_outputs_path.exists()
 	curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
-	CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
+	_, _, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
+	if len(custom_suffix) > 0:
+		if additional_session_context is not None:
+			if isinstance(additional_session_context, dict):
+				additional_session_context = IdentifyingContext(**additional_session_context)
+
+			## easiest to update as dict:	
+			additional_session_context = additional_session_context.to_dict()
+			additional_session_context['custom_suffix'] = (additional_session_context.get('custom_suffix', '') or '') + custom_suffix
+			additional_session_context = IdentifyingContext(**additional_session_context)
+			
+		else:
+			additional_session_context = IdentifyingContext(custom_suffix=custom_suffix)
+	
+		assert (additional_session_context is not None), f"compute_and_export_session_trial_by_trial_performance_completion_function: additional_session_context is None even after trying to add the computation params as additional_session_context"
+		# active_context = curr_active_pipeline.get_session_context()
+		if isinstance(additional_session_context, dict):
+			additional_session_context = IdentifyingContext(**additional_session_context)
+		active_context = (curr_active_pipeline.get_session_context() | additional_session_context)
+		CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}-{additional_session_context.get_description()}"
+	else:
+		CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}" ## OLD:
+	
 	print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
 
 	callback_outputs = {
@@ -1001,7 +1025,7 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
 		## INPUTS: laps_time_bin_marginals_df
 		# active_min_num_unique_aclu_inclusions_requirement: int = track_templates.min_num_unique_aclu_inclusions_requirement(curr_active_pipeline, required_min_percentage_of_active_cells=0.33333333333333)
 		active_min_num_unique_aclu_inclusions_requirement = None # must be none for individual `time_bin` periods
-		filtered_laps_time_bin_marginals_df, active_spikes_df = co_filter_epochs_and_spikes(active_spikes_df=get_proper_global_spikes_df(curr_active_pipeline, minimum_inclusion_fr_Hz=curr_active_pipeline.global_computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz),
+		filtered_laps_time_bin_marginals_df, active_spikes_df = co_filter_epochs_and_spikes(active_spikes_df=get_proper_global_spikes_df(curr_active_pipeline, minimum_inclusion_fr_Hz=curr_active_pipeline.global_computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values),
 																		active_epochs_df=laps_time_bin_marginals_df, included_aclus=track_templates.any_decoder_neuron_IDs, min_num_unique_aclu_inclusions=active_min_num_unique_aclu_inclusions_requirement,
 																		epoch_id_key_name='lap_individual_time_bin_id', no_interval_fill_value=-1, add_unique_aclus_list_column=True, drop_non_epoch_spikes=True)
 		callback_outputs['subset_decode_results_time_bin_marginals_df_dict'] = {'filtered_laps_time_bin_marginals_df': filtered_laps_time_bin_marginals_df,

@@ -177,6 +177,88 @@ def flatten_context_nested_dict(_context_figures_dict):
     return _flattened_context_path_dict, _flat_out_path_items
 
 
+@function_attributes(short_name=None, tags=['vscode_workspace', 'vscode', 'logs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-29 07:49', related_items=[])
+def build_vscode_log_browsing_workspace(logs_paths):
+    """ builds a VSCode workspace for the batch python scripts
+    
+    Usage:
+        from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import build_vscode_log_browsing_workspace
+
+        ## INPUTS: merged_log_files_paths
+        path_to_watch = "C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune/logs"
+        log_files = [v.as_posix() for v in merged_log_files_paths]
+
+        vscode_workspace_path = build_vscode_log_browsing_workspace(logs_paths=log_files)
+        vscode_workspace_path
+
+    """
+    import sys
+    import os
+    import platform
+    import pkg_resources # for Slurm templating
+    from jinja2 import Environment, FileSystemLoader, Template 
+
+    is_platform_windows: bool = False
+    if (platform.system() == 'Windows'):
+        is_platform_windows = True
+    else:
+        is_platform_windows = False
+
+    assert len(logs_paths) > 0, f"logs_paths is empty!"
+    top_level_merged_logs_folders_path: Path = Path(logs_paths[0]).resolve().parent # "C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune/logs/merged"
+    print(f'top_level_merged_logs_folders_path: {top_level_merged_logs_folders_path}')
+    top_level_logs_folders_path: Path = Path(logs_paths[0]).resolve().parent.parent # "C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune/logs"
+    print(f'top_level_logs_folders_path: {top_level_logs_folders_path}')
+    top_level_neptune_folders_path: Path = top_level_logs_folders_path.parent # "C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune"
+    print(f'top_level_neptune_folders_path: {top_level_neptune_folders_path}')
+    
+    workspace_relative_log_folders: List[Path] = [Path(a_path).relative_to(top_level_neptune_folders_path).resolve() for a_path in [top_level_merged_logs_folders_path, top_level_logs_folders_path]]
+    print(f'workspace_relative_log_folders: {workspace_relative_log_folders}')
+        
+    # script_folders: List[Path] = [top_level_neptune_folders_path] + [Path(a_path).parent.resolve() for a_path in logs_paths]
+    relative_log_files: List[Path] = [Path(a_path).relative_to(top_level_neptune_folders_path).resolve() for a_path in logs_paths] # not used
+    print(f'relative_log_files: {relative_log_files}')
+    # {
+    #     "path": "L:/Scratch/gen_scripts",
+    #     "name": "gen_scripts_root"
+    # },
+    
+    vscode_workspace_path = top_level_neptune_folders_path.joinpath('logs_workspace.code-workspace').resolve()
+    print(f'vscode_workspace_path: {vscode_workspace_path}')
+
+    # Set up Jinja2 environment
+    template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
+    env = Environment(loader=FileSystemLoader(template_path))
+    template = env.get_template('vscode_logs_workspace_template.code-workspace.j2')
+    # Render the template with the provided variables
+    
+    # Define folders as a list of dictionaries
+    # folders = [
+    #     {'path': '/path/to/your/project1', 'name': 'Project1'},
+    #     {'path': '/path/to/your/project2', 'name': 'Project2'},
+    # ]
+    folders = [
+        {'path': f'{a_folder.as_posix()}', 'name': f'{a_folder.name}'}
+        for a_folder in workspace_relative_log_folders
+    ]
+
+    # Define variables
+    variables = {
+        'folders': folders,
+        'is_platform_windows': is_platform_windows,
+    }
+
+    # Render the template with variables
+    workspace_file_content = template.render(variables)
+
+    # Write the generated content to a workspace file
+    with open(vscode_workspace_path, 'w') as f:
+        f.write(workspace_file_content)
+
+    return vscode_workspace_path
+
+
+
 # ==================================================================================================================== #
 # END UTILITY FUNCTIONS                                                                                                #
 # ==================================================================================================================== #

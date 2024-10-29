@@ -24,8 +24,7 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
 from pyphocorehelpers.mixins.serialized import SerializedAttributesAllowBlockSpecifyingClass
 
-from neuropy.utils.result_context import IdentifyingContext
-from neuropy.utils.result_context import providing_context
+from neuropy.utils.result_context import IdentifyingContext, providing_context, DisplaySpecifyingIdentifyingContext
 from neuropy.core.user_annotations import UserAnnotationsManager
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import SingleBarResult, InstantaneousSpikeRateGroupsComputation
@@ -2064,12 +2063,19 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
 	hist_kwargs = dict(color="time_bin_size")
 	# hist_kwargs = dict(color="is_user_annotated_epoch") # , histnorm='probability density'
 	# hist_kwargs.pop('color')
+	
+	figure_sup_huge_title_text: str = data_context.get_description(subset_includelist=['epochs_name', 'data_grain', 'dataframe_name'], separator=' | ')
+	if data_context.has_keys(keys_list=['custom_suffix']):
+		custom_suffix_description: str = data_context.get_description(subset_includelist=['custom_suffix'])
+		figure_sup_huge_title_text = figure_sup_huge_title_text + f'\n{custom_suffix_description}'
+	
+
 	new_fig, new_fig_context = plotly_pre_post_delta_scatter(data_results_df=concatenated_ripple_df, data_context=data_context,
 							out_scatter_fig=None, histogram_bins=histogram_bins,
 							px_scatter_kwargs=px_scatter_kwargs, histogram_variable_name=variable_name, hist_kwargs=hist_kwargs, forced_range_y=None,
 							time_delta_tuple=time_delta_tuple, legend_title_text=None, is_dark_mode=is_dark_mode,
 							# figure_sup_huge_title_text=data_context.get_description(subset_excludelist=['title_prefix'], separator=' | '),
-							figure_sup_huge_title_text=data_context.get_description(subset_includelist=['epochs_name', 'data_grain', 'dataframe_name'], separator=' | '),
+							figure_sup_huge_title_text=figure_sup_huge_title_text,
 )
 
 	new_fig = new_fig.update_layout(fig_size_kwargs)
