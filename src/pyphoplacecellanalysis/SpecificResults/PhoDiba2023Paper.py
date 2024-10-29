@@ -48,6 +48,12 @@ import matplotlib.pyplot as plt
 from pyphoplacecellanalysis.SpecificResults.fourthYearPresentation import fig_surprise_results, fig_remapping_cells
 from pyphocorehelpers.indexing_helpers import list_of_dicts_to_dict_of_lists
 
+from attrs import define, field, Factory  # Import the attrs library
+import ipywidgets as widgets
+from IPython.display import display
+from copy import deepcopy
+from IPython import get_ipython  # Import get_ipython to access the user namespace
+
 # Testing:
 
 
@@ -1627,6 +1633,222 @@ def build_single_time_bin_size_dfs(all_sessions_all_scores_epochs_df, all_sessio
 
 	## OUTPUTS: single_time_bin_size_all_sessions_ripple_df, single_time_bin_size_all_sessions_ripple_time_bin_df
 	return single_time_bin_size_all_sessions_epochs_df, single_time_bin_size_all_sessions_epochs_time_bin_df
+
+
+
+@define(slots=False, eq=False)
+class DataFrameFilter:
+	""" handles interactive filtering of dataframes 
+	
+	from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import DataFrameFilter
+	
+	df_filter: DataFrameFilter = DataFrameFilter(
+		all_sessions_ripple_df=all_sessions_ripple_df,
+		all_sessions_ripple_time_bin_df=all_sessions_ripple_time_bin_df,
+		all_sessions_MultiMeasure_ripple_df=all_sessions_MultiMeasure_ripple_df,
+		all_sessions_all_scores_ripple_df=all_sessions_all_scores_ripple_df,
+		all_sessions_laps_df=all_sessions_laps_df,
+		all_sessions_laps_time_bin_df=all_sessions_laps_time_bin_df,
+		all_sessions_MultiMeasure_laps_df=all_sessions_MultiMeasure_laps_df
+	)
+
+	"""
+	# Original DataFrames passed during initialization
+	all_sessions_ripple_df = field()
+	all_sessions_ripple_time_bin_df = field()
+	all_sessions_MultiMeasure_ripple_df = field()
+	all_sessions_all_scores_ripple_df = field()
+
+	# Original DataFrames for laps
+	all_sessions_laps_df = field()
+	all_sessions_laps_time_bin_df = field()
+	all_sessions_MultiMeasure_laps_df = field()
+
+	# Filtered DataFrames (initialized to None)
+	filtered_all_sessions_ripple_df = field(init=False, default=None)
+	filtered_all_sessions_ripple_time_bin_df = field(init=False, default=None)
+	filtered_all_sessions_MultiMeasure_ripple_df = field(init=False, default=None)
+	filtered_all_sessions_all_scores_ripple_df = field(init=False, default=None)
+
+	# Filtered DataFrames for laps
+	filtered_all_sessions_laps_df = field(init=False, default=None)
+	filtered_all_sessions_laps_time_bin_df = field(init=False, default=None)
+	filtered_all_sessions_MultiMeasure_laps_df = field(init=False, default=None)
+
+	# Widgets (will be initialized in __attrs_post_init__)
+	replay_name_widget = field(init=False)
+	time_bin_size_widget = field(init=False)
+	
+	@property
+	def replay_name(self) -> str:
+		"""The replay_name property."""
+		return self.replay_name_widget.value
+	@replay_name.setter
+	def replay_name(self, value):
+		self.replay_name_widget.value = value
+
+	@property
+	def time_bin_size(self) -> str:
+		"""The time_bin_size property."""
+		return self.time_bin_size_widget.value
+	@time_bin_size.setter
+	def time_bin_size(self, value):
+		self.time_bin_size_widget.value = value
+
+	def __attrs_post_init__(self):
+		# This method runs after the generated __init__
+		self._setup_widgets()
+		# Initial filtering with default widget values
+		self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
+
+	def _setup_widgets(self):
+		# Extract unique options for the widgets
+		replay_name_options = sorted(self.all_sessions_ripple_df['custom_replay_name'].unique())
+		time_bin_size_options = sorted(self.all_sessions_ripple_df['time_bin_size'].unique())
+		
+		# Create dropdown widgets with adjusted layout and style
+		self.replay_name_widget = widgets.Dropdown(
+			options=replay_name_options,
+			description='Replay Name:',
+			disabled=False,
+			layout=widgets.Layout(width='500px'),
+			style={'description_width': 'initial'}
+		)
+		
+		# # Use Dropdown widget for single-selection of time_bin_size
+		# self.time_bin_size_widget = widgets.Dropdown(
+		# 	options=time_bin_size_options,
+		# 	description='Time Bin Size:',
+		# 	disabled=False,
+		# 	layout=widgets.Layout(width='200px'),
+		# 	style={'description_width': 'initial'}
+		# )
+	
+		# Use SelectMultiple widget for time_bin_size
+        self.time_bin_size_widget = widgets.SelectMultiple(
+            options=time_bin_size_options,
+            description='Time Bin Size:',
+            disabled=False,
+            layout=widgets.Layout(width='200px', height='100px'),
+            style={'description_width': 'initial'}
+        )
+	
+		# Set up observers to handle changes in widget values
+		self.replay_name_widget.observe(self._on_widget_change, names='value')
+		self.time_bin_size_widget.observe(self._on_widget_change, names='value')
+		
+		# Display the widgets
+		display(widgets.HBox([self.replay_name_widget, self.time_bin_size_widget]))
+
+	def _on_widget_change(self, change):
+		# Update filtered DataFrames when widget values change
+		self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
+
+	def update_filtered_dataframes(self, replay_name, time_bin_size):
+		""" Perform filtering on each DataFrame
+		"""
+		# Filter ripple DataFrames using deepcopy
+		self.filtered_all_sessions_ripple_df = deepcopy(
+			self.all_sessions_ripple_df[
+				(self.all_sessions_ripple_df['custom_replay_name'] == replay_name) &
+				(self.all_sessions_ripple_df['time_bin_size'] == time_bin_size)
+			]
+		)
+
+		self.filtered_all_sessions_ripple_time_bin_df = deepcopy(
+			self.all_sessions_ripple_time_bin_df[
+				(self.all_sessions_ripple_time_bin_df['custom_replay_name'] == replay_name) &
+				(self.all_sessions_ripple_time_bin_df['time_bin_size'] == time_bin_size)
+			]
+		)
+
+		self.filtered_all_sessions_MultiMeasure_ripple_df = deepcopy(
+			self.all_sessions_MultiMeasure_ripple_df[
+				(self.all_sessions_MultiMeasure_ripple_df['custom_replay_name'] == replay_name) &
+				(self.all_sessions_MultiMeasure_ripple_df['time_bin_size'] == time_bin_size)
+			]
+		)
+
+		self.filtered_all_sessions_all_scores_ripple_df = deepcopy(
+			self.all_sessions_all_scores_ripple_df[
+				(self.all_sessions_all_scores_ripple_df['custom_replay_name'] == replay_name) &
+				(self.all_sessions_all_scores_ripple_df['time_bin_size'] == time_bin_size)
+			]
+		)
+
+		# Filter laps DataFrames using deepcopy
+		self.filtered_all_sessions_laps_df = deepcopy(
+			self.all_sessions_laps_df[
+				(self.all_sessions_laps_df['custom_replay_name'] == replay_name) &
+				(self.all_sessions_laps_df['time_bin_size'] == time_bin_size)
+			]
+		)
+
+		self.filtered_all_sessions_laps_time_bin_df = deepcopy(
+			self.all_sessions_laps_time_bin_df[
+				(self.all_sessions_laps_time_bin_df['custom_replay_name'] == replay_name) &
+				(self.all_sessions_laps_time_bin_df['time_bin_size'] == time_bin_size)
+			]
+		)
+
+		self.filtered_all_sessions_MultiMeasure_laps_df = deepcopy(
+			self.all_sessions_MultiMeasure_laps_df[
+				(self.all_sessions_MultiMeasure_laps_df['custom_replay_name'] == replay_name) &
+				(self.all_sessions_MultiMeasure_laps_df['time_bin_size'] == time_bin_size)
+			]
+		)
+		
+		# Provide feedback to the user
+		print(f"DataFrames filtered with Replay Name: '{replay_name}' and Time Bin Size: {time_bin_size}")
+		n_records: int = len(self.filtered_all_sessions_all_scores_ripple_df)
+		print(f'n_rows: {n_records}')
+		# self.update_calling_namespace_locals()
+		# display(self.filtered_all_sessions_all_scores_ripple_df.head())
+
+
+	def update_calling_namespace_locals(self):
+		""" dangerous!! Updates the calling namespace (such as a jupyter notebook cell) """
+		# Update the variables in the notebook's user namespace
+		ipython = get_ipython()
+		user_ns = ipython.user_ns
+
+		# Update ripple DataFrames
+		user_ns['filtered_all_sessions_ripple_df'] = self.filtered_all_sessions_ripple_df
+		user_ns['filtered_all_sessions_ripple_time_bin_df'] = self.filtered_all_sessions_ripple_time_bin_df
+		user_ns['filtered_all_sessions_MultiMeasure_ripple_df'] = self.filtered_all_sessions_MultiMeasure_ripple_df
+		user_ns['filtered_all_sessions_all_scores_ripple_df'] = self.filtered_all_sessions_all_scores_ripple_df
+		
+		# Update laps DataFrames
+		user_ns['filtered_all_sessions_laps_df'] = self.filtered_all_sessions_laps_df
+		user_ns['filtered_all_sessions_laps_time_bin_df'] = self.filtered_all_sessions_laps_time_bin_df
+		user_ns['filtered_all_sessions_MultiMeasure_laps_df'] = self.filtered_all_sessions_MultiMeasure_laps_df
+	
+
+
+	# Accessor methods for the filtered DataFrames _______________________________________________________________________ #
+	# Accessor methods for ripple DataFrames
+	def get_filtered_all_sessions_ripple_df(self):
+		return self.filtered_all_sessions_ripple_df
+	
+	def get_filtered_all_sessions_ripple_time_bin_df(self):
+		return self.filtered_all_sessions_ripple_time_bin_df
+	
+	def get_filtered_all_sessions_MultiMeasure_ripple_df(self):
+		return self.filtered_all_sessions_MultiMeasure_ripple_df
+	
+	def get_filtered_all_sessions_all_scores_ripple_df(self):
+		return self.filtered_all_sessions_all_scores_ripple_df
+	
+	# Accessor methods for laps DataFrames
+	def get_filtered_all_sessions_laps_df(self):
+		return self.filtered_all_sessions_laps_df
+	
+	def get_filtered_all_sessions_laps_time_bin_df(self):
+		return self.filtered_all_sessions_laps_time_bin_df
+	
+	def get_filtered_all_sessions_MultiMeasure_laps_df(self):
+		return self.filtered_all_sessions_MultiMeasure_laps_df
+
 
 
 # ==================================================================================================================== #
