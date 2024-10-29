@@ -380,31 +380,32 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
 			## easiest to update as dict:	
 			additional_session_context = additional_session_context.to_dict()
-			additional_session_context['custom_suffix'] = additional_session_context.get('custom_suffix', '') + custom_suffix
+			additional_session_context['custom_suffix'] = (additional_session_context.get('custom_suffix', '') or '') + custom_suffix
 			additional_session_context = IdentifyingContext(**additional_session_context)
 			
 		else:
 			additional_session_context = IdentifyingContext(custom_suffix=custom_suffix)
 	
+	assert (additional_session_context is not None), f"perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function: additional_session_context is None even after trying to add the computation params as additional_session_context"
 	# active_context = curr_active_pipeline.get_session_context()
 	if additional_session_context is not None:
 		if isinstance(additional_session_context, dict):
 			additional_session_context = IdentifyingContext(**additional_session_context)
 		active_context = (curr_active_pipeline.get_session_context() | additional_session_context)
-		if len(custom_suffix) == 0:
-			session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=(IdentifyingContext._get_session_context_keys() + list(additional_session_context.keys())))
-			CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}-{additional_session_context.get_description()}"
-		else:
-			session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=(IdentifyingContext._get_session_context_keys() + list(additional_session_context.keys()))) + f'|{custom_suffix}'
-			CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}-{additional_session_context.get_description()}-{custom_suffix}"
+		# if len(custom_suffix) == 0:
+		session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=(IdentifyingContext._get_session_context_keys() + list(additional_session_context.keys())))
+		CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}-{additional_session_context.get_description()}"
+		# else:
+		# 	session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=(IdentifyingContext._get_session_context_keys() + list(additional_session_context.keys()))) + f'|{custom_suffix}'
+		# 	CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}-{additional_session_context.get_description()}-{custom_suffix}"
 	else:
 		active_context = curr_active_pipeline.get_session_context()
 		session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
-		if len(custom_suffix) == 0:
-			CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
-		else:
-			session_ctxt_key:str = session_ctxt_key + custom_suffix
-			CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}-{custom_suffix}"
+		# if len(custom_suffix) == 0:
+		CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
+		# else:
+		# 	session_ctxt_key:str = session_ctxt_key + custom_suffix
+		# 	CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}-{custom_suffix}"
 
 	print(f'\tactive_context: {active_context}')    
 	print(f'\tsession_ctxt_key: {session_ctxt_key}')
