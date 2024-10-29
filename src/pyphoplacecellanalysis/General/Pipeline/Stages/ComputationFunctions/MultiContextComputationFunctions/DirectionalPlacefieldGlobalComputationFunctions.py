@@ -2900,7 +2900,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
 
 
-	@function_attributes(short_name=None, tags=['export', 'CSV', 'main'], input_requires=[], output_provides=['ripple_all_scores_merged_df.csv'], uses=['self.perform_export_dfs_dict_to_csvs', 'self.build_complete_all_scores_merged_df'], used_by=[], creation_date='2024-03-15 10:13', related_items=[])
+	@function_attributes(short_name=None, tags=['export', 'CSV', 'main'], input_requires=[], output_provides=['ripple_all_scores_merged_df.csv'], uses=['self.perform_export_dfs_dict_to_csvs', 'self.build_complete_all_scores_merged_df'], used_by=['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'], creation_date='2024-03-15 10:13', related_items=[])
 	def export_csvs(self, parent_output_path: Path, active_context: IdentifyingContext, session_name: str, curr_session_t_delta: Optional[float], user_annotation_selections=None, valid_epochs_selections=None):
 		""" export as separate .csv files. 
 
