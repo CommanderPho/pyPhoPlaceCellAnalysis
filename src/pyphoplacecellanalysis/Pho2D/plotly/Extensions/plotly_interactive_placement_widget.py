@@ -1,6 +1,6 @@
 import plotly.graph_objs as go
 import ipywidgets as widgets
-from ipywidgets import interact, interactive, Output
+from ipywidgets import interact, interactive, interactive_output, Output
 from IPython.display import display, clear_output  # Imports for display and clearing output  # Import for the display function
 
 class PlotlyInteractivePlacementWidget:
@@ -37,7 +37,7 @@ class PlotlyInteractivePlacementWidget:
 		self.reset_button.on_click(self.reset_values)
 	
 		# Output widget to capture the plot
-		self.output = Output()
+		self.output = Output(layout={'border': '3px solid red'})
 	
 
 	def update_plot(self, x=0.5, y=-0.1, xref='paper', yref='paper', font_size=10, text="This is a footer label",
@@ -68,45 +68,27 @@ class PlotlyInteractivePlacementWidget:
 
 
 	def run(self):
-		# Use the interact function to create the interactive UI
-		# interact(
-		# 	self.update_plot,
-		# 	x=self.x_widget,
-		# 	y=self.y_widget,
-		# 	xref=self.xref_widget,
-		# 	yref=self.yref_widget,
-		# 	font_size=self.font_size_widget,
-		# 	text=self.text_widget,
-		# 	showarrow=self.showarrow_widget,
-		# 	textangle=self.textangle_widget,
-		# 	xanchor=self.xanchor_widget,
-		# 	yanchor=self.yanchor_widget,
-		# 	margin_top=self.margin_top_widget,
-		# 	margin_bottom=self.margin_bottom_widget,
-		# 	margin_left=self.margin_left_widget,
-		# 	margin_right=self.margin_right_widget
-		# )
+		# Define a dictionary with all the widgets
+		widget_dict = {
+			'x': self.x_widget,
+			'y': self.y_widget,
+			'xref': self.xref_widget,
+			'yref': self.yref_widget,
+			'font_size': self.font_size_widget,
+			'text': self.text_widget,
+			'showarrow': self.showarrow_widget,
+			'textangle': self.textangle_widget,
+			'xanchor': self.xanchor_widget,
+			'yanchor': self.yanchor_widget,
+			'margin_top': self.margin_top_widget,
+			'margin_bottom': self.margin_bottom_widget,
+			'margin_left': self.margin_left_widget,
+			'margin_right': self.margin_right_widget
+		}
 
+		# Create interactive output
+		out = interactive_output(self.update_plot, widget_dict)
 		
-		# Create interactive plot without directly displaying it
-		interactive_plot = interactive(
-			self.update_plot,
-			x=self.x_widget,
-			y=self.y_widget,
-			xref=self.xref_widget,
-			yref=self.yref_widget,
-			font_size=self.font_size_widget,
-			text=self.text_widget,
-			showarrow=self.showarrow_widget,
-			textangle=self.textangle_widget,
-			xanchor=self.xanchor_widget,
-			yanchor=self.yanchor_widget,
-			margin_top=self.margin_top_widget,
-			margin_bottom=self.margin_bottom_widget,
-			margin_left=self.margin_left_widget,
-			margin_right=self.margin_right_widget
-		)
-
 		# Manually creating VBox layout with all widgets and control buttons
 		ui = widgets.VBox([
 			self.x_widget,
@@ -125,12 +107,13 @@ class PlotlyInteractivePlacementWidget:
 			self.margin_right_widget,
 			self.print_button,
 			self.reset_button,
-            self.output  # Output widget for displaying the plot
+			self.output  # Output widget for displaying the plot
 		])
-
+		
 		display(ui)
-		# display(interactive_plot.children[-1])  # Display the actual plot/output element
-		# display(interactive_plot.children[-1])  # Ensure this line is removed because it outputs separately
+		
+		# Display the output of the interactive
+		display(out)
 
 
 	def print_annotations_kwargs(self, b=None):
