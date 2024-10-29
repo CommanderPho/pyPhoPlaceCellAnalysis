@@ -528,12 +528,44 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
 			suptitle_kwarg_fig_width_dict = {1080: {'annotation_kwargs': dict(x=-0.11, ), 'line_x_pos': -0.078},
 								 1800: {'annotation_kwargs': dict(x=-0.057, ), 'line_x_pos': -0.04},
 			}
+			annotation_kwargs = suptitle_kwarg_fig_width_dict[curr_fig_width]['annotation_kwargs']
 			
+			# Split the text into individual lines
+			lines = figure_sup_huge_title_text.splitlines()
+			figure_sup_huge_title_text_nlines: int = len(lines)
+			# Check if there are at least two lines
+			if len(lines) >= 2:
+				font_size_px: float = round(25/figure_sup_huge_title_text_nlines)
+				integer_font_size_px: int = int(round(font_size_px))
+				
+				annotation_kwargs.update(dict(font=dict(size=font_size_px)))
+				# Apply styling to the top line
+				top_line = f"<span style='font-weight:bold; font-size:{integer_font_size_px}px;'>{lines[0]}</span>"				
+				# Apply styling to the bottom line(s) if needed (e.g., smaller font size)
+				bottom_lines = [
+					f"<span style='font-size:{integer_font_size_px}px;'>{line}</span>" for line in lines[1:]
+				]
+				# Combine the styled lines with HTML line breaks
+				styled_text = '<br>'.join([top_line] + bottom_lines)
+			else:
+				annotation_kwargs.update(dict(font=dict(size=25))) # working
+				# If there's only one line, apply styling to it
+				styled_text = f"<span style='font-weight:bold; font-size:25px;'>{figure_sup_huge_title_text}</span>"
+
+			figure_sup_huge_title_text = styled_text
+			
+			# if figure_sup_huge_title_text_nlines < 2:
+			# 	annotation_kwargs.update(dict(font=dict(size=25))) # working
+			# else:
+			# 	annotation_kwargs.update(dict(font=dict(size=round(25/figure_sup_huge_title_text_nlines))))
+			# 	figure_sup_huge_title_text = figure_sup_huge_title_text.replace('\n', '<br>')
+			
+				
 			fig = fig.update_layout(
 				margin=dict(l=(80+30), r=80, t=(100-60), b=(80-10)),  # Increase left margin to 60 pixels 
 			)
-			# Add a vertical text caption along the left side of the figure
-			annotation_kwargs = suptitle_kwarg_fig_width_dict[curr_fig_width]['annotation_kwargs']
+			print(f'figure_sup_huge_title_text: {figure_sup_huge_title_text}')
+			# Add a vertical text caption along the left side of the figure			
 			fig = fig.add_annotation(
 				text=figure_sup_huge_title_text,
 				**annotation_kwargs, # Position at the very left of the figure
@@ -542,7 +574,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
 				yref="paper",
 				showarrow=False,
 				# font=dict(size=40),
-				font=dict(size=25),
+				# font=dict(size=25), # working
 				textangle=-90,      # Rotate text 90 degrees counterclockwise
 				xanchor='center', # xanchor='center', 
 				yanchor='middle',
