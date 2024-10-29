@@ -32,13 +32,8 @@ class PlotlyInteractivePlacementWidget:
 		self.margin_right_widget = widgets.IntSlider(min=0, max=200, step=10, value=50, description="Right Margin")
 		self.print_button = widgets.Button(description="Print Annotation Kwargs")
 		self.print_button.on_click(self.print_annotations_kwargs)
-		# New button widget
 		self.reset_button = widgets.Button(description="Reset Values")
 		self.reset_button.on_click(self.reset_values)
-	
-		# Output widget to capture the plot
-		self.output = Output(layout={'border': '3px solid red'})
-	
 
 	def update_plot(self, x=0.5, y=-0.1, xref='paper', yref='paper', font_size=10, text="This is a footer label",
 					showarrow=False, textangle=0, xanchor='center', yanchor='middle',
@@ -60,12 +55,9 @@ class PlotlyInteractivePlacementWidget:
 					yanchor=yanchor
 				)
 			],
-			margin=dict(t=margin_top, b=margin_bottom, l=margin_left, r=margin_right)  # Set margins dynamically
+			margin=dict(t=margin_top, b=margin_bottom, l=margin_left, r=margin_right)
 		)
-		with self.output:
-			clear_output(wait=True)
-			fig.show()
-
+		return fig  # Return the figure instead of displaying it directly
 
 	def run(self):
 		# Define a dictionary with all the widgets
@@ -88,7 +80,7 @@ class PlotlyInteractivePlacementWidget:
 
 		# Create interactive output
 		out = interactive_output(self.update_plot, widget_dict)
-		
+
 		# Manually creating VBox layout with all widgets and control buttons
 		ui = widgets.VBox([
 			self.x_widget,
@@ -106,15 +98,11 @@ class PlotlyInteractivePlacementWidget:
 			self.margin_left_widget,
 			self.margin_right_widget,
 			self.print_button,
-			self.reset_button,
-			self.output  # Output widget for displaying the plot
+			self.reset_button
 		])
-		
-		display(ui)
-		
-		# Display the output of the interactive
-		display(out)
 
+		# Display the widgets and the output
+		display(ui, out)
 
 	def print_annotations_kwargs(self, b=None):
 		kwargs = {
@@ -130,7 +118,7 @@ class PlotlyInteractivePlacementWidget:
 			'yanchor': self.yanchor_widget.value
 		}
 		print(kwargs)
-	
+
 	def reset_values(self, b=None):
 		"""Reset all widgets to their default values."""
 		self.x_widget.value = 0.5
@@ -147,7 +135,6 @@ class PlotlyInteractivePlacementWidget:
 		self.margin_bottom_widget.value = 100
 		self.margin_left_widget.value = 50
 		self.margin_right_widget.value = 50
-				
 
 
 # # Instantiate and run the interactive plot
