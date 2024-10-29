@@ -1182,6 +1182,7 @@ class PhoDibaProjectsNeptuner(object):
         self.root_output_path = find_first_extant_path(path_list=[Path(r"C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/EXTERNAL/PhoDibaPaper2024Book/data/neptune").resolve(),
                                         Path("/home/halechr/repos/Spike3D/EXTERNAL/PhoDibaPaper2024Book/data").resolve(),
                                         Path('EXTERNAL/PhoDibaPaper2024Book/data/neptune').resolve(),
+                                        Path('/Users/pho/repo/Pho Secondary Workspace/Spike3DEnv/Spike3DWorkEnv/Spike3D/EXTERNAL/PhoDibaPaper2024Book/data').resolve(),
         ])
         self.root_output_path.mkdir(exist_ok=True)
 
