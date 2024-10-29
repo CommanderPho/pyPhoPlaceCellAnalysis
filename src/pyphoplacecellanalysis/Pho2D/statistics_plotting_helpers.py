@@ -1,5 +1,6 @@
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing import NewType
+from neuropy.utils.result_context import IdentifyingContext
 from typing_extensions import TypeAlias
 from nptyping import NDArray
 
@@ -451,7 +452,7 @@ def plot_histograms_across_sessions(data_results_df: pd.DataFrame, data_type: st
 
 
 @function_attributes(short_name=None, tags=['matplotlib', 'histogram', 'stacked', 'multi-session', 'plot', 'figure', 'good'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
-def plot_stacked_histograms(data_results_df: pd.DataFrame, data_type: str, session_spec: str, time_bin_duration_str: str, column_name:str='P_Long', **kwargs) -> None:
+def plot_stacked_histograms(data_results_df: pd.DataFrame, data_type: str, session_spec: str, time_bin_duration_str: str, column_name:str='P_Long', **kwargs):
     """ plots a colorful stacked histogram for each of the many time-bin sizes
     
     variable_name = 'P_Short' # Shows expected effect - short-only replay prior to delta and then split replays post-delta
@@ -470,8 +471,11 @@ def plot_stacked_histograms(data_results_df: pd.DataFrame, data_type: str, sessi
     layout = kwargs.pop('layout', 'none')
     defer_show = kwargs.pop('defer_show', False)
     figsize = kwargs.pop('figsize', (12, 2))
+    a_context: IdentifyingContext = IdentifyingContext(data_type=data_type, session_spec=session_spec, time_bin_duration_str=time_bin_duration_str, column_name=column_name)
+    
     descriptor_str: str = '|'.join([data_type, session_spec, time_bin_duration_str])
     figure_identifier: str = f"{descriptor_str}_PrePostDelta"
+    a_context = a_context.adding_context_if_missing(descriptor_str=descriptor_str, figure_identifier=figure_identifier)
     if data_type.find('epoch') != -1: # data_type.endswith('epoch'):
         title_indicator: str = 'epochs'
     else:
@@ -479,6 +483,8 @@ def plot_stacked_histograms(data_results_df: pd.DataFrame, data_type: str, sessi
         # assert data_type.endswith('time-bin'), f"data_type: {data_type}"    
         title_indicator: str = 'time bins'
 
+    a_context = a_context.adding_context_if_missing(title_indicator=title_indicator)
+    
     fig = plt.figure(num=figure_identifier, clear=True, figsize=figsize, layout=layout, **kwargs) # layout="constrained", 
     fig.suptitle(f'{descriptor_str}')
     
@@ -526,4 +532,4 @@ def plot_stacked_histograms(data_results_df: pd.DataFrame, data_type: str, sessi
     
     if not defer_show:
         fig.show()
-    return MatplotlibRenderPlots(name='plot_stacked_histograms', figures=[fig], axes=ax_dict)
+    return MatplotlibRenderPlots(name='plot_stacked_histograms', figures=[fig], axes=ax_dict, context=a_context)
