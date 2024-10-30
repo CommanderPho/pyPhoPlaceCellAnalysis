@@ -19,6 +19,7 @@ from typing import List, Dict, Optional, Tuple, Union, Callable
 from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path, set_posix_windows, convert_filelist_to_new_parent, find_matching_parent_path
 from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.notebook_helpers import convert_script_to_notebook
 
 # NeuroPy (Diba Lab Python Repo) Loading
 ## For computation parameters:
@@ -26,7 +27,7 @@ from neuropy.utils.result_context import IdentifyingContext
 # from neuropy.core.session.Formats.BaseDataSessionFormats import find_local_session_paths
 
 # included_session_contexts, output_python_scripts, output_slurm_scripts, powershell_script_path, vscode_workspace_path
-BatchScriptsCollection = attrs.make_class("BatchScriptsCollection", {k:field() for k in ("included_session_contexts", "output_python_scripts", "output_slurm_scripts", "output_non_slurm_bash_scripts", "vscode_workspace_path")}) # , "max_parallel_executions", "powershell_script_path"
+BatchScriptsCollection = attrs.make_class("BatchScriptsCollection", {k:field() for k in ("included_session_contexts", "output_python_scripts", "output_jupyter_notebooks", "output_slurm_scripts", "output_non_slurm_bash_scripts", "vscode_workspace_path")}) # , "max_parallel_executions", "powershell_script_path"
 
 from enum import Enum
 
@@ -234,7 +235,7 @@ class ProcessingScriptPhases(Enum):
 
 @function_attributes(short_name=None, tags=['slurm','jobs','files','batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-09 19:14', related_items=[])
 def generate_batch_single_session_scripts(global_data_root_parent_path, session_batch_basedirs: Dict[IdentifyingContext, Path], included_session_contexts: Optional[List[IdentifyingContext]], output_directory='output/gen_scripts/', use_separate_run_directories:bool=True,
-         create_slurm_scripts:bool=False, create_non_slurm_bash_scripts:bool=False, should_create_vscode_workspace:bool=True, should_use_neptune_logging:bool=True,  should_generate_run_scripts = True, should_generate_figure_scripts = True,
+         create_slurm_scripts:bool=False, create_non_slurm_bash_scripts:bool=False, should_create_vscode_workspace:bool=True, should_use_neptune_logging:bool=True,  should_generate_run_scripts = True, should_generate_figure_scripts = True, should_generate_run_notebooks: bool = False,
          should_use_file_redirected_output_logging:bool=False, # , should_create_powershell_scripts:bool=True
          separate_execute_and_figure_gen_scripts:bool=True, should_perform_figure_generation_to_file:bool=False, force_recompute_override_computations_includelist: Optional[List[str]]=None, force_recompute_override_computation_kwargs_dict: Optional[Dict[str, Dict]]=None, 
         batch_session_completion_handler_kwargs=None, **renderer_script_generation_kwargs) -> BatchScriptsCollection:
@@ -314,6 +315,8 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
     bash_non_slurm_template = env.get_template('bash_template.sh.j2')
 
     output_python_scripts = []
+    output_jupyter_notebooks = []
+    
 
     output_slurm_scripts = {'run': [], 'figs': []}
     output_non_slurm_bash_scripts = {'run': [], 'figs': []}
@@ -382,6 +385,15 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
                 bash_figure_script_path = _subfn_build_non_slurm_bash_script(a_python_script_path=python_figures_script_path, curr_batch_script_rundir=curr_batch_script_rundir, a_curr_session_context=curr_session_context, a_bash_script_name_prefix='figs')
                 output_non_slurm_bash_scripts['figs'].append(bash_figure_script_path)
 
+
+        if should_generate_run_notebooks:
+            script_path = Path(python_script_path).resolve()
+            # script_dir = script_path.parent.resolve()
+            notebook_path = script_path.with_suffix('.ipynb')
+            convert_script_to_notebook(script_path, notebook_path)
+            output_jupyter_notebooks.append(notebook_path)
+            
+            # convert_script_to_notebook(script_path, notebook_path, custom_delimiter=None)
 
     # if should_create_powershell_scripts and (platform.system() == 'Windows'):
     #     powershell_script_path = build_windows_powershell_run_script(output_python_scripts, max_concurrent_jobs=max_parallel_executions)
