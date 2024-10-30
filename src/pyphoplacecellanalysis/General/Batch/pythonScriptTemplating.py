@@ -409,7 +409,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
         vscode_workspace_path = None
 
 
-    return BatchScriptsCollection(included_session_contexts=included_session_contexts, output_python_scripts=output_python_scripts, output_slurm_scripts=output_slurm_scripts, output_non_slurm_bash_scripts=output_non_slurm_bash_scripts, vscode_workspace_path=vscode_workspace_path)
+    return BatchScriptsCollection(included_session_contexts=included_session_contexts, output_python_scripts=output_python_scripts, output_jupyter_notebooks=output_jupyter_notebooks, output_slurm_scripts=output_slurm_scripts, output_non_slurm_bash_scripts=output_non_slurm_bash_scripts, vscode_workspace_path=vscode_workspace_path)
     # return included_session_contexts, output_python_scripts, output_slurm_scripts
 
 
