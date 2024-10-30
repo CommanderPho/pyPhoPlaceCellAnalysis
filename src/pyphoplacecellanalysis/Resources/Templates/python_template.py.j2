@@ -128,9 +128,10 @@ should_perform_figure_generation_to_file=False
 {% endif %}
 
 
-/* ================================================================================================================== */
-/* Parameters and Override Dicts                                                                                      */
-/* ================================================================================================================== */
+# ==================================================================================================================
+# Parameters and Override Dicts                                                                                     
+# ==================================================================================================================
+
 multiprocessing_kwargs = dict(use_multiprocessing=False, num_processes=1)
 batch_session_completion_handler_kwargs = dict(
     {% for key, value in batch_session_completion_handler_kwargs | dictsort %}
