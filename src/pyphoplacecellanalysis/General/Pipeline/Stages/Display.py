@@ -5,7 +5,7 @@ from typing import Callable, Optional, List, Dict, Union
 import numpy as np
 from attrs import define, field, Factory
 
-from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum, NeuronExtendedIdentity
+from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap
 from neuropy.utils.result_context import IdentifyingContext
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters # to replace simple PlacefieldComputationParameters
