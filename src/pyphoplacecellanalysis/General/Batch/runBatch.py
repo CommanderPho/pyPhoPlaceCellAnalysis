@@ -1161,13 +1161,13 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
                                         saving_mode=saving_mode, force_reload=force_reload, skip_extended_batch_computations=skip_extended_batch_computations, debug_print=debug_print, fail_on_exception=fail_on_exception,
                                         override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict, **kwargs)
         
-    except BaseException as e:
+    except Exception as e:
         ## can fail here before callback function is even called.
         exception_info = sys.exc_info()
         an_error = CapturedException(e, exception_info, None)
         new_print(f'exception occured: {an_error}')
         if fail_on_exception:
-            raise e
+            raise # Re-raises the original exception with its traceback
         new_print(f'"{_line_sweep} END BATCH {_line_sweep}\n\n')
         
         return (SessionBatchProgress.FAILED, f"{an_error}", None) # return the Failed status and the exception that occured.
