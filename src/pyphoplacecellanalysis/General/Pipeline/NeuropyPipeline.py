@@ -327,8 +327,9 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 		# Overload `override_parameters_flat_keypaths_dict`
 		_obj = cls(name=f'{type_name}_pipeline', session_data_type=type_name, basedir=basepath, outputs_specifier=outputs_specifier,
 			load_function=known_type_properties.load_function, post_load_functions=post_load_functions)
-		_obj.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
+		# _obj.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict) ## seems too early as it is before the compute stage where global_computation_results is created (unless the pipeline was loaded.
 		return _obj
+	
 	# Load/Save Persistance and Comparison _______________________________________________________________________________ #
 	@classmethod
 	def try_init_from_saved_pickle_or_reload_if_needed(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties, override_basepath=None, outputs_specifier: Optional[OutputsSpecifier]=None, override_post_load_functions=None, override_parameters_flat_keypaths_dict=None, force_reload=False,
