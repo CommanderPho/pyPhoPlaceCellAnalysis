@@ -127,6 +127,10 @@ _restore_previous_matplotlib_settings_callback = matplotlib_configuration_update
 should_perform_figure_generation_to_file=False
 {% endif %}
 
+
+/* ================================================================================================================== */
+/* Parameters and Override Dicts                                                                                      */
+/* ================================================================================================================== */
 multiprocessing_kwargs = dict(use_multiprocessing=False, num_processes=1)
 batch_session_completion_handler_kwargs = dict(
     {% for key, value in batch_session_completion_handler_kwargs | dictsort %}
@@ -148,6 +152,7 @@ global_computation_results_override_file = script_file_parent_path.joinpath('glo
 local_computations_override_output_file = script_file_parent_path.joinpath('loadedSessPickle{{override_custom_pickle_suffix|default('')}}.pkl').resolve()
 global_computation_results_override_output_file = script_file_parent_path.joinpath('global_computation_results{{override_custom_pickle_suffix|default('')}}.pkl').resolve()
 
+override_parameters_flat_keypaths_dict = {{override_parameters_flat_keypaths_dict|default('dict()')}} # e.g. {'rank_order_shuffle_analysis.included_qclu_values': [1, 2], 'rank_order_shuffle_analysis.minimum_inclusion_fr_Hz': 5.0,}
 run_specific_batch_kwargs = {{run_specific_batch_kwargs|default('dict()')}}
 
 extended_computations_include_includelist = {{extended_computations_include_includelist|default('None')}}

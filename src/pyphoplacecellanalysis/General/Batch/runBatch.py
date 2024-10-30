@@ -1151,13 +1151,15 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
     
     # saving_mode = kwargs.pop('saving_mode', None) or PipelineSavingScheme.OVERWRITE_IN_PLACE
     skip_extended_batch_computations = kwargs.pop('skip_extended_batch_computations', True)
+    override_parameters_flat_keypaths_dict = kwargs.pop('override_parameters_flat_keypaths_dict', {})
     fail_on_exception = kwargs.pop('fail_on_exception', True)
     debug_print = kwargs.pop('debug_print', False)
 
     try:
         curr_active_pipeline = batch_load_session(global_data_root_parent_path, active_data_mode_name, basedir, epoch_name_includelist=epoch_name_includelist,
                                         computation_functions_name_includelist=active_computation_functions_name_includelist,
-                                        saving_mode=saving_mode, force_reload=force_reload, skip_extended_batch_computations=skip_extended_batch_computations, debug_print=debug_print, fail_on_exception=fail_on_exception, **kwargs)
+                                        saving_mode=saving_mode, force_reload=force_reload, skip_extended_batch_computations=skip_extended_batch_computations, debug_print=debug_print, fail_on_exception=fail_on_exception,
+                                        override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict, **kwargs)
         
     except BaseException as e:
         ## can fail here before callback function is even called.

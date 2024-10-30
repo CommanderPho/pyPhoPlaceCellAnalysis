@@ -313,7 +313,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 		self.logger.info(f'NeuropyPipeline.on_stage_changed(new_stage="{new_stage.identity}")')
 
 	@classmethod
-	def init_from_known_data_session_type(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties, override_basepath=None, outputs_specifier: Optional[OutputsSpecifier]=None, override_post_load_functions=None):
+	def init_from_known_data_session_type(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties, override_basepath=None, outputs_specifier: Optional[OutputsSpecifier]=None, override_post_load_functions=None, override_parameters_flat_keypaths_dict=None):
 		""" Initializes a new pipeline from a known data session type (e.g. 'bapun' or 'kdiba', which loads some defaults) """
 		if override_basepath is not None:
 			basepath = override_basepath
@@ -324,12 +324,15 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 		else:
 			post_load_functions = known_type_properties.post_load_functions
 			
-		return cls(name=f'{type_name}_pipeline', session_data_type=type_name, basedir=basepath, outputs_specifier=outputs_specifier,
+		# Overload `override_parameters_flat_keypaths_dict`
+		_obj = cls(name=f'{type_name}_pipeline', session_data_type=type_name, basedir=basepath, outputs_specifier=outputs_specifier,
 			load_function=known_type_properties.load_function, post_load_functions=post_load_functions)
-
+		_obj.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
+		return _obj
 	# Load/Save Persistance and Comparison _______________________________________________________________________________ #
 	@classmethod
-	def try_init_from_saved_pickle_or_reload_if_needed(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties, override_basepath=None, outputs_specifier: Optional[OutputsSpecifier]=None, override_post_load_functions=None, force_reload=False, active_pickle_filename='loadedSessPickle.pkl', skip_save_on_initial_load=True, progress_print=True, debug_print=False):
+	def try_init_from_saved_pickle_or_reload_if_needed(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties, override_basepath=None, outputs_specifier: Optional[OutputsSpecifier]=None, override_post_load_functions=None, override_parameters_flat_keypaths_dict=None, force_reload=False,
+													 active_pickle_filename='loadedSessPickle.pkl', skip_save_on_initial_load=True, progress_print=True, debug_print=False):
 		""" After a session has completed the loading stage prior to filtering (after all objects are built and such), it can be pickled to a file to drastically speed up future loading requests (as would have to be done when the notebook is restarted, etc) 
 		Tries to find an extant pickled pipeline, and if it exists it loads and returns that. Otherwise, it loads/rebuilds the pipeline from scratch (from the initial raw data files) and then saves a pickled copy out to disk to speed up future loading attempts.
 		
@@ -434,6 +437,9 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 				# Otherwise we assume it's a complete computed pipeline pickeled result, in which case the pipeline is located in the 'curr_active_pipeline' key of the loaded dictionary.
 				curr_active_pipeline = loaded_pipeline['curr_active_pipeline']
 				
+
+			curr_active_pipeline.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
+			
 			## Do patching/repair on the unpickled timeline and its sessions to ensure all correct properties are set:
 			active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
 			active_data_mode_registered_class = active_data_session_types_registered_classes_dict[type_name]
@@ -469,7 +475,8 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 			# Otherwise load failed, perform the fallback computation
 			if debug_print:
 				print(f'Must reload/rebuild.')
-			curr_active_pipeline = cls.init_from_known_data_session_type(type_name, known_type_properties, override_basepath=Path(basepath), outputs_specifier=outputs_specifier, override_post_load_functions=post_load_functions)
+			curr_active_pipeline = cls.init_from_known_data_session_type(type_name, known_type_properties, override_basepath=Path(basepath), outputs_specifier=outputs_specifier, override_post_load_functions=post_load_functions, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
+			curr_active_pipeline.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
 			# Save reloaded pipeline out to pickle for future loading
 			if not skip_save_on_initial_load:
 				saveData(finalized_loaded_sess_pickle_path, db=curr_active_pipeline) # 589 MB

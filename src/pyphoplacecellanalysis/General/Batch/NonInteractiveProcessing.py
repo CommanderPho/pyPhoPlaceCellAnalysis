@@ -65,7 +65,7 @@ def get_all_batch_computation_names():
 
 
 @function_attributes(short_name='batch_load_session', tags=['main', 'batch', 'automated', 'session', 'load'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-12-07 00:00')
-def batch_load_session(global_data_root_parent_path, active_data_mode_name, basedir, force_reload=False, saving_mode=PipelineSavingScheme.SKIP_SAVING, fail_on_exception=True, skip_extended_batch_computations=False, **kwargs):
+def batch_load_session(global_data_root_parent_path, active_data_mode_name, basedir, force_reload=False, saving_mode=PipelineSavingScheme.SKIP_SAVING, fail_on_exception=True, skip_extended_batch_computations=False, override_parameters_flat_keypaths_dict=None, **kwargs):
     """Loads and runs the entire pipeline for a session folder located at the path 'basedir'.
 
     Args:
@@ -96,7 +96,9 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
 
     ## Begin main run of the pipeline (load or execute):
     curr_active_pipeline = NeuropyPipeline.try_init_from_saved_pickle_or_reload_if_needed(active_data_mode_name, active_data_mode_type_properties,
-        override_basepath=Path(basedir), force_reload=force_reload, active_pickle_filename=active_pickle_filename, skip_save_on_initial_load=True)
+        override_basepath=Path(basedir), force_reload=force_reload, active_pickle_filename=active_pickle_filename, skip_save_on_initial_load=True, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
+    
+    curr_active_pipeline.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict) # should already be updated, but try it again anyway.
     
     was_loaded_from_file: bool =  curr_active_pipeline.has_associated_pickle # True if pipeline was loaded from an existing file, False if it was created fresh
     
@@ -141,7 +143,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     
         # lap_estimation_parameters = curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.laps
         # assert lap_estimation_parameters is not None
-        active_session_computation_configs = active_data_mode_registered_class.build_active_computation_configs(sess=curr_active_pipeline.sess, time_bin_size=time_bin_size) # , grid_bin_bounds=grid_bin_bounds
+        active_session_computation_configs = active_data_mode_registered_class.build_active_computation_configs(sess=curr_active_pipeline.sess, time_bin_size=time_bin_size, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict) # , grid_bin_bounds=grid_bin_bounds
     
     else:
         # Use the provided `active_session_computation_configs`:
