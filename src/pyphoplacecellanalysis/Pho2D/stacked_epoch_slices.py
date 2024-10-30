@@ -21,7 +21,8 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes  # for stacked_epoc
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore
 
 from neuropy.core.epoch import Epoch, TimeColumnAliasesProtocol
-from neuropy.utils.dynamic_container import DynamicContainer, override_dict, overriding_dict_with, get_dict_subset
+from neuropy.utils.dynamic_container import DynamicContainer
+from neuropy.utils.mixins.dict_representable import override_dict, overriding_dict_with, get_dict_subset
 from neuropy.utils.matplotlib_helpers import set_ax_emphasis_color
 
 

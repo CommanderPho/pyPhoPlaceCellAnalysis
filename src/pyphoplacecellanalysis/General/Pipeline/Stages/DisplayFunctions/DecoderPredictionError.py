@@ -13,7 +13,7 @@ from matplotlib import patheffects
 
 # from neuropy.core import Epoch
 from neuropy.core.epoch import Epoch, ensure_dataframe
-from neuropy.utils.dynamic_container import overriding_dict_with, get_dict_subset # required for safely_accepts_kwargs
+from neuropy.utils.mixins.dict_representable import overriding_dict_with, get_dict_subset # required for safely_accepts_kwargs
 from neuropy.utils.efficient_interval_search import get_non_overlapping_epochs # used in _display_plot_decoded_epoch_slices to get only the valid (non-overlapping) epochs
 from neuropy.utils.result_context import IdentifyingContext
 from neuropy.utils.mixins.binning_helpers import BinningContainer # for _build_radon_transform_plotting_data typehinting

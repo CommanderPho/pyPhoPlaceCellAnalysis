@@ -10,7 +10,7 @@ import sys
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from qtpy import QtCore, QtWidgets, QtGui
 
-from neuropy.utils.dynamic_container import get_dict_subset # used to filter kwargs down to proper Figure inputs
+from neuropy.utils.mixins.dict_representable import get_dict_subset # used to filter kwargs down to proper Figure inputs
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer

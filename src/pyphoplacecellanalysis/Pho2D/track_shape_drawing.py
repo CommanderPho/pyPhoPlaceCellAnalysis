@@ -8,7 +8,7 @@ from collections import namedtuple
 import numpy as np
 import pandas as pd
 
-from neuropy.utils.dynamic_container import overriding_dict_with # required for safely_accepts_kwargs
+from neuropy.utils.mixins.dict_representable import overriding_dict_with # required for safely_accepts_kwargs
 from pyphocorehelpers.geometry_helpers import point_tuple_mid_point, BoundsRect, is_point_in_rect
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes

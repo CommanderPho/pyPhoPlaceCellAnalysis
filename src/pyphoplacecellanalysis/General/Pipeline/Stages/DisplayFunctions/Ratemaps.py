@@ -17,7 +17,7 @@ from neuropy.plotting.placemaps import plot_all_placefields
 from neuropy.plotting.ratemaps import BackgroundRenderingOptions # for _plot_latent_recursive_pfs_depth_level
 from neuropy.utils.matplotlib_helpers import enumTuningMap2DPlotVariables # for getting the variant name from the dict
 from neuropy.utils.mixins.unwrap_placefield_computation_parameters import unwrap_placefield_computation_parameters
-from neuropy.utils.dynamic_container import overriding_dict_with
+from neuropy.utils.mixins.dict_representable import overriding_dict_with
 
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
 from pyphocorehelpers.DataStructure.RenderPlots.PyqtgraphRenderPlots import PyqtgraphRenderPlots

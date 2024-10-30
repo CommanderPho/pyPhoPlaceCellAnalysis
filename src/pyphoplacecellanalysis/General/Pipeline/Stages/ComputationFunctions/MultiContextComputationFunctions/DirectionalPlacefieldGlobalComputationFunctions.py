@@ -29,7 +29,8 @@ from pyphocorehelpers.assertion_helpers import Assert
 
 from neuropy.core.laps import Laps # used in `DirectionalLapsHelpers`
 from neuropy.utils.result_context import IdentifyingContext
-from neuropy.utils.dynamic_container import DynamicContainer, override_dict # used to build config
+from neuropy.utils.dynamic_container import DynamicContainer
+from neuropy.utils.mixins.dict_representable import override_dict # used to build config
 from neuropy.analyses.placefields import PlacefieldComputationParameters
 from neuropy.core.epoch import NamedTimerange, Epoch, ensure_dataframe
 from neuropy.core.epoch import find_data_indicies_from_epoch_times

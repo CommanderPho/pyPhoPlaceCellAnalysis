@@ -1,7 +1,7 @@
 import numpy as np
 
 from neuropy.utils.misc import safe_item
-from neuropy.utils.dynamic_container import overriding_dict_with # used in display_all_pf_2D_pyqtgraph_binned_image_rendering to only get the valid kwargs to pass from the display config
+from neuropy.utils.mixins.dict_representable import overriding_dict_with # used in display_all_pf_2D_pyqtgraph_binned_image_rendering to only get the valid kwargs to pass from the display config
 from neuropy.utils.matplotlib_helpers import _build_variable_max_value_label, enumTuningMap2DPlotMode, enumTuningMap2DPlotVariables, _determine_best_placefield_2D_layout, _scale_current_placefield_to_acceptable_range, _build_neuron_identity_label # for display_all_pf_2D_pyqtgraph_binned_image_rendering
 from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow # for display_all_pf_2D_pyqtgraph_binned_image_rendering
 from neuropy.core.neuron_identities import PlotStringBrevityModeEnum # for display_all_pf_2D_pyqtgraph_binned_image_rendering
