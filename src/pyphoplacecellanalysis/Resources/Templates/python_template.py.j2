@@ -146,12 +146,12 @@ local_computations_override_output_file = None
 global_computation_results_override_output_file = None #}
 
 ## Override input/output files:
-local_computations_override_file = script_file_parent_path.joinpath('loadedSessPickle{{override_custom_pickle_suffix|default('')}}.pkl').resolve()
-global_computation_results_override_file = script_file_parent_path.joinpath('global_computation_results{{override_custom_pickle_suffix|default('')}}.pkl').resolve()
+local_computations_override_file = script_file_parent_path.joinpath('loadedSessPickle{{override_custom_pickle_suffix|default('')}}.pkl') # do not call `.resolve()`, as this will mess up the session context parsing from the path when there are symlinks
+global_computation_results_override_file = script_file_parent_path.joinpath('global_computation_results{{override_custom_pickle_suffix|default('')}}.pkl') # do not call `.resolve()`, as this will mess up the session context parsing from the path when there are symlinks
 
 ## Overrides for the output files:
-local_computations_override_output_file = script_file_parent_path.joinpath('loadedSessPickle{{override_custom_pickle_suffix|default('')}}.pkl').resolve()
-global_computation_results_override_output_file = script_file_parent_path.joinpath('global_computation_results{{override_custom_pickle_suffix|default('')}}.pkl').resolve()
+local_computations_override_output_file = script_file_parent_path.joinpath('loadedSessPickle{{override_custom_pickle_suffix|default('')}}.pkl') # do not call `.resolve()`, as this will mess up the session context parsing from the path when there are symlinks
+global_computation_results_override_output_file = script_file_parent_path.joinpath('global_computation_results{{override_custom_pickle_suffix|default('')}}.pkl') # do not call `.resolve()`, as this will mess up the session context parsing from the path when there are symlinks
 
 override_parameters_flat_keypaths_dict = {{override_parameters_flat_keypaths_dict|default('dict()')}} # e.g. {'rank_order_shuffle_analysis.included_qclu_values': [1, 2], 'rank_order_shuffle_analysis.minimum_inclusion_fr_Hz': 5.0,}
 run_specific_batch_kwargs = {{run_specific_batch_kwargs|default('dict()')}}
