@@ -694,7 +694,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             n_slices = len(peak_height_multiplier_probe_levels)
 
             for neuron_idx in np.arange(n_neurons):
-                neuron_id = active_pf_2D.neuron_extended_ids[neuron_idx].id
+                neuron_id = active_pf_2D.neuron_extended_ids[neuron_idx].id #  Inner exception: 'NeuronExtendedIdentity' object has no attribute 'id'
                 neuron_tuning_curve_peak_firing_rate = tuning_curve_peak_firing_rates[neuron_idx]
                 slab = active_tuning_curves[neuron_idx].T
                 _, _, slab, cell_peaks_dict, id_map, prominence_map, parent_map = compute_prominence_contours(xbin_centers=active_pf_2D.xbin_centers, ybin_centers=active_pf_2D.ybin_centers, slab=slab, step=step, min_area=None, min_depth=0.2, include_edge=True, verbose=False)
