@@ -134,11 +134,11 @@ batch_session_completion_handler_kwargs = dict(
     {% endfor %}
 )
 
-# Disable all overrides for input/output files:
+{# # Disable all overrides for input/output files:
 local_computations_override_file = None
 global_computation_results_override_file = None
 local_computations_override_output_file = None
-global_computation_results_override_output_file = None
+global_computation_results_override_output_file = None #}
 
 ## Override input/output files:
 local_computations_override_file = script_file_parent_path.joinpath('loadedSessPickle{{override_custom_pickle_suffix|default('')}}.pkl').resolve()
@@ -148,7 +148,7 @@ global_computation_results_override_file = script_file_parent_path.joinpath('glo
 local_computations_override_output_file = script_file_parent_path.joinpath('loadedSessPickle{{override_custom_pickle_suffix|default('')}}.pkl').resolve()
 global_computation_results_override_output_file = script_file_parent_path.joinpath('global_computation_results{{override_custom_pickle_suffix|default('')}}.pkl').resolve()
 
-
+run_specific_batch_kwargs = {{run_specific_batch_kwargs|default('dict()')}}
 
 extended_computations_include_includelist = {{extended_computations_include_includelist|default('None')}}
 force_recompute_override_computations_includelist = {{force_recompute_override_computations_includelist|default('[]')}}
@@ -256,7 +256,7 @@ with noop_context():
                                                         force_reload = result_handler.force_reload_all,
                                                         post_run_callback_fn=result_handler.on_complete_success_execution_session,
                                                         fail_on_exception=False,
-                                                        saving_mode=result_handler.saving_mode)
+                                                        saving_mode=result_handler.saving_mode, **run_specific_batch_kwargs)
 
         new_print(f'finished run: {run_status}\nerrors: {run_errors}\n') # 'outputs: {run_outputs}'
 
