@@ -129,7 +129,16 @@ class BatchSessionCompletionHandler:
     """ handles completion of a single session's batch processing.
 
     Allows accumulating results across sessions and runs.
+    
+    
+    Holds powerful options that are used during its `on_complete_success_execution_session` function, which is always passed as the callback for `run_specific_batch`
+    
+    Passed to `batch_extended_computations(...)` for global computation function calculations:
+        self.extended_computations_include_includelist
+        self.force_recompute_override_computations_includelist
+        self.force_recompute_override_computation_kwargs_dict # #TODO 2024-10-30 08:35: - [ ] is `force_recompute_override_computation_kwargs_dict` actually only used when forcing a recompute, or does passing it when it's the same as the already computed values force it to recompute?
 
+        
 
     Usage:
         from pyphoplacecellanalysis.General.Batch.runBatch import BatchSessionCompletionHandler
@@ -493,7 +502,7 @@ class BatchSessionCompletionHandler:
             # build computation functions to compute list:
             active_extended_computations_include_includelist = deepcopy(self.extended_computations_include_includelist)
             force_recompute_override_computations_includelist = self.force_recompute_override_computations_includelist or []
-            force_recompute_override_computation_kwargs_dict = self.force_recompute_override_computation_kwargs_dict or {}
+            force_recompute_override_computation_kwargs_dict = self.force_recompute_override_computation_kwargs_dict or {} # #TODO 2024-10-30 08:35: - [ ] is `force_recompute_override_computation_kwargs_dict` actually only used when forcing a recompute, or does passing it when it's the same as the already computed values force it to recompute?
             
             try:
                 # # 2023-01-* - Call extended computations to build `_display_short_long_firing_rate_index_comparison` figures:
@@ -501,7 +510,8 @@ class BatchSessionCompletionHandler:
                     curr_active_pipeline.reload_default_computation_functions()
         
                     newly_computed_values += batch_extended_computations(curr_active_pipeline, include_includelist=active_extended_computations_include_includelist, include_global_functions=True, fail_on_exception=True, progress_print=True, 
-                                                                        force_recompute=self.force_global_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, computation_kwargs_dict=force_recompute_override_computation_kwargs_dict, debug_print=False)
+                                                                        force_recompute=self.force_global_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist,
+                                                                        computation_kwargs_dict=force_recompute_override_computation_kwargs_dict, debug_print=False)
                     #TODO 2023-07-11 19:20: - [ ] We want to save the global results if they are computed, but we don't want them to be needlessly written to disk even when they aren't changed.
                     return newly_computed_values # return the list of newly computed values
 
