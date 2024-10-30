@@ -3,7 +3,7 @@ import sys
 from copy import deepcopy
 from datetime import datetime, timedelta
 import typing
-from typing import Callable, Optional, Dict, List, Tuple, Union
+from typing import Any, Callable, Optional, Dict, List, Tuple, Union
 from warnings import warn
 import numpy as np
 import pandas as pd
@@ -1821,7 +1821,39 @@ class PipelineWithComputedPipelineStageMixin:
         #     'curr_global_param_typed_parameters': curr_global_param_typed_parameters,
         #     'param_typed_parameters': param_typed_parameters,
         # }
+
+    def update_parameters(self, override_parameters_flat_keypaths_dict: Dict[str, Any]=None):
+        """ updates any of the user-parameters by keypaths for the pipeline
         
+        """
+        from neuropy.core.parameters import ParametersContainer
+        from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters
+
+        if override_parameters_flat_keypaths_dict is None:
+            return
+        else:       
+            ## Add `curr_active_pipeline.global_computation_results.computation_config` as needed:
+            if self.global_computation_results.computation_config is None:
+                print('global_computation_results.computation_config is None! Making new one!')
+                curr_global_param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters.init_from_pipeline(curr_active_pipeline=self)
+                self.global_computation_results.computation_config = curr_global_param_typed_parameters
+                print(f'\tdone. Pipeline needs resave!')
+            else:
+                curr_global_param_typed_parameters: ComputationKWargParameters = self.global_computation_results.computation_config
+                
+
+            for k, v in override_parameters_flat_keypaths_dict.items():
+                if k.startswith('preprocessing'):
+                    raise NotImplementedError("Updating preprocessing parameters is not yet implemented!")            
+                    preprocessing_parameters: ParametersContainer = deepcopy(self.active_sess_config)
+                else:                
+                    # Set a value using keypath (e.g. 'directional_train_test_split.training_data_portion')
+                    curr_global_param_typed_parameters.set_by_keypath(k, v)
+
+            self.global_computation_results.computation_config = curr_global_param_typed_parameters
+            # return self.global_computation_results.computation_config # return the updated parameters
+
+
     @function_attributes(short_name=None, tags=['parameters', 'filenames', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 16:10', related_items=[])
     def get_custom_pipeline_filenames_from_parameters(self) -> Tuple:
         """ gets the custom suffix from the pipeline's parameters 
