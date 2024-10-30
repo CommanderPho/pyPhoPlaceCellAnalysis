@@ -88,7 +88,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
     computation_functions_name_includelist = kwargs.get('computation_functions_name_includelist', None)
 
 
-    known_data_session_type_properties_dict = DataSessionFormatRegistryHolder.get_registry_known_data_session_type_dict()
+    known_data_session_type_properties_dict = DataSessionFormatRegistryHolder.get_registry_known_data_session_type_dict(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
     active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
 
     active_data_mode_registered_class = active_data_session_types_registered_classes_dict[active_data_mode_name]
