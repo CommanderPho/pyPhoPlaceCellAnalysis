@@ -141,12 +141,14 @@ local_computations_override_output_file = None
 global_computation_results_override_output_file = None
 
 ## Override input/output files:
-#local_computations_override_file = script_file_parent_path.joinpath('loadedSessPickle.pkl').resolve()
-#global_computation_results_override_file = script_file_parent_path.joinpath('global_computation_results.pkl').resolve()
+local_computations_override_file = script_file_parent_path.joinpath('loadedSessPickle{{override_custom_pickle_suffix|default('')}}.pkl').resolve()
+global_computation_results_override_file = script_file_parent_path.joinpath('global_computation_results{{override_custom_pickle_suffix|default('')}}.pkl').resolve()
 
 ## Overrides for the output files:
-#local_computations_override_output_file = script_file_parent_path.joinpath('loadedSessPickle.pkl').resolve()
-#global_computation_results_override_output_file = script_file_parent_path.joinpath('global_computation_results.pkl').resolve()
+local_computations_override_output_file = script_file_parent_path.joinpath('loadedSessPickle{{override_custom_pickle_suffix|default('')}}.pkl').resolve()
+global_computation_results_override_output_file = script_file_parent_path.joinpath('global_computation_results{{override_custom_pickle_suffix|default('')}}.pkl').resolve()
+
+
 
 extended_computations_include_includelist = {{extended_computations_include_includelist|default('None')}}
 force_recompute_override_computations_includelist = {{force_recompute_override_computations_includelist|default('[]')}}
