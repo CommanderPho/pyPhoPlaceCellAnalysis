@@ -204,7 +204,9 @@ class PlotlyFigureContainer:
 def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: Optional[IdentifyingContext]=None, out_scatter_fig=None, histogram_bins:int=25,
 								   common_plot_kwargs=None, px_scatter_kwargs=None,
 								   histogram_variable_name='P_Long', hist_kwargs=None,
-								   forced_range_y=[0.0, 1.0], time_delta_tuple=None, is_dark_mode: bool = True, figure_sup_huge_title_text: str=None, is_top_supertitle: bool = False, curr_fig_width=1800,
+								   forced_range_y=[0.0, 1.0], time_delta_tuple=None, is_dark_mode: bool = True,
+								   figure_sup_huge_title_text: str=None, is_top_supertitle: bool = False, figure_footer_text: Optional[str]=None,
+								    curr_fig_width=1800,
 									**kwargs):
 	""" Plots a scatter plot of a variable pre/post delta, with a histogram on each end corresponding to the pre/post delta distribution
 
@@ -591,6 +593,27 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
 				yref="paper",
 				line=dict(color="Black", width=2)
 			)
+
+
+	if (figure_footer_text is not None) and (len(figure_footer_text) > 0):
+		print(f'footer_text: "{figure_footer_text}"')
+
+		# Add footer annotation
+		fig = fig.update_layout(
+			annotations=[
+				dict(
+					text=figure_footer_text,
+					# x=0.5,  # Centered horizontally
+					# y=-0.1,  # Offset below the plot
+					# xref='paper',  # Use figure coordinates
+					# yref='paper',  # Use figure coordinates
+					# showarrow=False,
+					# font=dict(size=10, color='gray'),
+					**{'x': 0.5, 'y': -0.19, 'xref': 'paper', 'yref': 'paper', 'showarrow': False, 'font': {'size': 11, 'color': 'gray'}, 'textangle': 0, 'xanchor': 'center', 'yanchor': 'middle'},
+				)
+			],
+			margin=dict(b=60)  # Increase bottom margin to accommodate the footer
+		)
 
 	return fig, figure_context
 

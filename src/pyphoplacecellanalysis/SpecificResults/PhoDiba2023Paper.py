@@ -2079,14 +2079,17 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
 		custom_suffix_description: str = data_context.get_description(subset_includelist=['custom_suffix'])
 		figure_sup_huge_title_text = figure_sup_huge_title_text + f'\n{custom_suffix_description}'
 	
+	# filter_context = df_filter.filter_context # IdentifyingContext(time_bin_sizes=df_filter.time_bin_size, custom_suffix=df_filter.replay_name)
+	figure_footer_text = data_context.get_description(separator='|', subset_excludelist=['time_bin_sizes'])
+
 
 	new_fig, new_fig_context = plotly_pre_post_delta_scatter(data_results_df=concatenated_ripple_df, data_context=data_context,
 							out_scatter_fig=None, histogram_bins=histogram_bins,
 							px_scatter_kwargs=px_scatter_kwargs, histogram_variable_name=variable_name, hist_kwargs=hist_kwargs, forced_range_y=None,
 							time_delta_tuple=time_delta_tuple, legend_title_text=None, is_dark_mode=is_dark_mode,
 							# figure_sup_huge_title_text=data_context.get_description(subset_excludelist=['title_prefix'], separator=' | '),
-							figure_sup_huge_title_text=figure_sup_huge_title_text,
-)
+							figure_sup_huge_title_text=figure_sup_huge_title_text, figure_footer_text=figure_footer_text,
+	)
 
 	new_fig = new_fig.update_layout(fig_size_kwargs)
 
