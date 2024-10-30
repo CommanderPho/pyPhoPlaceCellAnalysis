@@ -1151,7 +1151,7 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
     
     # saving_mode = kwargs.pop('saving_mode', None) or PipelineSavingScheme.OVERWRITE_IN_PLACE
     skip_extended_batch_computations = kwargs.pop('skip_extended_batch_computations', True)
-    override_parameters_flat_keypaths_dict = kwargs.pop('override_parameters_flat_keypaths_dict', {})
+    override_parameters_flat_keypaths_dict = kwargs.pop('override_parameters_flat_keypaths_dict', {}) or {} # ` or {}` part handles None values
     fail_on_exception = kwargs.pop('fail_on_exception', True)
     debug_print = kwargs.pop('debug_print', False)
 
