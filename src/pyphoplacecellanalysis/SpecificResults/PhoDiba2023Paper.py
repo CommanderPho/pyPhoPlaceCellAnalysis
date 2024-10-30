@@ -1679,7 +1679,7 @@ class DataFrameFilter:
 	filtered_all_sessions_MultiMeasure_laps_df = field(init=False, default=None)
 
 
-	filter_predicates = field(default=Factory(dict)) # a list of boolean predicates to be applied as filters
+	# filter_predicates = field(factory=dict) # a list of boolean predicates to be applied as filters
 
 
 	# Widgets (will be initialized in __attrs_post_init__)
