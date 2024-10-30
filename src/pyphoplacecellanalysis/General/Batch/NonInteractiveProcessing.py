@@ -221,7 +221,7 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
             raise
 
     try:
-        curr_active_pipeline.save_pipeline(saving_mode=saving_mode)
+        curr_active_pipeline.save_pipeline(saving_mode=saving_mode, active_pickle_filename=active_pickle_filename, override_pickle_path=kwargs.get('override_pickle_path', None))
     except Exception as e:
         exception_info = sys.exc_info()
         an_error = CapturedException(e, exception_info, curr_active_pipeline)
