@@ -83,7 +83,7 @@ class ProcessingScriptPhases(Enum):
                 }
             
             phase0_any_run_custom_user_completion_functions_dict = {
-                'backup_previous_session_files_completion_function': backup_previous_session_files_completion_function,
+                # 'backup_previous_session_files_completion_function': backup_previous_session_files_completion_function, # disabled 2024-10-29
                 # "determine_session_t_delta_completion_function": determine_session_t_delta_completion_function,  # ran 2024-05-28 6am
                 'reload_exported_kdiba_session_position_info_mat_completion_function': reload_exported_kdiba_session_position_info_mat_completion_function,
             }
@@ -312,9 +312,6 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
     # python_template = env.get_template('slurm_python_template_NoRecompute.py.j2', parent='slurm_python_template_base.py.j2')
     slurm_template = env.get_template('slurm_template.sh.j2')
     bash_non_slurm_template = env.get_template('bash_template.sh.j2')
-    
-    
-
 
     output_python_scripts = []
 
