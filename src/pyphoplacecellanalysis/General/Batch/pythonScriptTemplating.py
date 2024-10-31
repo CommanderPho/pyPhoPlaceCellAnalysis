@@ -197,6 +197,7 @@ class ProcessingScriptPhases(Enum):
             'directional_decoders_evaluate_epochs',
             'directional_decoders_epoch_heuristic_scoring',
             'extended_pf_peak_information',
+            'perform_wcorr_shuffle_analysis',
         ]
 
         _out_run_config = {}
