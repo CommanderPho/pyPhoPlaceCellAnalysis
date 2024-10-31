@@ -599,20 +599,17 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
 		print(f'footer_text: "{figure_footer_text}"')
 
 		# Add footer annotation
-		fig = fig.update_layout(
-			annotations=[
-				dict(
-					text=figure_footer_text,
-					# x=0.5,  # Centered horizontally
-					# y=-0.1,  # Offset below the plot
-					# xref='paper',  # Use figure coordinates
-					# yref='paper',  # Use figure coordinates
-					# showarrow=False,
-					# font=dict(size=10, color='gray'),
-					**{'x': 0.5, 'y': -0.19, 'xref': 'paper', 'yref': 'paper', 'showarrow': False, 'font': {'size': 11, 'color': 'gray'}, 'textangle': 0, 'xanchor': 'center', 'yanchor': 'middle'},
-				)
-			],
-			margin=dict(b=60)  # Increase bottom margin to accommodate the footer
+		fig = fig.add_annotation(
+				text=figure_footer_text,
+				# x=0.5,  # Centered horizontally
+				# y=-0.1,  # Offset below the plot
+				# xref='paper',  # Use figure coordinates
+				# yref='paper',  # Use figure coordinates
+				# showarrow=False,
+				# font=dict(size=10, color='gray'),
+				# **{'x': 0.5, 'y': -0.15, 'xref': 'paper', 'yref': 'paper', 'showarrow': False, 'font': {'size': 14, 'color': 'gray'}, 'textangle': 0, 'xanchor': 'center', 'yanchor': 'middle'},
+				# **{'x': 0.5, 'y': -0.19, 'xref': 'paper', 'yref': 'paper', 'showarrow': False, 'font': {'size': 11, 'color': 'gray'}, 'textangle': 0, 'xanchor': 'center', 'yanchor': 'middle'},
+				**{'x': 0.5, 'y': -0.15000000000000002, 'xref': 'paper', 'yref': 'paper', 'showarrow': False, 'font': {'size': 12, 'color': 'gray'}, 'textangle': 0, 'xanchor': 'center', 'yanchor': 'middle'},
 		)
 
 	return fig, figure_context

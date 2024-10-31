@@ -102,13 +102,6 @@ class PlotlyInteractivePlacementWidget:
         # Initialize the figure widget
         if self.base_fig is not None:
             self.base_fig = go.FigureWidget(deepcopy(self.base_fig).to_plotly_json())
-            if self.base_fig.layout.annotations and len(self.base_fig.layout.annotations) > 0:
-                annotation = self.base_fig.layout.annotations[self.active_annotation_index]
-                for key in self.annotation_defaults.keys():
-                    if key in annotation:
-                        self.annotation_defaults[key] = annotation[key]
-                if 'font' in annotation and 'size' in annotation.font:
-                    self.annotation_defaults['font']['size'] = annotation.font.size
             if self.base_fig.layout.margin:
                 for side in ['t', 'b', 'l', 'r']:
                     margin_value = getattr(self.base_fig.layout.margin, side, None)
@@ -117,6 +110,7 @@ class PlotlyInteractivePlacementWidget:
         else:
             self.base_fig = go.FigureWidget()
             self.base_fig.add_scatter(x=[1, 2, 3], y=[4, 5, 6])
+            
 
         # Initialize widgets
         self.x_widget = widgets.FloatSlider(min=0, max=1, step=0.01, value=self.annotation_defaults['x'], description="X Position")
@@ -169,7 +163,7 @@ class PlotlyInteractivePlacementWidget:
     def on_annotation_index_changed(self, change):
         """ todo: not yet called """
         print(f'on_annotation_index_changed(change: {change})')
-        active_annotation_index = self.active_annotation_index_widget.value
+        active_annotation_index = self.active_annotation_index
         
         if self.base_fig is not None:
             if self.base_fig.layout.annotations and (len(self.base_fig.layout.annotations) > 0):
@@ -180,7 +174,6 @@ class PlotlyInteractivePlacementWidget:
                 if 'font' in active_annotation and 'size' in active_annotation.font:
                     self.annotation_defaults['font']['size'] = active_annotation.font.size
 
-            
 
     def update_plot(self):
         # Extract current widget values
@@ -200,33 +193,6 @@ class PlotlyInteractivePlacementWidget:
         margin_right = self.margin_right_widget.value
         active_annotation_index = self.active_annotation_index_widget.value
         active_annotation = self.active_annotation
-        # self.fig.update_annotations(row=1, col=1, text=text,
-        #         x=x,
-        #         y=y,
-        #         xref=xref,
-        #         yref=yref,
-        #         showarrow=showarrow,
-        #         font=dict(size=font_size, color='gray'),
-        #         textangle=textangle,
-        #         xanchor=xanchor,
-        #         yanchor=yanchor)
-        
-    
-        # Update the figure's annotations
-        # self.base_fig.layout.annotations = [
-        #     dict(
-        #         text=text,
-        #         x=x,
-        #         y=y,
-        #         xref=xref,
-        #         yref=yref,
-        #         showarrow=showarrow,
-        #         font=dict(size=font_size, color='gray'),
-        #         textangle=textangle,
-        #         xanchor=xanchor,
-        #         yanchor=yanchor
-        #     )
-        # ]
 
         # Convert annotations to a list for mutable operations
         annotations = list(self.base_fig.layout.annotations)
