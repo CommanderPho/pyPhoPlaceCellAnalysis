@@ -1366,211 +1366,210 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 
 	return across_session_results_extended_dict
 
-@function_attributes(short_name=None, tags=['NOT_YET_FINISHED', 'PENDING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 10:54', related_items=[])
-def compute_and_export_session_with_alternative_parameters_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, included_qclu_values = [1,2,4,6,7,9], minimum_inclusion_fr_Hz=5.0) -> dict:
-	""" Sweeps through all sets of computation parameters, then performs apporpriate computations for each, exporting the results with an appropriate unique suffix.
+# @function_attributes(short_name=None, tags=['NOT_YET_FINISHED', 'PENDING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 10:54', related_items=[])
+# def compute_and_export_session_with_alternative_parameters_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, included_qclu_values = [1,2,4,6,7,9], minimum_inclusion_fr_Hz=5.0) -> dict:
+# 	""" Sweeps through all sets of computation parameters, then performs apporpriate computations for each, exporting the results with an appropriate unique suffix.
 
-	"""
-	import sys
-	import numpy as np
-	from datetime import timedelta, datetime
-	from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
-	from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
-	from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import SequenceBasedComputationsContainer, WCorrShuffle
-	from neuropy.utils.mixins.indexing_helpers import get_dict_subset
-	from neuropy.core.epoch import Epoch, ensure_Epoch, ensure_dataframe
-	from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
-	from pyphocorehelpers.exception_helpers import ExceptionPrintingContext
-	from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
-	from pyphocorehelpers.Filesystem.path_helpers import sanitize_filename_for_Windows
+# 	"""
+# 	import sys
+# 	import numpy as np
+# 	from datetime import timedelta, datetime
+# 	from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
+# 	from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
+# 	from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import SequenceBasedComputationsContainer, WCorrShuffle
+# 	from neuropy.utils.mixins.indexing_helpers import get_dict_subset
+# 	from neuropy.core.epoch import Epoch, ensure_Epoch, ensure_dataframe
+# 	from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
+# 	from pyphocorehelpers.exception_helpers import ExceptionPrintingContext
+# 	from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
+# 	from pyphocorehelpers.Filesystem.path_helpers import sanitize_filename_for_Windows
 
-	from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_diba_quiescent_style_replay_events, overwrite_replay_epochs_and_recompute, try_load_neuroscope_EVT_file_epochs, replace_replay_epochs
-	from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
-	from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_replay_wcorr_histogram
-	from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _get_custom_suffix_for_replay_filename
-	from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_all_replay_epoch_variations
+# 	from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_diba_quiescent_style_replay_events, overwrite_replay_epochs_and_recompute, try_load_neuroscope_EVT_file_epochs, replace_replay_epochs
+# 	from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
+# 	from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_replay_wcorr_histogram
+# 	from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _get_custom_suffix_for_replay_filename
+# 	from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_all_replay_epoch_variations
 
-	# SimpleBatchComputationDummy = make_class('SimpleBatchComputationDummy', attrs=['BATCH_DATE_TO_USE', 'collected_outputs_path'])
-	# a_dummy = SimpleBatchComputationDummy(BATCH_DATE_TO_USE, collected_outputs_path)
+# 	# SimpleBatchComputationDummy = make_class('SimpleBatchComputationDummy', attrs=['BATCH_DATE_TO_USE', 'collected_outputs_path'])
+# 	# a_dummy = SimpleBatchComputationDummy(BATCH_DATE_TO_USE, collected_outputs_path)
 	
-	# "self" already is a dummy
+# 	# "self" already is a dummy
 	
-	base_BATCH_DATE_TO_USE: str = f"{self.BATCH_DATE_TO_USE}" ## backup original string
-	should_suppress_errors: bool = (not self.fail_on_exception) # get('fail_on_exception', False)    
+# 	base_BATCH_DATE_TO_USE: str = f"{self.BATCH_DATE_TO_USE}" ## backup original string
+# 	should_suppress_errors: bool = (not self.fail_on_exception) # get('fail_on_exception', False)    
 
-	print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-	print(f'compute_and_export_session_with_alternative_parameters_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+# 	print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+# 	print(f'compute_and_export_session_with_alternative_parameters_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
 	
-	callback_outputs = {
-		'replay_epoch_variations': None,
-		'replay_epoch_outputs': None,
-		# 'wcorr_shuffles_data_output_filepath': None, #'t_end': t_end   
-		# 'standalone_MAT_filepath': None,
-		# 'ripple_WCorrShuffle_df_export_CSV_path': None,
-	}
+# 	callback_outputs = {
+# 		'replay_epoch_variations': None,
+# 		'replay_epoch_outputs': None,
+# 		# 'wcorr_shuffles_data_output_filepath': None, #'t_end': t_end   
+# 		# 'standalone_MAT_filepath': None,
+# 		# 'ripple_WCorrShuffle_df_export_CSV_path': None,
+# 	}
 
 
-	# ==================================================================================================================== #
-	# Compute Alternative Replays: `replay_epoch_variations`                                                               #
-	# ==================================================================================================================== #
+# 	# ==================================================================================================================== #
+# 	# Compute Alternative Replays: `replay_epoch_variations`                                                               #
+# 	# ==================================================================================================================== #
 
-	replay_epoch_outputs = {} # replay_epochs_key
+# 	replay_epoch_outputs = {} # replay_epochs_key
 
-	## Compute new epochs: 
-	replay_epoch_variations = {}
+# 	## Compute new epochs: 
+# 	replay_epoch_variations = {}
 
-	replay_epoch_variations = compute_all_replay_epoch_variations(curr_active_pipeline, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) ## returns a dict containing replays with attached metadata
+# 	replay_epoch_variations = compute_all_replay_epoch_variations(curr_active_pipeline, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) ## returns a dict containing replays with attached metadata
 
-	print(f'completed replay extraction, have: {list(replay_epoch_variations.keys())}')
+# 	print(f'completed replay extraction, have: {list(replay_epoch_variations.keys())}')
 	
-	## OUTPUT: replay_epoch_variations
-	callback_outputs['replay_epoch_variations'] = replay_epoch_variations
+# 	## OUTPUT: replay_epoch_variations
+# 	callback_outputs['replay_epoch_variations'] = replay_epoch_variations
 
-	## Save the replay epochs out to event files:
-	for replay_epochs_key, a_replay_epochs in replay_epoch_variations.items():
-		# ## Use `diba_evt_file_replay_epochs` as `new_replay_epochs`
-		# replay_epochs_key = 'diba_quiescent_method_replay_epochs'
-		# a_replay_epochs = replay_epoch_variations[replay_epochs_key]
-		print(f'performing comp for "{replay_epochs_key}"...')
-		replay_epoch_outputs[replay_epochs_key] = {} # init to empty
+# 	## Save the replay epochs out to event files:
+# 	for replay_epochs_key, a_replay_epochs in replay_epoch_variations.items():
+# 		# ## Use `diba_evt_file_replay_epochs` as `new_replay_epochs`
+# 		# replay_epochs_key = 'diba_quiescent_method_replay_epochs'
+# 		# a_replay_epochs = replay_epoch_variations[replay_epochs_key]
+# 		print(f'performing comp for "{replay_epochs_key}"...')
+# 		replay_epoch_outputs[replay_epochs_key] = {} # init to empty
 
-		custom_suffix: str = _get_custom_suffix_for_replay_filename(new_replay_epochs=a_replay_epochs) ## uses their metadata to determine the filename suffix
-		print(f'\treplay_epochs_key: {replay_epochs_key}: custom_suffix: "{custom_suffix}"')
+# 		custom_suffix: str = _get_custom_suffix_for_replay_filename(new_replay_epochs=a_replay_epochs) ## uses their metadata to determine the filename suffix
+# 		print(f'\treplay_epochs_key: {replay_epochs_key}: custom_suffix: "{custom_suffix}"')
 
-		## Export to .evt file
+# 		## Export to .evt file
 
-		## Save computed epochs out to a neuroscope .evt file:
-		filename = f"{curr_active_pipeline.session_name}{custom_suffix}"
-		good_filename: str = sanitize_filename_for_Windows(filename)
-		print(f'\tgood_filename: {good_filename}')
-		filepath = curr_active_pipeline.get_output_path().joinpath(good_filename).resolve()
+# 		## Save computed epochs out to a neuroscope .evt file:
+# 		filename = f"{curr_active_pipeline.session_name}{custom_suffix}"
+# 		good_filename: str = sanitize_filename_for_Windows(filename)
+# 		print(f'\tgood_filename: {good_filename}')
+# 		filepath = curr_active_pipeline.get_output_path().joinpath(good_filename).resolve()
 		
-		curr_replay_epoch = deepcopy(a_replay_epochs)
+# 		curr_replay_epoch = deepcopy(a_replay_epochs)
 
-		## set the filename of the Epoch:
-		curr_replay_epoch.filename = filepath
-		filepath = curr_replay_epoch.to_neuroscope(ext='PHONEW')
-		assert filepath.exists()
-		print(F'saved out newly computed epochs of type "{replay_epochs_key} to "{filepath}".')
-		replay_epoch_outputs[replay_epochs_key].update(dict(exported_evt_file_path=str(filepath.as_posix())))
+# 		## set the filename of the Epoch:
+# 		curr_replay_epoch.filename = filepath
+# 		filepath = curr_replay_epoch.to_neuroscope(ext='PHONEW')
+# 		assert filepath.exists()
+# 		print(F'saved out newly computed epochs of type "{replay_epochs_key} to "{filepath}".')
+# 		replay_epoch_outputs[replay_epochs_key].update(dict(exported_evt_file_path=str(filepath.as_posix())))
 
-	# ==================================================================================================================== #
-	# For each parameter set, duplicate entire pipeline to perform desired computations to ensure no downstream effects           #
-	# ==================================================================================================================== #
-	print(f'=====================================>> Starting computations for the 4 new epochs...')
+# 	# ==================================================================================================================== #
+# 	# For each parameter set, duplicate entire pipeline to perform desired computations to ensure no downstream effects           #
+# 	# ==================================================================================================================== #
+# 	print(f'=====================================>> Starting computations for the 4 new epochs...')
 
-	## Duplicate Copy of pipeline to perform desired computations:
-	for replay_epochs_key, a_replay_epochs in replay_epoch_variations.items():
-		# ## Use `diba_evt_file_replay_epochs` as `new_replay_epochs`
-		# replay_epochs_key = 'diba_quiescent_method_replay_epochs'
-		# a_replay_epochs = replay_epoch_variations[replay_epochs_key]
-		print(f'\t=====================================>> performing comp for "{replay_epochs_key}"...')
-		# replay_epoch_outputs[replay_epochs_key] = {} # init to empty
+# 	## Duplicate Copy of pipeline to perform desired computations:
+# 	for replay_epochs_key, a_replay_epochs in replay_epoch_variations.items():
+# 		# ## Use `diba_evt_file_replay_epochs` as `new_replay_epochs`
+# 		# replay_epochs_key = 'diba_quiescent_method_replay_epochs'
+# 		# a_replay_epochs = replay_epoch_variations[replay_epochs_key]
+# 		print(f'\t=====================================>> performing comp for "{replay_epochs_key}"...')
+# 		# replay_epoch_outputs[replay_epochs_key] = {} # init to empty
 
-		custom_suffix: str = _get_custom_suffix_for_replay_filename(new_replay_epochs=a_replay_epochs)
-		print(f'\treplay_epochs_key: {replay_epochs_key}: custom_suffix: "{custom_suffix}"')
+# 		custom_suffix: str = _get_custom_suffix_for_replay_filename(new_replay_epochs=a_replay_epochs)
+# 		print(f'\treplay_epochs_key: {replay_epochs_key}: custom_suffix: "{custom_suffix}"')
 
-		## Modify .BATCH_DATE_TO_USE to include the custom suffix
-		curr_BATCH_DATE_TO_USE: str = f"{base_BATCH_DATE_TO_USE}{custom_suffix}"
-		print(f'\tcurr_BATCH_DATE_TO_USE: "{curr_BATCH_DATE_TO_USE}"')
-		self.BATCH_DATE_TO_USE = curr_BATCH_DATE_TO_USE # set the internal BATCH_DATE_TO_USE which is used to determine the .csv and .h5 export names
+# 		## Modify .BATCH_DATE_TO_USE to include the custom suffix
+# 		curr_BATCH_DATE_TO_USE: str = f"{base_BATCH_DATE_TO_USE}{custom_suffix}"
+# 		print(f'\tcurr_BATCH_DATE_TO_USE: "{curr_BATCH_DATE_TO_USE}"')
+# 		self.BATCH_DATE_TO_USE = curr_BATCH_DATE_TO_USE # set the internal BATCH_DATE_TO_USE which is used to determine the .csv and .h5 export names
 
-		print(f'\tWARNING: should_suppress_errors: {should_suppress_errors}')
-		with ExceptionPrintingContext(suppress=should_suppress_errors, exception_print_fn=(lambda formatted_exception_str: print(f'\tfailed epoch computations for replay_epochs_key: "{replay_epochs_key}". Failed with error: {formatted_exception_str}. Skipping.'))):
-			# for replay_epochs_key, a_replay_epochs in replay_epoch_variations.items():
-			a_curr_active_pipeline = deepcopy(curr_active_pipeline)
-			did_change, custom_save_filenames, custom_save_filepaths = overwrite_replay_epochs_and_recompute(curr_active_pipeline=a_curr_active_pipeline, new_replay_epochs=a_replay_epochs,
-																											  enable_save_pipeline_pkl=True, enable_save_global_computations_pkl=False, enable_save_h5=False,
-																											  user_completion_dummy=self)
+# 		print(f'\tWARNING: should_suppress_errors: {should_suppress_errors}')
+# 		with ExceptionPrintingContext(suppress=should_suppress_errors, exception_print_fn=(lambda formatted_exception_str: print(f'\tfailed epoch computations for replay_epochs_key: "{replay_epochs_key}". Failed with error: {formatted_exception_str}. Skipping.'))):
+# 			# for replay_epochs_key, a_replay_epochs in replay_epoch_variations.items():
+# 			a_curr_active_pipeline = deepcopy(curr_active_pipeline)
+# 			did_change, custom_save_filenames, custom_save_filepaths = overwrite_replay_epochs_and_recompute(curr_active_pipeline=a_curr_active_pipeline, new_replay_epochs=a_replay_epochs,
+# 																											  enable_save_pipeline_pkl=True, enable_save_global_computations_pkl=False, enable_save_h5=False,
+# 																											  user_completion_dummy=self)
 
-			replay_epoch_outputs[replay_epochs_key].update(dict(did_change=did_change, custom_save_filenames=custom_save_filenames, custom_save_filepaths=custom_save_filepaths))
+# 			replay_epoch_outputs[replay_epochs_key].update(dict(did_change=did_change, custom_save_filenames=custom_save_filenames, custom_save_filepaths=custom_save_filepaths))
 
-			print(f'<<<<<<<<<<<<<<< Done with `overwrite_replay_epochs_and_recompute(...)` for replay_epochs_key: {replay_epochs_key}')
-			## modifies `_temp_curr_active_pipeline`
+# 			print(f'<<<<<<<<<<<<<<< Done with `overwrite_replay_epochs_and_recompute(...)` for replay_epochs_key: {replay_epochs_key}')
+# 			## modifies `_temp_curr_active_pipeline`
 
-			# ==================================================================================================================== #
-			# OUTPUT OF WCORR                                                                                                      #
-			# ==================================================================================================================== #
+# 			# ==================================================================================================================== #
+# 			# OUTPUT OF WCORR                                                                                                      #
+# 			# ==================================================================================================================== #
 
-			## Call on `a_replay_epochs`, _temp_curr_active_pipeline:
-			replay_epoch_outputs[replay_epochs_key].update(dict(custom_suffix=custom_suffix))
+# 			## Call on `a_replay_epochs`, _temp_curr_active_pipeline:
+# 			replay_epoch_outputs[replay_epochs_key].update(dict(custom_suffix=custom_suffix))
 
-			## INPUTS: a_curr_active_pipeline, custom_suffix
-			decoder_names = TrackTemplates.get_decoder_names()
+# 			## INPUTS: a_curr_active_pipeline, custom_suffix
+# 			decoder_names = TrackTemplates.get_decoder_names()
 
 
-			## INPUTS: wcorr_ripple_shuffle, a_curr_active_pipeline, wcorr_shuffles, custom_suffix
+# 			## INPUTS: wcorr_ripple_shuffle, a_curr_active_pipeline, wcorr_shuffles, custom_suffix
 
-			# # standalone save
-			# standalone_pkl_filename: str = f'{get_now_rounded_time_str()}{custom_suffix}_standalone_wcorr_ripple_shuffle_data_only_{wcorr_shuffles.n_completed_shuffles}.pkl' 
-			# standalone_pkl_filepath = a_curr_active_pipeline.get_output_path().joinpath(standalone_pkl_filename).resolve() # Path("W:\Data\KDIBA\gor01\one\2006-6-08_14-26-15\output\2024-05-30_0925AM_standalone_wcorr_ripple_shuffle_data_only_1100.pkl")
-			# print(f'saving to "{standalone_pkl_filepath}"...')
-			# wcorr_shuffles.save_data(standalone_pkl_filepath)
-			# ## INPUTS: wcorr_ripple_shuffle
-			# standalone_mat_filename: str = f'{get_now_rounded_time_str()}{custom_suffix}_standalone_all_shuffles_wcorr_array.mat' 
-			# standalone_mat_filepath = a_curr_active_pipeline.get_output_path().joinpath(standalone_mat_filename).resolve() # r"W:\Data\KDIBA\gor01\one\2006-6-09_1-22-43\output\2024-06-03_0400PM_standalone_all_shuffles_wcorr_array.mat"
-			# wcorr_shuffles.save_data_mat(filepath=standalone_mat_filepath, **{'session': a_curr_active_pipeline.get_session_context().to_dict()})
+# 			# # standalone save
+# 			# standalone_pkl_filename: str = f'{get_now_rounded_time_str()}{custom_suffix}_standalone_wcorr_ripple_shuffle_data_only_{wcorr_shuffles.n_completed_shuffles}.pkl' 
+# 			# standalone_pkl_filepath = a_curr_active_pipeline.get_output_path().joinpath(standalone_pkl_filename).resolve() # Path("W:\Data\KDIBA\gor01\one\2006-6-08_14-26-15\output\2024-05-30_0925AM_standalone_wcorr_ripple_shuffle_data_only_1100.pkl")
+# 			# print(f'saving to "{standalone_pkl_filepath}"...')
+# 			# wcorr_shuffles.save_data(standalone_pkl_filepath)
+# 			# ## INPUTS: wcorr_ripple_shuffle
+# 			# standalone_mat_filename: str = f'{get_now_rounded_time_str()}{custom_suffix}_standalone_all_shuffles_wcorr_array.mat' 
+# 			# standalone_mat_filepath = a_curr_active_pipeline.get_output_path().joinpath(standalone_mat_filename).resolve() # r"W:\Data\KDIBA\gor01\one\2006-6-09_1-22-43\output\2024-06-03_0400PM_standalone_all_shuffles_wcorr_array.mat"
+# 			# wcorr_shuffles.save_data_mat(filepath=standalone_mat_filepath, **{'session': a_curr_active_pipeline.get_session_context().to_dict()})
 
-			# replay_epoch_outputs[replay_epochs_key].update(dict(standalone_pkl_filepath=standalone_pkl_filepath, standalone_mat_filepath=standalone_mat_filepath))
+# 			# replay_epoch_outputs[replay_epochs_key].update(dict(standalone_pkl_filepath=standalone_pkl_filepath, standalone_mat_filepath=standalone_mat_filepath))
 
-			# try:
-			# 	active_context = a_curr_active_pipeline.get_session_context()
-			# 	session_name: str = f"{a_curr_active_pipeline.session_name}{custom_suffix}" ## appending this here is a hack, but it makes the correct filename
-			# 	active_context = active_context.adding_context_if_missing(suffix=custom_suffix)
+# 			# try:
+# 			# 	active_context = a_curr_active_pipeline.get_session_context()
+# 			# 	session_name: str = f"{a_curr_active_pipeline.session_name}{custom_suffix}" ## appending this here is a hack, but it makes the correct filename
+# 			# 	active_context = active_context.adding_context_if_missing(suffix=custom_suffix)
 
-			# 	export_files_dict = wcorr_shuffles.export_csvs(parent_output_path=a_curr_active_pipeline.get_output_path().resolve(), active_context=active_context, session_name=session_name, curr_active_pipeline=a_curr_active_pipeline,
-			# 												#    source='diba_evt_file',
-			# 													source='compute_diba_quiescent_style_replay_events',
-			# 													)
-			# 	ripple_WCorrShuffle_df_export_CSV_path = export_files_dict['ripple_WCorrShuffle_df']
-			# 	print(f'Successfully exported ripple_WCorrShuffle_df_export_CSV_path: "{ripple_WCorrShuffle_df_export_CSV_path}" with wcorr_shuffles.n_completed_shuffles: {wcorr_shuffles.n_completed_shuffles} unique shuffles.')
-			# 	replay_epoch_outputs[replay_epochs_key].update(dict(active_context=active_context, export_files_dict=export_files_dict))
+# 			# 	export_files_dict = wcorr_shuffles.export_csvs(parent_output_path=a_curr_active_pipeline.get_output_path().resolve(), active_context=active_context, session_name=session_name, curr_active_pipeline=a_curr_active_pipeline,
+# 			# 												#    source='diba_evt_file',
+# 			# 													source='compute_diba_quiescent_style_replay_events',
+# 			# 													)
+# 			# 	ripple_WCorrShuffle_df_export_CSV_path = export_files_dict['ripple_WCorrShuffle_df']
+# 			# 	print(f'Successfully exported ripple_WCorrShuffle_df_export_CSV_path: "{ripple_WCorrShuffle_df_export_CSV_path}" with wcorr_shuffles.n_completed_shuffles: {wcorr_shuffles.n_completed_shuffles} unique shuffles.')
+# 			# 	replay_epoch_outputs[replay_epochs_key].update(dict(active_context=active_context, export_files_dict=export_files_dict))
 			
 
-			# callback_outputs['ripple_WCorrShuffle_df_export_CSV_path'] = ripple_WCorrShuffle_df_export_CSV_path
-			# except BaseException as e:
-				# raise e
-				# exception_info = sys.exc_info()
-				# err = CapturedException(e, exception_info)
-				# print(f"ERROR: encountered exception {err} while trying to perform wcorr_ripple_shuffle.export_csvs(parent_output_path='{self.collected_outputs_path.resolve()}', ...) for {curr_session_context}")
-				# ripple_WCorrShuffle_df_export_CSV_path = None # set to None because it failed.
-				# if self.fail_on_exception:
-				#     raise err.exc
+# 			# callback_outputs['ripple_WCorrShuffle_df_export_CSV_path'] = ripple_WCorrShuffle_df_export_CSV_path
+# 			# except BaseException as e:
+# 				# raise e
+# 				# exception_info = sys.exc_info()
+# 				# err = CapturedException(e, exception_info)
+# 				# print(f"ERROR: encountered exception {err} while trying to perform wcorr_ripple_shuffle.export_csvs(parent_output_path='{self.collected_outputs_path.resolve()}', ...) for {curr_session_context}")
+# 				# ripple_WCorrShuffle_df_export_CSV_path = None # set to None because it failed.
+# 				# if self.fail_on_exception:
+# 				#     raise err.exc
 				
-			# wcorr_ripple_shuffle.discover_load_and_append_shuffle_data_from_directory(save_directory=curr_active_pipeline.get_output_path().resolve())
-			# active_context = curr_active_pipeline.get_session_context()
-			# session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
-			# session_name: str = curr_active_pipeline.session_name
-			# export_files_dict = wcorr_ripple_shuffle.export_csvs(parent_output_path=collected_outputs_path.resolve(), active_context=active_context, session_name=session_name, curr_active_pipeline=curr_active_pipeline)
-			# export_files_dict
+# 			# wcorr_ripple_shuffle.discover_load_and_append_shuffle_data_from_directory(save_directory=curr_active_pipeline.get_output_path().resolve())
+# 			# active_context = curr_active_pipeline.get_session_context()
+# 			# session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
+# 			# session_name: str = curr_active_pipeline.session_name
+# 			# export_files_dict = wcorr_ripple_shuffle.export_csvs(parent_output_path=collected_outputs_path.resolve(), active_context=active_context, session_name=session_name, curr_active_pipeline=curr_active_pipeline)
+# 			# export_files_dict
 
-			# replay_epoch_outputs[replay_epochs_key].update(dict(params_description_str=params_description_str, footer_annotation_text=footer_annotation_text, out_hist_fig_result=out_hist_fig_result))
+# 			# replay_epoch_outputs[replay_epochs_key].update(dict(params_description_str=params_description_str, footer_annotation_text=footer_annotation_text, out_hist_fig_result=out_hist_fig_result))
 
-			# Show the figure
-			# fig.show()
-		## end error handler
+# 			# Show the figure
+# 			# fig.show()
+# 		## end error handler
 
-	# END FOR
-	## restore original base_BATCH_DATE_TO_USE
-	self.BATCH_DATE_TO_USE = base_BATCH_DATE_TO_USE
+# 	# END FOR
+# 	## restore original base_BATCH_DATE_TO_USE
+# 	self.BATCH_DATE_TO_USE = base_BATCH_DATE_TO_USE
 
-	callback_outputs = {
-		'custom_suffix': custom_suffix,
-		# 'replay_epoch_variations': deepcopy(replay_epoch_variations),
-		# 'replay_epoch_outputs': deepcopy(replay_epoch_outputs),
-		#  'wcorr_shuffles_data_output_filepath': wcorr_shuffles_data_standalone_filepath, 'e':err, #'t_end': t_end   
-		#  'standalone_pkl_filepath': standalone_pkl_filepath,
-		#  'standalone_MAT_filepath': standalone_MAT_filepath,
-		#  'ripple_WCorrShuffle_df_export_CSV_path': ripple_WCorrShuffle_df_export_CSV_path,
-	}
+# 	callback_outputs = {
+# 		'custom_suffix': custom_suffix,
+# 		# 'replay_epoch_variations': deepcopy(replay_epoch_variations),
+# 		# 'replay_epoch_outputs': deepcopy(replay_epoch_outputs),
+# 		#  'wcorr_shuffles_data_output_filepath': wcorr_shuffles_data_standalone_filepath, 'e':err, #'t_end': t_end   
+# 		#  'standalone_pkl_filepath': standalone_pkl_filepath,
+# 		#  'standalone_MAT_filepath': standalone_MAT_filepath,
+# 		#  'ripple_WCorrShuffle_df_export_CSV_path': ripple_WCorrShuffle_df_export_CSV_path,
+# 	}
 
-	across_session_results_extended_dict['compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function'] = callback_outputs
+# 	across_session_results_extended_dict['compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function'] = callback_outputs
 
-	print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-	print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+# 	print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+# 	print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
 
-	return across_session_results_extended_dict
-
+# 	return across_session_results_extended_dict
 
 
 # ==================================================================================================================== #
