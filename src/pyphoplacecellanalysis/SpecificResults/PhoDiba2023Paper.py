@@ -1683,10 +1683,14 @@ class DataFrameFilter:
 	additional_filter_predicates = field(default=Factory(dict)) # a list of boolean predicates to be applied as filters
 
 
-	# Widgets (will be initialized in __attrs_post_init__)
+	# Widgets (will be initialized in __attrs_post_init__) _______________________________________________________________ #
 	replay_name_widget = field(init=False)
 	time_bin_size_widget = field(init=False)
+	active_filter_predicate_selector_widget: widgets.SelectMultiple = field(init=False)
 	
+	output_widget: widgets.Output = field(init=False)
+	
+
 	@property
 	def replay_name(self) -> str:
 		"""The replay_name property."""
@@ -1788,12 +1792,9 @@ class DataFrameFilter:
 		)
 
 
-
-
-
-
-	
-
+	# ==================================================================================================================== #
+	# Initializers                                                                                                         #
+	# ==================================================================================================================== #
 	def __attrs_post_init__(self):
 		# This method runs after the generated __init__
 		self._setup_widgets()
@@ -1832,12 +1833,26 @@ class DataFrameFilter:
 			style={'description_width': 'initial'}
 		)
 	
+
+		self.active_filter_predicate_selector_widget = widgets.SelectMultiple(
+			options=list(self.additional_filter_predicates.keys()),
+			value=[],  # Initial selection
+			description='Filter Predicates:',
+			disabled=False
+		)
+		
+		self.output_widget = widgets.Output(layout={'border': '1px solid black'})
+		
 		# Set up observers to handle changes in widget values
 		self.replay_name_widget.observe(self._on_widget_change, names='value')
 		self.time_bin_size_widget.observe(self._on_widget_change, names='value')
+		self.active_filter_predicate_selector_widget.observe(self._on_widget_change, names='value')
 		
 		# Display the widgets
-		display(widgets.HBox([self.replay_name_widget, self.time_bin_size_widget]))
+		display(widgets.VBox([widgets.HBox([self.replay_name_widget, self.time_bin_size_widget, self.active_filter_predicate_selector_widget]),
+					   self.output_widget,
+					   ]))
+
 
 	def _on_widget_change(self, change):
 		# Update filtered DataFrames when widget values change
@@ -1874,15 +1889,16 @@ class DataFrameFilter:
 			filtered_name: str = f"filtered_{name}"
 			setattr(self, filtered_name, deepcopy(df[df['is_filter_included']]))
 
-		
-		# Provide feedback to the user
-		print(f"DataFrames filtered with Replay Name: '{replay_name}' and Time Bin Sizes: {time_bin_sizes}")
-		n_records_dict = {name:len(df) for name, df in self.filtered_df_dict.items()}
-		display(n_records_dict)
-		# n_records: int = len(self.filtered_all_sessions_all_scores_ripple_df)
-		# print(f'n_rows: {n_records}')
-		# self.update_calling_namespace_locals()
-		# display(self.filtered_all_sessions_all_scores_ripple_df.head())
+		self.output_widget.clear_output()
+		with self.output_widget:
+			# Provide feedback to the user
+			print(f"DataFrames filtered with Replay Name: '{replay_name}' and Time Bin Sizes: {time_bin_sizes}")
+			n_records_dict = {name:len(df) for name, df in self.filtered_df_dict.items()}
+			display(n_records_dict)
+			# n_records: int = len(self.filtered_all_sessions_all_scores_ripple_df)
+			# print(f'n_rows: {n_records}')
+			# self.update_calling_namespace_locals()
+			# display(self.filtered_all_sessions_all_scores_ripple_df.head())
 
 
 	def update_calling_namespace_locals(self):

@@ -126,6 +126,8 @@ class InteractiveRasterBuilderWidget:
     
     💚 2023-12-08 - Add interactivity to raster plot so I can click and drop a spike.
     
+    To be used with `2023-12-08 - InteractiveRasterPlotter.ipynb`
+    
     """
     def __init__(self, num_neurons=10, time_window=100):
         self.num_neurons = num_neurons
