@@ -2128,7 +2128,7 @@ def _split_user_annotated_ripple_df(all_sessions_user_annotated_ripple_df):
 
 
 	"""
-	from pyphocorehelpers.indexing_helpers import  partition_df
+	from pyphocorehelpers.indexing_helpers import partition_df
 
 
 	all_unique_session_names = all_sessions_user_annotated_ripple_df['session_name'].unique()
