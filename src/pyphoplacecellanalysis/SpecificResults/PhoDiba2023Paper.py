@@ -1679,7 +1679,7 @@ class DataFrameFilter:
 	filtered_all_sessions_MultiMeasure_laps_df = field(init=False, default=None)
 
 
-	# filter_predicates = field(factory=dict) # a list of boolean predicates to be applied as filters
+	additional_filter_predicates = field(factory=dict) # a list of boolean predicates to be applied as filters
 
 
 	# Widgets (will be initialized in __attrs_post_init__)
@@ -1731,6 +1731,66 @@ class DataFrameFilter:
 	def filter_context(self) -> IdentifyingContext:
 		"""The time_bin_size property."""
 		return IdentifyingContext(time_bin_sizes=self.time_bin_size, custom_suffix=self.replay_name)
+	
+
+	@property
+	def original_df_list(self) -> Tuple[pd.DataFrame]:
+		"""The original_df_list property."""
+		return (
+			self.all_sessions_ripple_df,
+			self.all_sessions_ripple_time_bin_df,
+			self.all_sessions_MultiMeasure_ripple_df,
+			self.all_sessions_all_scores_ripple_df,
+			self.all_sessions_laps_df,
+			self.all_sessions_laps_time_bin_df,
+			self.all_sessions_MultiMeasure_laps_df
+		)
+		
+	@property
+	def filtered_df_list(self) -> Tuple[pd.DataFrame]:
+		"""The original_df_list property."""
+		return (
+			self.filtered_all_sessions_ripple_df,
+			self.filtered_all_sessions_ripple_time_bin_df,
+			self.filtered_all_sessions_MultiMeasure_ripple_df,
+			self.filtered_all_sessions_all_scores_ripple_df,
+			self.filtered_all_sessions_laps_df,
+			self.filtered_all_sessions_laps_time_bin_df,
+			self.filtered_all_sessions_MultiMeasure_laps_df
+		)
+
+
+	@property
+	def original_df_dict(self) -> Dict[str, pd.DataFrame]:
+		"""The original_df_list property."""
+		return dict(
+			all_sessions_ripple_df=self.all_sessions_ripple_df,
+			all_sessions_ripple_time_bin_df=self.all_sessions_ripple_time_bin_df,
+			all_sessions_MultiMeasure_ripple_df=self.all_sessions_MultiMeasure_ripple_df,
+			all_sessions_all_scores_ripple_df=self.all_sessions_all_scores_ripple_df,
+			all_sessions_laps_df=self.all_sessions_laps_df,
+			all_sessions_laps_time_bin_df=self.all_sessions_laps_time_bin_df,
+			all_sessions_MultiMeasure_laps_df=self.all_sessions_MultiMeasure_laps_df
+		)
+		
+	@property
+	def filtered_df_dict(self) -> Dict[str, pd.DataFrame]:
+		"""The original_df_list property."""
+		return dict(
+			filtered_all_sessions_ripple_df=self.filtered_all_sessions_ripple_df,
+			filtered_all_sessions_ripple_time_bin_df=self.filtered_all_sessions_ripple_time_bin_df,
+			filtered_all_sessions_MultiMeasure_ripple_df=self.filtered_all_sessions_MultiMeasure_ripple_df,
+			filtered_all_sessions_all_scores_ripple_df=self.filtered_all_sessions_all_scores_ripple_df,
+			filtered_all_sessions_laps_df=self.filtered_all_sessions_laps_df,
+			filtered_all_sessions_laps_time_bin_df=self.filtered_all_sessions_laps_time_bin_df,
+			filtered_all_sessions_MultiMeasure_laps_df=self.filtered_all_sessions_MultiMeasure_laps_df
+		)
+
+
+
+
+
+
 	
 
 	def __attrs_post_init__(self):
@@ -1794,62 +1854,32 @@ class DataFrameFilter:
 			time_bin_sizes = [time_bin_sizes]
 		elif isinstance(time_bin_sizes, tuple):
 			time_bin_sizes = list(time_bin_sizes)
-		
-		# Filter ripple DataFrames using deepcopy
-		self.filtered_all_sessions_ripple_df = deepcopy(
-			self.all_sessions_ripple_df[
-				(self.all_sessions_ripple_df['custom_replay_name'] == replay_name) &
-				(self.all_sessions_ripple_df['time_bin_size'].isin(time_bin_sizes))
-			]
-		)
+			
+		## Update the 'is_filter_included' column on the original dataframes
+		for name, df in self.original_df_dict.items():
+			if 'is_filter_included' not in df.columns:
+				df['is_filter_included'] = True
+			df['is_filter_included'] = True
+			df['is_filter_included'] = (df['custom_replay_name'] == replay_name) & (df['time_bin_size'].isin(time_bin_sizes))
+			for a_predicate_name, a_predicate_fn in self.additional_filter_predicates.items():
+				try:
+					is_predicate_true = a_predicate_fn(df)
+				except KeyError as e:
+					print(f'failed to apply predicate "{a_predicate_name}" to df: {name}')
+					is_predicate_true = False
+				# is_predicate_true = a_predicate_fn(df)
+				df['is_filter_included'] = (df['is_filter_included'] & is_predicate_true)
 
-		self.filtered_all_sessions_ripple_time_bin_df = deepcopy(
-			self.all_sessions_ripple_time_bin_df[
-				(self.all_sessions_ripple_time_bin_df['custom_replay_name'] == replay_name) &
-				(self.all_sessions_ripple_time_bin_df['time_bin_size'].isin(time_bin_sizes))
-			]
-		)
+			filtered_name: str = f"filtered_{name}"
+			setattr(self, filtered_name, deepcopy(df[df['is_filter_included']]))
 
-		self.filtered_all_sessions_MultiMeasure_ripple_df = deepcopy(
-			self.all_sessions_MultiMeasure_ripple_df[
-				(self.all_sessions_MultiMeasure_ripple_df['custom_replay_name'] == replay_name) &
-				(self.all_sessions_MultiMeasure_ripple_df['time_bin_size'].isin(time_bin_sizes))
-			]
-		)
-
-		self.filtered_all_sessions_all_scores_ripple_df = deepcopy(
-			self.all_sessions_all_scores_ripple_df[
-				(self.all_sessions_all_scores_ripple_df['custom_replay_name'] == replay_name) &
-				(self.all_sessions_all_scores_ripple_df['time_bin_size'].isin(time_bin_sizes))
-			]
-		)
-
-		# Filter laps DataFrames using deepcopy
-		self.filtered_all_sessions_laps_df = deepcopy(
-			self.all_sessions_laps_df[
-				(self.all_sessions_laps_df['custom_replay_name'] == replay_name) &
-				(self.all_sessions_laps_df['time_bin_size'].isin(time_bin_sizes))
-			]
-		)
-
-		self.filtered_all_sessions_laps_time_bin_df = deepcopy(
-			self.all_sessions_laps_time_bin_df[
-				(self.all_sessions_laps_time_bin_df['custom_replay_name'] == replay_name) &
-				(self.all_sessions_laps_time_bin_df['time_bin_size'].isin(time_bin_sizes))
-			]
-		)
-
-		self.filtered_all_sessions_MultiMeasure_laps_df = deepcopy(
-			self.all_sessions_MultiMeasure_laps_df[
-				(self.all_sessions_MultiMeasure_laps_df['custom_replay_name'] == replay_name) &
-				(self.all_sessions_MultiMeasure_laps_df['time_bin_size'].isin(time_bin_sizes))
-			]
-		)
 		
 		# Provide feedback to the user
 		print(f"DataFrames filtered with Replay Name: '{replay_name}' and Time Bin Sizes: {time_bin_sizes}")
-		n_records: int = len(self.filtered_all_sessions_all_scores_ripple_df)
-		print(f'n_rows: {n_records}')
+		n_records_dict = {name:len(df) for name, df in self.filtered_df_dict.items()}
+		display(n_records_dict)
+		# n_records: int = len(self.filtered_all_sessions_all_scores_ripple_df)
+		# print(f'n_rows: {n_records}')
 		# self.update_calling_namespace_locals()
 		# display(self.filtered_all_sessions_all_scores_ripple_df.head())
 
@@ -1871,6 +1901,15 @@ class DataFrameFilter:
 		user_ns['filtered_all_sessions_laps_time_bin_df'] = self.filtered_all_sessions_laps_time_bin_df
 		user_ns['filtered_all_sessions_MultiMeasure_laps_df'] = self.filtered_all_sessions_MultiMeasure_laps_df
 	
+
+	# Update instance values from a dictionary
+	def update_instance_from_dict(self, update_dict):
+		# Filter the dictionary to match only fields in the class
+		field_names = {field.name for field in self.__attrs_attrs__}
+		filtered_dict = {k: v for k, v in update_dict.items() if k in field_names}
+		for k, v in filtered_dict.items():
+			setattr(self, k, v)
+		# return evolve(self, **filtered_dict)
 
 
 	# Accessor methods for the filtered DataFrames _______________________________________________________________________ #
@@ -1897,6 +1936,16 @@ class DataFrameFilter:
 	def get_filtered_all_sessions_MultiMeasure_laps_df(self):
 		return self.filtered_all_sessions_MultiMeasure_laps_df
 
+
+	@classmethod
+	def safe_boolean_predicate_wrapper(cls, predicate_fn, df):
+		""" returns False if predicate can't be evaluated"""
+		try:
+			return predicate_fn(df)
+		except Exception as e:
+			# raise e
+			print(f'failed to apply predicate to df')
+			return False
 
 
 # ==================================================================================================================== #
