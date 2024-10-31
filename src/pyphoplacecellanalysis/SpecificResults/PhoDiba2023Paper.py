@@ -1652,7 +1652,8 @@ class DataFrameFilter:
 		all_sessions_all_scores_ripple_df=all_sessions_all_scores_ripple_df,
 		all_sessions_laps_df=all_sessions_laps_df,
 		all_sessions_laps_time_bin_df=all_sessions_laps_time_bin_df,
-		all_sessions_MultiMeasure_laps_df=all_sessions_MultiMeasure_laps_df
+		all_sessions_MultiMeasure_laps_df=all_sessions_MultiMeasure_laps_df,
+		additional_filter_predicates
 	)
 
 	"""
@@ -1679,7 +1680,7 @@ class DataFrameFilter:
 	filtered_all_sessions_MultiMeasure_laps_df = field(init=False, default=None)
 
 
-	additional_filter_predicates = field(factory=dict) # a list of boolean predicates to be applied as filters
+	additional_filter_predicates = field(default=Factory(dict)) # a list of boolean predicates to be applied as filters
 
 
 	# Widgets (will be initialized in __attrs_post_init__)
@@ -1902,6 +1903,10 @@ class DataFrameFilter:
 		user_ns['filtered_all_sessions_MultiMeasure_laps_df'] = self.filtered_all_sessions_MultiMeasure_laps_df
 	
 
+	def update_filters(self):
+		self.update_filtered_dataframes(replay_name=self.replay_name, time_bin_sizes=self.time_bin_size)
+
+
 	# Update instance values from a dictionary
 	def update_instance_from_dict(self, update_dict):
 		# Filter the dictionary to match only fields in the class
@@ -2047,7 +2052,7 @@ def _perform_dual_hist_plot(grainularity_desc: str, laps_df: pd.DataFrame, rippl
 
 
 @function_attributes(short_name=None, tags=['CRITICAL', 'FINAL', 'plotly'], input_requires=[], output_provides=[], uses=['plotly_pre_post_delta_scatter'], used_by=[], creation_date='2024-10-23 20:04', related_items=[])
-def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, concatenated_ripple_df: pd.DataFrame, time_delta_tuple: Tuple[float, float, float], fig_size_kwargs: Dict, save_plotly: Callable, is_dark_mode: bool=False, enable_custom_widget_buttons:bool=True, legend_groups_to_hide=['0.03', '0.044', '0.05']):
+def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, concatenated_ripple_df: pd.DataFrame, time_delta_tuple: Tuple[float, float, float], fig_size_kwargs: Dict, save_plotly: Callable, is_dark_mode: bool=False, enable_custom_widget_buttons:bool=True, legend_groups_to_hide=['0.03', '0.044', '0.05'], should_save: bool = True):
 	""" plots the stacked histograms for both laps and ripples
 
 	Usage:
@@ -2078,6 +2083,9 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
 	histogram_bins = 25
 	num_sessions = 1
 
+	num_events: int = len(concatenated_ripple_df)
+	print(f'num_events: {num_events}')
+	data_context.overwriting_context(n_events=num_events) # adds 'n_events' context
 	# .025 .03 .044 .05 .058
 	# Define the legend groups you want to hide on startup
 	legend_groups_to_hide = ['0.03', '0.044', '0.05'] # '0.025', , '0.058'
@@ -2106,7 +2114,7 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
 	# y_baseline_level: float = 0.0 # for wcorr, etc
 
 	# px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'color':"is_user_annotated_epoch", 'title': f"'{variable_name}'"} # , 'color': 'time_bin_size', 'range_y': [-1.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size', 'is_user_annotated_epoch':'user_sel'}
-	px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'title': f"{data_context.get_description(subset_includelist=['dataframe_name', 'title_prefix'], separator=' - ')} - '{variable_name}'"} # , 'color': 'time_bin_size', 'range_y': [-1.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size', 'is_user_annotated_epoch':'user_sel'}
+	px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'title': f"{data_context.get_description(subset_includelist=['dataframe_name', 'title_prefix', 'num_events'], separator=' - ')} - '{variable_name}'"} # , 'color': 'time_bin_size', 'range_y': [-1.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size', 'is_user_annotated_epoch':'user_sel'}
 	px_scatter_kwargs['color'] = "time_bin_size"
 	# px_scatter_kwargs.pop('color')
 
@@ -2123,7 +2131,7 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
 	# hist_kwargs = dict(color="is_user_annotated_epoch") # , histnorm='probability density'
 	# hist_kwargs.pop('color')
 	
-	figure_sup_huge_title_text: str = data_context.get_description(subset_includelist=['epochs_name', 'data_grain', 'dataframe_name'], separator=' | ')
+	figure_sup_huge_title_text: str = data_context.get_description(subset_includelist=['epochs_name', 'data_grain', 'dataframe_name', 'n_events'], separator=' | ')
 	if data_context.has_keys(keys_list=['custom_suffix']):
 		custom_suffix_description: str = data_context.get_description(subset_includelist=['custom_suffix'])
 		figure_sup_huge_title_text = figure_sup_huge_title_text + f'\n{custom_suffix_description}'
@@ -2161,8 +2169,11 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
 
 	# fig_to_clipboard(new_fig_laps, **fig_size_kwargs)
 	new_fig_context = new_fig_context.adding_context_if_missing(**data_context.get_subset(subset_includelist=['epochs_name', 'data_grain']).to_dict(), num_sessions=num_sessions, plot_type='scatter+hist', comparison='pre-post-delta', variable_name=variable_name)
-	figure_out_paths = save_plotly(a_fig=new_fig, a_fig_context=new_fig_context)
-
+	if should_save:
+		figure_out_paths = save_plotly(a_fig=new_fig, a_fig_context=new_fig_context)
+	else:
+		figure_out_paths = None
+		
 	if enable_custom_widget_buttons:
 		_extras_output_dict['out_widget'] = add_copy_save_action_buttons(new_fig)
 	

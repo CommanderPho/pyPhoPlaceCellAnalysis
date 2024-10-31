@@ -115,7 +115,6 @@ def add_copy_save_action_buttons(fig: go.Figure):
 	button_copy.on_click(on_copy_button_click)
 	button_download.on_click(on_download_button_click)
 	
-
 	# Create an output widget to hold the figure
 	output_fig = widgets.Output()
 	with output_fig:
