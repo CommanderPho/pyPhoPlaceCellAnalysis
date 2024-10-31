@@ -409,7 +409,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 		# 	session_ctxt_key:str = session_ctxt_key + custom_suffix
 		# 	CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}-{custom_suffix}"
 
-	print(f'\tactive_context: {active_context}')    
+	print(f'\tactive_context: {active_context}')
 	print(f'\tsession_ctxt_key: {session_ctxt_key}')
 	print(f'\tCURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')    
 	
@@ -691,6 +691,8 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 
 	Uses result computed by `_decode_and_evaluate_epochs_using_directional_decoders`
 
+	
+	Updates: ['DirectionalDecodersEpochsEvaluations'
 
 	"""
 	print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
