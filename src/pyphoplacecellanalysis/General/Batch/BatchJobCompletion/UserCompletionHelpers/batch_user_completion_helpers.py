@@ -1306,7 +1306,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 				export_files_dict = wcorr_shuffles.export_csvs(parent_output_path=a_curr_active_pipeline.get_output_path().resolve(), active_context=active_context, session_name=session_name, curr_active_pipeline=a_curr_active_pipeline,
 															#    source='diba_evt_file',
 																source='compute_diba_quiescent_style_replay_events',
-																)
+																) ## #TODO 2024-11-01 07:35: - [ ] make sure these exported CSVs contain the parameters for qclu/fr_Hz/etc. 
 				ripple_WCorrShuffle_df_export_CSV_path = export_files_dict['ripple_WCorrShuffle_df']
 				print(f'Successfully exported ripple_WCorrShuffle_df_export_CSV_path: "{ripple_WCorrShuffle_df_export_CSV_path}" with wcorr_shuffles.n_completed_shuffles: {wcorr_shuffles.n_completed_shuffles} unique shuffles.')
 				replay_epoch_outputs[replay_epochs_key].update(dict(active_context=active_context, export_files_dict=export_files_dict))
@@ -2632,7 +2632,7 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
 		minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
 		included_qclu_values: List[int] = rank_order_results.included_qclu_values
 		directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
-		track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+		track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
 		print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
 		print(f'included_qclu_values: {included_qclu_values}')
 	
