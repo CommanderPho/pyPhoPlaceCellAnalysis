@@ -730,7 +730,10 @@ def finalize_output_shuffled_wcorr(a_curr_active_pipeline, decoder_names, custom
 	wcorr_shuffles.save_data_mat(filepath=standalone_mat_filepath, **{'session': a_curr_active_pipeline.get_session_context().to_dict()})
 
 	try:
-		active_context = a_curr_active_pipeline.get_session_context()
+		# active_context = a_curr_active_pipeline.get_session_context()
+		# additional_session_context = a_curr_active_pipeline.get_session_additional_parameters_context()
+		complete_session_context, (session_context, additional_session_context) = a_curr_active_pipeline.get_complete_session_context()
+		active_context = complete_session_context
 		session_name: str = a_curr_active_pipeline.session_name
 		export_files_dict = wcorr_shuffles.export_csvs(parent_output_path=a_curr_active_pipeline.get_output_path().resolve(), active_context=active_context, session_name=session_name, curr_active_pipeline=a_curr_active_pipeline,
 													#    source='diba_evt_file',
