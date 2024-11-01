@@ -1936,13 +1936,9 @@ class PipelineWithComputedPipelineStageMixin:
 		## TODO: Ideally would use the value passed in self.get_all_parameters():
 		active_replay_epoch_parameters = deepcopy(self.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays)
 		epochs_source: str = active_replay_epoch_parameters.get('epochs_source', 'normal_computed')
-
-
-
-
 		custom_suffix: str = epochs_source
 		# custom_suffix += _get_custom_suffix_for_filename_from_computation_metadata(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
-		custom_save_filepaths, custom_save_filenames, custom_suffix = _get_custom_filenames_from_computation_metadata(replay_suffix=epochs_source, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
+		custom_save_filepaths, custom_save_filenames, custom_suffix = _get_custom_filenames_from_computation_metadata(epochs_source=epochs_source, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
 		# print(f'custom_save_filenames: {custom_save_filenames}')
 		# print(f'custom_suffix: "{custom_suffix}"')
 		
