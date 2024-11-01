@@ -2085,6 +2085,48 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 	return across_session_results_extended_dict
 
 
+@function_attributes(short_name=None, tags=['first-spikes', 'neurons', 'HDF5', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 14:25', related_items=[])
+def compute_and_export_cell_first_spikes_characteristics_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
+	""" Exports this session's cell first-firing information (HDF5) with custom suffix derived from parameters
+	
+	from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_cell_first_spikes_characteristics_completion_function
+	
+	"""
+	import sys
+	from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import CellsFirstSpikeTimes
+	from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
+
+	print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+	print(f'compute_and_export_cell_first_spikes_characteristics_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+	
+	assert self.collected_outputs_path.exists()
+	collected_outputs = self.collected_outputs_path.resolve()	
+	print(f'collected_outputs: {collected_outputs}')
+
+	was_write_good: bool = False
+	try:
+		all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict), hdf5_out_path = CellsFirstSpikeTimes.compute_cell_first_firings(curr_active_pipeline, hdf_save_parent_path=collected_outputs)	
+		was_write_good = True
+
+	except BaseException as e:
+		exception_info = sys.exc_info()
+		err = CapturedException(e, exception_info)
+		print(f"ERROR: encountered exception {err} while trying to export the first_firings for {curr_session_context}")
+		if self.fail_on_exception:
+			raise err.exc
+
+	callback_outputs = {
+		'hdf5_out_path': hdf5_out_path,
+		#  'all_cells_first_spike_time_df': all_cells_first_spike_time_df,
+		'was_write_good': was_write_good,
+	}
+	across_session_results_extended_dict['compute_and_export_cell_first_spikes_characteristics_completion_function'] = callback_outputs
+	
+	print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+	print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+
+	return across_session_results_extended_dict
+
 
 # ==================================================================================================================== #
 # Unsorted                                                                                                             #
@@ -2771,6 +2813,7 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
 									'backup_previous_session_files_completion_function': backup_previous_session_files_completion_function,
 									'compute_and_export_session_trial_by_trial_performance_completion_function': compute_and_export_session_trial_by_trial_performance_completion_function,
 									'save_custom_session_files_completion_function': save_custom_session_files_completion_function,
+									'compute_and_export_cell_first_spikes_characteristics_completion_function': compute_and_export_cell_first_spikes_characteristics_completion_function,
 									}
 	else:
 		# use the user one:
