@@ -1888,8 +1888,7 @@ class PipelineWithComputedPipelineStageMixin:
 			custom_suffix_string_parts = []
 			custom_suffix: str = ''
 			if (ctxt.get('epochs_source', None) is not None) and (len(str(ctxt.get('epochs_source', None))) > 0) and ('epochs_source' not in subset_excludelist):
-				custom_suffix: str = to_filename_conversion_dict[ctxt.get('epochs_source', None)]
-				custom_suffix_string_parts.append(ctxt.get('epochs_source', None))
+				custom_suffix_string_parts.append(to_filename_conversion_dict[ctxt.get('epochs_source', None)])
 			if (ctxt.get('minimum_inclusion_fr_Hz', None) is not None) and (len(str(ctxt.get('minimum_inclusion_fr_Hz', None))) > 0) and ('minimum_inclusion_fr_Hz' not in subset_excludelist):
 				custom_suffix_string_parts.append(f"frateThresh_{ctxt.get('minimum_inclusion_fr_Hz', None):.1f}")
 			if (ctxt.get('included_qclu_values', None) is not None) and (len(str(ctxt.get('included_qclu_values', None))) > 0) and ('included_qclu_values' not in subset_excludelist):
@@ -1949,9 +1948,6 @@ class PipelineWithComputedPipelineStageMixin:
 		
 		return custom_save_filepaths, custom_save_filenames, custom_suffix
 	
-
-	
-
 
 	@function_attributes(short_name=None, tags=['context', 'custom', 'parameters'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-01 00:00', related_items=[])
 	def get_complete_session_context(self) -> Tuple[DisplaySpecifyingIdentifyingContext, Tuple[DisplaySpecifyingIdentifyingContext]]:
