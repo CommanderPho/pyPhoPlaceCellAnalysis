@@ -2084,8 +2084,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 
 	return across_session_results_extended_dict
 
-
-@function_attributes(short_name=None, tags=['first-spikes', 'neurons', 'HDF5', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 14:25', related_items=[])
+@function_attributes(short_name=None, tags=['first-spikes', 'neurons', 'HDF5', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-01 18:30', related_items=[])
 def compute_and_export_cell_first_spikes_characteristics_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
 	""" Exports this session's cell first-firing information (HDF5) with custom suffix derived from parameters
 	
@@ -2113,7 +2112,7 @@ def compute_and_export_cell_first_spikes_characteristics_completion_function(sel
 		err = CapturedException(e, exception_info)
 		print(f"ERROR: encountered exception {err} while trying to export the first_firings for {curr_session_context}")
 		if self.fail_on_exception:
-			raise err.exc
+			raise
 
 	callback_outputs = {
 		'hdf5_out_path': hdf5_out_path,
