@@ -1867,6 +1867,8 @@ class PipelineWithComputedPipelineStageMixin:
 			active_context, session_ctxt_key, CURR_BATCH_OUTPUT_PREFIX, additional_session_context = curr_active_pipeline.get_complete_session_context(BATCH_DATE_TO_USE=self.BATCH_DATE_TO_USE)
 		
 		"""
+		to_filename_conversion_dict = {'compute_diba_quiescent_style_replay_events':'_withNewComputedReplays', 'diba_evt_file':'_withNewKamranExportedReplays', 'initial_loaded': '_withOldestImportedReplays', 'normal_computed': '_withNormalComputedReplays'}
+		
 		def _filename_formatting_fn(ctxt: DisplaySpecifyingIdentifyingContext, subset_includelist=None, subset_excludelist=None) -> str:
 			""" `neuropy.utils.result_context.ContextFormatRenderingFn` protocol format callable 
 			specific_purpose='filename_prefix'
@@ -1886,6 +1888,7 @@ class PipelineWithComputedPipelineStageMixin:
 			custom_suffix_string_parts = []
 			custom_suffix: str = ''
 			if (ctxt.get('epochs_source', None) is not None) and (len(str(ctxt.get('epochs_source', None))) > 0) and ('epochs_source' not in subset_excludelist):
+				custom_suffix: str = to_filename_conversion_dict[ctxt.get('epochs_source', None)]
 				custom_suffix_string_parts.append(ctxt.get('epochs_source', None))
 			if (ctxt.get('minimum_inclusion_fr_Hz', None) is not None) and (len(str(ctxt.get('minimum_inclusion_fr_Hz', None))) > 0) and ('minimum_inclusion_fr_Hz' not in subset_excludelist):
 				custom_suffix_string_parts.append(f"frateThresh_{ctxt.get('minimum_inclusion_fr_Hz', None):.1f}")
@@ -1904,16 +1907,17 @@ class PipelineWithComputedPipelineStageMixin:
 		
 		## TODO: Ideally would use the value passed in self.get_all_parameters():
 		active_replay_epoch_parameters = deepcopy(self.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays)
-		epochs_source: str = active_replay_epoch_parameters.get('epochs_source', '_withNormalComputedReplays')
+		epochs_source: str = active_replay_epoch_parameters.get('epochs_source', 'normal_computed')
 
 		additional_session_context: DisplaySpecifyingIdentifyingContext = DisplaySpecifyingIdentifyingContext(epochs_source=epochs_source, included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz,
 			specific_purpose_display_dict={'filename_formatting': _filename_formatting_fn, 
-		}, display_dict={'epochs_source': lambda k, v: str(v),
+		}, display_dict={'epochs_source': lambda k, v: to_filename_conversion_dict[v],
 				   'minimum_inclusion_fr_Hz': lambda k, v: f"frateThresh_{v:.1f}",
 				   'included_qclu_values': lambda k, v: f"qclu_{v}",
 		})
 		return additional_session_context
 	
+
 	@function_attributes(short_name=None, tags=['parameters', 'filenames', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 16:10', related_items=[])
 	def get_custom_pipeline_filenames_from_parameters(self) -> Tuple:
 		""" gets the custom suffix from the pipeline's parameters 
@@ -1932,7 +1936,7 @@ class PipelineWithComputedPipelineStageMixin:
 		
 		## TODO: Ideally would use the value passed in self.get_all_parameters():
 		active_replay_epoch_parameters = deepcopy(self.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays)
-		epochs_source: str = active_replay_epoch_parameters.get('epochs_source', '_withNormalComputedReplays')
+		epochs_source: str = active_replay_epoch_parameters.get('epochs_source', 'normal_computed')
 
 
 

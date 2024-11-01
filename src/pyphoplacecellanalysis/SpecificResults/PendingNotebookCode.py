@@ -911,6 +911,28 @@ def replace_replay_epochs(curr_active_pipeline, new_replay_epochs: Epoch):
 	return did_change, _backup_session_replay_epochs, _backup_session_configs
 
 
+def _get_custom_suffix_replay_epoch_source_name(epochs_source: str) -> str:
+	valid_epochs_source_values = ['compute_diba_quiescent_style_replay_events', 'diba_evt_file', 'initial_loaded', 'normal_computed']
+	assert epochs_source in valid_epochs_source_values, f"epochs_source: '{epochs_source}' is not in valid_epochs_source_values: {valid_epochs_source_values}"
+	to_filename_conversion_dict = {'compute_diba_quiescent_style_replay_events':'_withNewComputedReplays', 'diba_evt_file':'_withNewKamranExportedReplays', 'initial_loaded': '_withOldestImportedReplays', 'normal_computed': '_withNormalComputedReplays'}
+	return to_filename_conversion_dict[epochs_source]
+	# if epochs_source == 'compute_diba_quiescent_style_replay_events':
+	# 	return '_withNewComputedReplays'
+	# elif epochs_source == 'diba_evt_file':
+	# 	return '_withNewKamranExportedReplays'
+	# 	# qclu = new_replay_epochs.metadata.get('qclu', "[1,2]") # Diba export files are always qclus [1, 2]
+
+	# elif epochs_source == 'initial_loaded':
+	# 	return '_withOldestImportedReplays'
+
+	# elif epochs_source == 'normal_computed':
+	# 	return '_withNormalComputedReplays'
+		
+	# else:
+	# 	raise NotImplementedError(f'epochs_source: {epochs_source} is of unknown type or is missing metadata.')    
+
+
+
 @function_attributes(short_name=None, tags=['dataframe', 'filename', 'metadata'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 12:40', related_items=[])
 def _get_custom_suffix_for_replay_filename(new_replay_epochs: Epoch, *extras_strings) -> str:
 	""" Uses metadata stored in the replays dataframe to determine an appropriate filename
@@ -933,22 +955,19 @@ def _get_custom_suffix_for_replay_filename(new_replay_epochs: Epoch, *extras_str
 	valid_epochs_source_values = ['compute_diba_quiescent_style_replay_events', 'diba_evt_file', 'initial_loaded', 'normal_computed']
 	assert epochs_source in valid_epochs_source_values, f"epochs_source: '{epochs_source}' is not in valid_epochs_source_values: {valid_epochs_source_values}"
 
+	custom_suffix: str = _get_custom_suffix_replay_epoch_source_name(epochs_source=epochs_source)
+	
 	if epochs_source == 'compute_diba_quiescent_style_replay_events':
-		custom_suffix: str = '_withNewComputedReplays'
 		# qclu = new_replay_epochs.metadata.get('qclu', "[1,2]")
 		custom_suffix = '-'.join([custom_suffix, f"qclu_{metadata.get('included_qclu_values', '[1,2]')}", f"frateThresh_{metadata['minimum_inclusion_fr_Hz']:.1f}", *extras_strings])
 
 	elif epochs_source == 'diba_evt_file':
-		custom_suffix: str = '_withNewKamranExportedReplays'
 		custom_suffix = '-'.join([custom_suffix, f"qclu_{metadata.get('included_qclu_values', '[1,2]')}", f"frateThresh_{metadata.get('minimum_inclusion_fr_Hz', 5.0):.1f}", *extras_strings])
 		# qclu = new_replay_epochs.metadata.get('qclu', "[1,2]") # Diba export files are always qclus [1, 2]
-
 	elif epochs_source == 'initial_loaded':
-		custom_suffix: str = '_withOldestImportedReplays'
 		custom_suffix = '-'.join([custom_suffix, f"qclu_{metadata.get('included_qclu_values', 'XX')}", f"frateThresh_{metadata.get('minimum_inclusion_fr_Hz', 0.1):.1f}", *extras_strings])
 
 	elif epochs_source == 'normal_computed':
-		custom_suffix: str = '_withNormalComputedReplays'
 		custom_suffix = '-'.join([custom_suffix, f"qclu_{metadata.get('included_qclu_values', '[1,2]')}", f"frateThresh_{metadata['minimum_inclusion_fr_Hz']:.1f}", *extras_strings])
 	else:
 		raise NotImplementedError(f'epochs_source: {epochs_source} is of unknown type or is missing metadata.')    
