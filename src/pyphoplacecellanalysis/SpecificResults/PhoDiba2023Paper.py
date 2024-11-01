@@ -1801,6 +1801,7 @@ class DataFrameFilter:
 		# Initial filtering with default widget values
 		self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
 
+
 	def _setup_widgets(self):
 		# Extract unique options for the widgets
 		replay_name_options = sorted(self.all_sessions_ripple_df['custom_replay_name'].unique())
@@ -1858,6 +1859,7 @@ class DataFrameFilter:
 		# Update filtered DataFrames when widget values change
 		self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
 
+
 	def update_filtered_dataframes(self, replay_name, time_bin_sizes):
 		""" Perform filtering on each DataFrame
 		"""
@@ -1871,6 +1873,9 @@ class DataFrameFilter:
 		elif isinstance(time_bin_sizes, tuple):
 			time_bin_sizes = list(time_bin_sizes)
 			
+
+		enabled_filter_predicate_list = self.active_filter_predicate_selector_widget.value
+		
 		## Update the 'is_filter_included' column on the original dataframes
 		for name, df in self.original_df_dict.items():
 			if 'is_filter_included' not in df.columns:
@@ -1878,13 +1883,14 @@ class DataFrameFilter:
 			df['is_filter_included'] = True
 			df['is_filter_included'] = (df['custom_replay_name'] == replay_name) & (df['time_bin_size'].isin(time_bin_sizes))
 			for a_predicate_name, a_predicate_fn in self.additional_filter_predicates.items():
-				try:
-					is_predicate_true = a_predicate_fn(df)
-				except KeyError as e:
-					print(f'failed to apply predicate "{a_predicate_name}" to df: {name}')
-					is_predicate_true = False
-				# is_predicate_true = a_predicate_fn(df)
-				df['is_filter_included'] = (df['is_filter_included'] & is_predicate_true)
+				if a_predicate_name in enabled_filter_predicate_list:
+					try:
+						is_predicate_true = a_predicate_fn(df)
+					except KeyError as e:
+						print(f'failed to apply predicate "{a_predicate_name}" to df: {name}')
+						is_predicate_true = False
+					# is_predicate_true = a_predicate_fn(df)
+					df['is_filter_included'] = (df['is_filter_included'] & is_predicate_true)
 
 			filtered_name: str = f"filtered_{name}"
 			setattr(self, filtered_name, deepcopy(df[df['is_filter_included']]))
