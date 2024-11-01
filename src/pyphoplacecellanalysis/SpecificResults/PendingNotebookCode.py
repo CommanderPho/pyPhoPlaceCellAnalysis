@@ -1061,13 +1061,15 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
 		print(f'replay epochs changed!')
 
 		curr_active_pipeline.reload_default_computation_functions()
+		
+		should_skip_laps: bool = False
 
 		metadata = deepcopy(new_replay_epochs.metadata)
 		minimum_inclusion_fr_Hz = metadata.get('minimum_inclusion_fr_Hz', None)
 		included_qclu_values = metadata.get('included_qclu_values', None)
 		curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields','perform_rank_order_shuffle_analysis'],
 														   computation_kwargs_list=[{'laps_decoding_time_bin_size': None, 'ripple_decoding_time_bin_size': ripple_decoding_time_bin_size},
-																					{'num_shuffles': num_wcorr_shuffles, 'minimum_inclusion_fr_Hz': minimum_inclusion_fr_Hz, 'included_qclu_values': included_qclu_values, 'skip_laps': True}],
+																					{'num_shuffles': num_wcorr_shuffles, 'minimum_inclusion_fr_Hz': minimum_inclusion_fr_Hz, 'included_qclu_values': included_qclu_values, 'skip_laps': should_skip_laps}],
 														 enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
 		
 
