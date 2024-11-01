@@ -1931,6 +1931,9 @@ class PipelineWithComputedPipelineStageMixin:
 		active_replay_epoch_parameters = deepcopy(self.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays)
 		epochs_source: str = active_replay_epoch_parameters.get('epochs_source', '_withNormalComputedReplays')
 
+
+
+
 		custom_suffix: str = epochs_source
 		# custom_suffix += _get_custom_suffix_for_filename_from_computation_metadata(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
 		custom_save_filepaths, custom_save_filenames, custom_suffix = _get_custom_filenames_from_computation_metadata(replay_suffix=epochs_source, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
@@ -1940,52 +1943,75 @@ class PipelineWithComputedPipelineStageMixin:
 		return custom_save_filepaths, custom_save_filenames, custom_suffix
 	
 
-	@function_attributes(short_name=None, tags=['UNFINSHED', 'context', 'custom', 'parameters'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-31 19:46', related_items=[])
-	def get_complete_session_context(self, BATCH_DATE_TO_USE: str):
+	
+
+
+	@function_attributes(short_name=None, tags=['context', 'custom', 'parameters'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-01 00:00', related_items=[])
+	def get_complete_session_context(self) -> Tuple[DisplaySpecifyingIdentifyingContext, Tuple[DisplaySpecifyingIdentifyingContext]]:
 		""" gets the entire session context, including the noteworthy computation parameters that would be needed for determing which filename to save under .
 		
 		Usage:
-			active_context, session_ctxt_key, CURR_BATCH_OUTPUT_PREFIX, additional_session_context = curr_active_pipeline.get_complete_session_context(BATCH_DATE_TO_USE=self.BATCH_DATE_TO_USE)
+			complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
 		
 		"""
-		_obj: IdentifyingContext = self.get_session_context()
-		curr_session_name: str = self.session_name # '2006-6-08_14-26-15'
-		_, _, custom_suffix = self.get_custom_pipeline_filenames_from_parameters()
-		if len(custom_suffix) > 0:
-			if additional_session_context is not None:
-				if isinstance(additional_session_context, dict):
-					additional_session_context = IdentifyingContext(**additional_session_context)
+		curr_session_context: DisplaySpecifyingIdentifyingContext = DisplaySpecifyingIdentifyingContext.init_from_context(a_context=self.get_session_context()) # **_obj.to_dict(),
+		additional_session_context: DisplaySpecifyingIdentifyingContext = self.get_session_additional_parameters_context()
+		complete_session_context: DisplaySpecifyingIdentifyingContext = curr_session_context | additional_session_context # hoping this merger works
+		return complete_session_context, (curr_session_context,  additional_session_context)
 
-				## easiest to update as dict:	
-				additional_session_context = additional_session_context.to_dict()
-				additional_session_context['custom_suffix'] = (additional_session_context.get('custom_suffix', '') or '') + custom_suffix
-				additional_session_context = IdentifyingContext(**additional_session_context)
+
+	# @function_attributes(short_name=None, tags=['UNFINSHED', 'context', 'custom', 'parameters'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-31 19:46', related_items=[])
+	# def get_complete_session_context_description_str(self, BATCH_DATE_TO_USE: Optional[str]=None):
+	# 	""" gets the entire session context, including the noteworthy computation parameters that would be needed for determing which filename to save under .
+		
+	# 	Usage:
+	# 		# active_context, session_ctxt_key, CURR_BATCH_OUTPUT_PREFIX, additional_session_context = curr_active_pipeline.get_complete_session_context(BATCH_DATE_TO_USE=self.BATCH_DATE_TO_USE)
+		
+	# 	"""
+	# 	# curr_session_name: str = self.session_name # '2006-6-08_14-26-15'
+	# 	# _, _, custom_suffix = self.get_custom_pipeline_filenames_from_parameters()
+		
+	# 	# additional_session_context
+
+
+	# 	# if len(custom_suffix) > 0:
+	# 	# 	if additional_session_context is not None:
+	# 	# 		if isinstance(additional_session_context, dict):
+	# 	# 			additional_session_context = IdentifyingContext(**additional_session_context)
+
+	# 	# 		## easiest to update as dict:	
+	# 	# 		additional_session_context = additional_session_context.to_dict()
+	# 	# 		additional_session_context['custom_suffix'] = (additional_session_context.get('custom_suffix', '') or '') + custom_suffix
+	# 	# 		additional_session_context = IdentifyingContext(**additional_session_context)
 				
-			else:
-				additional_session_context = IdentifyingContext(custom_suffix=custom_suffix)
+	# 	# 	else:
+	# 	# 		additional_session_context = IdentifyingContext(custom_suffix=custom_suffix)
 		
-		assert (additional_session_context is not None), f"perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function: additional_session_context is None even after trying to add the computation params as additional_session_context"
-		# active_context = curr_active_pipeline.get_session_context()
-		if additional_session_context is not None:
-			if isinstance(additional_session_context, dict):
-				additional_session_context = IdentifyingContext(**additional_session_context)
-			active_context: IdentifyingContext = (self.get_session_context() | additional_session_context)
-			# if len(custom_suffix) == 0:
-			session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=(IdentifyingContext._get_session_context_keys() + list(additional_session_context.keys())))
-			CURR_BATCH_OUTPUT_PREFIX: str = f"{BATCH_DATE_TO_USE}-{curr_session_name}-{additional_session_context.get_description()}"
-			# else:
-			# 	session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=(IdentifyingContext._get_session_context_keys() + list(additional_session_context.keys()))) + f'|{custom_suffix}'
-			# 	CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}-{additional_session_context.get_description()}-{custom_suffix}"
-		else:
-			active_context: IdentifyingContext = self.get_session_context()
-			session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
-			# if len(custom_suffix) == 0:
-			CURR_BATCH_OUTPUT_PREFIX: str = f"{BATCH_DATE_TO_USE}-{curr_session_name}"
-			# else:
-			# 	session_ctxt_key:str = session_ctxt_key + custom_suffix
-			# 	CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}-{custom_suffix}"
+	# 	# assert (additional_session_context is not None), f"perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function: additional_session_context is None even after trying to add the computation params as additional_session_context"
+	# 	# # active_context = curr_active_pipeline.get_session_context()
+	# 	# if additional_session_context is not None:
+	# 	# 	if isinstance(additional_session_context, dict):
+	# 	# 		additional_session_context = IdentifyingContext(**additional_session_context)
+	# 	# 	active_context: IdentifyingContext = (self.get_session_context() | additional_session_context)
+	# 	# 	# if len(custom_suffix) == 0:
+	# 	# 	session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=(IdentifyingContext._get_session_context_keys() + list(additional_session_context.keys())))
+	# 	# 	CURR_BATCH_OUTPUT_PREFIX: str = f"{curr_session_name}-{additional_session_context.get_description()}"
+	# 	# 	# else:
+	# 	# 	# 	session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=(IdentifyingContext._get_session_context_keys() + list(additional_session_context.keys()))) + f'|{custom_suffix}'
+	# 	# 	# 	CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}-{additional_session_context.get_description()}-{custom_suffix}"
+	# 	# else:
+	# 	# 	active_context: IdentifyingContext = self.get_session_context()
+	# 	# 	session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
+	# 	# 	# if len(custom_suffix) == 0:
+	# 	# 	CURR_BATCH_OUTPUT_PREFIX: str = f"{curr_session_name}"
+	# 	# 	# else:
+	# 	# 	# 	session_ctxt_key:str = session_ctxt_key + custom_suffix
+	# 	# 	# 	CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}-{custom_suffix}"
+			
+	# 	# if BATCH_DATE_TO_USE is not None and len(BATCH_DATE_TO_USE) > 0:
+	# 	# 	CURR_BATCH_OUTPUT_PREFIX = f"{BATCH_DATE_TO_USE}-{CURR_BATCH_OUTPUT_PREFIX}"
 
-		print(f'\tactive_context: {active_context}')
+	# 	# print(f'\tactive_context: {active_context}')
 		
-		return active_context, session_ctxt_key, CURR_BATCH_OUTPUT_PREFIX, additional_session_context
+	# 	# return active_context, session_ctxt_key, CURR_BATCH_OUTPUT_PREFIX, additional_session_context
 	
