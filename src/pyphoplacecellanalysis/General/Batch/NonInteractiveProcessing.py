@@ -3,6 +3,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Dict, List
 
+from neuropy.utils.dynamic_container import DynamicContainer
 import numpy as np
 
 ## MATPLOTLIB Imports:
