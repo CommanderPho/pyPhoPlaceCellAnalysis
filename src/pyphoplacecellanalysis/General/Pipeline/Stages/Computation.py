@@ -1885,11 +1885,11 @@ class PipelineWithComputedPipelineStageMixin:
 			
 			custom_suffix_string_parts = []
 			custom_suffix: str = ''
-			if (ctxt.get('epochs_source', None) is not None) and (len(ctxt.get('epochs_source', None)) > 0) and ('epochs_source' not in subset_excludelist):
+			if (ctxt.get('epochs_source', None) is not None) and (len(str(ctxt.get('epochs_source', None))) > 0) and ('epochs_source' not in subset_excludelist):
 				custom_suffix_string_parts.append(ctxt.get('epochs_source', None))
-			if (ctxt.get('minimum_inclusion_fr_Hz', None) is not None) and (len(ctxt.get('minimum_inclusion_fr_Hz', None)) > 0) and ('minimum_inclusion_fr_Hz' not in subset_excludelist):
+			if (ctxt.get('minimum_inclusion_fr_Hz', None) is not None) and (len(str(ctxt.get('minimum_inclusion_fr_Hz', None))) > 0) and ('minimum_inclusion_fr_Hz' not in subset_excludelist):
 				custom_suffix_string_parts.append(f"frateThresh_{ctxt.get('minimum_inclusion_fr_Hz', None):.1f}")
-			if (ctxt.get('included_qclu_values', None) is not None) and (len(ctxt.get('included_qclu_values', None)) > 0) and ('included_qclu_values' not in subset_excludelist):
+			if (ctxt.get('included_qclu_values', None) is not None) and (len(str(ctxt.get('included_qclu_values', None))) > 0) and ('included_qclu_values' not in subset_excludelist):
 				custom_suffix_string_parts.append(f"qclu_{ctxt.get('included_qclu_values', None)}")
 			custom_suffix = '-'.join([custom_suffix, *custom_suffix_string_parts])
 			return custom_suffix
@@ -1906,8 +1906,11 @@ class PipelineWithComputedPipelineStageMixin:
 		active_replay_epoch_parameters = deepcopy(self.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays)
 		epochs_source: str = active_replay_epoch_parameters.get('epochs_source', '_withNormalComputedReplays')
 
-		additional_session_context: DisplaySpecifyingIdentifyingContext = DisplaySpecifyingIdentifyingContext(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values, epochs_source=epochs_source,
-			display_dict={'filename_formatting': _filename_formatting_fn,
+		additional_session_context: DisplaySpecifyingIdentifyingContext = DisplaySpecifyingIdentifyingContext(epochs_source=epochs_source, included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz,
+			specific_purpose_display_dict={'filename_formatting': _filename_formatting_fn, 
+		}, display_dict={'epochs_source': lambda k, v: str(v),
+				   'minimum_inclusion_fr_Hz': lambda k, v: f"frateThresh_{v:.1f}",
+				   'included_qclu_values': lambda k, v: f"qclu_{v}",
 		})
 		return additional_session_context
 	
