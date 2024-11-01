@@ -1052,15 +1052,24 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 			hdf5_output_path = None # set to None because it failed.
 			return (hdf5_output_path, e)
 
-	
-
-
 	@classmethod
 	def read_hdf(cls, file_path, key: str, **kwargs) -> "NeuropyPipeline":
 		""" Reads the data from the key in the hdf5 file at file_path
 		
 		"""
 		raise NotImplementedError
+	
+
+
+	# # CSV Serialization Methods __________________________________________________________________________________________ #
+	# @function_attributes(short_name=None, tags=['csv', 'export', 'output', 'filesystem'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-01 07:26', related_items=[])
+	# def export_pipeline_to_CSVs(self, override_path: Optional[Path]=None, override_filename: Optional[str]=None, fail_on_exception:bool=True):
+	# 	""" Export the pipeline's components to a folder full of CSVs, not yet implemented.
+
+	# 	"""
+	# 	raise NotImplementedError('Not yet implemented')
+		
+
 
 
 	@function_attributes(short_name=None, tags=['save', 'custom_save', 'export'], input_requires=[], output_provides=[], uses=['save_custom_parameters_pipeline', 'self.get_all_parameters'], used_by=[], creation_date='2024-10-28 14:04', related_items=[])
