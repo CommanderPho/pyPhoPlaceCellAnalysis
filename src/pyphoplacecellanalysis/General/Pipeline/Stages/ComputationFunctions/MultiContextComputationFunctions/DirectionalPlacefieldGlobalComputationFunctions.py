@@ -2751,7 +2751,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
 
 	@classmethod
-	def _perform_export_dfs_dict_to_csvs(cls, extracted_dfs_dict: Dict, parent_output_path: Path, active_context, session_name: str, tbin_values_dict: Dict,
+	def _perform_export_dfs_dict_to_csvs(cls, extracted_dfs_dict: Dict, parent_output_path: Path, active_context: IdentifyingContext, session_name: str, tbin_values_dict: Dict,
 										t_start: Optional[float]=None, curr_session_t_delta: Optional[float]=None, t_end: Optional[float]=None,
 										user_annotation_selections=None, valid_epochs_selections=None):
 		""" Classmethod: export as separate .csv files. 
@@ -2774,7 +2774,11 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
 		tbin_values_dict={'laps': self.laps_decoding_time_bin_size, 'ripple': self.ripple_decoding_time_bin_size}
 
-
+		#TODO 2024-11-01 07:53: - [ ] Need to pass the correct (full) context, including the qclu/fr_Hz filter values and the replay name. 
+		#TODO 2024-11-01 07:54: - [X] Need to add a proper timebin column to the df instead of including it in the filename (if possible)
+			- does already add a 'time_bin_size' column, and the suffix is probably so it doesn't get overwritten by different time_bin_sizes, might need to put them together post-hoc
+			
+			
 		"""
 
 		assert parent_output_path.exists(), f"'{parent_output_path}' does not exist!"
