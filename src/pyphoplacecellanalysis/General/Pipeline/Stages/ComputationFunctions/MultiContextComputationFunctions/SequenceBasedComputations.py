@@ -40,6 +40,7 @@ from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResu
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field, custom_define
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin, HDF_Converter
 from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
 
 # ==================================================================================================================== #
 # 2024-05-24 - Shuffling to show wcorr exceeds shuffles                                                                #
@@ -672,7 +673,9 @@ class WCorrShuffle(ComputedResult):
         shuffled_aclus, shuffle_IDXs = build_shuffled_ids(alt_directional_merged_decoders_result.all_directional_pf1D_Decoder.neuron_IDs, num_shuffles=num_shuffles, seed=None)
 
         if is_pre_compute_mode:
-            laps_pre_computed_filter_epochs_dict, ripple_pre_computed_filter_epochs_dict = cls._pre_build_all_templates_decoding_epochs(spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df), a_directional_merged_decoders_result=alt_directional_merged_decoders_result, shuffled_decoders_dict=deepcopy(track_templates.get_decoders_dict()), **all_templates_decode_kwargs)
+            # spikes_df = deepcopy(curr_active_pipeline.sess.spikes_df)
+            spikes_df = deepcopy(get_proper_global_spikes_df(curr_active_pipeline))
+            laps_pre_computed_filter_epochs_dict, ripple_pre_computed_filter_epochs_dict = cls._pre_build_all_templates_decoding_epochs(spikes_df=spikes_df, a_directional_merged_decoders_result=alt_directional_merged_decoders_result, shuffled_decoders_dict=deepcopy(track_templates.get_decoders_dict()), **all_templates_decode_kwargs)
 
 
         ## FOR EACH SHUFFLE:

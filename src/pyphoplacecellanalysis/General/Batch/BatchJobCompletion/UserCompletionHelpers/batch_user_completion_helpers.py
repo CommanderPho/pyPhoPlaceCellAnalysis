@@ -1917,14 +1917,16 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 		print(f'\t=====================================>> performing comp for "{replay_epochs_key}"...')
 		# replay_epoch_outputs[replay_epochs_key] = {} # init to empty
 
-		custom_suffix: str = _get_custom_suffix_for_replay_filename(new_replay_epochs=a_replay_epochs)
-		print(f'\treplay_epochs_key: {replay_epochs_key}: custom_suffix: "{custom_suffix}"')
+		# custom_suffix: str = _get_custom_suffix_for_replay_filename(new_replay_epochs=a_replay_epochs) # looks right
+		# print(f'\treplay_epochs_key: {replay_epochs_key}: custom_suffix: "{custom_suffix}"')
 
 		## Modify .BATCH_DATE_TO_USE to include the custom suffix
-		curr_BATCH_DATE_TO_USE: str = f"{base_BATCH_DATE_TO_USE}{custom_suffix}"
+		# curr_BATCH_DATE_TO_USE: str = f"{base_BATCH_DATE_TO_USE}{custom_suffix}"
+
+		curr_BATCH_DATE_TO_USE: str = f"{base_BATCH_DATE_TO_USE}"
 		print(f'\tcurr_BATCH_DATE_TO_USE: "{curr_BATCH_DATE_TO_USE}"')
 		self.BATCH_DATE_TO_USE = curr_BATCH_DATE_TO_USE # set the internal BATCH_DATE_TO_USE which is used to determine the .csv and .h5 export names
-
+		# self.BATCH_DATE_TO_USE = '2024-11-01_Apogee'
 		print(f'\tWARNING: should_suppress_errors: {should_suppress_errors}')
 		with ExceptionPrintingContext(suppress=should_suppress_errors, exception_print_fn=(lambda formatted_exception_str: print(f'\tfailed epoch computations for replay_epochs_key: "{replay_epochs_key}". Failed with error: {formatted_exception_str}. Skipping.'))):
 			# for replay_epochs_key, a_replay_epochs in replay_epoch_variations.items():
@@ -2013,6 +2015,8 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 			try:
 				active_context = a_curr_active_pipeline.get_session_context()
 				session_name: str = f"{a_curr_active_pipeline.session_name}{custom_suffix}" ## appending this here is a hack, but it makes the correct filename
+				# complete_session_context, (curr_session_context,  additional_session_context) = a_curr_active_pipeline.get_complete_session_context()
+				# active_context = complete_session_context
 				active_context = active_context.adding_context_if_missing(suffix=custom_suffix)
 
 				export_files_dict = wcorr_shuffles.export_csvs(parent_output_path=a_curr_active_pipeline.get_output_path().resolve(), active_context=active_context, session_name=session_name, curr_active_pipeline=a_curr_active_pipeline,

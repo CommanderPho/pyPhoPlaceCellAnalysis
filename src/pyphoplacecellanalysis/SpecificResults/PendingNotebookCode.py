@@ -1024,7 +1024,7 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
 	from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function
 
 	# 'epochs_source'
-	custom_suffix: str = _get_custom_suffix_for_replay_filename(new_replay_epochs=new_replay_epochs)
+	custom_suffix: str = _get_custom_suffix_for_replay_filename(new_replay_epochs=new_replay_epochs) # correct
 	print(f'custom_suffix: "{custom_suffix}"')
 
 	assert (user_completion_dummy is not None), f"2024-07-04 - `user_completion_dummy` must be provided with a modified .BATCH_DATE_TO_USE to include the custom suffix!"
@@ -1072,7 +1072,7 @@ def overwrite_replay_epochs_and_recompute(curr_active_pipeline, new_replay_epoch
 																					{'num_shuffles': num_wcorr_shuffles, 'minimum_inclusion_fr_Hz': minimum_inclusion_fr_Hz, 'included_qclu_values': included_qclu_values, 'skip_laps': should_skip_laps}],
 														 enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
 		
-
+		# '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0normal_computed-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]'
 		# curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['perform_rank_order_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': num_wcorr_shuffles, 'minimum_inclusion_fr_Hz': minimum_inclusion_fr_Hz, 'included_qclu_values': included_qclu_values, 'skip_laps': True}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
 
 		global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['DirectionalDecodersEpochsEvaluations'], debug_print=True)

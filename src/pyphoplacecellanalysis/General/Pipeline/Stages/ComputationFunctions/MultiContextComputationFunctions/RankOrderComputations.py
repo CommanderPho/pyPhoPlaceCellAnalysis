@@ -712,11 +712,14 @@ class RankOrderComputationsContainer(ComputedResult):
         
         # ['LR_Long_ActuallyIncludedAclus', 'RL_Long_ActuallyIncludedAclus', 'LR_Short_ActuallyIncludedAclus', 'RL_Short_ActuallyIncludedAclus']
         """
-        self.LR_laps.epochs_df = self.add_active_aclus_info(self, active_epochs_df=self.LR_laps.epochs_df, is_laps=True)
-        self.RL_laps.epochs_df = self.add_active_aclus_info(self, active_epochs_df=self.RL_laps.epochs_df, is_laps=True)
-
-        self.LR_ripple.epochs_df = self.add_active_aclus_info(self, active_epochs_df=self.LR_ripple.epochs_df, is_laps=False)
-        self.RL_ripple.epochs_df = self.add_active_aclus_info(self, active_epochs_df=self.RL_ripple.epochs_df, is_laps=False)
+        if self.LR_laps is not None:
+            self.LR_laps.epochs_df = self.add_active_aclus_info(self, active_epochs_df=self.LR_laps.epochs_df, is_laps=True) # self.LR_laps is none
+        if self.RL_laps is not None:
+            self.RL_laps.epochs_df = self.add_active_aclus_info(self, active_epochs_df=self.RL_laps.epochs_df, is_laps=True)
+        if self.LR_ripple is not None:
+            self.LR_ripple.epochs_df = self.add_active_aclus_info(self, active_epochs_df=self.LR_ripple.epochs_df, is_laps=False)
+        if self.RL_ripple is not None:
+            self.RL_ripple.epochs_df = self.add_active_aclus_info(self, active_epochs_df=self.RL_ripple.epochs_df, is_laps=False)
 
 
     @classmethod
@@ -1910,6 +1913,7 @@ class RankOrderAnalyses:
             # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
             # global_laps = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps).trimmed_to_non_overlapping()
             # active_laps_epochs = global_laps
+            # if ank_order_results.laps_combined_epoch_stats_df is not None:
             laps_combined_epoch_stats_df = deepcopy(rank_order_results.laps_combined_epoch_stats_df)
             active_laps_epochs_df = deepcopy(rank_order_results.LR_laps.epochs_df)
             
@@ -1971,7 +1975,8 @@ class RankOrderAnalyses:
             rank_order_results.laps_combined_epoch_stats_df['Short_BestDir_spearman'] = laps_evts_short_best_dir_raw_stats_values
             
         except (AttributeError, KeyError, IndexError, ValueError, ZeroDivisionError) as e:
-            raise e
+            # raise
+            print(f"failed for laps with error e: {e} but skipping laps is allowed, so just passing")
             laps_result_tuple = None
 
 

@@ -2778,25 +2778,28 @@ class DecoderDecodedEpochsResult(ComputedResult):
 		#TODO 2024-11-01 07:54: - [X] Need to add a proper timebin column to the df instead of including it in the filename (if possible)
 			- does already add a 'time_bin_size' column, and the suffix is probably so it doesn't get overwritten by different time_bin_sizes, might need to put them together post-hoc
 			
+		'2024-11-01_1250PM-kdiba_gor01_two_2006-6-12_16-53-46__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0normal_computed-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]-(laps_weighted_corr_merged_df)_tbin-1.5.csv'
 			
 		"""
 
 		assert parent_output_path.exists(), f"'{parent_output_path}' does not exist!"
 		output_date_str: str = get_now_rounded_time_str(rounded_minutes=10)
-
 		# Export CSVs:
 		def export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'(laps_marginals_df)'):
 			""" captures `active_context`, `parent_output_path`. 'output_date_str'
 			"""
 			# parent_output_path: Path = Path('output').resolve()
 			# active_context = curr_active_pipeline.get_session_context()
-			session_identifier_str: str = active_context.get_description()
+			session_identifier_str: str = active_context.get_description() # 'kdiba_gor01_two_2006-6-12_16-53-46__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0normal_computed-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]'
+			# session_identifier_str: str = active_context.get_description(subset_excludelist=['custom_suffix']) # no this is just the session
 			assert output_date_str is not None
 			out_basename = '-'.join([output_date_str, session_identifier_str, data_identifier_str]) # '2024-01-04|kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
 			out_filename = f"{out_basename}.csv"
 			out_path = parent_output_path.joinpath(out_filename).resolve()
 			export_df.to_csv(out_path)
 			return out_path 
+
+		# active_context.custom_suffix = '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0' # '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0normal_computed-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]'
 		
 		#TODO 2024-03-02 12:12: - [ ] Could add weighted correlation if there is a dataframe for that and it's computed:
 		# tbin_values_dict = {'laps': self.laps_decoding_time_bin_size, 'ripple': self.ripple_decoding_time_bin_size}
