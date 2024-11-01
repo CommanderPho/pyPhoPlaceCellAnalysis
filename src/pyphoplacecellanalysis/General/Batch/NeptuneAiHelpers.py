@@ -1328,10 +1328,11 @@ class PhoDibaProjectsNeptuner(object):
 			## INPUTS: most_recent_runs_table_df
 			most_recent_runs_context_indexed_run_extra_data: Dict[IdentifyingContext, Dict] = a_run_collected_results.most_recent_runs_context_indexed_run_extra_data
 			# most_recent_runs_context_indexed_run_extra_data # SessionTuple(format_name='kdiba', animal='pin01', exper_name='one', session_name='11-02_17-46-44', session_descriptor_string='kdiba_pin01_one_11-02_17-46-44_sess', id='LS2023-1335', hostname='gl3126.arc-ts.umich.edu', creation_time=Timestamp('2024-08-29 16:39:16.613000'), running_time=8735.629, ping_time=Timestamp('2024-09-24 08:38:06.626000'), monitoring_time=1543, size=28686905.0, tags='11-02_17-46-44,one,kdiba,pin01', entrypoint='figures_kdiba_pin01_one_11-02_17-46-44.py')
-			csv_output_paths[a_name] = f'output/{TODAY_DAY_DATE}_{a_name}_most_recent_neptune_runs_csv.csv'
+			output_directory = Path('output').resolve()
+			output_directory.mkdir(parents=False, exist_ok=True)
+			csv_output_paths[a_name] = output_directory.joinpath(f'{TODAY_DAY_DATE}_{a_name}_most_recent_neptune_runs_csv.csv')
 			most_recent_runs_table_df.to_csv(csv_output_paths[a_name])
 			most_recent_runs_table_df_dict[a_name] = most_recent_runs_table_df_dict
-			
 			## OUTPUTS: most_recent_runs_session_descriptor_string_to_context_map, context_indexed_run_logs, most_recent_runs_context_indexed_run_extra_data
 
 		return most_recent_runs_table_df_dict, csv_output_paths
