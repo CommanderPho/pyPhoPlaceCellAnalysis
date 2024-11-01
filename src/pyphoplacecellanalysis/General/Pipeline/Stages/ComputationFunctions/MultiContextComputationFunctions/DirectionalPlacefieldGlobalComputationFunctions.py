@@ -4681,7 +4681,7 @@ def _compute_arbitrary_epochs_decoding_for_decoder(a_directional_pf1D_Decoder: B
 		included_qclu_values: List[int] = active_decoding_epochs.metadata.get('included_qclu_values', [1,2])
 
 		directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
-		track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+		track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
 		# spikes_df = curr_active_pipeline.sess.spikes_df # inferior way
 		spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
 		## Decode epochs for all four decoders:

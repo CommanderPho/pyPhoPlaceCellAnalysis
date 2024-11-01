@@ -3237,7 +3237,7 @@ class RankOrderGlobalDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Dis
             minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
             ripple_result_tuple, laps_result_tuple = rank_order_results.ripple_most_likely_result_tuple, rank_order_results.laps_most_likely_result_tuple
             directional_laps_results = global_computation_results.computed_data['DirectionalLaps']
-            track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+            track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
             print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
 
             ## RankOrderRastersDebugger:

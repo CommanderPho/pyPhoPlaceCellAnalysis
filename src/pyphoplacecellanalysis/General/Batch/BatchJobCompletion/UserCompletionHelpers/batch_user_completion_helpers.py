@@ -893,7 +893,7 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
 			included_qclu_values: List[int] = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
 		
 		directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
-		track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+		track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
 		print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
 		print(f'included_qclu_values: {included_qclu_values}')
 	
