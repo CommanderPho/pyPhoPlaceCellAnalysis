@@ -17,7 +17,7 @@ from attrs import define, field, Factory
 from neuropy import core
 from neuropy.core.epoch import Epoch
 from neuropy.analyses.placefields import PlacefieldComputationParameters, perform_compute_placefields
-from neuropy.utils.result_context import IdentifyingContext
+from neuropy.utils.result_context import IdentifyingContext, DisplaySpecifyingIdentifyingContext
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters # to replace simple PlacefieldComputationParameters, `load_pickled_global_computation_results`
 from pyphocorehelpers.function_helpers import compose_functions, compose_functions_with_error_handling
@@ -1858,6 +1858,59 @@ class PipelineWithComputedPipelineStageMixin:
 				pass
 
 
+
+	@function_attributes(short_name=None, tags=['UNFINSHED', 'context', 'custom', 'parameters'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-31 19:46', related_items=[])
+	def get_session_additional_parameters_context(self) -> DisplaySpecifyingIdentifyingContext:
+		""" gets the entire session context, including the noteworthy computation parameters that would be needed for determing which filename to save under .
+		
+		Usage:
+			active_context, session_ctxt_key, CURR_BATCH_OUTPUT_PREFIX, additional_session_context = curr_active_pipeline.get_complete_session_context(BATCH_DATE_TO_USE=self.BATCH_DATE_TO_USE)
+		
+		"""
+		def _filename_formatting_fn(ctxt: DisplaySpecifyingIdentifyingContext, subset_includelist=None, subset_excludelist=None) -> str:
+			""" `neuropy.utils.result_context.ContextFormatRenderingFn` protocol format callable 
+			specific_purpose='filename_prefix'
+			renders a custom_prefix from the context
+			 
+			 final_filename like "2024-10-31_1020PM-kdiba_pin01_one_11-03_12-3-25__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]-(ripple_simple_pf_pearson_merged_df)_tbin-0.025.csv"
+			only handles the "_withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]" part
+			
+			History: duplicated from `_get_custom_suffix_for_filename_from_computation_metadata` 2024-11-01 08:16 
+			"""
+			if subset_includelist is None:
+				assert subset_includelist is None, f"subset_includelist is not supported for this formatting function but was provided as subset_includelist: {subset_includelist}"
+				# subset_includelist = []
+			if subset_excludelist is None:
+				subset_excludelist = []
+			
+			custom_suffix_string_parts = []
+			custom_suffix: str = ''
+			if (ctxt.get('epochs_source', None) is not None) and (len(ctxt.get('epochs_source', None)) > 0) and ('epochs_source' not in subset_excludelist):
+				custom_suffix_string_parts.append(ctxt.get('epochs_source', None))
+			if (ctxt.get('minimum_inclusion_fr_Hz', None) is not None) and (len(ctxt.get('minimum_inclusion_fr_Hz', None)) > 0) and ('minimum_inclusion_fr_Hz' not in subset_excludelist):
+				custom_suffix_string_parts.append(f"frateThresh_{ctxt.get('minimum_inclusion_fr_Hz', None):.1f}")
+			if (ctxt.get('included_qclu_values', None) is not None) and (len(ctxt.get('included_qclu_values', None)) > 0) and ('included_qclu_values' not in subset_excludelist):
+				custom_suffix_string_parts.append(f"qclu_{ctxt.get('included_qclu_values', None)}")
+			custom_suffix = '-'.join([custom_suffix, *custom_suffix_string_parts])
+			return custom_suffix
+
+
+		all_params_dict = self.get_all_parameters()
+
+		# preprocessing_parameters = all_params_dict['preprocessing']
+		rank_order_shuffle_analysis_parameters = all_params_dict['rank_order_shuffle_analysis']
+		minimum_inclusion_fr_Hz = deepcopy(rank_order_shuffle_analysis_parameters['minimum_inclusion_fr_Hz']) # 5.0
+		included_qclu_values = deepcopy(rank_order_shuffle_analysis_parameters['included_qclu_values']) # [1, 2, 4, 6, 7, 9]
+		
+		## TODO: Ideally would use the value passed in self.get_all_parameters():
+		active_replay_epoch_parameters = deepcopy(self.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays)
+		epochs_source: str = active_replay_epoch_parameters.get('epochs_source', '_withNormalComputedReplays')
+
+		additional_session_context: DisplaySpecifyingIdentifyingContext = DisplaySpecifyingIdentifyingContext(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values, epochs_source=epochs_source,
+			display_dict={'filename_formatting': _filename_formatting_fn,
+		})
+		return additional_session_context
+	
 	@function_attributes(short_name=None, tags=['parameters', 'filenames', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 16:10', related_items=[])
 	def get_custom_pipeline_filenames_from_parameters(self) -> Tuple:
 		""" gets the custom suffix from the pipeline's parameters 
