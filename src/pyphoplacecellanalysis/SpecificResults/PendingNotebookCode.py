@@ -53,6 +53,16 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 # ==================================================================================================================== #
 # 2024-11-01 - Cell First Firing - Cell's first firing -- during PBE, theta, or resting?                                                                                      #
 # ==================================================================================================================== #
+
+from functools import reduce
+
+from neuropy.core.neuron_identities import NeuronIdentityDataframeAccessor
+from neuropy.core.flattened_spiketrains import SpikesAccessor
+from neuropy.core.epoch import ensure_dataframe
+
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
+
+
 class CellsFirstSpikeTimes:
     """ First spike times
     
@@ -66,7 +76,65 @@ class CellsFirstSpikeTimes:
     
 
     # @function_attributes(short_name=None, tags=['first-spike', 'cell-analysis'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-01 13:59', related_items=[])
-    
+    @classmethod
+    def _subfn_get_first_spikes(cls, spikes_df: pd.DataFrame):
+            earliest_spike_df = spikes_df.groupby(['aclu']).agg(t_rel_seconds_idxmin=('t_rel_seconds', 'idxmin'), t_rel_seconds_min=('t_rel_seconds', 'min')).reset_index() # 't_rel_seconds_idxmin', 't_rel_seconds_min'
+            first_aclu_spike_records_df: pd.DataFrame = spikes_df[np.isin(spikes_df['t_rel_seconds'], earliest_spike_df['t_rel_seconds_min'].values)]
+            return first_aclu_spike_records_df
+        
+    @classmethod
+    def _subfn_build_first_spike_dataframe(cls, first_spikes_dict):
+        """
+        Builds a dataframe containing each 'aclu' value along with its first spike time for each category,
+        and determines the earliest spike category (excluding 'any').
+
+        Parameters:
+        - first_spikes_dict (dict): A dictionary where keys are category names and values are dataframes
+                                    containing spike data, including 'aclu' and 't_rel_seconds' columns.
+
+        Returns:
+        - pd.DataFrame: A dataframe with 'aclu', first spike times per category, and the earliest spike category.
+        """
+        # Step 1: Prepare list of dataframes with first spike times per category
+        dfs = []
+        for category, df in first_spikes_dict.items():
+            # Group by 'aclu' and get the minimum 't_rel_seconds' (first spike time)
+            df_grouped = df.groupby('aclu')['t_rel_seconds'].min().reset_index()
+            # Rename the 't_rel_seconds' column to include the category
+            df_grouped.rename(columns={'t_rel_seconds': f'first_spike_{category}'}, inplace=True)
+            dfs.append(df_grouped)
+        
+        # Step 2: Merge all dataframes on 'aclu'
+        df_final = reduce(lambda left, right: pd.merge(left, right, on='aclu', how='outer'), dfs)
+        
+        # Step 3: Determine earliest spike category (excluding 'any')
+        # Get the list of columns containing first spike times, excluding 'any'
+        spike_time_columns = [col for col in df_final.columns if col.startswith('first_spike_') and col != 'first_spike_any']
+        
+        # Function to get the earliest spike category for each row
+        def get_earliest_category(row):
+            # Extract spike times, excluding 'any'
+            spike_times = row[spike_time_columns].dropna()
+            if spike_times.empty:
+                return None  # No spike times available in categories excluding 'any'
+            # Find the minimum spike time
+            min_spike_time = spike_times.min()
+            # Get categories with the minimum spike time
+            min_spike_columns = spike_times[spike_times == min_spike_time].index.tolist()
+            # Extract category names
+            earliest_categories = [col.replace('first_spike_', '') for col in min_spike_columns]
+            # Join categories if there's a tie
+            return ', '.join(earliest_categories)
+        
+        # Apply the function to determine the earliest spike category
+        df_final['earliest_spike_category'] = df_final.apply(get_earliest_category, axis=1)
+        
+        # Optionally, add the earliest spike time (excluding 'any')
+        df_final['earliest_spike_time'] = df_final[spike_time_columns].min(axis=1)
+        
+        return df_final
+
+
     @classmethod
     def compute_cell_first_firings(cls, curr_active_pipeline, hdf_save_parent_path: Path=None): # , save_hdf: bool=True
         """ 
@@ -76,66 +144,7 @@ class CellsFirstSpikeTimes:
         all_cells_first_spike_time_df
         
         """
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
-        from neuropy.core.epoch import ensure_dataframe
-        from functools import reduce
 
-        def _subfn_get_first_spikes(spikes_df: pd.DataFrame):
-            earliest_spike_df = spikes_df.groupby(['aclu']).agg(t_rel_seconds_idxmin=('t_rel_seconds', 'idxmin'), t_rel_seconds_min=('t_rel_seconds', 'min')).reset_index() # 't_rel_seconds_idxmin', 't_rel_seconds_min'
-            first_aclu_spike_records_df: pd.DataFrame = spikes_df[np.isin(spikes_df['t_rel_seconds'], earliest_spike_df['t_rel_seconds_min'].values)]
-            return first_aclu_spike_records_df
-        
-
-        def _subfn_build_first_spike_dataframe(first_spikes_dict):
-            """
-            Builds a dataframe containing each 'aclu' value along with its first spike time for each category,
-            and determines the earliest spike category (excluding 'any').
-
-            Parameters:
-            - first_spikes_dict (dict): A dictionary where keys are category names and values are dataframes
-                                        containing spike data, including 'aclu' and 't_rel_seconds' columns.
-
-            Returns:
-            - pd.DataFrame: A dataframe with 'aclu', first spike times per category, and the earliest spike category.
-            """
-            # Step 1: Prepare list of dataframes with first spike times per category
-            dfs = []
-            for category, df in first_spikes_dict.items():
-                # Group by 'aclu' and get the minimum 't_rel_seconds' (first spike time)
-                df_grouped = df.groupby('aclu')['t_rel_seconds'].min().reset_index()
-                # Rename the 't_rel_seconds' column to include the category
-                df_grouped.rename(columns={'t_rel_seconds': f'first_spike_{category}'}, inplace=True)
-                dfs.append(df_grouped)
-            
-            # Step 2: Merge all dataframes on 'aclu'
-            df_final = reduce(lambda left, right: pd.merge(left, right, on='aclu', how='outer'), dfs)
-            
-            # Step 3: Determine earliest spike category (excluding 'any')
-            # Get the list of columns containing first spike times, excluding 'any'
-            spike_time_columns = [col for col in df_final.columns if col.startswith('first_spike_') and col != 'first_spike_any']
-            
-            # Function to get the earliest spike category for each row
-            def get_earliest_category(row):
-                # Extract spike times, excluding 'any'
-                spike_times = row[spike_time_columns].dropna()
-                if spike_times.empty:
-                    return None  # No spike times available in categories excluding 'any'
-                # Find the minimum spike time
-                min_spike_time = spike_times.min()
-                # Get categories with the minimum spike time
-                min_spike_columns = spike_times[spike_times == min_spike_time].index.tolist()
-                # Extract category names
-                earliest_categories = [col.replace('first_spike_', '') for col in min_spike_columns]
-                # Join categories if there's a tie
-                return ', '.join(earliest_categories)
-            
-            # Apply the function to determine the earliest spike category
-            df_final['earliest_spike_category'] = df_final.apply(get_earliest_category, axis=1)
-            
-            # Optionally, add the earliest spike time (excluding 'any')
-            df_final['earliest_spike_time'] = df_final[spike_time_columns].min(axis=1)
-            
-            return df_final
 
 
 
@@ -154,12 +163,15 @@ class CellsFirstSpikeTimes:
         global_spikes_df: pd.DataFrame = deepcopy(get_proper_global_spikes_df(curr_active_pipeline)).drop(columns=['neuron_type'], inplace=False) ## already has columns ['lap', 'maze_id', 'PBE_id'
         # global_spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].spikes_df).drop(columns=['neuron_type'], inplace=False) ## already has columns ['lap', 'maze_id', 'PBE_id'
         # global_spikes_df
+        global_spikes_df = global_spikes_df.neuron_identity.make_neuron_indexed_df_global(curr_active_pipeline.get_session_context(), add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
+        global_spikes_df
+    
 
 
         ## find earliest spike for each cell
         # Performed 1 aggregation grouped on column: 'aclu'
-        earliest_spike_df = global_spikes_df.groupby(['aclu']).agg(t_rel_seconds_idxmin=('t_rel_seconds', 'idxmin'), t_rel_seconds_min=('t_rel_seconds', 'min')).reset_index() # 't_rel_seconds_idxmin', 't_rel_seconds_min'
-        first_aclu_spike_records_df: pd.DataFrame = global_spikes_df[np.isin(global_spikes_df['t_rel_seconds'], earliest_spike_df['t_rel_seconds_min'].values)]
+        # earliest_spike_df = global_spikes_df.groupby(['aclu']).agg(t_rel_seconds_idxmin=('t_rel_seconds', 'idxmin'), t_rel_seconds_min=('t_rel_seconds', 'min')).reset_index() # 't_rel_seconds_idxmin', 't_rel_seconds_min'
+        # first_aclu_spike_records_df: pd.DataFrame = global_spikes_df[np.isin(global_spikes_df['t_rel_seconds'], earliest_spike_df['t_rel_seconds_min'].values)]
         # first_aclu_spike_records_df.aclu.unique()
 
         # ==================================================================================================================== #
@@ -174,26 +186,41 @@ class CellsFirstSpikeTimes:
         global_spikes_df_ripple_df = deepcopy(global_spikes_df[global_spikes_df['is_ripple'] == True])
         global_spikes_df_ripple_df
         
-
         global_spikes_df_neither_df = deepcopy(global_spikes_df[np.logical_and((global_spikes_df['is_ripple'] != True), (global_spikes_df['is_theta'] != True))])
         global_spikes_df_neither_df
         
+        # find first spikes of the PBE and lap periods:
+        _PBE_spikes = deepcopy(global_spikes_df)[global_spikes_df['PBE_id'] > -1]
+        _PBE_spikes
 
-        global_spikes_dict = {'any': global_spikes_df, 'theta': global_spikes_df_theta_df, 'ripple': global_spikes_df_ripple_df, 'neither': global_spikes_df_neither_df}
-        first_spikes_dict = {k:_subfn_get_first_spikes(v) for k, v in global_spikes_dict.items()} 
+        _Lap_spikes = deepcopy(global_spikes_df)[global_spikes_df['lap'] > -1]
+        _Lap_spikes
+
+        global_spikes_dict = {'any': global_spikes_df, 'theta': global_spikes_df_theta_df, 'ripple': global_spikes_df_ripple_df, 'neither': global_spikes_df_neither_df,
+                              'PBE': _PBE_spikes, 'lap': _Lap_spikes,
+                              }
+        
+        first_spikes_dict = {k:cls._subfn_get_first_spikes(v) for k, v in global_spikes_dict.items()} 
         # partition_df(global_spikes_df, 'is_theta')    
         
         # first_aclu_spike_records_df: pd.DataFrame = first_spikes_dict['any']
 
-        neuron_ids = {k:v.aclu.unique() for k, v in global_spikes_dict.items()}
-        at_least_one_decoder_neuron_ids = union_of_arrays(*list(neuron_ids.values()))
+        # neuron_ids = {k:v.aclu.unique() for k, v in global_spikes_dict.items()}
+        # at_least_one_decoder_neuron_ids = union_of_arrays(*list(neuron_ids.values()))
 
         ## Check whether the first
         # first_aclu_spike_records_df['is_theta']
 
         # first_aclu_spike_records_df['is_ripple']
-        all_cells_first_spike_time_df: pd.DataFrame = _subfn_build_first_spike_dataframe(first_spikes_dict)
+        all_cells_first_spike_time_df: pd.DataFrame = cls._subfn_build_first_spike_dataframe(first_spikes_dict)
+        all_cells_first_spike_time_df = all_cells_first_spike_time_df.neuron_identity.make_neuron_indexed_df_global(curr_active_pipeline.get_session_context(), add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
         
+
+        ## extra computations:
+        all_cells_first_spike_time_df['theta_to_ripple_lead_lag_diff'] = (all_cells_first_spike_time_df['first_spike_ripple'] - all_cells_first_spike_time_df['first_spike_theta']) ## if theta came first, diff should be positive
+        
+
+
         # running_epochs
         # pbe_epochs
         # all_epoch
@@ -257,6 +284,7 @@ class CellsFirstSpikeTimes:
         
         Usage:
         
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import CellsFirstSpikeTimes
             hdf_load_path = Path('K:/scratch/collected_outputs/kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]_first_spike_activity_data.h5').resolve()
             Assert.path_exists(hdf_load_path)
             # Load the data back from the HDF5 file
