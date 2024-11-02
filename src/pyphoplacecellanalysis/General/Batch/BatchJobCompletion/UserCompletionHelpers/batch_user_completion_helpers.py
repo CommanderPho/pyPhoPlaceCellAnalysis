@@ -2090,6 +2090,17 @@ def compute_and_export_cell_first_spikes_characteristics_completion_function(sel
 	
 	from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_cell_first_spikes_characteristics_completion_function
 	
+	
+	#TODO 2024-11-01 21:17: - [ ] need to export those globally unique identifiers for each aclu within a session, look at other user fcns for inspiration.
+	#TODO 2024-11-01 21:17: - [ ] Need to stanardize the output filename so that it can be parsed by `pyphoplacecellanalysis.SpecificResults.AcrossSessionResults.find_most_recent_files`. I think it might just need parens
+		"K:/scratch/collected_outputs/kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]_first_spike_activity_data.h5",
+		"K:/scratch/collected_outputs/kdiba-gor01-one-2006-6-12_15-55-31__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2, 4, 6, 7, 9]_first_spike_activity_data.h5",
+		"K:/scratch/collected_outputs/kdiba-vvp01-one-2006-4-10_12-25-50__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2, 4, 6, 7, 9]_first_spike_activity_data.h5",
+		"K:/scratch/collected_outputs/kdiba-vvp01-two-2006-4-09_16-40-54__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2, 4, 6, 7, 9]_first_spike_activity_data.h5",
+		"K:/scratch/collected_outputs/kdiba-pin01-one-11-03_12-3-25__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2, 4, 6, 7, 9]_first_spike_activity_data.h5",
+		"K:/scratch/collected_outputs/kdiba-vvp01-two-2006-4-10_12-58-3__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2, 4, 6, 7, 9]_first_spike_activity_data.h5",
+		"K:/scratch/collected_outputs/kdiba-gor01-two-2006-6-12_16-53-46__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2, 4, 6, 7, 9]_first_spike_activity_data.h5",
+
 	"""
 	import sys
 	from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import CellsFirstSpikeTimes
@@ -2105,6 +2116,8 @@ def compute_and_export_cell_first_spikes_characteristics_completion_function(sel
 	was_write_good: bool = False
 	try:
 		all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict), hdf5_out_path = CellsFirstSpikeTimes.compute_cell_first_firings(curr_active_pipeline, hdf_save_parent_path=collected_outputs)	
+		
+
 		was_write_good = True
 
 	except BaseException as e:
