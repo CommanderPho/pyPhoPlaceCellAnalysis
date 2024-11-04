@@ -334,7 +334,7 @@ class BatchSessionCompletionHandler:
         print(f'were pipeline preprocessing parameters missing and updated?: {was_updated}')
 
         ## BUG 2023-05-25 - Found ERROR for a loaded pipeline where for some reason the filtered_contexts[long_epoch_name]'s actual context was the same as the short maze ('...maze2'). Unsure how this happened.
-        was_updated = was_updated or cls._post_fix_filtered_contexts(curr_active_pipeline)
+        was_updated = was_updated or cls._post_fix_filtered_contexts(curr_active_pipeline) #TODO 2024-11-01 19:39: - [ ] This is where things go amiss it seems
 
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
@@ -509,7 +509,7 @@ class BatchSessionCompletionHandler:
                 with ExceptionPrintingContext(suppress=(not self.fail_on_exception)):
                     curr_active_pipeline.reload_default_computation_functions()
         
-                    newly_computed_values += batch_extended_computations(curr_active_pipeline, include_includelist=active_extended_computations_include_includelist, include_global_functions=True, fail_on_exception=True, progress_print=True, 
+                    newly_computed_values += batch_extended_computations(curr_active_pipeline, include_includelist=active_extended_computations_include_includelist, include_global_functions=True, fail_on_exception=True, progress_print=True, # #TODO 2024-11-01 19:33: - [ ] self.force_recompute is True for some reason!?!
                                                                         force_recompute=self.force_global_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist,
                                                                         computation_kwargs_dict=force_recompute_override_computation_kwargs_dict, debug_print=False)
                     #TODO 2023-07-11 19:20: - [ ] We want to save the global results if they are computed, but we don't want them to be needlessly written to disk even when they aren't changed.
