@@ -48,8 +48,6 @@ from pyphocorehelpers.DataStructure.general_parameter_containers import Visualiz
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 
-
-
 # ==================================================================================================================== #
 # 2024-11-01 - Cell First Firing - Cell's first firing -- during PBE, theta, or resting?                                                                                      #
 # ==================================================================================================================== #
