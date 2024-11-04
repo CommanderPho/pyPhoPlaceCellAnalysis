@@ -297,7 +297,60 @@ class CellsFirstSpikeTimes:
         print(f"Data successfully loaded from {filename}")
         return all_cells_first_spike_time_df, global_spikes_df, global_spikes_dict, first_spikes_dict
 
+    @classmethod
+    def load_batch_hdf5_exports(cls, first_spike_activity_data_h5_files):
+        """ 
+        
+        all_sessions_global_spikes_df, all_sessions_first_spike_combined_df, exact_category_counts = CellsFirstSpikeTimes.load_batch_hdf5_exports(first_spike_activity_data_h5_files=first_spike_activity_data_h5_files)
+        
+        """
+        first_spike_activity_data_h5_files = [Path(v).resolve() for v in first_spike_activity_data_h5_files] ## should parse who name and stuff... but we don't.
+        all_sessions_first_spike_activity_tuples: List[Tuple] = [CellsFirstSpikeTimes.load_data_from_hdf5(filename=hdf_load_path) for hdf_load_path in first_spike_activity_data_h5_files] ## need to export those globally unique identifiers for each aclu within a session
 
+        # all_sessions_all_cells_first_spike_time_df_loaded
+
+        # for i, an_all_cells_first_spike_time_df in enumerate(all_sessions_all_cells_first_spike_time_df_loaded):
+        total_counts = []
+        all_sessions_global_spikes_df = []
+
+        for i, (a_path, a_first_spike_time_tuple) in enumerate(zip(first_spike_activity_data_h5_files, all_sessions_first_spike_activity_tuples)):
+            all_cells_first_spike_time_df_loaded, global_spikes_df_loaded, global_spikes_dict_loaded, first_spikes_dict_loaded = a_first_spike_time_tuple ## unpack
+
+            # Parse out the session context from the filename ____________________________________________________________________ #
+            session_key, params_key = a_path.stem.split('__')
+            # session_key # 'kdiba-gor01-one-2006-6-08_14-26-15'
+            # params_key # 'withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]_first_spike_activity_data'
+            session_parts = session_key.split('-', maxsplit=3)
+            assert len(session_parts) == 4, f"session_parts: {session_parts}"
+            format_name, animal, exper_name, session_name = session_parts
+            reconstructed_session_context = IdentifyingContext(format_name=format_name, animal=animal, exper_name=exper_name, session_name=session_name)    
+            # print(f'reconstructed_session_context: {reconstructed_session_context}')
+            all_cells_first_spike_time_df_loaded = all_cells_first_spike_time_df_loaded.neuron_identity.make_neuron_indexed_df_global(reconstructed_session_context, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
+            global_spikes_df_loaded = global_spikes_df_loaded.neuron_identity.make_neuron_indexed_df_global(reconstructed_session_context, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
+            
+            # all_cells_first_spike_time_df_loaded['path'] = a_path.as_posix()
+            # all_cells_first_spike_time_df_loaded['session_key'] = session_key	 
+            # all_cells_first_spike_time_df_loaded['params_key'] = params_key
+            total_counts.append(all_cells_first_spike_time_df_loaded)
+            
+            all_sessions_global_spikes_df.append(global_spikes_df_loaded)
+            # first_spikes_dict_loaded
+            # all_cells_first_spike_time_df_loaded
+            # 1. Counting Exact Category Combinations
+            # exact_category_counts = all_cells_first_spike_time_df_loaded['earliest_spike_category'].value_counts(dropna=False)
+            # print("Exact Category Counts:")
+            # print(exact_category_counts)
+
+            # an_all_cells_first_spike_time_df
+            
+
+        all_sessions_first_spike_combined_df: pd.DataFrame = pd.concat(total_counts, axis='index')
+        # all_sessions_first_spike_combined_df
+        exact_category_counts = all_sessions_first_spike_combined_df['earliest_spike_category'].value_counts(dropna=False)
+        # print("Exact Category Counts:")
+        # print(exact_category_counts)
+        all_sessions_global_spikes_df = pd.concat(all_sessions_global_spikes_df, axis='index')
+        return all_sessions_global_spikes_df, all_sessions_first_spike_combined_df, exact_category_counts
 
 
 # ==================================================================================================================== #
