@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from pickle import PicklingError
 import sys
 from copy import deepcopy
 from datetime import datetime, timedelta
@@ -1497,7 +1498,7 @@ class PipelineWithComputedPipelineStageMixin:
 
 	@function_attributes(short_name=None, tags=['save', 'pickle', 'split'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-11 08:11', related_items=['load_split_pickled_global_computation_results'])
 	def save_split_global_computation_results(self, override_global_pickle_path: Optional[Path]=None, override_global_pickle_filename:Optional[str]=None,
-											  include_includelist=None, debug_print:bool=True):
+											  include_includelist=None, continue_after_pickling_errors: bool=True, debug_print:bool=True):
 		"""Save out the `global_computation_results` which are not currently saved with the pipeline
 
 		Reciprocal:
@@ -1571,6 +1572,13 @@ class PipelineWithComputedPipelineStageMixin:
 				except KeyError as e:
 					print(f'{k} encountered {e} while trying to save {k}. Skipping')
 					pass
+				except PicklingError as e:
+					if not continue_after_pickling_errors:
+						raise
+					else:
+						print(f'{k} encountered {e} while trying to save {k}. Skipping')
+						pass
+					
 				if was_save_success:
 					split_save_paths[k] = curr_split_result_pickle_path
 					split_save_output_types[k] = curr_item_type
