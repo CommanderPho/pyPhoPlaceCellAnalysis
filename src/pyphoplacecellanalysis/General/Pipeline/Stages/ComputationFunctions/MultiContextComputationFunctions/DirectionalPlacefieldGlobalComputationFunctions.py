@@ -948,7 +948,7 @@ class DirectionalLapsResult(ComputedResult):
 		# Restore instance attributes (i.e., _mapping and _keys_at_init).
 		self.__dict__.update(state)
 		# Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
-		super(DirectionalLapsResult, self).__init__() # TypeError: super(type, obj): obj must be an instance or subtype of type.
+		# super(DirectionalLapsResult, self).__init__() # TypeError: super(type, obj): obj must be an instance or subtype of type.
 
 
 
