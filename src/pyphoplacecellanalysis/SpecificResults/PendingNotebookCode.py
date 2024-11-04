@@ -60,7 +60,7 @@ from neuropy.core.epoch import ensure_dataframe
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
 
-
+@define(slots=False, eq=False)
 class CellsFirstSpikeTimes:
     """ First spike times
     
@@ -71,7 +71,26 @@ class CellsFirstSpikeTimes:
     all_cells_first_spike_time_df
 
     """
+    global_spikes_df: pd.DataFrame = field()
+    all_cells_first_spike_time_df: pd.DataFrame = field()
     
+    global_spikes_dict: Dict[str, pd.DataFrame] = field()
+    first_spikes_dict: Dict[str, pd.DataFrame] = field()
+    
+    hdf5_out_path: Optional[Path] = field()
+
+
+    @classmethod
+    def init_from_pipeline(cls, curr_active_pipeline, hdf_save_parent_path: Path=None) -> "CellsFirstSpikeTimes":
+        """ 
+        
+        """
+        all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict), hdf5_out_path = CellsFirstSpikeTimes.compute_cell_first_firings(curr_active_pipeline, hdf_save_parent_path=hdf_save_parent_path)
+        _obj: CellsFirstSpikeTimes = CellsFirstSpikeTimes(global_spikes_df=global_spikes_df, all_cells_first_spike_time_df=all_cells_first_spike_time_df,
+							 global_spikes_dict=global_spikes_dict, first_spikes_dict=first_spikes_dict,
+							 hdf5_out_path=hdf5_out_path)
+        return _obj
+
 
     # @function_attributes(short_name=None, tags=['first-spike', 'cell-analysis'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-01 13:59', related_items=[])
     @classmethod
@@ -203,7 +222,6 @@ class CellsFirstSpikeTimes:
         ## extra computations:
         all_cells_first_spike_time_df['theta_to_ripple_lead_lag_diff'] = (all_cells_first_spike_time_df['first_spike_ripple'] - all_cells_first_spike_time_df['first_spike_theta']) ## if theta came first, diff should be positive
         
-
         ## Save to .h5 or CSV
         if (hdf_save_parent_path is not None):
             custom_save_filepaths, custom_save_filenames, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters() # 'normal_computed-frateThresh_5.0-qclu_[1, 2]'
