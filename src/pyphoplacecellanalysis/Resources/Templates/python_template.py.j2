@@ -147,12 +147,16 @@ global_computation_results_override_output_file = None #}
 
 ## Override input/output files:
 parameter_specifier_str: str = "{{override_custom_pickle_suffix|default('')}}"
-local_computations_override_file = script_file_parent_path.joinpath(f'loadedSessPickle{parameter_specifier_str}.pkl') # do not call `.resolve()`, as this will mess up the session context parsing from the path when there are symlinks
-global_computation_results_override_file = script_file_parent_path.joinpath(f'global_computation_results{parameter_specifier_str}.pkl') # do not call `.resolve()`, as this will mess up the session context parsing from the path when there are symlinks
+{# override_output_folder: Path = script_file_parent_path #}
+override_output_folder: Path = Path(str(curr_session_basedir))
+assert override_output_folder.exists(), f"override_output_folder: '{override_output_folder}'" does not exist!
+
+local_computations_override_file = override_output_folder.joinpath(f'loadedSessPickle{parameter_specifier_str}.pkl') # do not call `.resolve()`, as this will mess up the session context parsing from the path when there are symlinks
+global_computation_results_override_file = override_output_folder.joinpath('output', f'global_computation_results{parameter_specifier_str}.pkl') # do not call `.resolve()`, as this will mess up the session context parsing from the path when there are symlinks
 
 ## Overrides for the output files:
-local_computations_override_output_file = script_file_parent_path.joinpath(f'loadedSessPickle{parameter_specifier_str}.pkl') # do not call `.resolve()`, as this will mess up the session context parsing from the path when there are symlinks
-global_computation_results_override_output_file = script_file_parent_path.joinpath(f'global_computation_results{parameter_specifier_str}.pkl') # do not call `.resolve()`, as this will mess up the session context parsing from the path when there are symlinks
+local_computations_override_output_file = override_output_folder.joinpath(f'loadedSessPickle{parameter_specifier_str}.pkl') # do not call `.resolve()`, as this will mess up the session context parsing from the path when there are symlinks
+global_computation_results_override_output_file = override_output_folder.joinpath('output', f'global_computation_results{parameter_specifier_str}.pkl') # do not call `.resolve()`, as this will mess up the session context parsing from the path when there are symlinks
 
 override_parameters_flat_keypaths_dict = {{override_parameters_flat_keypaths_dict|default('dict()')}} # e.g. {'rank_order_shuffle_analysis.included_qclu_values': [1, 2], 'rank_order_shuffle_analysis.minimum_inclusion_fr_Hz': 5.0,}
 run_specific_batch_kwargs = {{run_specific_batch_kwargs|default('dict()')}}
