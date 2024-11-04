@@ -144,10 +144,6 @@ class CellsFirstSpikeTimes:
         all_cells_first_spike_time_df
         
         """
-
-
-
-
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
         _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
@@ -164,9 +160,7 @@ class CellsFirstSpikeTimes:
         # global_spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].spikes_df).drop(columns=['neuron_type'], inplace=False) ## already has columns ['lap', 'maze_id', 'PBE_id'
         # global_spikes_df
         global_spikes_df = global_spikes_df.neuron_identity.make_neuron_indexed_df_global(curr_active_pipeline.get_session_context(), add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
-        global_spikes_df
-    
-
+        
 
         ## find earliest spike for each cell
         # Performed 1 aggregation grouped on column: 'aclu'
@@ -180,24 +174,17 @@ class CellsFirstSpikeTimes:
         # global_spikes_df_theta_df, global_spikes_df_non_theta_df = partition_df_dict(global_spikes_df, partitionColumn='is_theta')
         # global_spikes_df_theta_df
 
-        global_spikes_df_theta_df = deepcopy(global_spikes_df[global_spikes_df['is_theta'] == True])
-        global_spikes_df_theta_df
-
-        global_spikes_df_ripple_df = deepcopy(global_spikes_df[global_spikes_df['is_ripple'] == True])
-        global_spikes_df_ripple_df
-        
-        global_spikes_df_neither_df = deepcopy(global_spikes_df[np.logical_and((global_spikes_df['is_ripple'] != True), (global_spikes_df['is_theta'] != True))])
-        global_spikes_df_neither_df
+        global_spikes_theta_df = deepcopy(global_spikes_df[global_spikes_df['is_theta'] == True])
+        global_spikes_ripple_df = deepcopy(global_spikes_df[global_spikes_df['is_ripple'] == True])
+        global_spikes_neither_df = deepcopy(global_spikes_df[np.logical_and((global_spikes_df['is_ripple'] != True), (global_spikes_df['is_theta'] != True))])
         
         # find first spikes of the PBE and lap periods:
-        _PBE_spikes = deepcopy(global_spikes_df)[global_spikes_df['PBE_id'] > -1]
-        _PBE_spikes
+        global_spikes_PBE_df = deepcopy(global_spikes_df)[global_spikes_df['PBE_id'] > -1]
+        global_spikes_laps_df = deepcopy(global_spikes_df)[global_spikes_df['lap'] > -1]
 
-        _Lap_spikes = deepcopy(global_spikes_df)[global_spikes_df['lap'] > -1]
-        _Lap_spikes
-
-        global_spikes_dict = {'any': global_spikes_df, 'theta': global_spikes_df_theta_df, 'ripple': global_spikes_df_ripple_df, 'neither': global_spikes_df_neither_df,
-                              'PBE': _PBE_spikes, 'lap': _Lap_spikes,
+        ## main output products:
+        global_spikes_dict = {'any': global_spikes_df, 'theta': global_spikes_theta_df, 'ripple': global_spikes_ripple_df, 'neither': global_spikes_neither_df,
+                              'PBE': global_spikes_PBE_df, 'lap': global_spikes_laps_df,
                               }
         
         first_spikes_dict = {k:cls._subfn_get_first_spikes(v) for k, v in global_spikes_dict.items()} 
@@ -215,16 +202,10 @@ class CellsFirstSpikeTimes:
         all_cells_first_spike_time_df: pd.DataFrame = cls._subfn_build_first_spike_dataframe(first_spikes_dict)
         all_cells_first_spike_time_df = all_cells_first_spike_time_df.neuron_identity.make_neuron_indexed_df_global(curr_active_pipeline.get_session_context(), add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
         
-
         ## extra computations:
         all_cells_first_spike_time_df['theta_to_ripple_lead_lag_diff'] = (all_cells_first_spike_time_df['first_spike_ripple'] - all_cells_first_spike_time_df['first_spike_theta']) ## if theta came first, diff should be positive
         
 
-
-        # running_epochs
-        # pbe_epochs
-        # all_epoch
-        
         ## Save to .h5 or CSV
         if (hdf_save_parent_path is not None):
             custom_save_filepaths, custom_save_filenames, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters() # 'normal_computed-frateThresh_5.0-qclu_[1, 2]'
