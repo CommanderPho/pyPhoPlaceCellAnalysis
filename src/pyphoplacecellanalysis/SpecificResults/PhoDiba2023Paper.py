@@ -1641,7 +1641,8 @@ class DataframeFilterPredicates:
 
 @define(slots=False, eq=False)
 class DataFrameFilter:
-	""" handles interactive filtering of dataframes 
+	""" handles interactive filtering of dataframes by presenting a jupyter widget interface.
+	
 	
 	from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import DataFrameFilter
 	
@@ -2073,7 +2074,7 @@ def _perform_dual_hist_plot(grainularity_desc: str, laps_df: pd.DataFrame, rippl
 	return _laps_histogram_out, _ripple_histogram_out
 
 
-@function_attributes(short_name=None, tags=['CRITICAL', 'FINAL', 'plotly'], input_requires=[], output_provides=[], uses=['plotly_pre_post_delta_scatter'], used_by=[], creation_date='2024-10-23 20:04', related_items=[])
+@function_attributes(short_name=None, tags=['MAIN', 'CRITICAL', 'FINAL', 'plotly'], input_requires=[], output_provides=[], uses=['plotly_pre_post_delta_scatter'], used_by=[], creation_date='2024-10-23 20:04', related_items=[])
 def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, concatenated_ripple_df: pd.DataFrame, time_delta_tuple: Tuple[float, float, float], fig_size_kwargs: Dict, save_plotly: Callable, is_dark_mode: bool=False, enable_custom_widget_buttons:bool=True, legend_groups_to_hide=['0.03', '0.044', '0.05'], should_save: bool = True):
 	""" plots the stacked histograms for both laps and ripples
 
