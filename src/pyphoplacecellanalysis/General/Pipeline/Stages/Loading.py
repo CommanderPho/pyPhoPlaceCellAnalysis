@@ -97,7 +97,7 @@ def safeSaveData(pkl_path: Union[str, Path], db: Any, should_append:bool=False, 
             # delete the incomplete pickle file
             if is_temporary_file_used:
                 pkl_path.unlink(missing_ok=True) # removes the incomplete file. The user's file located at _desired_final_pickle_path is still intact.
-            raise e
+            raise
     
     
         
