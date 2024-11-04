@@ -49,6 +49,309 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 
 # ==================================================================================================================== #
+# 2024-11-04 - Custom spike Drawing                                                                                    #
+# ==================================================================================================================== #
+def test_plotRaw_v_time(active_pf1D, cellind, speed_thresh=False, spikes_color=None, spikes_alpha=None, ax=None, position_plot_kwargs=None, spike_plot_kwargs=None,
+    should_include_trajectory=True, should_include_spikes=True, should_include_filter_excluded_spikes=True, should_include_labels=True, use_filtered_positions=False, use_pandas_plotting=False):
+    """ Builds one subplot for each dimension of the position data
+    Updated to work with both 1D and 2D Placefields
+
+    should_include_trajectory:bool - if False, will not try to plot the animal's trajectory/position
+        NOTE: Draws the spike_positions actually instead of the continuously sampled animal position
+
+    should_include_labels:bool - whether the plot should include text labels, like the title, axes labels, etc
+    should_include_spikes:bool - if False, will not try to plot points for spikes
+    use_pandas_plotting:bool = False
+    use_filtered_positions:bool = False # If True, uses only the filtered positions (which are missing the end caps) and the default a.plot(...) results in connected lines which look bad.
+
+    """
+    from scipy.signal import savgol_filter
+    from neuropy.plotting.figure import pretty_plot
+    from neuropy.utils.misc import is_iterable
+    
+    if ax is None:
+        fig, ax = plt.subplots(active_pf1D.ndim, 1, sharex=True)
+        fig.set_size_inches([23, 9.7])
+
+    if not is_iterable(ax):
+        ax = [ax]
+
+    # plot trajectories
+    pos_df = active_pf1D.position.to_dataframe()
+    
+    # self.x, self.y contain filtered positions, pos_df's columns contain all positions.
+    if not use_pandas_plotting: # don't need to worry about 't' for pandas plotting, we'll just use the one in the dataframe.
+        if use_filtered_positions:
+            t = active_pf1D.t
+        else:
+            t = pos_df.t.to_numpy()
+
+    if active_pf1D.ndim < 2:
+        if not use_pandas_plotting:
+            if use_filtered_positions:
+                variable_array = [active_pf1D.x]
+            else:
+                variable_array = [pos_df.x.to_numpy()]
+        else:
+            variable_array = ['x']
+        label_array = ["X position (cm)"]
+    else:
+        if not use_pandas_plotting:
+            if use_filtered_positions:
+                variable_array = [active_pf1D.x, active_pf1D.y]
+            else:
+                variable_array = [pos_df.x.to_numpy(), pos_df.y.to_numpy()]
+        else:
+            variable_array = ['x', 'y']
+        label_array = ["X position (cm)", "Y position (cm)"]
+
+    for a, pos, ylabel in zip(ax, variable_array, label_array):
+        if should_include_trajectory:
+            if not use_pandas_plotting:
+                a.plot(t, pos, **(position_plot_kwargs or {}))
+            else:
+                pos_df.plot(x='t', y=pos, ax=a, legend=False, **(position_plot_kwargs or {})) # changed to pandas.plot because the filtered positions were missing the end caps, and the default a.plot(...) resulted in connected lines which looked bad.
+
+        if should_include_labels:
+            a.set_xlabel("Time (seconds)")
+            a.set_ylabel(ylabel)
+        pretty_plot(a)
+
+
+    # Define the tangent line function
+    def tangent_line(t_val, x_val, slope, delta=1.0):
+        """
+        Computes points on the tangent line at t_val.
+        
+        Parameters:
+        - t_val: The time at which the tangent is computed.
+        - x_val: The position at t_val.
+        - slope: The derivative dx/dt at t_val.
+        - delta: The range around t_val to plot the tangent line.
+        
+        Returns:
+        - t_tangent: Array of t values for the tangent line.
+        - y_tangent: Array of y values for the tangent line.
+        """
+        t_tangent = np.linspace(t_val - delta, t_val + delta, 10)
+        y_tangent = x_val + slope * (t_tangent - t_val)
+        return t_tangent, y_tangent
+
+    # Define the normal line function
+    def normal_line(t_val: float, x_val: float, slope_normal: float, delta: float=0.5):
+        """
+        Computes points on the normal line at t_val.
+        
+        Parameters:
+        - t_val: The time at which the normal is computed.
+        - x_val: The position at t_val.
+        - slope_normal: The slope of the normal line at t_val.
+        - delta: The range around t_val to plot the normal line.
+        
+        Returns:
+        - t_normal: Array of t values for the normal line.
+        - y_normal: Array of y values for the normal line.
+        - is_vertical: Boolean indicating if the normal line is vertical.
+        """
+        if np.isinf(slope_normal):
+            # Normal line is vertical
+            t_normal = np.array([t_val, t_val])
+            y_min = x_val - delta
+            y_max = x_val + delta
+            y_normal = np.array([y_min, y_max])
+            is_vertical = True
+        elif np.isclose(slope_normal, 0.0, atol=1e-3): # slope_normal == 0
+            # Normal line is horizontal
+            t_normal = np.linspace(t_val - delta, (t_val + delta), 10)
+            y_normal = np.full_like(t_normal, x_val)
+            is_vertical = False
+        else:
+            t_normal = np.linspace((t_val - delta), (t_val + delta), 10)
+            y_normal = x_val + slope_normal * (t_normal - t_val)
+            is_vertical = False
+        return t_normal, y_normal, is_vertical
+
+
+    # Compute the derivative dx/dt
+    # Step 2: Smooth the Data Using Savitzky-Golay Filter
+    window_length = 11  # Must be odd
+    polyorder = 3
+    x = deepcopy(pos)
+    t_delta: float = (t[1] - t[0])
+    x_smooth = savgol_filter(pos, window_length=window_length, polyorder=polyorder)
+    dx_dt = savgol_filter(x, window_length=window_length, polyorder=polyorder, deriv=1, delta=t_delta)
+    # dx_dt = np.gradient(x_smooth, t)  # Approximate derivative
+
+
+    # Example usage: Compute tangent lines for selected points
+    # Choose a subset of points to plot tangent lines for clarity
+    # For example, every 10th point
+    # indices = np.arange(0, len(t), 10)
+    # tangents = []
+    normals = []
+    normal_ts = []
+    normal_ys = []
+    normal_slopes = []
+    normal_is_vertical = []
+    # for i in indices:
+    # 	t_val = t[i]
+    # 	x_val = pos[i]
+    # 	slope_tangent = dx_dt[i]
+    # delta: float = 0.5
+    # delta: float =
+    
+    # for i, (t_val, x_val, slope_tangent) in enumerate(zip(t, x, dx_dt)):
+    for i, (t_val, x_val, slope_tangent) in enumerate(zip(t, x_smooth, dx_dt)):
+        # t_tangent, y_tangent = tangent_line(t_val, x_val, slope_tangent, delta=0.5)
+        # tangents.append((t_tangent, y_tangent))
+
+        # Avoid division by zero; handle zero slope separately
+        if np.isclose(slope_tangent, 0.0, atol=1e-3):
+            slope_normal = 0  # Horizontal normal line
+        else:
+            slope_normal = -1 / slope_tangent
+        
+        normal_slopes.append(slope_normal)
+        t_normal, y_normal, is_vertical = normal_line(t_val, x_val, slope_normal, delta=t_delta)
+        normal_ts.append((t_normal[0], t_normal[-1],)) # first and last value
+        normal_ys.append((y_normal[0], y_normal[-1],)) # first and last value
+        normal_is_vertical.append(is_vertical)
+        normals.append((t_normal, y_normal, is_vertical))
+
+    slope_tangents = deepcopy(dx_dt)
+    # slope_normals = 1.0/slope_tangents
+    # normal_df: pd.DataFrame = pd.DataFrame(normals, columns=['t', 'y', 'is_vertical'])
+    normal_df: pd.DataFrame = pd.DataFrame({'t': t, 'x': x, 'x_smooth': x_smooth, 'is_vertical': normal_is_vertical})
+    normal_df[['t_min', 't_max']] = normal_ts
+    normal_df[['y_min', 'y_max']] = normal_ys
+    normal_df['slope_normal'] = normal_slopes
+    normal_df['slope_tangent'] = slope_tangents
+    # normal_df['x'] = x
+    # normal_df['x_smooth'] = x_smooth
+
+    # # Select indices where normals will be plotted
+    # indices = np.arange(0, len(t), 10)  # Every 10th point
+    # # Plot the original curve
+    # plt.figure(figsize=(14, 7), num='test_normals')
+    # # plt.plot(t, pos, label='x(t)', color='blue')
+    # plt.plot(t, x, label='Noisy x(t)', color='gray', alpha=0.6)
+    # plt.plot(t, x_smooth, label='Smoothed x(t)', color='blue')
+    # # plt.scatter(t[indices], x_smooth[indices], color='green', label='Normal Points')
+
+    # # Plot normal lines
+    # for i, (t_normal, y_normal, is_vertical) in enumerate(normals):
+    # 	if i % 10 == 0:
+    # 		if is_vertical:
+    # 			plt.vlines(t_normal[0], y_normal[0], y_normal[1], colors='red', linestyles='--', linewidth=1)
+    # 		else:
+    # 			plt.plot(t_normal, y_normal, color='red', linestyle='--', linewidth=1)
+    
+
+    # plot spikes on trajectory
+    if cellind is not None:
+        if should_include_spikes:
+            # Grab correct spike times/positions
+            if speed_thresh and (not should_include_filter_excluded_spikes):
+                spk_pos_, spk_t_ = active_pf1D.run_spk_pos, active_pf1D.run_spk_t # TODO: these don't exist
+            else:
+                spk_pos_, spk_t_ = active_pf1D.spk_pos, active_pf1D.spk_t
+
+            # spk_tangents = np.interp(spk_t_, slope_tangents, slope_tangents)
+            spk_t = spk_t_[cellind]
+            # spk_pos_ = spk_pos_[cellind]
+            
+            spk_normals_tmin = np.interp(spk_t, normal_df['t'].values, normal_df['t_min'].values)
+            spk_normals_tmax = np.interp(spk_t, normal_df['t'].values, normal_df['t_max'].values)
+            spk_normals_slope = np.interp(spk_t, normal_df['t'].values, normal_df['slope_normal'].values)
+            spk_normals_ymin = np.interp(spk_t, normal_df['t'].values, normal_df['y_min'].values)
+            spk_normals_ymax = np.interp(spk_t, normal_df['t'].values, normal_df['y_max'].values)
+            
+            # spk_tangents = np.interp(spk_t_, slope_tangents, slope_tangents)
+            
+            #TODO 2024-11-04 17:39: - [ ] Finish
+
+            if spike_plot_kwargs is None:
+                spike_plot_kwargs = {}
+
+            if spikes_alpha is None:
+                spikes_alpha = 0.5 # default value of 0.5
+
+            if spikes_color is not None:
+                spikes_color_RGBA = [*spikes_color, spikes_alpha]
+                # Check for existing values in spike_plot_kwargs which will be overriden
+                markerfacecolor = spike_plot_kwargs.get('markerfacecolor', None)
+                # markeredgecolor = spike_plot_kwargs.get('markeredgecolor', None)
+                if markerfacecolor is not None:
+                    if markerfacecolor != spikes_color_RGBA:
+                        print(f"WARNING: spike_plot_kwargs's extant 'markerfacecolor' and 'markeredgecolor' values will be overriden by the provided spikes_color argument, meaning its original value will be lost.")
+                        spike_plot_kwargs['markerfacecolor'] = spikes_color_RGBA
+                        spike_plot_kwargs['markeredgecolor'] = spikes_color_RGBA
+            else:
+                # assign the default
+                spikes_color_RGBA = [*(0, 0, 0.8), spikes_alpha]
+
+
+            # interpolate the normal lines: spk_t_, spk_pos_
+            # Select indices where normals will be plotted
+            indices = np.arange(0, len(t), 10)  # Every 10th point
+
+            # Prev-dot-based _____________________________________________________________________________________________________ #
+            # for a, pos in zip(ax, spk_pos_[cellind]):
+            # 	# WARNING: if spike_plot_kwargs contains the 'markerfacecolor' key, it's value will override plot's color= argument, so the specified spikes_color will be ignored.
+            # 	a.plot(spk_t_[cellind], pos, color=spikes_color_RGBA, **(spike_plot_kwargs or {})) # , color=[*spikes_color, spikes_alpha]
+            # 	#TODO 2023-09-06 02:23: - [ ] Note that without extra `spike_plot_kwargs` this plots spikes as connected lines without markers which is nearly always wrong.
+
+            # 2024-11-04 - Lines normal to the position plot _____________________________________________________________________ #
+            # Determine the vertical span (delta) for the spike lines
+            # Here, delta_y is set to a small fraction of the y-axis range
+            # Alternatively, you can set a fixed value
+            spike_plot_kwargs.setdefault('color', spikes_color_RGBA)
+            spike_plot_kwargs.setdefault('linewidth', spike_plot_kwargs.get('linewidth', 1))  # Default line width
+            
+            delta_y = []
+            for a_ax, pos_label in zip(ax, variable_array):
+                y_min, y_max = a_ax.get_ylim()
+                span = y_max - y_min
+                delta = span * 0.01  # 1% of y-axis range
+                # delta = 0.5  # 1% of y-axis range
+                delta_y.append(delta)
+
+            # Plot spikes for each dimension
+            for dim, (a_ax, delta) in enumerate(zip(ax, delta_y)):
+                spk_t = spk_t_[cellind]
+                spk_pos = spk_pos_[cellind][:, dim] if active_pf1D.ndim > 1 else spk_pos_[cellind]
+
+                # Plot normal lines
+                # Calculate ymin and ymax for each spike
+                # ymin = spk_pos - delta
+                # ymax = spk_pos + delta
+                # Use ax.vlines to plot all spikes at once
+                # a_ax.vlines(spk_t, ymin, ymax, **spike_plot_kwargs)
+                # a_ax.vlines(spk_t, spk_normals_ymin, spk_normals_ymax, **spike_plot_kwargs)
+
+                # Plot normal lines
+                for i, (tmin, tmax, slope, ymin, ymax) in enumerate(zip(spk_normals_tmin, spk_normals_tmax, spk_normals_slope, spk_normals_ymin, spk_normals_ymax)):
+                    # if is_vertical:
+                    # 	plt.vlines(t_normal[0], y_normal[0], y_normal[1], colors='red', linestyles='--', linewidth=1)
+                    # plt.plot(t_normal, y_normal, color='red', linestyle='--', linewidth=1)
+                    a_ax.plot([tmin, tmax], [ymin, ymax], color='red', linestyle='--', linewidth=1, label='Normal Line' if i == 0 else "")  # Label only the first line to avoid duplicate legends
+                    # a_ax.vlines(spk_t, ymin, ymax, **spike_plot_kwargs)
+
+
+
+        # Put info on title
+        if should_include_labels:
+            ax[0].set_title(
+                "Cell "
+                + str(active_pf1D.cell_ids[cellind])
+                + ":, speed_thresh="
+                + str(active_pf1D.speed_thresh)
+            )
+    return ax
+
+
+
+# ==================================================================================================================== #
 # 2024-11-01 - Cell First Firing - Cell's first firing -- during PBE, theta, or resting?                                                                                      #
 # ==================================================================================================================== #
 
@@ -87,8 +390,8 @@ class CellsFirstSpikeTimes:
         """
         all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict), hdf5_out_path = CellsFirstSpikeTimes.compute_cell_first_firings(curr_active_pipeline, hdf_save_parent_path=hdf_save_parent_path)
         _obj: CellsFirstSpikeTimes = CellsFirstSpikeTimes(global_spikes_df=global_spikes_df, all_cells_first_spike_time_df=all_cells_first_spike_time_df,
-							 global_spikes_dict=global_spikes_dict, first_spikes_dict=first_spikes_dict,
-							 hdf5_out_path=hdf5_out_path)
+                             global_spikes_dict=global_spikes_dict, first_spikes_dict=first_spikes_dict,
+                             hdf5_out_path=hdf5_out_path)
         return _obj
 
 
