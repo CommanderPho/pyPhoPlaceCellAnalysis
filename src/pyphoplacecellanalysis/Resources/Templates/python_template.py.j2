@@ -146,7 +146,7 @@ local_computations_override_output_file = None
 global_computation_results_override_output_file = None #}
 
 ## Override input/output files:
-parameter_specifier_str: str = {{override_custom_pickle_suffix|default('')}} 
+parameter_specifier_str: str = "{{override_custom_pickle_suffix|default('')}}"
 local_computations_override_file = script_file_parent_path.joinpath(f'loadedSessPickle{parameter_specifier_str}.pkl') # do not call `.resolve()`, as this will mess up the session context parsing from the path when there are symlinks
 global_computation_results_override_file = script_file_parent_path.joinpath(f'global_computation_results{parameter_specifier_str}.pkl') # do not call `.resolve()`, as this will mess up the session context parsing from the path when there are symlinks
 
