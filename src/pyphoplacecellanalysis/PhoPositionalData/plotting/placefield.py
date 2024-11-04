@@ -81,6 +81,8 @@ def _plot_helper_build_jittered_spike_points(curr_cell_spike_times, curr_cell_in
         jitter_add = jitter_multiplier * minmax_scale(curr_cell_spike_times, feature_range=feature_range)
     return curr_cell_interpolated_spike_curve_values + jitter_add
 
+
+@function_attributes(short_name=None, tags=['helper'], input_requires=[], output_provides=[], uses=[], used_by=['plot_single_cell_1D_placecell_validation'], creation_date='2024-11-04 16:59', related_items=[])
 def _plot_helper_setup_gridlines(ax, bin_edges, bin_centers):
     ax.set_yticks(bin_edges, minor=False)
     ax.set_yticks(bin_centers, minor=True)
@@ -157,6 +159,9 @@ def plot_1d_placecell_validations(active_placefields1D, plotting_config, should_
     return MatplotlibRenderPlots(name=f'{common_basename}', figures=out_figures_list, axes=out_axes_list, ui=ui)
     
 
+@function_attributes(short_name=None, tags=['helper', 'spikes'], input_requires=[], output_provides=[],
+                      uses=['plot_placefield_tuning_curve', '_plot_helper_build_jittered_spike_points'],
+                      used_by=['plot_single_cell_1D_placecell_validation'], creation_date='2024-11-04 16:56', related_items=[])
 def _subfn_plot_pf1D_placefield(active_epoch_placefields1D, placefield_cell_index: int,
                                 ax_activity_v_time, ax_pf_tuning_curve, pf_tuning_curve_ax_position: str = 'right',
                                 # should_plot_spike_indicator_points_on_placefield:bool=False, should_plot_spike_indicator_lines_on_trajectory:bool=False,
@@ -235,7 +240,9 @@ def _subfn_plot_pf1D_placefield(active_epoch_placefields1D, placefield_cell_inde
             
 
 # 2d Placefield comparison figure:
-@function_attributes(short_name=None, tags=['pf1D', '1D'], input_requires=[], output_provides=[], uses=['plot_placefield_tuning_curve', 'active_epoch_placefields1D.plotRaw_v_time'], used_by=['plot_1d_placecell_validations'], creation_date='2023-09-06 01:55', related_items=[])
+@function_attributes(short_name=None, tags=['pf1D', '1D'], input_requires=[], output_provides=[],
+                      uses=['plot_placefield_tuning_curve', 'active_epoch_placefields1D.plotRaw_v_time', '_subfn_plot_pf1D_placefield', '_plot_helper_setup_gridlines'],
+                      used_by=['plot_1d_placecell_validations'], creation_date='2023-09-06 01:55', related_items=[])
 def plot_single_cell_1D_placecell_validation(active_epoch_placefields1D, placefield_cell_index, extant_fig=None, extant_axes=None, **kwargs):
     """ A single cell method of analyzing 1D placefields and the spikes that create them 
     
