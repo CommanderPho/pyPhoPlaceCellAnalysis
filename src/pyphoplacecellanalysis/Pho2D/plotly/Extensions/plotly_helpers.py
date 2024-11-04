@@ -246,7 +246,6 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
 
 	# figure_context_dict ________________________________________________________________________________________________ #
 	data_context = data_context.adding_context_if_missing(variable_name=histogram_variable_name)
-	# figure_context = deepcopy(data_context).adding_context_if_missing(**data_context.get_subset(subset_includelist=['epochs_name', 'data_grain']).to_dict(), plot_type='scatter+hist', comparison='pre-post-delta', variable_name=histogram_variable_name)
 	
 	figure_context_dict = {'histogram_variable_name': histogram_variable_name}
 
@@ -281,16 +280,9 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
 	if px_scatter_kwargs is None:
 		px_scatter_kwargs = {}
 		
-	# common_plot_kwargs = dict(color="time_bin_size")
 	if common_plot_kwargs is None:
 		common_plot_kwargs = {}
 		
-	# if ('color' in px_scatter_kwargs):
-	#     if ('color' == 'time_bin_size'):
-	#         print(f'converting data_results_df["time_bin_size"] column to str so it can be treated categorically.')
-	#         # Convert 'time_bin_size' to string to treat it as categorical
-	#         data_results_df['time_bin_size'] = data_results_df['time_bin_size'].astype(str)
-
 	# f"Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes"
 	# main_title: str = f"Across Sessions ({num_unique_sessions} Sessions) - {num_unique_time_bins} Time Bin Sizes"
 	if num_unique_sessions == 1:
@@ -311,7 +303,6 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
 		print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bin_sizes}')
 
 	hist_kwargs = dict(opacity=0.5, range_y=[0.0, 1.0], nbins=histogram_bins, barmode='overlay') | hist_kwargs
-	# print(f'hist_kwargs: {hist_kwargs}')
 
 	def _subfn_build_categorical_color_kwargs(shared_color_key: str):
 		""" captures: data_results_df, 
@@ -364,26 +355,8 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
 			del px_scatter_kwargs['color'] # remove from px_scatter_kwargs too
 			## add to shared instead
 			# Categorical 'time_bin_size' as color _______________________________________________________________________________ #
-			# Convert shared_color_key to string to treat it as categorical
-			# data_results_df[shared_color_key] = [f"{v:.3f}" for v in data_results_df[shared_color_key].values]
 			if debug_print:
 				print(f'shared_color_key: "{shared_color_key}"')
-			# # Sort based on numeric values, then convert to strings
-			# ## duplicate the `shared_color_key` column by adding the "_col_" prefix
-			# categorical_color_shared_color_key: str = f"_col_{shared_color_key}"
-			# print(f'categorical_color_shared_color_key: "{categorical_color_shared_color_key}"')
-			# data_results_df[categorical_color_shared_color_key] = deepcopy(data_results_df[shared_color_key])
-			# data_results_df[categorical_color_shared_color_key] = data_results_df[categorical_color_shared_color_key].map(lambda x: f'{x:.3f}').astype(str) # string type
-			# category_orders = {shared_color_key: [f'{v:.3f}' for v in sorted(data_results_df[categorical_color_shared_color_key].astype(float).unique())]} # should this be `categorical_color_shared_color_key` or `shared_color_key`
-			# # Define consistent category orders and color sequence
-			# # category_orders = {shared_color_key: sorted(data_results_df[shared_color_key].unique())} # category_orders: {'time_bin_size': ['0.025', '0.030', '0.044', '0.050', '0.058', '0.250', '1.500']},
-			# color_sequence = px.colors.qualitative.Plotly # `color_discrete_sequence`
-			# # color_sequence = px.colors.color_continuous_scale() # `color_continuous_scale`
-			# print(f'category_orders: {category_orders},\ncolor_sequence: {color_sequence}\n')
-			# common_plot_kwargs.update(dict(category_orders=category_orders, color_discrete_sequence=color_sequence,
-			#                             # color=shared_color_key,
-			#                             color=categorical_color_shared_color_key, ## override color to be `categorical_color_shared_color_key` instead of `shared_color_key`
-			#                             ))
 			a_kwargs_update_dict = _subfn_build_categorical_color_kwargs(shared_color_key=shared_color_key)
 			common_plot_kwargs.update(a_kwargs_update_dict)
 		
@@ -407,6 +380,10 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
 	if debug_print:
 		print(f'len(_tmp_pre_delta_fig.data): {len(_tmp_pre_delta_fig.data)}')
 	for a_trace in _tmp_pre_delta_fig.data:
+		# _tmp_post_delta_fig.update_traces(xbins=dict(start=0.05, end=0.95, size=0.1))
+		a_trace.xbins.start = 0.05
+		a_trace.xbins.end = 0.95
+		a_trace.xbins.size = 0.1
 		PlotlyFigureContainer.add_trace_with_legend_handling(fig=fig, trace=a_trace, row=1, col=1, already_added_legend_entries=already_added_legend_entries)
 
 
@@ -442,6 +419,10 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
 	# adding the second histogram
 	_tmp_post_delta_fig = px.histogram(post_delta_df, y=histogram_variable_name, **common_plot_kwargs, **hist_kwargs, title=post_delta_label)  # create a temporary disposable figure to extract the histogram traces out of
 	for a_trace in _tmp_post_delta_fig.data:
+		# _tmp_post_delta_fig.update_traces(xbins=dict(start=0.05, end=0.95, size=0.1))
+		a_trace.xbins.start = 0.05
+		a_trace.xbins.end = 0.95
+		a_trace.xbins.size = 0.1
 		PlotlyFigureContainer.add_trace_with_legend_handling(fig=fig, trace=a_trace, row=1, col=3, already_added_legend_entries=already_added_legend_entries)
 
 	# fig.update_layout(yaxis=dict(range=forced_range_y))
@@ -463,9 +444,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
 	# Set Figure Metadata ________________________________________________________________________________________________ #
 	# figure_context_dict['n_tbin'] = num_unique_time_bins
 	figure_context = IdentifyingContext(**figure_context_dict)
-	# print(f"figure_context: {figure_context.get_initialization_code_string()}")
 	figure_context = figure_context.adding_context_if_missing(**data_context.get_subset(subset_includelist=['epochs_name', 'data_grain']).to_dict(), plot_type='scatter+hist', comparison='pre-post-delta', variable_name=histogram_variable_name)
-	# print(f"figure_context: {figure_context.get_initialization_code_string()}")
 	preferred_filename: str = sanitize_filename_for_Windows(figure_context.get_subset(subset_excludelist=[]).get_description())
 	
 	fig.update_layout(meta={'figure_context': figure_context.to_dict(),
@@ -555,13 +534,6 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
 
 			figure_sup_huge_title_text = styled_text
 			
-			# if figure_sup_huge_title_text_nlines < 2:
-			# 	annotation_kwargs.update(dict(font=dict(size=25))) # working
-			# else:
-			# 	annotation_kwargs.update(dict(font=dict(size=round(25/figure_sup_huge_title_text_nlines))))
-			# 	figure_sup_huge_title_text = figure_sup_huge_title_text.replace('\n', '<br>')
-			
-				
 			fig = fig.update_layout(
 				margin=dict(l=(80+30), r=80, t=(100-60), b=(80-10)),  # Increase left margin to 60 pixels 
 			)
