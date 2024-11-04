@@ -1667,6 +1667,18 @@ def find_HDF5_files(directory: str, recurrsive: bool=False):
 	else:
 		return list(directory_path.glob('*.h5')) # Return a list of all .h5 files in the directory and its subdirectories
 
+@function_attributes(short_name=None, tags=['pickle', 'pkl', 'filesystem', 'discovery'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-04 15:39', related_items=[])
+def find_pkl_files(directory: str, recurrsive: bool=False):
+	""" 
+	from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import find_pkl_files
+	
+	"""
+	directory_path = Path(directory) # Convert string path to a Path object
+	if recurrsive:
+		return list(directory_path.glob('**/*.pkl')) # Return a list of all .csv files in the directory and its subdirectories
+	else:
+		return list(directory_path.glob('*.pkl')) # Return a list of all .csv files in the directory and its subdirectories
+
 
 
 
