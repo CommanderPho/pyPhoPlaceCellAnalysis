@@ -127,7 +127,7 @@ def try_move_pickle_files_on_GL(good_session_concrete_folders, session_basedirs_
                 ## perform the move/copy
                 was_success = try_perform_move(src_file=a_global_file, target_file=target_file, is_dryrun=is_dryrun, allow_overwrite_existing=allow_overwrite_existing)
                 if was_success:
-                    moved_dict[a_file] = target_file
+                    moved_dict[a_global_file] = target_file
             all_found_pipeline_pkl_files_dict[a_session_basedir] = list(a_script_folder.glob('loadedSessPickle*.pkl'))
             for a_file in all_found_pipeline_pkl_files_dict[a_session_basedir]:
                 ## iterate through the found global files:
