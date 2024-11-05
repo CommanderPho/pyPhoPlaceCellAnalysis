@@ -1179,6 +1179,120 @@ class CellsFirstSpikeTimes:
         return all_sessions_global_spikes_df, all_sessions_first_spike_combined_df, exact_category_counts, (all_sessions_global_spikes_dict, all_sessions_first_spikes_dict)
 
 
+    # ==================================================================================================================== #
+    # CSV Outputs                                                                                                          #
+    # ==================================================================================================================== #
+    @classmethod
+    def save_data_to_csvs(cls, all_cells_first_spike_time_df: pd.DataFrame, global_spikes_df: pd.DataFrame, global_spikes_dict: Dict[str, pd.DataFrame], first_spikes_dict: Dict[str, pd.DataFrame], output_dir: Union[str, Path] = 'output_csvs') -> None:
+        """
+        Saves the given DataFrames and dictionaries of DataFrames to several CSV files organized in a directory structure.
+
+        Parameters:
+        - all_cells_first_spike_time_df (pd.DataFrame): DataFrame containing first spike times and categories.
+        - global_spikes_df (pd.DataFrame): DataFrame containing all spikes.
+        - global_spikes_dict (dict): Dictionary of DataFrames for each spike category.
+        - first_spikes_dict (dict): Dictionary of DataFrames containing first spikes per category.
+        - output_dir (str or Path): Directory where the CSV files will be saved.
+
+        Directory Structure:
+        output_dir/
+            all_cells_first_spike_time_df.csv
+            global_spikes_df.csv
+            global_spikes_dict/
+                any.csv
+                theta.csv
+                ripple.csv
+                neither.csv
+                PBE.csv
+                lap.csv
+            first_spikes_dict/
+                any.csv
+                theta.csv
+                ripple.csv
+                neither.csv
+                PBE.csv
+                lap.csv
+
+        Usage:
+        
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import CellsFirstSpikeTimes
+            CellsFirstSpikeTimes.save_data_to_csvs(
+                all_cells_first_spike_time_df, 
+                global_spikes_df, 
+                global_spikes_dict, 
+                first_spikes_dict, 
+                output_dir=Path('path/to/output_directory')
+            )
+        """
+        output_dir = Path(output_dir)
+        # Create the main output directory if it doesn't exist
+        output_dir.mkdir(parents=True, exist_ok=True)
+        print(f"Saving CSV files to directory: {output_dir.resolve()}")
+
+        # Save the main DataFrames
+        main_df_filenames = {
+            'all_cells_first_spike_time_df.csv': all_cells_first_spike_time_df,
+            'global_spikes_df.csv': global_spikes_df
+        }
+        for filename, df in main_df_filenames.items():
+            file_path = output_dir / filename
+            df.to_csv(file_path, index=False)
+            print(f"Saved {filename}")
+
+        # Define subdirectories for dictionaries
+        dict_subdirs = {
+            'global_spikes_dict': global_spikes_dict,
+            'first_spikes_dict': first_spikes_dict
+        }
+
+        for subdir_name, data_dict in dict_subdirs.items():
+            subdir_path = output_dir / subdir_name
+            subdir_path.mkdir(exist_ok=True)
+            print(f"Saving dictionary '{subdir_name}' to subdirectory: {subdir_path.resolve()}")
+
+            for key, df in data_dict.items():
+                # Sanitize the key to create a valid filename
+                sanitized_key = "".join([c if c.isalnum() or c in (' ', '_') else '_' for c in key])
+                filename = f"{sanitized_key}.csv"
+                file_path = subdir_path / filename
+                df.to_csv(file_path, index=False)
+                print(f"Saved {subdir_name}/{filename}")
+
+        print("All CSV files have been successfully saved.")
+
+
+    def save_to_csvs(self, output_dir: Union[str, Path] = 'output_csvs') -> bool:
+        """
+        Saves the instance's DataFrames and dictionaries of DataFrames to CSV files.
+
+        Parameters:
+        - output_dir (str or Path): Directory where the CSV files will be saved.
+
+        Returns:
+        - bool: True if all files were saved successfully, False otherwise.
+
+        Usage:
+        
+            _obj: CellsFirstSpikeTimes = CellsFirstSpikeTimes.init_from_pipeline(curr_active_pipeline=curr_active_pipeline)
+            _obj.save_to_csvs(output_dir=Path('path/to/output_directory'))
+        """
+        try:
+            self.save_data_to_csvs(
+                all_cells_first_spike_time_df=self.all_cells_first_spike_time_df,
+                global_spikes_df=self.global_spikes_df,
+                global_spikes_dict=self.global_spikes_dict,
+                first_spikes_dict=self.first_spikes_dict,
+                output_dir=output_dir
+            )
+            # Optionally, you can store the output directory path if needed
+            # self.csv_out_path = Path(output_dir).resolve()
+            return True
+        except Exception as e:
+            print(f"An error occurred while saving CSV files: {e}")
+            return False
+        
+
+
 # ==================================================================================================================== #
 # 2024-10-09 - Building Custom Individual time_bin decoded posteriors                                                  #
 # ==================================================================================================================== #
