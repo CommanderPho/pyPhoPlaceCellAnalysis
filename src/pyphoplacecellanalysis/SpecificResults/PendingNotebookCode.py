@@ -52,14 +52,14 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 # ==================================================================================================================== #
 import shutil
 
-def try_perform_move(src_file, target_file, is_dryrun: bool):
+def try_perform_move(src_file, target_file, is_dryrun: bool, allow_overwrite_existing: bool):
 	""" tries to move the file from src_file to target_file """
 	print(f'try_perform_move(src_file: "{src_file}", target_file: "{target_file}")')
 	if not src_file.exists():
 		print(f'\tsrc_file "{src_file}" does not exist!')
 		return False
 	else:
-		if target_file.exists():
+		if (target_file.exists() and (not allow_overwrite_existing)):
 			print(f'\ttarget_file: "{target_file}" already exists!')
 			return False
 		else:
@@ -74,7 +74,7 @@ def try_perform_move(src_file, target_file, is_dryrun: bool):
 
 
 @function_attributes(short_name=None, tags=['move', 'pickle', 'filesystem', 'GL'], input_requires=[], output_provides=[], uses=['try_perform_move'], used_by=[], creation_date='2024-11-04 19:41', related_items=[])
-def try_move_pickle_files_on_GL(good_session_concrete_folders, session_basedirs_dict, computation_script_paths, excluded_session_keys=None, is_dryrun: bool=True, debug_print: bool=False):
+def try_move_pickle_files_on_GL(good_session_concrete_folders, session_basedirs_dict, computation_script_paths, excluded_session_keys=None, is_dryrun: bool=True, debug_print: bool=False, allow_overwrite_existing: bool=False):
     """ 
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import try_move_pickle_files_on_GL
     
@@ -125,7 +125,7 @@ def try_move_pickle_files_on_GL(good_session_concrete_folders, session_basedirs_
                 copy_dict[a_global_file] = target_file
                 # if not is_dryrun:
                 ## perform the move/copy
-                was_success = try_perform_move(src_file=a_global_file, target_file=target_file, is_dryrun=is_dryrun)
+                was_success = try_perform_move(src_file=a_global_file, target_file=target_file, is_dryrun=is_dryrun, allow_overwrite_existing=allow_overwrite_existing)
                 if was_success:
                     moved_dict[a_file] = target_file
             all_found_pipeline_pkl_files_dict[a_session_basedir] = list(a_script_folder.glob('loadedSessPickle*.pkl'))
@@ -135,7 +135,7 @@ def try_move_pickle_files_on_GL(good_session_concrete_folders, session_basedirs_
                 copy_dict[a_file] = target_file
                 # if not is_dryrun:
                 ## perform the move/copy
-                was_success = try_perform_move(src_file=a_file, target_file=target_file, is_dryrun=is_dryrun)
+                was_success = try_perform_move(src_file=a_file, target_file=target_file, is_dryrun=is_dryrun, allow_overwrite_existing=allow_overwrite_existing)
                 if was_success:
                     moved_dict[a_file] = target_file
             all_found_pipeline_h5_files_dict[a_session_basedir] = list(a_script_folder.glob('loadedSessPickle*.h5'))
@@ -145,7 +145,7 @@ def try_move_pickle_files_on_GL(good_session_concrete_folders, session_basedirs_
                 copy_dict[a_file] = target_file
                 # if not is_dryrun:
                 ## perform the move/copy
-                was_success = try_perform_move(src_file=a_file, target_file=target_file, is_dryrun=is_dryrun)
+                was_success = try_perform_move(src_file=a_file, target_file=target_file, is_dryrun=is_dryrun, allow_overwrite_existing=allow_overwrite_existing)
                 if was_success:
                     moved_dict[a_file] = target_file
             # all_found_pkl_files_dict[a_session_basedir] = find_pkl_files(a_script_folder)
