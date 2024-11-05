@@ -2105,6 +2105,29 @@ def compute_and_export_cell_first_spikes_characteristics_completion_function(sel
 	import sys
 	from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import CellsFirstSpikeTimes
 	from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
+	from pyphocorehelpers.print_helpers import get_now_day_str
+	from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import CellsFirstSpikeTimes
+        
+
+	def get_export_name(data_identifier_str: str, parent_output_path: Path, session_identifier_str: str, out_extension: Optional[str]='.csv'): # active_context: IdentifyingContext
+		""" captures nothing
+		
+		Outputs: '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
+		
+		out_path, out_filename, out_basename = get_export_name(data_identifier_str='', parent_output_path=parent_output_path, active_context=active_context, out_extension='.csv')
+		"""
+		# output_date_str: str = get_now_rounded_time_str()
+		output_date_str: str = get_now_day_str()
+		# session_identifier_str: str = active_context.get_description()
+		assert output_date_str is not None
+		out_basename = '-'.join([output_date_str, session_identifier_str, data_identifier_str]) # '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
+		if out_extension is None:
+			out_extension = ''
+		out_filename = f"{out_basename}{out_extension}"
+		out_path = parent_output_path.joinpath(out_filename).resolve()
+		return out_path, out_filename, out_basename
+	
+
 
 	print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
 	print(f'compute_and_export_cell_first_spikes_characteristics_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
@@ -2113,11 +2136,16 @@ def compute_and_export_cell_first_spikes_characteristics_completion_function(sel
 	collected_outputs = self.collected_outputs_path.resolve()	
 	print(f'collected_outputs: {collected_outputs}')
 
+	custom_save_filepaths, custom_save_filenames, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters() # 'normal_computed-frateThresh_5.0-qclu_[1, 2]'
+	complete_session_identifier_string: str = '_'.join([curr_active_pipeline.get_session_context().get_description(separator='-'), custom_suffix]) # 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]'
+	# session_identifier_str: str = active_context.get_description()
+	hdf5_out_path, out_filename, out_basename = get_export_name(data_identifier_str="(first_spike_activity_data)", parent_output_path=collected_outputs, session_identifier_str=complete_session_identifier_string, out_extension='.h5')
+
 	was_write_good: bool = False
 	try:
-		all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict), hdf5_out_path = CellsFirstSpikeTimes.compute_cell_first_firings(curr_active_pipeline, hdf_save_parent_path=collected_outputs)	
-		
-
+		# all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict), hdf5_out_path = CellsFirstSpikeTimes.compute_cell_first_firings(curr_active_pipeline, hdf_save_parent_path=collected_outputs)	
+		_obj: CellsFirstSpikeTimes = CellsFirstSpikeTimes.init_from_pipeline(curr_active_pipeline=curr_active_pipeline, hdf_save_parent_path=None)
+		_obj.save_to_hdf5(hdf_save_path=hdf5_out_path)
 		was_write_good = True
 
 	except BaseException as e:
