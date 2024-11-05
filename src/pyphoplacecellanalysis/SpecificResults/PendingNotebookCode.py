@@ -53,24 +53,24 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 import shutil
 
 def try_perform_move(src_file, target_file, is_dryrun: bool, allow_overwrite_existing: bool):
-	""" tries to move the file from src_file to target_file """
-	print(f'try_perform_move(src_file: "{src_file}", target_file: "{target_file}")')
-	if not src_file.exists():
-		print(f'\tsrc_file "{src_file}" does not exist!')
-		return False
-	else:
-		if (target_file.exists() and (not allow_overwrite_existing)):
-			print(f'\ttarget_file: "{target_file}" already exists!')
-			return False
-		else:
-			# does not exist, safe to copy
-			print(f'\t moving "{src_file}" -> "{target_file}"...')
-			if not is_dryrun:
-				shutil.move(src_file, target_file)
-			else:
-				print(f'\t\t(is_dryrun==True, so not actually moving.)')
-			print(f'\t\tdone!')
-			return True
+    """ tries to move the file from src_file to target_file """
+    print(f'try_perform_move(src_file: "{src_file}", target_file: "{target_file}")')
+    if not src_file.exists():
+        print(f'\tsrc_file "{src_file}" does not exist!')
+        return False
+    else:
+        if (target_file.exists() and (not allow_overwrite_existing)):
+            print(f'\ttarget_file: "{target_file}" already exists!')
+            return False
+        else:
+            # does not exist, safe to copy
+            print(f'\t moving "{src_file}" -> "{target_file}"...')
+            if not is_dryrun:
+                shutil.move(src_file, target_file)
+            else:
+                print(f'\t\t(is_dryrun==True, so not actually moving.)')
+            print(f'\t\tdone!')
+            return True
 
 
 @function_attributes(short_name=None, tags=['move', 'pickle', 'filesystem', 'GL'], input_requires=[], output_provides=[], uses=['try_perform_move'], used_by=[], creation_date='2024-11-04 19:41', related_items=[])
@@ -772,9 +772,10 @@ from neuropy.core.flattened_spiketrains import SpikesAccessor
 from neuropy.core.epoch import ensure_dataframe
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
+from neuropy.utils.mixins.AttrsClassHelpers import SimpleFieldSizesReprMixin
 
-@define(slots=False, eq=False)
-class CellsFirstSpikeTimes:
+@define(slots=False, eq=False, repr=False)
+class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
     """ First spike times
     
     
@@ -1272,6 +1273,123 @@ class CellsFirstSpikeTimes:
             return False
         
 
+    # ==================================================================================================================== #
+    # Plotting and Visualization                                                                                           #
+    # ==================================================================================================================== #
+    @function_attributes(short_name=None, tags=['matplotlib', 'scatter', 'spikes', 'position', 'time'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-05 13:23', related_items=[])
+    def plot_first_spike_scatter_figure(self, aclu_to_color_map=None):
+        """ plots a scatterplot showing the first spike for each cell during PBEs vs. Laps
+        
+        
+        # global_session.config.plotting_config
+        active_config = deepcopy(curr_active_pipeline.active_configs[global_epoch_name])
+        active_pf1D = deepcopy(global_pf1D)
+        aclu_to_color_map = {v.cell_uid:v.color.tolist() for v in active_config.plotting_config.pf_neuron_identities}
+        fig, ax = cells_first_spike_times.plot_first_spike_scatter_figure(aclu_to_color_map=aclu_to_color_map)
+        
+        """
+        ## INPUTS: active_config
+        # type(active_config.plotting_config.pf_colormap)
+        
+        self.all_cells_first_spike_time_df['color'] = self.all_cells_first_spike_time_df['aclu'].map(lambda x: aclu_to_color_map.get(x, [1.0, 1.0, 0.0, 1.0]))
+        column_names = ['first_spike_any', 'first_spike_theta', 'first_spike_lap', 'first_spike_PBE']
+        interpolated_position_column_names = []
+        for a_col in column_names:	
+            ## interpolate positions for each of these spike times
+            self.all_cells_first_spike_time_df[f'interp_pos_{a_col}'] = np.interp(self.all_cells_first_spike_time_df[a_col], self.global_position_df.t, self.global_position_df.x)
+            interpolated_position_column_names.append(f'interp_pos_{a_col}')
+
+        column_to_interpolated_position_column_name_dict = dict(zip(column_names, interpolated_position_column_names))
+        self.all_cells_first_spike_time_df
+
+        ## plot the spike timecourse:
+        fig = plt.figure(num='test_new_spikes', clear=True)
+
+        ax = self.global_position_df.plot(x='t', y='x', ax=fig.gca(), c=(0.3, 0.3, 0.3, 0.2))
+
+        spike_scatter_kwargs = dict(s=25)
+
+        ## find extrema
+        # active_col_names = column_names
+        active_col_names = ['first_spike_any', 'first_spike_lap']
+        earliest_first_spike_t: float = self.all_cells_first_spike_time_df[active_col_names].min(axis=0).min()
+        latest_first_spike_t: float = self.all_cells_first_spike_time_df[active_col_names].max(axis=0).max()
+        ax.set_xlim(earliest_first_spike_t, latest_first_spike_t)
+
+        # column_to_interpolated_position_column_name_dict['first_spike_any']
+        self.all_cells_first_spike_time_df.plot.scatter(x='first_spike_any', y=column_to_interpolated_position_column_name_dict['first_spike_any'], c='color', ax=ax, marker='d', **spike_scatter_kwargs)
+        self.all_cells_first_spike_time_df.plot.scatter(x='first_spike_lap', y=column_to_interpolated_position_column_name_dict['first_spike_lap'], c='color', ax=ax, marker='*', **spike_scatter_kwargs)
+
+        # cells_first_spike_times.all_cells_first_spike_time_df.plot.scatter(x='first_spike_any', y='interpolated_y', c='color', ax=ax) # , c='color'
+        return fig, ax
+
+
+    @function_attributes(short_name=None, tags=['pyqtgraph', 'raster', 'spikes'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-05 13:23', related_items=[])
+    def plot_first_lap_spike_relative_first_PBE_spike_scatter_figure(self, defer_show = False):
+        """ plots a raster plot showing the first spike for each PBE for each cell (rows) relative to the first lap spike (t=0)
+        
+        test_obj: CellsFirstSpikeTimes = CellsFirstSpikeTimes.init_from_batch_hdf5_exports(first_spike_activity_data_h5_files=first_spike_activity_data_h5_files)
+        app, win, plots, plots_data = test_obj.plot_first_lap_spike_relative_first_PBE_spike_scatter_figure()
+        
+        """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import new_plot_raster_plot, NewSimpleRaster
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.CustomInfiniteLine import CustomInfiniteLine
+        import pyphoplacecellanalysis.External.pyqtgraph as pg
+
+        ## INPUTS: active_config
+        # type(active_config.plotting_config.pf_colormap)
+        ## align to first lap spike (first_spike_lap)
+        self.all_cells_first_spike_time_df['lap_spike_relative_first_spike'] = self.all_cells_first_spike_time_df['first_spike_PBE'] - self.all_cells_first_spike_time_df['first_spike_lap']
+        # self.all_cells_first_spike_time_df['color'] = self.all_cells_first_spike_time_df['aclu'].map(lambda x: aclu_to_color_map.get(x, [1.0, 1.0, 0.0, 1.0]))
+        # column_names = ['first_spike_any', 'first_spike_theta', 'first_spike_lap', 'first_spike_PBE']
+
+        ## plot the spike timecourse:
+        # spike_scatter_kwargs = dict(s=25)
+
+        ## find extrema
+        # active_col_names = column_names
+        active_col_names = ['lap_spike_relative_first_spike', ]
+        earliest_first_spike_t: float = self.all_cells_first_spike_time_df[active_col_names].min(axis=0).min()
+        latest_first_spike_t: float = self.all_cells_first_spike_time_df[active_col_names].max(axis=0).max()
+        # ax.set_xlim(earliest_first_spike_t, latest_first_spike_t)
+
+
+        # _temp_active_spikes_df = deepcopy(test_obj.all_cells_first_spike_time_df)[['aclu', 'neuron_uid', 'lap_spike_relative_first_spike']].rename(columns={'lap_spike_relative_first_spike':'t_rel_seconds'})
+        _temp_active_spikes_df = deepcopy(self.all_cells_first_spike_time_df)[['neuron_uid', 'lap_spike_relative_first_spike']].rename(columns={'lap_spike_relative_first_spike':'t_rel_seconds'})
+        # Use pd.factorize to create new integer codes for 'neuron_uid'
+        _temp_active_spikes_df['aclu'], uniques = pd.factorize(_temp_active_spikes_df['neuron_uid'])
+        # Optionally, add 1 to start 'aclu' from 1 instead of 0
+        _temp_active_spikes_df['aclu'] = _temp_active_spikes_df['aclu'] + 1
+        # Now, 'aclu' contains unique integer IDs corresponding to 'neuron_uid'
+        print(_temp_active_spikes_df[['neuron_uid', 'aclu']].drop_duplicates())
+
+        _temp_active_spikes_df
+        # shared_aclus = deepcopy(_temp_active_spikes_df['neuron_uid'].unique())
+        shared_aclus = deepcopy(_temp_active_spikes_df['aclu'].unique())
+        shared_aclus
+        # Assuming _temp_active_spikes_df is your DataFrame
+
+
+        app, win, plots, plots_data = new_plot_raster_plot(_temp_active_spikes_df, shared_aclus, scatter_plot_kwargs=None,
+                                                            scatter_app_name=f'lap_spike_relative_first_spike_raster', defer_show=defer_show, active_context=None)
+
+        root_plot = plots['root_plot']
+        # Create a vertical line at x=3
+        v_line = CustomInfiniteLine(pos=0.0, angle=90, pen=pg.mkPen('r', width=2), label='first lap spike')
+        root_plot.addItem(v_line)
+        plots['v_line'] = v_line
+        
+        ## Set Labels
+        # plots['root_plot'].set_xlabel('First PBE spike relative to first lap spike (t=0)')
+        # plots['root_plot'].set_ylabel('Cell')
+        plots['root_plot'].setTitle("First PBE spike relative to first lap spike (t=0)", color='white', size='24pt')
+        # plots['root_plot'].setLabel('top', 'First PBE spike relative to first lap spike (t=0)', size='22pt') # , color='blue'
+        plots['root_plot'].setLabel('left', 'Cell ID', color='white', size='12pt') # , units='V', color='red'
+        plots['root_plot'].setLabel('bottom', 'Time (relative to first lap spike for each cell)', color='white', units='s', size='12pt') # , color='blue'
+
+
+        return app, win, plots, plots_data
+    
 
 # ==================================================================================================================== #
 # 2024-10-09 - Building Custom Individual time_bin decoded posteriors                                                  #

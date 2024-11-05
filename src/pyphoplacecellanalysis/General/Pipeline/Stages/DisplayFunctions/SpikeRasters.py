@@ -545,16 +545,23 @@ class NewSimpleRaster:
     
     """
     neuron_IDs: NDArray = field(repr=True)
-    neuron_colors: Dict[int, QColor] = field(init=False, repr=False)
-    neuron_y_pos: Dict[int, float] = field(init=False, repr=True)
+    neuron_colors: Dict[int, QColor] = field(init=False, repr=False) # , default=Factory(dict)
+    neuron_y_pos: Dict[int, float] = field(init=False, repr=True) # , default=Factory(dict)
+
+    def __attrs_post_init__(self):
+        self.neuron_colors = dict()
+        self.neuron_y_pos = dict()
 
     @classmethod
     def init_from_neuron_ids(cls, neuron_IDs, neuron_colors=None):
         _obj = cls(neuron_IDs=neuron_IDs)
         n_cells = len(_obj.neuron_IDs)
+        # _obj.neuron_colors = None
+        # _obj.neuron_y_pos = None
         
         if neuron_colors is None:	
             neuron_qcolors_list = DataSeriesColorHelpers._build_cell_qcolor_list(np.arange(n_cells), mode=UnitColoringMode.PRESERVE_FRAGILE_LINEAR_NEURON_IDXS, provided_cell_colors=None)
+            _obj.neuron_colors = dict(zip(_obj.neuron_IDs, neuron_qcolors_list))
         else:
             
             if isinstance(neuron_colors, dict):
@@ -675,7 +682,7 @@ class NewSimpleRaster:
         # config_fragile_linear_neuron_IDX_map values are of the form: (i, fragile_linear_neuron_IDX, curr_pen, self._series_identity_lower_y_values[i], self._series_identity_upper_y_values[i])
         # Emphasis/Deemphasis-Dependent Pens:
         # curr_spike_pens = [config_fragile_linear_neuron_IDX_map[a_fragile_linear_neuron_IDX][2][a_spike_emphasis_state] for a_fragile_linear_neuron_IDX, a_spike_emphasis_state in zip(filtered_spikes_df['fragile_linear_neuron_IDX'].to_numpy(), filtered_spikes_df['visualization_raster_emphasis_state'].to_numpy())] # get the pens for each spike from the configs map
-        curr_spike_pens = [pg.mkPen(self.neuron_colors[aclu], width=1) for aclu, a_spike_emphasis_state in zip(filtered_spikes_df['aclu'].to_numpy(), filtered_spikes_df['visualization_raster_emphasis_state'].to_numpy())] # ignores emphasis state
+        curr_spike_pens = [pg.mkPen(self.neuron_colors[aclu], width=1) for aclu, a_spike_emphasis_state in zip(filtered_spikes_df['aclu'].to_numpy(), filtered_spikes_df['visualization_raster_emphasis_state'].to_numpy())] # ignores emphasis state ## 2024-11-05 12:36 AttributeError: 'NewSimpleRaster' object has no attribute 'neuron_colors'
         curr_spikes_brushes = [pg.mkBrush(self.neuron_colors[aclu]) for aclu, a_spike_emphasis_state in zip(filtered_spikes_df['aclu'].to_numpy(), filtered_spikes_df['visualization_raster_emphasis_state'].to_numpy())] # ignores emphasis state
 
         curr_n = len(curr_spike_t) # curr number of spikes
