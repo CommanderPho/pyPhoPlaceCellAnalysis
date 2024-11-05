@@ -259,7 +259,7 @@ run_status, run_errors, run_outputs = run_specific_batch(global_data_root_parent
                                                 force_reload = result_handler.force_reload_all,
                                                 post_run_callback_fn=result_handler.on_complete_success_execution_session,
                                                 fail_on_exception=False,
-                                                saving_mode=result_handler.saving_mode, **run_specific_batch_kwargs)
+                                                saving_mode=result_handler.saving_mode, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict, **run_specific_batch_kwargs)
 
 new_print(f'finished run: {run_status}\nerrors: {run_errors}\n') # 'outputs: {run_outputs}'
 
