@@ -26,7 +26,7 @@ import base64
 
 # from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import add_copy_button
 @function_attributes(short_name=None, tags=['plotly', 'interactive', 'clipboard', 'save', 'metadata', 'USEFUL'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-25 07:30', related_items=[])
-def add_copy_save_action_buttons(fig: go.Figure):
+def add_copy_save_action_buttons(fig: go.Figure, output_widget=None):
 	"""
 	Adds buttons to copy the Plotly figure to the clipboard as an image
 	and download it with a specified filename inferred from the figure's title.
@@ -116,14 +116,19 @@ def add_copy_save_action_buttons(fig: go.Figure):
 	button_download.on_click(on_download_button_click)
 	
 	# Create an output widget to hold the figure
-	output_fig = widgets.Output()
-	with output_fig:
-		fig.show()
-	# display(widgets.HBox([widgets.HBox([button_copy, button_download]), output_fig]))
+	if output_widget is None:
+		output_widget = widgets.Output()
 	
+	# with output_widget:
+	# 	fig.show()
+	# display(widgets.HBox([widgets.HBox([button_copy, button_download]), output_widget]))
+	
+	# Create the container widget but do not directly display it
+	container = widgets.VBox([widgets.HBox([button_copy, button_download, filename_label]), output_widget])
 	# Display buttons with filename label to the right of the buttons
-	display(widgets.VBox([widgets.HBox([button_copy, button_download, filename_label]), output_fig]))
-	
+	# display(widgets.VBox([widgets.HBox([button_copy, button_download, filename_label]), output_widget]))
+	# display(container)
+	return container, output_widget
 
 
 @function_attributes(short_name=None, tags=['plotly', 'export', 'save'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-27 17:59', related_items=[])

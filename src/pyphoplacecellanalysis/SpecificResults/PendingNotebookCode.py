@@ -1126,9 +1126,12 @@ class CellsFirstSpikeTimes:
             for k, v in extra_dfs_dict_loaded.items():
                 if k not in all_sessions_extra_dfs_dict_dict:
                     all_sessions_extra_dfs_dict_dict[k] = [] # add this dataframe name
+                ## add the session column to `v` if it's missing
+                v['session_key'] = session_key
+                v['params_key'] = params_key
+                v['session_uid'] = reconstructed_session_context.get_description(separator="|")
                 all_sessions_extra_dfs_dict_dict[k].append(v) # append to this df name
                 
-
 
             # first_spikes_dict_loaded
             # all_cells_first_spike_time_df_loaded

@@ -1682,7 +1682,8 @@ class DataFrameFilter:
 
 
 	additional_filter_predicates = field(default=Factory(dict)) # a list of boolean predicates to be applied as filters
-
+	on_filtered_dataframes_changed_callback_fns = field(default=Factory(dict)) # a list of callables that will be called when the filters are changed. 
+	
 
 	# Widgets (will be initialized in __attrs_post_init__) _______________________________________________________________ #
 	replay_name_widget = field(init=False)
@@ -1881,7 +1882,7 @@ class DataFrameFilter:
 		for name, df in self.original_df_dict.items():
 			if 'is_filter_included' not in df.columns:
 				df['is_filter_included'] = True
-			df['is_filter_included'] = True
+			df.loc['is_filter_included'] = True
 			df['is_filter_included'] = (df['custom_replay_name'] == replay_name) & (df['time_bin_size'].isin(time_bin_sizes))
 			for a_predicate_name, a_predicate_fn in self.additional_filter_predicates.items():
 				if a_predicate_name in enabled_filter_predicate_list:
@@ -1907,6 +1908,13 @@ class DataFrameFilter:
 			# self.update_calling_namespace_locals()
 			# display(self.filtered_all_sessions_all_scores_ripple_df.head())
 
+			for k, a_callback_fn in self.on_filtered_dataframes_changed_callback_fns.items():
+				print(f'k: {k}')
+				try:
+					a_callback_fn(self)
+				except Exception as e:
+					raise
+				
 
 	def update_calling_namespace_locals(self):
 		""" dangerous!! Updates the calling namespace (such as a jupyter notebook cell) """
@@ -2075,7 +2083,7 @@ def _perform_dual_hist_plot(grainularity_desc: str, laps_df: pd.DataFrame, rippl
 
 
 @function_attributes(short_name=None, tags=['MAIN', 'CRITICAL', 'FINAL', 'plotly'], input_requires=[], output_provides=[], uses=['plotly_pre_post_delta_scatter'], used_by=[], creation_date='2024-10-23 20:04', related_items=[])
-def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, concatenated_ripple_df: pd.DataFrame, time_delta_tuple: Tuple[float, float, float], fig_size_kwargs: Dict, save_plotly: Callable, is_dark_mode: bool=False, enable_custom_widget_buttons:bool=True, legend_groups_to_hide=['0.03', '0.044', '0.05'], should_save: bool = True):
+def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, concatenated_ripple_df: pd.DataFrame, time_delta_tuple: Tuple[float, float, float], fig_size_kwargs: Dict, save_plotly: Callable, is_dark_mode: bool=False, enable_custom_widget_buttons:bool=True, custom_output_widget=None, legend_groups_to_hide=['0.03', '0.044', '0.05'], should_save: bool = True):
 	""" plots the stacked histograms for both laps and ripples
 
 	Usage:
@@ -2097,12 +2105,16 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
 
 
 	"""
-	from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import plotly_pre_post_delta_scatter
 	from pyphoplacecellanalysis.Pho2D.plotly.plotly_templates import PlotlyHelpers
 	from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import plotly_helper_save_figures, _helper_build_figure, plotly_pre_post_delta_scatter, add_copy_save_action_buttons
 	
 	is_dark_mode, template = PlotlyHelpers.get_plotly_template(is_dark_mode=is_dark_mode)
 	
+	if data_context is None:
+		data_context = concatenated_ripple_df.attrs.get('data_context', None)
+		assert data_context is not None, f"could not get context from dataframe's df.attrs.data_context either."
+		
+
 	histogram_bins = 25
 	num_sessions = 1
 
@@ -2198,7 +2210,10 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
 		figure_out_paths = None
 		
 	if enable_custom_widget_buttons:
-		_extras_output_dict['out_widget'] = add_copy_save_action_buttons(new_fig)
+		# _extras_output_dict['out_widget'] = add_copy_save_action_buttons(new_fig)
+		_extras_output_dict['out_container_widget'], _extras_output_dict['out_widget'] = add_copy_save_action_buttons(new_fig, output_widget=custom_output_widget)
+		
+
 	
 	return new_fig, new_fig_context, _extras_output_dict, figure_out_paths
 
