@@ -52,7 +52,7 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 # 2024-11-04 - Custom spike Drawing                                                                                    #
 # ==================================================================================================================== #
 def test_plotRaw_v_time(active_pf1D, cellind, speed_thresh=False, spikes_color=None, spikes_alpha=None, ax=None, position_plot_kwargs=None, spike_plot_kwargs=None,
-    should_include_trajectory=True, should_include_spikes=True, should_include_filter_excluded_spikes=True, should_include_labels=True, use_filtered_positions=False, use_pandas_plotting=False):
+    should_include_trajectory=True, should_include_spikes=True, should_include_filter_excluded_spikes=True, should_include_labels=True, use_filtered_positions=False, use_pandas_plotting=False, **kwargs):
     """ Builds one subplot for each dimension of the position data
     Updated to work with both 1D and 2D Placefields
 
@@ -153,6 +153,12 @@ def test_plotRaw_v_time(active_pf1D, cellind, speed_thresh=False, spikes_color=N
         - y_normal: Array of y values for the normal line.
         - is_vertical: Boolean indicating if the normal line is vertical.
         """
+        t_min: float = (t_val - delta)
+        t_max: float = (t_val + delta)
+        
+        # t_normal = np.array([t_val, t_val])
+        # t_normal = np.linspace(t_min, t_max, 10)
+        
         if np.isinf(slope_normal):
             # Normal line is vertical
             t_normal = np.array([t_val, t_val])
@@ -162,11 +168,11 @@ def test_plotRaw_v_time(active_pf1D, cellind, speed_thresh=False, spikes_color=N
             is_vertical = True
         elif np.isclose(slope_normal, 0.0, atol=1e-3): # slope_normal == 0
             # Normal line is horizontal
-            t_normal = np.linspace(t_val - delta, (t_val + delta), 10)
+            t_normal = np.linspace(t_min, t_max, 10)
             y_normal = np.full_like(t_normal, x_val)
             is_vertical = False
         else:
-            t_normal = np.linspace((t_val - delta), (t_val + delta), 10)
+            t_normal = np.linspace(t_min, t_max, 10)
             y_normal = x_val + slope_normal * (t_normal - t_val)
             is_vertical = False
         return t_normal, y_normal, is_vertical
@@ -178,8 +184,10 @@ def test_plotRaw_v_time(active_pf1D, cellind, speed_thresh=False, spikes_color=N
     polyorder = 3
     x = deepcopy(pos)
     t_delta: float = (t[1] - t[0])
+    override_t_delta: float = kwargs.get('override_t_delta', t_delta)
+    
     x_smooth = savgol_filter(pos, window_length=window_length, polyorder=polyorder)
-    dx_dt = savgol_filter(x, window_length=window_length, polyorder=polyorder, deriv=1, delta=t_delta)
+    dx_dt = savgol_filter(x, window_length=window_length, polyorder=polyorder, deriv=1, delta=override_t_delta)
     # dx_dt = np.gradient(x_smooth, t)  # Approximate derivative
 
 
@@ -212,7 +220,7 @@ def test_plotRaw_v_time(active_pf1D, cellind, speed_thresh=False, spikes_color=N
             slope_normal = -1 / slope_tangent
         
         normal_slopes.append(slope_normal)
-        t_normal, y_normal, is_vertical = normal_line(t_val, x_val, slope_normal, delta=t_delta)
+        t_normal, y_normal, is_vertical = normal_line(t_val, x_val, slope_normal, delta=override_t_delta)
         normal_ts.append((t_normal[0], t_normal[-1],)) # first and last value
         normal_ys.append((y_normal[0], y_normal[-1],)) # first and last value
         normal_is_vertical.append(is_vertical)
@@ -312,12 +320,14 @@ def test_plotRaw_v_time(active_pf1D, cellind, speed_thresh=False, spikes_color=N
             for a_ax, pos_label in zip(ax, variable_array):
                 y_min, y_max = a_ax.get_ylim()
                 span = y_max - y_min
-                delta = span * 0.01  # 1% of y-axis range
-                # delta = 0.5  # 1% of y-axis range
-                delta_y.append(delta)
-
+                a_delta_y = span * 0.01  # 1% of y-axis range
+                print(f'a_delta_y: {a_delta_y}')
+                # a_delta_y = 0.5  # 1% of y-axis range
+                delta_y.append(a_delta_y)
+                
+            print(f'delta_y: {delta_y}')
             # Plot spikes for each dimension
-            for dim, (a_ax, delta) in enumerate(zip(ax, delta_y)):
+            for dim, (a_ax, a_delta_y) in enumerate(zip(ax, delta_y)):
                 spk_t = spk_t_[cellind]
                 spk_pos = spk_pos_[cellind][:, dim] if active_pf1D.ndim > 1 else spk_pos_[cellind]
 
@@ -330,11 +340,13 @@ def test_plotRaw_v_time(active_pf1D, cellind, speed_thresh=False, spikes_color=N
                 # a_ax.vlines(spk_t, spk_normals_ymin, spk_normals_ymax, **spike_plot_kwargs)
 
                 # Plot normal lines
-                for i, (tmin, tmax, slope, ymin, ymax) in enumerate(zip(spk_normals_tmin, spk_normals_tmax, spk_normals_slope, spk_normals_ymin, spk_normals_ymax)):
+                for i, (tspike, tmin, tmax, slope, ymin, ymax) in enumerate(zip(spk_t, spk_normals_tmin, spk_normals_tmax, spk_normals_slope, spk_normals_ymin, spk_normals_ymax)):
                     # if is_vertical:
                     # 	plt.vlines(t_normal[0], y_normal[0], y_normal[1], colors='red', linestyles='--', linewidth=1)
                     # plt.plot(t_normal, y_normal, color='red', linestyle='--', linewidth=1)
-                    a_ax.plot([tmin, tmax], [ymin, ymax], color='red', linestyle='--', linewidth=1, label='Normal Line' if i == 0 else "")  # Label only the first line to avoid duplicate legends
+                    
+                    a_ax.plot([(tspike-a_delta_y), (tspike+a_delta_y)], [ymin, ymax], color='#ff00009b', linestyle='solid', linewidth=2, label='Normal Line' if i == 0 else "")  # Label only the first line to avoid duplicate legends
+                    # a_ax.plot([tmin, tmax], [ymin, ymax], color='red', linestyle='--', linewidth=1, label='Normal Line' if i == 0 else "")  # Label only the first line to avoid duplicate legends
                     # a_ax.vlines(spk_t, ymin, ymax, **spike_plot_kwargs)
 
 
