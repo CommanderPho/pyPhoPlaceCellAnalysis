@@ -363,6 +363,278 @@ def test_plotRaw_v_time(active_pf1D, cellind, speed_thresh=False, spikes_color=N
 
 
 
+# # t='t', x='x', y='y', 
+# def plot_raw_v_time(ndim, position_df, t=None, x=None, y=None, spk_pos=None, spk_t=None, run_spk_pos=None, run_spk_t=None, cell_ids=None, cellind=None, speed_thresh=False, speed_thresh_param=None, 
+#                     pretty_plot_func=None, spikes_color=None, spikes_alpha=0.5, ax=None, position_plot_kwargs=None, spike_plot_kwargs=None, should_include_trajectory=True, should_include_spikes=True,
+#                     should_include_filter_excluded_spikes=True, should_include_labels=True, use_filtered_positions=False, use_pandas_plotting=False, ):
+#     """
+#     Builds one subplot for each dimension of the position data and renders spikes
+#     as small lines normal to the current position value.
+
+#     Parameters:
+#     ----------
+#     ndim : int
+#         Number of dimensions of the position data (e.g., 1 or 2).
+    
+#     position_df : pandas.DataFrame
+#         DataFrame containing position data with at least a 't' column and 
+#         positional columns ('x', 'y', etc.).
+    
+#     t : array-like
+#         Array of time points corresponding to the position data. If `use_filtered_positions`
+#         is False, this should match `position_df['t']`. Otherwise, it should correspond to
+#         the filtered positions.
+    
+#     x : array-like, optional
+#         Array of x positions (filtered or raw based on `use_filtered_positions`).
+#         Required if `use_filtered_positions` is True.
+    
+#     y : array-like, optional
+#         Array of y positions (filtered or raw based on `use_filtered_positions`).
+#         Required if `ndim` >= 2 and `use_filtered_positions` is True.
+    
+#     spk_pos : list of arrays, optional
+#         List where each element corresponds to spike positions for a cell. Each spike position
+#         array should align with the respective dimension.
+    
+#     spk_t : list of arrays, optional
+#         List where each element corresponds to spike times for a cell.
+    
+#     run_spk_pos : list of arrays, optional
+#         (Optional) List of run-specific spike positions for a cell.
+    
+#     run_spk_t : list of arrays, optional
+#         (Optional) List of run-specific spike times for a cell.
+    
+#     cell_ids : list or array-like, optional
+#         List of cell identifiers. Required for setting plot titles.
+    
+#     cellind : int, optional
+#         Index of the cell to plot spikes for.
+    
+#     speed_thresh : bool, default=False
+#         Whether to apply speed thresholding to spikes.
+    
+#     speed_thresh_param : Any, optional
+#         Additional parameters for speed thresholding. Adjust based on actual usage.
+    
+#     pretty_plot_func : callable, optional
+#         Function to apply styling to each axis. If None, no additional styling is applied.
+    
+#     spikes_color : tuple, optional
+#         RGB tuple for spike line colors. Defaults to (0, 0, 0.8) if not provided.
+    
+#     spikes_alpha : float, default=0.5
+#         Transparency level for spike lines.
+    
+#     ax : matplotlib.axes.Axes or list of Axes, optional
+#         Matplotlib axes to plot on. If None, new axes are created.
+    
+#     position_plot_kwargs : dict, optional
+#         Additional keyword arguments for plotting positions.
+    
+#     spike_plot_kwargs : dict, optional
+#         Additional keyword arguments for plotting spikes.
+    
+#     should_include_trajectory : bool, default=True
+#         Whether to plot the trajectory.
+    
+#     should_include_spikes : bool, default=True
+#         Whether to plot spikes.
+    
+#     should_include_filter_excluded_spikes : bool, default=True
+#         Whether to filter excluded spikes.
+    
+#     should_include_labels : bool, default=True
+#         Whether to include axis labels and titles.
+    
+#     use_filtered_positions : bool, default=False
+#         Whether to use filtered positions (`x`, `y`). If False, uses positions from `position_df`.
+    
+#     use_pandas_plotting : bool, default=False
+#         Whether to use pandas' plotting functions.
+    
+#     Returns:
+#     -------
+#     ax : list of matplotlib.axes.Axes
+#         The axes with the plotted data.
+#     """
+#     if ax is None:
+#         fig, ax = plt.subplots(ndim, 1, sharex=True)
+#         fig.set_size_inches([23, 9.7])
+
+#     if not isinstance(ax, Iterable):
+#         ax = [ax]
+
+#     # Plot trajectories
+#     if not use_pandas_plotting:
+#         time = t
+#     else:
+#         time = position_df['t'].to_numpy()
+
+#     if ndim < 2:
+#         if not use_pandas_plotting:
+#             if use_filtered_positions:
+#                 variable_array = [x]
+#             else:
+#                 variable_array = [position_df['x'].to_numpy()]
+#         else:
+#             variable_array = ['x']
+#         label_array = ["X position (cm)"]
+#     else:
+#         if not use_pandas_plotting:
+#             if use_filtered_positions:
+#                 variable_array = [x, y]
+#             else:
+#                 variable_array = [position_df['x'].to_numpy(), position_df['y'].to_numpy()]
+#         else:
+#             variable_array = ['x', 'y']
+#         label_array = ["X position (cm)", "Y position (cm)"]
+
+#     for a_ax, pos, ylabel in zip(ax, variable_array, label_array):
+#         if should_include_trajectory:
+#             if not use_pandas_plotting:
+#                 a_ax.plot(time, pos, **(position_plot_kwargs or {}))
+#             else:
+#                 position_df.plot(x='t', y=pos, ax=a_ax, legend=False, **(position_plot_kwargs or {}))
+
+#         if should_include_labels:
+#             a_ax.set_xlabel("Time (seconds)")
+#             a_ax.set_ylabel(ylabel)
+#         if pretty_plot_func is not None:
+#             pretty_plot_func(a_ax)
+
+#     # Plot spikes on trajectory
+#     if cellind is not None and should_include_spikes:
+#         # Determine which spike data to use
+#         if speed_thresh and not should_include_filter_excluded_spikes:
+#             if run_spk_pos is not None and run_spk_t is not None:
+#                 spk_pos_, spk_t_ = run_spk_pos, run_spk_t
+#             else:
+#                 raise ValueError("run_spk_pos and run_spk_t must be provided when speed_thresh is True and should_include_filter_excluded_spikes is False.")
+#         else:
+#             if spk_pos is not None and spk_t is not None:
+#                 spk_pos_, spk_t_ = spk_pos, spk_t
+#             else:
+#                 raise ValueError("spk_pos and spk_t must be provided when plotting spikes.")
+
+#         # Set default spike plot kwargs if not provided
+#         if spike_plot_kwargs is None:
+#             spike_plot_kwargs = {}
+#         spike_plot_kwargs = spike_plot_kwargs.copy()  # To avoid mutating the original dict
+
+#         # Set default color and alpha
+#         if spikes_color is not None:
+#             spike_color = spikes_color
+#         else:
+#             spike_color = (0, 0, 0.8)  # Default color
+
+#         # Apply alpha to the color
+#         spike_color_RGBA = (*spike_color, spikes_alpha)
+#         spike_plot_kwargs.setdefault('color', spike_color_RGBA)
+#         spike_plot_kwargs.setdefault('linewidth', spike_plot_kwargs.get('linewidth', 1))  # Default line width
+
+#         # Determine the vertical span (delta) for the spike lines
+#         # Here, delta_y is set to a small fraction of the y-axis range
+#         # Alternatively, you can set a fixed value
+#         delta_y = []
+#         for a_ax, pos_label in zip(ax, variable_array):
+#             y_min, y_max = a_ax.get_ylim()
+#             span = y_max - y_min
+#             delta = span * 0.01  # 1% of y-axis range
+#             delta_y.append(delta)
+
+#         # Plot spikes for each dimension
+#         for dim, (a_ax, delta) in enumerate(zip(ax, delta_y)):
+#             spk_t_cell = spk_t_[cellind]
+#             if ndim > 1:
+#                 spk_pos_cell = spk_pos_[cellind][:, dim]
+#             else:
+#                 spk_pos_cell = spk_pos_[cellind]
+
+#             # Calculate ymin and ymax for each spike
+#             ymin = spk_pos_cell - delta
+#             ymax = spk_pos_cell + delta
+
+#             # Use ax.vlines to plot all spikes at once
+#             a_ax.vlines(spk_t_cell, ymin, ymax, **spike_plot_kwargs)
+
+#     # Add title with cell information
+#     if cellind is not None and should_include_labels:
+#         if cell_ids is not None:
+#             cell_id_str = str(cell_ids[cellind])
+#         else:
+#             cell_id_str = "Unknown"
+#         title_str = f"Cell {cell_id_str}: speed_thresh={speed_thresh}"
+#         ax[0].set_title(title_str)
+
+#     return ax
+
+
+# # Example data preparation
+# # ndim = 2
+# # time = pd.Series(range(100))
+# # position_data = {
+# #     't': time,
+# #     'x': pd.Series(range(100)) + pd.Series(range(100)).apply(lambda x: x * 0.1),
+# #     'y': pd.Series(range(100)).apply(lambda x: x * 0.5)
+# # }
+# position_df = deepcopy(active_pf1D.position.to_dataframe())
+
+# # Spike data for 3 cells
+# # spk_pos = [
+# #     None,  # Placeholder for cell 0
+# #     None,  # Placeholder for cell 1
+# #     pd.DataFrame({
+# #         'x': [20, 40, 60, 80],
+# #         'y': [25, 45, 65, 85]
+# #     }).values  # Cell 2 spike positions
+# # ]
+# # spk_t = [
+# #     None,  # Placeholder for cell 0
+# #     None,  # Placeholder for cell 1
+# #     [20, 40, 60, 80]  # Cell 2 spike times
+# # ]
+# # cell_ids = ['Cell_A', 'Cell_B', 'Cell_C']
+# cellind = 2  # Plotting spikes for Cell_C
+
+# # Define a simple pretty_plot function
+# # def pretty_plot(ax):
+# #     ax.grid(True)
+# #     ax.set_facecolor('#f0f0f0')
+
+# # Create plot
+# fig, axes = plt.subplots(ndim, 1, figsize=(15, 8))
+# plot_axes = plot_raw_v_time(
+#     ndim=active_pf1D.ndim,
+#     position_df=position_df,
+#     t=active_pf1D.t,
+# 	x=active_pf1D.x,
+#     y=active_pf1D.y,
+#     # x=position_df['x'].to_numpy(),
+#     # y=position_df['y'].to_numpy(),
+#     spk_pos=active_pf1D.spk_pos,
+#     spk_t=active_pf1D.spk_t,
+#     cell_ids=active_pf1D.cell_ids,
+#     cellind=cellind,
+#     speed_thresh=False,
+#     pretty_plot_func=pretty_plot,
+#     spikes_color=(1, 0, 0),  # Red spikes
+#     spikes_alpha=0.7,
+#     ax=axes,
+#     position_plot_kwargs={'linewidth': 2},
+#     spike_plot_kwargs={'linewidth': 1},
+#     should_include_trajectory=True,
+#     should_include_spikes=True,
+#     use_filtered_positions=True,
+#     use_pandas_plotting=False
+# )
+# plt.tight_layout()
+# plt.show()
+
+
+
+
 # ==================================================================================================================== #
 # 2024-11-01 - Cell First Firing - Cell's first firing -- during PBE, theta, or resting?                                                                                      #
 # ==================================================================================================================== #
