@@ -1093,7 +1093,8 @@ def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False,
 
 
 @function_attributes(short_name='run_specific_batch', tags=['batch', 'automated', 'load', 'main', 'pipeline'], input_requires=[], output_provides=[], uses=['batch_load_session'], used_by=['python_template.py.j2'], creation_date='2023-03-28 04:46')
-def run_specific_batch(global_data_root_parent_path: Path, curr_session_context: IdentifyingContext, curr_session_basedir: Path, active_pickle_filename:str='loadedSessPickle.pkl', existing_task_logger: Optional[logging.Logger]=None, force_reload:bool=True, post_run_callback_fn:Optional[Callable]=None, saving_mode=PipelineSavingScheme.OVERWRITE_IN_PLACE, **kwargs):
+def run_specific_batch(global_data_root_parent_path: Path, curr_session_context: IdentifyingContext, curr_session_basedir: Path, active_pickle_filename:str='loadedSessPickle.pkl', existing_task_logger: Optional[logging.Logger]=None, force_reload:bool=True,
+                        post_run_callback_fn:Optional[Callable]=None, saving_mode=PipelineSavingScheme.OVERWRITE_IN_PLACE, override_parameters_flat_keypaths_dict=None, **kwargs):
     """ For a specific session (identified by the session context) - calls batch_load_session(...) to get the curr_active_pipeline.
             - Then calls `post_run_callback_fn(...)
             
@@ -1155,7 +1156,10 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
     
     # saving_mode = kwargs.pop('saving_mode', None) or PipelineSavingScheme.OVERWRITE_IN_PLACE
     skip_extended_batch_computations = kwargs.pop('skip_extended_batch_computations', True)
-    override_parameters_flat_keypaths_dict = kwargs.pop('override_parameters_flat_keypaths_dict', {}) or {} # ` or {}` part handles None values
+    # override_parameters_flat_keypaths_dict = kwargs.pop('override_parameters_flat_keypaths_dict', {}) or {} # ` or {}` part handles None values
+    if override_parameters_flat_keypaths_dict is None:
+        override_parameters_flat_keypaths_dict = {}
+    
     fail_on_exception = kwargs.pop('fail_on_exception', True)
     debug_print = kwargs.pop('debug_print', False)
 
