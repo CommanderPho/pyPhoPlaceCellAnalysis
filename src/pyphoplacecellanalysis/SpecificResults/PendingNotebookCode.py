@@ -846,7 +846,9 @@ class CellsFirstSpikeTimes:
     @classmethod
     def init_from_pipeline(cls, curr_active_pipeline, hdf_save_parent_path: Path=None) -> "CellsFirstSpikeTimes":
         """ 
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import CellsFirstSpikeTimes
         
+        _obj: CellsFirstSpikeTimes = CellsFirstSpikeTimes.init_from_pipeline(curr_active_pipeline=curr_active_pipeline)
         """
         all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict), hdf5_out_path = CellsFirstSpikeTimes.compute_cell_first_firings(curr_active_pipeline, hdf_save_parent_path=hdf_save_parent_path)
         _obj: CellsFirstSpikeTimes = CellsFirstSpikeTimes(global_spikes_df=global_spikes_df, all_cells_first_spike_time_df=all_cells_first_spike_time_df,
@@ -1011,6 +1013,23 @@ class CellsFirstSpikeTimes:
         return all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict), hdf5_out_path
 
 
+    def save_to_hdf5(self, hdf_save_path: Path):
+        """ Save to .h5 or CSV 
+        """
+        print(f'hdf_save_path: {hdf_save_path}')
+        # Save the data to an HDF5 file
+        did_save_successfully: bool = False
+        try:
+            self.save_data_to_hdf5(self.all_cells_first_spike_time_df, self.global_spikes_df, self.global_spikes_dict, self.first_spikes_dict, filename=hdf_save_path) # Path(r'K:\scratch\collected_outputs\kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]_first_spike_activity_data.h5')
+            did_save_successfully = True
+            self.hdf5_out_path = hdf_save_path
+        except Exception as e:
+            raise
+
+        if not did_save_successfully: 
+            self.hdf5_out_path = None
+        return did_save_successfully
+    
 
     @classmethod
     def save_data_to_hdf5(cls, all_cells_first_spike_time_df, global_spikes_df, global_spikes_dict, first_spikes_dict, filename='output_file.h5'):
