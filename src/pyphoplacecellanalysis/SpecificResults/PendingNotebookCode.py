@@ -47,6 +47,116 @@ from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
+# ==================================================================================================================== #
+# 2024-11-04 - Moving Misplaced Pickles on GL                                                                          #
+# ==================================================================================================================== #
+import shutil
+
+def try_perform_move(src_file, target_file, is_dryrun: bool):
+	""" tries to move the file from src_file to target_file """
+	print(f'try_perform_move(src_file: "{src_file}", target_file: "{target_file}")')
+	if not src_file.exists():
+		print(f'\tsrc_file "{src_file}" does not exist!')
+		return False
+	else:
+		if target_file.exists():
+			print(f'\ttarget_file: "{target_file}" already exists!')
+			return False
+		else:
+			# does not exist, safe to copy
+			print(f'\t moving "{src_file}" -> "{target_file}"...')
+			if not is_dryrun:
+				shutil.move(src_file, target_file)
+			else:
+				print(f'\t\t(is_dryrun==True, so not actually moving.)')
+			print(f'\t\tdone!')
+			return True
+
+
+@function_attributes(short_name=None, tags=['move', 'pickle', 'filesystem', 'GL'], input_requires=[], output_provides=[], uses=['try_perform_move'], used_by=[], creation_date='2024-11-04 19:41', related_items=[])
+def try_move_pickle_files_on_GL(good_session_concrete_folders, session_basedirs_dict, computation_script_paths, excluded_session_keys=None, is_dryrun: bool=True, debug_print: bool=False):
+    """ 
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import try_move_pickle_files_on_GL
+    
+    
+    copy_dict, moved_dict, (all_found_pipeline_pkl_files_dict, all_found_global_pkl_files_dict, all_found_pipeline_h5_files_dict) = try_move_pickle_files_on_GL(good_session_concrete_folders, session_basedirs_dict, computation_script_paths,
+             is_dryrun: bool=True, debug_print: bool=False)
+    
+    """
+    ## INPUTS: good_session_concrete_folders, session_basedirs_dict, computation_script_paths
+    # session_basedirs_dict: Dict[IdentifyingContext, Path] = {a_session_folder.context:a_session_folder.path for a_session_folder in good_session_concrete_folders}
+    
+    # is_dryrun: bool = False
+    assert len(good_session_concrete_folders) == len(session_basedirs_dict)
+    assert len(good_session_concrete_folders) == len(computation_script_paths)
+
+    script_output_folders = [Path(v).parent for v in computation_script_paths]
+
+    if excluded_session_keys is None:
+        excluded_session_keys = []
+        
+
+    # excluded_session_keys = ['kdiba_pin01_one_fet11-01_12-58-54', 'kdiba_gor01_one_2006-6-08_14-26-15', 'kdiba_gor01_two_2006-6-07_16-40-19']
+    excluded_session_contexts = [IdentifyingContext(**dict(zip(IdentifyingContext._get_session_context_keys(), v.split('_', maxsplit=3)))) for v in excluded_session_keys]
+
+    # excluded_session_contexts
+
+    # all_found_pkl_files_dict = {}
+    all_found_pipeline_pkl_files_dict = {}
+    all_found_global_pkl_files_dict = {}
+    all_found_pipeline_h5_files_dict = {}
+
+    copy_dict = {}
+    moved_dict = {}
+
+    # scripts_output_path
+    for a_good_session_concrete_folder, a_session_basedir, a_script_folder in zip(good_session_concrete_folders, session_basedirs_dict, script_output_folders):
+        if debug_print:
+            print(f'a_good_session_concrete_folder: {a_good_session_concrete_folder}, a_session_basedir: {a_session_basedir}. a_script_folder: {a_script_folder}')
+        if a_good_session_concrete_folder.context in excluded_session_contexts:
+            if debug_print:
+                print(f'skipping excluded session: {a_good_session_concrete_folder.context}')
+        else:
+            all_found_global_pkl_files_dict[a_session_basedir] = list(a_script_folder.glob('global_computation_results*.pkl'))
+            
+            for a_global_file in all_found_global_pkl_files_dict[a_session_basedir]:
+                ## iterate through the found global files:
+                target_file = a_good_session_concrete_folder.global_computation_result_pickle.with_name(a_global_file.name)
+                copy_dict[a_global_file] = target_file
+                # if not is_dryrun:
+                ## perform the move/copy
+                was_success = try_perform_move(src_file=a_global_file, target_file=target_file, is_dryrun=is_dryrun)
+                if was_success:
+                    moved_dict[a_file] = target_file
+            all_found_pipeline_pkl_files_dict[a_session_basedir] = list(a_script_folder.glob('loadedSessPickle*.pkl'))
+            for a_file in all_found_pipeline_pkl_files_dict[a_session_basedir]:
+                ## iterate through the found global files:
+                target_file = a_good_session_concrete_folder.session_pickle.with_name(a_file.name)
+                copy_dict[a_file] = target_file
+                # if not is_dryrun:
+                ## perform the move/copy
+                was_success = try_perform_move(src_file=a_file, target_file=target_file, is_dryrun=is_dryrun)
+                if was_success:
+                    moved_dict[a_file] = target_file
+            all_found_pipeline_h5_files_dict[a_session_basedir] = list(a_script_folder.glob('loadedSessPickle*.h5'))
+            for a_file in all_found_pipeline_h5_files_dict[a_session_basedir]:
+                ## iterate through the found global files:
+                target_file = a_good_session_concrete_folder.pipeline_results_h5.with_name(a_file.name)
+                copy_dict[a_file] = target_file
+                # if not is_dryrun:
+                ## perform the move/copy
+                was_success = try_perform_move(src_file=a_file, target_file=target_file, is_dryrun=is_dryrun)
+                if was_success:
+                    moved_dict[a_file] = target_file
+            # all_found_pkl_files_dict[a_session_basedir] = find_pkl_files(a_script_folder)
+
+    ## discover .pkl files in the root of each folder:
+    # all_found_pipeline_pkl_files_dict
+    # all_found_global_pkl_files_dict
+    ## OUTPUTS: copy_dict
+    # copy_dict
+    return copy_dict, moved_dict, (all_found_pipeline_pkl_files_dict, all_found_global_pkl_files_dict, all_found_pipeline_h5_files_dict)
+
 
 # ==================================================================================================================== #
 # 2024-11-04 - Custom spike Drawing                                                                                    #
