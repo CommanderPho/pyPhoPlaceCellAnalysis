@@ -174,6 +174,72 @@ def test_plotRaw_v_time(active_pf1D, cellind, speed_thresh=False, spikes_color=N
     use_pandas_plotting:bool = False
     use_filtered_positions:bool = False # If True, uses only the filtered positions (which are missing the end caps) and the default a.plot(...) results in connected lines which look bad.
 
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import test_plotRaw_v_time
+        
+        
+        _restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
+    
+        active_config = deepcopy(curr_active_pipeline.active_configs[global_epoch_name])
+        active_pf1D = deepcopy(global_pf1D)
+
+        fig = plt.figure(figsize=(23, 9.7), clear=True, num='test_plotRaw_v_time')
+        # Need axes:
+        # Layout Subplots in Figure:
+        gs = fig.add_gridspec(1, 8)
+        gs.update(wspace=0, hspace=0.05) # set the spacing between axes. # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+        ax_activity_v_time = fig.add_subplot(gs[0, :-1]) # all except the last element are the trajectory over time
+        ax_pf_tuning_curve = fig.add_subplot(gs[0, -1], sharey=ax_activity_v_time) # The last element is the tuning curve
+        # if should_include_labels:
+            # ax_pf_tuning_curve.set_title('Normalized Placefield', fontsize='14')
+        ax_pf_tuning_curve.set_xticklabels([])
+        ax_pf_tuning_curve.set_yticklabels([])
+
+
+        cellind: int = 2
+
+        kwargs = {}
+        # jitter the curve_value for each spike based on the time it occured along the curve:
+        spikes_color_RGB = kwargs.get('spikes_color', (0, 0, 0))
+        spikes_alpha = kwargs.get('spikes_alpha', 0.8)
+        # print(f'spikes_color: {spikes_color_RGB}')
+        should_plot_bins_grid = kwargs.get('should_plot_bins_grid', False)
+
+        should_include_trajectory = kwargs.get('should_include_trajectory', True) # whether the plot should include 
+        should_include_labels = kwargs.get('should_include_labels', True) # whether the plot should include text labels, like the title, axes labels, etc
+        should_include_plotRaw_v_time_spikes = kwargs.get('should_include_spikes', True) # whether the plot should include plotRaw_v_time-spikes, should be set to False to plot completely with the new all spikes mode
+        use_filtered_positions: bool = kwargs.pop('use_filtered_positions', False)
+
+        # position_plot_kwargs = {'color': '#393939c8', 'linewidth': 1.0, 'zorder':5} | kwargs.get('position_plot_kwargs', {}) # passed into `active_epoch_placefields1D.plotRaw_v_time`
+        position_plot_kwargs = {'color': '#757575c8', 'linewidth': 1.0, 'zorder':5} | kwargs.get('position_plot_kwargs', {}) # passed into `active_epoch_placefields1D.plotRaw_v_time`
+
+
+        # _out = test_plotRaw_v_time(active_pf1D=active_pf1D, cellind=cellind)
+        # spike_plot_kwargs = {'linestyle':'none', 'markersize':5.0, 'marker': '.', 'markerfacecolor':spikes_color_RGB, 'markeredgecolor':spikes_color_RGB, 'zorder':10} ## OLDER
+        spike_plot_kwargs = {'zorder':10} ## OLDER
+
+
+
+        # active_pf1D.plotRaw_v_time(cellind, ax=ax_activity_v_time, spikes_alpha=spikes_alpha,
+        # 	position_plot_kwargs=position_plot_kwargs,
+        # 	spike_plot_kwargs=spike_plot_kwargs,
+        # 	should_include_labels=should_include_labels, should_include_trajectory=should_include_trajectory, should_include_spikes=should_include_plotRaw_v_time_spikes,
+        # 	use_filtered_positions=use_filtered_positions,
+        # ) # , spikes_color=spikes_color, spikes_alpha=spikes_alpha
+
+        _out = test_plotRaw_v_time(active_pf1D=active_pf1D, cellind=cellind, ax=ax_activity_v_time, spikes_alpha=spikes_alpha,
+            position_plot_kwargs=position_plot_kwargs,
+            spike_plot_kwargs=spike_plot_kwargs,
+            should_include_labels=should_include_labels, should_include_trajectory=should_include_trajectory, should_include_spikes=should_include_plotRaw_v_time_spikes,
+            use_filtered_positions=use_filtered_positions,
+        )
+
+        _out = _subfn_plot_pf1D_placefield(active_epoch_placefields1D=active_pf1D, placefield_cell_index=cellind,
+                                        ax_activity_v_time=ax_activity_v_time, ax_pf_tuning_curve=ax_pf_tuning_curve, pf_tuning_curve_ax_position='right')
+        _out
+
+
     """
     from scipy.signal import savgol_filter
     from neuropy.plotting.figure import pretty_plot
