@@ -313,14 +313,6 @@ with open(final_log_file_path, 'w') as f:
 {{ generate_block() | indent(8) }}
 
 {% else %}
-{# from contextlib import contextmanager
-
-@contextmanager
-def noop_context():
-    yield
-
-with noop_context():
-    with noop_context(): #}
 {# Insert the block with each line indented by 4 spaces #}
 {# {{ self.my_block() | indent(0) }} #}
 {{ generate_block() | indent(0) }}
