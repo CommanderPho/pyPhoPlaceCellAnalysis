@@ -239,6 +239,8 @@ def test_plotRaw_v_time(active_pf1D, cellind, speed_thresh=False, spikes_color=N
                                         ax_activity_v_time=ax_activity_v_time, ax_pf_tuning_curve=ax_pf_tuning_curve, pf_tuning_curve_ax_position='right')
         _out
 
+        
+    # active_pf1D: ['spk_pos', 'spk_t', 'ndim', 'cell_ids', 'speed_thresh', 'position', '', '']
 
     """
     from scipy.signal import savgol_filter
@@ -294,25 +296,6 @@ def test_plotRaw_v_time(active_pf1D, cellind, speed_thresh=False, spikes_color=N
         pretty_plot(a)
 
 
-    # Define the tangent line function
-    def tangent_line(t_val, x_val, slope, delta=1.0):
-        """
-        Computes points on the tangent line at t_val.
-        
-        Parameters:
-        - t_val: The time at which the tangent is computed.
-        - x_val: The position at t_val.
-        - slope: The derivative dx/dt at t_val.
-        - delta: The range around t_val to plot the tangent line.
-        
-        Returns:
-        - t_tangent: Array of t values for the tangent line.
-        - y_tangent: Array of y values for the tangent line.
-        """
-        t_tangent = np.linspace(t_val - delta, t_val + delta, 10)
-        y_tangent = x_val + slope * (t_tangent - t_val)
-        return t_tangent, y_tangent
-
     # Define the normal line function
     def normal_line(t_val: float, x_val: float, slope_normal: float, delta: float=0.5):
         """
@@ -366,29 +349,14 @@ def test_plotRaw_v_time(active_pf1D, cellind, speed_thresh=False, spikes_color=N
     dx_dt = savgol_filter(x, window_length=window_length, polyorder=polyorder, deriv=1, delta=override_t_delta)
     # dx_dt = np.gradient(x_smooth, t)  # Approximate derivative
 
-
-    # Example usage: Compute tangent lines for selected points
-    # Choose a subset of points to plot tangent lines for clarity
-    # For example, every 10th point
-    # indices = np.arange(0, len(t), 10)
     # tangents = []
     normals = []
     normal_ts = []
     normal_ys = []
     normal_slopes = []
     normal_is_vertical = []
-    # for i in indices:
-    # 	t_val = t[i]
-    # 	x_val = pos[i]
-    # 	slope_tangent = dx_dt[i]
-    # delta: float = 0.5
-    # delta: float =
     
-    # for i, (t_val, x_val, slope_tangent) in enumerate(zip(t, x, dx_dt)):
     for i, (t_val, x_val, slope_tangent) in enumerate(zip(t, x_smooth, dx_dt)):
-        # t_tangent, y_tangent = tangent_line(t_val, x_val, slope_tangent, delta=0.5)
-        # tangents.append((t_tangent, y_tangent))
-
         # Avoid division by zero; handle zero slope separately
         if np.isclose(slope_tangent, 0.0, atol=1e-3):
             slope_normal = 0  # Horizontal normal line
@@ -412,24 +380,6 @@ def test_plotRaw_v_time(active_pf1D, cellind, speed_thresh=False, spikes_color=N
     normal_df['slope_tangent'] = slope_tangents
     # normal_df['x'] = x
     # normal_df['x_smooth'] = x_smooth
-
-    # # Select indices where normals will be plotted
-    # indices = np.arange(0, len(t), 10)  # Every 10th point
-    # # Plot the original curve
-    # plt.figure(figsize=(14, 7), num='test_normals')
-    # # plt.plot(t, pos, label='x(t)', color='blue')
-    # plt.plot(t, x, label='Noisy x(t)', color='gray', alpha=0.6)
-    # plt.plot(t, x_smooth, label='Smoothed x(t)', color='blue')
-    # # plt.scatter(t[indices], x_smooth[indices], color='green', label='Normal Points')
-
-    # # Plot normal lines
-    # for i, (t_normal, y_normal, is_vertical) in enumerate(normals):
-    # 	if i % 10 == 0:
-    # 		if is_vertical:
-    # 			plt.vlines(t_normal[0], y_normal[0], y_normal[1], colors='red', linestyles='--', linewidth=1)
-    # 		else:
-    # 			plt.plot(t_normal, y_normal, color='red', linestyle='--', linewidth=1)
-    
 
     # plot spikes on trajectory
     if cellind is not None:
