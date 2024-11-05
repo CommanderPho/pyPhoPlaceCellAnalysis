@@ -183,10 +183,10 @@ class ProcessingScriptPhases(Enum):
 
         phase3_extended_computations_include_includelist=['lap_direction_determination', 'pf_computation', 
                                                 'pfdt_computation', 'firing_rate_trends',
-            # 'pf_dt_sequential_surprise',  # commented out 2024-11-05
+            'pf_dt_sequential_surprise',  # commented out 2024-11-05
             'extended_stats',
             'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', 
-            # 'ratemap_peaks_prominence2d', # commented out 2024-11-05
+            'ratemap_peaks_prominence2d', # commented out 2024-11-05
             'long_short_inst_spike_rate_groups',
             'long_short_endcap_analysis',
             # 'spike_burst_detection',
