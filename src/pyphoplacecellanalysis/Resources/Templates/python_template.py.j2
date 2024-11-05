@@ -1,6 +1,7 @@
 import os
 import sys
 from pathlib import Path
+import builtins
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
 from nptyping import NDArray
@@ -99,6 +100,10 @@ neptuner_run.sync()
 
 _line_sweep = '=========================='
 ## REPLACES THE `print` function within this scope
+if (print != builtins.print):
+	print(f'already replaced print function! Avoiding doing again to prevent infinite recurrsion!')
+	print = builtins.print ## restore the default print function before continuing
+
 _original_print = print
 def new_print(*args, **kwargs):
     # Call both regular print and logger.info
@@ -149,7 +154,7 @@ global_computation_results_override_output_file = None #}
 parameter_specifier_str: str = "{{override_custom_pickle_suffix|default('')}}"
 {# override_output_folder: Path = script_file_parent_path #}
 override_output_folder: Path = Path(str(curr_session_basedir))
-assert override_output_folder.exists(), f"override_output_folder: '{override_output_folder}'" does not exist!
+assert override_output_folder.exists(), f"override_output_folder: '{override_output_folder}' does not exist!"
 
 local_computations_override_file = override_output_folder.joinpath(f'loadedSessPickle{parameter_specifier_str}.pkl') # do not call `.resolve()`, as this will mess up the session context parsing from the path when there are symlinks
 global_computation_results_override_file = override_output_folder.joinpath('output', f'global_computation_results{parameter_specifier_str}.pkl') # do not call `.resolve()`, as this will mess up the session context parsing from the path when there are symlinks
@@ -249,7 +254,7 @@ neptuner_run.sync()
 
 
 {# Define a block named 'my_block' #}
-{% block my_block %}
+{% macro generate_block() %}
 run_status, run_errors, run_outputs = run_specific_batch(global_data_root_parent_path=Path(r'{{ global_data_root_parent_path }}').resolve(),
                                                 curr_session_context=curr_session_context,
                                                 curr_session_basedir=curr_session_basedir,
@@ -296,7 +301,7 @@ new_print(f'/* batch_session_completion_handler_kwargs: {batch_session_completio
 
 new_print(f'\n ALL DONE! \n')
 new_print(f'/* ================================================================================================================== */\n')
-{% endblock %}
+{% endmacro %}
 
 
 
@@ -305,6 +310,7 @@ with open(final_log_file_path, 'w') as f:
     with redirect_stdout(f), redirect_stderr(f):
 {# Insert the block with each line indented by 4 spaces #}
 {# {{ self.my_block() | indent(8) }} #}
+{{ generate_block() | indent(8) }}
 
 {% else %}
 {# from contextlib import contextmanager
@@ -317,6 +323,7 @@ with noop_context():
     with noop_context(): #}
 {# Insert the block with each line indented by 4 spaces #}
 {# {{ self.my_block() | indent(0) }} #}
+{{ generate_block() | indent(0) }}
 {% endif %}
 
 
