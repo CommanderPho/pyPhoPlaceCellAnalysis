@@ -790,6 +790,7 @@ class CellsFirstSpikeTimes:
     global_spikes_dict: Dict[str, pd.DataFrame] = field()
     first_spikes_dict: Dict[str, pd.DataFrame] = field()
     
+    global_position_df: pd.DataFrame = field()
     hdf5_out_path: Optional[Path] = field()
 
 
@@ -802,7 +803,7 @@ class CellsFirstSpikeTimes:
         """
         all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict), hdf5_out_path = CellsFirstSpikeTimes.compute_cell_first_firings(curr_active_pipeline, hdf_save_parent_path=hdf_save_parent_path)
         _obj: CellsFirstSpikeTimes = CellsFirstSpikeTimes(global_spikes_df=global_spikes_df, all_cells_first_spike_time_df=all_cells_first_spike_time_df,
-                             global_spikes_dict=global_spikes_dict, first_spikes_dict=first_spikes_dict,
+                             global_spikes_dict=global_spikes_dict, first_spikes_dict=first_spikes_dict, global_position_df=deepcopy(curr_active_pipeline.sess.position.df) # sess.position.to_dataframe()
                              hdf5_out_path=hdf5_out_path)
         return _obj
 
@@ -812,9 +813,11 @@ class CellsFirstSpikeTimes:
         """ 
         
         """        
-        all_sessions_global_spikes_df, all_sessions_first_spike_combined_df, exact_category_counts, (all_sessions_global_spikes_dict, all_sessions_first_spikes_dict) = cls.load_batch_hdf5_exports(first_spike_activity_data_h5_files=first_spike_activity_data_h5_files)
+        all_sessions_global_spikes_df, all_sessions_first_spike_combined_df, exact_category_counts, (all_sessions_global_spikes_dict, all_sessions_first_spikes_dict, all_sessions_extra_dfs_dict_dict) = cls.load_batch_hdf5_exports(first_spike_activity_data_h5_files=first_spike_activity_data_h5_files)
+        global_position_df = all_sessions_extra_dfs_dict_dict.get('global_position_df', None)
+        
         _obj: CellsFirstSpikeTimes = CellsFirstSpikeTimes(global_spikes_df=deepcopy(all_sessions_global_spikes_df), all_cells_first_spike_time_df=deepcopy(all_sessions_first_spike_combined_df),
-                                                            global_spikes_dict=deepcopy(all_sessions_global_spikes_dict), first_spikes_dict=deepcopy(all_sessions_first_spikes_dict), hdf5_out_path=None)
+                                                            global_spikes_dict=deepcopy(all_sessions_global_spikes_dict), first_spikes_dict=deepcopy(all_sessions_first_spikes_dict), hdf5_out_path=None, global_position_df=global_position_df)
         return _obj
 
 
@@ -970,7 +973,7 @@ class CellsFirstSpikeTimes:
         # Save the data to an HDF5 file
         did_save_successfully: bool = False
         try:
-            self.save_data_to_hdf5(self.all_cells_first_spike_time_df, self.global_spikes_df, self.global_spikes_dict, self.first_spikes_dict, filename=hdf_save_path) # Path(r'K:\scratch\collected_outputs\kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]_first_spike_activity_data.h5')
+            self.save_data_to_hdf5(self.all_cells_first_spike_time_df, self.global_spikes_df, self.global_spikes_dict, self.first_spikes_dict, filename=hdf_save_path, global_position_df=self.global_position_df) # Path(r'K:\scratch\collected_outputs\kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]_first_spike_activity_data.h5')
             did_save_successfully = True
             self.hdf5_out_path = hdf_save_path
         except Exception as e:
@@ -982,7 +985,7 @@ class CellsFirstSpikeTimes:
     
 
     @classmethod
-    def save_data_to_hdf5(cls, all_cells_first_spike_time_df, global_spikes_df, global_spikes_dict, first_spikes_dict, filename='output_file.h5'):
+    def save_data_to_hdf5(cls, all_cells_first_spike_time_df, global_spikes_df, global_spikes_dict, first_spikes_dict, filename='output_file.h5', **kwargs_extra_dfs):
         """
         Saves the given DataFrames and dictionaries of DataFrames to an HDF5 file.
 
@@ -1005,6 +1008,9 @@ class CellsFirstSpikeTimes:
             # Save the first_spikes_dict
             for key, df in first_spikes_dict.items():
                 store.put(f'first_spikes_dict/{key}', df)
+                
+            for key, df in kwargs_extra_dfs.items():
+                store.put(f'extra_dfs/{key}', df)
         
         print(f"Data successfully saved to {filename}")
 
@@ -1040,7 +1046,8 @@ class CellsFirstSpikeTimes:
             # Initialize dictionaries
             global_spikes_dict = {}
             first_spikes_dict = {}
-            
+            extra_dfs_dict = {}
+             
             # Load keys for global_spikes_dict
             global_spikes_keys = [key.split('/')[-1] for key in store.keys() if key.startswith('/global_spikes_dict/')]
             for key in global_spikes_keys:
@@ -1052,9 +1059,17 @@ class CellsFirstSpikeTimes:
             for key in first_spikes_keys:
                 df = store[f'first_spikes_dict/{key}']
                 first_spikes_dict[key] = df
+
+            # Load keys for extra_dfs
+            extra_dfs_keys = [key.split('/')[-1] for key in store.keys() if key.startswith('/extra_dfs/')]
+            for key in extra_dfs_keys:
+                df = store[f'extra_dfs/{key}']
+                extra_dfs_dict[key] = df
+                
         
         print(f"Data successfully loaded from {filename}")
-        return all_cells_first_spike_time_df, global_spikes_df, global_spikes_dict, first_spikes_dict
+        return all_cells_first_spike_time_df, global_spikes_df, global_spikes_dict, first_spikes_dict, extra_dfs_dict
+    
 
     @classmethod
     def load_batch_hdf5_exports(cls, first_spike_activity_data_h5_files):
@@ -1074,9 +1089,10 @@ class CellsFirstSpikeTimes:
         
         all_sessions_global_spikes_dict = {}
         all_sessions_first_spikes_dict = {}
+        all_sessions_extra_dfs_dict_dict = {}
 
         for i, (a_path, a_first_spike_time_tuple) in enumerate(zip(first_spike_activity_data_h5_files, all_sessions_first_spike_activity_tuples)):
-            all_cells_first_spike_time_df_loaded, global_spikes_df_loaded, global_spikes_dict_loaded, first_spikes_dict_loaded = a_first_spike_time_tuple ## unpack
+            all_cells_first_spike_time_df_loaded, global_spikes_df_loaded, global_spikes_dict_loaded, first_spikes_dict_loaded, extra_dfs_dict_loaded = a_first_spike_time_tuple ## unpack
 
             # Parse out the session context from the filename ____________________________________________________________________ #
             session_key, params_key = a_path.stem.split('__')
@@ -1106,6 +1122,14 @@ class CellsFirstSpikeTimes:
                     all_sessions_first_spikes_dict[k] = []
                 all_sessions_first_spikes_dict[k].append(v)
 
+
+            for k, v in extra_dfs_dict_loaded.items():
+                if k not in all_sessions_extra_dfs_dict_dict:
+                    all_sessions_extra_dfs_dict_dict[k] = [] # add this dataframe name
+                all_sessions_extra_dfs_dict_dict[k].append(v) # append to this df name
+                
+
+
             # first_spikes_dict_loaded
             # all_cells_first_spike_time_df_loaded
             # 1. Counting Exact Category Combinations
@@ -1118,7 +1142,10 @@ class CellsFirstSpikeTimes:
 
         all_sessions_global_spikes_dict = {k:pd.concat(v, axis='index') for k, v in all_sessions_global_spikes_dict.items()}
         all_sessions_first_spikes_dict = {k:pd.concat(v, axis='index') for k, v in all_sessions_first_spikes_dict.items()}
-      
+        # for extra_dataframe_name, extra_dataframe_df_list in all_sessions_extra_dfs_dict_dict.items():
+
+        # all_sessions_extra_dfs_dict_dict = {extra_dataframe_name:{k:pd.concat(v, axis='index') for k, v in extra_dataframe_df_list.items()} for extra_dataframe_name, extra_dataframe_df_list in all_sessions_extra_dfs_dict_dict.items()}
+        all_sessions_extra_dfs_dict_dict = {extra_dataframe_name:pd.concat(extra_dataframe_df_list, axis='index') for extra_dataframe_name, extra_dataframe_df_list in all_sessions_extra_dfs_dict_dict.items()}        
 
         all_sessions_first_spike_combined_df: pd.DataFrame = pd.concat(total_counts, axis='index')
         # all_sessions_first_spike_combined_df
@@ -1126,7 +1153,7 @@ class CellsFirstSpikeTimes:
         # print("Exact Category Counts:")
         # print(exact_category_counts)
         all_sessions_global_spikes_df: pd.DataFrame = pd.concat(all_sessions_global_spikes_df, axis='index')
-        return all_sessions_global_spikes_df, all_sessions_first_spike_combined_df, exact_category_counts, (all_sessions_global_spikes_dict, all_sessions_first_spikes_dict)
+        return all_sessions_global_spikes_df, all_sessions_first_spike_combined_df, exact_category_counts, (all_sessions_global_spikes_dict, all_sessions_first_spikes_dict, all_sessions_extra_dfs_dict_dict)
 
 
     # ==================================================================================================================== #
