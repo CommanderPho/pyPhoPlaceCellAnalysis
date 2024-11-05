@@ -245,67 +245,79 @@ neptuner_run.sync()
 
 
 # ~ # NBSplit
+
+
+
+{# Define a block named 'my_block' #}
+{% block my_block %}
+run_status, run_errors, run_outputs = run_specific_batch(global_data_root_parent_path=Path(r'{{ global_data_root_parent_path }}').resolve(),
+                                                curr_session_context=curr_session_context,
+                                                curr_session_basedir=curr_session_basedir,
+                                                existing_task_logger=curr_task_logger,
+                                                force_reload = result_handler.force_reload_all,
+                                                post_run_callback_fn=result_handler.on_complete_success_execution_session,
+                                                fail_on_exception=False,
+                                                saving_mode=result_handler.saving_mode, **run_specific_batch_kwargs)
+
+new_print(f'finished run: {run_status}\nerrors: {run_errors}\n') # 'outputs: {run_outputs}'
+
+{% if should_use_neptune_logging %}
+for k, v in {'run_status': run_status, 'run_errors': run_errors, 'run_outputs': run_outputs}.items():
+    try:
+        neptuner_run[f'outputs/{k}'] = stringify_unsupported(v)
+    except BaseException as err:
+        print(f'neptune error: {err} for key "{k}" (post `run_specific_batch`). Skipping and continuing')
+neptuner_run.sync()
+{% endif %}
+
+
+new_print(f'\n/* ================================================================================================================== */ \n')
+new_print(f'/* Finished {curr_session_context} __________________________________________________________________________________ */')
+
+new_print(f'/* script_file_parent_path: {script_file_parent_path} __________________________________________________________________________________ */')
+new_print(f'/* script_file_path: {script_file_path} __________________________________________________________________________________ */')
+{% if should_use_file_redirected_output_logging %}
+new_print(f'/* log_file_path: {final_log_file_path} __________________________________________________________________________________ */')
+{% endif %}
+new_print(f'/* session_basedir: {curr_session_basedir} __________________________________________________________________________________ */')
+new_print(f'/* local_computations_override_file: {local_computations_override_file} __________________________________________________________________________________ */')
+new_print(f'/* global_computation_results_override_file: {global_computation_results_override_file} __________________________________________________________________________________ */')
+new_print(f'/* local_computations_override_output_file: {local_computations_override_output_file} __________________________________________________________________________________ */')
+new_print(f'/* global_computation_results_override_output_file: {global_computation_results_override_output_file} __________________________________________________________________________________ */')
+new_print(f'/* should_freeze_pipeline_updates: {should_freeze_pipeline_updates} __________________________________________________________________________________ */')
+new_print(f'/* should_force_reload_all: {should_force_reload_all} __________________________________________________________________________________ */')
+new_print(f'/* should_perform_figure_generation_to_file: {should_perform_figure_generation_to_file} __________________________________________________________________________________ */')
+new_print(f'/* should_symlink_output_pickles: {should_symlink_output_pickles} __________________________________________________________________________________ */')
+new_print(f'/* extended_computations_include_includelist: {extended_computations_include_includelist} __________________________________________________________________________________ */')
+new_print(f'/* force_recompute_override_computations_includelist: {force_recompute_override_computations_includelist} __________________________________________________________________________________ */')
+new_print(f'/* batch_session_completion_handler_kwargs: {batch_session_completion_handler_kwargs} __________________________________________________________________________________ */')
+{# new_print(f'/* run_outputs: {run_outputs} __________________________________________________________________________________ */') #}
+{# new_print(f'/* batch_session_completion_handler_kwargs: {batch_session_completion_handler_kwargs} __________________________________________________________________________________ */') #}
+
+new_print(f'\n ALL DONE! \n')
+new_print(f'/* ================================================================================================================== */\n')
+{% endblock %}
+
+
+
 {% if should_use_file_redirected_output_logging %}
 with open(final_log_file_path, 'w') as f:
     with redirect_stdout(f), redirect_stderr(f):
+{# Insert the block with each line indented by 4 spaces #}
+{# {{ self.my_block() | indent(8) }} #}
 
 {% else %}
-from contextlib import contextmanager
+{# from contextlib import contextmanager
 
 @contextmanager
 def noop_context():
     yield
 
 with noop_context():
-    with noop_context():
-
+    with noop_context(): #}
+{# Insert the block with each line indented by 4 spaces #}
+{# {{ self.my_block() | indent(0) }} #}
 {% endif %}
-        run_status, run_errors, run_outputs = run_specific_batch(global_data_root_parent_path=Path(r'{{ global_data_root_parent_path }}').resolve(),
-                                                        curr_session_context=curr_session_context,
-                                                        curr_session_basedir=curr_session_basedir,
-                                                        existing_task_logger=curr_task_logger,
-                                                        force_reload = result_handler.force_reload_all,
-                                                        post_run_callback_fn=result_handler.on_complete_success_execution_session,
-                                                        fail_on_exception=False,
-                                                        saving_mode=result_handler.saving_mode, **run_specific_batch_kwargs)
-
-        new_print(f'finished run: {run_status}\nerrors: {run_errors}\n') # 'outputs: {run_outputs}'
-
-        {% if should_use_neptune_logging %}
-        for k, v in {'run_status': run_status, 'run_errors': run_errors, 'run_outputs': run_outputs}.items():
-            try:
-                neptuner_run[f'outputs/{k}'] = stringify_unsupported(v)
-            except BaseException as err:
-                print(f'neptune error: {err} for key "{k}" (post `run_specific_batch`). Skipping and continuing')
-        neptuner_run.sync()
-        {% endif %}
-
-
-        new_print(f'\n/* ================================================================================================================== */ \n')
-        new_print(f'/* Finished {curr_session_context} __________________________________________________________________________________ */')
-
-        new_print(f'/* script_file_parent_path: {script_file_parent_path} __________________________________________________________________________________ */')
-        new_print(f'/* script_file_path: {script_file_path} __________________________________________________________________________________ */')
-        {% if should_use_file_redirected_output_logging %}
-        new_print(f'/* log_file_path: {final_log_file_path} __________________________________________________________________________________ */')
-        {% endif %}
-        new_print(f'/* session_basedir: {curr_session_basedir} __________________________________________________________________________________ */')
-        new_print(f'/* local_computations_override_file: {local_computations_override_file} __________________________________________________________________________________ */')
-        new_print(f'/* global_computation_results_override_file: {global_computation_results_override_file} __________________________________________________________________________________ */')
-        new_print(f'/* local_computations_override_output_file: {local_computations_override_output_file} __________________________________________________________________________________ */')
-        new_print(f'/* global_computation_results_override_output_file: {global_computation_results_override_output_file} __________________________________________________________________________________ */')
-        new_print(f'/* should_freeze_pipeline_updates: {should_freeze_pipeline_updates} __________________________________________________________________________________ */')
-        new_print(f'/* should_force_reload_all: {should_force_reload_all} __________________________________________________________________________________ */')
-        new_print(f'/* should_perform_figure_generation_to_file: {should_perform_figure_generation_to_file} __________________________________________________________________________________ */')
-        new_print(f'/* should_symlink_output_pickles: {should_symlink_output_pickles} __________________________________________________________________________________ */')
-        new_print(f'/* extended_computations_include_includelist: {extended_computations_include_includelist} __________________________________________________________________________________ */')
-        new_print(f'/* force_recompute_override_computations_includelist: {force_recompute_override_computations_includelist} __________________________________________________________________________________ */')
-        new_print(f'/* batch_session_completion_handler_kwargs: {batch_session_completion_handler_kwargs} __________________________________________________________________________________ */')
-        {# new_print(f'/* run_outputs: {run_outputs} __________________________________________________________________________________ */') #}
-        {# new_print(f'/* batch_session_completion_handler_kwargs: {batch_session_completion_handler_kwargs} __________________________________________________________________________________ */') #}
-
-        new_print(f'\n ALL DONE! \n')
-        new_print(f'/* ================================================================================================================== */\n')
 
 
 {% if should_use_neptune_logging %}
