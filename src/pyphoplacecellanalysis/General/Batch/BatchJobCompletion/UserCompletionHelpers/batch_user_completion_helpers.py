@@ -137,6 +137,24 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 		print(f'\t!!!! 2024-07-10 WARNING: additional_session_context is None!')
 
 	# BEGIN _SUBFNS_ _____________________________________________________________________________________________________ #
+	def get_export_name(data_identifier_str: str, parent_output_path: Path, active_context: IdentifyingContext, out_extension: Optional[str]='.csv'):
+		""" captures nothing
+		
+		Outputs: '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
+		
+		out_path, out_filename, out_basename = get_export_name(data_identifier_str='', parent_output_path=parent_output_path, active_context=active_context, out_extension='.csv')
+		"""
+		# output_date_str: str = get_now_rounded_time_str()
+		output_date_str: str = get_now_day_str()
+		session_identifier_str: str = active_context.get_description()
+		assert output_date_str is not None
+		out_basename = '-'.join([output_date_str, session_identifier_str, data_identifier_str]) # '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
+		if out_extension is None:
+			out_extension = ''
+		out_filename = f"{out_basename}{out_extension}"
+		out_path = parent_output_path.joinpath(out_filename).resolve()
+		return out_path, out_filename, out_basename
+
 	# Export CSVs:
 	def export_marginals_df_csv(marginals_df: pd.DataFrame, data_identifier_str: str, parent_output_path: Path, active_context: IdentifyingContext):
 		""" captures nothing
@@ -144,15 +162,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 		Outputs: '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
 		
 		"""
-		# output_date_str: str = get_now_rounded_time_str()
-		output_date_str: str = get_now_day_str()
-		# parent_output_path: Path = Path('output').resolve()
-		# active_context = curr_active_pipeline.get_session_context()
-		session_identifier_str: str = active_context.get_description()
-		assert output_date_str is not None
-		out_basename = '-'.join([output_date_str, session_identifier_str, data_identifier_str]) # '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
-		out_filename = f"{out_basename}.csv"
-		out_path = parent_output_path.joinpath(out_filename).resolve()
+		out_path, out_filename, out_basename = get_export_name(data_identifier_str=data_identifier_str, parent_output_path=parent_output_path, active_context=active_context, out_extension='.csv')
 		marginals_df.to_csv(out_path)
 		return out_path 
 
