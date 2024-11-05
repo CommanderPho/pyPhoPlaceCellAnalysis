@@ -855,6 +855,17 @@ class CellsFirstSpikeTimes:
         return _obj
 
 
+    @classmethod
+    def init_from_batch_hdf5_exports(cls, first_spike_activity_data_h5_files: List[Union[str, Path]]) -> "CellsFirstSpikeTimes":
+        """ 
+        
+        """        
+        all_sessions_global_spikes_df, all_sessions_first_spike_combined_df, exact_category_counts, (all_sessions_global_spikes_dict, all_sessions_first_spikes_dict) = cls.load_batch_hdf5_exports(first_spike_activity_data_h5_files=first_spike_activity_data_h5_files)
+        _obj: CellsFirstSpikeTimes = CellsFirstSpikeTimes(global_spikes_df=deepcopy(all_sessions_global_spikes_df), all_cells_first_spike_time_df=deepcopy(all_sessions_first_spike_combined_df),
+                                                            global_spikes_dict=deepcopy(all_sessions_global_spikes_dict), first_spikes_dict=deepcopy(all_sessions_first_spikes_dict), hdf5_out_path=None)
+        return _obj
+
+
     # @function_attributes(short_name=None, tags=['first-spike', 'cell-analysis'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-01 13:59', related_items=[])
     @classmethod
     def _subfn_get_first_spikes(cls, spikes_df: pd.DataFrame):
@@ -1091,6 +1102,9 @@ class CellsFirstSpikeTimes:
         # for i, an_all_cells_first_spike_time_df in enumerate(all_sessions_all_cells_first_spike_time_df_loaded):
         total_counts = []
         all_sessions_global_spikes_df = []
+        
+        all_sessions_global_spikes_dict = {}
+        all_sessions_first_spikes_dict = {}
 
         for i, (a_path, a_first_spike_time_tuple) in enumerate(zip(first_spike_activity_data_h5_files, all_sessions_first_spike_activity_tuples)):
             all_cells_first_spike_time_df_loaded, global_spikes_df_loaded, global_spikes_dict_loaded, first_spikes_dict_loaded = a_first_spike_time_tuple ## unpack
@@ -1111,8 +1125,18 @@ class CellsFirstSpikeTimes:
             # all_cells_first_spike_time_df_loaded['session_key'] = session_key	 
             # all_cells_first_spike_time_df_loaded['params_key'] = params_key
             total_counts.append(all_cells_first_spike_time_df_loaded)
-            
             all_sessions_global_spikes_df.append(global_spikes_df_loaded)
+            
+            for k, v in global_spikes_dict_loaded.items():
+                if k not in all_sessions_global_spikes_dict:
+                    all_sessions_global_spikes_dict[k] = []
+                all_sessions_global_spikes_dict[k].append(v)
+
+            for k, v in first_spikes_dict_loaded.items():
+                if k not in all_sessions_first_spikes_dict:
+                    all_sessions_first_spikes_dict[k] = []
+                all_sessions_first_spikes_dict[k].append(v)
+
             # first_spikes_dict_loaded
             # all_cells_first_spike_time_df_loaded
             # 1. Counting Exact Category Combinations
@@ -1121,15 +1145,19 @@ class CellsFirstSpikeTimes:
             # print(exact_category_counts)
 
             # an_all_cells_first_spike_time_df
-            
+        # end for
+
+        all_sessions_global_spikes_dict = {k:pd.concat(v, axis='index') for k, v in all_sessions_global_spikes_dict.items()}
+        all_sessions_first_spikes_dict = {k:pd.concat(v, axis='index') for k, v in all_sessions_first_spikes_dict.items()}
+      
 
         all_sessions_first_spike_combined_df: pd.DataFrame = pd.concat(total_counts, axis='index')
         # all_sessions_first_spike_combined_df
         exact_category_counts = all_sessions_first_spike_combined_df['earliest_spike_category'].value_counts(dropna=False)
         # print("Exact Category Counts:")
         # print(exact_category_counts)
-        all_sessions_global_spikes_df = pd.concat(all_sessions_global_spikes_df, axis='index')
-        return all_sessions_global_spikes_df, all_sessions_first_spike_combined_df, exact_category_counts
+        all_sessions_global_spikes_df: pd.DataFrame = pd.concat(all_sessions_global_spikes_df, axis='index')
+        return all_sessions_global_spikes_df, all_sessions_first_spike_combined_df, exact_category_counts, (all_sessions_global_spikes_dict, all_sessions_first_spikes_dict)
 
 
 # ==================================================================================================================== #
