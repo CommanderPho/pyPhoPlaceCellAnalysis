@@ -12,7 +12,7 @@ from copy import deepcopy
 import multiprocessing
 # import concurrent.futures
 # from tqdm import tqdm
-
+import builtins
 from enum import Enum, unique  # SessionBatchProgress
 
 ## Pho's Custom Libraries:
@@ -69,7 +69,7 @@ def build_batch_task_logger(session_context: IdentifyingContext, additional_suff
     """ Builds a logger for a specific module that logs to BOTH console output and a file. 
     
     Creates output files like: f'debug_com.PhoHale.PhoPy3DPositionAnalyis.Batch.runBatch.run_specific_batch.{batch_processing_session_task_identifier}.log'
-		e.g. 'debug_com.PhoHale.PhoPy3DPositionAnalyis.Batch.runBatch.run_specific_batch.Apogee.kdiba.gor01.two.2006-6-07_16-40-19.log'
+        e.g. 'debug_com.PhoHale.PhoPy3DPositionAnalyis.Batch.runBatch.run_specific_batch.Apogee.kdiba.gor01.two.2006-6-07_16-40-19.log'
     
     
     History:
@@ -1093,7 +1093,7 @@ def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False,
 
 
 @function_attributes(short_name='run_specific_batch', tags=['batch', 'automated', 'load', 'main', 'pipeline'], input_requires=[], output_provides=[], uses=['batch_load_session'], used_by=['python_template.py.j2'], creation_date='2023-03-28 04:46')
-def run_specific_batch(global_data_root_parent_path: Path, curr_session_context: IdentifyingContext, curr_session_basedir: Path, existing_task_logger: Optional[logging.Logger]=None, force_reload:bool=True, post_run_callback_fn:Optional[Callable]=None, saving_mode=PipelineSavingScheme.OVERWRITE_IN_PLACE, **kwargs):
+def run_specific_batch(global_data_root_parent_path: Path, curr_session_context: IdentifyingContext, curr_session_basedir: Path, active_pickle_filename:str='loadedSessPickle.pkl', existing_task_logger: Optional[logging.Logger]=None, force_reload:bool=True, post_run_callback_fn:Optional[Callable]=None, saving_mode=PipelineSavingScheme.OVERWRITE_IN_PLACE, **kwargs):
     """ For a specific session (identified by the session context) - calls batch_load_session(...) to get the curr_active_pipeline.
             - Then calls `post_run_callback_fn(...)
             
@@ -1110,6 +1110,10 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
 
     _line_sweep = '=========================='
     ## REPLACES THE `print` function within this scope
+    # if (print != builtins.print):
+    #     print(f'already replaced print function! Avoiding doing again to prevent infinite recurrsion!')
+    #     print = builtins.print ## restore the default print function before continuing
+
     def new_print(*args, **kwargs):
         # Call both regular print and logger.info
         print(*args, **kwargs)
@@ -1156,7 +1160,7 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
     debug_print = kwargs.pop('debug_print', False)
 
     try:
-        curr_active_pipeline = batch_load_session(global_data_root_parent_path, active_data_mode_name, basedir, epoch_name_includelist=epoch_name_includelist,
+        curr_active_pipeline = batch_load_session(global_data_root_parent_path, active_data_mode_name, basedir, active_pickle_filename=active_pickle_filename, epoch_name_includelist=epoch_name_includelist,
                                         computation_functions_name_includelist=active_computation_functions_name_includelist,
                                         saving_mode=saving_mode, force_reload=force_reload, skip_extended_batch_computations=skip_extended_batch_computations, debug_print=debug_print, fail_on_exception=fail_on_exception,
                                         override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict, **kwargs)
@@ -1182,7 +1186,7 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
             try:
                 # handle exceptions in callback:
                 post_run_callback_fn_output = post_run_callback_fn(global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline)
-            except BaseException as e:
+            except Exception as e:
                 exception_info = sys.exc_info()
                 an_error = CapturedException(e, exception_info, curr_active_pipeline)
                 new_print(f'error occured in post_run_callback_fn: {an_error}. Suppressing.')
