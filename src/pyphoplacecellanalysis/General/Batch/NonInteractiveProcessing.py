@@ -186,10 +186,14 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
 	active_session_computation_configs = [deepcopy(a_config) for a_config in active_session_computation_configs]
 	
 	#TODO 2024-10-30 13:22: - [ ] This is where we should override the params using `override_parameters_flat_keypaths_dict`
-	if override_parameters_flat_keypaths_dict is not None:
-		for a_config in active_session_computation_configs:
-			for k, v in override_parameters_flat_keypaths_dict.items():
-				a_config.set_by_keypath(k, deepcopy(v))
+	# if override_parameters_flat_keypaths_dict is not None:
+	# 	for a_config in active_session_computation_configs:
+	# 		for k, v in override_parameters_flat_keypaths_dict.items():
+	# 			try:
+	# 				a_config.set_by_keypath(k, deepcopy(v))
+	# 			except Exception as e:
+	# 				# raise e
+	# 				print(f'cannot set_by_keypath: {k} -- error: {e}. Skipping for now.')
 
 	assert len(lap_direction_suffix_list) == len(active_session_computation_configs)
 	updated_active_session_pseudo_filter_configs = {} # empty list, woot!
@@ -209,14 +213,21 @@ def batch_load_session(global_data_root_parent_path, active_data_mode_name, base
 
 		## TODO 2023-01-15 - perform_computations for all configs!!
 		#TODO 2024-10-30 13:22: - [ ] This is where we should override the params
-		if override_parameters_flat_keypaths_dict is not None:
-			for k, v in override_parameters_flat_keypaths_dict.items():
-				a_filter_config_fn.set_by_keypath(k, deepcopy(v))
+		# if override_parameters_flat_keypaths_dict is not None:
+		# 	for k, v in override_parameters_flat_keypaths_dict.items():
+		# 		a_filter_config_fn.set_by_keypath(k, deepcopy(v))
+
+		# if override_parameters_flat_keypaths_dict is not None:
+		# 	curr_active_pipeline.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict) 
 
 
 		#TODO 2023-10-31 14:58: - [ ] This is where the computations are being done multiple times!
 		#TODO 2023-11-13 14:23: - [ ] With this approach, we can't actually properly filter the computation_configs for the relevant sessions ahead of time because they are calculated for a single computation config but across all sessions at once.
 		curr_active_pipeline.perform_computations(a_computation_config, computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=computation_functions_name_excludelist, fail_on_exception=fail_on_exception, debug_print=debug_print) #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
+
+		if override_parameters_flat_keypaths_dict is not None:
+			curr_active_pipeline.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict) 
+
 
 
 	if not skip_extended_batch_computations:
