@@ -803,7 +803,7 @@ class CellsFirstSpikeTimes:
         """
         all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict), hdf5_out_path = CellsFirstSpikeTimes.compute_cell_first_firings(curr_active_pipeline, hdf_save_parent_path=hdf_save_parent_path)
         _obj: CellsFirstSpikeTimes = CellsFirstSpikeTimes(global_spikes_df=global_spikes_df, all_cells_first_spike_time_df=all_cells_first_spike_time_df,
-                             global_spikes_dict=global_spikes_dict, first_spikes_dict=first_spikes_dict, global_position_df=deepcopy(curr_active_pipeline.sess.position.df) # sess.position.to_dataframe()
+                             global_spikes_dict=global_spikes_dict, first_spikes_dict=first_spikes_dict, global_position_df=deepcopy(curr_active_pipeline.sess.position.df), # sess.position.to_dataframe()
                              hdf5_out_path=hdf5_out_path)
         return _obj
 
