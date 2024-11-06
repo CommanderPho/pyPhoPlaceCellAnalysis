@@ -883,30 +883,23 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
 
 
     @classmethod
-    def compute_cell_first_firings(cls, curr_active_pipeline, hdf_save_parent_path: Path=None): # , save_hdf: bool=True
+    def perform_compute_cell_first_firings(cls, global_spikes_df: pd.DataFrame):
         """ 
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_cell_first_firings
+        requires a spikes_df with session columns
         
-        all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict) = compute_cell_first_firings(curr_active_pipeline)
-        all_cells_first_spike_time_df
-        
+        Usage:        
+            global_spikes_df: pd.DataFrame = deepcopy(get_proper_global_spikes_df(curr_active_pipeline)).drop(columns=['neuron_type'], inplace=False) ## already has columns ['lap', 'maze_id', 'PBE_id'
+            global_spikes_df = global_spikes_df.neuron_identity.make_neuron_indexed_df_global(curr_active_pipeline.get_session_context(), add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
+            # Perform the computations ___________________________________________________________________________________________ #
+            all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict) = cls.perform_compute_cell_first_firings(global_spikes_df=global_spikes_df)
+            ## add the sess properties to the output df:
+            all_cells_first_spike_time_df = all_cells_first_spike_time_df.neuron_identity.make_neuron_indexed_df_global(curr_active_pipeline.get_session_context(), add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True) 
+            
         """
-        # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
-        _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-        global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
-        # Get existing laps from session:
-        global_epoch = curr_active_pipeline.filtered_epochs[global_epoch_name]
-        t_start, t_end = global_epoch.start_end_times
-
-        running_epochs = ensure_dataframe(deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps.as_epoch_obj()))
-        pbe_epochs = ensure_dataframe(deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].pbe)) ## less selective than replay, which has cell participation and other requirements
-        all_epoch = ensure_dataframe(deepcopy(global_session.epochs))
-
-
-        global_spikes_df: pd.DataFrame = deepcopy(get_proper_global_spikes_df(curr_active_pipeline)).drop(columns=['neuron_type'], inplace=False) ## already has columns ['lap', 'maze_id', 'PBE_id'
-        # global_spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].spikes_df).drop(columns=['neuron_type'], inplace=False) ## already has columns ['lap', 'maze_id', 'PBE_id'
-        # global_spikes_df
-        global_spikes_df = global_spikes_df.neuron_identity.make_neuron_indexed_df_global(curr_active_pipeline.get_session_context(), add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
+        # global_spikes_df: pd.DataFrame = deepcopy(get_proper_global_spikes_df(curr_active_pipeline)).drop(columns=['neuron_type'], inplace=False) ## already has columns ['lap', 'maze_id', 'PBE_id'
+        # # global_spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].spikes_df).drop(columns=['neuron_type'], inplace=False) ## already has columns ['lap', 'maze_id', 'PBE_id'
+        # # global_spikes_df
+        # global_spikes_df = global_spikes_df.neuron_identity.make_neuron_indexed_df_global(curr_active_pipeline.get_session_context(), add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
         
 
         ## find earliest spike for each cell
@@ -947,12 +940,55 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
 
         # first_aclu_spike_records_df['is_ripple']
         all_cells_first_spike_time_df: pd.DataFrame = cls._subfn_build_first_spike_dataframe(first_spikes_dict)
-        all_cells_first_spike_time_df = all_cells_first_spike_time_df.neuron_identity.make_neuron_indexed_df_global(curr_active_pipeline.get_session_context(), add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
+        # all_cells_first_spike_time_df = all_cells_first_spike_time_df.neuron_identity.make_neuron_indexed_df_global(curr_active_pipeline.get_session_context(), add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True) ## why isn't it already neuron-indexed?
         
         ## extra computations:
         all_cells_first_spike_time_df['theta_to_ripple_lead_lag_diff'] = (all_cells_first_spike_time_df['first_spike_ripple'] - all_cells_first_spike_time_df['first_spike_theta']) ## if theta came first, diff should be positive
         
-        ## Save to .h5 or CSV
+        return all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict)
+
+
+    @classmethod
+    def compute_cell_first_firings(cls, curr_active_pipeline, hdf_save_parent_path: Path=None): # , save_hdf: bool=True
+        """ 
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_cell_first_firings
+        
+        all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict) = compute_cell_first_firings(curr_active_pipeline)
+        all_cells_first_spike_time_df
+        
+        global_spikes_df: pd.DataFrame = deepcopy(get_proper_global_spikes_df(curr_active_pipeline)).drop(columns=['neuron_type'], inplace=False).neuron_identity.make_neuron_indexed_df_global(curr_active_pipeline.get_session_context(), add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
+        
+        Actual INPUTS: global_spikes_df: pd.DataFrame, 
+        
+        
+        ## only for saving to .h5 
+        
+        
+        from pipeline uses: curr_active_pipeline.get_custom_pipeline_filenames_from_parameters(), 
+        curr_active_pipeline.get_session_context()
+        
+        
+        """
+        # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+        # _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        # global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
+        # Get existing laps from session:
+        # global_epoch = curr_active_pipeline.filtered_epochs[global_epoch_name]
+        # t_start, t_end = global_epoch.start_end_times
+
+        # running_epochs = ensure_dataframe(deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps.as_epoch_obj()))
+        # pbe_epochs = ensure_dataframe(deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].pbe)) ## less selective than replay, which has cell participation and other requirements
+        # all_epoch = ensure_dataframe(deepcopy(global_session.epochs))
+
+        # global_spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].spikes_df).drop(columns=['neuron_type'], inplace=False) ## already has columns ['lap', 'maze_id', 'PBE_id'
+        global_spikes_df: pd.DataFrame = deepcopy(get_proper_global_spikes_df(curr_active_pipeline)).drop(columns=['neuron_type'], inplace=False) ## already has columns ['lap', 'maze_id', 'PBE_id'
+        global_spikes_df = global_spikes_df.neuron_identity.make_neuron_indexed_df_global(curr_active_pipeline.get_session_context(), add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
+        # Perform the computations ___________________________________________________________________________________________ #
+        all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict) = cls.perform_compute_cell_first_firings(global_spikes_df=global_spikes_df)
+        ## add the sess properties to the output df:
+        all_cells_first_spike_time_df = all_cells_first_spike_time_df.neuron_identity.make_neuron_indexed_df_global(curr_active_pipeline.get_session_context(), add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True) ## why isn't it already neuron-indexed?
+
+        # Save to .h5 or CSV _________________________________________________________________________________________________ #
         if (hdf_save_parent_path is not None):
             custom_save_filepaths, custom_save_filenames, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters() # 'normal_computed-frateThresh_5.0-qclu_[1, 2]'
             complete_output_prefix: str = '_'.join([curr_active_pipeline.get_session_context().get_description(separator='-'), custom_suffix]) # 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]'
