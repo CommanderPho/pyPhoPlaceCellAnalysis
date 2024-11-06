@@ -1,3 +1,10 @@
+from __future__ import annotations # prevents having to specify types for typehinting as strings
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+	## typehinting only imports here
+	from pyphoplacecellanalysis.General.Batch.runBatch import ConcreteSessionFolder
+
 """
 Concerned with aggregating data (raw and computed results) across multiple sessions.
 	Previously (Pre 2023-07-31) everything was designed in terms of a single session: the entire `NeuropyPipeline` object represents a single recording session - although it might slice this session several different ways and process it with several different sets of computation parameters
@@ -11,7 +18,6 @@ Concerned with aggregating data (raw and computed results) across multiple sessi
 """ DESIGN DECISION/CONSTRAINT: This file should not focus on the process of directing the individual session pipeline computations (it's not a parallel processing manager) but instead on processing the data with a specified set of completed session pipelines.
 
 """
-
 import sys
 import re
 from copy import deepcopy
@@ -56,7 +62,6 @@ from pyphoplacecellanalysis.General.Mixins.ExportHelpers import  build_and_write
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
 
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
-
 
 """
 from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults, AcrossSessionsVisualizations
@@ -2914,7 +2919,7 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
 	)
 
 
-from pyphoplacecellanalysis.General.Batch.runBatch import ConcreteSessionFolder
+
 
 class OldFileArchiver:
 	
@@ -2949,7 +2954,8 @@ class OldFileArchiver:
 
 	@function_attributes(short_name=None, tags=['filesystem', 'clean', 'delete', 'temporary'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-06 04:27', related_items=[])
 	@classmethod
-	def remove_backup_files_from_session_data_folders(cls, good_session_concrete_folders: List["ConcreteSessionFolder"], is_dryrun: bool = True):
+	def remove_backup_files_from_session_data_folders(cls, good_session_concrete_folders: List["ConcreteSessionFolder"],
+												   always_delete_patterns=None, conditional_delete_patterns=None, cutoff_date: Optional[datetime.datetime]=None, is_dryrun: bool = True, debug_print:bool=False):
 		""" cleans up the temporary pickle files that are created during the session data loading process to recover space.
 		
 		Usage:
@@ -2972,36 +2978,98 @@ class OldFileArchiver:
 		# backup-20240911134307-loadedSessPickle.pkl.bak'
 		deleted_file_list = []
 
+		# Convert cutoff_date to timestamp for comparison, if provided
+		if cutoff_date is not None:
+			if cutoff_date.tzinfo is None:
+				# Assume local timezone if none provided
+				cutoff_timestamp = cutoff_date.timestamp()
+			else:
+				# Convert to UTC timestamp
+				cutoff_timestamp = cutoff_date.astimezone(datetime.timezone.utc).timestamp()
+		else:
+			cutoff_timestamp = None
+			
+
 		for a_folder in good_session_concrete_folders:
-			print(f'Processing "{a_folder.path.as_posix()}"...')
-			# a_folder.output_folder
-			delete_dict = {'.pkltmp': list(a_folder.path.glob('*.pkltmp')),
-						'.pkl.bak': list(a_folder.path.glob('*.pkl.bak')),
-						#    'backup': list(a_folder.path.glob('backup*')),
-						}
-			print(f'\tdelete_dict: {delete_dict}')
+			# Define patterns to always delete
+			if always_delete_patterns is None:
+				always_delete_patterns = {
+					'.pkltmp': '*.pkltmp',
+					'.pkl.bak': '*.pkl.bak',
+				}
+			
+			# Define patterns to conditionally delete
+			if conditional_delete_patterns is None:
+				conditional_delete_patterns = {
+					# '.pkl': '*.pkl',
+					'pipeline.pkl': '*loadedSessPickle*.pkl',
+					'global.pkl': '*global_computation_results*.pkl',
+				}
+			
+			# Function to collect files based on patterns and cutoff_date
+			def collect_files(folder: Path, patterns: dict, condition: str = 'always') -> List[Path]:
+				""" captures debug_print, cutoff_timestamp, and is_dryrun from the outer function """
+				files = []
+				for desc, pattern in patterns.items():
+					matched_files = list(folder.glob(pattern))
+					if debug_print:
+						print(f'\tLooking for {desc} files with pattern "{pattern}": Found {len(matched_files)} files.')
+					for file_path in matched_files:
+						if condition == 'conditional' and cutoff_timestamp is not None:
+							try:
+								file_mtime = file_path.stat().st_mtime
+							except OSError as e:
+								print(f'\t\tError accessing file "{file_path}": {e}')
+								continue
+							if file_mtime >= cutoff_timestamp:
+								if debug_print:
+									print(f'\t\tSkipping "{file_path.as_posix()}" (modified on {datetime.fromtimestamp(file_mtime)}) - newer than cutoff.')
+								continue
+						elif condition == 'conditional' and cutoff_timestamp is None:
+							# If conditional pattern but no cutoff_date provided, skip deletion
+							if debug_print:
+								print(f'\t\tNo cutoff_date provided. Skipping "{file_path.as_posix()}".')
+							continue
+						files.append(file_path)
+				return files
 
-			for k, v in delete_dict.items():
-				for a_path in v:
-					print(f'deleting "{a_path.as_posix()}"')
-					if not is_dryrun:
-						a_path.unlink()
-					deleted_file_list.append(a_path)
-					
-			## do for `a_folder.output_folder`:
-			delete_dict = {'.pkltmp': list(a_folder.output_folder.glob('*.pkltmp')),
-						'.pkl.bak': list(a_folder.output_folder.glob('*.pkl.bak')),
-						#    'backup': list(a_folder.path.glob('backup*')),
-						}
-			print(f'\t./Output folder delete_dict: {delete_dict}')
-			for k, v in delete_dict.items():
-				for a_path in v:
-					if not is_dryrun:
-						a_path.unlink()
-					deleted_file_list.append(a_path)
-					
-			print(f'\tdone.')
+			# Collect files to always delete from session folder
+			session_always_files = collect_files(a_folder.path, always_delete_patterns, condition='always')
+			if debug_print:
+				print(f'\tSession folder: {len(session_always_files)} files marked for always deletion.')
 
+			# Collect files to conditionally delete from session folder
+			session_conditional_files = collect_files(a_folder.path, conditional_delete_patterns, condition='conditional')
+			if debug_print:
+				print(f'\tSession folder: {len(session_conditional_files)} *.pkl files marked for conditional deletion.')
+
+			# Collect files to always delete from output folder
+			output_always_files = collect_files(a_folder.output_folder, always_delete_patterns, condition='always')
+			if debug_print:
+				print(f'\tOutput folder: {len(output_always_files)} files marked for always deletion.')
+
+			# Collect files to conditionally delete from output folder
+			output_conditional_files = collect_files(a_folder.output_folder, conditional_delete_patterns, condition='conditional')
+			if debug_print:
+				print(f'\tOutput folder: {len(output_conditional_files)} *.pkl files marked for conditional deletion.')
+
+			# Combine all files to delete
+			all_files_to_delete = session_always_files + session_conditional_files + output_always_files + output_conditional_files
+
+			for a_path in all_files_to_delete:
+				print(f'\tDeleting "{a_path.as_posix()}"...')
+				if not is_dryrun:
+					try:
+						a_path.unlink()
+						print(f'\t\tDeleted "{a_path.as_posix()}".')
+					except OSError as e:
+						print(f'\t\tFailed to delete "{a_path.as_posix()}": {e}')
+						continue
+				deleted_file_list.append(a_path)
+						
+			print(f'\tDone processing folder "{a_folder.path.as_posix()}".')
+
+		print(f'Total files {"would be " if is_dryrun else ""}deleted: {len(deleted_file_list)}')
 		return deleted_file_list
 
 
