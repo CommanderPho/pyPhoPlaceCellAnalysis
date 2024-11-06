@@ -2154,7 +2154,7 @@ def compute_and_export_cell_first_spikes_characteristics_completion_function(sel
 	was_write_good: bool = False
 	try:
 		# all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict), hdf5_out_path = CellsFirstSpikeTimes.compute_cell_first_firings(curr_active_pipeline, hdf_save_parent_path=collected_outputs)	
-		_obj: CellsFirstSpikeTimes = CellsFirstSpikeTimes.init_from_pipeline(curr_active_pipeline=curr_active_pipeline, hdf_save_parent_path=None)
+		_obj: CellsFirstSpikeTimes = CellsFirstSpikeTimes.init_from_pipeline(curr_active_pipeline=curr_active_pipeline, hdf_save_parent_path=None, should_include_only_spikes_after_initial_laps=True)
 		_obj.save_to_hdf5(hdf_save_path=hdf5_out_path)
 		was_write_good = True
 
