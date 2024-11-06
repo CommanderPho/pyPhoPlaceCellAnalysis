@@ -2500,7 +2500,7 @@ class RankOrderAnalyses:
         return combined_epoch_stats_df, (output_active_epoch_computed_values, combined_variable_names, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles)
     
 
-def validate_has_rank_order_results(curr_active_pipeline, computation_filter_name='maze', minimum_inclusion_fr_Hz:Optional[float]=None):
+def validate_has_rank_order_results(curr_active_pipeline, computation_filter_name='maze', minimum_inclusion_fr_Hz:Optional[float]=None, required_included_qclu_values:Optional[List[int]]=None):
     """ Returns True if the pipeline has a valid RankOrder results set of the latest version
 
     TODO: make sure minimum can be passed. Actually, can get it from the pipeline.
@@ -2514,23 +2514,45 @@ def validate_has_rank_order_results(curr_active_pipeline, computation_filter_nam
     laps_result_tuple: Optional[DirectionalRankOrderResult] = rank_order_results.laps_most_likely_result_tuple
 
 
+    ## comparing to parameters
     param_typed_parameters = curr_active_pipeline.global_computation_results.computation_config
     if param_typed_parameters is not None:
-        rank_order_shuffle_analysis = param_typed_parameters.get('rank_order_shuffle_analysis', None)
-        if rank_order_shuffle_analysis is not None:
+        rank_order_shuffle_analysis_params = param_typed_parameters.get('rank_order_shuffle_analysis', None)
+        if rank_order_shuffle_analysis_params is not None:
             ## has valid rank_order_shuffle_analysis config:
-            if (rank_order_shuffle_analysis.minimum_inclusion_fr_Hz != results_minimum_inclusion_fr_Hz):
-                print(f'minimum_inclusion_fr_Hz differs! results_value: {results_minimum_inclusion_fr_Hz}, params_val: {rank_order_shuffle_analysis.minimum_inclusion_fr_Hz}')
-                return False
-            
-            # if (rank_order_shuffle_analysis.num_shuffles != rank_order_results.num_shuffles):
-            #     print(f'num_shuffles differs! results_value: {rank_order_results.num_shuffles}, params_val: {rank_order_shuffle_analysis.num_shuffles}')
+            if required_included_qclu_values is None:
+                required_included_qclu_values = rank_order_shuffle_analysis_params.minimum_inclusion_fr_Hz # use the params value
+                
+            if minimum_inclusion_fr_Hz is None:
+                minimum_inclusion_fr_Hz = rank_order_shuffle_analysis_params.minimum_inclusion_fr_Hz
+                
+
+            # if (rank_order_shuffle_analysis_params.minimum_inclusion_fr_Hz != results_minimum_inclusion_fr_Hz):
+            #     print(f'minimum_inclusion_fr_Hz differs! results_value: {results_minimum_inclusion_fr_Hz}, params_val: {rank_order_shuffle_analysis_params.minimum_inclusion_fr_Hz}')
             #     return False
             
-            if (set(rank_order_shuffle_analysis.included_qclu_values) != set(results_included_qclu_values)):
-                print(f'included_qclu_values differs! results_value: {results_included_qclu_values}, params_val: {rank_order_shuffle_analysis.included_qclu_values}')
-                return False
+            # # if (rank_order_shuffle_analysis.num_shuffles != rank_order_results.num_shuffles):
+            # #     print(f'num_shuffles differs! results_value: {rank_order_results.num_shuffles}, params_val: {rank_order_shuffle_analysis.num_shuffles}')
+            # #     return False
             
+            # if (set(rank_order_shuffle_analysis_params.included_qclu_values) != set(results_included_qclu_values)):
+            #     print(f'included_qclu_values differs! results_value: {results_included_qclu_values}, params_val: {rank_order_shuffle_analysis_params.included_qclu_values}')
+            #     return False
+            
+
+    ## regardless of whether we have params, we can test the results value against the desired value:
+    if minimum_inclusion_fr_Hz is not None:
+        if (minimum_inclusion_fr_Hz != results_minimum_inclusion_fr_Hz):
+            print(f'minimum_inclusion_fr_Hz differs! results_value: {results_minimum_inclusion_fr_Hz}, specified_val: {minimum_inclusion_fr_Hz}, params_val: {rank_order_shuffle_analysis_params.get("minimum_inclusion_fr_Hz", "err")}')
+            return False
+    
+    
+    if required_included_qclu_values is None:
+        ## try to get the desired value from the parameters:
+        if (set(required_included_qclu_values) != set(results_included_qclu_values)):
+            print(f'included_qclu_values differs! results_value: {results_included_qclu_values}, specified_val: {required_included_qclu_values}, params_val: {rank_order_shuffle_analysis_params.get("included_qclu_values", "err")}')
+            return False
+     
 
     ## TODO: make sure result is for the current minimimum:
 
