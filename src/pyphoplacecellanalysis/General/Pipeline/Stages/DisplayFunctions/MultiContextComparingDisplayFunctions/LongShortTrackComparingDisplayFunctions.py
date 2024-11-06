@@ -1477,31 +1477,6 @@ class PhoJonathanPlotHelpers:
         curr_fig.set_facecolor('1.0') # white
         curr_fig.patch.set_alpha(0)  # Set figure background to clear
 
-        # num_gridspec_columns = 8 # hardcoded
-        # gs_kw = dict(width_ratios=np.repeat(1, num_gridspec_columns).tolist(), height_ratios=[1, 1], wspace=0.0, hspace=0.0)
-        # gs_kw['width_ratios'][-1] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
-
-        # gs = curr_fig.add_gridspec(2, num_gridspec_columns, **gs_kw) # layout figure is usually a gridspec of (1,8)
-        # curr_ax_firing_rate = curr_fig.add_subplot(gs[0, :-1]) # the whole top row except the last element (to match the firing rates below)
-        # curr_ax_cell_label = curr_fig.add_subplot(gs[0, -1]) # the last element of the first row contains the labels that identify the cell
-        # curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, :-1]) # all up to excluding the last element of the row
-        # curr_ax_placefield = curr_fig.add_subplot(gs[1, -1], sharey=curr_ax_lap_spikes) # only the last element of the row
-
-
-        # # New Gridspec - Both left and right columns:
-        # num_gridspec_columns = 10 # hardcoded
-        # gs_kw = dict(width_ratios=np.repeat(1, num_gridspec_columns).tolist(), height_ratios=[1, 1], wspace=0.0, hspace=0.0)
-        # gs_kw['width_ratios'][0] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
-        # gs_kw['width_ratios'][-2] = 0.2 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
-        # gs_kw['width_ratios'][-1] = 0.3 # make the last column (containing the 1D placefield plot) a fraction of the width of the others
-
-        # gs = curr_fig.add_gridspec(2, num_gridspec_columns, **gs_kw) # layout figure is usually a gridspec of (1,8)
-        # curr_ax_firing_rate = curr_fig.add_subplot(gs[0, 1:-2]) # the whole top row except the last element (to match the firing rates below)
-        # curr_ax_cell_label = curr_fig.add_subplot(gs[0, 0]) # the last element of the first row contains the labels that identify the cell
-        # curr_ax_extra_information_labels = curr_fig.add_subplot(gs[0, -2:]) # the last two element of the first row contains the labels that identify the cell
-        # curr_ax_lap_spikes = curr_fig.add_subplot(gs[1, 1:-2]) # all up to excluding the last element of the row
-        # curr_ax_placefield = curr_fig.add_subplot(gs[1, -2], sharey=curr_ax_lap_spikes) # only the last element of the row
-
         if disable_top_row:
             # num_gridspec_rows = 1
             # height_ratios=[1]
@@ -1541,25 +1516,12 @@ class PhoJonathanPlotHelpers:
         text_formatter = FormattedFigureText()
         text_formatter.left_margin = 0.5
         text_formatter.top_margin = 0.5
-        # text_formatter.left_margin = 0.025
-        # text_formatter.top_margin = 0.00
 
         title_axes_kwargs = dict(ha="center", va="center", xycoords='axes fraction') # , ma="left"
-        # title_axes_kwargs = dict(ha="left", va="bottom", ma="left", xycoords='axes fraction')
-        # Setup the aclu number ("title axis"):
-        # title_axes_kwargs = dict(ha="center", va="center", fontsize=22, color="black")
-        # curr_ax_cell_label.text(0.5, 0.5, short_title_string, transform=curr_ax_cell_label.transAxes, **title_axes_kwargs)
         # flexitext version:
         title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, formatted_cell_label_string, ax=curr_ax_cell_label, **title_axes_kwargs)
         # curr_ax_cell_label.set_facecolor('0.95')
         extra_information_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, optional_formatted_cell_label_string, xycoords='axes fraction', ax=curr_ax_extra_information_labels, ha="center", va="center")
-
-        # # # `flexitext` version:
-        # plt.title('')
-        # plt.suptitle('')
-        # fig = plt.gcf() # get figure to setup the margins on.
-        # text_formatter.setup_margins(curr_fig)
-        # footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
 
         curr_ax_cell_label.axis('off')
         curr_ax_extra_information_labels.axis('off')
