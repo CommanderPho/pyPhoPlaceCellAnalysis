@@ -800,13 +800,13 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
 
 
     @classmethod
-    def init_from_pipeline(cls, curr_active_pipeline, hdf_save_parent_path: Path=None) -> "CellsFirstSpikeTimes":
+    def init_from_pipeline(cls, curr_active_pipeline, hdf_save_parent_path: Path=None, should_include_only_spikes_after_initial_laps=True) -> "CellsFirstSpikeTimes":
         """ 
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import CellsFirstSpikeTimes
         
         _obj: CellsFirstSpikeTimes = CellsFirstSpikeTimes.init_from_pipeline(curr_active_pipeline=curr_active_pipeline)
         """
-        all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict), hdf5_out_path = CellsFirstSpikeTimes.compute_cell_first_firings(curr_active_pipeline, hdf_save_parent_path=hdf_save_parent_path)
+        all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict), hdf5_out_path = CellsFirstSpikeTimes.compute_cell_first_firings(curr_active_pipeline, hdf_save_parent_path=hdf_save_parent_path, should_include_only_spikes_after_initial_laps=should_include_only_spikes_after_initial_laps)
         _obj: CellsFirstSpikeTimes = CellsFirstSpikeTimes(global_spikes_df=global_spikes_df, all_cells_first_spike_time_df=all_cells_first_spike_time_df,
                              global_spikes_dict=global_spikes_dict, first_spikes_dict=first_spikes_dict, global_position_df=deepcopy(curr_active_pipeline.sess.position.df), # sess.position.to_dataframe()
                              hdf5_out_path=hdf5_out_path)
@@ -885,6 +885,39 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         
         return df_final
 
+    @classmethod
+    def _parse_split_session_key_with_prefix(cls, a_session_key: str):
+        # a_session_key: str = '2024-11-05-kdiba-gor01-one-2006-6-08_14-26-15'
+        a_key_split = a_session_key.split(sep='-')
+        session_descriptor_start_idx: int = a_key_split.index('kdiba')
+        assert session_descriptor_start_idx != -1
+        pre_session_info: str = '-'.join(a_key_split[:session_descriptor_start_idx]) # '2024-11-05'
+        # pre_session_info
+
+        true_session_key: str = '-'.join(a_key_split[session_descriptor_start_idx:]) # 'kdiba-gor01-one-2006-6-08_14-26-15'
+        # true_session_key
+        return true_session_key, pre_session_info
+
+    @classmethod
+    def _slice_by_valid_time_subsets(cls, a_global_spikes_df, session_uid, first_valid_pos_time, last_valid_pos_time):
+        trimmed_global_spikes_df = deepcopy(a_global_spikes_df).spikes.time_sliced(first_valid_pos_time, last_valid_pos_time)
+        trimmed_result_tuple = cls.perform_compute_cell_first_firings(global_spikes_df=trimmed_global_spikes_df)
+        ## OUTPUTS: trimmed_global_spikes_df, trimmed_all_cells_first_spike_time_df
+        # trimmed_all_cells_first_spike_time_df, trimmed_global_spikes_df, (trimmed_global_spikes_dict, trimmed_first_spikes_dict) = trimmed_result_tuple
+        return trimmed_result_tuple
+
+    # ==================================================================================================================== #
+    # After the first laps                                                                                                 #
+    # ==================================================================================================================== #
+    @classmethod
+    def _include_only_spikes_after_initial_laps(cls, a_global_spikes_df, initial_laps_end_time=np.inf, last_valid_pos_time=np.inf):
+        initial_laps_end_time: float = a_global_spikes_df[a_global_spikes_df['lap'] == 2]['t_rel_seconds'].max() # last spike in lap id=1 - 41.661858989158645
+        post_initial_lap_global_spikes_df = deepcopy(a_global_spikes_df).spikes.time_sliced(initial_laps_end_time, last_valid_pos_time) # trim to be after the first lap
+        post_initial_lap_tuple = cls.perform_compute_cell_first_firings(global_spikes_df=post_initial_lap_global_spikes_df)
+        # post_initial_lap_all_cells_first_spike_time_df, post_initial_lap_global_spikes_df, (post_first_lap_global_spikes_dict, post_first_lap_first_spikes_dict) = post_initial_lap_tuple
+        return post_initial_lap_tuple, initial_laps_end_time
+
+
 
     @classmethod
     def perform_compute_cell_first_firings(cls, global_spikes_df: pd.DataFrame):
@@ -953,7 +986,7 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
 
 
     @classmethod
-    def compute_cell_first_firings(cls, curr_active_pipeline, hdf_save_parent_path: Path=None): # , save_hdf: bool=True
+    def compute_cell_first_firings(cls, curr_active_pipeline, hdf_save_parent_path: Path=None, should_include_only_spikes_after_initial_laps=True): # , save_hdf: bool=True
         """ 
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_cell_first_firings
         
@@ -983,10 +1016,22 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         # running_epochs = ensure_dataframe(deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps.as_epoch_obj()))
         # pbe_epochs = ensure_dataframe(deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].pbe)) ## less selective than replay, which has cell participation and other requirements
         # all_epoch = ensure_dataframe(deepcopy(global_session.epochs))
-
+        
+    
+        a_session_context = curr_active_pipeline.get_session_context() # IdentifyingContext.try_init_from_session_key(session_str=a_session_uid, separator='|')
+        last_valid_pos_time = UserAnnotationsManager.get_hardcoded_specific_session_override_dict().get(a_session_context, {}).get('track_end_t', np.nan)
+        first_valid_pos_time = UserAnnotationsManager.get_hardcoded_specific_session_override_dict().get(a_session_context, {}).get('track_start_t', np.nan)
+    
         # global_spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].spikes_df).drop(columns=['neuron_type'], inplace=False) ## already has columns ['lap', 'maze_id', 'PBE_id'
         global_spikes_df: pd.DataFrame = deepcopy(get_proper_global_spikes_df(curr_active_pipeline)).drop(columns=['neuron_type'], inplace=False) ## already has columns ['lap', 'maze_id', 'PBE_id'
+        global_spikes_df = deepcopy(global_spikes_df).spikes.time_sliced(first_valid_pos_time, last_valid_pos_time)
+        
+        if should_include_only_spikes_after_initial_laps:
+            initial_laps_end_time: float = global_spikes_df[global_spikes_df['lap'] == 2]['t_rel_seconds'].max() # last spike in lap id=1 - 41.661858989158645
+            global_spikes_df = deepcopy(global_spikes_df).spikes.time_sliced(initial_laps_end_time, last_valid_pos_time) # trim to be after the first lap post_initial_lap_global_spikes_df
+        
         global_spikes_df = global_spikes_df.neuron_identity.make_neuron_indexed_df_global(curr_active_pipeline.get_session_context(), add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
+
         # Perform the computations ___________________________________________________________________________________________ #
         all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict) = cls.perform_compute_cell_first_firings(global_spikes_df=global_spikes_df)
         ## add the sess properties to the output df:
@@ -1007,38 +1052,14 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         return all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict), hdf5_out_path
 
 
+
     @function_attributes(short_name=None, tags=['first_spikes'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-06 07:03', related_items=[])
     def _post_hoc_filter_by_session_valid_track_and_lap_times(self) -> "CellsFirstSpikeTimes":
         """ 
+        
+        filtered_cells_first_spike_times: CellsFirstSpikeTimes = cells_first_spike_times._post_hoc_filter_by_session_valid_track_and_lap_times()
+        
         """
-        def _parse_split_session_key_with_prefix(a_session_key: str):
-            # a_session_key: str = '2024-11-05-kdiba-gor01-one-2006-6-08_14-26-15'
-            a_key_split = a_session_key.split(sep='-')
-            session_descriptor_start_idx: int = a_key_split.index('kdiba')
-            assert session_descriptor_start_idx != -1
-            pre_session_info: str = '-'.join(a_key_split[:session_descriptor_start_idx]) # '2024-11-05'
-            # pre_session_info
-
-            true_session_key: str = '-'.join(a_key_split[session_descriptor_start_idx:]) # 'kdiba-gor01-one-2006-6-08_14-26-15'
-            # true_session_key
-            return true_session_key, pre_session_info
-
-        def _slice_by_valid_time_subsets(a_global_spikes_df, session_uid, first_valid_pos_time, last_valid_pos_time):
-            trimmed_global_spikes_df = deepcopy(a_global_spikes_df).spikes.time_sliced(first_valid_pos_time, last_valid_pos_time)
-            trimmed_result_tuple = CellsFirstSpikeTimes.perform_compute_cell_first_firings(global_spikes_df=trimmed_global_spikes_df)
-            ## OUTPUTS: trimmed_global_spikes_df, trimmed_all_cells_first_spike_time_df
-            # trimmed_all_cells_first_spike_time_df, trimmed_global_spikes_df, (trimmed_global_spikes_dict, trimmed_first_spikes_dict) = trimmed_result_tuple
-            return trimmed_result_tuple
-
-        # ==================================================================================================================== #
-        # After the first laps                                                                                                 #
-        # ==================================================================================================================== #
-        def _include_only_spikes_after_initial_laps(a_global_spikes_df, initial_laps_end_time=np.inf):
-            initial_laps_end_time: float = a_global_spikes_df[a_global_spikes_df['lap'] == 2]['t_rel_seconds'].max() # last spike in lap id=1 - 41.661858989158645
-            post_initial_lap_global_spikes_df = deepcopy(a_global_spikes_df).spikes.time_sliced(initial_laps_end_time, last_valid_pos_time) # trim to be after the first lap
-            post_initial_lap_tuple = CellsFirstSpikeTimes.perform_compute_cell_first_firings(global_spikes_df=post_initial_lap_global_spikes_df)
-            # post_initial_lap_all_cells_first_spike_time_df, post_initial_lap_global_spikes_df, (post_first_lap_global_spikes_dict, post_first_lap_first_spikes_dict) = post_initial_lap_tuple
-            return post_initial_lap_tuple, initial_laps_end_time
 
 
         # ==================================================================================================================== #
@@ -1092,10 +1113,10 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
             last_valid_pos_time = session_uid_to_override_dict_map.get(a_session_uid, {}).get('track_end_t', np.nan)
             first_valid_pos_time = session_uid_to_override_dict_map.get(a_session_uid, {}).get('track_start_t', np.nan)
             ## all we need to do is properly prune each session's global_spikes_df and then re-call the compute_cell_first_firings
-            trimmed_result_tuples_dict[a_session_uid] = _slice_by_valid_time_subsets(a_sess_v, session_uid=a_session_uid, first_valid_pos_time=first_valid_pos_time, last_valid_pos_time=last_valid_pos_time)
+            trimmed_result_tuples_dict[a_session_uid] = self._slice_by_valid_time_subsets(a_sess_v, session_uid=a_session_uid, first_valid_pos_time=first_valid_pos_time, last_valid_pos_time=last_valid_pos_time)
             trimmed_all_cells_first_spike_time_df, a_trimmed_global_spikes_df, (trimmed_global_spikes_dict, trimmed_first_spikes_dict) = trimmed_result_tuples_dict[a_session_uid]
             a_trimmed_global_spikes_df = a_trimmed_global_spikes_df.neuron_identity.make_neuron_indexed_df_global(a_session_context, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True) ## add the sess properties to the output post_initial_lap_global_spikes_df:
-            post_initial_laps_result_tuples_dict[a_session_uid], initial_laps_end_time = _include_only_spikes_after_initial_laps(a_trimmed_global_spikes_df, initial_laps_end_time=last_valid_pos_time)
+            post_initial_laps_result_tuples_dict[a_session_uid], initial_laps_end_time = self._include_only_spikes_after_initial_laps(a_trimmed_global_spikes_df, initial_laps_end_time=last_valid_pos_time)
             print(f'\tinitial_laps_end_time: {initial_laps_end_time}')
             post_initial_lap_all_cells_first_spike_time_df, post_initial_lap_global_spikes_df, (post_first_lap_global_spikes_dict, post_first_lap_first_spikes_dict) = post_initial_laps_result_tuples_dict[a_session_uid]                
             
@@ -1124,8 +1145,6 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
             #     v['params_key'] = params_key
             #     v['session_uid'] = reconstructed_session_context.get_description(separator="|")
             #     all_sessions_extra_dfs_dict_dict[k].append(v) # append to this df name
-                
-
 
         ## end for
         post_initial_lap_global_spikes_df = pd.concat(post_initial_lap_global_spikes_df, axis='index') ## re-combine over all the sessions
