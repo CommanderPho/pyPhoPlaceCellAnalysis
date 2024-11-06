@@ -8,6 +8,7 @@ from typing import List, Optional, Dict, Tuple, Any, Union
 from matplotlib import cm, pyplot as plt
 from matplotlib.gridspec import GridSpec
 from neuropy.core import Laps
+from neuropy.core.user_annotations import UserAnnotationsManager
 from neuropy.utils.dynamic_container import DynamicContainer
 from neuropy.utils.indexing_helpers import union_of_arrays
 from neuropy.utils.result_context import IdentifyingContext
@@ -773,6 +774,9 @@ from neuropy.core.epoch import ensure_dataframe
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
 from neuropy.utils.mixins.AttrsClassHelpers import SimpleFieldSizesReprMixin
+from pyphocorehelpers.indexing_helpers import partition_df
+from neuropy.core.user_annotations import UserAnnotationsManager
+
 
 @define(slots=False, eq=False, repr=False)
 class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
@@ -1002,6 +1006,157 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
             
         return all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict), hdf5_out_path
 
+
+    @function_attributes(short_name=None, tags=['first_spikes'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-06 07:03', related_items=[])
+    def _post_hoc_filter_by_session_valid_track_and_lap_times(self) -> "CellsFirstSpikeTimes":
+        """ 
+        """
+        def _parse_split_session_key_with_prefix(a_session_key: str):
+            # a_session_key: str = '2024-11-05-kdiba-gor01-one-2006-6-08_14-26-15'
+            a_key_split = a_session_key.split(sep='-')
+            session_descriptor_start_idx: int = a_key_split.index('kdiba')
+            assert session_descriptor_start_idx != -1
+            pre_session_info: str = '-'.join(a_key_split[:session_descriptor_start_idx]) # '2024-11-05'
+            # pre_session_info
+
+            true_session_key: str = '-'.join(a_key_split[session_descriptor_start_idx:]) # 'kdiba-gor01-one-2006-6-08_14-26-15'
+            # true_session_key
+            return true_session_key, pre_session_info
+
+        def _slice_by_valid_time_subsets(a_global_spikes_df, session_uid, first_valid_pos_time, last_valid_pos_time):
+            trimmed_global_spikes_df = deepcopy(a_global_spikes_df).spikes.time_sliced(first_valid_pos_time, last_valid_pos_time)
+            trimmed_result_tuple = CellsFirstSpikeTimes.perform_compute_cell_first_firings(global_spikes_df=trimmed_global_spikes_df)
+            ## OUTPUTS: trimmed_global_spikes_df, trimmed_all_cells_first_spike_time_df
+            # trimmed_all_cells_first_spike_time_df, trimmed_global_spikes_df, (trimmed_global_spikes_dict, trimmed_first_spikes_dict) = trimmed_result_tuple
+            return trimmed_result_tuple
+
+        # ==================================================================================================================== #
+        # After the first laps                                                                                                 #
+        # ==================================================================================================================== #
+        def _include_only_spikes_after_initial_laps(a_global_spikes_df, initial_laps_end_time=np.inf):
+            initial_laps_end_time: float = a_global_spikes_df[a_global_spikes_df['lap'] == 2]['t_rel_seconds'].max() # last spike in lap id=1 - 41.661858989158645
+            post_initial_lap_global_spikes_df = deepcopy(a_global_spikes_df).spikes.time_sliced(initial_laps_end_time, last_valid_pos_time) # trim to be after the first lap
+            post_initial_lap_tuple = CellsFirstSpikeTimes.perform_compute_cell_first_firings(global_spikes_df=post_initial_lap_global_spikes_df)
+            # post_initial_lap_all_cells_first_spike_time_df, post_initial_lap_global_spikes_df, (post_first_lap_global_spikes_dict, post_first_lap_first_spikes_dict) = post_initial_lap_tuple
+            return post_initial_lap_tuple, initial_laps_end_time
+
+
+        # ==================================================================================================================== #
+        # BEGINF FUNCTION BODY                                                                                                 #
+        # ==================================================================================================================== #
+        session_uid_to_override_dict_map = {}
+        # for k, v in test_obj.global_spikes_dict.items():
+            
+        k = 'test_obj.global_spikes_dict'
+        v = deepcopy(self.global_spikes_df)
+        assert 'session_name' in v.columns, f"session_name not in columns: {v.columns}"
+        
+        # if 'session_name' in v.columns:
+        # v['session_t_delta'] = v.session_name.map(lambda x: t_delta_dict.get(IdentifyingContext.try_init_from_session_key(session_str=x, separator='-').get_description(separator='_'), {}).get('t_delta', None))
+        # [IdentifyingContext.try_init_from_session_key(session_str=x, separator='|') for x in v.session_uid.unique()]
+        # if 'session_track_start_t' not in v.columns:
+        print(f'k: {k} is included:')
+        # session_uid_to_override_dict_map = session_uid_to_override_dict_map | {x:UserAnnotationsManager.get_hardcoded_specific_session_override_dict().get(IdentifyingContext.try_init_from_session_key(session_str=x, separator='|')) for x in v.session_uid.unique()}
+        
+        ## only for global_spikes_df:
+        v['session_uid'] = v.session_name.map(lambda x: IdentifyingContext.try_init_from_session_key(session_str=x, separator='-').get_description(separator='|')) # get normal form session_uid    
+        v
+        
+        # session_uid_to_override_dict_map = session_uid_to_override_dict_map | {x:UserAnnotationsManager.get_hardcoded_specific_session_override_dict().get(IdentifyingContext.try_init_from_session_key(session_str=x, separator='-')) for x in v.session_name.unique()}
+        session_uid_to_override_dict_map = {x:UserAnnotationsManager.get_hardcoded_specific_session_override_dict().get(IdentifyingContext.try_init_from_session_key(session_str=x, separator='|')) for x in v.session_uid.unique()}
+        session_uid_to_override_dict_map
+        
+
+        # session_name: "kdiba-gor01-one-2006-6-08_14-26-15"
+        # true_session_key, pre_session_info = 
+        # test_obj.global_spikes_df.session_name.map(lambda x: _parse_split_session_key_with_prefix(a_session_key=x)[0])
+
+        # v['session_track_start_t'] = np.nan ## initialize the column
+        # v['session_track_start_t'] = v.session_uid.map(lambda x:  session_uid_to_override_dict_map.get(x, {}).get('track_start_t', np.nan))
+        # v['session_track_end_t'] = np.nan ## initialize the column
+        # v['session_track_end_t'] = v.session_uid.map(lambda x:  session_uid_to_override_dict_map.get(x, {}).get('track_end_t', np.nan))
+
+        partitioned_dfs = dict(zip(*partition_df(v, partitionColumn='session_uid'))) # split back up by session
+        trimmed_result_tuples_dict = {}
+        post_initial_laps_result_tuples_dict = {}
+        post_initial_lap_global_spikes_df = []
+        post_initial_lap_all_cells_first_spike_time_df = []
+        
+        post_first_lap_global_spikes_dict = {}
+        post_first_lap_first_spikes_dict = {}
+        all_sessions_extra_dfs_dict_dict = {}
+        
+        
+        for a_session_uid, a_sess_v in partitioned_dfs.items():
+            a_session_context = IdentifyingContext.try_init_from_session_key(session_str=a_session_uid, separator='|')
+            last_valid_pos_time = session_uid_to_override_dict_map.get(a_session_uid, {}).get('track_end_t', np.nan)
+            first_valid_pos_time = session_uid_to_override_dict_map.get(a_session_uid, {}).get('track_start_t', np.nan)
+            ## all we need to do is properly prune each session's global_spikes_df and then re-call the compute_cell_first_firings
+            trimmed_result_tuples_dict[a_session_uid] = _slice_by_valid_time_subsets(a_sess_v, session_uid=a_session_uid, first_valid_pos_time=first_valid_pos_time, last_valid_pos_time=last_valid_pos_time)
+            trimmed_all_cells_first_spike_time_df, a_trimmed_global_spikes_df, (trimmed_global_spikes_dict, trimmed_first_spikes_dict) = trimmed_result_tuples_dict[a_session_uid]
+            a_trimmed_global_spikes_df = a_trimmed_global_spikes_df.neuron_identity.make_neuron_indexed_df_global(a_session_context, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True) ## add the sess properties to the output post_initial_lap_global_spikes_df:
+            post_initial_laps_result_tuples_dict[a_session_uid], initial_laps_end_time = _include_only_spikes_after_initial_laps(a_trimmed_global_spikes_df, initial_laps_end_time=last_valid_pos_time)
+            print(f'\tinitial_laps_end_time: {initial_laps_end_time}')
+            post_initial_lap_all_cells_first_spike_time_df, post_initial_lap_global_spikes_df, (post_first_lap_global_spikes_dict, post_first_lap_first_spikes_dict) = post_initial_laps_result_tuples_dict[a_session_uid]                
+            
+            post_initial_lap_all_cells_first_spike_time_df = post_initial_lap_all_cells_first_spike_time_df.neuron_identity.make_neuron_indexed_df_global(a_session_context, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
+            post_initial_lap_global_spikes_df = post_initial_lap_global_spikes_df.neuron_identity.make_neuron_indexed_df_global(a_session_context, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
+        
+            post_initial_lap_global_spikes_df.append(post_initial_lap_global_spikes_df)
+            post_initial_lap_all_cells_first_spike_time_df.append(post_initial_lap_all_cells_first_spike_time_df)
+            
+            for k, v in post_first_lap_global_spikes_dict.items():
+                if k not in post_first_lap_global_spikes_dict:
+                    post_first_lap_global_spikes_dict[k] = []
+                post_first_lap_global_spikes_dict[k].append(v)
+
+            for k, v in post_first_lap_first_spikes_dict.items():
+                if k not in post_first_lap_first_spikes_dict:
+                    post_first_lap_first_spikes_dict[k] = []
+                post_first_lap_first_spikes_dict[k].append(v)
+
+
+            # for k, v in extra_dfs_dict_loaded.items():
+            #     if k not in all_sessions_extra_dfs_dict_dict:
+            #         all_sessions_extra_dfs_dict_dict[k] = [] # add this dataframe name
+            #     ## add the session column to `v` if it's missing
+            #     v['session_key'] = session_key
+            #     v['params_key'] = params_key
+            #     v['session_uid'] = reconstructed_session_context.get_description(separator="|")
+            #     all_sessions_extra_dfs_dict_dict[k].append(v) # append to this df name
+                
+
+
+        ## end for
+        post_initial_lap_global_spikes_df = pd.concat(post_initial_lap_global_spikes_df, axis='index') ## re-combine over all the sessions
+        post_initial_lap_all_cells_first_spike_time_df = pd.concat(post_initial_lap_all_cells_first_spike_time_df, axis='index')
+        
+        post_first_lap_global_spikes_dict = {k:pd.concat(v, axis='index') for k, v in post_first_lap_global_spikes_dict.items()}
+        post_first_lap_first_spikes_dict = {k:pd.concat(v, axis='index') for k, v in post_first_lap_first_spikes_dict.items()}
+        # all_sessions_extra_dfs_dict_dict = {extra_dataframe_name:pd.concat(extra_dataframe_df_list, axis='index') for extra_dataframe_name, extra_dataframe_df_list in all_sessions_extra_dfs_dict_dict.items()}        
+
+        # print(np.sum(np.isnan(v['session_track_start_t'])))
+        # a_session_start_t = v.session_uid.map(lambda x:  UserAnnotationsManager.get_hardcoded_specific_session_override_dict().get(IdentifyingContext.try_init_from_session_key(session_str=x, separator='|'), {}).get('track_start_t', None))
+        # a_session_start_t = v.session_name.map(lambda x:  UserAnnotationsManager.get_hardcoded_specific_session_override_dict().get(IdentifyingContext.try_init_from_session_key(session_str=x, separator='-'), {}).get('track_start_t', None))
+        # v['session_track_start_t'] = a_session_start_t
+        # a_session_start_t
+        # else:
+        #     print(f'k: {k}')
+            
+        ## OUTPUTS: _accumulated_global_spikes_df, session_uid_to_override_dict_map
+        # post_initial_lap_all_cells_first_spike_time_df, post_initial_lap_global_spikes_df, (post_first_lap_global_spikes_dict, post_first_lap_first_spikes_dict) = CellsFirstSpikeTimes.perform_compute_cell_first_firings(global_spikes_df=deepcopy(post_initial_lap_global_spikes_df)) ## DO NOT recompute now, everything should already be good.
+        
+        # post_initial_lap_global_spikes_df = post_initial_lap_global_spikes_df.neuron_identity.make_neuron_indexed_df_global(a_session_context, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True) ## add the sess properties to the output post_initial_lap_global_spikes_df:
+        global_pos_df = deepcopy(self.global_position_df)
+        # global_pos_df = global_pos_df.position.time_sliced(earliest_delta_aligned_t_start, latest_delta_aligned_t_end) ## TODO: this needs to be filtered too
+        
+        post_initial_lap_test_obj: CellsFirstSpikeTimes = CellsFirstSpikeTimes(global_spikes_df=post_initial_lap_global_spikes_df, all_cells_first_spike_time_df=post_initial_lap_all_cells_first_spike_time_df,
+                            global_spikes_dict=post_first_lap_global_spikes_dict, first_spikes_dict=post_first_lap_first_spikes_dict, global_position_df=global_pos_df, hdf5_out_path=None)
+        return post_initial_lap_test_obj
+
+    # ==================================================================================================================== #
+    # HDF5 Serialization                                                                                                   #
+    # ==================================================================================================================== #
 
     def save_to_hdf5(self, hdf_save_path: Path):
         """ Save to .h5 or CSV 
