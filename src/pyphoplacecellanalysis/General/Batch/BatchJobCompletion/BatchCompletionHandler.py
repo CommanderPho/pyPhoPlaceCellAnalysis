@@ -15,7 +15,7 @@ from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, Capture
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults
-from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations
+from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_evaluate_required_computations, batch_extended_computations
 from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import main_complete_figure_generations
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import LongShortPipelineTests, JonathanFiringRateAnalysisResult, InstantaneousSpikeRateGroupsComputation
@@ -502,7 +502,10 @@ class BatchSessionCompletionHandler:
             # build computation functions to compute list:
             active_extended_computations_include_includelist = deepcopy(self.extended_computations_include_includelist)
             force_recompute_override_computations_includelist = self.force_recompute_override_computations_includelist or []
-            force_recompute_override_computation_kwargs_dict = self.force_recompute_override_computation_kwargs_dict or {} # #TODO 2024-10-30 08:35: - [ ] is `force_recompute_override_computation_kwargs_dict` actually only used when forcing a recompute, or does passing it when it's the same as the already computed values force it to recompute?
+            force_recompute_override_computation_kwargs_dict = self.force_recompute_override_computation_kwargs_dict or {} # #TODO 2024-10-30 08:35: - [ ] is `force_recompute_override_computation_kwargs_dict` actually only used when forcing a recompute, or does passing it when it's the same as the already computed values force it to recompute? It seems to force it to recompute
+            # ## #TODO 2024-11-06 14:21: - [ ] I think we should use `batch_evaluate_required_computations` instead of `batch_extended_computations` to avoid forcing recomputations.
+            # needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=active_extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+            #                                         force_recompute=self.force_global_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
             
             try:
                 # # 2023-01-* - Call extended computations to build `_display_short_long_firing_rate_index_comparison` figures:
@@ -515,7 +518,7 @@ class BatchSessionCompletionHandler:
                     #TODO 2023-07-11 19:20: - [ ] We want to save the global results if they are computed, but we don't want them to be needlessly written to disk even when they aren't changed.
                     return newly_computed_values # return the list of newly computed values
 
-            except BaseException as e:
+            except Exception as e:
                 ## TODO: catch/log saving error and indicate that it isn't saved.
                 exception_info = sys.exc_info()
                 e = CapturedException(e, exception_info)
