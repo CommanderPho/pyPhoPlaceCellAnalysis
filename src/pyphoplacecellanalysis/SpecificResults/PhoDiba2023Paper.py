@@ -1806,7 +1806,7 @@ class DataFrameFilter:
 
 	def _setup_widgets(self):
 		# Extract unique options for the widgets
-		replay_name_options = sorted(self.all_sessions_ripple_df['custom_replay_name'].unique())
+		replay_name_options = sorted(self.all_sessions_ripple_df['custom_replay_name'].astype(str).unique())
 		time_bin_size_options = sorted(self.all_sessions_ripple_df['time_bin_size'].unique())
 		
 		# Create dropdown widgets with adjusted layout and style
