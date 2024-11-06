@@ -634,7 +634,7 @@ class BatchSessionCompletionHandler:
         # ## Post Compute Validate 2023-05-16:
         try:
             was_updated = was_updated | self.post_compute_validate(curr_active_pipeline)
-        except BaseException as e:
+        except Exception as e:
             exception_info = sys.exc_info()
             an_err = CapturedException(e, exception_info)
             print(f'self.post_compute_validate(...) failed with exception: {an_err}')
@@ -649,7 +649,7 @@ class BatchSessionCompletionHandler:
         try:
             # self.session_computations_options.override_file
             curr_active_pipeline.save_pipeline(saving_mode=self.saving_mode, active_pickle_filename=self.session_computations_options.override_output_file) # AttributeError: 'PfND_TimeDependent' object has no attribute '_included_thresh_neurons_indx'
-        except BaseException as e:
+        except Exception as e:
             ## TODO: catch/log saving error and indicate that it isn't saved.
             exception_info = sys.exc_info()
             e = CapturedException(e, exception_info)
@@ -713,7 +713,7 @@ class BatchSessionCompletionHandler:
             # LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus = _out_inst_fr_comps.LxC_ThetaDeltaMinus, _out_inst_fr_comps.LxC_ThetaDeltaPlus, _out_inst_fr_comps.SxC_ThetaDeltaMinus, _out_inst_fr_comps.SxC_ThetaDeltaPlus
             print(f'\t\t done (success).')
 
-        except BaseException as e:
+        except Exception as e:
             exception_info = sys.exc_info()
             e = CapturedException(e, exception_info)
             print(f"WARN: on_complete_success_execution_session: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
