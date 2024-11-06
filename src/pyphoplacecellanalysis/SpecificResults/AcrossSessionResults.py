@@ -1652,6 +1652,10 @@ def load_and_apply_session_experience_rank_csv(csv_path="./data/sessions_experim
 
 @function_attributes(short_name=None, tags=['csv', 'filesystem', 'discovery'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-09 18:19', related_items=[])
 def find_csv_files(directory: str, recurrsive: bool=False):
+	""" 
+	from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import find_csv_files, find_HDF5_files, find_pkl_files
+	
+	"""
 	directory_path = Path(directory) # Convert string path to a Path object
 	if recurrsive:
 		return list(directory_path.glob('**/*.csv')) # Return a list of all .csv files in the directory and its subdirectories
@@ -2910,33 +2914,98 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
 	)
 
 
+from pyphoplacecellanalysis.General.Batch.runBatch import ConcreteSessionFolder
 
-@function_attributes(short_name=None, tags=['archive', 'cleanup', 'filesystem'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-02 11:30', related_items=[])
-def archive_old_files(collected_outputs_directory: Path, excluded_or_outdated_files_list: List[Path], is_dry_run: bool=False):
-	""" moves old files that didn't meet the inclusion criteria into an archive directory.
+class OldFileArchiver:
 	
-	
-	"""
-	## INPUTS: collected_outputs_directory, excluded_or_outdated_files_list
-	
-	assert collected_outputs_directory.exists(), f"collected_outputs_directory: {collected_outputs_directory} does not exist! Is the right computer's config commented out above?"
-	# fullwidth_path_widget(scripts_output_path, file_name_label='Scripts Output Path:')
-	print(f'collected_outputs_directory: "{collected_outputs_directory}"')
+	@function_attributes(short_name=None, tags=['archive', 'cleanup', 'filesystem'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-02 11:30', related_items=[])
+	@classmethod
+	def archive_old_files(cls, collected_outputs_directory: Path, excluded_or_outdated_files_list: List[Path], is_dry_run: bool=False):
+		""" moves old files that didn't meet the inclusion criteria into an archive directory.
+		
+		
+		"""
+		## INPUTS: collected_outputs_directory, excluded_or_outdated_files_list
+		
+		assert collected_outputs_directory.exists(), f"collected_outputs_directory: {collected_outputs_directory} does not exist! Is the right computer's config commented out above?"
+		# fullwidth_path_widget(scripts_output_path, file_name_label='Scripts Output Path:')
+		print(f'collected_outputs_directory: "{collected_outputs_directory}"')
 
-	# Create a 'figures' subfolder if it doesn't exist
-	archive_folder: Path = collected_outputs_directory.joinpath('OLD').resolve()
-	archive_folder.mkdir(parents=False, exist_ok=True)
-	assert archive_folder.exists()
-	print(f'\tarchive_folder: "{archive_folder}"')
+		# Create a 'figures' subfolder if it doesn't exist
+		archive_folder: Path = collected_outputs_directory.joinpath('OLD').resolve()
+		archive_folder.mkdir(parents=False, exist_ok=True)
+		assert archive_folder.exists()
+		print(f'\tarchive_folder: "{archive_folder}"')
 
-	for a_file_path in excluded_or_outdated_files_list:
-		## move the file to the archive folder
-		# a_file_path.stem
-		print(f'copying "{a_file_path}" to "{archive_folder}"...')
-		if (not is_dry_run):
-			shutil.move(a_file_path, archive_folder)
+		for a_file_path in excluded_or_outdated_files_list:
+			## move the file to the archive folder
+			# a_file_path.stem
+			print(f'copying "{a_file_path}" to "{archive_folder}"...')
+			if (not is_dry_run):
+				shutil.move(a_file_path, archive_folder)
 
-	return archive_folder
+		return archive_folder
+
+
+	@function_attributes(short_name=None, tags=['filesystem', 'clean', 'delete', 'temporary'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-06 04:27', related_items=[])
+	@classmethod
+	def remove_backup_files_from_session_data_folders(cls, good_session_concrete_folders: List["ConcreteSessionFolder"], is_dryrun: bool = True):
+		""" cleans up the temporary pickle files that are created during the session data loading process to recover space.
+		
+		Usage:
+			from pyphoplacecellanalysis.General.Batch.runBatch import ConcreteSessionFolder, BackupMethods
+			from neuropy.core.user_annotations import UserAnnotationsManager
+
+			
+			included_session_contexts: List[IdentifyingContext] = UserAnnotationsManager.get_all_known_sessions()
+			known_global_data_root_parent_paths = [Path('/Users/pho/data'), Path(r'/nfs/turbo/umms-kdiba/Data'), Path(r'/media/halechr/MAX/Data'), Path(r'W:/Data'), Path(r'/home/halechr/FastData'), Path(r'/Volumes/MoverNew/data')] # Path(r'/home/halechr/cloud/turbo/Data'), , Path(r'/nfs/turbo/umms-kdiba/Data'), Path(r'/home/halechr/turbo/Data'), 
+			global_data_root_parent_path = find_first_extant_path(known_global_data_root_parent_paths)
+			assert global_data_root_parent_path.exists(), f"global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
+			print(f'global_data_root_parent_path: {global_data_root_parent_path}')
+			good_session_concrete_folders = ConcreteSessionFolder.build_concrete_session_folders(global_data_root_parent_path, included_session_contexts)
+			deleted_file_list = OldFileArchiver.remove_backup_files_from_session_data_folders(good_session_concrete_folders=good_session_concrete_folders, is_dryrun=True)
+			deleted_file_list
+
+		"""	
+		# a_folder = good_session_concrete_folders[0]
+		# a_folder.session_pickle
+		# backup-20240911134307-loadedSessPickle.pkl.bak'
+		deleted_file_list = []
+
+		for a_folder in good_session_concrete_folders:
+			print(f'Processing "{a_folder.path.as_posix()}"...')
+			# a_folder.output_folder
+			delete_dict = {'.pkltmp': list(a_folder.path.glob('*.pkltmp')),
+						'.pkl.bak': list(a_folder.path.glob('*.pkl.bak')),
+						#    'backup': list(a_folder.path.glob('backup*')),
+						}
+			print(f'\tdelete_dict: {delete_dict}')
+
+			for k, v in delete_dict.items():
+				for a_path in v:
+					print(f'deleting "{a_path.as_posix()}"')
+					if not is_dryrun:
+						a_path.unlink()
+					deleted_file_list.append(a_path)
+					
+			## do for `a_folder.output_folder`:
+			delete_dict = {'.pkltmp': list(a_folder.output_folder.glob('*.pkltmp')),
+						'.pkl.bak': list(a_folder.output_folder.glob('*.pkl.bak')),
+						#    'backup': list(a_folder.path.glob('backup*')),
+						}
+			print(f'\t./Output folder delete_dict: {delete_dict}')
+			for k, v in delete_dict.items():
+				for a_path in v:
+					if not is_dryrun:
+						a_path.unlink()
+					deleted_file_list.append(a_path)
+					
+			print(f'\tdone.')
+
+		return deleted_file_list
+
+
+
 
 # ==================================================================================================================== #
 # Visualizations                                                                                                       #
