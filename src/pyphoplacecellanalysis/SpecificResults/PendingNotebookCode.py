@@ -771,6 +771,7 @@ from functools import reduce
 from neuropy.core.neuron_identities import NeuronIdentityDataframeAccessor
 from neuropy.core.flattened_spiketrains import SpikesAccessor
 from neuropy.core.epoch import ensure_dataframe
+from pyphocorehelpers.indexing_helpers import reorder_columns_relative
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
 from neuropy.utils.mixins.AttrsClassHelpers import SimpleFieldSizesReprMixin
@@ -797,6 +798,10 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
     
     global_position_df: pd.DataFrame = field()
     hdf5_out_path: Optional[Path] = field()
+
+    def __attrs_post_init__(self):
+        """ after initializing, run post_init_cleanup() to order the columns """
+        self.post_init_cleanup()
 
 
     @classmethod
@@ -827,6 +832,51 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         _obj: CellsFirstSpikeTimes = CellsFirstSpikeTimes(global_spikes_df=deepcopy(all_sessions_global_spikes_df), all_cells_first_spike_time_df=deepcopy(all_sessions_first_spike_combined_df),
                                                             global_spikes_dict=deepcopy(all_sessions_global_spikes_dict), first_spikes_dict=deepcopy(all_sessions_first_spikes_dict), hdf5_out_path=None, global_position_df=global_position_df)
         return _obj
+
+
+
+    def add_session_info(self, t_delta_dict):
+        """ post-hoc after loading 
+        """
+        for k, v in self.first_spikes_dict.items():
+            if 'session_name' in v.columns:
+                v['session_t_delta'] = v.session_name.map(lambda x: t_delta_dict.get(IdentifyingContext.try_init_from_session_key(session_str=x, separator='-').get_description(separator='_'), {}).get('t_delta', None))
+            else:
+                print(f'k: {k}')
+                
+        for k, v in self.global_spikes_dict.items():
+            if 'session_name' in v.columns:
+                v['session_t_delta'] = v.session_name.map(lambda x: t_delta_dict.get(IdentifyingContext.try_init_from_session_key(session_str=x, separator='-').get_description(separator='_'), {}).get('t_delta', None))
+            else:
+                print(f'k: {k}')
+                
+        self.all_cells_first_spike_time_df['session_t_delta'] = self.all_cells_first_spike_time_df.session_name.map(lambda x: t_delta_dict.get(IdentifyingContext.try_init_from_session_key(session_str=x, separator='-').get_description(separator='_'), {}).get('t_delta', None))
+        self.global_spikes_df['session_t_delta'] = self.global_spikes_df.session_name.map(lambda x: t_delta_dict.get(IdentifyingContext.try_init_from_session_key(session_str=x, separator='-').get_description(separator='_'), {}).get('t_delta', None))
+
+
+
+
+    def post_init_cleanup(self):
+        """ orders the columns """
+        ordered_column_names = ['neuron_uid', 'format_name', 'animal', 'exper_name', 'session_name', 'aclu', 'session_uid']
+        
+        for k, v in self.first_spikes_dict.items():
+            self.first_spikes_dict[k] = reorder_columns_relative(v, column_names=ordered_column_names, # , 'session_datetime'
+                                            relative_mode='start')
+                
+        for k, v in self.global_spikes_dict.items():
+            self.global_spikes_dict[k] = reorder_columns_relative(v, column_names=ordered_column_names, # , 'session_datetime'
+                                            relative_mode='start')       
+
+        self.global_spikes_df = reorder_columns_relative(self.global_spikes_df, column_names=ordered_column_names, # , 'session_datetime'
+                                            relative_mode='start')
+
+        self.all_cells_first_spike_time_df = reorder_columns_relative(self.all_cells_first_spike_time_df, column_names=ordered_column_names, # , 'session_datetime'
+                                                    relative_mode='start')
+
+        ## add 'session_t_delta'?
+        ## add 'session_datetime'?
+                
 
 
     # @function_attributes(short_name=None, tags=['first-spike', 'cell-analysis'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-01 13:59', related_items=[])
@@ -1080,6 +1130,26 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         return all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict), global_position_df, hdf5_out_path
 
 
+
+
+    def sliced_by_neuron_id(self, included_neuron_ids) -> pd.DataFrame:
+        """ gets the slice of spikes with the specified `included_neuron_ids` """
+        assert included_neuron_ids is not None
+        test_obj = deepcopy(self)    
+
+        # for k, v in test_obj.first_spikes_dict.items():
+        #     test_obj.first_spikes_dict[k] = v.spikes.sliced_by_neuron_id(included_neuron_ids=included_neuron_ids)
+                
+        # for k, v in test_obj.global_spikes_dict.items():
+        #     test_obj.global_spikes_dict[k] = v.spikes.sliced_by_neuron_id(included_neuron_ids=included_neuron_ids)
+
+        test_obj.global_spikes_df = test_obj.global_spikes_df.spikes.sliced_by_neuron_id(included_neuron_ids=included_neuron_ids)
+        # test_obj.all_cells_first_spike_time_df = test_obj.all_cells_first_spike_time_df.spikes.sliced_by_neuron_id(included_neuron_ids=included_neuron_ids)
+        
+        return test_obj # self._obj[self._obj['aclu'].isin(included_neuron_ids)] ## restrict to only the shared aclus for both short and long
+        
+
+
     # ==================================================================================================================== #
     # HDF5 Serialization                                                                                                   #
     # ==================================================================================================================== #
@@ -1212,17 +1282,19 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         for i, (a_path, a_first_spike_time_tuple) in enumerate(zip(first_spike_activity_data_h5_files, all_sessions_first_spike_activity_tuples)):
             all_cells_first_spike_time_df_loaded, global_spikes_df_loaded, global_spikes_dict_loaded, first_spikes_dict_loaded, extra_dfs_dict_loaded = a_first_spike_time_tuple ## unpack
 
-            # Parse out the session context from the filename ____________________________________________________________________ #
-            session_key, params_key = a_path.stem.split('__')
-            # session_key # 'kdiba-gor01-one-2006-6-08_14-26-15'
-            # params_key # 'withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]_first_spike_activity_data'
-            session_parts = session_key.split('-', maxsplit=3)
-            assert len(session_parts) == 4, f"session_parts: {session_parts}"
-            format_name, animal, exper_name, session_name = session_parts
-            reconstructed_session_context = IdentifyingContext(format_name=format_name, animal=animal, exper_name=exper_name, session_name=session_name)    
-            # print(f'reconstructed_session_context: {reconstructed_session_context}')
-            all_cells_first_spike_time_df_loaded = all_cells_first_spike_time_df_loaded.neuron_identity.make_neuron_indexed_df_global(reconstructed_session_context, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
-            global_spikes_df_loaded = global_spikes_df_loaded.neuron_identity.make_neuron_indexed_df_global(reconstructed_session_context, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
+            # # Parse out the session context from the filename ____________________________________________________________________ #
+            # session_key, params_key = a_path.stem.split('__')
+            # # session_key # 'kdiba-gor01-one-2006-6-08_14-26-15'
+            # # params_key # 'withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]_first_spike_activity_data'
+            # session_parts = session_key.split('-', maxsplit=3)
+            # assert len(session_parts) == 4, f"session_parts: {session_parts}"
+            # format_name, animal, exper_name, session_name = session_parts
+            # reconstructed_session_context = IdentifyingContext(format_name=format_name, animal=animal, exper_name=exper_name, session_name=session_name)    
+            # # print(f'reconstructed_session_context: {reconstructed_session_context}')
+            # ## seems wrong: reconstructed_session_context
+
+            # all_cells_first_spike_time_df_loaded = all_cells_first_spike_time_df_loaded.neuron_identity.make_neuron_indexed_df_global(reconstructed_session_context, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
+            # global_spikes_df_loaded = global_spikes_df_loaded.neuron_identity.make_neuron_indexed_df_global(reconstructed_session_context, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
             
             # all_cells_first_spike_time_df_loaded['path'] = a_path.as_posix()
             # all_cells_first_spike_time_df_loaded['session_key'] = session_key	 
@@ -1245,9 +1317,12 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
                 if k not in all_sessions_extra_dfs_dict_dict:
                     all_sessions_extra_dfs_dict_dict[k] = [] # add this dataframe name
                 ## add the session column to `v` if it's missing
-                v['session_key'] = session_key
-                v['params_key'] = params_key
-                v['session_uid'] = reconstructed_session_context.get_description(separator="|")
+                # if 'session_key' not in v.columns:
+                #     v['session_key'] = session_key
+                # if 'params_key' not in v.columns:
+                #     v['params_key'] = params_key
+                # if 'session_uid' not in v.columns:
+                #     v['session_uid'] = reconstructed_session_context.get_description(separator="|")
                 all_sessions_extra_dfs_dict_dict[k].append(v) # append to this df name
                 
 
