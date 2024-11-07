@@ -364,6 +364,9 @@ class BatchRun(HDF_SerializationMixin):
     def execute_all(self, use_multiprocessing=True, num_processes=None, included_session_contexts: Optional[List[IdentifyingContext]]=None, session_inclusion_filter:Optional[Callable]=None, **kwargs):
         """ calls `run_specific_batch(...)` for each session context to actually execute the session's run. """
         allow_processing_previously_completed: bool = kwargs.pop('allow_processing_previously_completed', False)
+        
+        run_specific_batch_kwargs_fn = kwargs.pop('run_specific_batch_kwargs_fn', None) ## .execute_all(...) now supports passing `run_specific_batch_kwargs_fn`
+        
         # record the start timestamp:
         self.start_time = datetime.now()
         
@@ -399,7 +402,15 @@ class BatchRun(HDF_SerializationMixin):
             
             for curr_session_context in included_session_contexts:
                 curr_session_basedir = self.session_batch_basedirs[curr_session_context]
-                result = pool.apply_async(run_specific_batch, (self.global_data_root_parent_path, curr_session_context, curr_session_basedir), kwargs) # it can actually take a callback too.
+                ## more advanced parameters would have to be built here
+                if run_specific_batch_kwargs_fn is not None:
+                    # use the provided function to get the specific kwargs to apply:
+                    run_specific_batch_kwargs = run_specific_batch_kwargs_fn(curr_session_context=curr_session_context, curr_session_basedir=curr_session_basedir)
+                    result = pool.apply_async(run_specific_batch, **run_specific_batch_kwargs) # it can actually take a callback too.
+
+                else:
+                    result = pool.apply_async(run_specific_batch, (self.global_data_root_parent_path, curr_session_context, curr_session_basedir), kwargs) # it can actually take a callback too.
+
                 results[curr_session_context] = result
 
             pool.close()
@@ -410,21 +421,6 @@ class BatchRun(HDF_SerializationMixin):
                 self.session_batch_status[session_context] = status
                 self.session_batch_errors[session_context] = error
                 self.session_batch_outputs[session_context] = output
-                
-            # # `concurrent.futures` version instead of `multiprocessing` __________________________________________________________ #
-            # if num_processes is None:
-            #     num_processes = concurrent.futures.ProcessPoolExecutor().max_workers
-
-            # with concurrent.futures.ProcessPoolExecutor(max_workers=num_processes) as executor:
-            #     futures = {executor.submit(run_specific_batch, self.global_data_root_parent_path, curr_session_context, self.session_batch_basedirs[curr_session_context], **kwargs): curr_session_context for curr_session_context in included_session_contexts}
-
-            #     for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures)):
-            #         session_context = futures[future]  # get the context for this future
-            #         status, error, output = future.result()
-            #         self.session_batch_status[session_context] = status
-            #         self.session_batch_errors[session_context] = error
-            #         self.session_batch_outputs[session_context] = output
-
 
         else:
             # No multiprocessing, fall back to the normal way.
@@ -432,7 +428,13 @@ class BatchRun(HDF_SerializationMixin):
                 # evaluate a single session
                 curr_session_status = self.session_batch_status[curr_session_context]
                 curr_session_basedir = self.session_batch_basedirs[curr_session_context]
-                self.session_batch_status[curr_session_context], self.session_batch_errors[curr_session_context], self.session_batch_outputs[curr_session_context] = run_specific_batch(self.global_data_root_parent_path, curr_session_context, curr_session_basedir, **kwargs)
+                if run_specific_batch_kwargs_fn is not None:
+                    # use the provided function to get the specific kwargs to apply:
+                    run_specific_batch_kwargs = run_specific_batch_kwargs_fn(curr_session_context=curr_session_context, curr_session_basedir=curr_session_basedir)
+                    self.session_batch_status[curr_session_context], self.session_batch_errors[curr_session_context], self.session_batch_outputs[curr_session_context] = run_specific_batch(**run_specific_batch_kwargs)
+                    
+                else:                
+                    self.session_batch_status[curr_session_context], self.session_batch_errors[curr_session_context], self.session_batch_outputs[curr_session_context] = run_specific_batch(self.global_data_root_parent_path, curr_session_context, curr_session_basedir, **kwargs)
 
     # Updating ___________________________________________________________________________________________________________ #
     def change_global_root_path(self, desired_global_data_root_parent_path):
