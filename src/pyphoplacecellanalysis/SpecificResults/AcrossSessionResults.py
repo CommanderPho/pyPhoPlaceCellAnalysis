@@ -2928,7 +2928,8 @@ class OldFileArchiver:
 	def archive_old_files(cls, collected_outputs_directory: Path, excluded_or_outdated_files_list: List[Path], is_dry_run: bool=False):
 		""" moves old files that didn't meet the inclusion criteria into an archive directory.
 		
-		
+		from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import OldFileArchiver
+		archive_folder = OldFileArchiver.archive_old_files(collected_outputs_directory=collected_outputs_directory, excluded_or_outdated_files_list=excluded_or_outdated_files_list, is_dry_run=True)
 		"""
 		## INPUTS: collected_outputs_directory, excluded_or_outdated_files_list
 		
