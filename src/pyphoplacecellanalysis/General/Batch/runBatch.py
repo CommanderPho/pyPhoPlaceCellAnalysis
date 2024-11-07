@@ -406,8 +406,8 @@ class BatchRun(HDF_SerializationMixin):
                 if run_specific_batch_kwargs_fn is not None:
                     # use the provided function to get the specific kwargs to apply:
                     run_specific_batch_kwargs = run_specific_batch_kwargs_fn(curr_session_context=curr_session_context, curr_session_basedir=curr_session_basedir)
-                    result = pool.apply_async(run_specific_batch, **run_specific_batch_kwargs) # it can actually take a callback too.
-
+                    # result = pool.apply_async(run_specific_batch, **run_specific_batch_kwargs)
+                    result = pool.apply_async(run_specific_batch, (run_specific_batch_kwargs.pop('global_data_root_parent_path'), run_specific_batch_kwargs.pop('curr_session_context'), run_specific_batch_kwargs.pop('curr_session_basedir')), run_specific_batch_kwargs)
                 else:
                     result = pool.apply_async(run_specific_batch, (self.global_data_root_parent_path, curr_session_context, curr_session_basedir), kwargs) # it can actually take a callback too.
 
