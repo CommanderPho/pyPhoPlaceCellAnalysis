@@ -22,6 +22,7 @@ from pyphocorehelpers.indexing_helpers import reorder_keys_relative
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.exception_helpers import CapturedException, ExceptionPrintingContext
+from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
 
 # pyPhoPlaceCellAnalysis:
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
@@ -764,8 +765,32 @@ class BatchPhoJonathanFiguresHelper:
 
 
 	@classmethod
+	def perform_run(cls, curr_active_pipeline, shared_aclus=None, long_only_aclus=None, short_only_aclus=None, n_max_page_rows=10, write_vector_format=False, write_png=True, progress_print=True, debug_print=False, disable_top_row=False) -> Dict[IdentifyingContext, MatplotlibRenderPlots]:
+		""" The only public function. Performs the batch plotting.
+		
+		# split_by_short_long_shared, bool: whether to create separate figures for the short/long exclusive cells and the shared. If False all will be treated as "shared"
+		
+		"""
+		long_only_aclus = long_only_aclus or []
+		short_only_aclus = short_only_aclus or []
+		shared_aclus = shared_aclus or []
+
+		if debug_print:
+			print(f'shared_aclus: {shared_aclus}')
+			print(f'long_only_aclus: {long_only_aclus}')
+			print(f'short_only_aclus: {short_only_aclus}')
+
+		active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
+		
+		_batch_plot_kwargs_list = cls._build_batch_plot_kwargs(long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=n_max_page_rows, _extra_kwargs=dict(disable_top_row=disable_top_row))
+		active_out_figure_container_dict: Dict[IdentifyingContext, MatplotlibRenderPlots] = cls._perform_batch_plot(curr_active_pipeline, _batch_plot_kwargs_list, write_vector_format=write_vector_format, write_png=write_png, progress_print=progress_print, debug_print=debug_print)
+		
+		return active_out_figure_container_dict
+
+
+	@classmethod
 	def run(cls, curr_active_pipeline, neuron_replay_stats_df, included_unit_neuron_IDs=None, n_max_page_rows=10, write_vector_format=False, write_png=True, progress_print=True, debug_print=False,
-			 show_only_refined_cells:bool=False, disable_top_row=False, split_by_short_long_shared: bool = True):
+			 show_only_refined_cells:bool=False, disable_top_row=False, split_by_short_long_shared: bool = True) -> Dict[IdentifyingContext, MatplotlibRenderPlots]:
 		""" The only public function. Performs the batch plotting.
 		
 		# split_by_short_long_shared, bool: whether to create separate figures for the short/long exclusive cells and the shared. If False all will be treated as "shared"
@@ -804,38 +829,21 @@ class BatchPhoJonathanFiguresHelper:
 			long_only_aclus = []
 			shared_df = neuron_replay_stats_df.copy()
 			shared_aclus = shared_df.index.values.tolist()
-
-
-		if debug_print:
-			print(f'shared_aclus: {shared_aclus}')
-			print(f'long_only_aclus: {long_only_aclus}')
-			print(f'short_only_aclus: {short_only_aclus}')
-
-		active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06'
 		
-		_batch_plot_kwargs_list = cls._build_batch_plot_kwargs(long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=n_max_page_rows, _extra_kwargs=dict(disable_top_row=disable_top_row))
-		active_out_figures_dict = cls._perform_batch_plot(curr_active_pipeline, _batch_plot_kwargs_list, write_vector_format=write_vector_format, write_png=write_png, progress_print=progress_print, debug_print=debug_print)
-		
-		# ## find the output figures from the `curr_active_pipeline.registered_output_files`
-		# exports_any_figures_to_disk: bool = (write_png or write_vector_format and (len(active_out_figures_dict)>0))
-		# if exports_any_figures_to_disk:
-		#     _found_contexts_dict: Dict[IdentifyingContext, Path] = {}
-		#     for a_figure_path, an_output_dict in curr_active_pipeline.registered_output_files.items():
-		#         a_ctxt = an_output_dict['context']
-		#         _found_contexts_dict[a_ctxt] = a_figure_path
-
-		#     relevant_figures_dict: Dict[IdentifyingContext, Path] = IdentifyingContext.matching(_found_contexts_dict, criteria={'display_fn_name': 'BatchPhoJonathanReplayFRC'})
-		#     relevant_figures_dict
-
-		return active_out_figures_dict
+		return cls.perform_run(curr_active_pipeline=curr_active_pipeline, shared_aclus=shared_aclus, long_only_aclus=long_only_aclus, short_only_aclus=short_only_aclus, n_max_page_rows=n_max_page_rows, write_vector_format=write_vector_format, write_png=write_png, progress_print=progress_print, debug_print=debug_print,
+			disable_top_row=disable_top_row
+		)
+		# return active_out_figure_container_dict
 
 	@classmethod
-	def _subfn_batch_plot_automated(cls, curr_active_pipeline, included_unit_neuron_IDs=None, active_identifying_ctx=None, fignum=None, fig_idx=0, n_max_page_rows=10, disable_top_row=False):
+	def _subfn_batch_plot_automated(cls, curr_active_pipeline, included_unit_neuron_IDs=None, active_identifying_ctx=None, fignum=None, fig_idx=0, n_max_page_rows=10, disable_top_row=False) -> MatplotlibRenderPlots:
 		""" the a programmatic wrapper for automated output using `_display_batch_pho_jonathan_replay_firing_rate_comparison`. The specific plot function called. 
 		Called ONLY by `_perform_batch_plot(...)`
 
 		Calls `curr_active_pipeline.display(cls._display_fn_name, ...)
 		"""
+		
+		
 		# size_dpi = 100.0,
 		# single_subfigure_size_px = np.array([1920.0, 220.0])
 		single_subfigure_size_inches = np.array([19.2,  2.2])
@@ -843,13 +851,16 @@ class BatchPhoJonathanFiguresHelper:
 		num_cells = len(included_unit_neuron_IDs or [])
 		desired_figure_size_inches = single_subfigure_size_inches.copy()
 		desired_figure_size_inches[1] = desired_figure_size_inches[1] * num_cells
-		graphics_output_dict = curr_active_pipeline.display(cls._display_fn_name, active_identifying_ctx,
+		graphics_output_dict: MatplotlibRenderPlots = curr_active_pipeline.display(cls._display_fn_name, active_identifying_ctx,
 															n_max_plot_rows=n_max_page_rows, included_unit_neuron_IDs=included_unit_neuron_IDs,
 															show_inter_replay_frs=True, spikes_color=(0.1, 0.0, 0.1), spikes_alpha=0.5, fignum=fignum, fig_idx=fig_idx, figsize=desired_figure_size_inches, save_figure=False, defer_render=True, disable_top_row=disable_top_row) # save_figure will be false because we're saving afterwards
+		
 		# fig, subfigs, axs, plot_data = graphics_output_dict['fig'], graphics_output_dict['subfigs'], graphics_output_dict['axs'], graphics_output_dict['plot_data']
 		fig, subfigs, axs, plot_data = graphics_output_dict.figures[0], graphics_output_dict.subfigs, graphics_output_dict.axes, graphics_output_dict.plot_data
 		fig.suptitle(active_identifying_ctx.get_description()) # 'kdiba_2006-6-08_14-26-15_[4, 13, 36, 58, 60]'
-		return fig
+		return graphics_output_dict
+	
+		# return fig
 
 	@classmethod
 	def _build_batch_plot_kwargs(cls, long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=10, _extra_kwargs=None):
@@ -897,7 +908,7 @@ class BatchPhoJonathanFiguresHelper:
 		return _batch_plot_kwargs_list
 
 	@classmethod
-	def _perform_batch_plot(cls, curr_active_pipeline, active_kwarg_list, subset_includelist=None, subset_excludelist=None, write_vector_format=False, write_png=True, progress_print=True, debug_print=False):
+	def _perform_batch_plot(cls, curr_active_pipeline, active_kwarg_list, subset_includelist=None, subset_excludelist=None, write_vector_format=False, write_png=True, progress_print=True, debug_print=False) -> Dict[IdentifyingContext, MatplotlibRenderPlots]:
 		""" Plots everything by calling `cls._subfn_batch_plot_automated` using the kwargs provided in `active_kwarg_list`
 
 		Args:
@@ -917,7 +928,7 @@ class BatchPhoJonathanFiguresHelper:
 		# 2023-06-14 21:53: - [X] REPLACE `create_daily_programmatic_display_function_testing_folder_if_needed` with `curr_active_pipeline.get_figure_manager()` approach
 		fig_man = curr_active_pipeline.get_output_manager()
 
-		active_out_figures_dict = {} # empty dict to hold figures
+		active_out_figure_container_dict: Dict[IdentifyingContext, MatplotlibRenderPlots] = {} # empty dict to hold figures
 		num_pages = len(active_kwarg_list)
 
 		# Each figure:
@@ -928,8 +939,10 @@ class BatchPhoJonathanFiguresHelper:
 			final_figure_file_path = fig_man.get_figure_save_file_path(curr_active_identifying_ctx, make_folder_if_needed=True) # complete file path without extension: e.g. '/ProgrammaticDisplayFunctionTesting/2023-06-15/kdiba_pin01_one_11-03_12-3-25_BatchPhoJonathanReplayFRC_short_only_[13, 22, 28]'
 
 			# Perform the plotting:
-			a_fig = cls._subfn_batch_plot_automated(curr_active_pipeline, **curr_batch_plot_kwargs)
-			active_out_figures_dict[curr_active_identifying_ctx] = a_fig
+			a_fig_container: MatplotlibRenderPlots = cls._subfn_batch_plot_automated(curr_active_pipeline, **curr_batch_plot_kwargs)
+			a_fig, subfigs, axs, plot_data = a_fig_container.figures[0], a_fig_container.subfigs, a_fig_container.axes, a_fig_container.plot_data
+			# active_out_figures_dict[curr_active_identifying_ctx] = a_fig
+			active_out_figure_container_dict[curr_active_identifying_ctx] = a_fig_container
 
 			# One plot at a time to PDF:
 			if write_vector_format:
@@ -954,7 +967,7 @@ class BatchPhoJonathanFiguresHelper:
 					print(f'\t saved {fig_png_out_path}')
 
 
-		return active_out_figures_dict
+		return active_out_figure_container_dict
 
 
 # ==================================================================================================================== #
