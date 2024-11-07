@@ -771,9 +771,12 @@ class BatchPhoJonathanFiguresHelper:
 		# split_by_short_long_shared, bool: whether to create separate figures for the short/long exclusive cells and the shared. If False all will be treated as "shared"
 		
 		"""
-		long_only_aclus = long_only_aclus or []
-		short_only_aclus = short_only_aclus or []
-		shared_aclus = shared_aclus or []
+		if long_only_aclus is None:
+			long_only_aclus = []
+		if short_only_aclus is None:
+			short_only_aclus = []
+		if shared_aclus is None:
+			shared_aclus = []
 
 		if debug_print:
 			print(f'shared_aclus: {shared_aclus}')
@@ -863,7 +866,7 @@ class BatchPhoJonathanFiguresHelper:
 		# return fig
 
 	@classmethod
-	def _build_batch_plot_kwargs(cls, long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=10, _extra_kwargs=None):
+	def _build_batch_plot_kwargs(cls, long_only_aclus, short_only_aclus, shared_aclus, active_identifying_session_ctx, n_max_page_rows=10, _extra_kwargs=None, debug_print=False):
 		""" builds the list of kwargs for all figures (and their aclus). """
 		_batch_plot_kwargs_list = [] # empty list to start
 
@@ -873,14 +876,15 @@ class BatchPhoJonathanFiguresHelper:
 		_aclu_indicies_list_str_formatter = lambda a_list: ('(' + ','.join(map(str, a_list)) + ')')
 
 		## {long_only, short_only} plot configs (doesn't include the shared_aclus)
-		if len(long_only_aclus) > 0:        
+		if len(long_only_aclus) > 0:
 			_batch_plot_kwargs_list.append(dict(included_unit_neuron_IDs=long_only_aclus,
 			active_identifying_ctx=active_identifying_session_ctx.adding_context(collision_prefix='_batch_plot_test',
 				display_fn_name=cls._display_fn_context_display_name, plot_result_set='long_only', aclus=f"{_aclu_indicies_list_str_formatter(long_only_aclus)}"
 			),
 			fignum='long_only', n_max_page_rows=len(long_only_aclus), **_extra_kwargs))
 		else:
-			print(f'WARNING: long_only_aclus is empty, so not adding kwargs for these.')
+			if debug_print:
+				print(f'WARNING: long_only_aclus is empty, so not adding kwargs for these.')
 		
 		if len(short_only_aclus) > 0:
 			_batch_plot_kwargs_list.append(dict(included_unit_neuron_IDs=short_only_aclus,
@@ -889,7 +893,8 @@ class BatchPhoJonathanFiguresHelper:
 			),
 			fignum='short_only', n_max_page_rows=len(short_only_aclus), **_extra_kwargs))
 		else:
-			print(f'WARNING: short_only_aclus is empty, so not adding kwargs for these.')
+			if debug_print:
+				print(f'WARNING: short_only_aclus is empty, so not adding kwargs for these.')
 
 		## Build Pages for Shared ACLUS:    
 		nAclusToShow = len(shared_aclus)
@@ -899,12 +904,24 @@ class BatchPhoJonathanFiguresHelper:
 			num_pages = len(included_combined_indicies_pages)
 			## paginated outputs for shared cells
 			included_unit_indicies_pages = [[curr_included_unit_index for (a_linear_index, curr_row, curr_col, curr_included_unit_index) in v] for page_idx, v in enumerate(included_combined_indicies_pages)] # a list of length `num_pages` containing up to 10 items
-			paginated_shared_cells_kwarg_list = [dict(included_unit_neuron_IDs=curr_included_unit_indicies,
-				active_identifying_ctx=active_identifying_session_ctx.adding_context(collision_prefix='_batch_plot_test', display_fn_name=cls._display_fn_context_display_name, plot_result_set='shared', page=f'{page_idx+1}of{num_pages}', aclus=f"{_aclu_indicies_list_str_formatter(curr_included_unit_indicies)}"),
-				fignum=f'shared_{page_idx}', fig_idx=page_idx, n_max_page_rows=n_max_page_rows, **_extra_kwargs) for page_idx, curr_included_unit_indicies in enumerate(included_unit_indicies_pages)]
+			
+			if n_max_page_rows == 1:
+				## single aclu per page:
+				context_fn = lambda page_idx, curr_included_unit_indicies: active_identifying_session_ctx.adding_context(collision_prefix='_batch_plot_test', display_fn_name=cls._display_fn_context_display_name, plot_result_set='aclu', aclus=f"{str(curr_included_unit_indicies[0])}") # , page=f''
+				paginated_shared_cells_kwarg_list = [dict(included_unit_neuron_IDs=curr_included_unit_indicies,
+					active_identifying_ctx=context_fn(page_idx=page_idx, curr_included_unit_indicies=curr_included_unit_indicies),
+					fignum=f'aclu_{curr_included_unit_indicies[0]}', n_max_page_rows=n_max_page_rows, **_extra_kwargs) for page_idx, curr_included_unit_indicies in enumerate(included_unit_indicies_pages)] # , fig_idx=page_idx
+					
+			else:
+				context_fn = lambda page_idx, curr_included_unit_indicies: active_identifying_session_ctx.adding_context(collision_prefix='_batch_plot_test', display_fn_name=cls._display_fn_context_display_name, plot_result_set='shared', page=f'{page_idx+1}of{num_pages}', aclus=f"{_aclu_indicies_list_str_formatter(curr_included_unit_indicies)}")
+				paginated_shared_cells_kwarg_list = [dict(included_unit_neuron_IDs=curr_included_unit_indicies,
+					active_identifying_ctx=context_fn(page_idx=page_idx, curr_included_unit_indicies=curr_included_unit_indicies),
+					fignum=f'shared_{page_idx}', fig_idx=page_idx, n_max_page_rows=n_max_page_rows, **_extra_kwargs) for page_idx, curr_included_unit_indicies in enumerate(included_unit_indicies_pages)]
+
 			_batch_plot_kwargs_list.extend(paginated_shared_cells_kwarg_list) # add paginated_shared_cells_kwarg_list to the list
 		else:
-			print(f'WARNING: shared_aclus is empty, so not adding kwargs for these.')
+			if debug_print:
+				print(f'WARNING: shared_aclus is empty, so not adding kwargs for these.')
 		return _batch_plot_kwargs_list
 
 	@classmethod
