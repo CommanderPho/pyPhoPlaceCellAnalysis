@@ -48,6 +48,107 @@ from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
+
+# ==================================================================================================================== #
+# 2024-11-07 - Spike Stationarity Testing                                                                              #
+# ==================================================================================================================== #
+from statsmodels.tsa.stattools import adfuller, kpss
+
+@metadata_attributes(short_name=None, tags=['stationary', 'stationarity', 'time-series', 'statistics'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-07 13:45', related_items=['perform_timeseries_stationarity_tests'])
+@define
+class ADFResult:
+    """ Augmented Dickey-Fuller (ADF) Test for non-stationarity of a timeseries"""
+    adf_statistic: float
+    pvalue: float
+    usedlag: int
+    nobs: int
+    critical_values: dict
+    icbest: float
+
+    @classmethod
+    def from_tuple(cls, result_tuple):
+        return cls(*result_tuple)
+    
+    def print_summary(self):
+        """Prints the ADF test results and interpretation."""
+        # Print the results
+        print(f'ADF Statistic: {self.adf_statistic}')
+        print(f'p-value: {self.pvalue}')
+        print('Critical Values:')
+        for key, value in self.critical_values.items():
+            print(f'\t{key}: {value:.3f}')
+        
+        # Interpretation
+        adf_critical_value_5perc = self.critical_values['5%']
+        if (self.adf_statistic < adf_critical_value_5perc) or (self.pvalue < 0.05):
+            print('ADF Test Conclusion:')
+            print('\tReject the null hypothesis (series is stationary).')
+        else:
+            print('ADF Test Conclusion:')
+            print('\tFail to reject the null hypothesis (series is non-stationary).')
+
+@metadata_attributes(short_name=None, tags=['stationary', 'stationarity', 'time-series', 'statistics'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-07 13:44', related_items=['perform_timeseries_stationarity_tests'])
+@define
+class KPSSResult:
+    """ Kwiatkowski-Phillips-Schmidt-Shin (KPSS) Test for non-stationarity of a timeseries"""
+    kpss_statistic: float
+    pvalue: float
+    nlags: int
+    critical_values: dict
+
+    @classmethod
+    def from_tuple(cls, result_tuple):
+        return cls(*result_tuple)
+
+    def print_summary(self):
+        """Prints the KPSS test results and interpretation."""
+        # Print the results
+        print(f'KPSS Statistic: {self.kpss_statistic}')
+        print(f'p-value: {self.pvalue}')
+        print('Critical Values:')
+        for key, value in self.critical_values.items():
+            print(f'\t{key}: {value:.3f}')
+        
+        # Interpretation
+        kpss_critical_value_5perc = float(self.critical_values['5%'])
+        if (self.kpss_statistic < kpss_critical_value_5perc) and (self.pvalue > 0.05):
+            print('KPSS Test Conclusion:')
+            print('\tFail to reject the null hypothesis (series is stationary).')
+        else:
+            print('KPSS Test Conclusion:')
+            print('\tReject the null hypothesis (series is non-stationary).')
+
+
+@function_attributes(short_name=None, tags=['stationary', 'stationarity', 'time-series', 'statistics'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-07 13:44', related_items=[])
+def perform_timeseries_stationarity_tests(time_series) -> Tuple[ADFResult, KPSSResult]:
+    """Tests the time series for stationarity using ADF and KPSS tests.
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import perform_timeseries_stationarity_tests, ADFResult, KPSSResult
+        time_series = get_proper_global_spikes_df(curr_active_pipeline).t_rel_seconds.to_numpy()
+        # Perform the stationarity tests
+        adf_result, kpss_result = perform_timeseries_stationarity_tests(time_series)
+    """
+    # Augmented Dickey-Fuller (ADF) Test
+    adf_result_tuple = adfuller(time_series) # (-3.5758600257897317, 0.0062396609756376, 35, 144596, {'1%': -3.4303952254287307, '5%': -2.86155998899889, '10%': -2.5667806394328094}, -681134.6488980348)
+    adf_result = ADFResult.from_tuple(adf_result_tuple) 
+    
+    # Print ADF results
+    adf_result.print_summary()
+    print('\n')  # Add space between tests
+    
+    # Kwiatkowski-Phillips-Schmidt-Shin (KPSS) Test
+    kpss_result_tuple = kpss(time_series, regression='c')
+    kpss_result = KPSSResult.from_tuple(kpss_result_tuple)
+    
+    # Print KPSS results
+    kpss_result.print_summary()
+    
+    return adf_result, kpss_result
+
+
+
+
+
 # ==================================================================================================================== #
 # 2024-11-04 - Moving Misplaced Pickles on GL                                                                          #
 # ==================================================================================================================== #
@@ -799,6 +900,17 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
     global_position_df: pd.DataFrame = field()
     hdf5_out_path: Optional[Path] = field()
 
+    @property
+    def neuron_uids(self):
+        """The neuron_ids property."""
+        return self.all_cells_first_spike_time_df['neuron_uid'].unique()
+
+    @property
+    def neuron_ids(self):
+        """The neuron_ids property."""
+        return self.all_cells_first_spike_time_df['aclu'].unique()
+
+
     def __attrs_post_init__(self):
         """ after initializing, run post_init_cleanup() to order the columns """
         self.post_init_cleanup()
@@ -825,7 +937,7 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
     def init_from_batch_hdf5_exports(cls, first_spike_activity_data_h5_files: List[Union[str, Path]]) -> "CellsFirstSpikeTimes":
         """ 
         
-        """        
+        """
         all_sessions_global_spikes_df, all_sessions_first_spike_combined_df, exact_category_counts, (all_sessions_global_spikes_dict, all_sessions_first_spikes_dict, all_sessions_extra_dfs_dict_dict) = cls.load_batch_hdf5_exports(first_spike_activity_data_h5_files=first_spike_activity_data_h5_files)
         global_position_df = all_sessions_extra_dfs_dict_dict.get('global_position_df', None)
         
@@ -882,7 +994,12 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
     # @function_attributes(short_name=None, tags=['first-spike', 'cell-analysis'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-01 13:59', related_items=[])
     @classmethod
     def _subfn_get_first_spikes(cls, spikes_df: pd.DataFrame):
-            earliest_spike_df = spikes_df.groupby(['aclu']).agg(t_rel_seconds_idxmin=('t_rel_seconds', 'idxmin'), t_rel_seconds_min=('t_rel_seconds', 'min')).reset_index() # 't_rel_seconds_idxmin', 't_rel_seconds_min'
+            if 'neuron_uid' in spikes_df:
+                column_name: str = 'neuron_uid'
+            else:
+                column_name: str = 'aclu'
+                
+            earliest_spike_df = spikes_df.groupby([column_name]).agg(t_rel_seconds_idxmin=('t_rel_seconds', 'idxmin'), t_rel_seconds_min=('t_rel_seconds', 'min')).reset_index() # 't_rel_seconds_idxmin', 't_rel_seconds_min'
             first_aclu_spike_records_df: pd.DataFrame = spikes_df[np.isin(spikes_df['t_rel_seconds'], earliest_spike_df['t_rel_seconds_min'].values)]
             return first_aclu_spike_records_df
         
@@ -1132,20 +1249,23 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
 
 
 
-    def sliced_by_neuron_id(self, included_neuron_ids) -> pd.DataFrame:
+    def sliced_by_neuron_id(self, included_neuron_ids, key_name='aclu') -> pd.DataFrame:
         """ gets the slice of spikes with the specified `included_neuron_ids` """
         assert included_neuron_ids is not None
         test_obj = deepcopy(self)    
 
-        # for k, v in test_obj.first_spikes_dict.items():
-        #     test_obj.first_spikes_dict[k] = v.spikes.sliced_by_neuron_id(included_neuron_ids=included_neuron_ids)
-                
-        # for k, v in test_obj.global_spikes_dict.items():
-        #     test_obj.global_spikes_dict[k] = v.spikes.sliced_by_neuron_id(included_neuron_ids=included_neuron_ids)
-
-        test_obj.global_spikes_df = test_obj.global_spikes_df.spikes.sliced_by_neuron_id(included_neuron_ids=included_neuron_ids)
-        # test_obj.all_cells_first_spike_time_df = test_obj.all_cells_first_spike_time_df.spikes.sliced_by_neuron_id(included_neuron_ids=included_neuron_ids)
+        for k, v in test_obj.first_spikes_dict.items():
+            test_obj.first_spikes_dict[k] = v[v[key_name].isin(included_neuron_ids)].reset_index(drop=True)
+        for k, v in test_obj.global_spikes_dict.items():
+            # test_obj.global_spikes_dict[k] = v.spikes.sliced_by_neuron_id(included_neuron_ids=included_neuron_ids)
+            test_obj.global_spikes_dict[k] = v[v[key_name].isin(included_neuron_ids)].reset_index(drop=True)
+            
+        # test_obj.global_spikes_df = test_obj.global_spikes_df.spikes.sliced_by_neuron_id(included_neuron_ids=included_neuron_ids)
+        test_obj.global_spikes_df = test_obj.global_spikes_df[test_obj.global_spikes_df[key_name].isin(included_neuron_ids)].reset_index(drop=True)
         
+        # test_obj.all_cells_first_spike_time_df = test_obj.all_cells_first_spike_time_df.spikes.sliced_by_neuron_id(included_neuron_ids=included_neuron_ids)
+        test_obj.all_cells_first_spike_time_df = test_obj.all_cells_first_spike_time_df[test_obj.all_cells_first_spike_time_df[key_name].isin(included_neuron_ids)].reset_index(drop=True)
+
         return test_obj # self._obj[self._obj['aclu'].isin(included_neuron_ids)] ## restrict to only the shared aclus for both short and long
         
 
