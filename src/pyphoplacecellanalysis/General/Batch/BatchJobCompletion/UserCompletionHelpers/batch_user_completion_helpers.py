@@ -2177,6 +2177,39 @@ def compute_and_export_cell_first_spikes_characteristics_completion_function(sel
 
 	return across_session_results_extended_dict
 
+@function_attributes(short_name=None, tags=['first-spikes'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-07 21:31', related_items=[])
+def figures_plot_cell_first_spikes_characteristics_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
+	from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import CellsFirstSpikeTimes
+
+	assert self.collected_outputs_path.exists()
+	curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
+	CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
+	print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
+	
+	print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+	print(f'figures_plot_cell_first_spikes_characteristics_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+	
+	cells_first_spike_times: CellsFirstSpikeTimes = CellsFirstSpikeTimes.init_from_pipeline(curr_active_pipeline, hdf_save_parent_path=None, should_include_only_spikes_after_initial_laps=False)
+
+	later_lap_appearing_aclus = cells_first_spike_times.all_cells_first_spike_time_df[cells_first_spike_times.all_cells_first_spike_time_df['lap_spike_lap'] > 4]['aclu'].unique()
+	if later_lap_appearing_aclus is not None and (len(later_lap_appearing_aclus) > 0):
+		# later_lap_appearing_aclus = [32, 33,34, 35, 62, 67]
+		# later_lap_appearing_aclus = [62]
+		filtered_cells_first_spike_times: CellsFirstSpikeTimes = cells_first_spike_times.sliced_by_neuron_id(later_lap_appearing_aclus)
+
+		later_lap_appearing_aclus_df = filtered_cells_first_spike_times.all_cells_first_spike_time_df ## find ones that appear only on later laps
+		# later_lap_appearing_aclus_df
+		later_lap_appearing_aclus = later_lap_appearing_aclus_df['aclu'].to_numpy() ## get the aclus that only appear on later laps
+
+		later_lap_appearing_figures_dict = filtered_cells_first_spike_times.plot_PhoJonathan_plots_with_time_indicator_lines(curr_active_pipeline, included_neuron_ids=later_lap_appearing_aclus, write_vector_format=True, write_png=True)
+
+	
+	print(f'>>\t done with {curr_session_context}')
+	print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+	print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+
+	# return True
+	return across_session_results_extended_dict
 
 # ==================================================================================================================== #
 # Unsorted                                                                                                             #
@@ -2864,6 +2897,7 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
 									'compute_and_export_session_trial_by_trial_performance_completion_function': compute_and_export_session_trial_by_trial_performance_completion_function,
 									'save_custom_session_files_completion_function': save_custom_session_files_completion_function,
 									'compute_and_export_cell_first_spikes_characteristics_completion_function': compute_and_export_cell_first_spikes_characteristics_completion_function,
+									'figures_plot_cell_first_spikes_characteristics_completion_function': figures_plot_cell_first_spikes_characteristics_completion_function
 									}
 	else:
 		# use the user one:
