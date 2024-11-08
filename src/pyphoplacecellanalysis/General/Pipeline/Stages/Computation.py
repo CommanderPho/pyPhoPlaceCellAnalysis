@@ -2022,6 +2022,17 @@ class PipelineWithComputedPipelineStageMixin:
         return custom_save_filepaths, custom_save_filenames, custom_suffix
     
 
+    @function_attributes(short_name=None, tags=['parameters', 'filenames', 'export'], input_requires=[], output_provides=[], uses=['get_custom_pipeline_filenames_from_parameters'], used_by=[], creation_date='2024-11-08 10:36', related_items=[])
+    def get_complete_session_identifier_string(self) -> str:
+        """ returns a string like 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]', with the session context and the parameters
+	    complete_session_identifier_string: str = curr_active_pipeline.get_complete_session_identifier_string()
+    
+        """
+        custom_save_filepaths, custom_save_filenames, custom_suffix = self.get_custom_pipeline_filenames_from_parameters() # 'normal_computed-frateThresh_5.0-qclu_[1, 2]'
+        complete_session_identifier_string: str = '_'.join([self.get_session_context().get_description(separator='-'), custom_suffix]) # 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]'
+        return complete_session_identifier_string
+
+
     @function_attributes(short_name=None, tags=['context', 'custom', 'parameters'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-01 00:00', related_items=[])
     def get_complete_session_context(self) -> Tuple[DisplaySpecifyingIdentifyingContext, Tuple[DisplaySpecifyingIdentifyingContext]]:
         """ gets the entire session context, including the noteworthy computation parameters that would be needed for determing which filename to save under .

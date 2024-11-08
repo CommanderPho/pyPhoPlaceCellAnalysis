@@ -384,15 +384,28 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
 	assert self.collected_outputs_path.exists()
 	curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
-	_, _, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
+	_, _, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters() # this `custom_suffix` is correct and not duplicated
 	if len(custom_suffix) > 0:
 		if additional_session_context is not None:
 			if isinstance(additional_session_context, dict):
 				additional_session_context = IdentifyingContext(**additional_session_context)
-
 			## easiest to update as dict:	
 			additional_session_context = additional_session_context.to_dict()
-			additional_session_context['custom_suffix'] = (additional_session_context.get('custom_suffix', '') or '') + custom_suffix
+			## do not duplicate context:
+
+			existing_custom_suffix: str = (additional_session_context.get('custom_suffix', '') or '')
+			print(f'final_custom_suffix: "{existing_custom_suffix}"')	
+			final_custom_suffix: str = existing_custom_suffix # 
+			found_existing_same_custom_suffix_idx: int = existing_custom_suffix.find(custom_suffix)
+			if found_existing_same_custom_suffix_idx > -1:
+				# prevent duplication of custom suffix:
+				print(f'\tdropping "{custom_suffix}" to prevent duplication...')	
+				final_custom_suffix = final_custom_suffix.replace(custom_suffix, '') # drop the custom_suffix so it isn't duplicated
+
+			final_custom_suffix = final_custom_suffix + custom_suffix ## add it back on to the end, so there's only one repetition.
+			print(f'final_custom_suffix: "{final_custom_suffix}"')	
+			# additional_session_context['custom_suffix'] = (additional_session_context.get('custom_suffix', '') or '') + custom_suffix # this is where the duplication happens
+			additional_session_context['custom_suffix'] =  final_custom_suffix
 			additional_session_context = IdentifyingContext(**additional_session_context)
 			
 		else:
@@ -448,7 +461,6 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 	all_param_sweep_options = custom_all_param_sweep_options
 
 	## Perfrom the computations:
-
 	rank_order_results = curr_active_pipeline.global_computation_results.computed_data.get('RankOrder', None)
 	if rank_order_results is not None:
 		minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
@@ -1754,8 +1766,9 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
 	err = None
 
 	try:
-		active_context = curr_active_pipeline.get_session_context()
-		session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
+		# active_context = curr_active_pipeline.get_session_context()
+		active_context = curr_active_pipeline.get_complete_session_context() ## #TODO 2024-11-08 10:29: - [ ] complete instead of basic session context
+		# session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
 		session_name: str = curr_active_pipeline.session_name
 		export_files_dict = wcorr_shuffles.export_csvs(parent_output_path=self.collected_outputs_path.resolve(), active_context=active_context, session_name=session_name, curr_active_pipeline=curr_active_pipeline)
 		ripple_WCorrShuffle_df_export_CSV_path = export_files_dict['ripple_WCorrShuffle_df']
@@ -1829,6 +1842,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 	# Extracts the callback results 'determine_session_t_delta_completion_function':
 	extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('determine_session_t_delta_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
 
+	2024-11-08 12:25 - output filenames seem correct and don't have duplicated parameter strings
 
 	"""
 	import sys
@@ -2146,8 +2160,9 @@ def compute_and_export_cell_first_spikes_characteristics_completion_function(sel
 	collected_outputs = self.collected_outputs_path.resolve()	
 	print(f'collected_outputs: {collected_outputs}')
 
-	custom_save_filepaths, custom_save_filenames, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters() # 'normal_computed-frateThresh_5.0-qclu_[1, 2]'
-	complete_session_identifier_string: str = '_'.join([curr_active_pipeline.get_session_context().get_description(separator='-'), custom_suffix]) # 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]'
+	# custom_save_filepaths, custom_save_filenames, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters() # 'normal_computed-frateThresh_5.0-qclu_[1, 2]'
+	# complete_session_identifier_string: str = '_'.join([curr_active_pipeline.get_session_context().get_description(separator='-'), custom_suffix]) # 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]'
+	complete_session_identifier_string: str = curr_active_pipeline.get_complete_session_identifier_string()
 	# session_identifier_str: str = active_context.get_description()
 	hdf5_out_path, out_filename, out_basename = get_export_name(data_identifier_str="(first_spike_activity_data)", parent_output_path=collected_outputs, session_identifier_str=complete_session_identifier_string, out_extension='.h5')
 
