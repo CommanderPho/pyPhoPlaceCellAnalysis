@@ -2816,7 +2816,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
 			## Add t_bin column method
 			a_df = cls.add_session_df_columns(a_df, session_name=session_name, time_bin_size=a_tbin_size, t_start=t_start, curr_session_t_delta=curr_session_t_delta, t_end=t_end, time_col=a_time_col_name)
 			a_tbin_size_str: str = f"{round(a_tbin_size, ndigits=5)}"
-			a_data_identifier_str: str = f'({a_df_name})_tbin-{a_tbin_size_str}' ## build the identifier 
+			a_data_identifier_str: str = f'({a_df_name})_tbin-{a_tbin_size_str}' ## build the identifier '(laps_weighted_corr_merged_df)_tbin-1.5'
 			
 			# add in custom columns
 			#TODO 2024-03-14 06:48: - [ ] I could use my newly implemented `directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(curr_active_pipeline, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=True)` function, but since this looks at decoder-specific info it's better just to duplicate implementation and do it again here.
@@ -2878,7 +2878,8 @@ class DecoderDecodedEpochsResult(ComputedResult):
 						print(f'\t failed all methods for selection filter')
 
 			export_files_dict[a_df_name] = export_df_to_csv(a_df, data_identifier_str=a_data_identifier_str)
-			
+		# end for a_df_name, a_df
+		
 		return export_files_dict
 	
 
