@@ -216,8 +216,14 @@ class FigureOutputLocation(Enum):
         elif self.name == FigureOutputLocation.SESSION_OUTPUT_FOLDER.name:
             raise NotImplementedError
             absolute_out_path = None
+        elif self.name == FigureOutputLocation.CUSTOM.name:
+            # custom mode:        
+            assert overriding_root_path is not None, f"in FigureOutputLocation.CUSTOM mode, the `overriding_root_path` must be passed!"
+            if not isinstance(overriding_root_path, Path):
+                overriding_root_path = Path(overriding_root_path)
+            absolute_out_path = overriding_root_path
         else:
-            raise NotImplementedError
+            raise NotImplementedError(f"unknown type: {self}")
 
         # end if		
         if make_folder_if_needed:
@@ -304,17 +310,26 @@ class FileOutputManager:
     """ 2023-06-14 - Manages figure output. Singleton/not persisted.
 
     Usage:
+    
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode
         fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
         test_context = IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='one',session_name='2006-6-08_14-26-15',display_fn_name='display_long_short_laps')
         fig_man.get_figure_save_file_path(test_context, make_folder_if_needed=False)
         >>> Path('/home/halechr/repo/Spike3D/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/2023-06-14/kdiba_gor01_one_2006-6-08_14-26-15_display_long_short_laps')
     """
-    figure_output_location: FigureOutputLocation
-    context_to_path_mode: ContextToPathMode
+    figure_output_location: FigureOutputLocation = field()
+    context_to_path_mode: ContextToPathMode = field()
+    override_output_parent_path: Optional[Path] = field(default=None)
     
     def get_figure_output_parent_and_basename(self, final_context: IdentifyingContext, make_folder_if_needed:bool=True, **kwargs) -> tuple[Path, str]:
         """ gets the final output path for the figure to be saved specified by final_context """
-        figures_parent_out_path = self.figure_output_location.get_figures_output_parent_path(make_folder_if_needed=make_folder_if_needed)
+        if self.figure_output_location.name == FigureOutputLocation.CUSTOM.name:
+            assert self.override_output_parent_path is not None
+        else:
+            assert self.override_output_parent_path is None, f"for all modes other than FigureOutputLocation.CUSTOM, the override_output_parent_path should be None!"
+                        
+
+        figures_parent_out_path = self.figure_output_location.get_figures_output_parent_path(overriding_root_path=self.override_output_parent_path, make_folder_if_needed=make_folder_if_needed)            
         fig_save_path = self.context_to_path_mode.session_context_to_relative_path(figures_parent_out_path, session_ctx=final_context)
         if make_folder_if_needed:
             fig_save_path.mkdir(parents=True, exist_ok=True) # make folder if needed
@@ -330,7 +345,7 @@ class FileOutputManager:
     def get_figure_save_file_path(self, final_context: IdentifyingContext, make_folder_if_needed:bool=True, **kwargs) -> Path:
         """ Returns a complete path to a file without the extension (as a basepath). Same information output by `get_figure_output_parent_and_basename` but returns a single output path instead of the parent_path and basename.
         
-        """ 
+        """
         parent_save_path, fig_save_basename = self.get_figure_output_parent_and_basename(final_context, make_folder_if_needed=make_folder_if_needed, **kwargs)
         return parent_save_path.joinpath(fig_save_basename).resolve()
 
