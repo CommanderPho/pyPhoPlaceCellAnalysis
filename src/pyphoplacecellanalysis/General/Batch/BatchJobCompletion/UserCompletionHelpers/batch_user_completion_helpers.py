@@ -2206,9 +2206,8 @@ def figures_plot_cell_first_spikes_characteristics_completion_function(self, glo
 		later_lap_appearing_aclus = later_lap_appearing_aclus_df['aclu'].to_numpy() ## get the aclus that only appear on later laps
 
 		later_lap_appearing_figures_dict = filtered_cells_first_spike_times.plot_PhoJonathan_plots_with_time_indicator_lines(curr_active_pipeline, included_neuron_ids=later_lap_appearing_aclus,
-																													    write_vector_format=True, write_png=True, override_fig_man=custom_fig_man)
+																													    write_vector_format=False, write_png=True, override_fig_man=custom_fig_man)
 
-	
 	print(f'>>\t done with {curr_session_context}')
 	print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
 	print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
