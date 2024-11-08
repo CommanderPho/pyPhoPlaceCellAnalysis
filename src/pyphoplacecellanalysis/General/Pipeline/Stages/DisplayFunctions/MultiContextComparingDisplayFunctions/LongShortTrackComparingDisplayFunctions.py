@@ -1629,7 +1629,7 @@ class PhoJonathanPlotHelpers:
             curr_ax_firing_rate.set_xlim((t_start, t_end)) # We don't want to clip to only the spiketimes for this cell, we want it for all cells, or even when the recording started/ended
             curr_ax_lap_spikes.sharex(curr_ax_firing_rate) # Sync the time axes of the laps and the firing rates
 
-        return {'firing_rate':curr_ax_firing_rate, 'lap_spikes': curr_ax_lap_spikes, 'placefield': curr_ax_right_placefield, 'left_placefield': curr_ax_left_placefield, 'labels': curr_ax_cell_label}
+        return {'firing_rate':curr_ax_firing_rate, 'lap_spikes': curr_ax_lap_spikes, 'placefield': curr_ax_right_placefield, 'left_placefield': curr_ax_left_placefield, 'labels': curr_ax_cell_label, 'extra_labels': curr_ax_extra_information_labels}
 
 
     @classmethod
