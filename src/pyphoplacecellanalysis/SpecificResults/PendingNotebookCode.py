@@ -75,7 +75,6 @@ def add_time_indicator_lines(later_lap_appearing_figures_dict, later_lap_appeari
         later_lap_appearing_figures_dict: Dict[IdentifyingContext, MatplotlibRenderPlots] = BatchPhoJonathanFiguresHelper.perform_run(curr_active_pipeline, shared_aclus=later_lap_appearing_aclus, n_max_page_rows=1, disable_top_row=True,
                                                                                                                                     #    progress_print=True, write_png=True, write_vector_format=True,
                                                                                                                                     )
-
         ## Inputs: later_lap_appearing_aclus_df
         time_point_formatting_kwargs_dict = {'lap': dict(color='orange', alpha=0.8), 'PBE': dict(color='purple', alpha=0.8)}
         later_lap_appearing_aclus_times_dict: Dict[types.aclu_index, Dict[str, float]] = {aclu_tuple.aclu:{'lap': aclu_tuple.first_spike_lap, 'PBE': aclu_tuple.first_spike_PBE} for aclu_tuple in later_lap_appearing_aclus_df.itertuples(index=False)}
@@ -1788,7 +1787,35 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
 
         return app, win, plots, plots_data
     
+    def plot_PhoJonathan_plots_with_time_indicator_lines(self, curr_active_pipeline, included_neuron_ids=None, time_point_formatting_kwargs_dict=None, defer_draw: bool=False):
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import add_time_indicator_lines
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import CellsFirstSpikeTimes
+        from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
+        from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import BatchPhoJonathanFiguresHelper
 
+        if included_neuron_ids is None:
+            included_neuron_ids = self.all_cells_first_spike_time_df.aclu.unique()
+
+        if time_point_formatting_kwargs_dict is None:
+            time_point_formatting_kwargs_dict = {'lap': dict(color='orange', alpha=0.8), 'PBE': dict(color='purple', alpha=0.8)}
+
+        filtered_cells_first_spike_times: CellsFirstSpikeTimes = self.sliced_by_neuron_id(included_neuron_ids)
+        later_lap_appearing_aclus_df = filtered_cells_first_spike_times.all_cells_first_spike_time_df ## find ones that appear only on later laps
+        included_neuron_ids = later_lap_appearing_aclus_df['aclu'].to_numpy() ## get the aclus that only appear on later laps
+
+        ## plot each aclu in a separate figures
+        later_lap_appearing_figures_dict: Dict[IdentifyingContext, MatplotlibRenderPlots] = BatchPhoJonathanFiguresHelper.perform_run(curr_active_pipeline, shared_aclus=included_neuron_ids, n_max_page_rows=1, disable_top_row=True,
+                                                                                                                                    #    progress_print=True, write_png=True, write_vector_format=True,
+                                                                                                                                    )
+        ## Inputs: later_lap_appearing_aclus_df
+        later_lap_appearing_aclus_times_dict: Dict[types.aclu_index, Dict[str, float]] = {aclu_tuple.aclu:{'lap': aclu_tuple.first_spike_lap, 'PBE': aclu_tuple.first_spike_PBE} for aclu_tuple in later_lap_appearing_aclus_df.itertuples(index=False)}
+
+        # ## add the lines:
+        add_time_indicator_lines(later_lap_appearing_figures_dict, later_lap_appearing_aclus_times_dict=later_lap_appearing_aclus_times_dict, time_point_formatting_kwargs_dict=time_point_formatting_kwargs_dict, defer_draw=False)
+
+        return later_lap_appearing_figures_dict
+
+            
 # ==================================================================================================================== #
 # 2024-10-09 - Building Custom Individual time_bin decoded posteriors                                                  #
 # ==================================================================================================================== #
