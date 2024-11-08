@@ -2877,7 +2877,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
 					else:
 						print(f'\t failed all methods for selection filter')
 
-			export_files_dict[a_df_name] = export_df_to_csv(a_df, data_identifier_str=a_data_identifier_str)
+			export_files_dict[a_df_name] = export_df_to_csv(a_df, data_identifier_str=a_data_identifier_str) # this is exporting corr
 		# end for a_df_name, a_df
 		
 		return export_files_dict

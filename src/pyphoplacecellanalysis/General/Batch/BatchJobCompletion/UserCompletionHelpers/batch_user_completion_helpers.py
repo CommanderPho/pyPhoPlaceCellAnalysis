@@ -1833,7 +1833,8 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
 
 
 @function_attributes(short_name=None, tags=['wcorr', 'shuffle', 'replay', 'epochs', 'alternative_replays'], input_requires=[], output_provides=[], uses=['compute_all_replay_epoch_variations', 'overwrite_replay_epochs_and_recompute'], used_by=[], creation_date='2024-06-28 01:50', related_items=[])
-def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, included_qclu_values = [1,2,4,6,7,9], minimum_inclusion_fr_Hz=5.0) -> dict:
+def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
+																					  included_qclu_values = [1,2,4,6,7,9], minimum_inclusion_fr_Hz=5.0, num_wcorr_shuffles: int = 1024) -> dict:
 	"""  Computes several different alternative replay-detection variants and computes and exports the shuffled wcorrs for each of them
 	from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function
 	
@@ -1941,8 +1942,8 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 		print(f'\t=====================================>> performing comp for "{replay_epochs_key}"...')
 		# replay_epoch_outputs[replay_epochs_key] = {} # init to empty
 
-		# custom_suffix: str = _get_custom_suffix_for_replay_filename(new_replay_epochs=a_replay_epochs) # looks right
-		# print(f'\treplay_epochs_key: {replay_epochs_key}: custom_suffix: "{custom_suffix}"')
+		custom_suffix: str = _get_custom_suffix_for_replay_filename(new_replay_epochs=a_replay_epochs) # looks right
+		print(f'\treplay_epochs_key: {replay_epochs_key}: custom_suffix: "{custom_suffix}"')
 
 		## Modify .BATCH_DATE_TO_USE to include the custom suffix
 		# curr_BATCH_DATE_TO_USE: str = f"{base_BATCH_DATE_TO_USE}{custom_suffix}"
@@ -1957,6 +1958,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 			a_curr_active_pipeline = deepcopy(curr_active_pipeline)
 			did_change, custom_save_filenames, custom_save_filepaths = overwrite_replay_epochs_and_recompute(curr_active_pipeline=a_curr_active_pipeline, new_replay_epochs=a_replay_epochs,
 																											  enable_save_pipeline_pkl=True, enable_save_global_computations_pkl=False, enable_save_h5=False,
+																											  num_wcorr_shuffles=num_wcorr_shuffles,
 																											  user_completion_dummy=self)
 
 			replay_epoch_outputs[replay_epochs_key].update(dict(did_change=did_change, custom_save_filenames=custom_save_filenames, custom_save_filepaths=custom_save_filepaths))
