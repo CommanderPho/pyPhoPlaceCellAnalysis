@@ -964,7 +964,7 @@ class BatchPhoJonathanFiguresHelper:
 				# curr_page_str = f'pg{i+1}of{num_pages}'
 				fig_png_out_path = final_figure_file_path.with_suffix('.png')
 				# fig_png_out_path = fig_png_out_path.with_stem(f'{curr_pdf_save_path.stem}_{curr_page_str}') # note this replaces the current .pdf extension with .png, resulting in a good filename for a .png
-				a_fig.savefig(fig_png_out_path)
+				a_fig.savefig(fig_png_out_path, dpi=240)
 				curr_active_pipeline.register_output_file(output_path=fig_png_out_path, output_metadata={'context': curr_active_identifying_ctx, 'fig': (a_fig)})
 				output_file_paths.append(fig_png_out_path)
 				a_fig_container.saved_figures.append(fig_png_out_path)
