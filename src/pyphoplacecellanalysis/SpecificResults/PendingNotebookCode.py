@@ -1797,7 +1797,7 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
 
         return app, win, plots, plots_data
     
-    def plot_PhoJonathan_plots_with_time_indicator_lines(self, curr_active_pipeline, included_neuron_ids=None, write_vector_format=False, write_png=True, override_fig_man: Optional[FileOutputManager]=None, time_point_formatting_kwargs_dict=None, defer_draw: bool=False):
+    def plot_PhoJonathan_plots_with_time_indicator_lines(self, curr_active_pipeline, included_neuron_ids=None, write_vector_format=False, write_png=True, override_fig_man: Optional[FileOutputManager]=None, time_point_formatting_kwargs_dict=None, n_max_page_rows=1, defer_draw: bool=False):
         """
         
         """
@@ -1816,7 +1816,7 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         included_neuron_ids = later_lap_appearing_aclus_df['aclu'].to_numpy() ## get the aclus that only appear on later laps
 
         ## plot each aclu in a separate figures
-        active_out_figure_container_dict: Dict[IdentifyingContext, MatplotlibRenderPlots] = BatchPhoJonathanFiguresHelper.perform_run(curr_active_pipeline, shared_aclus=included_neuron_ids, n_max_page_rows=1, disable_top_row=True,
+        active_out_figure_container_dict: Dict[IdentifyingContext, MatplotlibRenderPlots] = BatchPhoJonathanFiguresHelper.perform_run(curr_active_pipeline, shared_aclus=included_neuron_ids, n_max_page_rows=n_max_page_rows, disable_top_row=True,
                                                                                                                                        progress_print=False, write_png=False, write_vector_format=False, # explicitly don't save here, because we need to add the indicator lines
                                                                                                                                     )
         ## Inputs: later_lap_appearing_aclus_df

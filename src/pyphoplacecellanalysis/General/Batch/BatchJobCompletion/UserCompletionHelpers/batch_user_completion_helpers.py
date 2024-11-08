@@ -2177,6 +2177,7 @@ def compute_and_export_cell_first_spikes_characteristics_completion_function(sel
 
 	return across_session_results_extended_dict
 
+
 @function_attributes(short_name=None, tags=['first-spikes'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-07 21:31', related_items=[])
 def figures_plot_cell_first_spikes_characteristics_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
 	from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode	
@@ -2193,8 +2194,7 @@ def figures_plot_cell_first_spikes_characteristics_completion_function(self, glo
 	custom_fig_man: FileOutputManager = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=custom_figure_output_path)
 	# test_context = IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='one',session_name='2006-6-08_14-26-15',display_fn_name='display_long_short_laps')
 	# custom_fig_man.get_figure_save_file_path(test_context, make_folder_if_needed=False)
-	cells_first_spike_times: CellsFirstSpikeTimes = CellsFirstSpikeTimes.init_from_pipeline(curr_active_pipeline, hdf_save_parent_path=None, should_include_only_spikes_after_initial_laps=False)
-
+	cells_first_spike_times: CellsFirstSpikeTimes = CellsFirstSpikeTimes.init_from_pipeline(curr_active_pipeline, hdf_save_parent_path=self.collected_outputs_path, should_include_only_spikes_after_initial_laps=False)
 	later_lap_appearing_aclus = cells_first_spike_times.all_cells_first_spike_time_df[cells_first_spike_times.all_cells_first_spike_time_df['lap_spike_lap'] > 4]['aclu'].unique()
 	if later_lap_appearing_aclus is not None and (len(later_lap_appearing_aclus) > 0):
 		# later_lap_appearing_aclus = [32, 33,34, 35, 62, 67]
@@ -2205,7 +2205,7 @@ def figures_plot_cell_first_spikes_characteristics_completion_function(self, glo
 		# later_lap_appearing_aclus_df
 		later_lap_appearing_aclus = later_lap_appearing_aclus_df['aclu'].to_numpy() ## get the aclus that only appear on later laps
 
-		later_lap_appearing_figures_dict = filtered_cells_first_spike_times.plot_PhoJonathan_plots_with_time_indicator_lines(curr_active_pipeline, included_neuron_ids=later_lap_appearing_aclus,
+		later_lap_appearing_figures_dict = filtered_cells_first_spike_times.plot_PhoJonathan_plots_with_time_indicator_lines(curr_active_pipeline, included_neuron_ids=later_lap_appearing_aclus, n_max_page_rows=16,
 																													    write_vector_format=False, write_png=True, override_fig_man=custom_fig_man)
 
 	print(f'>>\t done with {curr_session_context}')
