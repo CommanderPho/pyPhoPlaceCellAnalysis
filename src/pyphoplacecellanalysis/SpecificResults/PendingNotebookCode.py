@@ -56,7 +56,7 @@ import neuropy.utils.type_aliases as types
 
 # DecoderName = NewType('DecoderName', str)
 
-def add_time_indicator_lines(later_lap_appearing_figures_dict, later_lap_appearing_aclus_times_dict: Dict[types.aclu_index, Dict[str, float]], time_point_formatting_kwargs_dict=None, defer_draw: bool=False):
+def add_time_indicator_lines(active_figures_dict, later_lap_appearing_aclus_times_dict: Dict[types.aclu_index, Dict[str, float]], time_point_formatting_kwargs_dict=None, defer_draw: bool=False):
     """ 
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import add_time_indicator_lines
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import CellsFirstSpikeTimes
@@ -89,8 +89,9 @@ def add_time_indicator_lines(later_lap_appearing_figures_dict, later_lap_appeari
 
     # 
     # _out_dict = {}
+    modified_figures_dict = {}
 
-    for fig_page_context, container in later_lap_appearing_figures_dict.items():
+    for fig_page_context, container in active_figures_dict.items():
         ## Add the first-spike time point indicator lines to each of the aclus:
         # container: MatplotlibRenderPlots = list(later_lap_appearing_figures_dict.values())[0]
         container.plot_data['first_spike_indicator_lines'] = {} # empty
@@ -117,6 +118,11 @@ def add_time_indicator_lines(later_lap_appearing_figures_dict, later_lap_appeari
                 lap_first_spike_lines[name]['triangle_marker'] = ax.plot(time_point, ylims[-1]-10, marker='v', markersize=10, **common_formatting_kwargs)  # 'v' for downward triangle
                 
             ax.set_ybound(*ylims)
+            # if not defer_render:
+            #     fig = ax.get_figure().get_figure() # For SubFigure
+            #     fig.canvas.draw()
+                            
+
             # _out_dict[aclu] = lap_first_spike_lines
             container.plot_data['first_spike_indicator_lines'][aclu] = lap_first_spike_lines
         ## end for aclu, ax
@@ -125,12 +131,16 @@ def add_time_indicator_lines(later_lap_appearing_figures_dict, later_lap_appeari
         for fig in container.figures:
             fig.canvas.draw()   # Redraw the current figure
 
+
+
+        modified_context = fig_page_context.overwriting_context(modification='first_spike')
+        modified_figures_dict[modified_context] = container # deepcopy(container)
     # end for fig_page_context, container
 
     if not defer_draw:
         plt.draw()
 
-    # return container.plot_data['first_spike_indicator_lines']
+    return modified_figures_dict #container.plot_data['first_spike_indicator_lines']
 
 
 
@@ -1787,9 +1797,11 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
 
         return app, win, plots, plots_data
     
-    def plot_PhoJonathan_plots_with_time_indicator_lines(self, curr_active_pipeline, included_neuron_ids=None, time_point_formatting_kwargs_dict=None, defer_draw: bool=False):
+    def plot_PhoJonathan_plots_with_time_indicator_lines(self, curr_active_pipeline, included_neuron_ids=None, write_vector_format=False, write_png=True, time_point_formatting_kwargs_dict=None, defer_draw: bool=False):
+        """
+        
+        """
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import add_time_indicator_lines
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import CellsFirstSpikeTimes
         from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
         from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import BatchPhoJonathanFiguresHelper
 
@@ -1804,16 +1816,21 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         included_neuron_ids = later_lap_appearing_aclus_df['aclu'].to_numpy() ## get the aclus that only appear on later laps
 
         ## plot each aclu in a separate figures
-        later_lap_appearing_figures_dict: Dict[IdentifyingContext, MatplotlibRenderPlots] = BatchPhoJonathanFiguresHelper.perform_run(curr_active_pipeline, shared_aclus=included_neuron_ids, n_max_page_rows=1, disable_top_row=True,
-                                                                                                                                    #    progress_print=True, write_png=True, write_vector_format=True,
+        active_out_figure_container_dict: Dict[IdentifyingContext, MatplotlibRenderPlots] = BatchPhoJonathanFiguresHelper.perform_run(curr_active_pipeline, shared_aclus=included_neuron_ids, n_max_page_rows=1, disable_top_row=True,
+                                                                                                                                       progress_print=False, write_png=False, write_vector_format=False, # explicitly don't save here, because we need to add the indicator lines
                                                                                                                                     )
         ## Inputs: later_lap_appearing_aclus_df
         later_lap_appearing_aclus_times_dict: Dict[types.aclu_index, Dict[str, float]] = {aclu_tuple.aclu:{'lap': aclu_tuple.first_spike_lap, 'PBE': aclu_tuple.first_spike_PBE} for aclu_tuple in later_lap_appearing_aclus_df.itertuples(index=False)}
 
         # ## add the lines:
-        add_time_indicator_lines(later_lap_appearing_figures_dict, later_lap_appearing_aclus_times_dict=later_lap_appearing_aclus_times_dict, time_point_formatting_kwargs_dict=time_point_formatting_kwargs_dict, defer_draw=False)
+        modified_figure_container_dict: Dict[IdentifyingContext, MatplotlibRenderPlots] = add_time_indicator_lines(active_figures_dict=active_out_figure_container_dict, later_lap_appearing_aclus_times_dict=later_lap_appearing_aclus_times_dict, time_point_formatting_kwargs_dict=time_point_formatting_kwargs_dict, defer_draw=False)
 
-        return later_lap_appearing_figures_dict
+        ## perform saving if needed:
+        if (write_png or write_vector_format):
+            print(f'perfomring save...')
+            BatchPhoJonathanFiguresHelper._perform_save_batch_plotted_figures(curr_active_pipeline, active_out_figure_container_dict=modified_figure_container_dict, write_vector_format=write_vector_format, write_png=write_png, progress_print=True, debug_print=False)
+
+        return modified_figure_container_dict
 
             
 # ==================================================================================================================== #
