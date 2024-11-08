@@ -1,7 +1,7 @@
 import sys
 from copy import deepcopy
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional, Any, Tuple
 
 from neuropy.utils.dynamic_container import DynamicContainer
 import numpy as np
@@ -35,7 +35,7 @@ from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipel
 from pyphoplacecellanalysis.SpecificResults.fourthYearPresentation import export_active_relative_entropy_results_videos
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPlacefieldGlobalComputationFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import SequenceBasedComputationsGlobalComputationFunctions
-
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode # for BatchPhoJonathanFiguresHelper
 
 """ 
 
@@ -740,7 +740,6 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
 
 
 
-
 @metadata_attributes(short_name=None, tags=['PhoJonathan', 'figure', 'batch', 'LxC', 'SxC', 'LongShort'], input_requires=[], output_provides=[], uses=[], used_by=['batch_programmatic_figures', 'batch_extended_programmatic_figures'],
 					 creation_date='2024-09-16 17:34', related_items=['PhoJonathanPlotHelpers'])
 class BatchPhoJonathanFiguresHelper:
@@ -925,7 +924,7 @@ class BatchPhoJonathanFiguresHelper:
 		return _batch_plot_kwargs_list
 
 	@classmethod
-	def _perform_save_batch_plotted_figures(cls, curr_active_pipeline, active_out_figure_container_dict: Dict[IdentifyingContext, MatplotlibRenderPlots], subset_includelist=None, subset_excludelist=None, write_vector_format=False, write_png=True, progress_print=True, debug_print=False):
+	def _perform_save_batch_plotted_figures(cls, curr_active_pipeline, active_out_figure_container_dict: Dict[IdentifyingContext, MatplotlibRenderPlots], subset_includelist=None, subset_excludelist=None, write_vector_format=False, write_png=True, override_fig_man: Optional[FileOutputManager]=None, progress_print=True, debug_print=False):
 		""" Saves all plots produced by the first half of `_perform_batch_plot` 
 			
 		## perform saving if needed:
@@ -933,7 +932,13 @@ class BatchPhoJonathanFiguresHelper:
 			cls._perform_save_batch_plotted_figures(curr_active_pipeline, active_out_figure_container_dict=active_out_figure_container_dict, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, write_vector_format=write_vector_format, write_png=write_png, progress_print=progress_print, debug_print=debug_print)
 	
 		"""
-		fig_man = curr_active_pipeline.get_output_manager()
+		output_file_paths = []
+		if override_fig_man is None:
+			fig_man = curr_active_pipeline.get_output_manager()
+		else:
+			# use custom figure manager
+			fig_man = override_fig_man
+			
 
 		# Each figure:
 		for curr_active_identifying_ctx, a_fig_container in active_out_figure_container_dict.items():
@@ -949,6 +954,8 @@ class BatchPhoJonathanFiguresHelper:
 					# Save out PDF page:
 					pdf.savefig(a_fig)
 					curr_active_pipeline.register_output_file(output_path=curr_pdf_save_path, output_metadata={'context': curr_active_identifying_ctx, 'fig': (a_fig), 'pdf_metadata': active_pdf_metadata})
+					output_file_paths.append(curr_pdf_save_path)
+					a_fig_container.saved_figures.append(curr_pdf_save_path)
 					if progress_print:
 						print(f'\t saved {curr_pdf_save_path}')
 
@@ -959,10 +966,12 @@ class BatchPhoJonathanFiguresHelper:
 				# fig_png_out_path = fig_png_out_path.with_stem(f'{curr_pdf_save_path.stem}_{curr_page_str}') # note this replaces the current .pdf extension with .png, resulting in a good filename for a .png
 				a_fig.savefig(fig_png_out_path)
 				curr_active_pipeline.register_output_file(output_path=fig_png_out_path, output_metadata={'context': curr_active_identifying_ctx, 'fig': (a_fig)})
+				output_file_paths.append(fig_png_out_path)
+				a_fig_container.saved_figures.append(fig_png_out_path)
 				if progress_print:
 					print(f'\t saved {fig_png_out_path}')
 
-
+		return output_file_paths
 
 
 	@classmethod
@@ -991,7 +1000,7 @@ class BatchPhoJonathanFiguresHelper:
 
 		## perform saving if needed:
 		if (write_png or write_vector_format):
-			cls._perform_save_batch_plotted_figures(curr_active_pipeline, active_out_figure_container_dict=active_out_figure_container_dict, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, write_vector_format=write_vector_format, write_png=write_png, progress_print=progress_print, debug_print=debug_print)
+			output_file_paths = cls._perform_save_batch_plotted_figures(curr_active_pipeline, active_out_figure_container_dict=active_out_figure_container_dict, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, write_vector_format=write_vector_format, write_png=write_png, progress_print=progress_print, debug_print=debug_print)
 
 		return active_out_figure_container_dict
 

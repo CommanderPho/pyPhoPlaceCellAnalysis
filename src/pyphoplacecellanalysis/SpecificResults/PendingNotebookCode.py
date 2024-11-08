@@ -973,7 +973,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 from neuropy.utils.mixins.AttrsClassHelpers import SimpleFieldSizesReprMixin
 from pyphocorehelpers.indexing_helpers import partition_df
 from neuropy.core.user_annotations import UserAnnotationsManager
-
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode # for CellsFirstSpikeTimes
 
 @define(slots=False, eq=False, repr=False)
 class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
@@ -1797,7 +1797,7 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
 
         return app, win, plots, plots_data
     
-    def plot_PhoJonathan_plots_with_time_indicator_lines(self, curr_active_pipeline, included_neuron_ids=None, write_vector_format=False, write_png=True, time_point_formatting_kwargs_dict=None, defer_draw: bool=False):
+    def plot_PhoJonathan_plots_with_time_indicator_lines(self, curr_active_pipeline, included_neuron_ids=None, write_vector_format=False, write_png=True, override_fig_man: Optional[FileOutputManager]=None, time_point_formatting_kwargs_dict=None, defer_draw: bool=False):
         """
         
         """
@@ -1828,8 +1828,9 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         ## perform saving if needed:
         if (write_png or write_vector_format):
             print(f'perfomring save...')
-            BatchPhoJonathanFiguresHelper._perform_save_batch_plotted_figures(curr_active_pipeline, active_out_figure_container_dict=modified_figure_container_dict, write_vector_format=write_vector_format, write_png=write_png, progress_print=True, debug_print=False)
-
+            saved_file_paths = BatchPhoJonathanFiguresHelper._perform_save_batch_plotted_figures(curr_active_pipeline, active_out_figure_container_dict=modified_figure_container_dict, write_vector_format=write_vector_format, write_png=write_png, override_fig_man=override_fig_man, progress_print=True, debug_print=False)
+            print(f'\tsaved_file_paths: {saved_file_paths}')
+            
         return modified_figure_container_dict
 
             
