@@ -925,6 +925,47 @@ class BatchPhoJonathanFiguresHelper:
 		return _batch_plot_kwargs_list
 
 	@classmethod
+	def _perform_save_batch_plotted_figures(cls, curr_active_pipeline, active_out_figure_container_dict: Dict[IdentifyingContext, MatplotlibRenderPlots], subset_includelist=None, subset_excludelist=None, write_vector_format=False, write_png=True, progress_print=True, debug_print=False):
+		""" Saves all plots produced by the first half of `_perform_batch_plot` 
+			
+		## perform saving if needed:
+		if (write_png or write_vector_format):
+			cls._perform_save_batch_plotted_figures(curr_active_pipeline, active_out_figure_container_dict=active_out_figure_container_dict, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, write_vector_format=write_vector_format, write_png=write_png, progress_print=progress_print, debug_print=debug_print)
+	
+		"""
+		fig_man = curr_active_pipeline.get_output_manager()
+
+		# Each figure:
+		for curr_active_identifying_ctx, a_fig_container in active_out_figure_container_dict.items():
+			## 2023-06-14 - New way using `fig_man.get_figure_save_file_path(...)` - this is correct
+			final_figure_file_path = fig_man.get_figure_save_file_path(curr_active_identifying_ctx, make_folder_if_needed=True) # complete file path without extension: e.g. '/ProgrammaticDisplayFunctionTesting/2023-06-15/kdiba_pin01_one_11-03_12-3-25_BatchPhoJonathanReplayFRC_short_only_[13, 22, 28]'
+			a_fig, subfigs, axs, plot_data = a_fig_container.figures[0], a_fig_container.subfigs, a_fig_container.axes, a_fig_container.plot_data
+			
+			# One plot at a time to PDF:
+			if write_vector_format:
+				active_pdf_metadata, _UNUSED_pdf_save_filename = build_pdf_metadata_from_display_context(curr_active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist)
+				curr_pdf_save_path = final_figure_file_path.with_suffix('.pdf')
+				with backend_pdf.PdfPages(curr_pdf_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:
+					# Save out PDF page:
+					pdf.savefig(a_fig)
+					curr_active_pipeline.register_output_file(output_path=curr_pdf_save_path, output_metadata={'context': curr_active_identifying_ctx, 'fig': (a_fig), 'pdf_metadata': active_pdf_metadata})
+					if progress_print:
+						print(f'\t saved {curr_pdf_save_path}')
+
+			# Also save .png versions:
+			if write_png:
+				# curr_page_str = f'pg{i+1}of{num_pages}'
+				fig_png_out_path = final_figure_file_path.with_suffix('.png')
+				# fig_png_out_path = fig_png_out_path.with_stem(f'{curr_pdf_save_path.stem}_{curr_page_str}') # note this replaces the current .pdf extension with .png, resulting in a good filename for a .png
+				a_fig.savefig(fig_png_out_path)
+				curr_active_pipeline.register_output_file(output_path=fig_png_out_path, output_metadata={'context': curr_active_identifying_ctx, 'fig': (a_fig)})
+				if progress_print:
+					print(f'\t saved {fig_png_out_path}')
+
+
+
+
+	@classmethod
 	def _perform_batch_plot(cls, curr_active_pipeline, active_kwarg_list, subset_includelist=None, subset_excludelist=None, write_vector_format=False, write_png=True, progress_print=True, debug_print=False) -> Dict[IdentifyingContext, MatplotlibRenderPlots]:
 		""" Plots everything by calling `cls._subfn_batch_plot_automated` using the kwargs provided in `active_kwarg_list`
 
@@ -939,50 +980,18 @@ class BatchPhoJonathanFiguresHelper:
 		Returns:
 			_type_: _description_
 		"""
-		# if figures_parent_out_path is None:
-		#     figures_parent_out_path = create_daily_programmatic_display_function_testing_folder_if_needed()
-
-		# 2023-06-14 21:53: - [X] REPLACE `create_daily_programmatic_display_function_testing_folder_if_needed` with `curr_active_pipeline.get_figure_manager()` approach
-		fig_man = curr_active_pipeline.get_output_manager()
-
 		active_out_figure_container_dict: Dict[IdentifyingContext, MatplotlibRenderPlots] = {} # empty dict to hold figures
-		num_pages = len(active_kwarg_list)
 
 		# Each figure:
 		for i, curr_batch_plot_kwargs in enumerate(active_kwarg_list):
 			curr_active_identifying_ctx = curr_batch_plot_kwargs['active_identifying_ctx'] # this context is good
-			
-			## 2023-06-14 - New way using `fig_man.get_figure_save_file_path(...)` - this is correct
-			final_figure_file_path = fig_man.get_figure_save_file_path(curr_active_identifying_ctx, make_folder_if_needed=True) # complete file path without extension: e.g. '/ProgrammaticDisplayFunctionTesting/2023-06-15/kdiba_pin01_one_11-03_12-3-25_BatchPhoJonathanReplayFRC_short_only_[13, 22, 28]'
-
 			# Perform the plotting:
 			a_fig_container: MatplotlibRenderPlots = cls._subfn_batch_plot_automated(curr_active_pipeline, **curr_batch_plot_kwargs)
-			a_fig, subfigs, axs, plot_data = a_fig_container.figures[0], a_fig_container.subfigs, a_fig_container.axes, a_fig_container.plot_data
-			# active_out_figures_dict[curr_active_identifying_ctx] = a_fig
 			active_out_figure_container_dict[curr_active_identifying_ctx] = a_fig_container
 
-			# One plot at a time to PDF:
-			if write_vector_format:
-				active_pdf_metadata, _UNUSED_pdf_save_filename = build_pdf_metadata_from_display_context(curr_active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist)
-				curr_pdf_save_path = final_figure_file_path.with_suffix('.pdf')
-				with backend_pdf.PdfPages(curr_pdf_save_path, keep_empty=False, metadata=active_pdf_metadata) as pdf:
-					# Save out PDF page:
-					pdf.savefig(a_fig)
-					curr_active_pipeline.register_output_file(output_path=curr_pdf_save_path, output_metadata={'context': curr_active_identifying_ctx, 'fig': (a_fig), 'pdf_metadata': active_pdf_metadata})
-					if progress_print:
-						print(f'\t saved {curr_pdf_save_path}')
-
-
-			# Also save .png versions:
-			if write_png:
-				# curr_page_str = f'pg{i+1}of{num_pages}'
-				fig_png_out_path = final_figure_file_path.with_suffix('.png')
-				# fig_png_out_path = fig_png_out_path.with_stem(f'{curr_pdf_save_path.stem}_{curr_page_str}') # note this replaces the current .pdf extension with .png, resulting in a good filename for a .png
-				a_fig.savefig(fig_png_out_path)
-				curr_active_pipeline.register_output_file(output_path=fig_png_out_path, output_metadata={'context': curr_active_identifying_ctx, 'fig': (a_fig)})
-				if progress_print:
-					print(f'\t saved {fig_png_out_path}')
-
+		## perform saving if needed:
+		if (write_png or write_vector_format):
+			cls._perform_save_batch_plotted_figures(curr_active_pipeline, active_out_figure_container_dict=active_out_figure_container_dict, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, write_vector_format=write_vector_format, write_png=write_png, progress_print=progress_print, debug_print=debug_print)
 
 		return active_out_figure_container_dict
 
