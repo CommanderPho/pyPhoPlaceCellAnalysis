@@ -1095,7 +1095,32 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
                 column_name: str = 'aclu'
                 
             earliest_spike_df = spikes_df.groupby([column_name]).agg(t_rel_seconds_idxmin=('t_rel_seconds', 'idxmin'), t_rel_seconds_min=('t_rel_seconds', 'min')).reset_index() # 't_rel_seconds_idxmin', 't_rel_seconds_min'
-            first_aclu_spike_records_df: pd.DataFrame = spikes_df[np.isin(spikes_df['t_rel_seconds'], earliest_spike_df['t_rel_seconds_min'].values)]
+            # first_aclu_spike_records_df: pd.DataFrame = spikes_df[np.isin(spikes_df['t_rel_seconds'], earliest_spike_df['t_rel_seconds_min'].values)]
+            
+            # Select rows using the indices of the minimal t_rel_seconds
+            first_aclu_spike_records_df: pd.DataFrame = spikes_df.loc[earliest_spike_df['t_rel_seconds_idxmin']] ## ChatGPT claimed correct
+            # 2024-11-08 17:10 I don't get why these differ. It makes zero sense to me.
+            
+
+            # # Print the earliest_spike_df to see minimal times and their indices
+            # print("Earliest spikes per neuron:")
+            # print(earliest_spike_df)
+
+            # # For each neuron, find all indices where t_rel_seconds equals the minimal time
+            # print("\nIndices with minimal t_rel_seconds per neuron:")
+            # for _, row in earliest_spike_df.iterrows():
+            #     neuron = row[column_name]
+            #     min_time = row['t_rel_seconds_min']
+            #     indices = spikes_df[(spikes_df[column_name] == neuron) & (spikes_df['t_rel_seconds'] == min_time)].index.tolist()
+            #     print(f"Neuron {neuron}: min_time = {min_time}, indices = {indices}")
+
+            # # Use np.isin to select all spikes where t_rel_seconds equals any minimal time
+            # first_aclu_spike_records_df = spikes_df[np.isin(spikes_df['t_rel_seconds'], earliest_spike_df['t_rel_seconds_min'].values)]
+
+            # # Print the resulting DataFrame to see duplicates
+            # print("\nFirst spike records (may contain duplicates):")
+            # print(first_aclu_spike_records_df)
+
             return first_aclu_spike_records_df
         
     @classmethod
@@ -1111,6 +1136,8 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         Returns:
         - pd.DataFrame: A dataframe with 'aclu', first spike times per category, and the earliest spike category.
         """
+        from neuropy.utils.indexing_helpers import union_of_arrays
+        
         # Step 1: Prepare list of dataframes with first spike times per category
         category_column_inclusion_dict = dict(zip(list(first_spikes_dict.keys()), [['aclu', 't_rel_seconds']]*len(first_spikes_dict))) ## as a minimum each category includes ['t_rel_seconds']
         ## extra columns used to prevent duplication
@@ -1121,6 +1148,10 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         for category, extra_columns in category_column_extra_columns_dict.items():
             category_column_inclusion_dict[category] = category_column_inclusion_dict[category] + extra_columns
             
+
+        any_df_aclus = union_of_arrays([df['aclu'].unique() for category, df in first_spikes_dict.items()])
+        n_unique_aclus: int = len(any_df_aclus)
+        
         dfs = []
         for category, df in first_spikes_dict.items():
             ## each incoming df is a first_spikes_df, so it only has one spike from eahc aclu
@@ -1133,12 +1164,16 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
                 extra_columns_rename_dict = dict(zip(extra_category_columns, [f'{category}_spike_{v}' for v in extra_category_columns]))
             else:
                 extra_columns_rename_dict = {} # empty, don't rename
-            df_grouped.rename(columns={'t_rel_seconds': f'first_spike_{category}', **extra_columns_rename_dict}, inplace=True)
+            df_grouped.rename(columns={'t_rel_seconds': f'first_spike_{category}', **extra_columns_rename_dict}, inplace=True) ## rename each 't_rel_seconds' to a unique column name
+            
+            assert set(df_grouped['aclu'].unique()) == set(any_df_aclus), f"set(any_df_aclus): {set(any_df_aclus)}, set(df_grouped['aclu'].unique()): {set(df_grouped['aclu'].unique())}"
+            
             dfs.append(df_grouped)
         
+        assert np.all([np.shape(a_df)[0] == n_unique_aclus for a_df in dfs]), f"every df must have the same alus (all of them)!  {[np.shape(a_df) == n_unique_aclus for a_df in dfs]}"
         # Step 2: Merge all dataframes on 'aclu'
         df_final = reduce(lambda left, right: pd.merge(left, right, on='aclu', how='outer'), dfs)
-        
+        assert len(df_final['aclu'].unique()) == n_unique_aclus, f"final must have the same alus as before! len(df_final['aclu'].unique()): {len(df_final['aclu'].unique())}, n_unique_aclus: {n_unique_aclus}"
         # Step 3: Determine earliest spike category (excluding 'any')
         # Get the list of columns containing first spike times, excluding 'any'
         spike_time_columns = [col for col in df_final.columns if col.startswith('first_spike_') and col != 'first_spike_any']
@@ -1197,8 +1232,6 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         post_initial_lap_tuple = cls.perform_compute_cell_first_firings(global_spikes_df=post_initial_lap_global_spikes_df)
         # post_initial_lap_all_cells_first_spike_time_df, post_initial_lap_global_spikes_df, (post_first_lap_global_spikes_dict, post_first_lap_first_spikes_dict) = post_initial_lap_tuple
         return post_initial_lap_tuple, initial_laps_end_time
-
-
 
     @classmethod
     def perform_compute_cell_first_firings(cls, global_spikes_df: pd.DataFrame):
@@ -1263,6 +1296,8 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         ## extra computations:
         all_cells_first_spike_time_df['theta_to_ripple_lead_lag_diff'] = (all_cells_first_spike_time_df['first_spike_ripple'] - all_cells_first_spike_time_df['first_spike_theta']) ## if theta came first, diff should be positive
         
+        assert len(all_cells_first_spike_time_df) == len(all_cells_first_spike_time_df['aclu'].unique()), f"end result must have one entry for every unique aclu"
+
         return all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict)
 
 
