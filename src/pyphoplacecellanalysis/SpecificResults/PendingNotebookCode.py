@@ -50,6 +50,92 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 
 # ==================================================================================================================== #
+# 2024-11-07 - PhoJonathan first-spike indicator lines                                                                 #
+# ==================================================================================================================== #
+import neuropy.utils.type_aliases as types
+
+# DecoderName = NewType('DecoderName', str)
+
+def add_time_indicator_lines(later_lap_appearing_figures_dict, later_lap_appearing_aclus_times_dict: Dict[types.aclu_index, Dict[str, float]], time_point_formatting_kwargs_dict=None, defer_draw: bool=False):
+    """ 
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import add_time_indicator_lines
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import CellsFirstSpikeTimes
+        from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
+        from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import BatchPhoJonathanFiguresHelper
+
+        ## INPUTS: cells_first_spike_times
+
+        later_lap_appearing_aclus = [32, 33,34, 35, 62, 67]
+        filtered_cells_first_spike_times: CellsFirstSpikeTimes = cells_first_spike_times.sliced_by_neuron_id(later_lap_appearing_aclus)
+
+        later_lap_appearing_aclus_df = filtered_cells_first_spike_times.all_cells_first_spike_time_df ## find ones that appear only on later laps
+        later_lap_appearing_aclus = later_lap_appearing_aclus_df['aclu'].to_numpy() ## get the aclus that only appear on later laps
+
+        ## plot each aclu in a separate figures
+        later_lap_appearing_figures_dict: Dict[IdentifyingContext, MatplotlibRenderPlots] = BatchPhoJonathanFiguresHelper.perform_run(curr_active_pipeline, shared_aclus=later_lap_appearing_aclus, n_max_page_rows=1, disable_top_row=True,
+                                                                                                                                    #    progress_print=True, write_png=True, write_vector_format=True,
+                                                                                                                                    )
+
+        ## Inputs: later_lap_appearing_aclus_df
+        time_point_formatting_kwargs_dict = {'lap': dict(color='orange', alpha=0.8), 'PBE': dict(color='purple', alpha=0.8)}
+        later_lap_appearing_aclus_times_dict: Dict[types.aclu_index, Dict[str, float]] = {aclu_tuple.aclu:{'lap': aclu_tuple.first_spike_lap, 'PBE': aclu_tuple.first_spike_PBE} for aclu_tuple in later_lap_appearing_aclus_df.itertuples(index=False)}
+
+        # ## add the lines:
+        add_time_indicator_lines(later_lap_appearing_figures_dict, later_lap_appearing_aclus_times_dict=later_lap_appearing_aclus_times_dict, time_point_formatting_kwargs_dict=time_point_formatting_kwargs_dict, defer_draw=False)
+
+    """
+    ## INPUTS: later_lap_appearing_figures_dict, later_lap_appearing_aclus_df
+    if time_point_formatting_kwargs_dict is None:
+        time_point_formatting_kwargs_dict = {'lap': dict(color='orange', alpha=0.8), 'PBE': dict(color='purple', alpha=0.8)}
+
+    # 
+    # _out_dict = {}
+
+    for fig_page_context, container in later_lap_appearing_figures_dict.items():
+        ## Add the first-spike time point indicator lines to each of the aclus:
+        # container: MatplotlibRenderPlots = list(later_lap_appearing_figures_dict.values())[0]
+        container.plot_data['first_spike_indicator_lines'] = {} # empty
+        ## for a single container/figure, parse back into the real aclu value from the axes name
+        lap_spikes_axs = [v['lap_spikes'] for v in container.axes]
+        laps_spikes_aclu_ax_dict = {int(ax.get_label().removeprefix('ax_lap_spikes[').removesuffix(']')):ax for ax in lap_spikes_axs}
+        # aclu_first_lap_spike_time_dict = dict(zip(later_lap_appearing_aclus_df['aclu'].values, later_lap_appearing_aclus_df['first_spike_lap'].values))
+        ## OUTPUT: laps_spikes_aclu_ax_dict
+
+        for aclu, ax in laps_spikes_aclu_ax_dict.items():
+            lap_first_spike_lines = {}
+            # _temp_df = later_lap_appearing_aclus_df[later_lap_appearing_aclus_df['aclu'] == aclu][['first_spike_lap', 'first_spike_PBE']]
+            # lap_time_point = _temp_df['first_spike_lap'].to_numpy()[0]
+            # pbe_time_point = _temp_df['first_spike_PBE'].to_numpy()[0]
+            # time_point_dict = {'lap': lap_time_point, 'PBE': pbe_time_point}
+            time_point_dict = later_lap_appearing_aclus_times_dict[aclu]
+            ylims = deepcopy(laps_spikes_aclu_ax_dict[aclu].get_ylim())
+            # print(f'time_point: {time_point}')
+            for name, time_point in time_point_dict.items():
+                lap_first_spike_lines[name] = {}
+                common_formatting_kwargs = time_point_formatting_kwargs_dict[name] # could do .get(name, dict(color='black', alpha=1.0)) to provide defaults
+                # Draw vertical line
+                lap_first_spike_lines[name]['vline'] = ax.axvline(x=time_point, linewidth=1, **common_formatting_kwargs)
+                lap_first_spike_lines[name]['triangle_marker'] = ax.plot(time_point, ylims[-1]-10, marker='v', markersize=10, **common_formatting_kwargs)  # 'v' for downward triangle
+                
+            ax.set_ybound(*ylims)
+            # _out_dict[aclu] = lap_first_spike_lines
+            container.plot_data['first_spike_indicator_lines'][aclu] = lap_first_spike_lines
+        ## end for aclu, ax
+        # container.plot_data['first_spike_indicator_lines'] = _out_dict
+        ## redraw all figures in this container
+        for fig in container.figures:
+            fig.canvas.draw()   # Redraw the current figure
+
+    # end for fig_page_context, container
+
+    if not defer_draw:
+        plt.draw()
+
+    # return container.plot_data['first_spike_indicator_lines']
+
+
+
+# ==================================================================================================================== #
 # 2024-11-07 - Spike Stationarity Testing                                                                              #
 # ==================================================================================================================== #
 from statsmodels.tsa.stattools import adfuller, kpss
