@@ -5908,7 +5908,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 						validate_computation_test=_workaround_validate_has_directional_trial_by_trial_activity_result, 
 						is_global=True, computation_precidence=(1002.4))
 	def _build_trial_by_trial_activity_metrics(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
-		""" Analyzes the trial-by-trial changes (such as the lap-to-lap correlations in the placefields for each cell
+		""" Analyzes the trial-by-trial changes (such as the lap-to-lap correlations in the placefields for each cell)
 		
 		Requires:
 			['sess']

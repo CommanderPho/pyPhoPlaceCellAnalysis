@@ -395,7 +395,7 @@ class TrialByTrialActivity:
         epsilon_value: float = 1e-12
         # Assuming 'occupancy_weighted_tuning_maps_matrix' is your dataset with shape (trials, positions)
         # Z-score along the position axis (axis=1)
-        position_axis_idx: int = 2
+        position_axis_idx: int = 2 ## 
         z_scored_tuning_map_matrix: NDArray = (occupancy_weighted_tuning_maps_matrix - np.nanmean(occupancy_weighted_tuning_maps_matrix, axis=position_axis_idx, keepdims=True)) / ((np.nanstd(occupancy_weighted_tuning_maps_matrix, axis=position_axis_idx, keepdims=True))+epsilon_value)
 
         # trial-by-trial correlation matrix C
@@ -415,6 +415,7 @@ class TrialByTrialActivity:
         aclu_to_matrix_IDX_map = dict(zip(neuron_ids, np.arange(n_aclus)))
 
         return C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map
+
 
     ## MAIN CALL:
     @classmethod
@@ -481,6 +482,7 @@ class TrialByTrialActivity:
             directional_active_lap_pf_results_dicts[an_epoch_name] = TrialByTrialActivity(active_epochs_df=active_laps_df, C_trial_by_trial_correlation_matrix=C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix=z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map=aclu_to_matrix_IDX_map, neuron_ids=neuron_ids)
             
         return directional_active_lap_pf_results_dicts
+
 
     @classmethod
     def plot_napari_trial_by_trial_correlation_matrix(cls, directional_active_lap_pf_results_dicts: Dict[types.DecoderName, "TrialByTrialActivity"], include_trial_by_trial_correlation_matrix:bool=True):

@@ -1387,7 +1387,7 @@ class PhoJonathanPlotHelpers:
     @classmethod
     @function_attributes(short_name='_plot_pho_jonathan_batch_plot_single_cell', tags=['private', 'matplotlib', 'pho_jonathan_batch'], input_requires=[], output_provides=[],
                           uses=['plot_single_cell_1D_placecell_validation', '_temp_draw_jonathan_ax', '_plot_general_all_spikes'], used_by=['_make_pho_jonathan_batch_plots'], creation_date='2023-04-11 08:06')
-    def _plot_pho_jonathan_batch_plot_single_cell(cls, t_split: float, time_bins: NDArray, unit_specific_time_binned_firing_rates, pf1D_all, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs: bool, pf1D_aclu_to_idx: Dict, aclu: int, curr_fig, colors, debug_print=False, disable_top_row=False, **kwargs):
+    def _plot_pho_jonathan_batch_plot_single_cell(cls, t_split: float, time_bins: NDArray, unit_specific_time_binned_firing_rates, pf1D_all, rdf_aclu_to_idx, rdf, irdf, show_inter_replay_frs: bool, pf1D_aclu_to_idx: Dict, aclu: int, curr_fig, colors, debug_print=False, disable_top_row=False, disable_extra_info_labels:bool=True, **kwargs):
         """ Plots a single cell's plots for a stacked Jonathan-style firing-rate-across-epochs-plot
         Internally calls `plot_single_cell_1D_placecell_validation`, `_temp_draw_jonathan_ax`, and `_plot_general_all_spikes`
 
@@ -1461,7 +1461,7 @@ class PhoJonathanPlotHelpers:
                 print(f'has optional_cell_info_labels: {optional_cell_info_labels}')
             optional_cell_info_labels_string: str = optional_cell_info_labels # already should be a string
             # formatted_cell_label_string = f'{formatted_cell_label_string}\n<size:9>{optional_cell_info_labels_string}</>' # single label mode
-            optional_formatted_cell_label_string = f'<size:9>{optional_cell_info_labels_string}</>' # separate single mode
+            optional_formatted_cell_label_string = f'<size:7>{optional_cell_info_labels_string}</>' # separate single mode
         else:
             optional_formatted_cell_label_string = ''
 
@@ -1521,10 +1521,16 @@ class PhoJonathanPlotHelpers:
         # flexitext version:
         title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, formatted_cell_label_string, ax=curr_ax_cell_label, **title_axes_kwargs)
         # curr_ax_cell_label.set_facecolor('0.95')
-        extra_information_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, optional_formatted_cell_label_string, xycoords='axes fraction', ax=curr_ax_extra_information_labels, ha="center", va="center")
+        if not disable_extra_info_labels:
+            extra_information_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, optional_formatted_cell_label_string, xycoords='axes fraction', ax=curr_ax_extra_information_labels, ha="center", va="center") # no top margin
 
         curr_ax_cell_label.axis('off')
         curr_ax_extra_information_labels.axis('off')
+
+        ## debugging
+        # curr_ax_cell_label.set_facecolor("pink")
+        # curr_ax_extra_information_labels.set_facecolor("blue")
+
 
         custom_replay_scatter_markers_plot_kwargs_list = kwargs.pop('custom_replay_scatter_markers_plot_kwargs_list', None)
         # Whether to plot the orange horizontal indicator lines that show where spikes occur. Slows down plots a lot.
@@ -1658,12 +1664,6 @@ class PhoJonathanPlotHelpers:
                 included_unit_neuron_IDs = included_unit_neuron_IDs[:actual_num_unit_neuron_IDs]
 
 
-    
-        # neuron_replay_stats_df = neuron_replay_stats_df.copy()
-        # neuron_replay_stats_df = neuron_replay_stats_df.neuron_identity.make_neuron_indexed_df_global(curr_session_context=None, add_expanded_session_context_keys=False, add_extended_aclu_identity_columns=True)
-        # neuron_replay_stats_df
-
-
         # the index passed into plot_single_cell_1D_placecell_validation(...) must be in terms of the pf1D_all ratemap that's provided. the rdf_aclu_to_idx does not work and will result in indexing errors
         _temp_aclu_to_fragile_linear_neuron_IDX = {aclu:i for i, aclu in enumerate(pf1D_all.ratemap.neuron_ids)}
 
@@ -1686,8 +1686,6 @@ class PhoJonathanPlotHelpers:
         kwargs['optional_cell_info_labels'] = optional_cell_info_labels
 
         # # Build all spikes interpolated positions/dfs:
-        # cell_spikes_dfs_dict = kwargs.get('cell_spikes_dfs_dict', None)
-        # cell_grouped_spikes_df, cell_spikes_dfs = _build_spikes_df_interpolated_props(global_results)
         colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
         axs_list = []
 

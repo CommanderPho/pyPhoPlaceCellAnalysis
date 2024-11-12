@@ -1012,7 +1012,7 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
 
 
     @classmethod
-    def init_from_pipeline(cls, curr_active_pipeline, hdf_save_parent_path: Path=None, should_include_only_spikes_after_initial_laps=True) -> "CellsFirstSpikeTimes":
+    def init_from_pipeline(cls, curr_active_pipeline, hdf_save_parent_path: Path=None, should_include_only_spikes_after_initial_laps=False) -> "CellsFirstSpikeTimes":
         """ 
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import CellsFirstSpikeTimes
         
@@ -1095,31 +1095,11 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
                 column_name: str = 'aclu'
                 
             earliest_spike_df = spikes_df.groupby([column_name]).agg(t_rel_seconds_idxmin=('t_rel_seconds', 'idxmin'), t_rel_seconds_min=('t_rel_seconds', 'min')).reset_index() # 't_rel_seconds_idxmin', 't_rel_seconds_min'
-            # first_aclu_spike_records_df: pd.DataFrame = spikes_df[np.isin(spikes_df['t_rel_seconds'], earliest_spike_df['t_rel_seconds_min'].values)]
-            
+            # first_aclu_spike_records_df: pd.DataFrame = spikes_df[np.isin(spikes_df['t_rel_seconds'], earliest_spike_df['t_rel_seconds_min'].values)]           
             # Select rows using the indices of the minimal t_rel_seconds
             first_aclu_spike_records_df: pd.DataFrame = spikes_df.loc[earliest_spike_df['t_rel_seconds_idxmin']] ## ChatGPT claimed correct
             # 2024-11-08 17:10 I don't get why these differ. It makes zero sense to me.
-            
 
-            # # Print the earliest_spike_df to see minimal times and their indices
-            # print("Earliest spikes per neuron:")
-            # print(earliest_spike_df)
-
-            # # For each neuron, find all indices where t_rel_seconds equals the minimal time
-            # print("\nIndices with minimal t_rel_seconds per neuron:")
-            # for _, row in earliest_spike_df.iterrows():
-            #     neuron = row[column_name]
-            #     min_time = row['t_rel_seconds_min']
-            #     indices = spikes_df[(spikes_df[column_name] == neuron) & (spikes_df['t_rel_seconds'] == min_time)].index.tolist()
-            #     print(f"Neuron {neuron}: min_time = {min_time}, indices = {indices}")
-
-            # # Use np.isin to select all spikes where t_rel_seconds equals any minimal time
-            # first_aclu_spike_records_df = spikes_df[np.isin(spikes_df['t_rel_seconds'], earliest_spike_df['t_rel_seconds_min'].values)]
-
-            # # Print the resulting DataFrame to see duplicates
-            # print("\nFirst spike records (may contain duplicates):")
-            # print(first_aclu_spike_records_df)
 
             return first_aclu_spike_records_df
         
@@ -1247,18 +1227,6 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
             all_cells_first_spike_time_df = all_cells_first_spike_time_df.neuron_identity.make_neuron_indexed_df_global(curr_active_pipeline.get_session_context(), add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True) 
             
         """
-        # global_spikes_df: pd.DataFrame = deepcopy(get_proper_global_spikes_df(curr_active_pipeline)).drop(columns=['neuron_type'], inplace=False) ## already has columns ['lap', 'maze_id', 'PBE_id'
-        # # global_spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].spikes_df).drop(columns=['neuron_type'], inplace=False) ## already has columns ['lap', 'maze_id', 'PBE_id'
-        # # global_spikes_df
-        # global_spikes_df = global_spikes_df.neuron_identity.make_neuron_indexed_df_global(curr_active_pipeline.get_session_context(), add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
-        
-
-        ## find earliest spike for each cell
-        # Performed 1 aggregation grouped on column: 'aclu'
-        # earliest_spike_df = global_spikes_df.groupby(['aclu']).agg(t_rel_seconds_idxmin=('t_rel_seconds', 'idxmin'), t_rel_seconds_min=('t_rel_seconds', 'min')).reset_index() # 't_rel_seconds_idxmin', 't_rel_seconds_min'
-        # first_aclu_spike_records_df: pd.DataFrame = global_spikes_df[np.isin(global_spikes_df['t_rel_seconds'], earliest_spike_df['t_rel_seconds_min'].values)]
-        # first_aclu_spike_records_df.aclu.unique()
-
         # ==================================================================================================================== #
         # Separate Theta/Ripple/etc dfs                                                                                        #
         # ==================================================================================================================== #
@@ -1302,7 +1270,7 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
 
 
     @classmethod
-    def compute_cell_first_firings(cls, curr_active_pipeline, hdf_save_parent_path: Path=None, should_include_only_spikes_after_initial_laps=True): # , save_hdf: bool=True
+    def compute_cell_first_firings(cls, curr_active_pipeline, hdf_save_parent_path: Path=None, should_include_only_spikes_after_initial_laps:bool=False): # , save_hdf: bool=True
         """ 
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_cell_first_firings
         
