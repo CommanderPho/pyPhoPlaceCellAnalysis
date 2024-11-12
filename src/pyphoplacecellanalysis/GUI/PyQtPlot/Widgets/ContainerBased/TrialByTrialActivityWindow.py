@@ -39,7 +39,7 @@ from pyphoplacecellanalysis.External.pyqtgraph_extensions.graphicsItems.LabelIte
 
 @define(slots=False, eq=False)
 class TrialByTrialActivityWindow:
-    """ DockPlanningHelperWindow displays four rasters showing the same spikes but sorted according to four different templates (RL_odd, RL_even, LR_odd, LR_even)
+    """ TrialByTrialActivityWindow 
     
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TrialByTrialActivityWindow import TrialByTrialActivityWindow
 
@@ -371,14 +371,6 @@ class TrialByTrialActivityWindow:
         active_z_scored_tuning_map_matrix = active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix # shape (n_epochs, n_neurons, n_pos_bins),
         print(f'np.shape(active_z_scored_tuning_map_matrix): {np.shape(active_z_scored_tuning_map_matrix)}')
 
-        # MATPLOTLIB way
-        # additional_cmap_names['long_LR'] = 'Reds'
-        # additional_cmap_names['long_RL'] = 'Purples'
-        # additional_cmap_names['short_LR'] = 'Greens'
-        # additional_cmap_names['short_RL'] = 'Oranges'
-        # additional_cmap_names['maze_all'] = 'Greys'
-        # additional_cmaps = {k: create_transparent_colormap(cmap_name=v, lower_bound_alpha=0.1) for k, v in additional_cmap_names.items()}
-
         # additional_cmap_names = dict(zip(TrackTemplates.get_decoder_names(), ['red', 'purple', 'green', 'orange'])) # {'long_LR': 'red', 'long_RL': 'purple', 'short_LR': 'green', 'short_RL': 'orange'}
         long_epoch_config = long_short_display_config_manager.long_epoch_config.as_pyqtgraph_kwargs()
         short_epoch_config = long_short_display_config_manager.short_epoch_config.as_pyqtgraph_kwargs()
@@ -476,6 +468,19 @@ class TrialByTrialActivityWindow:
             
         legend_layout.setMaximumWidth(100)
 
+        #TODO 2024-11-12 12:22: - [ ] Add position plot to the right-most column of the figure, spanning all rows after the first.
+        ## Add position plot
+        root_render_widget.nextRow()
+        # position_plot_layout: pg.GraphicsLayout = root_render_widget.addLayout()  # Automatically places in the next available row
+        position_plot = root_render_widget.addPlot(row=2, col=5, rowspan=4, colspan=1) # start below the legend. Ideally span to rows until the end of the figure.
+        # position_plot.addCurve() # 
+        # active_trial_by_trial_activity_obj # don't have the position, tragic
+        ## Usage:
+        # position_plot = _a_trial_by_trial_window.plots.position_plot # PlotItem
+        # pos_df: pd.DataFrame = deepcopy(active_pf_dt.position.to_dataframe())
+        # position_plot.clearPlots()
+        # position_plot.plot(x=pos_df['x'].to_numpy(), y=pos_df['t'].to_numpy())
+
             
         # END if is_overlaid_heatmaps_mode                
         parent_root_widget.setWindowTitle('TrialByTrialActivity - trial_to_trial_reliability_all_decoders_image_stack')
@@ -491,7 +496,10 @@ class TrialByTrialActivityWindow:
                                  legend_entries_dict=legend_entries_dict,
                                  other_components_array=other_components_array,
                                  img_item_array=img_item_array,
-                                 additional_img_items_dict=additional_img_items_dict) # , ctrl_widgets={'slider': slider} # .plots.additional_img_items_dict
+                                 additional_img_items_dict=additional_img_items_dict, 
+                                #  position_plot_layout=position_plot_layout,
+                                 position_plot=position_plot, 
+                                 ) # , ctrl_widgets={'slider': slider} # .plots.additional_img_items_dict
         _obj.plots_data = RenderPlotsData(name=name, 
                                           plot_data_array=plot_data_array,
                                           active_neuron_IDs=deepcopy(active_neuron_IDs),
