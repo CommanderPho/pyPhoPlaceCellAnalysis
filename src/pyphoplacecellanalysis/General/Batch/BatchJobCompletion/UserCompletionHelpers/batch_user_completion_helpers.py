@@ -1600,42 +1600,87 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 # Rank-Order and WCorr                                                                                                 #
 # ==================================================================================================================== #
 
-@function_attributes(short_name=None, tags=['batch', 'rank-order'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-27 21:21', related_items=[])
-def export_rank_order_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
+@function_attributes(short_name=None, tags=['batch', 'rank-order'], input_requires=['rank_order_results.ripple_merged_complete_epoch_stats_df'], output_provides=[], uses=[], used_by=[], creation_date='2024-04-27 21:21', related_items=[])
+def export_rank_order_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, should_save_pkl:bool=True, should_save_CSV:bool=True) -> dict:
+	"""
+	provides_files=['']
+	
+	Unpacking:	
+		callback_outputs = _across_session_results_extended_dict['export_rank_order_results_completion_function']
+		merged_complete_ripple_epoch_stats_df_output_path = callback_outputs['merged_complete_ripple_epoch_stats_df_output_path']
+		minimum_inclusion_fr_Hz = callback_outputs['minimum_inclusion_fr_Hz']
+		included_qclu_values = callback_outputs['included_qclu_values']
+		print(f'merged_complete_ripple_epoch_stats_df_output_path: {merged_complete_ripple_epoch_stats_df_output_path}')
+
+	"""
+	from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import save_rank_order_results
+	from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor
+
 	# print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
 	print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
 	print(f'export_rank_order_results_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
 	long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-
+	# Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
+	session_name: str = curr_active_pipeline.session_name
+	t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+	
 	assert self.collected_outputs_path.exists()
-	curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
-	CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
-	print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
+	# curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
+	complete_session_identifier_string: str = curr_active_pipeline.get_complete_session_identifier_string() # 'kdiba-gor01-one-2006-6-09_1-22-43__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2, 4, 6, 7, 9]'
+	custom_replay_source: str = curr_active_pipeline.get_session_additional_parameters_context().to_dict()['epochs_source']
+	
+	# CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}" # self.BATCH_DATE_TO_USE: '2024-11-15_Lab'
+	CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{complete_session_identifier_string}" # self.BATCH_DATE_TO_USE: '2024-11-15_Lab'
+	print(f'CURR_BATCH_OUTPUT_PREFIX: "{CURR_BATCH_OUTPUT_PREFIX}"') # CURR_BATCH_OUTPUT_PREFIX: "2024-11-15_Lab-kdiba-gor01-one-2006-6-09_1-22-43__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2, 4, 6, 7, 9]"
 
-	from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import save_rank_order_results, SaveStringGenerator
-	save_rank_order_results(curr_active_pipeline, day_date=f"{CURR_BATCH_OUTPUT_PREFIX}", override_output_parent_path=self.collected_outputs_path) # "2024-01-02_301pm" "2024-01-02_734pm""
+	callback_outputs = {
+		'pkl_rank_order_output_path': None,'pkl_directional_laps_output_path': None,'pkl_directional_merged_decoders_output_path': None, 'out_filename_str': None,
+		'merged_complete_ripple_epoch_stats_df_output_path': None, 
+		'minimum_inclusion_fr_Hz': None,
+		'included_qclu_values': None,
+	}
+	
+
+	if should_save_pkl:
+		## Save out pickled results:
+		rank_order_output_path, directional_laps_output_path, directional_merged_decoders_output_path, out_filename_str = save_rank_order_results(curr_active_pipeline, day_date=f"{self.BATCH_DATE_TO_USE}", override_output_parent_path=self.collected_outputs_path) # don't pass `CURR_BATCH_OUTPUT_PREFIX` or it will double up the descriptors
+		callback_outputs['pkl_rank_order_output_path'] = rank_order_output_path
+		callback_outputs['pkl_directional_laps_output_path'] = directional_laps_output_path
+		callback_outputs['pkl_directional_merged_decoders_output_path'] = directional_merged_decoders_output_path
+		callback_outputs['out_filename_str'] = out_filename_str
+	
+	# save_rank_order_results(curr_active_pipeline, day_date=f"{CURR_BATCH_OUTPUT_PREFIX}", override_output_parent_path=self.collected_outputs_path) # "2024-01-02_301pm" "2024-01-02_734pm""
 
 	## 2023-12-21 - Export to CSV:
-	spikes_df = curr_active_pipeline.sess.spikes_df
+	# spikes_df = curr_active_pipeline.sess.spikes_df
 	rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
 	minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
 	included_qclu_values: List[int] = rank_order_results.included_qclu_values
-	ripple_result_tuple, laps_result_tuple = rank_order_results.ripple_most_likely_result_tuple, rank_order_results.laps_most_likely_result_tuple
-	directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
-	track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
-	print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
-	print(f'included_qclu_values: {included_qclu_values}')
+	callback_outputs['minimum_inclusion_fr_Hz'] = minimum_inclusion_fr_Hz
+	callback_outputs['included_qclu_values'] = included_qclu_values
 
-	print(f'\t try saving to CSV...')
-	# active_csv_parent_output_path = curr_active_pipeline.get_output_path().resolve()
-	active_csv_parent_output_path = self.collected_outputs_path.resolve()
-	merged_complete_epoch_stats_df = rank_order_results.ripple_merged_complete_epoch_stats_df ## New method
-	merged_complete_ripple_epoch_stats_df_output_path = active_csv_parent_output_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_merged_complete_epoch_stats_df.csv').resolve()
-	merged_complete_epoch_stats_df.to_csv(merged_complete_ripple_epoch_stats_df_output_path)
-	print(f'\t saving to CSV: {merged_complete_ripple_epoch_stats_df_output_path} done.')
+	# ripple_result_tuple, laps_result_tuple = rank_order_results.ripple_most_likely_result_tuple, rank_order_results.laps_most_likely_result_tuple
+	# directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+	# track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+	# print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
+	# print(f'included_qclu_values: {included_qclu_values}')
+	if should_save_CSV:
+		print(f'\t try saving to CSV...')
+		# active_csv_parent_output_path = curr_active_pipeline.get_output_path().resolve()
+		active_csv_parent_output_path = self.collected_outputs_path.resolve()
+		merged_complete_epoch_stats_df: pd.DataFrame = rank_order_results.ripple_merged_complete_epoch_stats_df ## New method
+		## add the missing context columns, like session, time_bin_size, etc.
+		merged_complete_epoch_stats_df = merged_complete_epoch_stats_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=None, custom_replay_source=custom_replay_source, curr_session_t_delta=t_delta, time_col='start')
+
+		merged_complete_ripple_epoch_stats_df_output_path = active_csv_parent_output_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}-(merged_complete_epoch_stats_df).csv').resolve()
+		merged_complete_epoch_stats_df.to_csv(merged_complete_ripple_epoch_stats_df_output_path)
+		print(f'\t saving to CSV: "{merged_complete_ripple_epoch_stats_df_output_path}" done.')
+		callback_outputs['merged_complete_ripple_epoch_stats_df_output_path'] = str(merged_complete_ripple_epoch_stats_df_output_path.as_posix())
+		# across_session_results_extended_dict['merged_complete_epoch_stats_df'] = merged_complete_ripple_epoch_stats_df_output_path
+
+	across_session_results_extended_dict['export_rank_order_results_completion_function'] = callback_outputs
 	
-	# across_session_results_extended_dict['merged_complete_epoch_stats_df'] = merged_complete_ripple_epoch_stats_df_output_path
-	
+
 	print(f'>>\t done with {curr_session_context}')
 	print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
 	print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')

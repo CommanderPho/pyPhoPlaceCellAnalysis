@@ -2290,35 +2290,10 @@ class DecoderDecodedEpochsResult(ComputedResult):
 			a_ripple_df = DecoderDecodedEpochsResult.add_session_df_columns(a_ripple_df, session_name=session_name, time_bin_size=None, curr_session_t_delta=t_delta, time_col='ripple_start_t')
 	
 		"""
-		from neuropy.core.epoch import EpochsAccessor
-		from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
-
-		if time_col is None:
-			# time_col = 'start' # 'ripple_start_t' for ripples, etc
-			time_col = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(df, col_connonical_name='start', required_columns_synonym_dict={"start":{'begin','start_t','ripple_start_t'}, "stop":['end','stop_t']}, should_raise_exception_on_fail=False)
-			
-		if end_time_col_name is None:
-			end_time_col_name = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(df, col_connonical_name='stop', required_columns_synonym_dict={"start":{'begin','start_t','ripple_start_t'}, "stop":['end','stop_t']}, should_raise_exception_on_fail=False)
+		from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor
 		
-		df['session_name'] = session_name
-		if time_bin_size is not None:
-			df['time_bin_size'] = np.full((len(df), ), time_bin_size)
-		if curr_session_t_delta is not None:
-			if time_col is not None:
-				df['delta_aligned_start_t'] = df[time_col] - curr_session_t_delta
-				## Add 'pre_post_delta_category' helper column:
-				df['pre_post_delta_category'] = 'post-delta'
-				df.loc[(df['delta_aligned_start_t'] <= 0.0), 'pre_post_delta_category'] = 'pre-delta'
-				if (t_start is not None) and (t_end is not None) and (end_time_col_name is not None):
-					try:
-						df = EpochsAccessor.add_maze_id_if_needed(epochs_df=df, t_start=t_start, t_delta=curr_session_t_delta, t_end=t_end, start_time_col_name=time_col, end_time_col_name=end_time_col_name) # Adds Columns: ['maze_id']
-					except (AttributeError, KeyError) as e:
-						print(f'could not add the "maze_id" column to the dataframe (err: {e})\n\tlikely because it lacks valid "t_start" or "t_end" columns. df.columns: {list(df.columns)}. Skipping.')
-					except BaseException as e:
-						raise e
-
-		return df
-
+		return df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=time_bin_size, t_start=t_start, curr_session_t_delta=curr_session_t_delta, t_end=t_end, time_col=time_col, end_time_col_name=end_time_col_name)
+	
 	@classmethod
 	@function_attributes(short_name=None, tags=['temp'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-01 22:58', related_items=[])
 	def load_user_selected_epoch_times(cls, curr_active_pipeline, track_templates=None, epochs_name='ripple', **additional_selections_context) -> Tuple[Dict[str, NDArray], NDArray]:

@@ -296,22 +296,37 @@ def determine_good_aclus_by_qclu(curr_active_pipeline, included_qclu_values=[1,2
     return filtered_neuron_identities.aclu.to_numpy()
 
 
+# class SaveStringGenerator:
+#     """ 
+#     # 2023-11-27 - I'd like to be able to save/load single results a time, (meaning specific to their parameters):
+#     day_date_str: str = '2023-12-11-minimum_inclusion_fr_Hz_2_included_qclu_values_1-2_'
 
-class SaveStringGenerator:
-    """ 
-    # 2023-11-27 - I'd like to be able to save/load single results a time, (meaning specific to their parameters):
-    day_date_str: str = '2023-12-11-minimum_inclusion_fr_Hz_2_included_qclu_values_1-2_'
-
-    """
-    _minimal_decimals_float_formatter = lambda x: f"{x:.1f}".rstrip('0').rstrip('.')
+#     """
+#     _minimal_decimals_float_formatter = lambda x: f"{x:.1f}".rstrip('0').rstrip('.')
     
-    @classmethod
-    def generate_save_suffix(cls, minimum_inclusion_fr_Hz: float, included_qclu_values: List[int], day_date: str='2023-12-11') -> str:
-        # day_date_str: str = '2023-12-11-minimum_inclusion_fr_Hz_2_included_qclu_values_1-2_'
-        print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
-        print(f'included_qclu_values: {included_qclu_values}')
-        out_filename_str: str = '-'.join([day_date, f'minimum_inclusion_fr', cls._minimal_decimals_float_formatter(minimum_inclusion_fr_Hz), f'included_qclu_values', f'{included_qclu_values}'])
-        return out_filename_str
+#     @classmethod
+#     def generate_save_suffix(cls, day_date: str='2023-12-11', session_identifier: Optional[str]=None, minimum_inclusion_fr_Hz: Optional[float]=None, included_qclu_values: Optional[List[int]]=None) -> str:
+#         """ 
+        
+#         """
+#         # day_date_str: str = '2023-12-11-minimum_inclusion_fr_Hz_2_included_qclu_values_1-2_'
+#         print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
+#         print(f'included_qclu_values: {included_qclu_values}')
+#         # _format_arr = [day_date, f'minimum_inclusion_fr', cls._minimal_decimals_float_formatter(minimum_inclusion_fr_Hz), f'included_qclu_values', f'{included_qclu_values}']
+#         _format_arr = [day_date]
+#         if ((session_identifier is not None) and (len(session_identifier) > 0)):
+#             _format_arr.append(session_identifier)
+#         if ((minimum_inclusion_fr_Hz is not None) and (len(str(minimum_inclusion_fr_Hz)) > 0)):
+#             _format_arr.append(cls._minimal_decimals_float_formatter(minimum_inclusion_fr_Hz))
+#         if ((included_qclu_values is not None) and (len(included_qclu_values) > 0)):
+#             _format_arr.append(f'{included_qclu_values}')
+#         # if ((session_identifier is not None) and (len(session_identifier) > 0)):
+#         #     _format_arr.append(session_identifier)
+
+#         #  f'minimum_inclusion_fr', cls._minimal_decimals_float_formatter(minimum_inclusion_fr_Hz), f'included_qclu_values', f'{included_qclu_values}']
+
+#         out_filename_str: str = '-'.join(_format_arr)
+#         return out_filename_str
 
 # list = ['2Hz', '12Hz']
 
@@ -319,40 +334,52 @@ def save_rank_order_results(curr_active_pipeline, day_date: str='2023-12-19_729p
     """ saves out the rnak-order and directional laps results to disk.
     
     rank_order_output_path, directional_laps_output_path, directional_merged_decoders_output_path, out_filename_str
-    
-    
+
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import save_rank_order_results
     
      rank_order_output_path, directional_laps_output_path, directional_merged_decoders_output_path, out_filename_str = save_rank_order_results(curr_active_pipeline, day_date: str='2024-09-26_503pm')
     
+     "2024-11-15_Lab-kdiba-gor01-one-2006-6-09_1-22-43__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2, 4, 6, 7, 9]-(DirectionalLaps).pkl"
+     "2024-11-15_Lab-kdiba-gor01-one-2006-6-09_1-22-43__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2, 4, 6, 7, 9]-(RankOrder).pkl"
+     "2024-11-15_Lab-kdiba-gor01-one-2006-6-09_1-22-43__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2, 4, 6, 7, 9]-(DirectionalMergedDecoders).pkl"
+     
     """
     from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
     ## Uses `SaveStringGenerator.generate_save_suffix` and the current rank_order_result's parameters to build a reasonable save name:
     assert curr_active_pipeline.global_computation_results.computed_data['RankOrder'] is not None
-    minimum_inclusion_fr_Hz: float = curr_active_pipeline.global_computation_results.computed_data['RankOrder'].minimum_inclusion_fr_Hz
-    included_qclu_values: List[int] = curr_active_pipeline.global_computation_results.computed_data['RankOrder'].included_qclu_values
-    out_filename_str = SaveStringGenerator.generate_save_suffix(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values, day_date=day_date)
+    # minimum_inclusion_fr_Hz: float = curr_active_pipeline.global_computation_results.computed_data['RankOrder'].minimum_inclusion_fr_Hz
+    # included_qclu_values: List[int] = curr_active_pipeline.global_computation_results.computed_data['RankOrder'].included_qclu_values
+    # curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
+    complete_session_identifier_string: str = curr_active_pipeline.get_complete_session_identifier_string() # 'kdiba-gor01-one-2006-6-09_1-22-43__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2, 4, 6, 7, 9]'
+    
+    # CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}" # self.BATCH_DATE_TO_USE: '2024-11-15_Lab'
+    CURR_BATCH_OUTPUT_PREFIX: str = f"{day_date}-{complete_session_identifier_string}" # self.BATCH_DATE_TO_USE: '2024-11-15_Lab'
+    print(f'CURR_BATCH_OUTPUT_PREFIX: "{CURR_BATCH_OUTPUT_PREFIX}"') # CURR_BATCH_OUTPUT_PREFIX: "2024-11-15_Lab-kdiba-gor01-one-2006-6-09_1-22-43__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2, 4, 6, 7, 9]"
+    
+    # out_filename_str = SaveStringGenerator.generate_save_suffix(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values, day_date=day_date)
+    out_filename_str: str = CURR_BATCH_OUTPUT_PREFIX
+
     print(f'save_rank_order_results(...): out_filename_str: "{out_filename_str}"')
     output_parent_path: Path = (override_output_parent_path or curr_active_pipeline.get_output_path()).resolve()
 
     try:
-        directional_laps_output_path = output_parent_path.joinpath(f'{out_filename_str}DirectionalLaps.pkl').resolve()
+        directional_laps_output_path = output_parent_path.joinpath(f'{out_filename_str}-(DirectionalLaps).pkl').resolve()
         saveData(directional_laps_output_path, (curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']))
-    except BaseException as e:
+    except Exception as e:
         print(f'issue saving "{directional_laps_output_path}": error: {e}')
         pass
     
     try:
-        rank_order_output_path = output_parent_path.joinpath(f'{out_filename_str}RankOrder.pkl').resolve()
+        rank_order_output_path = output_parent_path.joinpath(f'{out_filename_str}-(RankOrder).pkl').resolve()
         saveData(rank_order_output_path, (curr_active_pipeline.global_computation_results.computed_data['RankOrder']))
-    except BaseException as e:
+    except Exception as e:
         print(f'issue saving "{directional_laps_output_path}": error: {e}')
         pass
 
     try:
-        directional_merged_decoders_output_path = output_parent_path.joinpath(f'{out_filename_str}DirectionalMergedDecoders.pkl').resolve()
+        directional_merged_decoders_output_path = output_parent_path.joinpath(f'{out_filename_str}-(DirectionalMergedDecoders).pkl').resolve()
         saveData(directional_merged_decoders_output_path, (curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']))
-    except BaseException as e:
+    except Exception as e:
         print(f'issue saving "{directional_laps_output_path}": error: {e}')
         pass
     
@@ -2489,7 +2516,7 @@ class RankOrderAnalyses:
                 # combined_epoch_stats_df = combined_epoch_stats_df.set_index('label')
             else:
                 print('invalid active_epochs_df. skipping adding labels')
-        except BaseException as e:
+        except Exception as e:
             print(f'Not giving up: e: {e}')
             pass
 
