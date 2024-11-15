@@ -1150,11 +1150,6 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 	from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import finalize_output_shuffled_wcorr, _get_custom_suffix_for_replay_filename
 	from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_all_replay_epoch_variations
 
-	# SimpleBatchComputationDummy = make_class('SimpleBatchComputationDummy', attrs=['BATCH_DATE_TO_USE', 'collected_outputs_path'])
-	# a_dummy = SimpleBatchComputationDummy(BATCH_DATE_TO_USE, collected_outputs_path)
-	
-	# "self" already is a dummy
-	
 	base_BATCH_DATE_TO_USE: str = f"{self.BATCH_DATE_TO_USE}" ## backup original string
 	should_suppress_errors: bool = (not self.fail_on_exception) # get('fail_on_exception', False)    
 
@@ -1164,11 +1159,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 	callback_outputs = {
 		'replay_epoch_variations': None,
 		'replay_epoch_outputs': None,
-		# 'wcorr_shuffles_data_output_filepath': None, #'t_end': t_end   
-		# 'standalone_MAT_filepath': None,
-		# 'ripple_WCorrShuffle_df_export_CSV_path': None,
 	}
-
 
 	# ==================================================================================================================== #
 	# Compute Alternative Replays: `replay_epoch_variations`                                                               #
@@ -1189,11 +1180,9 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 	## Save the replay epochs out to event files:
 	for replay_epochs_key, a_replay_epochs in replay_epoch_variations.items():
 		# ## Use `diba_evt_file_replay_epochs` as `new_replay_epochs`
-		# replay_epochs_key = 'diba_quiescent_method_replay_epochs'
-		# a_replay_epochs = replay_epoch_variations[replay_epochs_key]
 		print(f'performing comp for "{replay_epochs_key}"...')
 		replay_epoch_outputs[replay_epochs_key] = {} # init to empty
-
+		
 		custom_suffix: str = _get_custom_suffix_for_replay_filename(new_replay_epochs=a_replay_epochs)
 		print(f'\treplay_epochs_key: {replay_epochs_key}: custom_suffix: "{custom_suffix}"')
 
@@ -1222,11 +1211,8 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 	## Duplicate Copy of pipeline to perform desired computations:
 	for replay_epochs_key, a_replay_epochs in replay_epoch_variations.items():
 		# ## Use `diba_evt_file_replay_epochs` as `new_replay_epochs`
-		# replay_epochs_key = 'diba_quiescent_method_replay_epochs'
-		# a_replay_epochs = replay_epoch_variations[replay_epochs_key]
 		print(f'\t=====================================>> performing comp for "{replay_epochs_key}"...')
-		# replay_epoch_outputs[replay_epochs_key] = {} # init to empty
-
+		
 		custom_suffix: str = _get_custom_suffix_for_replay_filename(new_replay_epochs=a_replay_epochs)
 		print(f'\treplay_epochs_key: {replay_epochs_key}: custom_suffix: "{custom_suffix}"')
 
@@ -1237,7 +1223,6 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 
 		print(f'\tWARNING: should_suppress_errors: {should_suppress_errors}')
 		with ExceptionPrintingContext(suppress=should_suppress_errors, exception_print_fn=(lambda formatted_exception_str: print(f'\tfailed epoch computations for replay_epochs_key: "{replay_epochs_key}". Failed with error: {formatted_exception_str}. Skipping.'))):
-			# for replay_epochs_key, a_replay_epochs in replay_epoch_variations.items():
 			a_curr_active_pipeline = deepcopy(curr_active_pipeline)
 			did_change, custom_save_filenames, custom_save_filepaths = overwrite_replay_epochs_and_recompute(curr_active_pipeline=a_curr_active_pipeline, new_replay_epochs=a_replay_epochs,
 																											  enable_save_pipeline_pkl=True, enable_save_global_computations_pkl=False, enable_save_h5=False,
