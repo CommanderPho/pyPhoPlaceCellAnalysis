@@ -2768,7 +2768,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
 			session_identifier_str: str = active_context.get_description() # 'kdiba_gor01_two_2006-6-12_16-53-46__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0normal_computed-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]'
 			# session_identifier_str: str = active_context.get_description(subset_excludelist=['custom_suffix']) # no this is just the session
 			assert output_date_str is not None
-			out_basename = '-'.join([output_date_str, session_identifier_str, data_identifier_str]) # '2024-01-04|kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
+			out_basename = '-'.join([output_date_str, session_identifier_str, data_identifier_str]) # '2024-11-15_0200PM-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays_qclu_[1, 2, 4, 6, 7, 9]_frateThresh_5.0-(ripple_WCorrShuffle_df)_tbin-0.025'
 			out_filename = f"{out_basename}.csv"
 			out_path = parent_output_path.joinpath(out_filename).resolve()
 			export_df.to_csv(out_path)
@@ -2852,7 +2852,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
 					else:
 						print(f'\t failed all methods for selection filter')
 
-			export_files_dict[a_df_name] = export_df_to_csv(a_df, data_identifier_str=a_data_identifier_str) # this is exporting corr
+			export_files_dict[a_df_name] = export_df_to_csv(a_df, data_identifier_str=a_data_identifier_str) # this is exporting corr '(ripple_WCorrShuffle_df)_tbin-0.025'
 		# end for a_df_name, a_df
 		
 		return export_files_dict

@@ -1714,7 +1714,8 @@ def figures_rank_order_results_completion_function(self, global_data_root_parent
 
 
 @function_attributes(short_name=None, tags=['wcorr', 'shuffle'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
-def compute_and_export_session_wcorr_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
+def compute_and_export_session_wcorr_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
+								   should_skip_previous_saved_shuffles:bool=False, with_data_name: Optional[str]=None) -> dict:
 	"""  Computes the shuffled wcorrs and export them to several formats: .mat, .pkl, and .csv
 	
 	from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import reload_exported_kdiba_session_position_info_mat_completion_function
@@ -1741,6 +1742,8 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
 	# desired_total_num_shuffles: int = 4096
 	desired_total_num_shuffles: int = 700
 	minimum_required_unique_num_shuffles: int = 700
+
+	newer_than: Optional[datetime] = datetime(2024, 11, 11)
 
 	allow_update_global_result: bool = False
 	callback_outputs = {
@@ -1770,8 +1773,9 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
 
 	wcorr_shuffles.compute_shuffles(num_shuffles=2, curr_active_pipeline=curr_active_pipeline) # do one more shuffle
 	
-	# try load previous compatible shuffles: _____________________________________________________________________________ #
-	wcorr_shuffles.discover_load_and_append_shuffle_data_from_directory(save_directory=curr_active_pipeline.get_output_path().resolve())
+	if not should_skip_previous_saved_shuffles:
+		# try load previous compatible shuffles: _____________________________________________________________________________ #
+		wcorr_shuffles.discover_load_and_append_shuffle_data_from_directory(save_directory=curr_active_pipeline.get_output_path().resolve(), newer_than=newer_than, with_data_name=with_data_name)
 
 	n_completed_shuffles: int = wcorr_shuffles.n_completed_shuffles
 
@@ -1812,14 +1816,14 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
 
 	try:
 		# active_context = curr_active_pipeline.get_session_context()
-		active_context = curr_active_pipeline.get_complete_session_context() ## #TODO 2024-11-08 10:29: - [ ] complete instead of basic session context
+		active_context, (curr_session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context() ## #TODO 2024-11-08 10:29: - [ ] complete instead of basic session context
 		# session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
 		session_name: str = curr_active_pipeline.session_name
 		export_files_dict = wcorr_shuffles.export_csvs(parent_output_path=self.collected_outputs_path.resolve(), active_context=active_context, session_name=session_name, curr_active_pipeline=curr_active_pipeline)
 		ripple_WCorrShuffle_df_export_CSV_path = export_files_dict['ripple_WCorrShuffle_df']
 		print(f'Successfully exported ripple_WCorrShuffle_df_export_CSV_path: "{ripple_WCorrShuffle_df_export_CSV_path}" with wcorr_shuffles.n_completed_shuffles: {wcorr_shuffles.n_completed_shuffles} unique shuffles.')
 		callback_outputs['ripple_WCorrShuffle_df_export_CSV_path'] = ripple_WCorrShuffle_df_export_CSV_path
-	except BaseException as e:
+	except Exception as e:
 		exception_info = sys.exc_info()
 		err = CapturedException(e, exception_info)
 		print(f"ERROR: encountered exception {err} while trying to perform wcorr_ripple_shuffle.export_csvs(parent_output_path='{self.collected_outputs_path.resolve()}', ...) for {curr_session_context}")
@@ -1838,7 +1842,7 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
 		was_write_good = True
 		callback_outputs['wcorr_shuffles_data_output_filepath'] = wcorr_shuffles_data_standalone_filepath
 
-	except BaseException as e:
+	except Exception as e:
 		exception_info = sys.exc_info()
 		err = CapturedException(e, exception_info)
 		print(f"ERROR: encountered exception {err} while trying to perform wcorr_shuffles.save_data('{wcorr_shuffles_data_standalone_filepath}') for {curr_session_context}")
@@ -1856,7 +1860,7 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
 	try:
 		wcorr_shuffles.save_data_mat(filepath=standalone_MAT_filepath, additional_mat_elements={'session': curr_active_pipeline.get_session_context().to_dict()})
 		callback_outputs['standalone_MAT_filepath'] = standalone_MAT_filepath
-	except BaseException as e:
+	except Exception as e:
 		exception_info = sys.exc_info()
 		err = CapturedException(e, exception_info)
 		print(f"ERROR: encountered exception {err} while trying to perform savemat('{standalone_MAT_filepath}') for {curr_session_context}")
