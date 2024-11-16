@@ -1898,24 +1898,25 @@ class DataFrameFilter:
 			filtered_name: str = f"filtered_{name}"
 			setattr(self, filtered_name, deepcopy(df[df['is_filter_included']]))
 
-		self.output_widget.clear_output()
-		with self.output_widget:
-			# Provide feedback to the user
-			print(f"DataFrames filtered with Replay Name: '{replay_name}' and Time Bin Sizes: {time_bin_sizes}")
-			n_records_dict = {name:len(df) for name, df in self.filtered_df_dict.items()}
-			display(n_records_dict)
-			# n_records: int = len(self.filtered_all_sessions_all_scores_ripple_df)
-			# print(f'n_rows: {n_records}')
-			# self.update_calling_namespace_locals()
-			# display(self.filtered_all_sessions_all_scores_ripple_df.head())
+		# self.output_widget.clear_output()
+		# with self.output_widget:
+		# Provide feedback to the user
+		print(f"DataFrames filtered with Replay Name: '{replay_name}' and Time Bin Sizes: {time_bin_sizes}")
+		n_records_dict = {name:len(df) for name, df in self.filtered_df_dict.items()}
+		display(n_records_dict)
+		# n_records: int = len(self.filtered_all_sessions_all_scores_ripple_df)
+		# print(f'n_rows: {n_records}')
+		# self.update_calling_namespace_locals()
+		# display(self.filtered_all_sessions_all_scores_ripple_df.head())
 
-			for k, a_callback_fn in self.on_filtered_dataframes_changed_callback_fns.items():
-				print(f'k: {k}')
-				try:
-					a_callback_fn(self)
-				except Exception as e:
-					raise
-				
+		for k, a_callback_fn in self.on_filtered_dataframes_changed_callback_fns.items():
+			print(f'k: {k}')
+			try:
+				a_callback_fn(self)
+			except Exception as e:
+				raise
+		
+
 
 	def update_calling_namespace_locals(self):
 		""" dangerous!! Updates the calling namespace (such as a jupyter notebook cell) """
