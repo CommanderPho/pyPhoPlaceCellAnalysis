@@ -1710,7 +1710,17 @@ def parse_filename(path: Path, debug_print:bool=False) -> Tuple[datetime, str, O
     
     """
     filename: str = path.stem   # Get filename without extension
-    final_parsed_output_dict = try_parse_chain(basename=filename)
+    final_parsed_output_dict = try_parse_chain(basename=filename) ## previous implementation
+    
+    export_file_type = (final_parsed_output_dict or {}).get('export_file_type', None)
+    if ((export_file_type is not None) and (export_file_type == '_withNormalComputedReplays')):
+        ## do the new 2024-11-15 19:01 parse instead    
+        print(f'for file "{filename}" using more modern parse method...')
+        final_parsed_output_dict = try_iterative_parse_chain(basename=filename)
+    # if final_parsed_output_dict is None:
+    #     ## this version failed, fall-back to the older implementation
+    #     final_parsed_output_dict = try_parse_chain(basename=filename) ## previous implementation
+    
     if final_parsed_output_dict is None:
         print(f'ERR: Could not parse filename: "{filename}"') # 2024-01-18_GL_t_split_df
         return None, None, None, None, None # used to return ValueError when it couldn't parse, but we'd rather skip unparsable files
