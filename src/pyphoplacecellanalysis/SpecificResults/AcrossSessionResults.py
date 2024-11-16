@@ -1589,7 +1589,7 @@ from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import find_csv
 from typing import Dict, List, Tuple, Optional
 import neuropy.utils.type_aliases as types
 from attrs import define
-from pyphocorehelpers.Filesystem.path_helpers import try_parse_chain # used in `parse_filename`
+from pyphocorehelpers.Filesystem.path_helpers import try_parse_chain, try_iterative_parse_chain # used in `parse_filename`
 
 
 def build_session_t_delta(t_delta_csv_path: Path):
@@ -2881,7 +2881,7 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
                 _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_merged_complete_epoch_stats_df_dict, session_name, curr_session_t_delta, time_key='start', **additional_columns_dict)				
 
             else:
-                print(f'WARN: File type {file_type} not implemented.')
+                print(f'WARN: File type "{file_type}" for filename "{path.name}" not implemented.')
                 # _is_file_valid = False # shouldn't mark unknown files as invalid
                 # File type neuron_replay_stats_df not implemented.
                 # File type laps_marginals_df not implemented.
