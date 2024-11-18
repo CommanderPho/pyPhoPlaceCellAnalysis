@@ -786,8 +786,8 @@ class HeuristicReplayScoring:
             all_epochs_scores_df
 
         """
-        from neuropy.utils.misc import adding_additional_df_columns
-        from neuropy.utils.indexing_helpers import NumpyHelpers
+        
+        from neuropy.utils.indexing_helpers import NumpyHelpers, PandasHelpers
         from pyphoplacecellanalysis.Pho2D.track_shape_drawing import get_track_length_dict
 
         ## INPUTS: track_templates, a_decoded_filter_epochs_decoder_result_dict
@@ -824,7 +824,7 @@ class HeuristicReplayScoring:
             ## once done with all scores for this decoder, have `_a_separate_decoder_new_scores_dict`:
             separate_decoder_new_scores_df[a_name] =  pd.DataFrame(_a_separate_decoder_new_scores_dict)
             assert np.shape(separate_decoder_new_scores_df[a_name])[0] == np.shape(a_result.filter_epochs)[0], f"np.shape(separate_decoder_new_scores_df[a_name])[0]: {np.shape(separate_decoder_new_scores_df[a_name])[0]} != np.shape(a_result.filter_epochs)[0]: {np.shape(a_result.filter_epochs)[0]}"
-            a_result.filter_epochs = adding_additional_df_columns(original_df=a_result.filter_epochs, additional_cols_df=separate_decoder_new_scores_df[a_name]) # update the filter_epochs with the new columns
+            a_result.filter_epochs = PandasHelpers.adding_additional_df_columns(original_df=a_result.filter_epochs, additional_cols_df=separate_decoder_new_scores_df[a_name]) # update the filter_epochs with the new columns
 
         # END for `a_decoded_filter_epochs_decoder_result_dict`
         ## OUTPUTS: all_epochs_scores_dict, all_epochs_scores_df
@@ -842,7 +842,7 @@ class HeuristicReplayScoring:
 
 
         """
-        from neuropy.utils.misc import adding_additional_df_columns
+        from neuropy.utils.indexing_helpers import PandasHelpers
 
         # positions __________________________________________________________________________________________________________ #
         # def directionality_ratio(positions):
@@ -1007,7 +1007,7 @@ class HeuristicReplayScoring:
         for a_name, a_result in a_decoded_filter_epochs_decoder_result_dict.items():
             _out_new_scores[a_name] =  pd.DataFrame([asdict(cls.compute_pho_heuristic_replay_scores(a_result=a_result, an_epoch_idx=an_epoch_idx), filter=lambda a, v: a.name not in ['position_derivatives_df']) for an_epoch_idx in np.arange(a_result.num_filter_epochs)])
             assert np.shape(_out_new_scores[a_name])[0] == np.shape(a_result.filter_epochs)[0], f"np.shape(_out_new_scores[a_name])[0]: {np.shape(_out_new_scores[a_name])[0]} != np.shape(a_result.filter_epochs)[0]: {np.shape(a_result.filter_epochs)[0]}"
-            a_result.filter_epochs = adding_additional_df_columns(original_df=a_result.filter_epochs, additional_cols_df=_out_new_scores[a_name]) # update the filter_epochs with the new columns
+            a_result.filter_epochs = PandasHelpers.adding_additional_df_columns(original_df=a_result.filter_epochs, additional_cols_df=_out_new_scores[a_name]) # update the filter_epochs with the new columns
 
 
         return a_decoded_filter_epochs_decoder_result_dict, _out_new_scores

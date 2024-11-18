@@ -1599,7 +1599,7 @@ def build_single_time_bin_size_dfs(all_sessions_all_scores_epochs_df, all_sessio
 	  
 	 History: 2024-07-15 - Factored out of Across Session Notebook
 	"""
-	from neuropy.utils.misc import add_explicit_dataframe_columns_from_lookup_df
+	from neuropy.utils.indexing_helpers import PandasHelpers
 
 	print(f'all_sessions_ripple_df.time_bin_size.unique(): {all_sessions_epochs_df.time_bin_size.unique()}')
 	single_time_bin_size_all_sessions_epochs_df = deepcopy(all_sessions_epochs_df[np.isclose(all_sessions_epochs_df['time_bin_size'], target_time_bin_size)])
@@ -1618,11 +1618,11 @@ def build_single_time_bin_size_dfs(all_sessions_all_scores_epochs_df, all_sessio
 	single_time_bin_size_all_sessions_epochs_df['delta_aligned_start_t'] = single_time_bin_size_all_sessions_epochs_df['delta_aligned_start_t'].astype(float)
 
 	# Added 'delta_aligned_start_t' for the merge
-	single_time_bin_size_all_sessions_epochs_df = add_explicit_dataframe_columns_from_lookup_df(single_time_bin_size_all_sessions_epochs_df, all_sessions_all_scores_epochs_df[included_columns], join_column_name='delta_aligned_start_t')
+	single_time_bin_size_all_sessions_epochs_df = PandasHelpers.add_explicit_dataframe_columns_from_lookup_df(single_time_bin_size_all_sessions_epochs_df, all_sessions_all_scores_epochs_df[included_columns], join_column_name='delta_aligned_start_t')
 	single_time_bin_size_all_sessions_epochs_df.sort_values(by=['delta_aligned_start_t'], inplace=True) # Need to re-sort by timestamps once done
 	single_time_bin_size_all_sessions_epochs_df
 
-	single_time_bin_size_all_sessions_epochs_time_bin_df = add_explicit_dataframe_columns_from_lookup_df(single_time_bin_size_all_sessions_epochs_time_bin_df, all_sessions_all_scores_epochs_df[included_columns], join_column_name='delta_aligned_start_t')
+	single_time_bin_size_all_sessions_epochs_time_bin_df = PandasHelpers.add_explicit_dataframe_columns_from_lookup_df(single_time_bin_size_all_sessions_epochs_time_bin_df, all_sessions_all_scores_epochs_df[included_columns], join_column_name='delta_aligned_start_t')
 	single_time_bin_size_all_sessions_epochs_time_bin_df.sort_values(by=['t_bin_center'], inplace=True) # Need to re-sort by timestamps once done
 	
 	## Add plotly helper columns:
