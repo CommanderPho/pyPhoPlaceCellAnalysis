@@ -443,9 +443,12 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     if num_unique_time_bin_sizes > 1:
         main_title = main_title + f" - {num_unique_time_bin_sizes} Time Bin Sizes"
         figure_context_dict['n_tbin'] = num_unique_time_bin_sizes
-    else:
+    elif num_unique_time_bin_sizes == 1:
         time_bin_size: float = unique_time_bin_sizes[0]
         main_title = main_title + f" - time bin size: {time_bin_size} sec"
+    else:
+        main_title = main_title + f" - ERR: <No Entries in DataFrame>"
+        
 
     figure_context_dict['title'] = main_title
     if debug_print:
