@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Dict, Callable, Tuple
+from typing import Dict, Callable, List, Tuple
 from attrs import define, field
 import numpy as np
 import pandas as pd
@@ -1685,6 +1685,8 @@ class DataFrameFilter:
 	filtered_all_sessions_laps_time_bin_df: pd.DataFrame = field(init=False, default=None)
 	filtered_all_sessions_MultiMeasure_laps_df: pd.DataFrame = field(init=False, default=None)
 
+	active_plot_df_name: str = field(default='filtered_all_sessions_all_scores_ripple_df')
+	active_plot_variable_name: str = field(default='P_Short')
 
 	additional_filter_predicates = field(default=Factory(dict)) # a list of boolean predicates to be applied as filters
 	on_filtered_dataframes_changed_callback_fns = field(default=Factory(dict)) # a list of callables that will be called when the filters are changed. 
@@ -1694,11 +1696,15 @@ class DataFrameFilter:
 	replay_name_widget = field(init=False)
 	time_bin_size_widget = field(init=False)
 	active_filter_predicate_selector_widget: widgets.SelectMultiple = field(init=False)
+	active_plot_df_name_selector_widget = field(init=False)
+	active_plot_variable_name_widget = field(init=False)
 	
 	output_widget: widgets.Output = field(init=False)
 	figure_widget: go.FigureWidget = field(init=False)
 	table_widget: DataGrid = field(init=False)
 
+
+	# Begin Properties ___________________________________________________________________________________________________ #
 	@property
 	def replay_name(self) -> str:
 		"""The replay_name property."""
@@ -1801,12 +1807,32 @@ class DataFrameFilter:
 
 
 	@property
+	def original_df_names(self) -> List[str]:
+		return sorted(list(self.original_df_dict.keys()))
+	
+	@property
+	def filtered_df_names(self) -> List[str]:
+		return sorted(list(self.filtered_df_dict.keys()))
+	
+	@property
 	def filtered_size_info_df(self) -> pd.DataFrame:
-		"""The original_df_list property."""
-		# num_events: int = len(concatenated_ripple_df)
-		# n_records_dict = {name:len(df) for name, df in self.filtered_df_dict.items()}
+		"""The size of the filtered dataframes with the current filters."""
 		n_records_tuples = [(name, len(df)) for name, df in self.filtered_df_dict.items() if (df is not None)]
 		return pd.DataFrame(n_records_tuples, columns=['df_name', 'n_elements'])
+
+
+	@property
+	def plot_variable_name_options(self) -> List[str]:
+		return sorted(['P_Short', 'best_overall_quantile'])
+	
+
+	@property
+	def active_plot_df(self) -> pd.DataFrame:
+		"""The selected filtered dataframe to use with the plot."""
+		return self.filtered_df_dict[self.active_plot_df_name]
+
+
+
 
 	# ==================================================================================================================== #
 	# Initializers                                                                                                         #
@@ -1825,6 +1851,8 @@ class DataFrameFilter:
 		# Extract unique options for the widgets
 		replay_name_options = sorted(self.all_sessions_ripple_df['custom_replay_name'].astype(str).unique())
 		time_bin_size_options = sorted(self.all_sessions_ripple_df['time_bin_size'].unique())
+		plot_df_name_options = sorted(self.filtered_df_names)
+		plot_variable_name_options = sorted(self.plot_variable_name_options)
 		
 		# Create dropdown widgets with adjusted layout and style
 		self.replay_name_widget = widgets.Dropdown(
@@ -1835,15 +1863,24 @@ class DataFrameFilter:
 			style={'description_width': 'initial'}
 		)
 		
-		# # Use Dropdown widget for single-selection of time_bin_size
-		# self.time_bin_size_widget = widgets.Dropdown(
-		# 	options=time_bin_size_options,
-		# 	description='Time Bin Size:',
-		# 	disabled=False,
-		# 	layout=widgets.Layout(width='200px'),
-		# 	style={'description_width': 'initial'}
-		# )
-	
+		self.active_plot_df_name_selector_widget = widgets.Dropdown(
+			options=plot_df_name_options,
+			description='Plot df Name:',
+			disabled=False,
+			layout=widgets.Layout(width='500px'),
+			style={'description_width': 'initial'}
+		)
+		self.active_plot_df_name_selector_widget.value = self.active_plot_df_name
+		
+		self.active_plot_variable_name_widget = widgets.Dropdown(
+			options=plot_variable_name_options,
+			description='Plot Variable Name:',
+			disabled=False,
+			layout=widgets.Layout(width='300px'),
+			style={'description_width': 'initial'}
+		)
+		self.active_plot_variable_name_widget.value = self.active_plot_variable_name
+		
 		# Use SelectMultiple widget for time_bin_size
 		self.time_bin_size_widget = widgets.SelectMultiple(
 			options=time_bin_size_options,
@@ -1852,15 +1889,14 @@ class DataFrameFilter:
 			layout=widgets.Layout(width='200px', height='100px'),
 			style={'description_width': 'initial'}
 		)
-	
 
 		self.active_filter_predicate_selector_widget = widgets.SelectMultiple(
 			options=list(self.additional_filter_predicates.keys()),
 			value=[],  # Initial selection
 			description='Filter Predicates:',
-			disabled=False
+			disabled=False,
 		)
-		
+
 		self.output_widget = widgets.Output(layout={'border': '1px solid black'})
 		# self.figure_widget = go.FigureWidget()
 		# self.figure_widget = None
@@ -1871,15 +1907,21 @@ class DataFrameFilter:
 		self.replay_name_widget.observe(self._on_widget_change, names='value')
 		self.time_bin_size_widget.observe(self._on_widget_change, names='value')
 		self.active_filter_predicate_selector_widget.observe(self._on_widget_change, names='value')
+		self.active_plot_df_name_selector_widget.observe(self._on_widget_change, names='value')
+		self.active_plot_variable_name_widget.observe(self._on_widget_change, names='value')
 		
+
 		self.table_widget = DataGrid(self.filtered_size_info_df,
 							    base_row_size=15, base_column_size=300,
 								#  renderers=renderers,
 								)
 		# self.table_widget.transform([{"type": "sort", "columnIndex": 2, "desc": True}])
 		
+	
+
 		# Display the widgets
 		display(widgets.VBox([widgets.HBox([self.replay_name_widget, self.time_bin_size_widget, self.active_filter_predicate_selector_widget]),
+						widgets.HBox([self.active_plot_df_name_selector_widget, self.active_plot_variable_name_widget]),
 					   self.output_widget,
 					   self.figure_widget,
 					   self.table_widget,
@@ -1887,6 +1929,10 @@ class DataFrameFilter:
 
 
 	def _on_widget_change(self, change):
+		active_plot_df_name = self.active_plot_df_name_selector_widget.value
+		self.active_plot_df_name = self.active_plot_df_name_selector_widget.value
+		self.active_plot_variable_name = self.active_plot_variable_name_widget.value
+		
 		# Update filtered DataFrames when widget values change
 		self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
 
@@ -1921,6 +1967,8 @@ class DataFrameFilter:
 					except KeyError as e:
 						print(f'failed to apply predicate "{a_predicate_name}" to df: {name}')
 						is_predicate_true = False
+					except Exception as e:
+						raise
 					# is_predicate_true = a_predicate_fn(df)
 					df['is_filter_included'] = (df['is_filter_included'] & is_predicate_true)
 

@@ -534,14 +534,8 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
         
     # already_added_legend_entries = set()  # Keep track of trace names that are already added
 
-    # Determine batch update context
-    if isinstance(fig, go.FigureWidget):
-        batch_update_context = fig.batch_update()
-    else:
-        batch_update_context = contextlib.nullcontext()
 
-    # Begin batch update
-    # with batch_update_context:
+    # already_added_legend_entries = set()  # Keep track of trace names that are already added
 
     # Pre-Delta Histogram
     _tmp_pre_delta_fig = px.histogram(pre_delta_df, y=histogram_variable_name, **common_plot_kwargs, **hist_kwargs, title=pre_delta_label)
