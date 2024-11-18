@@ -203,13 +203,51 @@ class PlotlyFigureContainer:
 			trace.showlegend = True  # This is usually true by default, can be omitted
 		fig.add_trace(trace, row=row, col=col)
 
+	@classmethod
+	def _helper_build_pre_post_delta_figure_if_needed(cls, extant_figure=None, main_title: str='', use_latex_labels: bool = False, figure_class=go.Figure):
+		""" 
+		Usage:
+			from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import PlotlyFigureContainer
+			fig, did_create_new_figure = PlotlyFigureContainer._helper_build_pre_post_delta_figure_if_needed(extant_figure=extant_figure, use_latex_labels=use_latex_labels, main_title=main_title)
+		
+		"""
+		import plotly.subplots as sp
+		import plotly.express as px
+		import plotly.graph_objs as go
 
-@function_attributes(short_name=None, tags=['plotly', 'scatter'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-27 09:07', related_items=[])
+		if use_latex_labels:
+			pre_delta_label: str = r'"$\\text{Pre-}\Delta$"'
+			post_delta_label: str = r'"$\\text{Post-}\Delta$"'
+		else:
+			pre_delta_label: str = 'Pre-delta'
+			post_delta_label: str = 'Post-delta'
+
+		# ==================================================================================================================== #
+		# Build Figure                                                                                                         #
+		# ==================================================================================================================== #
+		# creating subplots
+		has_valid_extant_figure: bool = False
+		if extant_figure is not None:
+			assert isinstance(extant_figure, (go.Figure, go.FigureWidget)), f"extant_figure is not a go.Figure object, instead it is of type: {type(extant_figure)}"
+			fig = extant_figure ## reuse the extant figure
+			has_valid_extant_figure = True
+			
+		if not has_valid_extant_figure:	
+			## create a new figure if needed:
+			fig = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=[pre_delta_label, main_title, post_delta_label], figure_class=figure_class) ## figure created here, using `go.FigureWidget`
+		
+		did_create_new_figure: bool = (not has_valid_extant_figure)
+		return fig, did_create_new_figure
+
+
+
+@function_attributes(short_name=None, tags=['plotly', 'scatter'], input_requires=[], output_provides=[], uses=['PlotlyFigureContainer'], used_by=[], creation_date='2024-05-27 09:07', related_items=[])
 def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: Optional[IdentifyingContext]=None, out_scatter_fig=None, histogram_bins:int=25,
 								   common_plot_kwargs=None, px_scatter_kwargs=None,
 								   histogram_variable_name='P_Long', hist_kwargs=None,
 								   forced_range_y=[0.0, 1.0], time_delta_tuple=None, is_dark_mode: bool = True,
 								   figure_sup_huge_title_text: str=None, is_top_supertitle: bool = False, figure_footer_text: Optional[str]=None,
+								   extant_figure=None, # an existing plotly figure
 								    curr_fig_width=1800,
 									**kwargs):
 	""" Plots a scatter plot of a variable pre/post delta, with a histogram on each end corresponding to the pre/post delta distribution
@@ -376,7 +414,8 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
 	# Build Figure                                                                                                         #
 	# ==================================================================================================================== #
 	# creating subplots
-	fig = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=[pre_delta_label, main_title, post_delta_label]) ## figure created here?
+	fig, did_create_new_figure = PlotlyFigureContainer._helper_build_pre_post_delta_figure_if_needed(extant_figure=extant_figure, use_latex_labels=use_latex_labels, main_title=main_title)
+	
 	already_added_legend_entries = set()  # Keep track of trace names that are already added
 
 	# Pre-Delta Histogram ________________________________________________________________________________________________ #

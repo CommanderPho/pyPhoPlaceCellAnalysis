@@ -1634,6 +1634,9 @@ def build_single_time_bin_size_dfs(all_sessions_all_scores_epochs_df, all_sessio
 	return single_time_bin_size_all_sessions_epochs_df, single_time_bin_size_all_sessions_epochs_time_bin_df
 
 
+
+import plotly.graph_objects as go
+
 @define(slots=False, eq=False)
 class DataframeFilterPredicates:
 	is_enabled: bool = field(default=True)
@@ -1659,26 +1662,26 @@ class DataFrameFilter:
 
 	"""
 	# Original DataFrames passed during initialization
-	all_sessions_ripple_df = field()
-	all_sessions_ripple_time_bin_df = field()
-	all_sessions_MultiMeasure_ripple_df = field()
-	all_sessions_all_scores_ripple_df = field()
+	all_sessions_ripple_df: pd.DataFrame = field()
+	all_sessions_ripple_time_bin_df: pd.DataFrame = field()
+	all_sessions_MultiMeasure_ripple_df: pd.DataFrame = field()
+	all_sessions_all_scores_ripple_df: pd.DataFrame = field()
 
 	# Original DataFrames for laps
-	all_sessions_laps_df = field()
-	all_sessions_laps_time_bin_df = field()
-	all_sessions_MultiMeasure_laps_df = field()
+	all_sessions_laps_df: pd.DataFrame = field()
+	all_sessions_laps_time_bin_df: pd.DataFrame = field()
+	all_sessions_MultiMeasure_laps_df: pd.DataFrame = field()
 
 	# Filtered DataFrames (initialized to None)
-	filtered_all_sessions_ripple_df = field(init=False, default=None)
-	filtered_all_sessions_ripple_time_bin_df = field(init=False, default=None)
-	filtered_all_sessions_MultiMeasure_ripple_df = field(init=False, default=None)
-	filtered_all_sessions_all_scores_ripple_df = field(init=False, default=None)
+	filtered_all_sessions_ripple_df: pd.DataFrame = field(init=False, default=None)
+	filtered_all_sessions_ripple_time_bin_df: pd.DataFrame = field(init=False, default=None)
+	filtered_all_sessions_MultiMeasure_ripple_df: pd.DataFrame = field(init=False, default=None)
+	filtered_all_sessions_all_scores_ripple_df: pd.DataFrame = field(init=False, default=None)
 
 	# Filtered DataFrames for laps
-	filtered_all_sessions_laps_df = field(init=False, default=None)
-	filtered_all_sessions_laps_time_bin_df = field(init=False, default=None)
-	filtered_all_sessions_MultiMeasure_laps_df = field(init=False, default=None)
+	filtered_all_sessions_laps_df: pd.DataFrame = field(init=False, default=None)
+	filtered_all_sessions_laps_time_bin_df: pd.DataFrame = field(init=False, default=None)
+	filtered_all_sessions_MultiMeasure_laps_df: pd.DataFrame = field(init=False, default=None)
 
 
 	additional_filter_predicates = field(default=Factory(dict)) # a list of boolean predicates to be applied as filters
@@ -1691,6 +1694,7 @@ class DataFrameFilter:
 	active_filter_predicate_selector_widget: widgets.SelectMultiple = field(init=False)
 	
 	output_widget: widgets.Output = field(init=False)
+	figure_widget: go.FigureWidget = field(init=False)
 	
 
 	@property
@@ -1805,6 +1809,9 @@ class DataFrameFilter:
 
 
 	def _setup_widgets(self):
+		import plotly.subplots as sp
+		from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import PlotlyFigureContainer
+		
 		# Extract unique options for the widgets
 		replay_name_options = sorted(self.all_sessions_ripple_df['custom_replay_name'].astype(str).unique())
 		time_bin_size_options = sorted(self.all_sessions_ripple_df['time_bin_size'].unique())
@@ -1845,6 +1852,10 @@ class DataFrameFilter:
 		)
 		
 		self.output_widget = widgets.Output(layout={'border': '1px solid black'})
+		# self.figure_widget = go.FigureWidget()
+		# self.figure_widget = None
+		# self.figure_widget = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=[pre_delta_label, main_title, post_delta_label], figure_class=go.FigureWidget) ## figure created here?
+		self.figure_widget, did_create_new_figure = PlotlyFigureContainer._helper_build_pre_post_delta_figure_if_needed(extant_figure=None, use_latex_labels=False, main_title='test', figure_class=go.FigureWidget)
 		
 		# Set up observers to handle changes in widget values
 		self.replay_name_widget.observe(self._on_widget_change, names='value')
@@ -1854,6 +1865,7 @@ class DataFrameFilter:
 		# Display the widgets
 		display(widgets.VBox([widgets.HBox([self.replay_name_widget, self.time_bin_size_widget, self.active_filter_predicate_selector_widget]),
 					   self.output_widget,
+					   self.figure_widget,
 					   ]))
 
 
@@ -2085,7 +2097,7 @@ def _perform_dual_hist_plot(grainularity_desc: str, laps_df: pd.DataFrame, rippl
 
 
 @function_attributes(short_name=None, tags=['MAIN', 'CRITICAL', 'FINAL', 'plotly'], input_requires=[], output_provides=[], uses=['plotly_pre_post_delta_scatter'], used_by=[], creation_date='2024-10-23 20:04', related_items=[])
-def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, concatenated_ripple_df: pd.DataFrame, time_delta_tuple: Tuple[float, float, float], fig_size_kwargs: Dict, save_plotly: Callable, is_dark_mode: bool=False, enable_custom_widget_buttons:bool=True, custom_output_widget=None, legend_groups_to_hide=['0.03', '0.044', '0.05'], should_save: bool = True, variable_name = 'P_Short'):
+def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, concatenated_ripple_df: pd.DataFrame, time_delta_tuple: Tuple[float, float, float], fig_size_kwargs: Dict, save_plotly: Callable, is_dark_mode: bool=False, enable_custom_widget_buttons:bool=True, extant_figure=None, custom_output_widget=None, legend_groups_to_hide=['0.03', '0.044', '0.05'], should_save: bool = True, variable_name = 'P_Short'):
 	""" plots the stacked histograms for both laps and ripples
 
 	Usage:
@@ -2127,26 +2139,6 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
 	# Define the legend groups you want to hide on startup
 	legend_groups_to_hide = ['0.03', '0.044', '0.05'] # '0.025', , '0.058'
 
-	# variable_name = 'P_LR'
-	# variable_name = 'P_Long'
-	 # Shows expected effect - short-only replay prior to delta and then split replays post-delta
-	# variable_name = 'short_best_wcorr'
-	# variable_name = 'long_best_pf_peak_x_pearsonr'
-	# variable_name = 'long_best_jump'
-	# variable_name = 'wcorr_abs_diff'
-	# variable_name = 'short_best_wcorr'
-	# variable_name = 'wcorr_long_LR'
-	# variable_name = 'pearsonr_abs_diff'
-	# variable_name = 'direction_change_bin_ratio_diff'
-	# variable_name = 'longest_sequence_length_ratio_diff'
-	# variable_name = 'long_best_longest_sequence_length_ratio'
-	# variable_name = 'long_best_congruent_dir_bins_ratio'
-	# variable_name = 'congruent_dir_bins_ratio_diff'
-	# variable_name = 'total_congruent_direction_change_diff'
-	# variable_name = 'long_best_congruent_dir_bins_ratio'
-	# variable_name = 'long_best_direction_change_bin_ratio'
-	# variable_name = 'long_best_congruent_dir_bins_ratio'
-
 	y_baseline_level: float = 0.5 # for P(short), etc
 	# y_baseline_level: float = 0.0 # for wcorr, etc
 
@@ -2178,6 +2170,7 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
 
 
 	new_fig, new_fig_context = plotly_pre_post_delta_scatter(data_results_df=concatenated_ripple_df, data_context=data_context,
+														  	extant_figure=extant_figure,
 							out_scatter_fig=None, histogram_bins=histogram_bins,
 							px_scatter_kwargs=px_scatter_kwargs, histogram_variable_name=variable_name, hist_kwargs=hist_kwargs, forced_range_y=None,
 							time_delta_tuple=time_delta_tuple, legend_title_text=None, is_dark_mode=is_dark_mode,
