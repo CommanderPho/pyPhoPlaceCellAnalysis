@@ -420,8 +420,11 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
 	# ==================================================================================================================== #
 	# creating subplots
 	fig, did_create_new_figure = PlotlyFigureContainer._helper_build_pre_post_delta_figure_if_needed(extant_figure=extant_figure, use_latex_labels=use_latex_labels, main_title=main_title)
-	
-	already_added_legend_entries = set()  # Keep track of trace names that are already added
+	## use `did_create_new_figure` to prevent duplicate traces in legend:
+	legend_entries = [trace.name for trace in fig.data if trace.showlegend]
+	already_added_legend_entries = set(legend_entries)
+
+	# already_added_legend_entries = set()  # Keep track of trace names that are already added
 
 	# Pre-Delta Histogram ________________________________________________________________________________________________ #
 	# adding first histogram
