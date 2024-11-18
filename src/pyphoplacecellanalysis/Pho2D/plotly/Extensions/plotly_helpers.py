@@ -116,19 +116,23 @@ def add_copy_save_action_buttons(fig: go.Figure, output_widget=None):
     button_download.on_click(on_download_button_click)
     
     # Create an output widget to hold the figure
-    if output_widget is None:
-        output_widget = widgets.Output()
+    # if output_widget is None:
+    #     output_widget = widgets.Output()
+    assert output_widget is None
     
     # with output_widget:
     # 	fig.show()
     # display(widgets.HBox([widgets.HBox([button_copy, button_download]), output_widget]))
     
     # Create the container widget but do not directly display it
-    container = widgets.VBox([widgets.HBox([button_copy, button_download, filename_label]), output_widget])
+    buttons_container = widgets.HBox([button_copy, button_download, filename_label])
+    
+    # container = widgets.VBox([buttons_container, output_widget])
     # Display buttons with filename label to the right of the buttons
     # display(widgets.VBox([widgets.HBox([button_copy, button_download, filename_label]), output_widget]))
     # display(container)
-    return container, output_widget
+    # return buttons_container, container, output_widget
+    return buttons_container
 
 
 @function_attributes(short_name=None, tags=['plotly', 'export', 'save'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-27 17:59', related_items=[])

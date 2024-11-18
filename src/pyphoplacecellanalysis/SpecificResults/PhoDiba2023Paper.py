@@ -1637,6 +1637,7 @@ def build_single_time_bin_size_dfs(all_sessions_all_scores_epochs_df, all_sessio
 
 import plotly.graph_objects as go
 from ipydatagrid import Expr, DataGrid, TextRenderer, BarRenderer # for use in DataFrameFilter
+from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import add_copy_save_action_buttons
 
 
 @define(slots=False, eq=False)
@@ -1903,6 +1904,10 @@ class DataFrameFilter:
 		# self.figure_widget = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=[pre_delta_label, main_title, post_delta_label], figure_class=go.FigureWidget) ## figure created here?
 		self.figure_widget, did_create_new_figure = PlotlyFigureContainer._helper_build_pre_post_delta_figure_if_needed(extant_figure=None, use_latex_labels=False, main_title='test', figure_class=go.FigureWidget)
 		
+		extra_button_widgets = add_copy_save_action_buttons(fig=self.figure_widget)
+		
+
+
 		# Set up observers to handle changes in widget values
 		self.replay_name_widget.observe(self._on_widget_change, names='value')
 		self.time_bin_size_widget.observe(self._on_widget_change, names='value')
@@ -1924,6 +1929,7 @@ class DataFrameFilter:
 						widgets.HBox([self.active_plot_df_name_selector_widget, self.active_plot_variable_name_widget]),
 					   self.output_widget,
 					   self.figure_widget,
+					   extra_button_widgets,
 					   self.table_widget,
 					   ]))
 
@@ -2274,9 +2280,9 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
 		
 	if enable_custom_widget_buttons:
 		# _extras_output_dict['out_widget'] = add_copy_save_action_buttons(new_fig)
-		_extras_output_dict['out_container_widget'], _extras_output_dict['out_widget'] = add_copy_save_action_buttons(new_fig, output_widget=custom_output_widget)
+		# _extras_output_dict['out_container_widget'], _extras_output_dict['out_widget'] = add_copy_save_action_buttons(new_fig, output_widget=custom_output_widget)
+		_extras_output_dict['custom_widget_buttons'] = add_copy_save_action_buttons(new_fig)
 		
 
-	
 	return new_fig, new_fig_context, _extras_output_dict, figure_out_paths
 
