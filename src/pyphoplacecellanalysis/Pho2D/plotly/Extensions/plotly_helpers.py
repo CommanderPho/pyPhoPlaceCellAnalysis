@@ -202,8 +202,36 @@ class PlotlyFigureContainer:
             already_added_legend_entries.add(trace_name)
             trace.showlegend = True  # This is usually true by default, can be omitted
             
+        # trace.legend = trace_name
+        
         trace.name = '_'.join([v for v in [trace_name_prefix, trace.name] if (len(v)>0)]) ## build new trace name
         fig.add_trace(trace, row=row, col=col) # , name=trace_name
+        
+
+    @classmethod
+    def add_or_update_trace_with_legend_handling(cls, fig, trace, row, col, already_added_legend_entries, trace_name_prefix):
+        """ Adds a trace to the figure while managing legend entries to avoid duplicates. """
+        a_full_trace_name: str = '_'.join([v for v in [trace_name_prefix, trace.name] if (len(v)>0)]) ## build new trace name
+        # fig.update_trace(
+        fig.update_traces(patch=trace,
+				  selector={'name': a_full_trace_name}, row=row, col=col)
+        
+        
+                  
+                  
+        trace_name = trace.name
+        trace.legendgroup = trace_name  # Set the legend group so all related traces can be toggled together
+        if trace_name in already_added_legend_entries:
+            # For already added trace categories, set showlegend to False
+            trace.showlegend = False
+        else:
+            # For the first trace of each category, keep showlegend as True
+            already_added_legend_entries.add(trace_name)
+            trace.showlegend = True  # This is usually true by default, can be omitted
+            
+        trace.name = '_'.join([v for v in [trace_name_prefix, trace.name] if (len(v)>0)]) ## build new trace name
+        fig.add_trace(trace, row=row, col=col) # , name=trace_name
+        
         
         
 
@@ -528,9 +556,6 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     # ==================================================================================================================== #
     # creating subplots
     fig, did_create_new_figure = PlotlyFigureContainer._helper_build_pre_post_delta_figure_if_needed(extant_figure=extant_figure, use_latex_labels=use_latex_labels, main_title=main_title)
-    ## use `did_create_new_figure` to prevent duplicate traces in legend:
-    legend_entries = [trace.name for trace in fig.data if trace.showlegend]
-    already_added_legend_entries = set(legend_entries)
 
     if not did_create_new_figure:
         ## need to update properties of the existing figure:
@@ -538,7 +563,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
         # fig.layout.annotations = [] ## clear initial annotations
         fig.layout.annotations = fig.layout.annotations[:3] # only the first 3 annotations
         fig.layout.shapes = []
-        fig.data = [] ## clear all data
+        fig.data = [] ## clear all data/traces
         
         # fig.update_layout(
         #     annotations=[],
@@ -549,10 +574,17 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
         # PlotlyFigureContainer.clear_subplot(fig=fig, row=1, col=3)
 
 
+    ## use `did_create_new_figure` to prevent duplicate traces in legend:
+    legend_entries = [trace.name for trace in fig.data if trace.showlegend]
+    # legend_entries = list(set([trace.legendgroup for trace in fig.data if trace.showlegend]))
+    already_added_legend_entries = set(legend_entries)
+    
     # already_added_legend_entries = set()  # Keep track of trace names that are already added
-
+    # print(f'already_added_legend_entries: {already_added_legend_entries}')
+    
     # Pre-Delta Histogram
-    trace_name_prefix:str = 'trace_pre_delta_hist'
+    # trace_name_prefix:str = 'trace_pre_delta_hist'
+    trace_name_prefix:str = ''
     _tmp_pre_delta_fig = px.histogram(pre_delta_df, y=histogram_variable_name, **common_plot_kwargs, **hist_kwargs, title=pre_delta_label)
     for a_trace in _tmp_pre_delta_fig.data:
         a_trace.xbins.start = 0.05
@@ -573,7 +605,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
             a_trace.marker.opacity = 0.5
             a_full_trace_name: str = '_'.join([v for v in [trace_name_prefix, a_trace.name] if (len(v)>0)]) ## build new trace name
             PlotlyFigureContainer.add_trace_with_legend_handling(
-                fig=fig, trace=a_trace, row=1, col=2, already_added_legend_entries=already_added_legend_entries
+                fig=fig, trace=a_trace, row=1, col=2, already_added_legend_entries=already_added_legend_entries, trace_name_prefix=trace_name_prefix
             )
     else:
         assert px_scatter_kwargs is not None

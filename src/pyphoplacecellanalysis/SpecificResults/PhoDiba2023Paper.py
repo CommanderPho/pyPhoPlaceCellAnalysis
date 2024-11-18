@@ -1990,7 +1990,7 @@ class DataFrameFilter:
 		self.table_widget.data = self.filtered_size_info_df
 		
 		for k, a_callback_fn in self.on_filtered_dataframes_changed_callback_fns.items():
-			print(f'k: {k}')
+			# print(f'k: {k}')
 			try:
 				a_callback_fn(self)
 			except Exception as e:
@@ -2201,7 +2201,7 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
 	num_sessions = 1
 
 	num_events: int = len(concatenated_ripple_df)
-	print(f'num_events: {num_events}')
+	# print(f'num_events: {num_events}')
 	data_context.overwriting_context(n_events=num_events) # adds 'n_events' context
 	# .025 .03 .044 .05 .058
 	# Define the legend groups you want to hide on startup
