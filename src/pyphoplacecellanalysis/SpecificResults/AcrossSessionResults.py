@@ -3284,7 +3284,156 @@ class AcrossSessionsVisualizations:
 
 
 
+class AcrossSessionHelpers:
+    """ contains helper methods for loading and using AcrossSession outputs
+    
+    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionHelpers
+    
+    
+    """
+    @function_attributes(short_name=None, tags=['merge', 'correlation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-18 11:33', related_items=[])
+    @classmethod
+    def _subfn_perform_add_merged_complete_epoch_stats_df(cls, a_paired_main_ripple_df: pd.DataFrame, an_all_sessions_merged_complete_epoch_stats_df: pd.DataFrame):
+        """ adds the columns ['Long_BestDir_quantile', 'Short_BestDir_quantile', 'best_overall_quantile'] to the dataframe `a_paired_main_ripple_df`
 
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionHelpers
+        an_all_sessions_merged_complete_epoch_stats_df = AcrossSessionHelpers._subfn_perform_add_merged_complete_epoch_stats_df(a_paired_main_ripple_df=deepcopy(all_sessions_all_scores_ripple_df), an_all_sessions_merged_complete_epoch_stats_df=deepcopy(all_sessions_merged_complete_epoch_stats_df))
+        an_all_sessions_merged_complete_epoch_stats_df
+
+        """
+        from pyphocorehelpers.DataStructure.data_structure_builders import cartesian_product
+        from neuropy.utils.indexing_helpers import NumpyHelpers
+        
+        # an_all_sessions_merged_complete_epoch_stats_df['best_overall_quantile']
+        len(an_all_sessions_merged_complete_epoch_stats_df)
+        if 'best_overall_quantile' not in an_all_sessions_merged_complete_epoch_stats_df.columns:
+            an_all_sessions_merged_complete_epoch_stats_df['best_overall_quantile'] = np.nanmax(an_all_sessions_merged_complete_epoch_stats_df[['Long_BestDir_quantile', 'Short_BestDir_quantile']], axis=1)
+
+        assert (a_paired_main_ripple_df['ripple_start_t'] == a_paired_main_ripple_df['start']).all()
+        # a_paired_main_ripple_df[['start', 'stop']]
+
+        # Shared columns for comparison
+        comparison_must_match_column_names = ['custom_replay_name', 'session_name', 'start', 'stop']
+        comparison_must_match_non_temporal_column_names = ['custom_replay_name', 'session_name']
+        desired_transfer_col_names = ['Long_BestDir_quantile', 'Short_BestDir_quantile', 'best_overall_quantile']
+
+        df1 = deepcopy(a_paired_main_ripple_df)
+        df2 = deepcopy(an_all_sessions_merged_complete_epoch_stats_df)
+
+        _preferred_form_session_names = deepcopy(df1['session_name'].unique()) ## the one with underscores like "kdiba_gor01_one_2006-6-08_14-26-15"
+        df1['session_name'] = df1['session_name'].str.replace('_','-') # replace both with hyphens so they match
+        df2['session_name'] = df2['session_name'].str.replace('_','-') # replace both with hyphens so they match
+
+        _compare_form_session_names = deepcopy(df1['session_name'].unique())
+        _compare_to_preferred_session_name_map = dict(zip(_compare_form_session_names, _preferred_form_session_names)) # used to replace desired session names when done
+
+        df1_unique_values_dict = {k:deepcopy(df1[k].unique().tolist()) for k in comparison_must_match_non_temporal_column_names}
+        df2_unique_values_dict = {k:deepcopy(df2[k].unique().tolist()) for k in comparison_must_match_non_temporal_column_names}
+
+        combined_shared_unique_values_dict = {}
+        for k in comparison_must_match_non_temporal_column_names:
+            combined_shared_unique_values_dict[k] = tuple(set(df1_unique_values_dict[k]).intersection(df2_unique_values_dict[k]))
+            
+
+        combined_shared_unique_value_tuples = cartesian_product(list(combined_shared_unique_values_dict.values()))
+        # combined_shared_unique_value_tuples
+        # matching_df1_update_tuples = []
+
+        for a_values_tuple in combined_shared_unique_value_tuples:
+            a_values_dict = dict(zip(comparison_must_match_non_temporal_column_names, a_values_tuple))
+            # a_values_dict
+            df1_matches_all_conditions = NumpyHelpers.logical_generic(np.logical_and, *[df1[k] == v for k, v in a_values_dict.items()])
+            df2_matches_all_conditions = NumpyHelpers.logical_generic(np.logical_and, *[df2[k] == v for k, v in a_values_dict.items()])
+            active_df1 = df1[df1_matches_all_conditions][comparison_must_match_column_names]
+            active_df2 = df2[df2_matches_all_conditions][comparison_must_match_column_names + desired_transfer_col_names]
+            # (active_df1.shape, active_df2.shape)
+            ## drop duplicates    
+            # active_df1 = active_df1.drop_duplicates(ignore_index=True) # df1 should have duplicates for each time_bin_size
+            active_df2 = active_df2.drop_duplicates(ignore_index=True) # df2 should have no duplicates. 
+            active_df2 = active_df2.drop_duplicates(ignore_index=True, subset=['start', 'stop'])
+            # (active_df1.shape, active_df2.shape)
+            ## for each start, stop in `active_df2`, find matching values in active_df1
+            for a_row in active_df2.itertuples(index=True):
+                is_df1_row_matching = NumpyHelpers.logical_generic(np.logical_and, *[(active_df1['start'] == a_row.start), (active_df1['stop'] == a_row.stop)])
+                _df1_row_matching_indicies = active_df1[is_df1_row_matching].index ## get the indicies
+                ## perform the update inline:
+                df1.loc[_df1_row_matching_indicies, 'Long_BestDir_quantile'] = a_row.Long_BestDir_quantile
+                df1.loc[_df1_row_matching_indicies, 'Short_BestDir_quantile'] = a_row.Short_BestDir_quantile
+                df1.loc[_df1_row_matching_indicies, 'best_overall_quantile'] = a_row.best_overall_quantile
+                
+                a_paired_main_ripple_df.loc[_df1_row_matching_indicies, 'Long_BestDir_quantile'] = a_row.Long_BestDir_quantile
+                a_paired_main_ripple_df.loc[_df1_row_matching_indicies, 'Short_BestDir_quantile'] = a_row.Short_BestDir_quantile
+                a_paired_main_ripple_df.loc[_df1_row_matching_indicies, 'best_overall_quantile'] = a_row.best_overall_quantile
+                
+                # matching_df1_update_tuples.append([_df1_row_matching_indicies, a_row.Long_BestDir_quantile, a_row.Short_BestDir_quantile])
+                
+            # unique_start_stop = active_df2[['start', 'stop']].unique()
+            # unique_start_stop
+            
+        # a_paired_main_ripple_df = df1
+        return a_paired_main_ripple_df
+
+    @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-13 00:00', related_items=[])
+    @classmethod
+    def _older_subfn_perform_add_merged_complete_epoch_stats_df(cls, a_paired_main_ripple_df: pd.DataFrame, an_all_sessions_merged_complete_epoch_stats_df: pd.DataFrame, t_delta_dict=None):
+        """ adds the columns ['Long_BestDir_quantile', 'Short_BestDir_quantile', 'best_overall_quantile'] to the dataframe `a_paired_main_ripple_df`
+        
+        """
+        # all_sessions_merged_complete_epoch_stats_df['time_bin_size'] = 0.25 # 'time_bin_size', 'session_experience_rank', 'session_experience_orientation_rank', 'custom_replay_name'-- all missing for this df
+        # all_sessions_merged_complete_epoch_stats_df['custom_replay_name'] = 'withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2, 4, 6, 7, 9]'
+        # all_sessions_merged_complete_epoch_stats_df['Long_BestDir_quantile'] # 'Long_BestDir_quantile', 'Short_BestDir_quantile'
+        a_paired_main_ripple_df = deepcopy(a_paired_main_ripple_df)
+        an_all_sessions_merged_complete_epoch_stats_df = deepcopy(an_all_sessions_merged_complete_epoch_stats_df)
+        
+        an_all_sessions_merged_complete_epoch_stats_df = an_all_sessions_merged_complete_epoch_stats_df[an_all_sessions_merged_complete_epoch_stats_df['custom_replay_name'] != ''] # only non-blank values
+
+        ## need to match 'start' and the other
+        # all_sessions_merged_complete_epoch_stats_relevant_df: pd.DataFrame = deepcopy(all_sessions_merged_complete_epoch_stats_df.epochs.matching_epoch_times_slice(epoch_times=all_sessions_all_scores_ripple_df.ripple_start_t))
+        all_sessions_merged_complete_epoch_stats_relevant_df: pd.DataFrame = deepcopy(an_all_sessions_merged_complete_epoch_stats_df.epochs.matching_epoch_times_slice(epoch_times=a_paired_main_ripple_df.ripple_start_t))
+        
+        ## INPUTS: all_sessions_merged_complete_epoch_stats_relevant_df
+        # all_sessions_merged_complete_epoch_stats_relevant_df # 'Long_BestDir_quantile', 'Short_BestDir_quantile'
+        
+        if 'delta_aligned_start_t' not in all_sessions_merged_complete_epoch_stats_relevant_df.columns:
+            session_name_t_delta_dict = {'_'.join(k.split('_')[-2:]):v['t_delta'] for k, v in t_delta_dict.items()} # '2006-6-08_21-16-25'
+            all_sessions_merged_complete_epoch_stats_relevant_df['delta_aligned_start_t'] = all_sessions_merged_complete_epoch_stats_relevant_df['start'] - all_sessions_merged_complete_epoch_stats_relevant_df['session_name'].map(lambda x: session_name_t_delta_dict[x])
+        all_sessions_merged_complete_epoch_stats_relevant_df['best_overall_quantile'] = np.nanmax(all_sessions_merged_complete_epoch_stats_relevant_df[['Long_BestDir_quantile', 'Short_BestDir_quantile']], axis=1)
+
+
+        ## INPUTS: df_filter, all_sessions_merged_complete_epoch_stats_relevant_df, 
+
+        #TODO 2024-11-15 12:02: - [ ] We also need to constrain based on the time_bin_size and replay_name in addition to just searching for matching epoch start times.
+
+        initial_row_count: int = len(a_paired_main_ripple_df)
+        print(f'initial_row_count: {initial_row_count}')
+        # relevent_column_names = ['start', 'stop', 'label', 'duration', 'LR_Long_ActuallyIncludedAclus', 'LR_Long_rel_num_cells', 'RL_Long_ActuallyIncludedAclus', 'RL_Long_rel_num_cells', 'LR_Short_ActuallyIncludedAclus', 'LR_Short_rel_num_cells', 'RL_Short_ActuallyIncludedAclus', 'RL_Short_rel_num_cells', 'combined_best_direction_indicies', 'long_relative_direction_likelihoods', 'short_relative_direction_likelihoods', 'long_best_direction_indices', 'short_best_direction_indices', 'LR_Short_spearman', 'LR_Long_spearman', 'RL_Short_pearson', 'RL_Long_spearman', 'LR_Short_pearson', 'RL_Long_pearson', 'LR_Long_pearson', 'RL_Short_spearman', 'LR_Short_spearman_Z', 'LR_Long_spearman_Z', 'RL_Short_pearson_Z', 'RL_Long_spearman_Z', 'LR_Short_pearson_Z', 'RL_Long_pearson_Z', 'LR_Long_pearson_Z', 'RL_Short_spearman_Z', 'Long_BestDir_spearman', 'Short_BestDir_spearman', 'LR_Short_spearman_percentile', 'LR_Long_spearman_percentile', 'RL_Short_pearson_percentile', 'RL_Long_spearman_percentile', 'LR_Short_pearson_percentile', 'RL_Long_pearson_percentile', 'LR_Long_pearson_percentile', 'RL_Short_spearman_percentile', 'LR_Long_percentile', 'RL_Long_percentile', 'LR_Short_percentile', 'RL_Short_percentile', 'Long_BestDir_quantile', 'Short_BestDir_quantile', 'LongShort_BestDir_quantile_diff', 'LongShort_LR_quantile_diff', 'LongShort_RL_quantile_diff', 'session_name', 'custom_replay_name', 'time_bin_size', 'session_experience_rank', 'session_experience_orientation_rank', 'is_novel_exposure', 'delta_aligned_start_t', 'best_overall_quantile']
+        relevent_column_names = ['start', 'stop', 'label', 'duration', 'delta_aligned_start_t', 'Long_BestDir_quantile', 'Short_BestDir_quantile', 'best_overall_quantile']
+        shuffle_column_names = ['Long_BestDir_quantile', 'Short_BestDir_quantile', 'best_overall_quantile']
+        # paired_main_ripple_df.delta_aligned_start_t
+
+        # paired_main_ripple_df.start
+
+        # all_sessions_merged_complete_epoch_stats_relevant_df.start
+
+        ## Just need to obtain shuffle scores for each of the epochs in the filtered df:
+        filtered_temp: pd.DataFrame = all_sessions_merged_complete_epoch_stats_relevant_df.loc[all_sessions_merged_complete_epoch_stats_relevant_df.epochs.find_data_indicies_from_epoch_times(a_paired_main_ripple_df.start)].reset_index(drop=True)[relevent_column_names] ## get only the matching entries
+        # filtered_temp
+        # print(list(filtered_temp.columns))
+        ## Filll NaNs first:
+        a_paired_main_ripple_df[shuffle_column_names] = np.nan
+
+        ## Need to assign to `df_filter.all_sessions_MultiMeasure_ripple_df`
+        _relevent_indexes = a_paired_main_ripple_df.epochs.find_data_indicies_from_epoch_times(filtered_temp.start) # indexes into `paired_main_ripple_df`, but wait, not all indicies are guarnateed to be in here right?
+        # _relevent_indexes
+
+        ## Sanity checks:
+        # len(_relevent_indexes)
+        assert np.sum(np.isnan(_relevent_indexes)) == 0 # no NaNs
+        assert np.sum(_relevent_indexes < 0) == 0 # no -1 (not found sentinal value)s
+        ## assign the relevent values
+        a_paired_main_ripple_df.loc[_relevent_indexes, shuffle_column_names] = deepcopy(filtered_temp[shuffle_column_names]) ## only copy the shuffle columns
+        assert initial_row_count == len(a_paired_main_ripple_df)
+        return a_paired_main_ripple_df
 
 
 # ==================================================================================================================== #
