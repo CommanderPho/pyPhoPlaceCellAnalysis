@@ -234,8 +234,13 @@ class PlotlyFigureContainer:
 			
 		if not has_valid_extant_figure:	
 			## create a new figure if needed:
-			fig = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=[pre_delta_label, main_title, post_delta_label], figure_class=figure_class) ## figure created here, using `go.FigureWidget`
-		
+			if figure_class == go.Figure:
+				fig = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=[pre_delta_label, main_title, post_delta_label]) ## figure created here, using `go.FigureWidget`
+			elif figure_class == go.FigureWidget:
+				fig = go.FigureWidget().set_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=[pre_delta_label, main_title, post_delta_label])
+			else:
+				raise NotImplementedError(f'Unknown figure_class: {figure_class}')
+				
 		did_create_new_figure: bool = (not has_valid_extant_figure)
 		return fig, did_create_new_figure
 
