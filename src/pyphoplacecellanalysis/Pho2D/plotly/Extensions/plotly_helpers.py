@@ -267,9 +267,12 @@ class PlotlyFigureContainer:
     @classmethod
     def clear_subplot(cls, fig, row, col):
         # Get the axis IDs for the specified subplot
-        xaxis_key = fig.get_subplot(row, col)['xaxis']
-        yaxis_key = fig.get_subplot(row, col)['yaxis']
-
+        # xaxis_key = fig.get_subplot(row, col)['xaxis']
+        # yaxis_key = fig.get_subplot(row, col)['yaxis']
+        a_subplot = fig.get_subplot(row, col)
+        xaxis_key: str = a_subplot.xaxis.plotly_name # 'xaxis'
+        yaxis_key: str = a_subplot.yaxis.plotly_name # 'yaxis'
+        
         # Map 'xaxis1' -> 'x1', 'xaxis' -> 'x', etc.
         xaxis_id = xaxis_key.replace('xaxis', 'x')
         yaxis_id = yaxis_key.replace('yaxis', 'y')
