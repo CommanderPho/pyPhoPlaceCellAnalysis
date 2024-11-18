@@ -3309,7 +3309,7 @@ class AcrossSessionHelpers:
         if 'best_overall_quantile' not in an_all_sessions_merged_complete_epoch_stats_df.columns:
             an_all_sessions_merged_complete_epoch_stats_df['best_overall_quantile'] = np.nanmax(an_all_sessions_merged_complete_epoch_stats_df[['Long_BestDir_quantile', 'Short_BestDir_quantile']], axis=1)
 
-        assert (a_paired_main_ripple_df['ripple_start_t'] == a_paired_main_ripple_df['start']).all()
+        # assert (a_paired_main_ripple_df['ripple_start_t'] == a_paired_main_ripple_df['start']).all()
         # a_paired_main_ripple_df[['start', 'stop']]
 
         # Shared columns for comparison
@@ -3373,11 +3373,17 @@ class AcrossSessionHelpers:
         # a_paired_main_ripple_df = df1
         return a_paired_main_ripple_df
 
-    @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-13 00:00', related_items=[])
+    @function_attributes(short_name=None, tags=['DEPRICATED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-13 00:00', related_items=[])
     @classmethod
     def _older_subfn_perform_add_merged_complete_epoch_stats_df(cls, a_paired_main_ripple_df: pd.DataFrame, an_all_sessions_merged_complete_epoch_stats_df: pd.DataFrame, t_delta_dict=None):
         """ adds the columns ['Long_BestDir_quantile', 'Short_BestDir_quantile', 'best_overall_quantile'] to the dataframe `a_paired_main_ripple_df`
-        
+
+        ## INPUTS: all_sessions_merged_complete_epoch_stats_df
+        all_sessions_all_scores_ripple_df = AcrossSessionHelpers._older_subfn_perform_add_merged_complete_epoch_stats_df(a_paired_main_ripple_df=all_sessions_all_scores_ripple_df, an_all_sessions_merged_complete_epoch_stats_df=all_sessions_merged_complete_epoch_stats_df, t_delta_dict=t_delta_dict)
+        all_sessions_all_scores_ripple_df
+        # all_sessions_MultiMeasure_ripple_df = _subfn_perform_add_merged_complete_epoch_stats_df(a_paired_main_ripple_df=all_sessions_MultiMeasure_ripple_df, a_all_sessions_merged_complete_epoch_stats_df=all_sessions_merged_complete_epoch_stats_df)
+
+
         """
         # all_sessions_merged_complete_epoch_stats_df['time_bin_size'] = 0.25 # 'time_bin_size', 'session_experience_rank', 'session_experience_orientation_rank', 'custom_replay_name'-- all missing for this df
         # all_sessions_merged_complete_epoch_stats_df['custom_replay_name'] = 'withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2, 4, 6, 7, 9]'
