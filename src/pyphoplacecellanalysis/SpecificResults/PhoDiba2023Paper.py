@@ -1636,6 +1636,8 @@ def build_single_time_bin_size_dfs(all_sessions_all_scores_epochs_df, all_sessio
 
 
 import plotly.graph_objects as go
+from ipydatagrid import Expr, DataGrid, TextRenderer, BarRenderer # for use in DataFrameFilter
+
 
 @define(slots=False, eq=False)
 class DataframeFilterPredicates:
@@ -1695,7 +1697,7 @@ class DataFrameFilter:
 	
 	output_widget: widgets.Output = field(init=False)
 	figure_widget: go.FigureWidget = field(init=False)
-	
+	table_widget: DataGrid = field(init=False)
 
 	@property
 	def replay_name(self) -> str:
@@ -1798,6 +1800,14 @@ class DataFrameFilter:
 		)
 
 
+	@property
+	def filtered_size_info_df(self) -> pd.DataFrame:
+		"""The original_df_list property."""
+		# num_events: int = len(concatenated_ripple_df)
+		# n_records_dict = {name:len(df) for name, df in self.filtered_df_dict.items()}
+		n_records_tuples = [(name, len(df)) for name, df in self.filtered_df_dict.items() if (df is not None)]
+		return pd.DataFrame(n_records_tuples, columns=['df_name', 'n_elements'])
+
 	# ==================================================================================================================== #
 	# Initializers                                                                                                         #
 	# ==================================================================================================================== #
@@ -1862,10 +1872,17 @@ class DataFrameFilter:
 		self.time_bin_size_widget.observe(self._on_widget_change, names='value')
 		self.active_filter_predicate_selector_widget.observe(self._on_widget_change, names='value')
 		
+		self.table_widget = DataGrid(self.filtered_size_info_df,
+							    base_row_size=15, base_column_size=300,
+								#  renderers=renderers,
+								)
+		# self.table_widget.transform([{"type": "sort", "columnIndex": 2, "desc": True}])
+		
 		# Display the widgets
 		display(widgets.VBox([widgets.HBox([self.replay_name_widget, self.time_bin_size_widget, self.active_filter_predicate_selector_widget]),
 					   self.output_widget,
 					   self.figure_widget,
+					   self.table_widget,
 					   ]))
 
 
@@ -1913,14 +1930,17 @@ class DataFrameFilter:
 		# self.output_widget.clear_output()
 		# with self.output_widget:
 		# Provide feedback to the user
-		print(f"DataFrames filtered with Replay Name: '{replay_name}' and Time Bin Sizes: {time_bin_sizes}")
-		n_records_dict = {name:len(df) for name, df in self.filtered_df_dict.items()}
-		display(n_records_dict)
+		# print(f"DataFrames filtered with Replay Name: '{replay_name}' and Time Bin Sizes: {time_bin_sizes}")
+		# n_records_dict = {name:len(df) for name, df in self.filtered_df_dict.items()}
+		# display(n_records_dict)
 		# n_records: int = len(self.filtered_all_sessions_all_scores_ripple_df)
 		# print(f'n_rows: {n_records}')
 		# self.update_calling_namespace_locals()
 		# display(self.filtered_all_sessions_all_scores_ripple_df.head())
 
+		## Update sizes table:
+		self.table_widget.data = self.filtered_size_info_df
+		
 		for k, a_callback_fn in self.on_filtered_dataframes_changed_callback_fns.items():
 			print(f'k: {k}')
 			try:

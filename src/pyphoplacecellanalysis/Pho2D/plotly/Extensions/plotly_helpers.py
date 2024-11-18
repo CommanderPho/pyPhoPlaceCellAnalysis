@@ -244,6 +244,103 @@ class PlotlyFigureContainer:
         did_create_new_figure: bool = (not has_valid_extant_figure)
         return fig, did_create_new_figure
 
+    @classmethod
+    def get_figure_subplot_indicies(cls, fig):
+        """ Gets the valid subplot indicies for the figure
+        Usage:
+            (n_row, n_col), (row_indicies, column_indicies) = PlotlyFigureContainer.get_figure_subplot_indicies(fig)
+            (n_row, n_col)
+            row_indicies
+            column_indicies
+        """
+        row_indicies, column_indicies = fig._get_subplot_rows_columns()
+        row_indicies = list(row_indicies)
+        column_indicies = list(column_indicies)
+        n_row = len(row_indicies)
+        n_col = len(column_indicies)
+        return (n_row, n_col), (row_indicies, column_indicies)
+
+
+
+
+
+    @classmethod
+    def clear_subplot(cls, fig, row, col):
+        # Get the axis IDs for the specified subplot
+        xaxis_key = fig.get_subplot(row, col)['xaxis']
+        yaxis_key = fig.get_subplot(row, col)['yaxis']
+
+        # Map 'xaxis1' -> 'x1', 'xaxis' -> 'x', etc.
+        xaxis_id = xaxis_key.replace('xaxis', 'x')
+        yaxis_id = yaxis_key.replace('yaxis', 'y')
+
+        # Collect indices of traces to remove
+        indices_to_remove = []
+        for i, trace in enumerate(fig.data):
+            trace_xaxis = trace.xaxis if 'xaxis' in trace else 'x'
+            trace_yaxis = trace.yaxis if 'yaxis' in trace else 'y'
+
+            if trace_xaxis == xaxis_id and trace_yaxis == yaxis_id:
+                indices_to_remove.append(i)
+
+        # Remove traces in reverse order to maintain correct indexing
+        for i in reversed(indices_to_remove):
+            fig.data = fig.data[:i] + fig.data[i+1:]
+
+
+    @classmethod
+    def clear_annotations_in_subplot(cls, fig, row, col):
+        xaxis_key = fig.get_subplot(row, col)['xaxis']
+        yaxis_key = fig.get_subplot(row, col)['yaxis']
+
+        annotations_to_keep = []
+        for annotation in fig.layout.annotations:
+            if annotation.xref == xaxis_key and annotation.yref == yaxis_key:
+                continue  # Skip annotations in the specified subplot
+            annotations_to_keep.append(annotation)
+
+        fig.layout.annotations = annotations_to_keep
+
+    @classmethod
+    def clear_shapes_in_subplot(cls, fig, row, col):
+        xaxis_key = fig.get_subplot(row, col)['xaxis']
+        yaxis_key = fig.get_subplot(row, col)['yaxis']
+
+        shapes_to_keep = []
+        for shape in fig.layout.shapes:
+            if shape.xref == xaxis_key and shape.yref == yaxis_key:
+                continue  # Skip shapes in the specified subplot
+            shapes_to_keep.append(shape)
+
+        fig.layout.shapes = shapes_to_keep
+
+
+    @classmethod
+    def update_subplot_title(cls, fig, row, col, new_title):
+        """ Function to update subplot title
+        
+        # Update the title of the second subplot
+        update_subplot_title(fig, row=1, col=2, new_title="Updated Title 2")
+
+        # Display the updated figure
+        fig
+
+
+        """
+        # Get the number of columns in the figure
+        (n_row, n_col), (row_indicies, column_indicies) = cls.get_figure_subplot_indicies(fig)
+        
+        # Calculate the index of the subplot title annotation
+        index = (row - 1) * n_col + (col - 1)
+
+        # Check if the index is within the range of annotations
+        if index < len(fig.layout.annotations):
+            # Update the annotation text
+            fig.layout.annotations[index].text = new_title
+        else:
+            print(f"No subplot at row {row}, col {col}")
+
+
 
 
 @function_attributes(short_name=None, tags=['plotly', 'scatter'], input_requires=[], output_provides=[], uses=['PlotlyFigureContainer'], used_by=[], creation_date='2024-05-27 09:07', related_items=[])
@@ -425,6 +522,10 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     legend_entries = [trace.name for trace in fig.data if trace.showlegend]
     already_added_legend_entries = set(legend_entries)
 
+    if not did_create_new_figure:
+        ## need to update properties of the existing figure:
+        PlotlyFigureContainer.update_subplot_title(fig, row=1, col=2, new_title=main_title) ## update the `main_title`
+        
     # already_added_legend_entries = set()  # Keep track of trace names that are already added
 
     # Determine batch update context
@@ -523,6 +624,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     fig.update_xaxes(title_text="Delta-aligned Event Time (seconds)", row=1, col=2)
     fig.update_xaxes(title_text="# Events", row=1, col=3)
 
+    ## #TODO 2024-11-18 08:52: - [ ] Needs updated based on the plotted variable name:
     fig.update_yaxes(
         title_text="Probability of Short Track", row=1, col=1, range=[0, 1],
         autorange=False, fixedrange=True
@@ -534,6 +636,8 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
             fig.update_layout(
                 margin=dict(l=80, r=80, t=100, b=(80-10)),
             )
+            # fig.update_annotations
+            ## #TODO 2024-11-18 08:52: - [ ] update instead of add
             fig.add_annotation(
                 text=figure_sup_huge_title_text,
                 x=0.11, y=1.25,
@@ -604,7 +708,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
 
 
 @function_attributes(short_name=None, tags=['plotly', 'helper', 'epoch', 'track'], input_requires=[], output_provides=[], uses=[], used_by=['_helper_build_figure'], creation_date='2024-03-01 13:58', related_items=[])
-def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: float, t_split:float, t_end: float, is_dark_mode: bool = True, total_rows=1):
+def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: float, t_split:float, t_end: float, is_dark_mode: bool = True, total_rows:int=1):
     """ adds shapes representing the epochs to the scatter plot at index scatter_column_index
 
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plotly_helper_add_epoch_shapes
