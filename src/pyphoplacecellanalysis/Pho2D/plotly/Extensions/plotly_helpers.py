@@ -201,7 +201,9 @@ class PlotlyFigureContainer:
             # For the first trace of each category, keep showlegend as True
             already_added_legend_entries.add(trace_name)
             trace.showlegend = True  # This is usually true by default, can be omitted
-        fig.add_trace(trace, row=row, col=col)
+        fig.add_trace(trace, row=row, col=col) # , name=trace_name
+        
+        
 
     @classmethod
     def _helper_build_pre_post_delta_figure_if_needed(cls, extant_figure=None, main_title: str='', use_latex_labels: bool = False, figure_class=go.Figure):
@@ -536,7 +538,13 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
         fig.layout.shapes = []
         fig.data = [] ## clear all data
         
-    # already_added_legend_entries = set()  # Keep track of trace names that are already added
+        # fig.update_layout(
+        #     annotations=[],
+        #     shapes=[],            
+        # )
+        # PlotlyFigureContainer.clear_subplot(fig=fig, row=1, col=1)
+        # PlotlyFigureContainer.clear_subplot(fig=fig, row=1, col=2)
+        # PlotlyFigureContainer.clear_subplot(fig=fig, row=1, col=3)
 
 
     # already_added_legend_entries = set()  # Keep track of trace names that are already added
@@ -642,6 +650,8 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
             )
             # fig.update_annotations
             ## #TODO 2024-11-18 08:52: - [ ] update instead of add
+            # fig.update_annotations
+            
             fig.add_annotation(
                 text=figure_sup_huge_title_text,
                 x=0.11, y=1.25,
@@ -676,6 +686,9 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
                 margin=dict(l=(80+30), r=80, t=(100-60), b=(80-10)),
             )
             line_x_pos: float = suptitle_kwarg_fig_width_dict[curr_fig_width]['line_x_pos']
+
+
+            # if did_create_new_figure:
             fig.add_annotation(
                 text=figure_sup_huge_title_text,
                 **annotation_kwargs,
@@ -699,6 +712,31 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
                 line=dict(color="Black", width=2),
                 name='figure_sup_huge_title_text_line'
             )
+                
+            # else:
+            #     ## need to update properties of the existing figure:
+            #     print(f'trying to update existing figure "figure_sup_huge_title_text_annotation"')
+            #     # fig.update_annotations(selector={'name':'figure_sup_huge_title_text_annotation'},
+            #     #                     patch=dict(
+            #     #                         text=figure_sup_huge_title_text,
+            #     #                         **annotation_kwargs,
+            #     #                         y=0.5,
+            #     #                         xref="paper",
+            #     #                         yref="paper",
+            #     #                         showarrow=False,
+            #     #                         textangle=-90,
+            #     #                         xanchor='center',
+            #     #                         yanchor='middle',
+            #     #                         name='figure_sup_huge_title_text_annotation',
+            #     #                     ),
+            #     # )
+            #     annotation_idx: int = -1
+            #     fig.layout.annotations[annotation_idx].text = figure_sup_huge_title_text
+            ## TODO: update shape 'figure_sup_huge_title_text_line'
+                    
+            
+            
+
 
     # Add footer text if provided
     if figure_footer_text:
