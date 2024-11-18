@@ -531,6 +531,10 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     if not did_create_new_figure:
         ## need to update properties of the existing figure:
         PlotlyFigureContainer.update_subplot_title(fig, row=1, col=2, new_title=main_title) ## update the `main_title`
+        # fig.layout.annotations = [] ## clear initial annotations
+        fig.layout.annotations = fig.layout.annotations[:3] # only the first 3 annotations
+        fig.layout.shapes = []
+        fig.data = [] ## clear all data
         
     # already_added_legend_entries = set()  # Keep track of trace names that are already added
 
@@ -645,6 +649,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
                 showarrow=False,
                 font=dict(size=40),
                 xanchor='left', yanchor='top',
+                name='figure_sup_huge_title_text_annotation',
             )
         else:
             suptitle_kwarg_fig_width_dict = {
@@ -670,6 +675,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
             fig.update_layout(
                 margin=dict(l=(80+30), r=80, t=(100-60), b=(80-10)),
             )
+            line_x_pos: float = suptitle_kwarg_fig_width_dict[curr_fig_width]['line_x_pos']
             fig.add_annotation(
                 text=figure_sup_huge_title_text,
                 **annotation_kwargs,
@@ -680,8 +686,8 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
                 textangle=-90,
                 xanchor='center',
                 yanchor='middle',
+                name='figure_sup_huge_title_text_annotation',
             )
-            line_x_pos: float = suptitle_kwarg_fig_width_dict[curr_fig_width]['line_x_pos']
             fig.add_shape(
                 type="line",
                 x0=line_x_pos,
@@ -690,7 +696,8 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
                 y1=1.5,
                 xref="paper",
                 yref="paper",
-                line=dict(color="Black", width=2)
+                line=dict(color="Black", width=2),
+                name='figure_sup_huge_title_text_line'
             )
 
     # Add footer text if provided
