@@ -190,7 +190,7 @@ class PlotlyFigureContainer:
     fig = field()
     
     @classmethod
-    def add_trace_with_legend_handling(cls, fig, trace, row, col, already_added_legend_entries):
+    def add_trace_with_legend_handling(cls, fig, trace, row, col, already_added_legend_entries, trace_name_prefix):
         """ Adds a trace to the figure while managing legend entries to avoid duplicates. """
         trace_name = trace.name
         trace.legendgroup = trace_name  # Set the legend group so all related traces can be toggled together
@@ -201,6 +201,8 @@ class PlotlyFigureContainer:
             # For the first trace of each category, keep showlegend as True
             already_added_legend_entries.add(trace_name)
             trace.showlegend = True  # This is usually true by default, can be omitted
+            
+        trace.name = '_'.join([v for v in [trace_name_prefix, trace.name] if (len(v)>0)]) ## build new trace name
         fig.add_trace(trace, row=row, col=col) # , name=trace_name
         
         
@@ -550,21 +552,26 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     # already_added_legend_entries = set()  # Keep track of trace names that are already added
 
     # Pre-Delta Histogram
+    trace_name_prefix:str = 'trace_pre_delta_hist'
     _tmp_pre_delta_fig = px.histogram(pre_delta_df, y=histogram_variable_name, **common_plot_kwargs, **hist_kwargs, title=pre_delta_label)
     for a_trace in _tmp_pre_delta_fig.data:
         a_trace.xbins.start = 0.05
         a_trace.xbins.end = 0.95
         a_trace.xbins.size = 0.1
+        a_full_trace_name: str = '_'.join([v for v in [trace_name_prefix, a_trace.name] if (len(v)>0)]) ## build new trace name
+        
         PlotlyFigureContainer.add_trace_with_legend_handling(
-            fig=fig, trace=a_trace, row=1, col=1, already_added_legend_entries=already_added_legend_entries
+            fig=fig, trace=a_trace, row=1, col=1, already_added_legend_entries=already_added_legend_entries, trace_name_prefix=trace_name_prefix
         )
 
     # Scatter Plot
+    trace_name_prefix:str = 'trace_scatter'
     if out_scatter_fig is not None:
         _tmp_scatter_fig = out_scatter_fig
         for a_trace in _tmp_scatter_fig.data:
             a_trace.marker.line.width = 0 
             a_trace.marker.opacity = 0.5
+            a_full_trace_name: str = '_'.join([v for v in [trace_name_prefix, a_trace.name] if (len(v)>0)]) ## build new trace name
             PlotlyFigureContainer.add_trace_with_legend_handling(
                 fig=fig, trace=a_trace, row=1, col=2, already_added_legend_entries=already_added_legend_entries
             )
@@ -574,18 +581,21 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
         for i, a_trace in enumerate(_tmp_scatter_fig.data):
             a_trace.marker.line.width = 0 
             a_trace.marker.opacity = 0.5
+            a_full_trace_name: str = '_'.join([v for v in [trace_name_prefix, a_trace.name] if (len(v)>0)]) ## build new trace name
             PlotlyFigureContainer.add_trace_with_legend_handling(
-                fig=fig, trace=a_trace, row=1, col=2, already_added_legend_entries=already_added_legend_entries
+                fig=fig, trace=a_trace, row=1, col=2, already_added_legend_entries=already_added_legend_entries, trace_name_prefix=trace_name_prefix
             )
 
     # Post-Delta Histogram
+    trace_name_prefix:str = 'trace_post_delta_hist'
     _tmp_post_delta_fig = px.histogram(post_delta_df, y=histogram_variable_name, **common_plot_kwargs, **hist_kwargs, title=post_delta_label)
     for a_trace in _tmp_post_delta_fig.data:
         a_trace.xbins.start = 0.05
         a_trace.xbins.end = 0.95
         a_trace.xbins.size = 0.1
+        a_full_trace_name: str = '_'.join([v for v in [trace_name_prefix, a_trace.name] if (len(v)>0)]) ## build new trace name
         PlotlyFigureContainer.add_trace_with_legend_handling(
-            fig=fig, trace=a_trace, row=1, col=3, already_added_legend_entries=already_added_legend_entries
+            fig=fig, trace=a_trace, row=1, col=3, already_added_legend_entries=already_added_legend_entries, trace_name_prefix=trace_name_prefix
         )
 
     # Update layouts and axes
@@ -745,7 +755,8 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
             **{
                 'x': 0.5, 'y': -0.15000000000000002, 'xref': 'paper', 'yref': 'paper',
                 'showarrow': False, 'font': {'size': 12, 'color': 'gray'},
-                'textangle': 0, 'xanchor': 'center', 'yanchor': 'middle'
+                'textangle': 0, 'xanchor': 'center', 'yanchor': 'middle',
+                'name': 'figure_footer_text_annotation'
             },
         )
             
@@ -782,18 +793,27 @@ def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: floa
     for row in range(1, total_rows + 1):
         row_column_kwargs = dict(row=row, col=scatter_column_index)
         ## new methods
-        _extras_output_dict[f"y_zero_line_{row}"] = fig.add_hline(y=0.0, line=dict(color=y_zero_line_color, width=9), **row_column_kwargs)
-        vertical_divider_line = fig.add_vline(x=0.0, line=dict(color=vertical_epoch_divider_line_color, width=3, ), **row_column_kwargs)
+        fig.add_hline(y=0.0, line=dict(color=y_zero_line_color, width=9), **row_column_kwargs, name=f'y_zero_line_{row}')
+        # _extras_output_dict[f"y_zero_line_{row}"].name = f"y_zero_line_{row}"
+        _extras_output_dict[f"y_zero_line_{row}"] = 'line'
+        
 
+        fig.add_vline(x=0.0, line=dict(color=vertical_epoch_divider_line_color, width=3, ), **row_column_kwargs, name=f'vertical_divider_line_{row}')
+        _extras_output_dict[f"vertical_divider_line_{row}"] = 'line'
+        
         # fig.add_hrect(y0=0.9, y1=2.6, line_width=0, fillcolor="red", opacity=0.2)
 
-        blue_shape = fig.add_vrect(x0=t_start, x1=t_split, label=dict(text="Long", textposition="top center", font=dict(size=20, family="Times New Roman"), ), layer="below", opacity=0.5, line_width=1, **long_epoch_kwargs, **row_column_kwargs) # , fillcolor="green", opacity=0.25
-        red_shape = fig.add_vrect(x0=t_split, x1=t_end, label=dict(text="Short", textposition="top center", font=dict(size=20, family="Times New Roman"), ), layer="below", opacity=0.5, line_width=1, **short_epoch_kwargs, **row_column_kwargs)
+        fig.add_vrect(x0=t_start, x1=t_split, label=dict(text="Long", textposition="top center", font=dict(size=20, family="Times New Roman"), ), layer="below", opacity=0.5, line_width=1, **long_epoch_kwargs, **row_column_kwargs, name=f"long_region_{row}") # , fillcolor="green", opacity=0.25
+        fig.add_vrect(x0=t_split, x1=t_end, label=dict(text="Short", textposition="top center", font=dict(size=20, family="Times New Roman"), ), layer="below", opacity=0.5, line_width=1, **short_epoch_kwargs, **row_column_kwargs, name=f"short_region_{row}")
+        
+        # _extras_output_dict[f"long_region_{row}"] = blue_shape
+        # _extras_output_dict[f"short_region_{row}"] = red_shape
+        # _extras_output_dict[f"divider_line_{row}"] = vertical_divider_line
+        
+        _extras_output_dict[f"long_region_{row}"] = 'shape'
+        _extras_output_dict[f"short_region_{row}"] = 'shape'
 
-        _extras_output_dict[f"long_region_{row}"] = blue_shape
-        _extras_output_dict[f"short_region_{row}"] = red_shape
-        _extras_output_dict[f"divider_line_{row}"] = vertical_divider_line
-
+        # _extras_output_dict[f"y_zero_line_{row}"] = 
     
     return _extras_output_dict
 
