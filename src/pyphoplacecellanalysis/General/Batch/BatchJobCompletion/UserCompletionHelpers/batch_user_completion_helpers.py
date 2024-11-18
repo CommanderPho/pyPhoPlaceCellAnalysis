@@ -1586,7 +1586,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 # ==================================================================================================================== #
 
 @function_attributes(short_name=None, tags=['batch', 'rank-order'], input_requires=['rank_order_results.ripple_merged_complete_epoch_stats_df'], output_provides=[], uses=[], used_by=[], creation_date='2024-04-27 21:21', related_items=[])
-def export_rank_order_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, should_save_pkl:bool=True, should_save_CSV:bool=True) -> dict:
+def export_rank_order_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, should_save_pkl:bool=False, should_save_CSV:bool=True) -> dict:
 	"""
 	provides_files=['']
 	
