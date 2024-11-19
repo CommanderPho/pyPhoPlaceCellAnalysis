@@ -303,7 +303,7 @@ class BatchCompletionHelpers:
 			(several_time_bin_sizes_laps_df, laps_out_path, several_time_bin_sizes_time_bin_laps_df, laps_time_bin_marginals_out_path), (several_time_bin_sizes_ripple_df, ripple_out_path, several_time_bin_sizes_time_bin_ripple_df, ripple_time_bin_marginals_out_path) = combined_multi_timebin_outputs_tuple
 
 			_out_file_paths_dict = {
-				'ripple_h5_out_path': out_path,
+				'ripple_h5_out_path': out_path, # this seems to duplicate parameters '2024-11-18-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0_withNormalComputedReplays-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]-(laps_time_bin_marginals_df).csv'
 				'ripple_csv_out_path': ripple_out_path,
 				'ripple_csv_time_bin_marginals': ripple_time_bin_marginals_out_path,
 				

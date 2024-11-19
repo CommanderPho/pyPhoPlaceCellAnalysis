@@ -1436,6 +1436,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 	print(f'compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
 	
 	callback_outputs = {
+		'custom_suffix': None,
 		'replay_epoch_variations': None,
 		'replay_epoch_outputs': None,
 		# 'wcorr_shuffles_data_output_filepath': None, #'t_end': t_end   
