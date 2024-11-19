@@ -413,7 +413,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
             else:
                 notebook_path = script_path.with_suffix('.ipynb')
                 
-            convert_script_to_notebook(_temp_notebook_python_script_path, notebook_path)
+            convert_script_to_notebook(_temp_notebook_python_script_path, notebook_path, enable_auto_reload=False)
             ## remove temporary script when done
             try:
                 _temp_notebook_python_script_path.unlink()
