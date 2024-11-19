@@ -2042,38 +2042,83 @@ class PipelineWithComputedPipelineStageMixin:
     
 
     @function_attributes(short_name=None, tags=['parameters', 'filenames', 'export'], input_requires=[], output_provides=[], uses=['get_custom_pipeline_filenames_from_parameters'], used_by=[], creation_date='2024-11-08 10:36', related_items=[])
-    def get_complete_session_identifier_string(self, parts_separator:str='_', sub_parts_separator:str='-', session_identity_parts_separator:str='_') -> str:
+    def get_complete_session_identifier_string(self, parts_separator:str='_', custom_parameter_keyvalue_parts_separator:str='-', session_identity_parts_separator:str='_') -> str:
         """ returns a string like 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]', with the session context and the parameters
         complete_session_identifier_string: str = curr_active_pipeline.get_complete_session_identifier_string()
     
         Used to be `parts_separator:str='_'`
         """
-        custom_save_filepaths, custom_save_filenames, custom_suffix = self.get_custom_pipeline_filenames_from_parameters(parts_separator=sub_parts_separator) # 'normal_computed-frateThresh_5.0-qclu_[1, 2]'
+        custom_save_filepaths, custom_save_filenames, custom_suffix = self.get_custom_pipeline_filenames_from_parameters(parts_separator=custom_parameter_keyvalue_parts_separator) # 'normal_computed-frateThresh_5.0-qclu_[1, 2]'
         complete_session_identifier_string: str = parts_separator.join([self.get_session_context().get_description(separator=session_identity_parts_separator), custom_suffix]) # 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]'
         return complete_session_identifier_string
 
 
     @function_attributes(short_name=None, tags=['parameters', 'filenames', 'export'], input_requires=[], output_provides=[], uses=['get_complete_session_identifier_string'], used_by=[], creation_date='2024-11-19 01:19', related_items=[])
-    def build_complete_session_identifier_filename_string(self, data_identifier_str: str, parent_output_path: Optional[Path]=None, out_extension: Optional[str]='.csv',
-            output_date_str: Optional[str]=None, parts_separator:str='_', sub_parts_separator:str='-', session_identity_parts_separator:str='_') -> Tuple[Path, str, str]:
+    def build_complete_session_identifier_filename_string(self, data_identifier_str: str, parent_output_path: Optional[Path]=None, extra_parts: Optional[List[str]]=None, out_extension: Optional[str]='.csv', suffix_string: Optional[str]=None,
+            output_date_str: Optional[str]=None, parts_separator:str='_', custom_parameter_keyvalue_parts_separator:str='-', session_identity_parts_separator:str='_', ensure_no_duplicate_parts: bool = True) -> Tuple[Path, str, str]:
         """ returns a string like 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]', with the session context and the parameters
         complete_session_identifier_string: str = curr_active_pipeline.get_complete_session_identifier_string()
     
         Used to be `parts_separator:str='_'`
+        
+        Usage:
+        
+        out_path, out_filename, out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=None, data_identifier_str="(ripple_WCorrShuffle_df)", parent_output_path=None, out_extension='.csv', extra_parts=None, ensure_no_duplicate_parts=False)
+        out_filename # '2024-11-19_0148AM-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_WCorrShuffle_df).csv'
+
+        out_path, out_filename, out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(data_identifier_str="(ripple_WCorrShuffle_df)", parent_output_path=None, out_extension='.csv', extra_parts=['tbin-0.025'])
+        out_filename  # '2024-11-19_0148AM-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_WCorrShuffle_df)-tbin-0.025.csv'
+
+        out_path, out_filename, out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(data_identifier_str="(ripple_WCorrShuffle_df)", parent_output_path=None, out_extension='.csv', suffix_string='_tbin-0.025')
+        out_filename  # '2024-11-19_0148AM-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_WCorrShuffle_df)_tbin-0.025.csv'
+
+        
         """
         from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
 
-        session_identifier_str: str = self.get_complete_session_identifier_string(parts_separator=parts_separator, sub_parts_separator=sub_parts_separator, session_identity_parts_separator=session_identity_parts_separator)
+        session_identifier_str: str = self.get_complete_session_identifier_string(parts_separator=parts_separator, custom_parameter_keyvalue_parts_separator=custom_parameter_keyvalue_parts_separator, session_identity_parts_separator=session_identity_parts_separator)
 
         # custom_save_filepaths, custom_save_filenames, custom_suffix = self.get_custom_pipeline_filenames_from_parameters(parts_separator=sub_parts_separator) # 'normal_computed-frateThresh_5.0-qclu_[1, 2]'
         # complete_session_identifier_string: str = parts_separator.join([self.get_session_context().get_description(separator=session_identity_parts_separator), custom_suffix]) # 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]'
         if output_date_str is None:
-            output_date_str: str = get_now_rounded_time_str()
-            # output_date_str: str = get_now_day_str()
+            output_date_str = get_now_rounded_time_str()
+            # output_date_str = get_now_day_str()
 
-        # session_identifier_str: str = active_context.get_description()
-        assert output_date_str is not None
-        out_basename: str = '-'.join([output_date_str, session_identifier_str, data_identifier_str]) # '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
+        _all_parts = []
+
+        # _all_parts = [output_date_str, session_identifier_str, data_identifier_str]
+
+        if (output_date_str is not None) and (len(output_date_str) > 0):
+            _all_parts.append(output_date_str)
+            
+        if (session_identifier_str is not None) and (len(session_identifier_str) > 0):
+            _all_parts.append(session_identifier_str)
+            
+        if (data_identifier_str is not None) and (len(data_identifier_str) > 0):
+            _all_parts.append(data_identifier_str)
+
+        # assert output_date_str is not None
+        if extra_parts is not None:
+            for a_part in extra_parts:
+                if (a_part is not None) and (len(a_part) > 0):
+                    _all_parts.append(a_part)
+
+            # _all_parts.extend(extra_parts)
+
+        
+        if ensure_no_duplicate_parts:
+            # _all_parts = list(set(_all_parts)) ## drop duplicate parts
+            # _all_parts = np.unique(_all_parts).tolist()
+            _all_parts = list(dict.fromkeys(_all_parts))
+            
+            
+        # out_basename: str = '-'.join([output_date_str, session_identifier_str, data_identifier_str]) # '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
+        out_basename: str = custom_parameter_keyvalue_parts_separator.join(_all_parts) # '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
+        if (suffix_string is not None) and (len(suffix_string) > 0):
+            if ensure_no_duplicate_parts:
+                assert (not out_basename.endswith(suffix_string)), f"out_basename: '{out_basename}', suffix_string: '{suffix_string}'"
+            out_basename = f"{out_basename}{suffix_string}" ## append suffix string before extension
+        
         if out_extension is None:
             out_extension = ''
         out_filename: str = f"{out_basename}{out_extension}"
