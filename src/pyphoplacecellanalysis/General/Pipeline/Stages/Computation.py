@@ -1980,8 +1980,9 @@ class PipelineWithComputedPipelineStageMixin:
 
         # preprocessing_parameters = all_params_dict['preprocessing']
         rank_order_shuffle_analysis_parameters = all_params_dict['rank_order_shuffle_analysis']
-        minimum_inclusion_fr_Hz = deepcopy(rank_order_shuffle_analysis_parameters['minimum_inclusion_fr_Hz']) # 5.0
         included_qclu_values = deepcopy(rank_order_shuffle_analysis_parameters['included_qclu_values']) # [1, 2, 4, 6, 7, 9]
+        minimum_inclusion_fr_Hz = deepcopy(rank_order_shuffle_analysis_parameters['minimum_inclusion_fr_Hz']) # 5.0
+        
         
         ## TODO: Ideally would use the value passed in self.get_all_parameters():
         active_replay_epoch_parameters = deepcopy(self.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays)
@@ -1990,8 +1991,8 @@ class PipelineWithComputedPipelineStageMixin:
         additional_session_context: DisplaySpecifyingIdentifyingContext = DisplaySpecifyingIdentifyingContext(epochs_source=epochs_source, included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz,
             specific_purpose_display_dict={'filename_formatting': _filename_formatting_fn, 
         }, display_dict={'epochs_source': lambda k, v: to_filename_conversion_dict[v],
-                   'minimum_inclusion_fr_Hz': lambda k, v: f"frateThresh_{v:.1f}",
-                   'included_qclu_values': lambda k, v: f"qclu_{v}",
+                'included_qclu_values': lambda k, v: f"qclu_{v}",
+                'minimum_inclusion_fr_Hz': lambda k, v: f"frateThresh_{v:.1f}",
         })
         return additional_session_context
     
@@ -2003,7 +2004,7 @@ class PipelineWithComputedPipelineStageMixin:
         custom_save_filepaths, custom_save_filenames, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
         
         """
-        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _get_custom_filenames_from_computation_metadata, _get_custom_suffix_for_filename_from_computation_metadata
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _get_custom_filenames_from_computation_metadata
         
         all_params_dict = self.get_all_parameters()
 
@@ -2017,7 +2018,7 @@ class PipelineWithComputedPipelineStageMixin:
         epochs_source: str = active_replay_epoch_parameters.get('epochs_source', 'normal_computed')
         custom_suffix: str = epochs_source
         # custom_suffix += _get_custom_suffix_for_filename_from_computation_metadata(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
-        custom_save_filepaths, custom_save_filenames, custom_suffix = _get_custom_filenames_from_computation_metadata(epochs_source=epochs_source, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values, parts_separator=parts_separator)
+        custom_save_filepaths, custom_save_filenames, custom_suffix = _get_custom_filenames_from_computation_metadata(epochs_source=epochs_source, included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, parts_separator=parts_separator)
         # print(f'custom_save_filenames: {custom_save_filenames}')
         # print(f'custom_suffix: "{custom_suffix}"')
         
@@ -2047,7 +2048,9 @@ class PipelineWithComputedPipelineStageMixin:
         """
         curr_session_context: DisplaySpecifyingIdentifyingContext = DisplaySpecifyingIdentifyingContext.init_from_context(a_context=self.get_session_context()) # **_obj.to_dict(),
         additional_session_context: DisplaySpecifyingIdentifyingContext = self.get_session_additional_parameters_context()
-        complete_session_context: DisplaySpecifyingIdentifyingContext = curr_session_context | additional_session_context # hoping this merger works
+        # complete_session_context: DisplaySpecifyingIdentifyingContext = curr_session_context | additional_session_context # hoping this merger works
+        complete_session_context: DisplaySpecifyingIdentifyingContext = curr_session_context.adding_context(collision_prefix='_additional', **additional_session_context.to_dict()) # hoping this merger works
+        
         return complete_session_context, (curr_session_context,  additional_session_context)
 
     @function_attributes(short_name=None, tags=['valid_track_times'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-05 16:18', related_items=[])
