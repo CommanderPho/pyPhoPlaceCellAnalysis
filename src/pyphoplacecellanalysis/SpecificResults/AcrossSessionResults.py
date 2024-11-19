@@ -3339,6 +3339,97 @@ class AcrossSessionsVisualizations:
         return graphics_output_dict
 
 
+from neuropy.utils.debug_helpers import parameter_sweeps
+ 
+import re
+
+class ExportValueNameCleaner:
+    """ 
+    Usage:
+        new_name_list = ExportValueNameCleaner.clean_all(name_list=all_sessions_MultiMeasure_ripple_df['custom_replay_name'].unique().tolist())
+        new_name_list
+
+    """
+    @staticmethod
+    def reorder_ensuring_qclu_before_frateThresh(name: str) -> str:
+        pattern = r'^(.*?)-?(frateThresh_[^-\s]+|qclu_\[[^\]]+\])-?(frateThresh_[^-\s]+|qclu_\[[^\]]+\])(.*)$'
+        match = re.match(pattern, name)
+        if match:
+            prefix = match.group(1)
+            comp1 = match.group(2)
+            comp2 = match.group(3)
+            suffix = match.group(4)
+            # Determine which component is 'qclu_' and which is 'frateThresh_'
+            if comp1.startswith('qclu_'):
+                qclu_comp = comp1
+                frate_comp = comp2
+            else:
+                qclu_comp = comp2
+                frate_comp = comp1
+            new_name = f"{prefix}-{qclu_comp}-{frate_comp}{suffix}"
+        else:
+            # Does not match expected pattern, return as is
+            new_name = name
+        return new_name
+
+
+    @staticmethod
+    def remove_redundant_suffix(name: str) -> str:
+        """ 
+        malformed: 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0normal_computed-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]' - > 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0normal_computed-frateThresh_1.0'
+
+        """
+        data_str: str = 'withNormalComputedReplays'
+        # Split the string at '_withNormalComputedReplays'
+        # parts = name.split('_withNormalComputedReplays')
+        parts = name.split(data_str)
+        # print(f'parts: {parts}')
+        valid_parts = parts[:2]
+        valid_str: str = data_str.join(valid_parts).rstrip('-_')
+        # print(f'valid_str: {valid_str}')
+
+        # # Collect all components from each part
+        # components = []
+        # for part in valid_parts:
+        #     # Remove leading/trailing hyphens and split into components
+        #     comps = part.strip('-').split('-')
+        #     components.extend(comps)
+        # # Remove duplicates while preserving order
+        # seen = set()
+        # unique_components = []
+        # for comp in components:
+        #     if comp not in seen:
+        #         seen.add(comp)
+        #         unique_components.append(comp)
+        # # Reconstruct the string from unique components
+        # new_name = '-'.join(unique_components)
+        return valid_str
+    
+
+    @classmethod
+    def clean_all(cls, name_list: List[str], return_only_unique:bool=False, debug_print=False):
+        """ 
+        name_list=all_sessions_MultiMeasure_ripple_df['custom_replay_name'].unique().tolist()
+        """
+        if debug_print:
+            print(name_list)
+
+        new_name_list = [cls.remove_redundant_suffix(replay_name) for replay_name in name_list]
+        if debug_print:
+            print(new_name_list)
+
+        new_name_list = [cls.reorder_ensuring_qclu_before_frateThresh(replay_name) for replay_name in new_name_list]
+
+        new_name_list = [v for v in new_name_list if (v.find('normal_computed') == -1)] # drop entries with 'normal_computed', which is a malformed string
+        # ['', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0', 'withNormalComputedReplays-qclu_[1, 2]-frateThresh_5.0', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0']
+
+        if return_only_unique:
+            new_name_list = list(dict.fromkeys(new_name_list))
+
+        if debug_print:
+            print(new_name_list) # ['', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0', 'withNormalComputedReplays-qclu_[1, 2]-frateThresh_5.0', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0']
+        return new_name_list
+    
 
 
 class AcrossSessionHelpers:
@@ -3360,7 +3451,7 @@ class AcrossSessionHelpers:
         an_all_sessions_merged_complete_epoch_stats_df
 
         """
-        from pyphocorehelpers.DataStructure.data_structure_builders import cartesian_product
+        # from pyphocorehelpers.DataStructure.data_structure_builders import cartesian_product
         from neuropy.utils.indexing_helpers import NumpyHelpers
         
         if comparison_must_match_column_names is None:
@@ -3399,13 +3490,17 @@ class AcrossSessionHelpers:
         df1['session_name'] = df1['session_name'].str.replace('_','-') # replace both with hyphens so they match
         df2['session_name'] = df2['session_name'].str.replace('_','-') # replace both with hyphens so they match
 
-        ## is this okay?
+        ## Clean up!
+        df1['custom_replay_name'] = ExportValueNameCleaner.clean_all(name_list=df1['custom_replay_name'].to_list(), return_only_unique=False)
+        df2['custom_replay_name'] = ExportValueNameCleaner.clean_all(name_list=df2['custom_replay_name'].to_list(), return_only_unique=False)
+
         df1['custom_replay_name'] = df1['custom_replay_name'].str.replace('_','-') # replace both with hyphens so they match
         df2['custom_replay_name'] = df2['custom_replay_name'].str.replace('_','-') # replace both with hyphens so they match
         
-        df1['custom_replay_name'] = df1['custom_replay_name'].str.replace('withNormalComputedReplays-qclu-[1, 2, 4, 6, 7, 9]-frateThresh-1.0-withNormalComputedReplays-frateThresh-1.0-qclu-[1, 2, 4, 6, 7, 9]',
-                                                                          'withNormalComputedReplays-qclu-[1, 2, 4, 6, 7, 9]-frateThresh-1.0') ## drop invalid duplicated versions
+        # df1['custom_replay_name'] = df1['custom_replay_name'].str.replace('withNormalComputedReplays-qclu-[1, 2, 4, 6, 7, 9]-frateThresh-1.0-withNormalComputedReplays-frateThresh-1.0-qclu-[1, 2, 4, 6, 7, 9]',
+        #                                                                   'withNormalComputedReplays-qclu-[1, 2, 4, 6, 7, 9]-frateThresh-1.0') ## drop invalid duplicated versions
         
+
         # _compare_form_session_names = deepcopy(df1['session_name'].unique())
         # _compare_to_preferred_session_name_map = dict(zip(_compare_form_session_names, _preferred_form_session_names)) # used to replace desired session names when done
 
@@ -3417,12 +3512,17 @@ class AcrossSessionHelpers:
             combined_shared_unique_values_dict[k] = tuple(set(df1_unique_values_dict[k]).intersection(df2_unique_values_dict[k]))
             
 
-        combined_shared_unique_value_tuples = cartesian_product(list(combined_shared_unique_values_dict.values()))
-        # combined_shared_unique_value_tuples
+        # new_name_list = ExportValueNameCleaner.clean_all(name_list=all_sessions_MultiMeasure_ripple_df['custom_replay_name'].unique().tolist())
+        # new_name_list
+        # combined_shared_unique_value_tuples, param_sweep_option_n_values = parameter_sweeps(smooth=[(None, None), (0.5, 0.5), (1.0, 1.0), (2.0, 2.0), (5.0, 5.0)], grid_bin=[(1,1),(5,5),(10,10)])
+        combined_shared_unique_value_tuples, param_sweep_option_n_values = parameter_sweeps(**combined_shared_unique_values_dict)
+
         # matching_df1_update_tuples = []
 
-        for a_values_tuple in combined_shared_unique_value_tuples:
-            a_values_dict = dict(zip(comparison_must_match_non_temporal_column_names, a_values_tuple))
+        # for a_values_tuple in combined_shared_unique_value_tuples:
+        #     a_values_dict = dict(zip(comparison_must_match_non_temporal_column_names, a_values_tuple))
+
+        for a_values_dict in combined_shared_unique_value_tuples:
             # a_values_dict
             df1_matches_all_conditions = NumpyHelpers.logical_generic(np.logical_and, *[df1[k] == v for k, v in a_values_dict.items()])
             df2_matches_all_conditions = NumpyHelpers.logical_generic(np.logical_and, *[df2[k] == v for k, v in a_values_dict.items()])
@@ -3443,14 +3543,6 @@ class AcrossSessionHelpers:
                     df1.loc[_df1_row_matching_indicies, an_update_col_name] = getattr(a_row, an_update_col_name) # a_row.Long_BestDir_quantile
                     a_paired_main_ripple_df.loc[_df1_row_matching_indicies, an_update_col_name] = getattr(a_row, an_update_col_name) # a_row.Long_BestDir_quantile
 
-                # df1.loc[_df1_row_matching_indicies, 'Long_BestDir_quantile'] = a_row.Long_BestDir_quantile
-                # df1.loc[_df1_row_matching_indicies, 'Short_BestDir_quantile'] = a_row.Short_BestDir_quantile
-                # df1.loc[_df1_row_matching_indicies, 'best_overall_quantile'] = a_row.best_overall_quantile
-                
-                # a_paired_main_ripple_df.loc[_df1_row_matching_indicies, 'Long_BestDir_quantile'] = a_row.Long_BestDir_quantile
-                # a_paired_main_ripple_df.loc[_df1_row_matching_indicies, 'Short_BestDir_quantile'] = a_row.Short_BestDir_quantile
-                # a_paired_main_ripple_df.loc[_df1_row_matching_indicies, 'best_overall_quantile'] = a_row.best_overall_quantile
-                
                 # # matching_df1_update_tuples.append([_df1_row_matching_indicies, a_row.Long_BestDir_quantile, a_row.Short_BestDir_quantile])
                 
             # unique_start_stop = active_df2[['start', 'stop']].unique()
