@@ -3346,6 +3346,7 @@ import re
 class ExportValueNameCleaner:
     """ 
     Usage:
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import ExportValueNameCleaner
         new_name_list = ExportValueNameCleaner.clean_all(name_list=all_sessions_MultiMeasure_ripple_df['custom_replay_name'].unique().tolist())
         new_name_list
 
