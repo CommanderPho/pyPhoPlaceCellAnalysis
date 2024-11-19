@@ -778,15 +778,36 @@ class BatchCompletionHelpers:
 		## OUTPUTS: wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df
 
 
-		## INPUTS: wcorr_ripple_shuffle
+		## INPUTS: wcorr_ripple_shuffle, a_curr_active_pipeline
+		def a_subfn_custom_export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'(laps_marginals_df)', parent_output_path: Path=None):
+			""" captures `a_curr_active_pipeline`
+			"""
+			out_path, out_filename, out_basename = a_curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=get_now_rounded_time_str(rounded_minutes=10), data_identifier_str=data_identifier_str,
+																													parent_output_path=parent_output_path, out_extension='.csv')
+			export_df.to_csv(out_path)
+			return out_path 
+		
+
+		#TODO 2024-11-19 03:33: - [ ] `custom_export_df_to_csv_fn`
+		custom_export_df_to_csv_fn = a_subfn_custom_export_df_to_csv		
+
 		# standalone save
-		standalone_pkl_filename: str = f'{get_now_rounded_time_str()}{custom_suffix}_standalone_wcorr_ripple_shuffle_data_only_{wcorr_shuffles.n_completed_shuffles}.pkl' 
-		standalone_pkl_filepath = a_curr_active_pipeline.get_output_path().joinpath(standalone_pkl_filename).resolve() # Path("W:\Data\KDIBA\gor01\one\2006-6-08_14-26-15\output\2024-05-30_0925AM_standalone_wcorr_ripple_shuffle_data_only_1100.pkl")
+		out_path, standalone_pkl_filename, standalone_pkl_filepath = a_curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=get_now_rounded_time_str(), data_identifier_str='standalone_wcorr_ripple_shuffle_data_only', parent_output_path=a_curr_active_pipeline.get_output_path(), out_extension='.pkl', suffix_string=f'_{wcorr_shuffles.n_completed_shuffles}')		
+		_prev_standalone_pkl_filename: str = f'{get_now_rounded_time_str()}{custom_suffix}_standalone_wcorr_ripple_shuffle_data_only_{wcorr_shuffles.n_completed_shuffles}.pkl' 
+		if _prev_standalone_pkl_filename != standalone_pkl_filename:
+			print(f'standalone_pkl_filename:\n\t"{standalone_pkl_filename}"')
+			print(f'_prev_standalone_pkl_filename:\n\t"{_prev_standalone_pkl_filename}"')
+		# standalone_pkl_filepath = a_curr_active_pipeline.get_output_path().joinpath(standalone_pkl_filename).resolve() # Path("W:\Data\KDIBA\gor01\one\2006-6-08_14-26-15\output\2024-05-30_0925AM_standalone_wcorr_ripple_shuffle_data_only_1100.pkl")
 		print(f'saving to "{standalone_pkl_filepath}"...')
 		wcorr_shuffles.save_data(standalone_pkl_filepath)
 		## INPUTS: wcorr_ripple_shuffle
-		standalone_mat_filename: str = f'{get_now_rounded_time_str()}{custom_suffix}_standalone_all_shuffles_wcorr_array.mat' 
-		standalone_mat_filepath = a_curr_active_pipeline.get_output_path().joinpath(standalone_mat_filename).resolve() # r"W:\Data\KDIBA\gor01\one\2006-6-09_1-22-43\output\2024-06-03_0400PM_standalone_all_shuffles_wcorr_array.mat"
+		_prev_standalone_mat_filename: str = f'{get_now_rounded_time_str()}{custom_suffix}_standalone_all_shuffles_wcorr_array.mat' 
+		# standalone_mat_filepath = a_curr_active_pipeline.get_output_path().joinpath(standalone_mat_filename).resolve() # r"W:\Data\KDIBA\gor01\one\2006-6-09_1-22-43\output\2024-06-03_0400PM_standalone_all_shuffles_wcorr_array.mat"
+		out_path, standalone_mat_filename, standalone_mat_filepath = a_curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=get_now_rounded_time_str(), data_identifier_str='standalone_all_shuffles_wcorr_array', parent_output_path=a_curr_active_pipeline.get_output_path(), out_extension='.mat')
+		if _prev_standalone_mat_filename != standalone_mat_filename:
+			print(f'standalone_mat_filepath:\n\t"{standalone_mat_filepath}"')
+			print(f'_prev_standalone_mat_filename:\n\t"{_prev_standalone_mat_filename}"')
+		#TODO 2024-11-19 03:25: - [ ] Previously used `custom_suffix`
 		wcorr_shuffles.save_data_mat(filepath=standalone_mat_filepath, **{'session': a_curr_active_pipeline.get_session_context().to_dict()})
 
 		try:
@@ -798,6 +819,7 @@ class BatchCompletionHelpers:
 			export_files_dict = wcorr_shuffles.export_csvs(parent_output_path=a_curr_active_pipeline.get_output_path().resolve(), active_context=active_context, session_name=session_name, curr_active_pipeline=a_curr_active_pipeline,
 														#    source='diba_evt_file',
 														source='compute_diba_quiescent_style_replay_events',
+														custom_export_df_to_csv_fn=custom_export_df_to_csv_fn,
 														)
 			ripple_WCorrShuffle_df_export_CSV_path = export_files_dict['ripple_WCorrShuffle_df']
 			print(f'Successfully exported ripple_WCorrShuffle_df_export_CSV_path: "{ripple_WCorrShuffle_df_export_CSV_path}" with wcorr_shuffles.n_completed_shuffles: {wcorr_shuffles.n_completed_shuffles} unique shuffles.')
