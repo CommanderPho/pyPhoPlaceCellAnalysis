@@ -437,7 +437,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 		active_context = (curr_active_pipeline.get_session_context() | additional_session_context)
 		# if len(custom_suffix) == 0:
 		session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=(IdentifyingContext._get_session_context_keys() + list(additional_session_context.keys())))
-		CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}-{additional_session_context.get_description()}"
+		# CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}-{additional_session_context.get_description()}"
 		# else:
 		# 	session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=(IdentifyingContext._get_session_context_keys() + list(additional_session_context.keys()))) + f'|{custom_suffix}'
 		# 	CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}-{additional_session_context.get_description()}-{custom_suffix}"
@@ -445,7 +445,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 		active_context = curr_active_pipeline.get_session_context()
 		session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
 		# if len(custom_suffix) == 0:
-		CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
+		# CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
 		# else:
 		# 	session_ctxt_key:str = session_ctxt_key + custom_suffix
 		# 	CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}-{custom_suffix}"
@@ -454,7 +454,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 	
 	print(f'\tactive_context: {active_context}')
 	print(f'\tsession_ctxt_key: {session_ctxt_key}')
-	print(f'\tCURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')    
+	# print(f'\tCURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
 	
 	## INPUT PARAMETER: time_bin_size sweep paraemters    
 	if custom_all_param_sweep_options is None:
