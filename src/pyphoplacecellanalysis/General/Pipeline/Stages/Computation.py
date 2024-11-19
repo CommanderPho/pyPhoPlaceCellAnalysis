@@ -2042,28 +2042,72 @@ class PipelineWithComputedPipelineStageMixin:
     
 
     @function_attributes(short_name=None, tags=['parameters', 'filenames', 'export'], input_requires=[], output_provides=[], uses=['get_custom_pipeline_filenames_from_parameters'], used_by=[], creation_date='2024-11-08 10:36', related_items=[])
-    def get_complete_session_identifier_string(self, parts_separator:str='-') -> str:
+    def get_complete_session_identifier_string(self, parts_separator:str='_', sub_parts_separator:str='-', session_identity_parts_separator:str='_') -> str:
         """ returns a string like 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]', with the session context and the parameters
-	    complete_session_identifier_string: str = curr_active_pipeline.get_complete_session_identifier_string()
+        complete_session_identifier_string: str = curr_active_pipeline.get_complete_session_identifier_string()
     
         Used to be `parts_separator:str='_'`
         """
-        sub_parts_separator:str='-'
         custom_save_filepaths, custom_save_filenames, custom_suffix = self.get_custom_pipeline_filenames_from_parameters(parts_separator=sub_parts_separator) # 'normal_computed-frateThresh_5.0-qclu_[1, 2]'
-        complete_session_identifier_string: str = parts_separator.join([self.get_session_context().get_description(separator='-'), custom_suffix]) # 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]'
+        complete_session_identifier_string: str = parts_separator.join([self.get_session_context().get_description(separator=session_identity_parts_separator), custom_suffix]) # 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]'
         return complete_session_identifier_string
 
 
+    @function_attributes(short_name=None, tags=['parameters', 'filenames', 'export'], input_requires=[], output_provides=[], uses=['get_complete_session_identifier_string'], used_by=[], creation_date='2024-11-19 01:19', related_items=[])
+    def build_complete_session_identifier_filename_string(self, data_identifier_str: str, parent_output_path: Optional[Path]=None, out_extension: Optional[str]='.csv',
+            output_date_str: Optional[str]=None, parts_separator:str='_', sub_parts_separator:str='-', session_identity_parts_separator:str='_') -> Tuple[Path, str, str]:
+        """ returns a string like 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]', with the session context and the parameters
+        complete_session_identifier_string: str = curr_active_pipeline.get_complete_session_identifier_string()
+    
+        Used to be `parts_separator:str='_'`
+        """
+        from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
+
+        session_identifier_str: str = self.get_complete_session_identifier_string(parts_separator=parts_separator, sub_parts_separator=sub_parts_separator, session_identity_parts_separator=session_identity_parts_separator)
+
+        # custom_save_filepaths, custom_save_filenames, custom_suffix = self.get_custom_pipeline_filenames_from_parameters(parts_separator=sub_parts_separator) # 'normal_computed-frateThresh_5.0-qclu_[1, 2]'
+        # complete_session_identifier_string: str = parts_separator.join([self.get_session_context().get_description(separator=session_identity_parts_separator), custom_suffix]) # 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]'
+        if output_date_str is None:
+            output_date_str: str = get_now_rounded_time_str()
+            # output_date_str: str = get_now_day_str()
+
+        # session_identifier_str: str = active_context.get_description()
+        assert output_date_str is not None
+        out_basename: str = '-'.join([output_date_str, session_identifier_str, data_identifier_str]) # '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
+        if out_extension is None:
+            out_extension = ''
+        out_filename: str = f"{out_basename}{out_extension}"
+        if parent_output_path is not None:
+            out_path: Path = parent_output_path.joinpath(out_filename).resolve()
+        else:
+            out_path: Path = Path(out_filename)
+        return out_path, out_filename, out_basename
+
+
+
+
+
     @function_attributes(short_name=None, tags=['context', 'custom', 'parameters'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-01 00:00', related_items=[])
-    def get_complete_session_context(self) -> Tuple[DisplaySpecifyingIdentifyingContext, Tuple[DisplaySpecifyingIdentifyingContext]]:
+    def get_complete_session_context(self, parts_separator:str='_') -> Tuple[DisplaySpecifyingIdentifyingContext, Tuple[DisplaySpecifyingIdentifyingContext]]:
         """ gets the entire session context, including the noteworthy computation parameters that would be needed for determing which filename to save under .
         
         Usage:
             complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
         
         """
-        curr_session_context: DisplaySpecifyingIdentifyingContext = DisplaySpecifyingIdentifyingContext.init_from_context(a_context=self.get_session_context()) # **_obj.to_dict(),
-        additional_session_context: DisplaySpecifyingIdentifyingContext = self.get_session_additional_parameters_context()
+        _filename_formatting_fn = partial(
+            session_context_filename_formatting_fn,
+            parts_separator=parts_separator,
+        )
+
+        curr_session_context: DisplaySpecifyingIdentifyingContext = DisplaySpecifyingIdentifyingContext.init_from_context(a_context=self.get_session_context(),
+        specific_purpose_display_dict={'filename_formatting': _filename_formatting_fn,},
+        # display_dict={'epochs_source': lambda k, v: to_filename_conversion_dict[v],
+        #         'included_qclu_values': lambda k, v: f"qclu_{v}",
+        #         'minimum_inclusion_fr_Hz': lambda k, v: f"frateThresh_{v:.1f}",
+        # },
+        ) # **_obj.to_dict(),
+        additional_session_context: DisplaySpecifyingIdentifyingContext = self.get_session_additional_parameters_context(parts_separator=parts_separator)
         # complete_session_context: DisplaySpecifyingIdentifyingContext = curr_session_context | additional_session_context # hoping this merger works
         complete_session_context: DisplaySpecifyingIdentifyingContext = curr_session_context.adding_context(collision_prefix='_additional', **additional_session_context.to_dict()) # hoping this merger works
         
