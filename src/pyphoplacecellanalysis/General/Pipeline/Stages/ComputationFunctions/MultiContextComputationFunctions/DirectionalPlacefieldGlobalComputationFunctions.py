@@ -2815,7 +2815,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
 							any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=['ripple_start_t',], atol=0.01, not_found_action='skip_index', debug_print=False)
 						except AttributeError as e:
 							print(f'ERROR: failed method 2 for {a_df_name}. Out of options.')        
-						except BaseException as e:
+						except Exception as e:
 							print(f'ERROR: failed for {a_df_name}. Out of options.')
 						
 					if any_good_selected_epoch_indicies is not None:
@@ -2840,7 +2840,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
 							any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=['ripple_start_t',], atol=0.01, not_found_action='skip_index', debug_print=False)
 						except AttributeError as e:
 							print(f'ERROR: failed method 2 for {a_df_name}. Out of options.')        
-						except BaseException as e:
+						except Exception as e:
 							print(f'ERROR: failed for {a_df_name}. Out of options.')
 						
 					if any_good_selected_epoch_indicies is not None:
@@ -2851,7 +2851,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
 							a_df['is_valid_epoch'].iloc[any_good_selected_epoch_indicies] = True
 							# a_df['is_valid_epoch'].loc[any_good_selected_epoch_indicies] = True
 
-						except BaseException as e:
+						except Exception as e:
 							print(f'WARNING: trying to get whether the epochs are valid FAILED probably, 2024-06-28 custom computed epochs thing: {e}, just setting all to True')
 							a_df['is_valid_epoch'] = True
 					else:
