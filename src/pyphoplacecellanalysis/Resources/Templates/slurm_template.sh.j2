@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=job_{{ curr_session_context }}
+#SBATCH --job-name=job_{{ curr_session_context }}{% if job_suffix %}_{{ job_suffix }}{% endif %}
 #SBATCH --output=slurm_%x-%j.out
 #SBATCH --chdir='{{ curr_batch_script_rundir }}'
 #SBATCH --ntasks=1
