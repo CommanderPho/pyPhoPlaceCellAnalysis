@@ -650,15 +650,26 @@ class BatchCompletionHelpers:
 			## Get the estimation parameters:
 			replay_estimation_parameters = deepcopy(curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays)
 			assert replay_estimation_parameters is not None
+			
+			if minimum_inclusion_fr_Hz is not None:
+				## apply the specified `minimum_inclusion_fr_Hz` to the replay_estimation_parameters
+				replay_estimation_parameters['min_inclusion_fr_active_thresh'] = minimum_inclusion_fr_Hz
+				
+
 
 			## get the epochs computed normally:
 			replay_epoch_variations.update({
 				'normal_computed': ensure_Epoch(deepcopy(curr_active_pipeline.sess.replay), metadata={'epochs_source': 'normal_computed',
-																							'minimum_inclusion_fr_Hz': replay_estimation_parameters['min_inclusion_fr_active_thresh'],
+																							# 'minimum_inclusion_fr_Hz': replay_estimation_parameters['min_inclusion_fr_active_thresh'],
+																							'minimum_inclusion_fr_Hz': minimum_inclusion_fr_Hz,
 																							'min_num_active_neurons': replay_estimation_parameters['min_num_unique_aclu_inclusions'],
 																								'included_qclu_values': deepcopy(included_qclu_values)
 																								}),
+																								
 			})
+			
+		
+
 
 		# with ExceptionPrintingContext(suppress=suppress_exceptions, exception_print_fn=(lambda formatted_exception_str: print(f'\t"diba_quiescent_method_replay_epochs" failed with error: {formatted_exception_str}. Skipping.'))):
 		#     ## Compute new epochs:
