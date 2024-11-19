@@ -118,7 +118,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 	from neuropy.utils.debug_helpers import parameter_sweeps
 	from neuropy.core.laps import Laps
 	from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
-	from pyphocorehelpers.print_helpers import get_now_day_str
+	from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
 	from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _check_result_laps_epochs_df_performance
 	from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
 	from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
@@ -167,6 +167,18 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 		# out_path, out_filename, out_basename = get_export_name(data_identifier_str=data_identifier_str, parent_output_path=parent_output_path, active_context=active_context, out_extension='.csv')
 		marginals_df.to_csv(out_path)
 		return out_path 
+
+
+	def _subfn_custom_export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'(laps_marginals_df)', parent_output_path: Path=None):
+		""" captures `curr_active_pipeline`
+		"""
+		out_path, out_filename, out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=get_now_rounded_time_str(rounded_minutes=10), data_identifier_str=data_identifier_str,
+																												 parent_output_path=parent_output_path, out_extension='.csv')
+		export_df.to_csv(out_path)
+		return out_path 
+	
+	custom_export_df_to_csv_fn = _subfn_custom_export_df_to_csv
+	
 
 	def _subfn_process_time_bin_swept_results(output_extracted_result_tuples, active_context: IdentifyingContext):
 		""" After the sweeps are complete and multiple (one for each time_bin_size swept) indepdnent dfs are had with the four results types this function concatenates each of the four into a single dataframe for all time_bin_size values with a column 'time_bin_size'. 
@@ -240,7 +252,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 		laps_time_bin_marginals_out_path, laps_out_path, ripple_time_bin_marginals_out_path, ripple_out_path = None, None, None, None
 		if save_csvs:
 			assert self.collected_outputs_path.exists()
-			assert active_context is not None
+			# assert active_context is not None
 			if several_time_bin_sizes_time_bin_laps_df is not None:
 				laps_time_bin_marginals_out_path = export_marginals_df_csv(several_time_bin_sizes_time_bin_laps_df, data_identifier_str=f'(laps_time_bin_marginals_df)', parent_output_path=self.collected_outputs_path, active_context=active_context)
 			if several_time_bin_sizes_laps_df is not None:
@@ -488,11 +500,11 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
 	# out_path_basename_str: str = f"{now_day_str}_{active_context}_time_bin_size-{laps_decoding_time_bin_size}_{data_identifier_str}"
 	# out_path_basename_str: str = f"{now_day_str}_{active_context}_time_bin_size_sweep_results"
-	out_path_basename_str: str = f"{CURR_BATCH_OUTPUT_PREFIX}_time_bin_size_sweep_results"
+	# out_path_basename_str: str = f"{CURR_BATCH_OUTPUT_PREFIX}_time_bin_size_sweep_results"
 	# out_path_filenname_str: str = f"{out_path_basename_str}.csv"
-
-	out_path_filenname_str: str = f"{out_path_basename_str}.h5"
-	out_path: Path = self.collected_outputs_path.resolve().joinpath(out_path_filenname_str).resolve()
+	# out_path_filenname_str: str = f"{out_path_basename_str}.h5"
+	# out_path: Path = self.collected_outputs_path.resolve().joinpath(out_path_filenname_str).resolve()
+	out_path, out_path_filenname_str, out_path_basename_str = curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=self.BATCH_DATE_TO_USE, data_identifier_str="(time_bin_size_sweep_results)", parent_output_path=self.collected_outputs_path.resolve(), out_extension='.h5')
 	print(f'\tout_path_str: "{out_path_filenname_str}"')
 	print(f'\tout_path: "{out_path}"')
 	
@@ -695,6 +707,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 		_output_csv_paths = a_directional_decoders_epochs_decode_result.export_csvs(parent_output_path=self.collected_outputs_path.resolve(), active_context=active_context, session_name=curr_session_name, curr_session_t_delta=t_delta,
 																						user_annotation_selections={'ripple': any_good_selected_epoch_times},
 																						valid_epochs_selections={'ripple': filtered_valid_epoch_times},
+																						custom_export_df_to_csv_fn=custom_export_df_to_csv_fn, 
 																					)
 		print(f'\t>>>>>>>>>> exported files: {_output_csv_paths}\n\n')
 

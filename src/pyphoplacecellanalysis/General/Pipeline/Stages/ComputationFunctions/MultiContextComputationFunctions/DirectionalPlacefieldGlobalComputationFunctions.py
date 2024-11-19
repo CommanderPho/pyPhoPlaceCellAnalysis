@@ -2728,7 +2728,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
 	@classmethod
 	def _perform_export_dfs_dict_to_csvs(cls, extracted_dfs_dict: Dict, parent_output_path: Path, active_context: IdentifyingContext, session_name: str, tbin_values_dict: Dict,
 										t_start: Optional[float]=None, curr_session_t_delta: Optional[float]=None, t_end: Optional[float]=None,
-										user_annotation_selections=None, valid_epochs_selections=None):
+										user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None):
 		""" Classmethod: export as separate .csv files. 
 		active_context = curr_active_pipeline.get_session_context()
 		curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
@@ -2760,8 +2760,8 @@ class DecoderDecodedEpochsResult(ComputedResult):
 		assert parent_output_path.exists(), f"'{parent_output_path}' does not exist!"
 		output_date_str: str = get_now_rounded_time_str(rounded_minutes=10)
 		# Export CSVs:
-		def export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'(laps_marginals_df)'):
-			""" captures `active_context`, `parent_output_path`. 'output_date_str'
+		def export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'(laps_marginals_df)', parent_output_path: Path=None):
+			""" captures `active_context`, 'output_date_str'
 			"""
 			# parent_output_path: Path = Path('output').resolve()
 			# active_context = curr_active_pipeline.get_session_context()
@@ -2773,6 +2773,11 @@ class DecoderDecodedEpochsResult(ComputedResult):
 			out_path = parent_output_path.joinpath(out_filename).resolve()
 			export_df.to_csv(out_path)
 			return out_path 
+
+		if custom_export_df_to_csv_fn is None:
+			# use the default
+			custom_export_df_to_csv_fn = export_df_to_csv
+
 
 		# active_context.custom_suffix = '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0' # '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0normal_computed-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]'
 		
@@ -2852,14 +2857,14 @@ class DecoderDecodedEpochsResult(ComputedResult):
 					else:
 						print(f'\t failed all methods for selection filter')
 
-			export_files_dict[a_df_name] = export_df_to_csv(a_df, data_identifier_str=a_data_identifier_str) # this is exporting corr '(ripple_WCorrShuffle_df)_tbin-0.025'
+			export_files_dict[a_df_name] = custom_export_df_to_csv_fn(a_df, data_identifier_str=a_data_identifier_str, parent_output_path=parent_output_path) # this is exporting corr '(ripple_WCorrShuffle_df)_tbin-0.025'
 		# end for a_df_name, a_df
 		
 		return export_files_dict
 	
 
 
-	def perform_export_dfs_dict_to_csvs(self, extracted_dfs_dict: Dict, parent_output_path: Path, active_context, session_name: str, curr_session_t_delta: Optional[float], user_annotation_selections=None, valid_epochs_selections=None):
+	def perform_export_dfs_dict_to_csvs(self, extracted_dfs_dict: Dict, parent_output_path: Path, active_context, session_name: str, curr_session_t_delta: Optional[float], user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None):
 		""" export as separate .csv files. 
 		active_context = curr_active_pipeline.get_session_context()
 		curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
@@ -2880,12 +2885,12 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
 		"""
 		return self._perform_export_dfs_dict_to_csvs(extracted_dfs_dict=extracted_dfs_dict, parent_output_path=parent_output_path, active_context=active_context, session_name=session_name, tbin_values_dict={'laps': self.laps_decoding_time_bin_size, 'ripple': self.ripple_decoding_time_bin_size},
-													 curr_session_t_delta=curr_session_t_delta, user_annotation_selections=user_annotation_selections, valid_epochs_selections=valid_epochs_selections)
+													 curr_session_t_delta=curr_session_t_delta, user_annotation_selections=user_annotation_selections, valid_epochs_selections=valid_epochs_selections, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn)
 
 
 
 	@function_attributes(short_name=None, tags=['export', 'CSV', 'main'], input_requires=[], output_provides=['ripple_all_scores_merged_df.csv'], uses=['self.perform_export_dfs_dict_to_csvs', 'self.build_complete_all_scores_merged_df'], used_by=['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'], creation_date='2024-03-15 10:13', related_items=[])
-	def export_csvs(self, parent_output_path: Path, active_context: IdentifyingContext, session_name: str, curr_session_t_delta: Optional[float], user_annotation_selections=None, valid_epochs_selections=None):
+	def export_csvs(self, parent_output_path: Path, active_context: IdentifyingContext, session_name: str, curr_session_t_delta: Optional[float], user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None):
 		""" export as separate .csv files. 
 
 		from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
@@ -2912,12 +2917,12 @@ class DecoderDecodedEpochsResult(ComputedResult):
 		"""
 		_df_variables_names = ['laps_weighted_corr_merged_df', 'ripple_weighted_corr_merged_df', 'laps_simple_pf_pearson_merged_df', 'ripple_simple_pf_pearson_merged_df']
 		extracted_dfs_dict = {a_df_name:getattr(self, a_df_name) for a_df_name in _df_variables_names}
-		export_files_dict = self.perform_export_dfs_dict_to_csvs(extracted_dfs_dict=extracted_dfs_dict, parent_output_path=parent_output_path, active_context=active_context, session_name=session_name, curr_session_t_delta=curr_session_t_delta, user_annotation_selections=user_annotation_selections, valid_epochs_selections=valid_epochs_selections)
+		export_files_dict = self.perform_export_dfs_dict_to_csvs(extracted_dfs_dict=extracted_dfs_dict, parent_output_path=parent_output_path, active_context=active_context, session_name=session_name, curr_session_t_delta=curr_session_t_delta, user_annotation_selections=user_annotation_selections, valid_epochs_selections=valid_epochs_selections, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn)
 
 		## try to export the merged all_scores dataframe
 		extracted_merged_scores_df: pd.DataFrame = self.build_complete_all_scores_merged_df()
 		export_df_dict = {'ripple_all_scores_merged_df': extracted_merged_scores_df}
-		export_files_dict = export_files_dict | self.perform_export_dfs_dict_to_csvs(extracted_dfs_dict=export_df_dict, parent_output_path=parent_output_path, active_context=active_context, session_name=session_name, curr_session_t_delta=curr_session_t_delta, user_annotation_selections=None, valid_epochs_selections=None)
+		export_files_dict = export_files_dict | self.perform_export_dfs_dict_to_csvs(extracted_dfs_dict=export_df_dict, parent_output_path=parent_output_path, active_context=active_context, session_name=session_name, curr_session_t_delta=curr_session_t_delta, user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn)
 
 		return export_files_dict
 
