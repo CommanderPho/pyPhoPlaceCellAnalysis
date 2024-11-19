@@ -296,10 +296,11 @@ class BatchCompletionHelpers:
 															save_hdf=enable_save_h5, save_csvs=True,
 															# desired_shared_decoding_time_bin_sizes = np.linspace(start=0.030, stop=0.5, num=4),
 															custom_all_param_sweep_options=custom_all_param_sweep_options, # directly provide the parameter sweeps
-															additional_session_context=additional_session_context
+															additional_session_context=additional_session_context,
+															# additional_session_context=IdentifyingContext(custom_suffix=None),
 														)
 			# with `return_full_decoding_results == False`
-			out_path, output_laps_decoding_accuracy_results_df, output_extracted_result_tuples, combined_multi_timebin_outputs_tuple = _across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function']
+			out_path, output_laps_decoding_accuracy_results_df, output_extracted_result_tuples, combined_multi_timebin_outputs_tuple, output_saved_individual_sweep_files_dict = _across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function']
 			(several_time_bin_sizes_laps_df, laps_out_path, several_time_bin_sizes_time_bin_laps_df, laps_time_bin_marginals_out_path), (several_time_bin_sizes_ripple_df, ripple_out_path, several_time_bin_sizes_time_bin_ripple_df, ripple_time_bin_marginals_out_path) = combined_multi_timebin_outputs_tuple
 
 			_out_file_paths_dict = {
@@ -314,6 +315,11 @@ class BatchCompletionHelpers:
 
 			for a_name, a_path in _out_file_paths_dict.items():
 				custom_save_filepaths[a_name] = a_path
+
+
+			for an_export_file_type, a_path_list in output_saved_individual_sweep_files_dict.items():
+				custom_save_filepaths[an_export_file_type] = deepcopy(a_path_list) # a list of paths
+				
 
 			# custom_save_filepaths['csv_out_path'] = out_path # ends up being the .h5 path for some reason
 			# custom_save_filepaths['csv_out_path'] = out_path # ends up being the .h5 path for some reason

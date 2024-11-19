@@ -636,15 +636,17 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 			#     # 2024-04-03 `DirectionalPseudo2DDecodersResult` is actually missing a `to_hdf` implementation, so no dice.
 
 		#     output_alt_directional_merged_decoders_result.to_hdf(out_path, key=f'{session_ctxt_key}/alt_directional_merged_decoders_result')
-		across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'] = tuple(across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'])
+		# across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'] = tuple(across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'])
 
 
+	# across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'] ## add the output files?
+	
 	## UNPACKING
 	# # with `return_full_decoding_results == False`
-	# out_path, output_laps_decoding_accuracy_results_df, output_extracted_result_tuples, combined_multi_timebin_outputs_tuple = across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function']
+	# out_path, output_laps_decoding_accuracy_results_df, output_extracted_result_tuples, combined_multi_timebin_outputs_tuple, output_saved_individual_sweep_files_dict = across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function']
 
 	# # with `return_full_decoding_results == True`
-	# out_path, output_laps_decoding_accuracy_results_df, output_extracted_result_tuples, combined_multi_timebin_outputs_tuple, output_full_directional_merged_decoders_result = across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function']
+	# out_path, output_laps_decoding_accuracy_results_df, output_extracted_result_tuples, combined_multi_timebin_outputs_tuple, output_full_directional_merged_decoders_result, output_saved_individual_sweep_files_dict = across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function']
 
 
 	# can unpack like:
@@ -685,8 +687,17 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 																						custom_export_df_to_csv_fn=custom_export_df_to_csv_fn, 
 																					)
 		print(f'\t>>>>>>>>>> exported files: {_output_csv_paths}\n\n')
+		for k, v in _output_csv_paths.items():
+			## current iteration only
+			if k not in _temp_saved_files_dict:
+				_temp_saved_files_dict[k] = [] # initialize an empty array for this key
+			_temp_saved_files_dict[k].append(v) ## append the path to the output files dict				
 
-
+	## update output files:
+	across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'].append(_temp_saved_files_dict)
+	
+	across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'] = tuple(across_session_results_extended_dict['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'])
+	
 
 	print(f'>>\t done with {curr_session_context}')
 	print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
