@@ -1715,7 +1715,7 @@ class DataFrameFilter:
     button_download: widgets.Button = field(init=False)
     filename_label: widgets.Label = field(init=False)
     # Add Output widget for JavaScript execution
-    js_output: widgets.Output = field(init=False)
+    # js_output: widgets.Output = field(init=False)
     
 
     # Begin Properties ___________________________________________________________________________________________________ #
@@ -1860,11 +1860,7 @@ class DataFrameFilter:
         # Button Widget Initialize ___________________________________________________________________________________________ #
         # Set up the buttons after figure_widget is created
         self._setup_widgets_buttons()
-        self.on_widget_update_filename()  # Initialize filename and label
-        # Set up observers for figure changes
-        self.figure_widget.layout.on_change(self.on_fig_layout_change, 'title', 'meta')
-        # Initialize the Output widget for JavaScript execution
-        self.js_output = widgets.Output()
+
 
     def _setup_widgets(self):
         import plotly.subplots as sp
@@ -1963,8 +1959,8 @@ class DataFrameFilter:
         def on_copy_button_click(b):
             # Convert the figure to a PNG image
             # Retrieve width and height if set
-            width = fig.layout.width
-            height = fig.layout.height
+            width = self.figure_widget.layout.width
+            height = self.figure_widget.layout.height
             to_image_kwargs = {}
             print(f"Width: {width}, Height: {height}")
             if width is not None:
@@ -1972,7 +1968,7 @@ class DataFrameFilter:
             if height is not None:
                 to_image_kwargs['height'] = height
 
-            png_bytes = pio.to_image(fig, format='png', **to_image_kwargs)
+            png_bytes = pio.to_image(self.figure_widget, format='png', **to_image_kwargs)
             encoded_image = base64.b64encode(png_bytes).decode('utf-8')
 
             # JavaScript code to copy the image to the clipboard using the canvas element
@@ -2000,14 +1996,14 @@ class DataFrameFilter:
 
         def on_download_button_click(b):
             # Convert the figure to a PNG image
-            png_bytes = pio.to_image(fig, format='png')
+            png_bytes = pio.to_image(self.figure_widget, format='png')
             encoded_image = base64.b64encode(png_bytes).decode('utf-8')
 
             # JavaScript code to trigger download with a specific filename
             js_code = f'''
                 const link = document.createElement('a');
                 link.href = 'data:image/png;base64,{encoded_image}';
-                link.download = '{filename}';
+                link.download = '{self.filename}';
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
@@ -2015,12 +2011,19 @@ class DataFrameFilter:
 
             display(Javascript(js_code))
 
-        button_copy.on_click(on_copy_button_click)
-        button_download.on_click(on_download_button_click)
-                
+        self.button_copy.on_click(on_copy_button_click)
+        self.button_download.on_click(on_download_button_click)
 
-        self.button_copy.on_click(self.on_copy_button_click)
-        self.button_download.on_click(self.on_download_button_click)
+        ## Finish setup:
+        self.on_widget_update_filename()  # Initialize filename and label
+        # Set up observers for figure changes
+        # self.figure_widget.layout.on_change(self.on_fig_layout_change, 'title', 'meta')
+        # Initialize the Output widget for JavaScript execution
+        # self.js_output = widgets.Output()
+
+
+        # self.button_copy.on_click(self.on_copy_button_click)
+        # self.button_download.on_click(self.on_download_button_click)
 
     # ==================================================================================================================== #
     # Widget Update Functions                                                                                              #
@@ -2041,51 +2044,51 @@ class DataFrameFilter:
         """Callback for when the figure's layout changes."""
         self.on_widget_update_filename()
 
-    def on_copy_button_click(self, b):
-        """Copies the figure as an image to the clipboard."""
-        fig = self.figure_widget
-        png_bytes = pio.to_image(fig, format='png')
-        encoded_image = base64.b64encode(png_bytes).decode('utf-8')
+    # def on_copy_button_click(self, b):
+    #     """Copies the figure as an image to the clipboard."""
+    #     fig = self.figure_widget
+    #     png_bytes = pio.to_image(fig, format='png')
+    #     encoded_image = base64.b64encode(png_bytes).decode('utf-8')
 
-        js_code = f'''
-            const img = new Image();
-            img.src = 'data:image/png;base64,{encoded_image}';
-            img.onload = function() {{
-                const canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
-                canvas.toBlob(function(blob) {{
-                    const item = new ClipboardItem({{ 'image/png': blob }});
-                    navigator.clipboard.write([item]).then(function() {{
-                        console.log('Image copied to clipboard');
-                    }}).catch(function(error) {{
-                        console.error('Error copying image to clipboard: ', error);
-                    }});
-                }});
-            }};
-        '''
-        with self.js_output:
-            display(Javascript(js_code))
+    #     js_code = f'''
+    #         const img = new Image();
+    #         img.src = 'data:image/png;base64,{encoded_image}';
+    #         img.onload = function() {{
+    #             const canvas = document.createElement('canvas');
+    #             canvas.width = img.width;
+    #             canvas.height = img.height;
+    #             const ctx = canvas.getContext('2d');
+    #             ctx.drawImage(img, 0, 0);
+    #             canvas.toBlob(function(blob) {{
+    #                 const item = new ClipboardItem({{ 'image/png': blob }});
+    #                 navigator.clipboard.write([item]).then(function() {{
+    #                     console.log('Image copied to clipboard');
+    #                 }}).catch(function(error) {{
+    #                     console.error('Error copying image to clipboard: ', error);
+    #                 }});
+    #             }});
+    #         }};
+    #     '''
+    #     with self.js_output:
+    #         display(Javascript(js_code))
 
 
-    def on_download_button_click(self, b):
-        """Triggers a download of the figure as an image with the specified filename."""
-        fig = self.figure_widget
-        png_bytes = pio.to_image(fig, format='png')
-        encoded_image = base64.b64encode(png_bytes).decode('utf-8')
+    # def on_download_button_click(self, b):
+    #     """Triggers a download of the figure as an image with the specified filename."""
+    #     fig = self.figure_widget
+    #     png_bytes = pio.to_image(fig, format='png')
+    #     encoded_image = base64.b64encode(png_bytes).decode('utf-8')
 
-        js_code = f'''
-            const link = document.createElement('a');
-            link.href = 'data:image/png;base64,{encoded_image}';
-            link.download = '{self.filename}';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        '''
-        with self.js_output:
-            display(Javascript(js_code))
+    #     js_code = f'''
+    #         const link = document.createElement('a');
+    #         link.href = 'data:image/png;base64,{encoded_image}';
+    #         link.download = '{self.filename}';
+    #         document.body.appendChild(link);
+    #         link.click();
+    #         document.body.removeChild(link);
+    #     '''
+    #     with self.js_output:
+    #         display(Javascript(js_code))
 
     def display(self):
         """Displays the widgets."""
@@ -2111,7 +2114,7 @@ class DataFrameFilter:
             self.output_widget,
             self.figure_widget,
             widgets.HBox([self.button_copy, self.button_download, self.filename_label]),
-            self.js_output,  # Include the Output widget to allow the buttons to perform their actions
+            # self.js_output,  # Include the Output widget to allow the buttons to perform their actions
             self.table_widget,
         ]))
         
