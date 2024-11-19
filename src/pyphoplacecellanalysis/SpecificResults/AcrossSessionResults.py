@@ -934,7 +934,8 @@ class H5FileAggregator:
 
 
         print(f'concatenating dataframes from {len(data_frames)} of {len(self.file_list)} files')
-        master_table = pd.concat(data_frames, ignore_index=True)
+        # master_table = pd.concat(data_frames, ignore_index=True)
+        master_table = PandasHelpers.safe_concat(data_frames, ignore_index=True)
         return master_table
 
 
@@ -3346,7 +3347,6 @@ import re
 class ExportValueNameCleaner:
     """ 
     Usage:
-        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import ExportValueNameCleaner
         new_name_list = ExportValueNameCleaner.clean_all(name_list=all_sessions_MultiMeasure_ripple_df['custom_replay_name'].unique().tolist())
         new_name_list
 
