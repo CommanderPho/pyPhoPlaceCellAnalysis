@@ -1730,8 +1730,7 @@ def compute_and_export_cell_first_spikes_characteristics_completion_function(sel
 	collected_outputs = self.collected_outputs_path.resolve()	
 	print(f'collected_outputs: {collected_outputs}')
 
-	# custom_save_filepaths, custom_save_filenames, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters() # 'normal_computed-frateThresh_5.0-qclu_[1, 2]'
-	# complete_session_identifier_string: str = '_'.join([curr_active_pipeline.get_session_context().get_description(separator='-'), custom_suffix]) # 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]'
+	 # 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]'
 	complete_session_identifier_string: str = curr_active_pipeline.get_complete_session_identifier_string()
 	# session_identifier_str: str = active_context.get_description()
 	hdf5_out_path, out_filename, out_basename = get_export_name(data_identifier_str="(first_spike_activity_data)", parent_output_path=collected_outputs, session_identifier_str=complete_session_identifier_string, out_extension='.h5')

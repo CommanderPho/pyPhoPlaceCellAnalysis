@@ -1937,7 +1937,7 @@ class PipelineWithComputedPipelineStageMixin:
 
 
     @function_attributes(short_name=None, tags=['UNFINSHED', 'context', 'custom', 'parameters'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-31 19:46', related_items=[])
-    def get_session_additional_parameters_context(self) -> DisplaySpecifyingIdentifyingContext:
+    def get_session_additional_parameters_context(self, parts_separator:str='-') -> DisplaySpecifyingIdentifyingContext:
         """ gets the entire session context, including the noteworthy computation parameters that would be needed for determing which filename to save under .
         
         Usage:
@@ -1950,6 +1950,8 @@ class PipelineWithComputedPipelineStageMixin:
             """ `neuropy.utils.result_context.ContextFormatRenderingFn` protocol format callable 
             specific_purpose='filename_prefix'
             renders a custom_prefix from the context
+            
+            Captures: parts_separator, 
              
              final_filename like "2024-10-31_1020PM-kdiba_pin01_one_11-03_12-3-25__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]-(ripple_simple_pf_pearson_merged_df)_tbin-0.025.csv"
             only handles the "_withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]" part
@@ -1970,7 +1972,7 @@ class PipelineWithComputedPipelineStageMixin:
                 custom_suffix_string_parts.append(f"frateThresh_{ctxt.get('minimum_inclusion_fr_Hz', None):.1f}")
             if (ctxt.get('included_qclu_values', None) is not None) and (len(str(ctxt.get('included_qclu_values', None))) > 0) and ('included_qclu_values' not in subset_excludelist):
                 custom_suffix_string_parts.append(f"qclu_{ctxt.get('included_qclu_values', None)}")
-            custom_suffix = '-'.join([custom_suffix, *custom_suffix_string_parts])
+            custom_suffix = parts_separator.join([custom_suffix, *custom_suffix_string_parts])
             return custom_suffix
 
 
@@ -1995,7 +1997,7 @@ class PipelineWithComputedPipelineStageMixin:
     
 
     @function_attributes(short_name=None, tags=['parameters', 'filenames', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 16:10', related_items=[])
-    def get_custom_pipeline_filenames_from_parameters(self) -> Tuple:
+    def get_custom_pipeline_filenames_from_parameters(self, parts_separator:str='-') -> Tuple:
         """ gets the custom suffix from the pipeline's parameters 
         
         custom_save_filepaths, custom_save_filenames, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
@@ -2015,7 +2017,7 @@ class PipelineWithComputedPipelineStageMixin:
         epochs_source: str = active_replay_epoch_parameters.get('epochs_source', 'normal_computed')
         custom_suffix: str = epochs_source
         # custom_suffix += _get_custom_suffix_for_filename_from_computation_metadata(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
-        custom_save_filepaths, custom_save_filenames, custom_suffix = _get_custom_filenames_from_computation_metadata(epochs_source=epochs_source, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
+        custom_save_filepaths, custom_save_filenames, custom_suffix = _get_custom_filenames_from_computation_metadata(epochs_source=epochs_source, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values, parts_separator=parts_separator)
         # print(f'custom_save_filenames: {custom_save_filenames}')
         # print(f'custom_suffix: "{custom_suffix}"')
         
@@ -2023,13 +2025,15 @@ class PipelineWithComputedPipelineStageMixin:
     
 
     @function_attributes(short_name=None, tags=['parameters', 'filenames', 'export'], input_requires=[], output_provides=[], uses=['get_custom_pipeline_filenames_from_parameters'], used_by=[], creation_date='2024-11-08 10:36', related_items=[])
-    def get_complete_session_identifier_string(self) -> str:
+    def get_complete_session_identifier_string(self, parts_separator:str='-') -> str:
         """ returns a string like 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]', with the session context and the parameters
 	    complete_session_identifier_string: str = curr_active_pipeline.get_complete_session_identifier_string()
     
+        Used to be `parts_separator:str='_'`
         """
-        custom_save_filepaths, custom_save_filenames, custom_suffix = self.get_custom_pipeline_filenames_from_parameters() # 'normal_computed-frateThresh_5.0-qclu_[1, 2]'
-        complete_session_identifier_string: str = '_'.join([self.get_session_context().get_description(separator='-'), custom_suffix]) # 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]'
+        sub_parts_separator:str='-'
+        custom_save_filepaths, custom_save_filenames, custom_suffix = self.get_custom_pipeline_filenames_from_parameters(parts_separator=sub_parts_separator) # 'normal_computed-frateThresh_5.0-qclu_[1, 2]'
+        complete_session_identifier_string: str = parts_separator.join([self.get_session_context().get_description(separator='-'), custom_suffix]) # 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]'
         return complete_session_identifier_string
 
 
