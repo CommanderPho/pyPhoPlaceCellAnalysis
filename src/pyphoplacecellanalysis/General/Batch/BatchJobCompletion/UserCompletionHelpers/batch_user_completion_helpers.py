@@ -137,32 +137,34 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 		print(f'\t!!!! 2024-07-10 WARNING: additional_session_context is None!')
 
 	# BEGIN _SUBFNS_ _____________________________________________________________________________________________________ #
-	def get_export_name(data_identifier_str: str, parent_output_path: Path, active_context: IdentifyingContext, out_extension: Optional[str]='.csv'):
-		""" captures nothing
+	# def get_export_name(data_identifier_str: str, parent_output_path: Path, active_context: IdentifyingContext, out_extension: Optional[str]='.csv'):
+	# 	""" captures nothing
 		
-		Outputs: '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
+	# 	Outputs: '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
 		
-		out_path, out_filename, out_basename = get_export_name(data_identifier_str='', parent_output_path=parent_output_path, active_context=active_context, out_extension='.csv')
-		"""
-		# output_date_str: str = get_now_rounded_time_str()
-		output_date_str: str = get_now_day_str()
-		session_identifier_str: str = active_context.get_description()
-		assert output_date_str is not None
-		out_basename = '-'.join([output_date_str, session_identifier_str, data_identifier_str]) # '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
-		if out_extension is None:
-			out_extension = ''
-		out_filename = f"{out_basename}{out_extension}"
-		out_path = parent_output_path.joinpath(out_filename).resolve()
-		return out_path, out_filename, out_basename
+	# 	out_path, out_filename, out_basename = get_export_name(data_identifier_str='', parent_output_path=parent_output_path, active_context=active_context, out_extension='.csv')
+	# 	"""
+	# 	# output_date_str: str = get_now_rounded_time_str()
+	# 	output_date_str: str = get_now_day_str()
+	# 	session_identifier_str: str = active_context.get_description()
+	# 	assert output_date_str is not None
+	# 	out_basename = '-'.join([output_date_str, session_identifier_str, data_identifier_str]) # '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
+	# 	if out_extension is None:
+	# 		out_extension = ''
+	# 	out_filename = f"{out_basename}{out_extension}"
+	# 	out_path = parent_output_path.joinpath(out_filename).resolve()
+	# 	return out_path, out_filename, out_basename
 
 	# Export CSVs:
 	def export_marginals_df_csv(marginals_df: pd.DataFrame, data_identifier_str: str, parent_output_path: Path, active_context: IdentifyingContext):
-		""" captures nothing
+		""" 
+		captures: curr_active_pipeline,
 		
 		Outputs: '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
 		
 		"""
-		out_path, out_filename, out_basename = get_export_name(data_identifier_str=data_identifier_str, parent_output_path=parent_output_path, active_context=active_context, out_extension='.csv')
+		out_path, out_filename, out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=get_now_day_str(), data_identifier_str=data_identifier_str, parent_output_path=parent_output_path, out_extension='.csv')
+		# out_path, out_filename, out_basename = get_export_name(data_identifier_str=data_identifier_str, parent_output_path=parent_output_path, active_context=active_context, out_extension='.csv')
 		marginals_df.to_csv(out_path)
 		return out_path 
 
@@ -379,12 +381,16 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
 		return result_laps_epochs_df
 
+
 	# BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
 	should_output_lap_decoding_performance_info: bool = False
 
 	assert self.collected_outputs_path.exists()
 	curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
+	#TODO 2024-11-19 02:05: - [ ] Depricated in favor of using `curr_active_pipeline.build_complete_session_identifier_filename_string(...)`
 	_, _, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters() # this `custom_suffix` is correct and not duplicated
+	# curr_active_pipeline.get
+	#TODO 2024-11-19 00:11: - [ ] Get proper names
 	if len(custom_suffix) > 0:
 		if additional_session_context is not None:
 			if isinstance(additional_session_context, dict):
@@ -432,6 +438,8 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 		# 	session_ctxt_key:str = session_ctxt_key + custom_suffix
 		# 	CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}-{custom_suffix}"
 
+	active_context = None
+	
 	print(f'\tactive_context: {active_context}')
 	print(f'\tsession_ctxt_key: {session_ctxt_key}')
 	print(f'\tCURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')    
@@ -503,12 +511,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 	# BEGIN BLOCK 2 - modernizing from `_perform_compute_custom_epoch_decoding`  ________________________________________________________________________________________________________ #
 	
 	# Uses: session_ctxt_key, all_param_sweep_options
-	# output_alt_directional_merged_decoders_result: Dict[Tuple, Dict[types.DecoderName, DirectionalPseudo2DDecodersResult]] = {} # empty dict
-
 	output_alt_directional_merged_decoders_result: Dict[Tuple, DirectionalPseudo2DDecodersResult] = {} # empty dict
-	# output_alt_directional_merged_decoders_result: Dict[Tuple, Dict[types.DecoderName, DirectionalPseudo2DDecodersResult]] = {} # empty dict
-
-	# Tuple[DirectionalPseudo2DDecodersResult, Tuple[DecodedEpochsResultsDict, DecodedEpochsResultsDict]]
 	output_directional_decoders_epochs_decode_results_dict: Dict[Tuple, DecoderDecodedEpochsResult] = {} # `_decode_and_evaluate_epochs_using_directional_decoders`-style output
 
 	output_laps_decoding_accuracy_results_dict = {} # empty dict
@@ -1520,6 +1523,11 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 																											  enable_save_pipeline_pkl=True, enable_save_global_computations_pkl=False, enable_save_h5=False,
 																											  num_wcorr_shuffles=num_wcorr_shuffles,
 																											  user_completion_dummy=self, drop_previous_result_and_compute_fresh=drop_previous_result_and_compute_fresh)
+			# 'ripple_h5_out_path': WindowsPath('K:/scratch/collected_outputs/2024-11-18_Lab-2006-6-09_1-22-43-_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0_withNormalComputedReplays-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]_time_bin_size_sweep_results.h5'),
+			# 'ripple_csv_out_path': WindowsPath('K:/scratch/collected_outputs/2024-11-18-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0_withNormalComputedReplays-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]-(ripple_marginals_df).csv'),
+			# 'ripple_csv_time_bin_marginals': WindowsPath('K:/scratch/collected_outputs/2024-11-18-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0_withNormalComputedReplays-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]-(ripple_time_bin_marginals_df).csv'),
+			# 'laps_csv_out_path': WindowsPath('K:/scratch/collected_outputs/2024-11-18-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0_withNormalComputedReplays-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]-(laps_marginals_df).csv'),
+			# 'laps_csv_time_bin_marginals_out_path': WindowsPath('K:/scratch/collected_outputs/2024-11-18-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0_withNormalComputedReplays-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]-(laps_time_bin_marginals_df).csv'),
 
 			replay_epoch_outputs[replay_epochs_key].update(dict(did_change=did_change, custom_save_filenames=custom_save_filenames, custom_save_filepaths=custom_save_filepaths))
 
@@ -1704,26 +1712,6 @@ def compute_and_export_cell_first_spikes_characteristics_completion_function(sel
 	from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import CellsFirstSpikeTimes
 
 
-	def get_export_name(data_identifier_str: str, parent_output_path: Path, session_identifier_str: str, out_extension: Optional[str]='.csv'): # active_context: IdentifyingContext
-		""" captures nothing
-		
-		Outputs: '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
-		
-		out_path, out_filename, out_basename = get_export_name(data_identifier_str='', parent_output_path=parent_output_path, active_context=active_context, out_extension='.csv')
-		"""
-		# output_date_str: str = get_now_rounded_time_str()
-		output_date_str: str = get_now_day_str()
-		# session_identifier_str: str = active_context.get_description()
-		assert output_date_str is not None
-		out_basename = '-'.join([output_date_str, session_identifier_str, data_identifier_str]) # '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
-		if out_extension is None:
-			out_extension = ''
-		out_filename = f"{out_basename}{out_extension}"
-		out_path = parent_output_path.joinpath(out_filename).resolve()
-		return out_path, out_filename, out_basename
-	
-
-
 	print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
 	print(f'compute_and_export_cell_first_spikes_characteristics_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
 	
@@ -1732,9 +1720,10 @@ def compute_and_export_cell_first_spikes_characteristics_completion_function(sel
 	print(f'collected_outputs: {collected_outputs}')
 
 	 # 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]'
-	complete_session_identifier_string: str = curr_active_pipeline.get_complete_session_identifier_string()
+	# complete_session_identifier_string: str = curr_active_pipeline.get_complete_session_identifier_string()
 	# session_identifier_str: str = active_context.get_description()
-	hdf5_out_path, out_filename, out_basename = get_export_name(data_identifier_str="(first_spike_activity_data)", parent_output_path=collected_outputs, session_identifier_str=complete_session_identifier_string, out_extension='.h5')
+	# hdf5_out_path, out_filename, out_basename = get_export_name(data_identifier_str="(first_spike_activity_data)", parent_output_path=collected_outputs, session_identifier_str=complete_session_identifier_string, out_extension='.h5')
+	hdf5_out_path, out_filename, out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=get_now_day_str(), data_identifier_str="(first_spike_activity_data)", parent_output_path=collected_outputs, out_extension='.h5')
 
 	was_write_good: bool = False
 	try:
