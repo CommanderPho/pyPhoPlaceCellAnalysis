@@ -1868,7 +1868,7 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
 
 @function_attributes(short_name=None, tags=['wcorr', 'shuffle', 'replay', 'epochs', 'alternative_replays'], input_requires=[], output_provides=[], uses=['compute_all_replay_epoch_variations', 'overwrite_replay_epochs_and_recompute'], used_by=[], creation_date='2024-06-28 01:50', related_items=[])
 def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-																					  included_qclu_values = [1,2,4,6,7,9], minimum_inclusion_fr_Hz=5.0, num_wcorr_shuffles: int = 1024) -> dict:
+																					  included_qclu_values = [1,2,4,6,7,9], minimum_inclusion_fr_Hz=5.0, num_wcorr_shuffles: int = 1024, drop_previous_result_and_compute_fresh:bool=True) -> dict:
 	"""  Computes several different alternative replay-detection variants and computes and exports the shuffled wcorrs for each of them
 	from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function
 	
@@ -1883,10 +1883,8 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 	import sys
 	import numpy as np
 	from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
-	from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
 	from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import SequenceBasedComputationsContainer, WCorrShuffle
 	from neuropy.utils.mixins.indexing_helpers import get_dict_subset
-	from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
 	from pyphocorehelpers.exception_helpers import ExceptionPrintingContext
 	from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
 	from pyphocorehelpers.Filesystem.path_helpers import sanitize_filename_for_Windows
@@ -1989,7 +1987,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 			did_change, custom_save_filenames, custom_save_filepaths = BatchCompletionHelpers.overwrite_replay_epochs_and_recompute(curr_active_pipeline=a_curr_active_pipeline, new_replay_epochs=a_replay_epochs,
 																											  enable_save_pipeline_pkl=True, enable_save_global_computations_pkl=False, enable_save_h5=False,
 																											  num_wcorr_shuffles=num_wcorr_shuffles,
-																											  user_completion_dummy=self)
+																											  user_completion_dummy=self, drop_previous_result_and_compute_fresh=drop_previous_result_and_compute_fresh)
 
 			replay_epoch_outputs[replay_epochs_key].update(dict(did_change=did_change, custom_save_filenames=custom_save_filenames, custom_save_filepaths=custom_save_filepaths))
 

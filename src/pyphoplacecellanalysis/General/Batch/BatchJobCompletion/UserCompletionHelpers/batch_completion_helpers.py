@@ -182,7 +182,7 @@ class BatchCompletionHelpers:
 	@classmethod
 	def overwrite_replay_epochs_and_recompute(cls, curr_active_pipeline, new_replay_epochs: Epoch, ripple_decoding_time_bin_size: float = 0.025, 
 											num_wcorr_shuffles: int=25, fail_on_exception=True,
-											enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=False, enable_save_h5: bool = False, user_completion_dummy=None):
+											enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=False, enable_save_h5: bool = False, user_completion_dummy=None, drop_previous_result_and_compute_fresh:bool=True):
 		""" Recomputes the replay epochs using a custom implementation of the criteria in Diba 2007.
 
 		, included_qclu_values=[1,2], minimum_inclusion_fr_Hz=5.0
@@ -206,7 +206,6 @@ class BatchCompletionHelpers:
 			did_change, custom_save_filenames, custom_save_filepaths = overwrite_replay_epochs_and_recompute(curr_active_pipeline=curr_active_pipeline, new_replay_epochs=evt_epochs)
 
 		"""
-		from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
 		from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
 		from neuropy.utils.debug_helpers import parameter_sweeps
 		from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function
@@ -244,7 +243,7 @@ class BatchCompletionHelpers:
 			curr_active_pipeline.reload_default_computation_functions()
 		
 			## wcorr shuffle:
-			curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['wcorr_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': num_wcorr_shuffles}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False)
+			curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['wcorr_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': num_wcorr_shuffles, 'drop_previous_result_and_compute_fresh': drop_previous_result_and_compute_fresh}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False)
 
 		else:
 			print(f'replay epochs changed!')
@@ -269,17 +268,6 @@ class BatchCompletionHelpers:
 			curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_evaluate_epochs',  'directional_decoders_epoch_heuristic_scoring'],
 							computation_kwargs_list=[{'should_skip_radon_transform': False}, {}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
 			
-
-			# curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields',
-			#                                                                                            'directional_decoders_evaluate_epochs',
-			#                                                                                              'directional_decoders_epoch_heuristic_scoring'],
-			#                 computation_kwargs_list=[{'laps_decoding_time_bin_size': None, 'ripple_decoding_time_bin_size': ripple_decoding_time_bin_size},
-			#                                          {'should_skip_radon_transform': False},
-			#                                             {}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
-			
-
-
-
 			## Export these new computations to .csv for across-session analysis:
 			# Uses `perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function` to compute the new outputs:
 
@@ -301,7 +289,7 @@ class BatchCompletionHelpers:
 			_across_session_results_extended_dict = _across_session_results_extended_dict | perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(user_completion_dummy, None,
 															curr_session_context=curr_active_pipeline.get_session_context(), curr_session_basedir=curr_active_pipeline.sess.basepath.resolve(), curr_active_pipeline=curr_active_pipeline,
 															across_session_results_extended_dict=_across_session_results_extended_dict, return_full_decoding_results=return_full_decoding_results,
-															save_hdf=True, save_csvs=True,
+															save_hdf=enable_save_h5, save_csvs=True,
 															# desired_shared_decoding_time_bin_sizes = np.linspace(start=0.030, stop=0.5, num=4),
 															custom_all_param_sweep_options=custom_all_param_sweep_options, # directly provide the parameter sweeps
 															additional_session_context=additional_session_context
@@ -335,7 +323,7 @@ class BatchCompletionHelpers:
 
 			## Rank-Order Shuffle
 			## try dropping result and recomputing:
-			global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['SequenceBased'], debug_print=True)
+			# global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['SequenceBased'], debug_print=True) # Now use , drop_previous_result_and_compute_fresh:bool=True
 
 			# curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['rank_order_shuffle_analysis',], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
 			# curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['rank_order_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': 10, 'skip_laps': True}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False)
@@ -344,7 +332,7 @@ class BatchCompletionHelpers:
 			# custom_save_filepaths = helper_perform_pickle_pipeline(curr_active_pipeline=curr_active_pipeline, custom_save_filepaths=custom_save_filepaths)
 
 			## wcorr shuffle:
-			curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['wcorr_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': num_wcorr_shuffles}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False)
+			curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['wcorr_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': num_wcorr_shuffles, 'drop_previous_result_and_compute_fresh': drop_previous_result_and_compute_fresh}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False)
 
 			## Pickle again after recomputing:
 			custom_save_filepaths = helper_perform_pickle_pipeline(a_curr_active_pipeline=curr_active_pipeline, custom_save_filenames=custom_save_filenames, custom_save_filepaths=custom_save_filepaths,
@@ -352,38 +340,19 @@ class BatchCompletionHelpers:
 
 		try:
 			decoder_names = deepcopy(TrackTemplates.get_decoder_names())
-			wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df, (standalone_pkl_filepath, standalone_mat_filepath, ripple_WCorrShuffle_df_export_CSV_path) = finalize_output_shuffled_wcorr(a_curr_active_pipeline=curr_active_pipeline,
-																																			decoder_names=decoder_names, custom_suffix=custom_suffix)
+			wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df, (standalone_pkl_filepath, standalone_mat_filepath, ripple_WCorrShuffle_df_export_CSV_path) = finalize_output_shuffled_wcorr(a_curr_active_pipeline=curr_active_pipeline, decoder_names=decoder_names, custom_suffix=custom_suffix)
 			custom_save_filepaths['standalone_wcorr_pkl'] = standalone_pkl_filepath
 			custom_save_filepaths['standalone_mat_pkl'] = standalone_mat_filepath
 			print(f'completed overwrite_replay_epochs_and_recompute(...). custom_save_filepaths: {custom_save_filepaths}\n')
 			custom_save_filenames['standalone_wcorr_pkl'] = standalone_pkl_filepath.name
 			custom_save_filenames['standalone_mat_pkl'] = standalone_mat_filepath.name
 			
-		except BaseException as e:
+		except Exception as e:
 			print(f'failed doing `finalize_output_shuffled_wcorr(...)` with error: {e}')
 			if user_completion_dummy.fail_on_exception:
 				print(f'did_change: {did_change}, custom_save_filenames: {custom_save_filenames}, custom_save_filepaths: {custom_save_filepaths}')
 				raise e
 
-		# global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['SequenceBased', 'RankOrder', 'long_short_fr_indicies_analysis', 'long_short_leave_one_out_decoding_analysis', 'jonathan_firing_rate_analysis', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded', 'DirectionalDecodersEpochsEvaluations', 'DirectionalDecodersDecoded'], debug_print=True)    
-		# curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=[
-		#     'merged_directional_placefields', 
-		#     'long_short_decoding_analyses',
-		#     'jonathan_firing_rate_analysis',
-		#     'long_short_fr_indicies_analyses',
-		#     'short_long_pf_overlap_analyses',
-		#     'long_short_post_decoding',
-		#     'long_short_rate_remapping',
-		#     'long_short_inst_spike_rate_groups',
-		#     'long_short_endcap_analysis',
-		#     ], enabled_filter_names=None, fail_on_exception=False, debug_print=False) # , computation_kwargs_list=[{'should_skip_radon_transform': False}]
-
-		# 2024-06-25 - Save all custom _______________________________________________________________________________________ #
-		## INPUTS: custom_suffix
-
-		# custom_save_filepaths['pipeline_pkl'] = Path('W:/Data/KDIBA/gor01/two/2006-6-07_16-40-19/loadedSessPickle_withNewKamranExportedReplays.pkl').resolve()
-		# custom_save_filepaths['global_computation_pkl'] = Path(r'W:\Data\KDIBA\gor01\two\2006-6-07_16-40-19\output\global_computation_results_withNewKamranExportedReplays.pkl').resolve()
 
 		return did_change, custom_save_filenames, custom_save_filepaths
 
