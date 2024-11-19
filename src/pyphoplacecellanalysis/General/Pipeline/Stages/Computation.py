@@ -12,7 +12,7 @@ from pathlib import Path
 from enum import Enum # for EvaluationActions
 from datetime import datetime
 from attrs import define, field, Factory
-
+from functools import partial
 
 # NeuroPy (Diba Lab Python Repo) Loading
 from neuropy import core
@@ -68,6 +68,47 @@ class FunctionsSearchMode(Enum):
                 return cls.GLOBAL_ONLY
             else:
                 return cls.NON_GLOBAL_ONLY
+
+
+
+def session_context_filename_formatting_fn(ctxt: DisplaySpecifyingIdentifyingContext, subset_includelist=None, subset_excludelist=None, parts_separator:str='-') -> str:
+    """ `neuropy.utils.result_context.ContextFormatRenderingFn` protocol format callable 
+    specific_purpose='filename_prefix'
+    renders a custom_prefix from the context
+    
+        
+        final_filename like "2024-10-31_1020PM-kdiba_pin01_one_11-03_12-3-25__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]-(ripple_simple_pf_pearson_merged_df)_tbin-0.025.csv"
+    only handles the "_withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]" part
+    
+    History: duplicated from `_get_custom_suffix_for_filename_from_computation_metadata` 2024-11-01 08:16 
+    """
+    to_filename_conversion_dict = {'compute_diba_quiescent_style_replay_events':'_withNewComputedReplays', 'diba_evt_file':'_withNewKamranExportedReplays', 'initial_loaded': '_withOldestImportedReplays', 'normal_computed': '_withNormalComputedReplays'}
+
+    if subset_includelist is None:
+        assert subset_includelist is None, f"subset_includelist is not supported for this formatting function but was provided as subset_includelist: {subset_includelist}"
+        # subset_includelist = []
+    if subset_excludelist is None:
+        subset_excludelist = []
+    
+    custom_suffix_string_parts = []
+    custom_suffix: str = ''
+    basic_session_property_names = ['format_name', 'animal', 'exper_name', 'session_name']
+    for a_key in basic_session_property_names:
+        if (ctxt.get(a_key, None) is not None) and (len(str(ctxt.get(a_key, None))) > 0) and (a_key not in subset_excludelist):
+            # custom_suffix_string_parts.append(f"{a_key}_{ctxt.get(a_key, None)}")
+            custom_suffix_string_parts.append(f"{ctxt.get(a_key, None)}") ## no key names
+
+    if (ctxt.get('epochs_source', None) is not None) and (len(str(ctxt.get('epochs_source', None))) > 0) and ('epochs_source' not in subset_excludelist):
+        custom_suffix_string_parts.append(to_filename_conversion_dict[ctxt.get('epochs_source', None)])
+    if (ctxt.get('included_qclu_values', None) is not None) and (len(str(ctxt.get('included_qclu_values', None))) > 0) and ('included_qclu_values' not in subset_excludelist):
+        custom_suffix_string_parts.append(f"qclu_{ctxt.get('included_qclu_values', None)}")
+    if (ctxt.get('minimum_inclusion_fr_Hz', None) is not None) and (len(str(ctxt.get('minimum_inclusion_fr_Hz', None))) > 0) and ('minimum_inclusion_fr_Hz' not in subset_excludelist):
+        custom_suffix_string_parts.append(f"frateThresh_{ctxt.get('minimum_inclusion_fr_Hz', None):.1f}")
+    # custom_suffix = parts_separator.join([custom_suffix, *custom_suffix_string_parts])
+    custom_suffix = parts_separator.join(custom_suffix_string_parts)
+    return custom_suffix
+
+
 
 # ==================================================================================================================== #
 # PIPELINE STAGE                                                                                                       #
@@ -1935,7 +1976,6 @@ class PipelineWithComputedPipelineStageMixin:
                 pass
 
 
-
     @function_attributes(short_name=None, tags=['UNFINSHED', 'context', 'custom', 'parameters'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-31 19:46', related_items=[])
     def get_session_additional_parameters_context(self, parts_separator:str='-') -> DisplaySpecifyingIdentifyingContext:
         """ gets the entire session context, including the noteworthy computation parameters that would be needed for determing which filename to save under .
@@ -1945,36 +1985,6 @@ class PipelineWithComputedPipelineStageMixin:
         
         """
         to_filename_conversion_dict = {'compute_diba_quiescent_style_replay_events':'_withNewComputedReplays', 'diba_evt_file':'_withNewKamranExportedReplays', 'initial_loaded': '_withOldestImportedReplays', 'normal_computed': '_withNormalComputedReplays'}
-        
-        def _filename_formatting_fn(ctxt: DisplaySpecifyingIdentifyingContext, subset_includelist=None, subset_excludelist=None) -> str:
-            """ `neuropy.utils.result_context.ContextFormatRenderingFn` protocol format callable 
-            specific_purpose='filename_prefix'
-            renders a custom_prefix from the context
-            
-            Captures: parts_separator, 
-             
-             final_filename like "2024-10-31_1020PM-kdiba_pin01_one_11-03_12-3-25__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]-(ripple_simple_pf_pearson_merged_df)_tbin-0.025.csv"
-            only handles the "_withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]" part
-            
-            History: duplicated from `_get_custom_suffix_for_filename_from_computation_metadata` 2024-11-01 08:16 
-            """
-            if subset_includelist is None:
-                assert subset_includelist is None, f"subset_includelist is not supported for this formatting function but was provided as subset_includelist: {subset_includelist}"
-                # subset_includelist = []
-            if subset_excludelist is None:
-                subset_excludelist = []
-            
-            custom_suffix_string_parts = []
-            custom_suffix: str = ''
-            if (ctxt.get('epochs_source', None) is not None) and (len(str(ctxt.get('epochs_source', None))) > 0) and ('epochs_source' not in subset_excludelist):
-                custom_suffix_string_parts.append(to_filename_conversion_dict[ctxt.get('epochs_source', None)])
-            if (ctxt.get('minimum_inclusion_fr_Hz', None) is not None) and (len(str(ctxt.get('minimum_inclusion_fr_Hz', None))) > 0) and ('minimum_inclusion_fr_Hz' not in subset_excludelist):
-                custom_suffix_string_parts.append(f"frateThresh_{ctxt.get('minimum_inclusion_fr_Hz', None):.1f}")
-            if (ctxt.get('included_qclu_values', None) is not None) and (len(str(ctxt.get('included_qclu_values', None))) > 0) and ('included_qclu_values' not in subset_excludelist):
-                custom_suffix_string_parts.append(f"qclu_{ctxt.get('included_qclu_values', None)}")
-            custom_suffix = parts_separator.join([custom_suffix, *custom_suffix_string_parts])
-            return custom_suffix
-
 
         all_params_dict = self.get_all_parameters()
 
@@ -1987,9 +1997,15 @@ class PipelineWithComputedPipelineStageMixin:
         ## TODO: Ideally would use the value passed in self.get_all_parameters():
         active_replay_epoch_parameters = deepcopy(self.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays)
         epochs_source: str = active_replay_epoch_parameters.get('epochs_source', 'normal_computed')
+        
+        _filename_formatting_fn = partial(
+            session_context_filename_formatting_fn,
+            parts_separator=parts_separator,
+        )
 
         additional_session_context: DisplaySpecifyingIdentifyingContext = DisplaySpecifyingIdentifyingContext(epochs_source=epochs_source, included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz,
             specific_purpose_display_dict={'filename_formatting': _filename_formatting_fn, 
+
         }, display_dict={'epochs_source': lambda k, v: to_filename_conversion_dict[v],
                 'included_qclu_values': lambda k, v: f"qclu_{v}",
                 'minimum_inclusion_fr_Hz': lambda k, v: f"frateThresh_{v:.1f}",
@@ -2010,8 +2026,8 @@ class PipelineWithComputedPipelineStageMixin:
 
         # preprocessing_parameters = all_params_dict['preprocessing']
         rank_order_shuffle_analysis_parameters = all_params_dict['rank_order_shuffle_analysis']
-        minimum_inclusion_fr_Hz = deepcopy(rank_order_shuffle_analysis_parameters['minimum_inclusion_fr_Hz']) # 5.0
         included_qclu_values = deepcopy(rank_order_shuffle_analysis_parameters['included_qclu_values']) # [1, 2, 4, 6, 7, 9]
+        minimum_inclusion_fr_Hz = deepcopy(rank_order_shuffle_analysis_parameters['minimum_inclusion_fr_Hz']) # 5.0
         
         ## TODO: Ideally would use the value passed in self.get_all_parameters():
         active_replay_epoch_parameters = deepcopy(self.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays)
