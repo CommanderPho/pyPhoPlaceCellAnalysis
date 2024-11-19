@@ -1302,15 +1302,17 @@ class AcrossSessionTables:
         # session_group_keys: List[str] = [("/" + a_ctxt.get_description(separator="/", include_property_names=False)) for a_ctxt in included_session_contexts] # 'kdiba/gor01/one/2006-6-08_14-26-15'
         a_loader = H5FileAggregator.init_from_file_lists(file_list=included_h5_paths, short_name_list=session_short_names)
         _out_table = a_loader.load_and_consolidate(table_key_list=df_table_keys, fail_on_exception=False)
-        if should_restore_native_column_types:
-            _out_table = HDF_Converter.general_post_load_restore_table_as_needed(_out_table)
+        if _out_table is not None:
+            if should_restore_native_column_types:
+                _out_table = HDF_Converter.general_post_load_restore_table_as_needed(_out_table)
 
-        if drop_columns_list is not None:
-            # Drop columns: 'neuron_IDX', 'has_short_pf' and 3 other columns
-            _out_table = _out_table.drop(columns=drop_columns_list)
+            if drop_columns_list is not None:
+                # Drop columns: 'neuron_IDX', 'has_short_pf' and 3 other columns
+                _out_table = _out_table.drop(columns=drop_columns_list)
 
-        # try to rename the columns if needed
-        _out_table.rename(columns=AcrossSessionTables.aliases_columns_dict, inplace=True)
+            # try to rename the columns if needed
+            _out_table.rename(columns=AcrossSessionTables.aliases_columns_dict, inplace=True)
+                        
         return _out_table
 
     @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-25 14:28', related_items=[])
@@ -1564,7 +1566,7 @@ class AcrossSessionTables:
             neuron_replay_stats_table = _callback_add_df_columns(neuron_replay_stats_table, session_id_column_name='session_uid')
             long_short_fr_indicies_analysis_table = _callback_add_df_columns(long_short_fr_indicies_analysis_table, session_id_column_name='session_uid')
 
-        except BaseException as e:
+        except Exception as e:
             print(f'failed to load and apply the sessions rank CSV to tables. Error: {e}')
             raise e
         
@@ -3347,6 +3349,7 @@ import re
 class ExportValueNameCleaner:
     """ 
     Usage:
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import ExportValueNameCleaner
         new_name_list = ExportValueNameCleaner.clean_all(name_list=all_sessions_MultiMeasure_ripple_df['custom_replay_name'].unique().tolist())
         new_name_list
 
