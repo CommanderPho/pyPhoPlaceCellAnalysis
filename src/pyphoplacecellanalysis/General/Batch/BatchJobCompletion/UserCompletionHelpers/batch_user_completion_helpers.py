@@ -1882,23 +1882,19 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 	"""
 	import sys
 	import numpy as np
-	from datetime import timedelta, datetime
 	from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
 	from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
 	from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import SequenceBasedComputationsContainer, WCorrShuffle
 	from neuropy.utils.mixins.indexing_helpers import get_dict_subset
-	from neuropy.core.epoch import Epoch, ensure_Epoch, ensure_dataframe
 	from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
 	from pyphocorehelpers.exception_helpers import ExceptionPrintingContext
 	from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
 	from pyphocorehelpers.Filesystem.path_helpers import sanitize_filename_for_Windows
 
-	from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_diba_quiescent_style_replay_events, overwrite_replay_epochs_and_recompute, try_load_neuroscope_EVT_file_epochs, replace_replay_epochs
-	from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
+	from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_completion_helpers import BatchCompletionHelpers
+	
 	from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_replay_wcorr_histogram
-	from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import finalize_output_shuffled_wcorr, _get_custom_suffix_for_replay_filename
-	from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_all_replay_epoch_variations
-
+	
 	# SimpleBatchComputationDummy = make_class('SimpleBatchComputationDummy', attrs=['BATCH_DATE_TO_USE', 'collected_outputs_path'])
 	# a_dummy = SimpleBatchComputationDummy(BATCH_DATE_TO_USE, collected_outputs_path)
 	
@@ -1928,7 +1924,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 	## Compute new epochs: 
 	replay_epoch_variations = {}
 
-	replay_epoch_variations = compute_all_replay_epoch_variations(curr_active_pipeline, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
+	replay_epoch_variations = BatchCompletionHelpers.compute_all_replay_epoch_variations(curr_active_pipeline, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
 
 	print(f'completed replay extraction, have: {list(replay_epoch_variations.keys())}')
 	
@@ -1943,7 +1939,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 		print(f'performing comp for "{replay_epochs_key}"...')
 		replay_epoch_outputs[replay_epochs_key] = {} # init to empty
 
-		custom_suffix: str = _get_custom_suffix_for_replay_filename(new_replay_epochs=a_replay_epochs)
+		custom_suffix: str = BatchCompletionHelpers._get_custom_suffix_for_replay_filename(new_replay_epochs=a_replay_epochs)
 		print(f'\treplay_epochs_key: {replay_epochs_key}: custom_suffix: "{custom_suffix}"')
 
 		## Export to .evt file
@@ -1976,7 +1972,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 		print(f'\t=====================================>> performing comp for "{replay_epochs_key}"...')
 		# replay_epoch_outputs[replay_epochs_key] = {} # init to empty
 
-		custom_suffix: str = _get_custom_suffix_for_replay_filename(new_replay_epochs=a_replay_epochs) # looks right
+		custom_suffix: str = BatchCompletionHelpers._get_custom_suffix_for_replay_filename(new_replay_epochs=a_replay_epochs) # looks right
 		print(f'\treplay_epochs_key: {replay_epochs_key}: custom_suffix: "{custom_suffix}"')
 
 		## Modify .BATCH_DATE_TO_USE to include the custom suffix
@@ -1990,7 +1986,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 		with ExceptionPrintingContext(suppress=should_suppress_errors, exception_print_fn=(lambda formatted_exception_str: print(f'\tfailed epoch computations for replay_epochs_key: "{replay_epochs_key}". Failed with error: {formatted_exception_str}. Skipping.'))):
 			# for replay_epochs_key, a_replay_epochs in replay_epoch_variations.items():
 			a_curr_active_pipeline = deepcopy(curr_active_pipeline)
-			did_change, custom_save_filenames, custom_save_filepaths = overwrite_replay_epochs_and_recompute(curr_active_pipeline=a_curr_active_pipeline, new_replay_epochs=a_replay_epochs,
+			did_change, custom_save_filenames, custom_save_filepaths = BatchCompletionHelpers.overwrite_replay_epochs_and_recompute(curr_active_pipeline=a_curr_active_pipeline, new_replay_epochs=a_replay_epochs,
 																											  enable_save_pipeline_pkl=True, enable_save_global_computations_pkl=False, enable_save_h5=False,
 																											  num_wcorr_shuffles=num_wcorr_shuffles,
 																											  user_completion_dummy=self)
