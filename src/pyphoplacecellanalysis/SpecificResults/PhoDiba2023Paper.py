@@ -1634,10 +1634,12 @@ def build_single_time_bin_size_dfs(all_sessions_all_scores_epochs_df, all_sessio
     return single_time_bin_size_all_sessions_epochs_df, single_time_bin_size_all_sessions_epochs_time_bin_df
 
 
-
+import plotly.io as pio
 import plotly.graph_objects as go
 from ipydatagrid import Expr, DataGrid, TextRenderer, BarRenderer # for use in DataFrameFilter
 from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import add_copy_save_action_buttons
+from IPython.display import display, Javascript
+import base64
 
 
 @define(slots=False, eq=False)
@@ -1688,9 +1690,10 @@ class DataFrameFilter:
 
     active_plot_df_name: str = field(default='filtered_all_sessions_all_scores_ripple_df')
     active_plot_variable_name: str = field(default='P_Short')
-
     active_plot_fn_kwargs: Dict = field(default=Factory(dict))
-
+    # Add filename attribute
+    filename: str = field(init=False, default='figure.png')
+    
 
     additional_filter_predicates = field(default=Factory(dict)) # a list of boolean predicates to be applied as filters
     on_filtered_dataframes_changed_callback_fns = field(default=Factory(dict)) # a list of callables that will be called when the filters are changed. 
@@ -1707,6 +1710,13 @@ class DataFrameFilter:
     figure_widget: go.FigureWidget = field(init=False)
     table_widget: DataGrid = field(init=False)
 
+    # Add button widgets as class attributes
+    button_copy: widgets.Button = field(init=False)
+    button_download: widgets.Button = field(init=False)
+    filename_label: widgets.Label = field(init=False)
+    # Add Output widget for JavaScript execution
+    js_output: widgets.Output = field(init=False)
+    
 
     # Begin Properties ___________________________________________________________________________________________________ #
     @property
@@ -1846,7 +1856,15 @@ class DataFrameFilter:
         self._setup_widgets()
         # Initial filtering with default widget values
         self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
-
+        
+        # Button Widget Initialize ___________________________________________________________________________________________ #
+        # Set up the buttons after figure_widget is created
+        self._setup_widgets_buttons()
+        self.on_widget_update_filename()  # Initialize filename and label
+        # Set up observers for figure changes
+        self.figure_widget.layout.on_change(self.on_fig_layout_change, 'title', 'meta')
+        # Initialize the Output widget for JavaScript execution
+        self.js_output = widgets.Output()
 
     def _setup_widgets(self):
         import plotly.subplots as sp
@@ -1907,8 +1925,7 @@ class DataFrameFilter:
         # self.figure_widget = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=[pre_delta_label, main_title, post_delta_label], figure_class=go.FigureWidget) ## figure created here?
         self.figure_widget, did_create_new_figure = PlotlyFigureContainer._helper_build_pre_post_delta_figure_if_needed(extant_figure=None, use_latex_labels=False, main_title='test', figure_class=go.FigureWidget)
         
-        extra_button_widgets = add_copy_save_action_buttons(fig=self.figure_widget)
-        
+        # extra_button_widgets = add_copy_save_action_buttons(fig=self.figure_widget)
 
 
         # Set up observers to handle changes in widget values
@@ -1928,14 +1945,176 @@ class DataFrameFilter:
     
 
         # Display the widgets
-        display(widgets.VBox([widgets.HBox([self.replay_name_widget, self.time_bin_size_widget, self.active_filter_predicate_selector_widget]),
-                        widgets.HBox([self.active_plot_df_name_selector_widget, self.active_plot_variable_name_widget]),
-                       self.output_widget,
-                       self.figure_widget,
-                       extra_button_widgets,
-                       self.table_widget,
-                       ]))
+        # display(widgets.VBox([widgets.HBox([self.replay_name_widget, self.time_bin_size_widget, self.active_filter_predicate_selector_widget]),
+        #                 widgets.HBox([self.active_plot_df_name_selector_widget, self.active_plot_variable_name_widget]),
+        #                self.output_widget,
+        #                self.figure_widget,
+        #                extra_button_widgets,
+        #                self.table_widget,
+        #                ]))
 
+
+    def _setup_widgets_buttons(self):
+        """Sets up the copy and download buttons."""
+        self.button_copy = widgets.Button(description="Copy to Clipboard", icon='copy')
+        self.button_download = widgets.Button(description="Download Image", icon='save')
+        self.filename_label = widgets.Label()
+
+        def on_copy_button_click(b):
+            # Convert the figure to a PNG image
+            # Retrieve width and height if set
+            width = fig.layout.width
+            height = fig.layout.height
+            to_image_kwargs = {}
+            print(f"Width: {width}, Height: {height}")
+            if width is not None:
+                to_image_kwargs['width'] = width
+            if height is not None:
+                to_image_kwargs['height'] = height
+
+            png_bytes = pio.to_image(fig, format='png', **to_image_kwargs)
+            encoded_image = base64.b64encode(png_bytes).decode('utf-8')
+
+            # JavaScript code to copy the image to the clipboard using the canvas element
+            js_code = f'''
+                const img = new Image();
+                img.src = 'data:image/png;base64,{encoded_image}';
+                img.onload = function() {{
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    canvas.toBlob(function(blob) {{
+                        const item = new ClipboardItem({{ 'image/png': blob }});
+                        navigator.clipboard.write([item]).then(function() {{
+                            console.log('Image copied to clipboard');
+                        }}).catch(function(error) {{
+                            console.error('Error copying image to clipboard: ', error);
+                        }});
+                    }});
+                }};
+            '''
+
+            display(Javascript(js_code))
+
+        def on_download_button_click(b):
+            # Convert the figure to a PNG image
+            png_bytes = pio.to_image(fig, format='png')
+            encoded_image = base64.b64encode(png_bytes).decode('utf-8')
+
+            # JavaScript code to trigger download with a specific filename
+            js_code = f'''
+                const link = document.createElement('a');
+                link.href = 'data:image/png;base64,{encoded_image}';
+                link.download = '{filename}';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            '''
+
+            display(Javascript(js_code))
+
+        button_copy.on_click(on_copy_button_click)
+        button_download.on_click(on_download_button_click)
+                
+
+        self.button_copy.on_click(self.on_copy_button_click)
+        self.button_download.on_click(self.on_download_button_click)
+
+    # ==================================================================================================================== #
+    # Widget Update Functions                                                                                              #
+    # ==================================================================================================================== #
+    def on_widget_update_filename(self):
+        """Updates the filename and label based on the figure's title or metadata."""
+        fig = self.figure_widget
+        preferred_filename = fig.layout.meta.get('preferred_filename') if fig.layout.meta else None
+        if preferred_filename:
+            self.filename = f"{preferred_filename}.png"
+            self.filename_label.value = preferred_filename
+        else:
+            title = fig.layout.title.text if fig.layout.title and fig.layout.title.text else "figure"
+            self.filename = f"{title.replace(' ', '_')}.png"
+            self.filename_label.value = title
+
+    def on_fig_layout_change(self, layout, *args):
+        """Callback for when the figure's layout changes."""
+        self.on_widget_update_filename()
+
+    def on_copy_button_click(self, b):
+        """Copies the figure as an image to the clipboard."""
+        fig = self.figure_widget
+        png_bytes = pio.to_image(fig, format='png')
+        encoded_image = base64.b64encode(png_bytes).decode('utf-8')
+
+        js_code = f'''
+            const img = new Image();
+            img.src = 'data:image/png;base64,{encoded_image}';
+            img.onload = function() {{
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                canvas.toBlob(function(blob) {{
+                    const item = new ClipboardItem({{ 'image/png': blob }});
+                    navigator.clipboard.write([item]).then(function() {{
+                        console.log('Image copied to clipboard');
+                    }}).catch(function(error) {{
+                        console.error('Error copying image to clipboard: ', error);
+                    }});
+                }});
+            }};
+        '''
+        with self.js_output:
+            display(Javascript(js_code))
+
+
+    def on_download_button_click(self, b):
+        """Triggers a download of the figure as an image with the specified filename."""
+        fig = self.figure_widget
+        png_bytes = pio.to_image(fig, format='png')
+        encoded_image = base64.b64encode(png_bytes).decode('utf-8')
+
+        js_code = f'''
+            const link = document.createElement('a');
+            link.href = 'data:image/png;base64,{encoded_image}';
+            link.download = '{self.filename}';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        '''
+        with self.js_output:
+            display(Javascript(js_code))
+
+    def display(self):
+        """Displays the widgets."""
+        # display(widgets.VBox([widgets.HBox([self.replay_name_widget, self.time_bin_size_widget, self.active_filter_predicate_selector_widget]),
+        # 		widgets.HBox([self.active_plot_df_name_selector_widget, self.active_plot_variable_name_widget]),
+        # 		self.output_widget,
+        # 		self.figure_widget,
+        # 		extra_button_widgets,
+        # 		self.table_widget,
+        # 		]))
+
+        # Arrange your widgets as needed
+        display(widgets.VBox([
+            widgets.HBox([
+                self.replay_name_widget, 
+                self.time_bin_size_widget, 
+                self.active_filter_predicate_selector_widget
+            ]),
+            widgets.HBox([
+                self.active_plot_df_name_selector_widget, 
+                self.active_plot_variable_name_widget
+            ]),
+            self.output_widget,
+            self.figure_widget,
+            widgets.HBox([self.button_copy, self.button_download, self.filename_label]),
+            self.js_output,  # Include the Output widget to allow the buttons to perform their actions
+            self.table_widget,
+        ]))
+        
 
     def _on_widget_change(self, change):
         active_plot_df_name = self.active_plot_df_name_selector_widget.value
@@ -1946,6 +2125,9 @@ class DataFrameFilter:
         self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
 
 
+    # ==================================================================================================================== #
+    # Data Update Functions                                                                                                #
+    # ==================================================================================================================== #
     def update_filtered_dataframes(self, replay_name, time_bin_sizes):
         """ Perform filtering on each DataFrame
         """
