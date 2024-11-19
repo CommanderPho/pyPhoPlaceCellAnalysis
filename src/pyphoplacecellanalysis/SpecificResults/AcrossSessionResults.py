@@ -1770,7 +1770,7 @@ top_level_parts_separators = ['-', '__']
 #     return most_recent_files
 
 
-def get_only_most_recent_csv_sessions(parsed_paths_df: pd.DataFrame) -> pd.DataFrame:
+def get_only_most_recent_csv_sessions(parsed_paths_df: pd.DataFrame, group_column_names=['session', 'custom_replay_name', 'file_type', 'decoding_time_bin_size_str'], sort_datetime_col_name:str='export_datetime') -> pd.DataFrame:
     """ returns a dataframe containing only the most recent '.err' and '.log' file for each session. 
     
     from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import get_only_most_recent_csv_sessions
@@ -1784,16 +1784,17 @@ def get_only_most_recent_csv_sessions(parsed_paths_df: pd.DataFrame) -> pd.DataF
     """
     df = deepcopy(parsed_paths_df)
 
-    required_cols = ['session', 'custom_replay_name', 'file_type', 'decoding_time_bin_size_str', 'export_datetime'] # Replace with actual column names you require
+    # required_cols = ['session', 'custom_replay_name', 'file_type', 'decoding_time_bin_size_str', 'export_datetime'] # Replace with actual column names you require
+    required_cols = deepcopy(group_column_names) + [sort_datetime_col_name, ]
     has_required_columns = PandasHelpers.require_columns(df, required_cols, print_missing_columns=True)
     assert has_required_columns
 
-    df['export_datetime'] = pd.to_datetime(df['export_datetime'])
+    df[sort_datetime_col_name] = pd.to_datetime(df[sort_datetime_col_name])
     # Replace NaN values with empty strings
     df.fillna('', inplace=True)
 
     # Get the most recent entry for each group
-    most_recent_entries_df: pd.DataFrame = df.loc[df.groupby(['session', 'custom_replay_name', 'file_type', 'decoding_time_bin_size_str'])['export_datetime'].idxmax()]
+    most_recent_entries_df: pd.DataFrame = df.loc[df.groupby(group_column_names)[sort_datetime_col_name].idxmax()]
     return most_recent_entries_df
 
 
@@ -1846,11 +1847,26 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
 
     tuple_column_names = ['export_datetime', 'session', 'custom_replay_name', 'file_type', 'decoding_time_bin_size_str', 'path']
     parsed_paths_df: pd.DataFrame = pd.DataFrame(parsed_paths, columns=tuple_column_names)
+   
+    # compare_custom_replay_name_col_name: str = 'custom_replay_name'
+    compare_custom_replay_name_col_name: str = '_comparable_custom_replay_name'
+    
+    ## replace undscores with hyphens so comparisons are insensitive to whether '_' or '-' are used:
+    # parsed_paths_df['session'] = parsed_paths_df['session'].str.replace('_','-') # replace both with hyphens so they match
+    # parsed_paths_df['custom_replay_name'] = parsed_paths_df['custom_replay_name'].str.replace('_','-') # replace both with hyphens so they match
+    parsed_paths_df['_comparable_custom_replay_name'] = parsed_paths_df['custom_replay_name'].str.replace('_','-') # replace both with hyphens so they match
+    # parsed_paths_df[['session_name', '_comparable_custom_replay_name']]
+    
+    # _preferred_form_session_names = deepcopy(parsed_paths_df['session_name'].unique()) ## the one with underscores like "kdiba_gor01_one_2006-6-08_14-26-15"
+    # _compare_form_session_names = deepcopy(parsed_paths_df['session_name'].unique())
+    # _compare_to_preferred_session_name_map = dict(zip(_compare_form_session_names, _preferred_form_session_names)) # used to replace desired session names when done
+
+
     # Sort by columns: 'session' (ascending), 'custom_replay_name' (ascending) and 3 other columns
-    parsed_paths_df = parsed_paths_df.sort_values(['session', 'file_type', 'custom_replay_name', 'decoding_time_bin_size_str', 'export_datetime']).reset_index(drop=True)
+    parsed_paths_df = parsed_paths_df.sort_values(['session', 'file_type', compare_custom_replay_name_col_name, 'decoding_time_bin_size_str', 'export_datetime']).reset_index(drop=True)
     ## #TODO 2024-09-27 01:49: - [ ] Confirmed that `parsed_paths_df` still has the `laps_time_bin_marginals` outputs in the list
     ## This is where we drop all but the most recent:
-    filtered_parsed_paths_df = get_only_most_recent_csv_sessions(parsed_paths_df=deepcopy(parsed_paths_df)) ## `filtered_parsed_paths_df` still has it
+    filtered_parsed_paths_df = get_only_most_recent_csv_sessions(parsed_paths_df=deepcopy(parsed_paths_df), group_column_names=['session', compare_custom_replay_name_col_name, 'file_type', 'decoding_time_bin_size_str']) ## `filtered_parsed_paths_df` still has it
 
     # Drop rows with export_datetime less than or equal to cutoff_date
     if cuttoff_date is not None:
