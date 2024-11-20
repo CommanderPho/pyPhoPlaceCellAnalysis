@@ -1432,7 +1432,7 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
 
 @function_attributes(short_name=None, tags=['wcorr', 'shuffle', 'replay', 'epochs', 'alternative_replays'], input_requires=[], output_provides=[], uses=['compute_all_replay_epoch_variations', 'overwrite_replay_epochs_and_recompute'], used_by=[], creation_date='2024-06-28 01:50', related_items=[])
 def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-																					  included_qclu_values = [1,2,4,6,7,9], minimum_inclusion_fr_Hz=5.0, num_wcorr_shuffles: int = 1024, drop_previous_result_and_compute_fresh:bool=True, enable_plot_wcorr_hist_figure:bool=False) -> dict:
+																					  included_qclu_values = [1,2,4,6,7,9], minimum_inclusion_fr_Hz=5.0, ripple_decoding_time_bin_size: float = 0.025, num_wcorr_shuffles: int = 1024, drop_previous_result_and_compute_fresh:bool=True, enable_plot_wcorr_hist_figure:bool=False) -> dict:
 	"""  Computes several different alternative replay-detection variants and computes and exports the shuffled wcorrs for each of them
 	from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function
 	
@@ -1465,6 +1465,11 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 		'custom_suffix': None,
 		'replay_epoch_variations': None,
 		'replay_epoch_outputs': None,
+		'included_qclu_values': included_qclu_values,
+		'minimum_inclusion_fr_Hz': minimum_inclusion_fr_Hz,
+		'ripple_decoding_time_bin_size': ripple_decoding_time_bin_size,
+		'num_wcorr_shuffles': num_wcorr_shuffles,
+		'drop_previous_result_and_compute_fresh': drop_previous_result_and_compute_fresh,
 		# 'wcorr_shuffles_data_output_filepath': None, #'t_end': t_end   
 		# 'standalone_MAT_filepath': None,
 		# 'ripple_WCorrShuffle_df_export_CSV_path': None,
@@ -1545,7 +1550,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 			did_change, custom_save_filenames, custom_save_filepaths = BatchCompletionHelpers.overwrite_replay_epochs_and_recompute(curr_active_pipeline=a_curr_active_pipeline, new_replay_epochs=a_replay_epochs,
 																											  enable_save_pipeline_pkl=True, enable_save_global_computations_pkl=False, enable_save_h5=False,
 																											  num_wcorr_shuffles=num_wcorr_shuffles,
-																											  user_completion_dummy=self, drop_previous_result_and_compute_fresh=drop_previous_result_and_compute_fresh)
+																											  user_completion_dummy=self, drop_previous_result_and_compute_fresh=drop_previous_result_and_compute_fresh, ripple_decoding_time_bin_size=ripple_decoding_time_bin_size)
 			# 'ripple_h5_out_path': WindowsPath('K:/scratch/collected_outputs/2024-11-18_Lab-2006-6-09_1-22-43-_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0_withNormalComputedReplays-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]_time_bin_size_sweep_results.h5'),
 			# 'ripple_csv_out_path': WindowsPath('K:/scratch/collected_outputs/2024-11-18-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0_withNormalComputedReplays-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]-(ripple_marginals_df).csv'),
 			# 'ripple_csv_time_bin_marginals': WindowsPath('K:/scratch/collected_outputs/2024-11-18-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0_withNormalComputedReplays-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]-(ripple_time_bin_marginals_df).csv'),
@@ -1628,6 +1633,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 			#TODO 2024-11-19 03:33: - [ ] `custom_export_df_to_csv_fn`
 			custom_export_df_to_csv_fn = a_subfn_custom_export_df_to_csv
 			
+			#TODO 2024-11-20 06:16: - [ ] I feel like these need the time_bin_size as a suffix
 			# standalone save (2024-11-19 03:40 Identical to `vscode://file/c:/Users/pho/repos/Spike3DWorkEnv/pyPhoPlaceCellAnalysis/src/pyphoplacecellanalysis/General/Batch/BatchJobCompletion/UserCompletionHelpers/batch_completion_helpers.py:806`
 			out_path, standalone_pkl_filename, standalone_pkl_filepath = a_curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=get_now_rounded_time_str(), data_identifier_str='standalone_wcorr_ripple_shuffle_data_only', parent_output_path=a_curr_active_pipeline.get_output_path(), out_extension='.pkl', suffix_string=f'_{wcorr_shuffles.n_completed_shuffles}')		
 			_prev_standalone_pkl_filename: str = f'{get_now_rounded_time_str()}{custom_suffix}_standalone_wcorr_ripple_shuffle_data_only_{wcorr_shuffles.n_completed_shuffles}.pkl' 
@@ -1666,13 +1672,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 				replay_epoch_outputs[replay_epochs_key].update(dict(active_context=active_context, export_files_dict=export_files_dict))
 				# callback_outputs['ripple_WCorrShuffle_df_export_CSV_path'] = ripple_WCorrShuffle_df_export_CSV_path
 			except Exception as e:
-				raise e
-				# exception_info = sys.exc_info()
-				# err = CapturedException(e, exception_info)
-				# print(f"ERROR: encountered exception {err} while trying to perform wcorr_ripple_shuffle.export_csvs(parent_output_path='{self.collected_outputs_path.resolve()}', ...) for {curr_session_context}")
-				# ripple_WCorrShuffle_df_export_CSV_path = None # set to None because it failed.
-				# if self.fail_on_exception:
-				#     raise err.exc
+				raise
 				
 			# wcorr_ripple_shuffle.discover_load_and_append_shuffle_data_from_directory(save_directory=curr_active_pipeline.get_output_path().resolve())
 			# active_context = curr_active_pipeline.get_session_context()
@@ -1717,6 +1717,11 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
 		'custom_suffix': custom_suffix,
 		'replay_epoch_variations': deepcopy(replay_epoch_variations),
 		'replay_epoch_outputs': deepcopy(replay_epoch_outputs),
+		'included_qclu_values': included_qclu_values,
+		'minimum_inclusion_fr_Hz': minimum_inclusion_fr_Hz,
+		'ripple_decoding_time_bin_size': ripple_decoding_time_bin_size,
+		'num_wcorr_shuffles': num_wcorr_shuffles,
+		'drop_previous_result_and_compute_fresh': drop_previous_result_and_compute_fresh,
 		#  'wcorr_shuffles_data_output_filepath': wcorr_shuffles_data_standalone_filepath, 'e':err, #'t_end': t_end   
 		#  'standalone_pkl_filepath': standalone_pkl_filepath,
 		#  'standalone_MAT_filepath': standalone_MAT_filepath,
