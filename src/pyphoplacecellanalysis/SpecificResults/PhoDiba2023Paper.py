@@ -1595,7 +1595,7 @@ def _perform_dual_hist_plot(grainularity_desc: str, laps_df: pd.DataFrame, rippl
 
 
 @function_attributes(short_name=None, tags=['MAIN', 'CRITICAL', 'FINAL', 'plotly'], input_requires=[], output_provides=[], uses=['plotly_pre_post_delta_scatter'], used_by=[], creation_date='2024-10-23 20:04', related_items=[])
-def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, concatenated_ripple_df: pd.DataFrame, time_delta_tuple: Tuple[float, float, float], fig_size_kwargs: Dict, save_plotly: Callable, is_dark_mode: bool=False, enable_custom_widget_buttons:bool=True, extant_figure=None, custom_output_widget=None, legend_groups_to_hide=['0.03', '0.044', '0.05'], should_save: bool = True, variable_name = 'P_Short'):
+def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, concatenated_ripple_df: pd.DataFrame, time_delta_tuple: Tuple[float, float, float], fig_size_kwargs: Dict, save_plotly: Callable, is_dark_mode: bool=False, enable_custom_widget_buttons:bool=True, extant_figure=None, custom_output_widget=None, legend_groups_to_hide=['0.03', '0.044', '0.05'], should_save: bool = True, variable_name = 'P_Short', y_baseline_level: float = 0.5):
     """ plots the stacked histograms for both laps and ripples
 
     Usage:
@@ -1637,7 +1637,7 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
     # Define the legend groups you want to hide on startup
     legend_groups_to_hide = ['0.03', '0.044', '0.05'] # '0.025', , '0.058'
 
-    y_baseline_level: float = 0.5 # for P(short), etc
+    # y_baseline_level: float = 0.5 # for P(short), etc
     # y_baseline_level: float = 0.0 # for wcorr, etc
 
     # px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'color':"is_user_annotated_epoch", 'title': f"'{variable_name}'"} # , 'color': 'time_bin_size', 'range_y': [-1.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size', 'is_user_annotated_epoch':'user_sel'}
