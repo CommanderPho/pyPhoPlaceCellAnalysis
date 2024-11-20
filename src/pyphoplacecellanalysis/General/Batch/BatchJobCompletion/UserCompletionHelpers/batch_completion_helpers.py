@@ -279,13 +279,13 @@ class BatchCompletionHelpers:
 			return_full_decoding_results: bool = False
 			# desired_laps_decoding_time_bin_size = [None] # doesn't work
 			desired_laps_decoding_time_bin_size = [1.5] # large so it doesn't take long
-			desired_ripple_decoding_time_bin_size = [0.010, 0.025]
-
+			# desired_ripple_decoding_time_bin_size = [0.010, 0.025]
+			desired_ripple_decoding_time_bin_size = [ripple_decoding_time_bin_size, ]
+			
 			custom_all_param_sweep_options, param_sweep_option_n_values = parameter_sweeps(desired_laps_decoding_time_bin_size=desired_laps_decoding_time_bin_size,
 																						desired_ripple_decoding_time_bin_size=desired_ripple_decoding_time_bin_size,
 																					use_single_time_bin_per_epoch=[False],
 																					minimum_event_duration=[desired_ripple_decoding_time_bin_size[-1]])
-
 
 			## make sure that the exported .csv and .h5 files have unique names based on the unique replays used. Also avoid unduely recomputing laps each time.
 			_across_session_results_extended_dict = {}
@@ -320,11 +320,6 @@ class BatchCompletionHelpers:
 			for an_export_file_type, a_path_list in output_saved_individual_sweep_files_dict.items():
 				custom_save_filepaths[an_export_file_type] = deepcopy(a_path_list) # a list of paths
 				
-
-			# custom_save_filepaths['csv_out_path'] = out_path # ends up being the .h5 path for some reason
-			# custom_save_filepaths['csv_out_path'] = out_path # ends up being the .h5 path for some reason
-			# custom_save_filepaths['ripple_csv_out_path'] = ripple_out_path
-
 			# END Normal data Export _____________________________________________________________________________________________ #
 
 			## Long/Short Stuff:
