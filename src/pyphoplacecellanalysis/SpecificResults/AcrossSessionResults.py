@@ -3448,7 +3448,7 @@ class AcrossSessionHelpers:
     def _subfn_perform_add_merged_complete_epoch_stats_df(cls, a_paired_main_ripple_df: pd.DataFrame, an_all_sessions_merged_complete_epoch_stats_df: pd.DataFrame,
                                                           comparison_must_match_column_names=None, comparison_must_match_non_temporal_column_names=None, desired_transfer_col_names=None,
                                                           ):
-        """ adds the columns ['Long_BestDir_quantile', 'Short_BestDir_quantile', 'best_overall_quantile'] to the dataframe `a_paired_main_ripple_df`
+        """ adds the columns in `desired_transfer_col_names` to the dataframe `a_paired_main_ripple_df`
 
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionHelpers
         an_all_sessions_merged_complete_epoch_stats_df = AcrossSessionHelpers._subfn_perform_add_merged_complete_epoch_stats_df(a_paired_main_ripple_df=deepcopy(all_sessions_all_scores_ripple_df), an_all_sessions_merged_complete_epoch_stats_df=deepcopy(all_sessions_merged_complete_epoch_stats_df))
@@ -3487,19 +3487,19 @@ class AcrossSessionHelpers:
         # comparison_must_match_non_temporal_column_names = ['custom_replay_name', 'session_name']
         # desired_transfer_col_names = ['Long_BestDir_quantile', 'Short_BestDir_quantile', 'best_overall_quantile']
         
-        df1 = deepcopy(a_paired_main_ripple_df)
-        df2 = deepcopy(an_all_sessions_merged_complete_epoch_stats_df)
+        target_df = deepcopy(a_paired_main_ripple_df) # 'df1'
+        source_df = deepcopy(an_all_sessions_merged_complete_epoch_stats_df) # 'df2'
 
         # _preferred_form_session_names = deepcopy(df1['session_name'].unique()) ## the one with underscores like "kdiba_gor01_one_2006-6-08_14-26-15"
-        df1['session_name'] = df1['session_name'].str.replace('_','-') # replace both with hyphens so they match
-        df2['session_name'] = df2['session_name'].str.replace('_','-') # replace both with hyphens so they match
+        target_df['session_name'] = target_df['session_name'].str.replace('_','-') # replace both with hyphens so they match
+        source_df['session_name'] = source_df['session_name'].str.replace('_','-') # replace both with hyphens so they match
 
         ## Clean up!
-        df1['custom_replay_name'] = ExportValueNameCleaner.clean_all(name_list=df1['custom_replay_name'].to_list(), return_only_unique=False)
-        df2['custom_replay_name'] = ExportValueNameCleaner.clean_all(name_list=df2['custom_replay_name'].to_list(), return_only_unique=False)
+        target_df['custom_replay_name'] = ExportValueNameCleaner.clean_all(name_list=target_df['custom_replay_name'].to_list(), return_only_unique=False)
+        source_df['custom_replay_name'] = ExportValueNameCleaner.clean_all(name_list=source_df['custom_replay_name'].to_list(), return_only_unique=False)
 
-        df1['custom_replay_name'] = df1['custom_replay_name'].str.replace('_','-') # replace both with hyphens so they match
-        df2['custom_replay_name'] = df2['custom_replay_name'].str.replace('_','-') # replace both with hyphens so they match
+        target_df['custom_replay_name'] = target_df['custom_replay_name'].str.replace('_','-') # replace both with hyphens so they match
+        source_df['custom_replay_name'] = source_df['custom_replay_name'].str.replace('_','-') # replace both with hyphens so they match
         
         # df1['custom_replay_name'] = df1['custom_replay_name'].str.replace('withNormalComputedReplays-qclu-[1, 2, 4, 6, 7, 9]-frateThresh-1.0-withNormalComputedReplays-frateThresh-1.0-qclu-[1, 2, 4, 6, 7, 9]',
         #                                                                   'withNormalComputedReplays-qclu-[1, 2, 4, 6, 7, 9]-frateThresh-1.0') ## drop invalid duplicated versions
@@ -3508,8 +3508,8 @@ class AcrossSessionHelpers:
         # _compare_form_session_names = deepcopy(df1['session_name'].unique())
         # _compare_to_preferred_session_name_map = dict(zip(_compare_form_session_names, _preferred_form_session_names)) # used to replace desired session names when done
 
-        df1_unique_values_dict = {k:deepcopy(df1[k].unique().tolist()) for k in comparison_must_match_non_temporal_column_names}
-        df2_unique_values_dict = {k:deepcopy(df2[k].unique().tolist()) for k in comparison_must_match_non_temporal_column_names}
+        df1_unique_values_dict = {k:deepcopy(target_df[k].unique().tolist()) for k in comparison_must_match_non_temporal_column_names}
+        df2_unique_values_dict = {k:deepcopy(source_df[k].unique().tolist()) for k in comparison_must_match_non_temporal_column_names}
 
         combined_shared_unique_values_dict = {}
         for k in comparison_must_match_non_temporal_column_names:
@@ -3519,19 +3519,14 @@ class AcrossSessionHelpers:
         # new_name_list = ExportValueNameCleaner.clean_all(name_list=all_sessions_MultiMeasure_ripple_df['custom_replay_name'].unique().tolist())
         # new_name_list
         # combined_shared_unique_value_tuples, param_sweep_option_n_values = parameter_sweeps(smooth=[(None, None), (0.5, 0.5), (1.0, 1.0), (2.0, 2.0), (5.0, 5.0)], grid_bin=[(1,1),(5,5),(10,10)])
-        combined_shared_unique_value_tuples, param_sweep_option_n_values = parameter_sweeps(**combined_shared_unique_values_dict)
+        combined_shared_unique_value_dicts, param_sweep_option_n_values = parameter_sweeps(**combined_shared_unique_values_dict)
 
-        # matching_df1_update_tuples = []
-
-        # for a_values_tuple in combined_shared_unique_value_tuples:
-        #     a_values_dict = dict(zip(comparison_must_match_non_temporal_column_names, a_values_tuple))
-
-        for a_values_dict in combined_shared_unique_value_tuples:
+        for a_values_dict in combined_shared_unique_value_dicts:
             # a_values_dict
-            df1_matches_all_conditions = NumpyHelpers.logical_generic(np.logical_and, *[df1[k] == v for k, v in a_values_dict.items()])
-            df2_matches_all_conditions = NumpyHelpers.logical_generic(np.logical_and, *[df2[k] == v for k, v in a_values_dict.items()])
-            active_df1 = df1[df1_matches_all_conditions][comparison_must_match_column_names]
-            active_df2 = df2[df2_matches_all_conditions][comparison_must_match_column_names + desired_transfer_col_names]
+            df1_matches_all_conditions = NumpyHelpers.logical_generic(np.logical_and, *[target_df[k] == v for k, v in a_values_dict.items()])
+            df2_matches_all_conditions = NumpyHelpers.logical_generic(np.logical_and, *[source_df[k] == v for k, v in a_values_dict.items()])
+            active_df1 = target_df[df1_matches_all_conditions][comparison_must_match_column_names]
+            active_df2 = source_df[df2_matches_all_conditions][comparison_must_match_column_names + desired_transfer_col_names]
             # (active_df1.shape, active_df2.shape)
             ## drop duplicates    
             # active_df1 = active_df1.drop_duplicates(ignore_index=True) # df1 should have duplicates for each time_bin_size
@@ -3544,7 +3539,7 @@ class AcrossSessionHelpers:
                 _df1_row_matching_indicies = active_df1[is_df1_row_matching].index ## get the indicies
                 ## perform the update inline:
                 for an_update_col_name in desired_transfer_col_names:
-                    df1.loc[_df1_row_matching_indicies, an_update_col_name] = getattr(a_row, an_update_col_name) # a_row.Long_BestDir_quantile
+                    target_df.loc[_df1_row_matching_indicies, an_update_col_name] = getattr(a_row, an_update_col_name) # a_row.Long_BestDir_quantile
                     a_paired_main_ripple_df.loc[_df1_row_matching_indicies, an_update_col_name] = getattr(a_row, an_update_col_name) # a_row.Long_BestDir_quantile
 
                 # # matching_df1_update_tuples.append([_df1_row_matching_indicies, a_row.Long_BestDir_quantile, a_row.Short_BestDir_quantile])
@@ -3554,6 +3549,115 @@ class AcrossSessionHelpers:
             
         # a_paired_main_ripple_df = df1
         return a_paired_main_ripple_df
+    
+
+    @function_attributes(short_name=None, tags=['merge', 'time_bin', 'correlation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-18 11:33', related_items=[])
+    @classmethod
+    def _subfn_perform_add_stats_to_time_bins_df(cls, a_paired_epoch_stats_df: pd.DataFrame, an_epoch_time_bin_df: pd.DataFrame,
+                                                          comparison_must_match_column_names=None, comparison_must_match_non_temporal_column_names=None, desired_transfer_col_names=None,
+                                                          ):
+        """ adds the columns `desired_transfer_col_names` from `a_paired_epoch_stats_df` to the dataframe `an_epoch_time_bin_df`
+
+        
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionHelpers
+
+        an_epoch_time_bin_df = AcrossSessionHelpers._subfn_perform_add_stats_to_time_bins_df(a_paired_epoch_stats_df=deepcopy(all_sessions_MultiMeasure_ripple_df),
+             an_epoch_time_bin_df=deepcopy(all_sessions_ripple_time_bin_df))
+        an_epoch_time_bin_df
+        
+        # all_sessions_ripple_time_bin_df = an_epoch_time_bin_df ## assign
+
+        """
+        # from pyphocorehelpers.DataStructure.data_structure_builders import cartesian_product
+        from neuropy.utils.indexing_helpers import NumpyHelpers
+        
+        # if isinstance(comparison_must_match_column_names[-1],
+        epoch_idx_match_col_name: str = comparison_must_match_column_names[-1]
+        if (epoch_idx_match_col_name not in an_epoch_time_bin_df) and ('parent_epoch_label' in an_epoch_time_bin_df):
+            ## make the needed epoch index column in time_bin
+            an_epoch_time_bin_df[epoch_idx_match_col_name] = an_epoch_time_bin_df['parent_epoch_label']
+        
+        # if comparison_must_match_column_names is None:
+        #     comparison_must_match_column_names = ['custom_replay_name', 'session_name', 'start', 'stop']
+            
+        # if comparison_must_match_non_temporal_column_names is None:
+        #     comparison_must_match_non_temporal_column_names = ['custom_replay_name', 'session_name']
+            
+        # if desired_transfer_col_names is None:
+        #     desired_transfer_col_names = ['Long_BestDir_quantile', 'Short_BestDir_quantile', 'best_overall_quantile']
+            
+        
+        if (len(desired_transfer_col_names)==3) and (desired_transfer_col_names[-1] not in an_epoch_time_bin_df.columns):
+            # e.g. ['Long_BestDir_quantile', 'Short_BestDir_quantile', 'best_overall_quantile']
+            derived_column_name: str = desired_transfer_col_names[-1] # derived_column_name -- e.g. 'best_overall_quantile'
+            an_epoch_time_bin_df[derived_column_name] = np.nanmax(an_epoch_time_bin_df[desired_transfer_col_names[:-1]], axis=1)
+
+        source_df = deepcopy(a_paired_epoch_stats_df) ## "df1"
+        target_df = deepcopy(an_epoch_time_bin_df)
+
+        # _preferred_form_session_names = deepcopy(df1['session_name'].unique()) ## the one with underscores like "kdiba_gor01_one_2006-6-08_14-26-15"
+        target_df['session_name'] = target_df['session_name'].str.replace('_','-') # replace both with hyphens so they match
+        source_df['session_name'] = source_df['session_name'].str.replace('_','-') # replace both with hyphens so they match
+
+        ## Clean up!
+        target_df['custom_replay_name'] = ExportValueNameCleaner.clean_all(name_list=target_df['custom_replay_name'].to_list(), return_only_unique=False)
+        source_df['custom_replay_name'] = ExportValueNameCleaner.clean_all(name_list=source_df['custom_replay_name'].to_list(), return_only_unique=False)
+
+        target_df['custom_replay_name'] = target_df['custom_replay_name'].str.replace('_','-') # replace both with hyphens so they match
+        source_df['custom_replay_name'] = source_df['custom_replay_name'].str.replace('_','-') # replace both with hyphens so they match
+        
+        # df1['custom_replay_name'] = df1['custom_replay_name'].str.replace('withNormalComputedReplays-qclu-[1, 2, 4, 6, 7, 9]-frateThresh-1.0-withNormalComputedReplays-frateThresh-1.0-qclu-[1, 2, 4, 6, 7, 9]',
+        #                                                                   'withNormalComputedReplays-qclu-[1, 2, 4, 6, 7, 9]-frateThresh-1.0') ## drop invalid duplicated versions
+        
+
+        # _compare_form_session_names = deepcopy(df1['session_name'].unique())
+        # _compare_to_preferred_session_name_map = dict(zip(_compare_form_session_names, _preferred_form_session_names)) # used to replace desired session names when done
+
+        df1_unique_values_dict = {k:deepcopy(target_df[k].unique().tolist()) for k in comparison_must_match_non_temporal_column_names}
+        df2_unique_values_dict = {k:deepcopy(source_df[k].unique().tolist()) for k in comparison_must_match_non_temporal_column_names}
+
+        combined_shared_unique_values_dict = {}
+        for k in comparison_must_match_non_temporal_column_names:
+            combined_shared_unique_values_dict[k] = tuple(set(df1_unique_values_dict[k]).intersection(df2_unique_values_dict[k]))
+            
+
+        # new_name_list = ExportValueNameCleaner.clean_all(name_list=all_sessions_MultiMeasure_ripple_df['custom_replay_name'].unique().tolist())
+        # new_name_list
+        # combined_shared_unique_value_tuples, param_sweep_option_n_values = parameter_sweeps(smooth=[(None, None), (0.5, 0.5), (1.0, 1.0), (2.0, 2.0), (5.0, 5.0)], grid_bin=[(1,1),(5,5),(10,10)])
+        combined_shared_unique_value_dicts, param_sweep_option_n_values = parameter_sweeps(**combined_shared_unique_values_dict)
+
+        # start_idx_name: str = 'start'
+        start_idx_name: str = 'ripple_idx'
+        
+        for a_values_dict in combined_shared_unique_value_dicts:
+            # a_values_dict
+            target_df_matches_all_conditions = NumpyHelpers.logical_generic(np.logical_and, *[target_df[k] == v for k, v in a_values_dict.items()])
+            source_df_matches_all_conditions = NumpyHelpers.logical_generic(np.logical_and, *[source_df[k] == v for k, v in a_values_dict.items()])
+            active_target_df = target_df[target_df_matches_all_conditions][comparison_must_match_column_names]
+            active_source_df = source_df[source_df_matches_all_conditions][comparison_must_match_column_names + desired_transfer_col_names]
+            # (active_df1.shape, active_df2.shape)
+            ## drop duplicates    
+            # active_df1 = active_df1.drop_duplicates(ignore_index=True) # df1 should have duplicates for each time_bin_size
+            active_source_df = active_source_df.drop_duplicates(ignore_index=True) # df2 should have no duplicates. 
+            active_source_df = active_source_df.drop_duplicates(ignore_index=True, subset=[start_idx_name, ])
+            # (active_df1.shape, active_df2.shape)
+            ## for each start, stop in `active_df2`, find matching values in active_df1
+            for a_row in active_source_df.itertuples(index=True):
+                is_target_df_row_matching = NumpyHelpers.logical_generic(np.logical_and, *[(active_target_df['parent_epoch_label'] == a_row.ripple_idx), ])
+                _target_df_row_matching_indicies = active_target_df[is_target_df_row_matching].index ## get the indicies
+                ## perform the update inline:
+                for an_update_col_name in desired_transfer_col_names:
+                    target_df.loc[_target_df_row_matching_indicies, an_update_col_name] = getattr(a_row, an_update_col_name) # a_row.Long_BestDir_quantile
+                    an_epoch_time_bin_df.loc[_target_df_row_matching_indicies, an_update_col_name] = getattr(a_row, an_update_col_name) # a_row.Long_BestDir_quantile
+
+                # # matching_df1_update_tuples.append([_df1_row_matching_indicies, a_row.Long_BestDir_quantile, a_row.Short_BestDir_quantile])
+                
+            # unique_start_stop = active_df2[['start', 'stop']].unique()
+            # unique_start_stop
+            
+        # a_paired_main_ripple_df = df1
+        return an_epoch_time_bin_df
+    
 
     @function_attributes(short_name=None, tags=['DEPRICATED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-13 00:00', related_items=[])
     @classmethod

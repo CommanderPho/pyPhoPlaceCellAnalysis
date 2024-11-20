@@ -2343,7 +2343,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     # Plot Updating Functions                                                                                              #
     # ==================================================================================================================== #
 
-
+    @function_attributes(short_name=None, tags=['plotting'], input_requires=[], output_provides=[], uses=['_perform_plot_pre_post_delta_scatter'], used_by=[], creation_date='2024-11-20 13:08', related_items=[])
     @classmethod
     def _build_plot_callback(cls, earliest_delta_aligned_t_start, latest_delta_aligned_t_end, save_plotly, should_save: bool = False, resolution_multiplier=1, enable_debug_print=False):
         # fig_size_kwargs = {'width': 1650, 'height': 480}
@@ -2451,7 +2451,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
 
 
-    def update_filtered_dataframes(self, replay_name, time_bin_sizes, debug_print=False):
+    def update_filtered_dataframes(self, replay_name, time_bin_sizes, debug_print=True):
         """ Perform filtering on each DataFrame
         """
         if not time_bin_sizes:
@@ -2484,7 +2484,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                 active_predicate_filter_name_modifier = []
                 for a_predicate_name, a_predicate_fn in self.additional_filter_predicates.items():
                     if a_predicate_name in enabled_filter_predicate_list:
-                        did_predicate_fail: bool = False
+                        did_predicate_fail: bool = False # whether an error was encountered when trying to evaluate this predicate for this df
                         try:
                             is_predicate_true = a_predicate_fn(df)
                             did_predicate_fail = False
@@ -2502,7 +2502,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                         df['is_filter_included'] = (df['is_filter_included'] & is_predicate_true)
                         if not did_predicate_fail:
                             active_predicate_filter_name_modifier.append(a_predicate_name)
-
+                # END for a_predicate_name, a_predicate_fn
 
                 
                 filtered_df = deepcopy(df[df['is_filter_included']])
