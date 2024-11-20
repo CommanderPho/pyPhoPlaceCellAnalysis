@@ -232,7 +232,7 @@ class BatchCompletionHelpers:
 			
 
 		## OUTPUTS: new_replay_epochs, new_replay_epochs_df
-		did_change, _backup_session_replay_epochs, _backup_session_configs = cls.replace_replay_epochs(curr_active_pipeline=curr_active_pipeline, new_replay_epochs=new_replay_epochs)
+		did_replay_epochs_change, _backup_session_replay_epochs, _backup_session_configs = cls.replace_replay_epochs(curr_active_pipeline=curr_active_pipeline, new_replay_epochs=new_replay_epochs)
 
 		custom_save_filenames = {
 			'pipeline_pkl':f'loadedSessPickle{custom_suffix}.pkl',
@@ -241,6 +241,33 @@ class BatchCompletionHelpers:
 		}
 		print(f'custom_save_filenames: {custom_save_filenames}')
 		custom_save_filepaths = {k:v for k, v in custom_save_filenames.items()}
+
+
+		#TODO 2024-11-20 06:39: - [ ] `did_change` must be True when time_bin_size or other parameters change I believe!! Because WCorr calculations use the time_bin_size in `'DirectionalMergedDecoders'`
+		
+		def _test_did_compute_parameters_change() -> bool:
+			""" Test whether the previously computed results have the same parameters as the desired ones:		
+			captures: curr_active_pipeline, """
+			did_computation_parameters_change: bool = False
+			rank_order_results = curr_active_pipeline.global_computation_results.computed_data.get('RankOrder', None)
+			if rank_order_results is None:
+				return True
+			## TODO: handle these:
+			results_minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+			results_included_qclu_values: List[int] = rank_order_results.included_qclu_values
+			# if (results_minimum_inclusion_fr_Hz !=
+			directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data.get('DirectionalMergedDecoders', None)
+			if directional_merged_decoders_result is None:
+				return True
+			computed_ripple_decoding_time_bin_size: float = directional_merged_decoders_result.ripple_decoding_time_bin_size
+			if (computed_ripple_decoding_time_bin_size != ripple_decoding_time_bin_size):
+				print(f'desired ripple time_bin_size differs from computed result!')
+				return True
+			return did_computation_parameters_change		
+		
+
+		did_computation_parameters_change: bool = _test_did_compute_parameters_change()
+		did_change: bool = did_replay_epochs_change or did_computation_parameters_change
 
 		if not did_change:
 			print(f'no changes!')
@@ -256,6 +283,7 @@ class BatchCompletionHelpers:
 			
 			should_skip_laps: bool = False
 
+			## This is where `ripple_decoding_time_bin_size` is used!!!
 			metadata = deepcopy(new_replay_epochs.metadata)
 			minimum_inclusion_fr_Hz = metadata.get('minimum_inclusion_fr_Hz', None)
 			included_qclu_values = metadata.get('included_qclu_values', None)
@@ -355,11 +383,11 @@ class BatchCompletionHelpers:
 		except Exception as e:
 			print(f'failed doing `finalize_output_shuffled_wcorr(...)` with error: {e}')
 			if user_completion_dummy.fail_on_exception:
-				print(f'did_change: {did_change}, custom_save_filenames: {custom_save_filenames}, custom_save_filepaths: {custom_save_filepaths}')
+				print(f'did_change: {did_replay_epochs_change}, custom_save_filenames: {custom_save_filenames}, custom_save_filepaths: {custom_save_filepaths}')
 				raise e
 
 
-		return did_change, custom_save_filenames, custom_save_filepaths
+		return did_replay_epochs_change, custom_save_filenames, custom_save_filepaths
 
 
 	# Replay Loading/Estimation Methods __________________________________________________________________________________ #
