@@ -1667,7 +1667,6 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
     # filter_context = df_filter.filter_context # IdentifyingContext(time_bin_sizes=df_filter.time_bin_size, custom_suffix=df_filter.replay_name)
     figure_footer_text = data_context.get_description(separator='|', subset_excludelist=['time_bin_sizes'])
 
-
     new_fig, new_fig_context = plotly_pre_post_delta_scatter(data_results_df=concatenated_ripple_df, data_context=data_context,
                                                               extant_figure=extant_figure,
                             out_scatter_fig=None, histogram_bins=histogram_bins,
@@ -2348,7 +2347,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
 
     @classmethod
-    def _build_plot_callback(cls, earliest_delta_aligned_t_start, latest_delta_aligned_t_end, save_plotly, should_save: bool = False, resolution_multiplier=1):
+    def _build_plot_callback(cls, earliest_delta_aligned_t_start, latest_delta_aligned_t_end, save_plotly, should_save: bool = False, resolution_multiplier=1, enable_debug_print=False):
         # fig_size_kwargs = {'width': 1650, 'height': 480}
         
         # fig_size_kwargs = {'width': resolution_multiplier*1650, 'height': resolution_multiplier*480}
@@ -2418,8 +2417,9 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                 else:
                     # print(f'NOPE! points: {points}, trace: {trace}')
                     df_filter.output_widget.clear_output()
-                    with df_filter.output_widget:
-                        print(f'NOPE! points: {points}, trace: {trace}')
+                    if enable_debug_print:
+                        with df_filter.output_widget:
+                            print(f'NOPE! points: {points}, trace: {trace}')
                     
 
             fig.layout.hovermode = 'closest'
