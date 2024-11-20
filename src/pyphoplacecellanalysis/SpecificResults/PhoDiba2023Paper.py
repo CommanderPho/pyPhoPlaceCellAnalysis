@@ -2119,6 +2119,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     # ==================================================================================================================== #
     def __attrs_post_init__(self):
         # This method runs after the generated __init__
+        self._init_filtered_dataframes()
+        
         self._setup_widgets()
         # Initial filtering with default widget values
         self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
@@ -2181,13 +2183,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         )
 
         self.output_widget = widgets.Output(layout={'border': '1px solid black'})
-        # self.figure_widget = go.FigureWidget()
-        # self.figure_widget = None
-        # self.figure_widget = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=[pre_delta_label, main_title, post_delta_label], figure_class=go.FigureWidget) ## figure created here?
         self.figure_widget, did_create_new_figure = PlotlyFigureContainer._helper_build_pre_post_delta_figure_if_needed(extant_figure=None, use_latex_labels=False, main_title='test', figure_class=go.FigureWidget)
         
-        # extra_button_widgets = add_copy_save_action_buttons(fig=self.figure_widget)
-
 
         # Set up observers to handle changes in widget values
         self.replay_name_widget.observe(self._on_widget_change, names='value')
@@ -2202,17 +2199,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                                 #  renderers=renderers,
                                 )
         # self.table_widget.transform([{"type": "sort", "columnIndex": 2, "desc": True}])
-        
-        # solara.FileDownload.widget(data=data, filename=filename, label="Save Figure", mime_type=mime_type, )
-
-        # Display the widgets
-        # display(widgets.VBox([widgets.HBox([self.replay_name_widget, self.time_bin_size_widget, self.active_filter_predicate_selector_widget]),
-        #                 widgets.HBox([self.active_plot_df_name_selector_widget, self.active_plot_variable_name_widget]),
-        #                self.output_widget,
-        #                self.figure_widget,
-        #                extra_button_widgets,
-        #                self.table_widget,
-        #                ]))
+ 
 
     def _setup_widgets_buttons(self):
         """Sets up the copy and download buttons."""
@@ -2413,17 +2400,6 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                 customdata=active_plot_df[["session_name", "custom_replay_name", "start", "duration"]].values
             )
 
-            # create our callback function
-            # def update_point(trace, points, selector):
-            #     c = list(scatter.marker.color)
-            #     s = list(scatter.marker.size)
-            #     for i in points.point_inds:
-            #         c[i] = '#bae2be'
-            #         s[i] = 20
-            #         with f.batch_update():
-            #             scatter.marker.color = c
-            #             scatter.marker.size = s
-
             def on_click(trace, points, selector):
                 if points.point_inds:
                     ind = points.point_inds[0]
@@ -2464,7 +2440,20 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     # ==================================================================================================================== #
     # Data Update Functions                                                                                                #
     # ==================================================================================================================== #
-    def update_filtered_dataframes(self, replay_name, time_bin_sizes):
+    
+    def _init_filtered_dataframes(self):
+        """ builds the filtered dataframes from the original_df_dict. Initially they are unfiltered. """
+        ## Update the 'is_filter_included' column on the original dataframes
+        for name, df in self.original_df_dict.items():
+            if 'is_filter_included' not in df.columns:
+                df['is_filter_included'] = True  # Initialize with default value
+            filtered_name: str = f"filtered_{name}"
+            filtered_df = deepcopy(df[df['is_filter_included']])
+            setattr(self, filtered_name, filtered_df)
+
+
+
+    def update_filtered_dataframes(self, replay_name, time_bin_sizes, debug_print=False):
         """ Perform filtering on each DataFrame
         """
         if not time_bin_sizes:
