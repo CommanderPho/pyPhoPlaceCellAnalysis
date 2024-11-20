@@ -1,4 +1,5 @@
 from copy import deepcopy
+from pathlib import Path
 from typing import Dict, Callable, List, Tuple
 from attrs import define, field
 import numpy as np
@@ -1650,13 +1651,15 @@ def _build_solera_file_download_widget(fig, filename="figure-image.png", label="
     png_bytes = pio.to_image(fig, format='png')
     mime_type="image/png"
     data = deepcopy(png_bytes)
-    return widgets.VBox(
-            children=[
-                # solara.FileDownload.widget(data=data, filename="solara-download.txt", label="Download file") #.widget(directory=a_path, on_file_open=on_file_open)
-                    solara.FileDownload.widget(data=data, filename=filename, label=label, mime_type=mime_type, ) #.widget(directory=a_path, on_file_open=on_file_open)
-            ]
-        )
-            
+    return solara.FileDownload.widget(data=data, filename=filename, label=label, mime_type=mime_type, )
+    # return widgets.VBox(
+    #         children=[
+    #             # solara.FileDownload.widget(data=data, filename="solara-download.txt", label="Download file") #.widget(directory=a_path, on_file_open=on_file_open)
+    #                 solara.FileDownload.widget(data=data, filename=filename, label=label, mime_type=mime_type, ) #.widget(directory=a_path, on_file_open=on_file_open)
+    #         ]
+    #     )
+
+
 @define(slots=False, eq=False)
 class DataframeFilterPredicates:
     is_enabled: bool = field(default=True)
@@ -1970,6 +1973,17 @@ class DataFrameFilter:
         self.button_copy = widgets.Button(description="Copy to Clipboard", icon='copy')
         # self.button_download = widgets.Button(description="Download Image", icon='save')
         self.button_download =  _build_solera_file_download_widget(fig=self.figure_widget, filename="figure-image.png")
+        
+        # @solara.component
+        # def Page():
+        #     def get_data():
+        #         # I run in a thread, so I can do some heavy processing
+        #         time.sleep(3)
+        #         # I only get called when the download is requested
+        #         return "This is the content of the file"
+        #     solara.FileDownload(get_data, "solara-lazy-download.txt")
+            
+
         self.filename_label = widgets.Label()
 
         def on_copy_button_click(b):
@@ -2010,22 +2024,22 @@ class DataFrameFilter:
 
             display(Javascript(js_code))
 
-        def on_download_button_click(b):
-            # Convert the figure to a PNG image
-            png_bytes = pio.to_image(self.figure_widget, format='png')
-            encoded_image = base64.b64encode(png_bytes).decode('utf-8')
+        # def on_download_button_click(b):
+        #     # Convert the figure to a PNG image
+        #     png_bytes = pio.to_image(self.figure_widget, format='png')
+        #     encoded_image = base64.b64encode(png_bytes).decode('utf-8')
 
-            # JavaScript code to trigger download with a specific filename
-            js_code = f'''
-                const link = document.createElement('a');
-                link.href = 'data:image/png;base64,{encoded_image}';
-                link.download = '{self.filename}';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            '''
+        #     # JavaScript code to trigger download with a specific filename
+        #     js_code = f'''
+        #         const link = document.createElement('a');
+        #         link.href = 'data:image/png;base64,{encoded_image}';
+        #         link.download = '{self.filename}';
+        #         document.body.appendChild(link);
+        #         link.click();
+        #         document.body.removeChild(link);
+        #     '''
 
-            display(Javascript(js_code))
+        #     display(Javascript(js_code))
 
         self.button_copy.on_click(on_copy_button_click)
         # self.button_download.on_click(on_download_button_click)
@@ -2055,6 +2069,11 @@ class DataFrameFilter:
             title = fig.layout.title.text if fig.layout.title and fig.layout.title.text else "figure"
             self.filename = f"{title.replace(' ', '_')}.png"
             self.filename_label.value = title
+
+        ## rebuild the download widget with the current figure
+        self.button_download =  _build_solera_file_download_widget(fig=self.figure_widget, filename=Path(self.filename).with_suffix('.png').as_posix())
+
+
 
     def on_fig_layout_change(self, layout, *args):
         """Callback for when the figure's layout changes."""
@@ -2206,6 +2225,12 @@ class DataFrameFilter:
             except Exception as e:
                 raise
         
+        ## Update the preferred_filename from the dataframe metadata:
+        self.on_widget_update_filename()
+        
+        # ## rebuild the download widget with the current figure
+        # self.button_download =  _build_solera_file_download_widget(fig=self.figure_widget, filename=Path(self.filename).with_suffix('.png').as_posix())
+
 
 
     def update_calling_namespace_locals(self):
