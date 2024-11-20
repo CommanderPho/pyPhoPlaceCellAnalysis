@@ -3571,21 +3571,23 @@ class AcrossSessionHelpers:
         # from pyphocorehelpers.DataStructure.data_structure_builders import cartesian_product
         from neuropy.utils.indexing_helpers import NumpyHelpers
         
-        # if isinstance(comparison_must_match_column_names[-1],
+        if comparison_must_match_column_names is None:
+            # epoch_idx_col_name: str = 'epoch_idx'
+            # epoch_idx_col_name: str = 'label' # for 'all_sessions_all_scores_ripple_df', doesn't quite work
+            epoch_idx_col_name: str = 'ripple_idx' # for 'all_sessions_MultiMeasure_ripple_df',
+            comparison_must_match_column_names = ['session_name', 'custom_replay_name', 'time_bin_size', epoch_idx_col_name]
+            
+        if comparison_must_match_non_temporal_column_names is None:
+            comparison_must_match_non_temporal_column_names = comparison_must_match_column_names
+            
+        if desired_transfer_col_names is None:
+            desired_transfer_col_names = ['Long_BestDir_quantile', 'Short_BestDir_quantile', 'best_overall_quantile', 'wcorr_z_long', 'wcorr_z_short', 'best_overall_wcorr_z']
+            
+        ## add the corresponding column to `an_epoch_time_bin_df` if it is missing
         epoch_idx_match_col_name: str = comparison_must_match_column_names[-1]
         if (epoch_idx_match_col_name not in an_epoch_time_bin_df) and ('parent_epoch_label' in an_epoch_time_bin_df):
             ## make the needed epoch index column in time_bin
             an_epoch_time_bin_df[epoch_idx_match_col_name] = an_epoch_time_bin_df['parent_epoch_label']
-        
-        # if comparison_must_match_column_names is None:
-        #     comparison_must_match_column_names = ['custom_replay_name', 'session_name', 'start', 'stop']
-            
-        # if comparison_must_match_non_temporal_column_names is None:
-        #     comparison_must_match_non_temporal_column_names = ['custom_replay_name', 'session_name']
-            
-        # if desired_transfer_col_names is None:
-        #     desired_transfer_col_names = ['Long_BestDir_quantile', 'Short_BestDir_quantile', 'best_overall_quantile']
-            
         
         if (len(desired_transfer_col_names)==3) and (desired_transfer_col_names[-1] not in an_epoch_time_bin_df.columns):
             # e.g. ['Long_BestDir_quantile', 'Short_BestDir_quantile', 'best_overall_quantile']
@@ -3620,10 +3622,8 @@ class AcrossSessionHelpers:
         for k in comparison_must_match_non_temporal_column_names:
             combined_shared_unique_values_dict[k] = tuple(set(df1_unique_values_dict[k]).intersection(df2_unique_values_dict[k]))
             
-
         # new_name_list = ExportValueNameCleaner.clean_all(name_list=all_sessions_MultiMeasure_ripple_df['custom_replay_name'].unique().tolist())
         # new_name_list
-        # combined_shared_unique_value_tuples, param_sweep_option_n_values = parameter_sweeps(smooth=[(None, None), (0.5, 0.5), (1.0, 1.0), (2.0, 2.0), (5.0, 5.0)], grid_bin=[(1,1),(5,5),(10,10)])
         combined_shared_unique_value_dicts, param_sweep_option_n_values = parameter_sweeps(**combined_shared_unique_values_dict)
 
         # start_idx_name: str = 'start'
@@ -3635,15 +3635,13 @@ class AcrossSessionHelpers:
             source_df_matches_all_conditions = NumpyHelpers.logical_generic(np.logical_and, *[source_df[k] == v for k, v in a_values_dict.items()])
             active_target_df = target_df[target_df_matches_all_conditions][comparison_must_match_column_names]
             active_source_df = source_df[source_df_matches_all_conditions][comparison_must_match_column_names + desired_transfer_col_names]
-            # (active_df1.shape, active_df2.shape)
             ## drop duplicates    
             # active_df1 = active_df1.drop_duplicates(ignore_index=True) # df1 should have duplicates for each time_bin_size
             active_source_df = active_source_df.drop_duplicates(ignore_index=True) # df2 should have no duplicates. 
             active_source_df = active_source_df.drop_duplicates(ignore_index=True, subset=[start_idx_name, ])
-            # (active_df1.shape, active_df2.shape)
             ## for each start, stop in `active_df2`, find matching values in active_df1
             for a_row in active_source_df.itertuples(index=True):
-                is_target_df_row_matching = NumpyHelpers.logical_generic(np.logical_and, *[(active_target_df['parent_epoch_label'] == a_row.ripple_idx), ])
+                is_target_df_row_matching = NumpyHelpers.logical_generic(np.logical_and, *[(active_target_df[start_idx_name] == a_row.ripple_idx), ])
                 _target_df_row_matching_indicies = active_target_df[is_target_df_row_matching].index ## get the indicies
                 ## perform the update inline:
                 for an_update_col_name in desired_transfer_col_names:
@@ -3652,10 +3650,8 @@ class AcrossSessionHelpers:
 
                 # # matching_df1_update_tuples.append([_df1_row_matching_indicies, a_row.Long_BestDir_quantile, a_row.Short_BestDir_quantile])
                 
-            # unique_start_stop = active_df2[['start', 'stop']].unique()
-            # unique_start_stop
-            
-        # a_paired_main_ripple_df = df1
+
+    
         return an_epoch_time_bin_df
     
 
