@@ -2457,41 +2457,75 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         if not time_bin_sizes:
             print("Please select at least one Time Bin Size.")
             return
-        
-        # Convert time_bin_sizes to a list if it's not already
-        if isinstance(time_bin_sizes, (float, int)):
-            time_bin_sizes = [time_bin_sizes]
-        elif isinstance(time_bin_sizes, tuple):
-            time_bin_sizes = list(time_bin_sizes)
+
+        self.output_widget.clear_output()
+        with self.output_widget:            
+            # Convert time_bin_sizes to a list if it's not already
+            if isinstance(time_bin_sizes, (float, int)):
+                time_bin_sizes = [time_bin_sizes]
+            elif isinstance(time_bin_sizes, tuple):
+                time_bin_sizes = list(time_bin_sizes)
+                
+
+            enabled_filter_predicate_list = self.active_filter_predicate_selector_widget.value
+            did_applying_predicate_fail_for_df_dict = {}
             
+            ## Update the 'is_filter_included' column on the original dataframes
+            for name, df in self.original_df_dict.items():
+                filtered_name: str = f"filtered_{name}"
+                did_applying_predicate_fail_for_df_dict[filtered_name] = False ## start false
+                
+                if 'is_filter_included' not in df.columns:
+                    df['is_filter_included'] = False  # Initialize with default value
+                # Update based on conditions
+                df['is_filter_included'] = (df['custom_replay_name'] == replay_name) & (df['time_bin_size'].isin(time_bin_sizes))
 
-        enabled_filter_predicate_list = self.active_filter_predicate_selector_widget.value
-        
-        ## Update the 'is_filter_included' column on the original dataframes
-        for name, df in self.original_df_dict.items():
-            if 'is_filter_included' not in df.columns:
-                df['is_filter_included'] = False  # Initialize with default value
-            # Update based on conditions
-            df['is_filter_included'] = (df['custom_replay_name'] == replay_name) & (df['time_bin_size'].isin(time_bin_sizes))
+                ## Apply predicates
+                active_predicate_filter_name_modifier = []
+                for a_predicate_name, a_predicate_fn in self.additional_filter_predicates.items():
+                    if a_predicate_name in enabled_filter_predicate_list:
+                        did_predicate_fail: bool = False
+                        try:
+                            is_predicate_true = a_predicate_fn(df)
+                            did_predicate_fail = False
+                        except KeyError as e:
+                            if debug_print:
+                                print(f'NOTE: failed to apply predicate "{a_predicate_name}" to df: {name}')                            
+                            is_predicate_true = False
+                            did_predicate_fail = True
+                        except Exception as e:
+                            did_predicate_fail = True
+                            raise
+                        if did_predicate_fail:
+                            did_applying_predicate_fail_for_df_dict[filtered_name] = (did_applying_predicate_fail_for_df_dict[filtered_name] or did_predicate_fail)
 
-            for a_predicate_name, a_predicate_fn in self.additional_filter_predicates.items():
-                if a_predicate_name in enabled_filter_predicate_list:
-                    try:
-                        is_predicate_true = a_predicate_fn(df)
-                    except KeyError as e:
-                        print(f'failed to apply predicate "{a_predicate_name}" to df: {name}')
-                        is_predicate_true = False
-                    except Exception as e:
-                        raise
-                    # is_predicate_true = a_predicate_fn(df)
-                    df['is_filter_included'] = (df['is_filter_included'] & is_predicate_true)
+                        df['is_filter_included'] = (df['is_filter_included'] & is_predicate_true)
+                        if not did_predicate_fail:
+                            active_predicate_filter_name_modifier.append(a_predicate_name)
 
-            filtered_name: str = f"filtered_{name}"
-            setattr(self, filtered_name, deepcopy(df[df['is_filter_included']]))
 
-        ## Update sizes table:
-        self.table_widget.data = self.filtered_size_info_df
-        
+                
+                filtered_df = deepcopy(df[df['is_filter_included']])
+                
+                ## update df metadata to indicate that it is filtered
+                df_context_dict = filtered_df.attrs['data_context'].to_dict() #  ## benedict dict
+                df_context_dict.pop('filter', None) ## remove old filter
+                if len(active_predicate_filter_name_modifier) > 0:
+                    active_predicate_filter_name_modifier = '_'.join(active_predicate_filter_name_modifier) ## build string
+                    df_context_dict['filter'] = active_predicate_filter_name_modifier
+                filtered_df.attrs['data_context'] = IdentifyingContext.init_from_dict(df_context_dict) ## update
+                filtered_df.attrs['did_filter_predicate_fail'] = did_applying_predicate_fail_for_df_dict[filtered_name]
+                setattr(self, filtered_name, filtered_df)
+            # END for name, df
+
+            ## Update sizes table:
+            self.table_widget.data = self.filtered_size_info_df
+            
+            if did_applying_predicate_fail_for_df_dict[self.active_plot_df_name]:
+                print(f'!!! Warning!!! applying predicates failed for the current active plot df (self.active_plot_df_name: {self.active_plot_df_name})!\n\tthe plotted output has NOT been filtered!')
+                
+
+        ## end with self.output_widget
         for k, a_callback_fn in self.on_filtered_dataframes_changed_callback_fns.items():
             # print(f'k: {k}')
             try:
