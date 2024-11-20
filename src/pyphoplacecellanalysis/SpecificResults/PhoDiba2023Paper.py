@@ -2133,10 +2133,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import PlotlyFigureContainer
         
         # Extract unique options for the widgets
-        replay_name_options = sorted(self.all_sessions_ripple_df['custom_replay_name'].astype(str).unique())
-        time_bin_size_options = sorted(self.all_sessions_ripple_df['time_bin_size'].unique())
-        plot_df_name_options = sorted(self.filtered_df_names)
-        plot_variable_name_options = sorted(self.plot_variable_name_options)
+        replay_name_options = sorted(self.active_plot_df['custom_replay_name'].astype(str).unique())
+        time_bin_size_options = sorted(self.active_plot_df['time_bin_size'].unique())
         
         # Create dropdown widgets with adjusted layout and style
         self.replay_name_widget = widgets.Dropdown(
@@ -2148,7 +2146,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         )
         
         self.active_plot_df_name_selector_widget = widgets.Dropdown(
-            options=plot_df_name_options,
+            options=sorted(self.filtered_df_names),
             description='Plot df Name:',
             disabled=False,
             layout=widgets.Layout(width='500px'),
@@ -2157,7 +2155,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         self.active_plot_df_name_selector_widget.value = self.active_plot_df_name
         
         self.active_plot_variable_name_widget = widgets.Dropdown(
-            options=plot_variable_name_options,
+            options=sorted(self.plot_variable_name_options),
             description='Plot Variable Name:',
             disabled=False,
             layout=widgets.Layout(width='300px'),
@@ -2171,7 +2169,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             description='Time Bin Size:',
             disabled=False,
             layout=widgets.Layout(width='200px', height='100px'),
-            style={'description_width': 'initial'}
+            style={'description_width': 'initial'},
         )
 
         self.active_filter_predicate_selector_widget = widgets.SelectMultiple(
@@ -2499,10 +2497,13 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             try:
                 a_callback_fn(self)
             except Exception as e:
+                print(f'WARNING: callback_fn[{k}] failed with error: {e}, skipping.')
                 raise
-        
+            
         ## Update the preferred_filename from the dataframe metadata:
         self.on_widget_update_filename()
+
+
         # ## rebuild the download widget with the current figure
         # self.button_download =  _build_solera_file_download_widget(fig=self.figure_widget, filename=Path(self.filename).with_suffix('.png').as_posix())
     
