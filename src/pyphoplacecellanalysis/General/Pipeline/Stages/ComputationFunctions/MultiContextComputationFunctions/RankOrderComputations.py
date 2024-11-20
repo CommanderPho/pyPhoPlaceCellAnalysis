@@ -2540,7 +2540,7 @@ def validate_has_rank_order_results(curr_active_pipeline, computation_filter_nam
     ripple_result_tuple: Optional[DirectionalRankOrderResult] = rank_order_results.ripple_most_likely_result_tuple
     laps_result_tuple: Optional[DirectionalRankOrderResult] = rank_order_results.laps_most_likely_result_tuple
 
-
+    
     ## comparing to parameters
     param_typed_parameters = curr_active_pipeline.global_computation_results.computation_config
     if param_typed_parameters is not None:
@@ -2678,6 +2678,8 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
     def perform_rank_order_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=500, minimum_inclusion_fr_Hz:float=5.0, included_qclu_values=[1,2,4,6,7,9], skip_laps=False):
         """ Performs the computation of the spearman and pearson correlations for the ripple and lap epochs.
 
+        Does this not depend on the desired_ripple_decoding_time_bin_size?
+        
         Requires:
             ['sess']
 
