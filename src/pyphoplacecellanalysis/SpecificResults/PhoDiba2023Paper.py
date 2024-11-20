@@ -1640,8 +1640,23 @@ from ipydatagrid import Expr, DataGrid, TextRenderer, BarRenderer # for use in D
 from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import add_copy_save_action_buttons
 from IPython.display import display, Javascript
 import base64
+import solara # `pip install "solara[assets]`
 
-
+def _build_solera_file_download_widget(fig, filename="figure-image.png", label="Save Figure"):
+    """ 
+    _file_download_widget = _build_solera_file_download_widget(fig=self.figure_widget, filename="figure-image.png")
+    
+    """
+    png_bytes = pio.to_image(fig, format='png')
+    mime_type="image/png"
+    data = deepcopy(png_bytes)
+    return widgets.VBox(
+            children=[
+                # solara.FileDownload.widget(data=data, filename="solara-download.txt", label="Download file") #.widget(directory=a_path, on_file_open=on_file_open)
+                    solara.FileDownload.widget(data=data, filename=filename, label=label, mime_type=mime_type, ) #.widget(directory=a_path, on_file_open=on_file_open)
+            ]
+        )
+            
 @define(slots=False, eq=False)
 class DataframeFilterPredicates:
     is_enabled: bool = field(default=True)
@@ -1712,7 +1727,7 @@ class DataFrameFilter:
 
     # Add button widgets as class attributes
     button_copy: widgets.Button = field(init=False)
-    button_download: widgets.Button = field(init=False)
+    button_download: widgets.widget = field(init=False)
     filename_label: widgets.Label = field(init=False)
     # Add Output widget for JavaScript execution
     # js_output: widgets.Output = field(init=False)
@@ -1938,7 +1953,7 @@ class DataFrameFilter:
                                 )
         # self.table_widget.transform([{"type": "sort", "columnIndex": 2, "desc": True}])
         
-    
+        # solara.FileDownload.widget(data=data, filename=filename, label="Save Figure", mime_type=mime_type, )
 
         # Display the widgets
         # display(widgets.VBox([widgets.HBox([self.replay_name_widget, self.time_bin_size_widget, self.active_filter_predicate_selector_widget]),
@@ -1953,7 +1968,8 @@ class DataFrameFilter:
     def _setup_widgets_buttons(self):
         """Sets up the copy and download buttons."""
         self.button_copy = widgets.Button(description="Copy to Clipboard", icon='copy')
-        self.button_download = widgets.Button(description="Download Image", icon='save')
+        # self.button_download = widgets.Button(description="Download Image", icon='save')
+        self.button_download =  _build_solera_file_download_widget(fig=self.figure_widget, filename="figure-image.png")
         self.filename_label = widgets.Label()
 
         def on_copy_button_click(b):
@@ -2012,7 +2028,7 @@ class DataFrameFilter:
             display(Javascript(js_code))
 
         self.button_copy.on_click(on_copy_button_click)
-        self.button_download.on_click(on_download_button_click)
+        # self.button_download.on_click(on_download_button_click)
 
         ## Finish setup:
         self.on_widget_update_filename()  # Initialize filename and label
