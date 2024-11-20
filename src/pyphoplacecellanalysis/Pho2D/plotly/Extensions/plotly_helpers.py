@@ -509,7 +509,11 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
         data_results_df[categorical_color_shared_color_key] = data_results_df[categorical_color_shared_color_key].map(lambda x: f'{x}').astype(str) # string type
         category_orders = {shared_color_key: [f'{v}' for v in sorted(data_results_df[categorical_color_shared_color_key].astype(float).unique())]} # should this be `categorical_color_shared_color_key` or `shared_color_key`
         
-        color_sequence = px.colors.qualitative.Plotly # `color_discrete_sequence`
+        # color_sequence = px.colors.qualitative.Plotly # `color_discrete_sequence`
+        # Get the original colors and remove red and blue
+        # color_sequence = [color for color in px.colors.qualitative.Plotly if color not in ['#636EFA', '#EF553B']]
+        color_sequence = px.colors.qualitative.Plotly[3:]
+
         # color_sequence = px.colors.color_continuous_scale() # `color_continuous_scale`
         kwargs_update_dict = dict(category_orders=category_orders, color_discrete_sequence=color_sequence,
                                     # color=shared_color_key,
