@@ -2491,17 +2491,6 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             filtered_name: str = f"filtered_{name}"
             setattr(self, filtered_name, deepcopy(df[df['is_filter_included']]))
 
-        # self.output_widget.clear_output()
-        # with self.output_widget:
-        # Provide feedback to the user
-        # print(f"DataFrames filtered with Replay Name: '{replay_name}' and Time Bin Sizes: {time_bin_sizes}")
-        # n_records_dict = {name:len(df) for name, df in self.filtered_df_dict.items()}
-        # display(n_records_dict)
-        # n_records: int = len(self.filtered_all_sessions_all_scores_ripple_df)
-        # print(f'n_rows: {n_records}')
-        # self.update_calling_namespace_locals()
-        # display(self.filtered_all_sessions_all_scores_ripple_df.head())
-
         ## Update sizes table:
         self.table_widget.data = self.filtered_size_info_df
         
@@ -2514,7 +2503,6 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         
         ## Update the preferred_filename from the dataframe metadata:
         self.on_widget_update_filename()
-        
         # ## rebuild the download widget with the current figure
         # self.button_download =  _build_solera_file_download_widget(fig=self.figure_widget, filename=Path(self.filename).with_suffix('.png').as_posix())
     
