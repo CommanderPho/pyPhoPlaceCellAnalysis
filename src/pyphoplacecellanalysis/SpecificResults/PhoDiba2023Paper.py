@@ -1493,812 +1493,7 @@ def main_complete_figure_generations(curr_active_pipeline, enable_default_neptun
     
     # plots
 
-# ==================================================================================================================== #
-# SpecificPrePostDeltaScatter                                                                                          #
-# ==================================================================================================================== #
 
-from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import plotly_pre_post_delta_scatter
-from pyphocorehelpers.Filesystem.path_helpers import sanitize_filename_for_Windows
-
-
-@metadata_attributes(short_name=None, tags=['plotly', 'scatter', 'notebook', 'figure', 'outputs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-08 15:10', related_items=[])
-class SpecificPrePostDeltaScatter:
-    """ not yet finished.
-    """
-    _generic_kwargs = {'fig_size_kwargs': None, 'is_dark_mode': False, 'histogram_bins': 25, 'num_sessions': 1}
-    
-    @classmethod
-    def _pre_post_delta_scatter_laps_per_time_bin(cls, all_sessions_laps_time_bin_df, t_delta_df, t_delta_dict, earliest_delta_aligned_t_start, latest_delta_aligned_t_end):
-        histogram_bins = 25
-        num_sessions = 1
-
-        # ==================================================================================================================== #
-        # Laps                                                                                                                 #
-        # ==================================================================================================================== #
-        # all_sessions_laps_time_bin_df
-        # all_sessions_simple_pearson_laps_df
-
-        # Define the legend groups you want to hide on startup
-        legend_groups_to_hide = ['0.030', '0.044', '0.050', '0.058'] # '0.025', 
-
-        # data_context = IdentifyingContext(epochs_name='laps', data_grain='per_epoch', title_prefix="Lap Per Epoch")
-        # concatenated_ripple_df = deepcopy(all_sessions_laps_df)
-        data_context = IdentifyingContext(epochs_name='laps', data_grain='per_time_bin', title_prefix="Lap Individual Time Bins")
-        concatenated_ripple_df = deepcopy(all_sessions_laps_time_bin_df)
-
-        # data_context = IdentifyingContext(epochs_name='PBE', data_grain='per_epoch', title_prefix="PBE Per Epoch")
-        # concatenated_ripple_df = deepcopy(all_sessions_ripple_df)
-        # data_context = IdentifyingContext(epochs_name='PBE', data_grain='per_time_bin', title_prefix="PBE Individual Time Bins")
-        # concatenated_ripple_df = deepcopy(all_sessions_ripple_time_bin_df)
-
-        # concatenated_ripple_df = deepcopy(all_sessions_simple_pearson_laps_df) # ['P_LR', 'P_RL', 'P_Long', 'P_Short', 'ripple_idx', 'ripple_start_t', 'P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL', 'most_likely_decoder_index', 'start', 'stop', 'label', 'duration', 'long_LR_pf_peak_x_pearsonr', 'long_RL_pf_peak_x_pearsonr', 'short_LR_pf_peak_x_pearsonr', 'short_RL_pf_peak_x_pearsonr', 'best_decoder_index', 'session_name', 'time_bin_size', 'delta_aligned_start_t', 'is_user_annotated_epoch', 'is_valid_epoch', 'custom_replay_name', 'epoch_idx', 'long_best_pf_peak_x_pearsonr', 'short_best_pf_peak_x_pearsonr', 'wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL', 'long_best_wcorr', 'short_best_wcorr', 'wcorr_abs_diff', 'pearsonr_abs_diff']
-        # concatenated_ripple_df = deepcopy(all_sessions_laps_time_bin_df) # ['P_LR', 'P_RL', 'P_Long', 'P_Short', 'ripple_idx', 'ripple_start_t', 'P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL', 'most_likely_decoder_index', 'start', 'stop', 'label', 'duration', 'long_LR_pf_peak_x_pearsonr', 'long_RL_pf_peak_x_pearsonr', 'short_LR_pf_peak_x_pearsonr', 'short_RL_pf_peak_x_pearsonr', 'best_decoder_index', 'session_name', 'time_bin_size', 'delta_aligned_start_t', 'is_user_annotated_epoch', 'is_valid_epoch', 'custom_replay_name', 'epoch_idx', 'long_best_pf_peak_x_pearsonr', 'short_best_pf_peak_x_pearsonr', 'wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL', 'long_best_wcorr', 'short_best_wcorr', 'wcorr_abs_diff', 'pearsonr_abs_diff']
-        # print(f'concatenated_ripple_df.columns: {list(concatenated_ripple_df.columns)}')
-        # concatenated_ripple_df
-
-        # variable_name = 'P_Long'
-        variable_name = 'P_Short' # Shows expected effect - short-only replay prior to delta and then split replays post-delta
-        # variable_name = 'P_LR'
-
-        y_baseline_level: float = 0.5 # for P(short), etc
-        # y_baseline_level: float = 0.0 # for wcorr, etc
-
-        # px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'color':"is_user_annotated_epoch", 'title': f"'{variable_name}'"} # , 'color': 'time_bin_size', 'range_y': [-1.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size', 'is_user_annotated_epoch':'user_sel'}
-        px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'title': f"{data_context.get_description(subset_includelist=['title_prefix'])} - '{variable_name}'"} # , 'color': 'time_bin_size', 'range_y': [-1.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size', 'is_user_annotated_epoch':'user_sel'}
-        px_scatter_kwargs['color'] = "time_bin_size"
-        # px_scatter_kwargs.pop('color')
-
-        concatenated_ripple_df['dummy_column_for_size'] = 1.0
-        px_scatter_kwargs['size'] = "dummy_column_for_size"
-        px_scatter_kwargs['size_max'] = 3
-        # px_scatter_kwargs['marker'] = dict(line=dict(width=0))
-        # Remove the white border around scatter points by setting line width to 0
-        # px_scatter_kwargs['line_width'] = 0  # <---- Correct way for Plotly Express
-
-        # px_scatter_kwargs.update(dict(marginal_x="histogram", marginal_y="rug"))
-
-        hist_kwargs = dict(color="time_bin_size")
-        # hist_kwargs = dict(color="is_user_annotated_epoch") # , histnorm='probability density'
-        # hist_kwargs.pop('color')
-        new_fig_laps, new_fig_laps_context = plotly_pre_post_delta_scatter(data_results_df=concatenated_ripple_df, out_scatter_fig=None, histogram_bins=histogram_bins,
-                                px_scatter_kwargs=px_scatter_kwargs, histogram_variable_name=variable_name, hist_kwargs=hist_kwargs, forced_range_y=None,
-                                time_delta_tuple=(earliest_delta_aligned_t_start, 0.0, latest_delta_aligned_t_end), legend_title_text=None, is_dark_mode=is_dark_mode)
-
-
-        new_fig_laps = new_fig_laps.update_layout(fig_size_kwargs)
-
-        if legend_groups_to_hide is not None:
-            # Collect all unique legend groups you want to hide
-            hidden_groups = set(legend_groups_to_hide)
-
-            # Iterate over traces and hide those in the specified legend groups
-            for trace in new_fig_laps.data:
-                if trace.legendgroup in hidden_groups:
-                    trace.visible = 'legendonly'
-                
-        # new_fig_laps.show()
-
-        _extras_output_dict = {}
-        if is_dark_mode:
-            _extras_output_dict["y_mid_line"] = new_fig_laps.add_hline(y=y_baseline_level, line=dict(color="rgba(0.8,0.8,0.8,.75)", width=2), row='all', col='all')
-        else:
-            _extras_output_dict["y_mid_line"] = new_fig_laps.add_hline(y=y_baseline_level, line=dict(color="rgba(0.2,0.2,0.2,.75)", width=2), row='all', col='all')
-
-
-        # fig_to_clipboard(new_fig_laps, **fig_size_kwargs)
-        new_fig_laps_context = new_fig_laps_context.adding_context_if_missing(**data_context.get_subset(subset_includelist=['epochs_name', 'data_grain']).to_dict(), num_sessions=num_sessions, plot_type='scatter+hist', comparison='pre-post-delta', variable_name=variable_name)
-        # figure_out_paths = save_plotly(a_fig=new_fig_laps, a_fig_context=new_fig_laps_context)
-        new_fig_laps
-
-
-
-@function_attributes(short_name=None, tags=['across-session', 'time_bin_size'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-15 00:00', related_items=[])
-def build_single_time_bin_size_dfs(all_sessions_all_scores_epochs_df, all_sessions_epochs_df, all_sessions_epochs_time_bin_df, target_time_bin_size: float, included_columns = ['delta_aligned_start_t', 'is_user_annotated_epoch', 'is_valid_epoch']):
-    """ Filters the epochs dataframe down to a single time_bin_size specified by `target_time_bin_size`. 
-     
-     from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import build_single_time_bin_size_dfs
-      
-     History: 2024-07-15 - Factored out of Across Session Notebook
-    """
-    from neuropy.utils.indexing_helpers import PandasHelpers
-
-    print(f'all_sessions_ripple_df.time_bin_size.unique(): {all_sessions_epochs_df.time_bin_size.unique()}')
-    single_time_bin_size_all_sessions_epochs_df = deepcopy(all_sessions_epochs_df[np.isclose(all_sessions_epochs_df['time_bin_size'], target_time_bin_size)])
-    print(f'np.shape(single_time_bin_size_all_sessions_ripple_df): {np.shape(single_time_bin_size_all_sessions_epochs_df)}')
-
-    print(f'all_sessions_ripple_time_bin_df.time_bin_size.unique(): {all_sessions_epochs_time_bin_df.time_bin_size.unique()}')
-    single_time_bin_size_all_sessions_epochs_time_bin_df = deepcopy(all_sessions_epochs_time_bin_df[np.isclose(all_sessions_epochs_time_bin_df['time_bin_size'], target_time_bin_size)])
-    print(f'np.shape(single_time_bin_size_all_sessions_ripple_time_bin_df): {np.shape(single_time_bin_size_all_sessions_epochs_time_bin_df)}')
-
-    # single_time_bin_size_all_sessions_ripple_time_bin_df
-    # single_time_bin_size_all_sessions_ripple_df # has ['ripple_start_t']
-    # all_sessions_all_scores_ripple_df
-
-    ## recover the important columns (user-annotation, epoch validity) from the newer `all_sessions_all_scores_ripple_df` for use in 'single_time_bin_size_all_sessions_ripple_df'
-    all_sessions_all_scores_epochs_df['delta_aligned_start_t'] = all_sessions_all_scores_epochs_df['delta_aligned_start_t'].astype(float)
-    single_time_bin_size_all_sessions_epochs_df['delta_aligned_start_t'] = single_time_bin_size_all_sessions_epochs_df['delta_aligned_start_t'].astype(float)
-
-    # Added 'delta_aligned_start_t' for the merge
-    single_time_bin_size_all_sessions_epochs_df = PandasHelpers.add_explicit_dataframe_columns_from_lookup_df(single_time_bin_size_all_sessions_epochs_df, all_sessions_all_scores_epochs_df[included_columns], join_column_name='delta_aligned_start_t')
-    single_time_bin_size_all_sessions_epochs_df.sort_values(by=['delta_aligned_start_t'], inplace=True) # Need to re-sort by timestamps once done
-    single_time_bin_size_all_sessions_epochs_df
-
-    single_time_bin_size_all_sessions_epochs_time_bin_df = PandasHelpers.add_explicit_dataframe_columns_from_lookup_df(single_time_bin_size_all_sessions_epochs_time_bin_df, all_sessions_all_scores_epochs_df[included_columns], join_column_name='delta_aligned_start_t')
-    single_time_bin_size_all_sessions_epochs_time_bin_df.sort_values(by=['t_bin_center'], inplace=True) # Need to re-sort by timestamps once done
-    
-    ## Add plotly helper columns:
-    for a_df in (all_sessions_all_scores_epochs_df, all_sessions_epochs_df, all_sessions_epochs_time_bin_df, single_time_bin_size_all_sessions_epochs_df, single_time_bin_size_all_sessions_epochs_time_bin_df):
-        a_df['pre_post_delta_category'] = 'post-delta'
-        a_df['pre_post_delta_category'][a_df['delta_aligned_start_t'] < 0.0] = 'pre-delta'
-
-    ## OUTPUTS: single_time_bin_size_all_sessions_ripple_df, single_time_bin_size_all_sessions_ripple_time_bin_df
-    return single_time_bin_size_all_sessions_epochs_df, single_time_bin_size_all_sessions_epochs_time_bin_df
-
-
-import plotly.io as pio
-import plotly.graph_objects as go
-from ipydatagrid import Expr, DataGrid, TextRenderer, BarRenderer # for use in DataFrameFilter
-from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import add_copy_save_action_buttons
-from IPython.display import display, Javascript
-import base64
-import solara # `pip install "solara[assets]`
-
-def _build_solera_file_download_widget(fig, filename="figure-image.png", label="Save Figure"):
-    """ 
-    _file_download_widget = _build_solera_file_download_widget(fig=self.figure_widget, filename="figure-image.png")
-    
-    """
-    png_bytes = pio.to_image(fig, format='png')
-    mime_type="image/png"
-    data = deepcopy(png_bytes)
-    return solara.FileDownload.widget(data=data, filename=filename, label=label, mime_type=mime_type, )
-    # return widgets.VBox(
-    #         children=[
-    #             # solara.FileDownload.widget(data=data, filename="solara-download.txt", label="Download file") #.widget(directory=a_path, on_file_open=on_file_open)
-    #                 solara.FileDownload.widget(data=data, filename=filename, label=label, mime_type=mime_type, ) #.widget(directory=a_path, on_file_open=on_file_open)
-    #         ]
-    #     )
-
-
-@define(slots=False, eq=False)
-class DataframeFilterPredicates:
-    is_enabled: bool = field(default=True)
-    
-
-@define(slots=False, eq=False)
-class DataFrameFilter:
-    """ handles interactive filtering of dataframes by presenting a jupyter widget interface.
-    
-    
-    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import DataFrameFilter
-    
-    df_filter: DataFrameFilter = DataFrameFilter(
-        all_sessions_ripple_df=all_sessions_ripple_df,
-        all_sessions_ripple_time_bin_df=all_sessions_ripple_time_bin_df,
-        all_sessions_MultiMeasure_ripple_df=all_sessions_MultiMeasure_ripple_df,
-        all_sessions_all_scores_ripple_df=all_sessions_all_scores_ripple_df,
-        all_sessions_laps_df=all_sessions_laps_df,
-        all_sessions_laps_time_bin_df=all_sessions_laps_time_bin_df,
-        all_sessions_MultiMeasure_laps_df=all_sessions_MultiMeasure_laps_df,
-        additional_filter_predicates
-    )
-
-    """
-    # Original DataFrames passed during initialization
-    all_sessions_ripple_df: pd.DataFrame = field()
-    all_sessions_ripple_time_bin_df: pd.DataFrame = field()
-    all_sessions_MultiMeasure_ripple_df: pd.DataFrame = field()
-    all_sessions_all_scores_ripple_df: pd.DataFrame = field()
-
-    # Original DataFrames for laps
-    all_sessions_laps_df: pd.DataFrame = field()
-    all_sessions_laps_time_bin_df: pd.DataFrame = field()
-    all_sessions_MultiMeasure_laps_df: pd.DataFrame = field()
-
-    # Filtered DataFrames (initialized to None)
-    filtered_all_sessions_ripple_df: pd.DataFrame = field(init=False, default=None)
-    filtered_all_sessions_ripple_time_bin_df: pd.DataFrame = field(init=False, default=None)
-    filtered_all_sessions_MultiMeasure_ripple_df: pd.DataFrame = field(init=False, default=None)
-    filtered_all_sessions_all_scores_ripple_df: pd.DataFrame = field(init=False, default=None)
-
-    # Filtered DataFrames for laps
-    filtered_all_sessions_laps_df: pd.DataFrame = field(init=False, default=None)
-    filtered_all_sessions_laps_time_bin_df: pd.DataFrame = field(init=False, default=None)
-    filtered_all_sessions_MultiMeasure_laps_df: pd.DataFrame = field(init=False, default=None)
-
-    active_plot_df_name: str = field(default='filtered_all_sessions_all_scores_ripple_df')
-    active_plot_variable_name: str = field(default='P_Short')
-    active_plot_fn_kwargs: Dict = field(default=Factory(dict))
-    # Add filename attribute
-    filename: str = field(init=False, default='figure.png')
-    
-
-    additional_filter_predicates = field(default=Factory(dict)) # a list of boolean predicates to be applied as filters
-    on_filtered_dataframes_changed_callback_fns = field(default=Factory(dict)) # a list of callables that will be called when the filters are changed. 
-    
-
-    # Widgets (will be initialized in __attrs_post_init__) _______________________________________________________________ #
-    replay_name_widget = field(init=False)
-    time_bin_size_widget = field(init=False)
-    active_filter_predicate_selector_widget: widgets.SelectMultiple = field(init=False)
-    active_plot_df_name_selector_widget = field(init=False)
-    active_plot_variable_name_widget = field(init=False)
-    
-    output_widget: widgets.Output = field(init=False)
-    figure_widget: go.FigureWidget = field(init=False)
-    table_widget: DataGrid = field(init=False)
-
-    # Add button widgets as class attributes
-    button_copy: widgets.Button = field(init=False)
-    button_download: widgets.widget = field(init=False)
-    filename_label: widgets.Label = field(init=False)
-    # Add Output widget for JavaScript execution
-    # js_output: widgets.Output = field(init=False)
-    
-
-    # Begin Properties ___________________________________________________________________________________________________ #
-    @property
-    def replay_name(self) -> str:
-        """The replay_name property."""
-        return self.replay_name_widget.value
-    @replay_name.setter
-    def replay_name(self, value):
-        self.replay_name_widget.value = value
-
-    @property
-    def time_bin_size(self) -> str:
-        """The time_bin_size property."""
-        return self.time_bin_size_widget.value
-    @time_bin_size.setter
-    def time_bin_size(self, value):
-        # Combine all DataFrames to get unique options
-        # combined_df = self.all_sessions_ripple_df.append(self.all_sessions_laps_df, ignore_index=True)
-        # replay_name_options = sorted(combined_df['custom_replay_name'].unique())
-        # time_bin_size_options = sorted(combined_df['time_bin_size'].unique())
-
-        # Set default initial_time_bin_sizes if not provided
-        if value is None:
-            # Default to selecting all options or the first option
-            # initial_time_bin_sizes = (time_bin_size_options[0],)
-            value = tuple() # empty tuple
-            pass
-        else:
-            # Ensure initial_time_bin_sizes is a tuple
-            if isinstance(value, (float, int)):
-                value = (value,)
-            elif isinstance(value, list):
-                value = tuple(value)
-            elif isinstance(value, tuple):
-                pass  # already a tuple
-            else:
-                raise ValueError("initial_time_bin_sizes must be a float, int, list, or tuple")
-
-        self.time_bin_size_widget.value = value
-
-    
-        
-
-    @property
-    def filter_context(self) -> IdentifyingContext:
-        """The time_bin_size property."""
-        return IdentifyingContext(time_bin_sizes=self.time_bin_size, custom_suffix=self.replay_name)
-    
-
-    @property
-    def original_df_list(self) -> Tuple[pd.DataFrame]:
-        """The original_df_list property."""
-        return (
-            self.all_sessions_ripple_df,
-            self.all_sessions_ripple_time_bin_df,
-            self.all_sessions_MultiMeasure_ripple_df,
-            self.all_sessions_all_scores_ripple_df,
-            self.all_sessions_laps_df,
-            self.all_sessions_laps_time_bin_df,
-            self.all_sessions_MultiMeasure_laps_df
-        )
-        
-    @property
-    def filtered_df_list(self) -> Tuple[pd.DataFrame]:
-        """The original_df_list property."""
-        return (
-            self.filtered_all_sessions_ripple_df,
-            self.filtered_all_sessions_ripple_time_bin_df,
-            self.filtered_all_sessions_MultiMeasure_ripple_df,
-            self.filtered_all_sessions_all_scores_ripple_df,
-            self.filtered_all_sessions_laps_df,
-            self.filtered_all_sessions_laps_time_bin_df,
-            self.filtered_all_sessions_MultiMeasure_laps_df
-        )
-
-
-    @property
-    def original_df_dict(self) -> Dict[str, pd.DataFrame]:
-        """The original_df_list property."""
-        return dict(
-            all_sessions_ripple_df=self.all_sessions_ripple_df,
-            all_sessions_ripple_time_bin_df=self.all_sessions_ripple_time_bin_df,
-            all_sessions_MultiMeasure_ripple_df=self.all_sessions_MultiMeasure_ripple_df,
-            all_sessions_all_scores_ripple_df=self.all_sessions_all_scores_ripple_df,
-            all_sessions_laps_df=self.all_sessions_laps_df,
-            all_sessions_laps_time_bin_df=self.all_sessions_laps_time_bin_df,
-            all_sessions_MultiMeasure_laps_df=self.all_sessions_MultiMeasure_laps_df
-        )
-        
-    @property
-    def filtered_df_dict(self) -> Dict[str, pd.DataFrame]:
-        """The original_df_list property."""
-        return dict(
-            filtered_all_sessions_ripple_df=self.filtered_all_sessions_ripple_df,
-            filtered_all_sessions_ripple_time_bin_df=self.filtered_all_sessions_ripple_time_bin_df,
-            filtered_all_sessions_MultiMeasure_ripple_df=self.filtered_all_sessions_MultiMeasure_ripple_df,
-            filtered_all_sessions_all_scores_ripple_df=self.filtered_all_sessions_all_scores_ripple_df,
-            filtered_all_sessions_laps_df=self.filtered_all_sessions_laps_df,
-            filtered_all_sessions_laps_time_bin_df=self.filtered_all_sessions_laps_time_bin_df,
-            filtered_all_sessions_MultiMeasure_laps_df=self.filtered_all_sessions_MultiMeasure_laps_df
-        )
-
-
-    @property
-    def original_df_names(self) -> List[str]:
-        return sorted(list(self.original_df_dict.keys()))
-    
-    @property
-    def filtered_df_names(self) -> List[str]:
-        return sorted(list(self.filtered_df_dict.keys()))
-    
-    @property
-    def filtered_size_info_df(self) -> pd.DataFrame:
-        """The size of the filtered dataframes with the current filters."""
-        n_records_tuples = [(name, len(df)) for name, df in self.filtered_df_dict.items() if (df is not None)]
-        return pd.DataFrame(n_records_tuples, columns=['df_name', 'n_elements'])
-
-
-    @property
-    def plot_variable_name_options(self) -> List[str]:
-        return sorted(['P_Short', 'best_overall_quantile', 'best_overall_wcorr_z'])
-    
-
-    @property
-    def active_plot_df(self) -> pd.DataFrame:
-        """The selected filtered dataframe to use with the plot."""
-        return self.filtered_df_dict[self.active_plot_df_name]
-
-
-
-
-    # ==================================================================================================================== #
-    # Initializers                                                                                                         #
-    # ==================================================================================================================== #
-    def __attrs_post_init__(self):
-        # This method runs after the generated __init__
-        self._setup_widgets()
-        # Initial filtering with default widget values
-        self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
-        
-        # Button Widget Initialize ___________________________________________________________________________________________ #
-        # Set up the buttons after figure_widget is created
-        self._setup_widgets_buttons()
-
-
-    def _setup_widgets(self):
-        import plotly.subplots as sp
-        from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import PlotlyFigureContainer
-        
-        # Extract unique options for the widgets
-        replay_name_options = sorted(self.all_sessions_ripple_df['custom_replay_name'].astype(str).unique())
-        time_bin_size_options = sorted(self.all_sessions_ripple_df['time_bin_size'].unique())
-        plot_df_name_options = sorted(self.filtered_df_names)
-        plot_variable_name_options = sorted(self.plot_variable_name_options)
-        
-        # Create dropdown widgets with adjusted layout and style
-        self.replay_name_widget = widgets.Dropdown(
-            options=replay_name_options,
-            description='Replay Name:',
-            disabled=False,
-            layout=widgets.Layout(width='500px'),
-            style={'description_width': 'initial'}
-        )
-        
-        self.active_plot_df_name_selector_widget = widgets.Dropdown(
-            options=plot_df_name_options,
-            description='Plot df Name:',
-            disabled=False,
-            layout=widgets.Layout(width='500px'),
-            style={'description_width': 'initial'}
-        )
-        self.active_plot_df_name_selector_widget.value = self.active_plot_df_name
-        
-        self.active_plot_variable_name_widget = widgets.Dropdown(
-            options=plot_variable_name_options,
-            description='Plot Variable Name:',
-            disabled=False,
-            layout=widgets.Layout(width='300px'),
-            style={'description_width': 'initial'}
-        )
-        self.active_plot_variable_name_widget.value = self.active_plot_variable_name
-        
-        # Use SelectMultiple widget for time_bin_size
-        self.time_bin_size_widget = widgets.SelectMultiple(
-            options=time_bin_size_options,
-            description='Time Bin Size:',
-            disabled=False,
-            layout=widgets.Layout(width='200px', height='100px'),
-            style={'description_width': 'initial'}
-        )
-
-        self.active_filter_predicate_selector_widget = widgets.SelectMultiple(
-            options=list(self.additional_filter_predicates.keys()),
-            value=[],  # Initial selection
-            description='Filter Predicates:',
-            disabled=False,
-        )
-
-        self.output_widget = widgets.Output(layout={'border': '1px solid black'})
-        # self.figure_widget = go.FigureWidget()
-        # self.figure_widget = None
-        # self.figure_widget = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=[pre_delta_label, main_title, post_delta_label], figure_class=go.FigureWidget) ## figure created here?
-        self.figure_widget, did_create_new_figure = PlotlyFigureContainer._helper_build_pre_post_delta_figure_if_needed(extant_figure=None, use_latex_labels=False, main_title='test', figure_class=go.FigureWidget)
-        
-        # extra_button_widgets = add_copy_save_action_buttons(fig=self.figure_widget)
-
-
-        # Set up observers to handle changes in widget values
-        self.replay_name_widget.observe(self._on_widget_change, names='value')
-        self.time_bin_size_widget.observe(self._on_widget_change, names='value')
-        self.active_filter_predicate_selector_widget.observe(self._on_widget_change, names='value')
-        self.active_plot_df_name_selector_widget.observe(self._on_widget_change, names='value')
-        self.active_plot_variable_name_widget.observe(self._on_widget_change, names='value')
-        
-
-        self.table_widget = DataGrid(self.filtered_size_info_df,
-                                base_row_size=15, base_column_size=300,
-                                #  renderers=renderers,
-                                )
-        # self.table_widget.transform([{"type": "sort", "columnIndex": 2, "desc": True}])
-        
-        # solara.FileDownload.widget(data=data, filename=filename, label="Save Figure", mime_type=mime_type, )
-
-        # Display the widgets
-        # display(widgets.VBox([widgets.HBox([self.replay_name_widget, self.time_bin_size_widget, self.active_filter_predicate_selector_widget]),
-        #                 widgets.HBox([self.active_plot_df_name_selector_widget, self.active_plot_variable_name_widget]),
-        #                self.output_widget,
-        #                self.figure_widget,
-        #                extra_button_widgets,
-        #                self.table_widget,
-        #                ]))
-
-
-    def _setup_widgets_buttons(self):
-        """Sets up the copy and download buttons."""
-        self.button_copy = widgets.Button(description="Copy to Clipboard", icon='copy')
-        # self.button_download = widgets.Button(description="Download Image", icon='save')
-        self.button_download =  _build_solera_file_download_widget(fig=self.figure_widget, filename="figure-image.png")
-        
-        # @solara.component
-        # def Page():
-        #     def get_data():
-        #         # I run in a thread, so I can do some heavy processing
-        #         time.sleep(3)
-        #         # I only get called when the download is requested
-        #         return "This is the content of the file"
-        #     solara.FileDownload(get_data, "solara-lazy-download.txt")
-            
-
-        self.filename_label = widgets.Label()
-
-        def on_copy_button_click(b):
-            # Convert the figure to a PNG image
-            # Retrieve width and height if set
-            width = self.figure_widget.layout.width
-            height = self.figure_widget.layout.height
-            to_image_kwargs = {}
-            print(f"Width: {width}, Height: {height}")
-            if width is not None:
-                to_image_kwargs['width'] = width
-            if height is not None:
-                to_image_kwargs['height'] = height
-
-            png_bytes = pio.to_image(self.figure_widget, format='png', **to_image_kwargs)
-            encoded_image = base64.b64encode(png_bytes).decode('utf-8')
-
-            # JavaScript code to copy the image to the clipboard using the canvas element
-            js_code = f'''
-                const img = new Image();
-                img.src = 'data:image/png;base64,{encoded_image}';
-                img.onload = function() {{
-                    const canvas = document.createElement('canvas');
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0);
-                    canvas.toBlob(function(blob) {{
-                        const item = new ClipboardItem({{ 'image/png': blob }});
-                        navigator.clipboard.write([item]).then(function() {{
-                            console.log('Image copied to clipboard');
-                        }}).catch(function(error) {{
-                            console.error('Error copying image to clipboard: ', error);
-                        }});
-                    }});
-                }};
-            '''
-
-            display(Javascript(js_code))
-
-        # def on_download_button_click(b):
-        #     # Convert the figure to a PNG image
-        #     png_bytes = pio.to_image(self.figure_widget, format='png')
-        #     encoded_image = base64.b64encode(png_bytes).decode('utf-8')
-
-        #     # JavaScript code to trigger download with a specific filename
-        #     js_code = f'''
-        #         const link = document.createElement('a');
-        #         link.href = 'data:image/png;base64,{encoded_image}';
-        #         link.download = '{self.filename}';
-        #         document.body.appendChild(link);
-        #         link.click();
-        #         document.body.removeChild(link);
-        #     '''
-
-        #     display(Javascript(js_code))
-
-        self.button_copy.on_click(on_copy_button_click)
-        # self.button_download.on_click(on_download_button_click)
-
-        ## Finish setup:
-        self.on_widget_update_filename()  # Initialize filename and label
-        # Set up observers for figure changes
-        # self.figure_widget.layout.on_change(self.on_fig_layout_change, 'title', 'meta')
-        # Initialize the Output widget for JavaScript execution
-        # self.js_output = widgets.Output()
-
-
-        # self.button_copy.on_click(self.on_copy_button_click)
-        # self.button_download.on_click(self.on_download_button_click)
-
-    # ==================================================================================================================== #
-    # Widget Update Functions                                                                                              #
-    # ==================================================================================================================== #
-    def on_widget_update_filename(self):
-        """Updates the filename and label based on the figure's title or metadata."""
-        fig = self.figure_widget
-        preferred_filename = fig.layout.meta.get('preferred_filename') if fig.layout.meta else None
-        if preferred_filename:
-            self.filename = f"{preferred_filename}.png"
-            self.filename_label.value = preferred_filename
-        else:
-            title = fig.layout.title.text if fig.layout.title and fig.layout.title.text else "figure"
-            self.filename = f"{title.replace(' ', '_')}.png"
-            self.filename_label.value = title
-
-        ## rebuild the download widget with the current figure
-        self.button_download =  _build_solera_file_download_widget(fig=self.figure_widget, filename=Path(self.filename).with_suffix('.png').as_posix())
-
-
-
-    def on_fig_layout_change(self, layout, *args):
-        """Callback for when the figure's layout changes."""
-        self.on_widget_update_filename()
-
-    # def on_copy_button_click(self, b):
-    #     """Copies the figure as an image to the clipboard."""
-    #     fig = self.figure_widget
-    #     png_bytes = pio.to_image(fig, format='png')
-    #     encoded_image = base64.b64encode(png_bytes).decode('utf-8')
-
-    #     js_code = f'''
-    #         const img = new Image();
-    #         img.src = 'data:image/png;base64,{encoded_image}';
-    #         img.onload = function() {{
-    #             const canvas = document.createElement('canvas');
-    #             canvas.width = img.width;
-    #             canvas.height = img.height;
-    #             const ctx = canvas.getContext('2d');
-    #             ctx.drawImage(img, 0, 0);
-    #             canvas.toBlob(function(blob) {{
-    #                 const item = new ClipboardItem({{ 'image/png': blob }});
-    #                 navigator.clipboard.write([item]).then(function() {{
-    #                     console.log('Image copied to clipboard');
-    #                 }}).catch(function(error) {{
-    #                     console.error('Error copying image to clipboard: ', error);
-    #                 }});
-    #             }});
-    #         }};
-    #     '''
-    #     with self.js_output:
-    #         display(Javascript(js_code))
-
-
-    # def on_download_button_click(self, b):
-    #     """Triggers a download of the figure as an image with the specified filename."""
-    #     fig = self.figure_widget
-    #     png_bytes = pio.to_image(fig, format='png')
-    #     encoded_image = base64.b64encode(png_bytes).decode('utf-8')
-
-    #     js_code = f'''
-    #         const link = document.createElement('a');
-    #         link.href = 'data:image/png;base64,{encoded_image}';
-    #         link.download = '{self.filename}';
-    #         document.body.appendChild(link);
-    #         link.click();
-    #         document.body.removeChild(link);
-    #     '''
-    #     with self.js_output:
-    #         display(Javascript(js_code))
-
-    def display(self):
-        """Displays the widgets."""
-        # display(widgets.VBox([widgets.HBox([self.replay_name_widget, self.time_bin_size_widget, self.active_filter_predicate_selector_widget]),
-        # 		widgets.HBox([self.active_plot_df_name_selector_widget, self.active_plot_variable_name_widget]),
-        # 		self.output_widget,
-        # 		self.figure_widget,
-        # 		extra_button_widgets,
-        # 		self.table_widget,
-        # 		]))
-
-        # Arrange your widgets as needed
-        display(widgets.VBox([
-            widgets.HBox([
-                self.replay_name_widget, 
-                self.time_bin_size_widget, 
-                self.active_filter_predicate_selector_widget
-            ]),
-            widgets.HBox([
-                self.active_plot_df_name_selector_widget, 
-                self.active_plot_variable_name_widget
-            ]),
-            self.output_widget,
-            self.figure_widget,
-            widgets.HBox([self.button_copy, self.button_download, self.filename_label]),
-            # self.js_output,  # Include the Output widget to allow the buttons to perform their actions
-            self.table_widget,
-        ]))
-        
-
-    def _on_widget_change(self, change):
-        active_plot_df_name = self.active_plot_df_name_selector_widget.value
-        self.active_plot_df_name = self.active_plot_df_name_selector_widget.value
-        self.active_plot_variable_name = self.active_plot_variable_name_widget.value
-        
-        # Update filtered DataFrames when widget values change
-        self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
-
-
-    # ==================================================================================================================== #
-    # Data Update Functions                                                                                                #
-    # ==================================================================================================================== #
-    def update_filtered_dataframes(self, replay_name, time_bin_sizes):
-        """ Perform filtering on each DataFrame
-        """
-        if not time_bin_sizes:
-            print("Please select at least one Time Bin Size.")
-            return
-        
-        # Convert time_bin_sizes to a list if it's not already
-        if isinstance(time_bin_sizes, (float, int)):
-            time_bin_sizes = [time_bin_sizes]
-        elif isinstance(time_bin_sizes, tuple):
-            time_bin_sizes = list(time_bin_sizes)
-            
-
-        enabled_filter_predicate_list = self.active_filter_predicate_selector_widget.value
-        
-        ## Update the 'is_filter_included' column on the original dataframes
-        for name, df in self.original_df_dict.items():
-            if 'is_filter_included' not in df.columns:
-                df['is_filter_included'] = False  # Initialize with default value
-            # Update based on conditions
-            df['is_filter_included'] = (df['custom_replay_name'] == replay_name) & (df['time_bin_size'].isin(time_bin_sizes))
-
-            for a_predicate_name, a_predicate_fn in self.additional_filter_predicates.items():
-                if a_predicate_name in enabled_filter_predicate_list:
-                    try:
-                        is_predicate_true = a_predicate_fn(df)
-                    except KeyError as e:
-                        print(f'failed to apply predicate "{a_predicate_name}" to df: {name}')
-                        is_predicate_true = False
-                    except Exception as e:
-                        raise
-                    # is_predicate_true = a_predicate_fn(df)
-                    df['is_filter_included'] = (df['is_filter_included'] & is_predicate_true)
-
-            filtered_name: str = f"filtered_{name}"
-            setattr(self, filtered_name, deepcopy(df[df['is_filter_included']]))
-
-        # self.output_widget.clear_output()
-        # with self.output_widget:
-        # Provide feedback to the user
-        # print(f"DataFrames filtered with Replay Name: '{replay_name}' and Time Bin Sizes: {time_bin_sizes}")
-        # n_records_dict = {name:len(df) for name, df in self.filtered_df_dict.items()}
-        # display(n_records_dict)
-        # n_records: int = len(self.filtered_all_sessions_all_scores_ripple_df)
-        # print(f'n_rows: {n_records}')
-        # self.update_calling_namespace_locals()
-        # display(self.filtered_all_sessions_all_scores_ripple_df.head())
-
-        ## Update sizes table:
-        self.table_widget.data = self.filtered_size_info_df
-        
-        for k, a_callback_fn in self.on_filtered_dataframes_changed_callback_fns.items():
-            # print(f'k: {k}')
-            try:
-                a_callback_fn(self)
-            except Exception as e:
-                raise
-        
-        ## Update the preferred_filename from the dataframe metadata:
-        self.on_widget_update_filename()
-        
-        # ## rebuild the download widget with the current figure
-        # self.button_download =  _build_solera_file_download_widget(fig=self.figure_widget, filename=Path(self.filename).with_suffix('.png').as_posix())
-
-
-
-    def update_calling_namespace_locals(self):
-        """ dangerous!! Updates the calling namespace (such as a jupyter notebook cell) """
-        # Update the variables in the notebook's user namespace
-        ipython = get_ipython()
-        user_ns = ipython.user_ns
-
-        # Update ripple DataFrames
-        user_ns['filtered_all_sessions_ripple_df'] = self.filtered_all_sessions_ripple_df
-        user_ns['filtered_all_sessions_ripple_time_bin_df'] = self.filtered_all_sessions_ripple_time_bin_df
-        user_ns['filtered_all_sessions_MultiMeasure_ripple_df'] = self.filtered_all_sessions_MultiMeasure_ripple_df
-        user_ns['filtered_all_sessions_all_scores_ripple_df'] = self.filtered_all_sessions_all_scores_ripple_df
-        
-        # Update laps DataFrames
-        user_ns['filtered_all_sessions_laps_df'] = self.filtered_all_sessions_laps_df
-        user_ns['filtered_all_sessions_laps_time_bin_df'] = self.filtered_all_sessions_laps_time_bin_df
-        user_ns['filtered_all_sessions_MultiMeasure_laps_df'] = self.filtered_all_sessions_MultiMeasure_laps_df
-    
-
-    def update_filters(self):
-        self.update_filtered_dataframes(replay_name=self.replay_name, time_bin_sizes=self.time_bin_size)
-
-
-    # Update instance values from a dictionary
-    def update_instance_from_dict(self, update_dict):
-        # Filter the dictionary to match only fields in the class
-        field_names = {field.name for field in self.__attrs_attrs__}
-        filtered_dict = {k: v for k, v in update_dict.items() if k in field_names}
-        for k, v in filtered_dict.items():
-            setattr(self, k, v)
-        # return evolve(self, **filtered_dict)
-
-
-    # Accessor methods for the filtered DataFrames _______________________________________________________________________ #
-    # Accessor methods for ripple DataFrames
-    def get_filtered_all_sessions_ripple_df(self):
-        return self.filtered_all_sessions_ripple_df
-    
-    def get_filtered_all_sessions_ripple_time_bin_df(self):
-        return self.filtered_all_sessions_ripple_time_bin_df
-    
-    def get_filtered_all_sessions_MultiMeasure_ripple_df(self):
-        return self.filtered_all_sessions_MultiMeasure_ripple_df
-    
-    def get_filtered_all_sessions_all_scores_ripple_df(self):
-        return self.filtered_all_sessions_all_scores_ripple_df
-    
-    # Accessor methods for laps DataFrames
-    def get_filtered_all_sessions_laps_df(self):
-        return self.filtered_all_sessions_laps_df
-    
-    def get_filtered_all_sessions_laps_time_bin_df(self):
-        return self.filtered_all_sessions_laps_time_bin_df
-    
-    def get_filtered_all_sessions_MultiMeasure_laps_df(self):
-        return self.filtered_all_sessions_MultiMeasure_laps_df
-
-
-    @classmethod
-    def safe_boolean_predicate_wrapper(cls, predicate_fn, df):
-        """ returns False if predicate can't be evaluated"""
-        try:
-            return predicate_fn(df)
-        except Exception as e:
-            # raise e
-            print(f'failed to apply predicate to df')
-            return False
 
 
 # ==================================================================================================================== #
@@ -2450,6 +1645,7 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
     px_scatter_kwargs['color'] = "time_bin_size"
     # px_scatter_kwargs.pop('color')
 
+    # Controls scatterplot point size
     concatenated_ripple_df['dummy_column_for_size'] = 1.0
     px_scatter_kwargs['size'] = "dummy_column_for_size"
     px_scatter_kwargs['size_max'] = 3
@@ -2515,3 +1711,987 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
 
     return new_fig, new_fig_context, _extras_output_dict, figure_out_paths
 
+
+# ==================================================================================================================== #
+# SpecificPrePostDeltaScatter                                                                                          #
+# ==================================================================================================================== #
+
+from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import plotly_pre_post_delta_scatter
+from pyphocorehelpers.Filesystem.path_helpers import sanitize_filename_for_Windows
+
+
+@metadata_attributes(short_name=None, tags=['plotly', 'scatter', 'notebook', 'figure', 'outputs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-08 15:10', related_items=[])
+class SpecificPrePostDeltaScatter:
+    """ not yet finished.
+    """
+    _generic_kwargs = {'fig_size_kwargs': None, 'is_dark_mode': False, 'histogram_bins': 25, 'num_sessions': 1}
+    
+    @classmethod
+    def _pre_post_delta_scatter_laps_per_time_bin(cls, all_sessions_laps_time_bin_df, t_delta_df, t_delta_dict, earliest_delta_aligned_t_start, latest_delta_aligned_t_end):
+        histogram_bins = 25
+        num_sessions = 1
+
+        # ==================================================================================================================== #
+        # Laps                                                                                                                 #
+        # ==================================================================================================================== #
+        # all_sessions_laps_time_bin_df
+        # all_sessions_simple_pearson_laps_df
+
+        # Define the legend groups you want to hide on startup
+        legend_groups_to_hide = ['0.030', '0.044', '0.050', '0.058'] # '0.025', 
+
+        # data_context = IdentifyingContext(epochs_name='laps', data_grain='per_epoch', title_prefix="Lap Per Epoch")
+        # concatenated_ripple_df = deepcopy(all_sessions_laps_df)
+        data_context = IdentifyingContext(epochs_name='laps', data_grain='per_time_bin', title_prefix="Lap Individual Time Bins")
+        concatenated_ripple_df = deepcopy(all_sessions_laps_time_bin_df)
+
+        # data_context = IdentifyingContext(epochs_name='PBE', data_grain='per_epoch', title_prefix="PBE Per Epoch")
+        # concatenated_ripple_df = deepcopy(all_sessions_ripple_df)
+        # data_context = IdentifyingContext(epochs_name='PBE', data_grain='per_time_bin', title_prefix="PBE Individual Time Bins")
+        # concatenated_ripple_df = deepcopy(all_sessions_ripple_time_bin_df)
+
+        # concatenated_ripple_df = deepcopy(all_sessions_simple_pearson_laps_df) # ['P_LR', 'P_RL', 'P_Long', 'P_Short', 'ripple_idx', 'ripple_start_t', 'P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL', 'most_likely_decoder_index', 'start', 'stop', 'label', 'duration', 'long_LR_pf_peak_x_pearsonr', 'long_RL_pf_peak_x_pearsonr', 'short_LR_pf_peak_x_pearsonr', 'short_RL_pf_peak_x_pearsonr', 'best_decoder_index', 'session_name', 'time_bin_size', 'delta_aligned_start_t', 'is_user_annotated_epoch', 'is_valid_epoch', 'custom_replay_name', 'epoch_idx', 'long_best_pf_peak_x_pearsonr', 'short_best_pf_peak_x_pearsonr', 'wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL', 'long_best_wcorr', 'short_best_wcorr', 'wcorr_abs_diff', 'pearsonr_abs_diff']
+        # concatenated_ripple_df = deepcopy(all_sessions_laps_time_bin_df) # ['P_LR', 'P_RL', 'P_Long', 'P_Short', 'ripple_idx', 'ripple_start_t', 'P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL', 'most_likely_decoder_index', 'start', 'stop', 'label', 'duration', 'long_LR_pf_peak_x_pearsonr', 'long_RL_pf_peak_x_pearsonr', 'short_LR_pf_peak_x_pearsonr', 'short_RL_pf_peak_x_pearsonr', 'best_decoder_index', 'session_name', 'time_bin_size', 'delta_aligned_start_t', 'is_user_annotated_epoch', 'is_valid_epoch', 'custom_replay_name', 'epoch_idx', 'long_best_pf_peak_x_pearsonr', 'short_best_pf_peak_x_pearsonr', 'wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL', 'long_best_wcorr', 'short_best_wcorr', 'wcorr_abs_diff', 'pearsonr_abs_diff']
+        # print(f'concatenated_ripple_df.columns: {list(concatenated_ripple_df.columns)}')
+        # concatenated_ripple_df
+
+        # variable_name = 'P_Long'
+        variable_name = 'P_Short' # Shows expected effect - short-only replay prior to delta and then split replays post-delta
+        # variable_name = 'P_LR'
+
+        y_baseline_level: float = 0.5 # for P(short), etc
+        # y_baseline_level: float = 0.0 # for wcorr, etc
+
+        # px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'color':"is_user_annotated_epoch", 'title': f"'{variable_name}'"} # , 'color': 'time_bin_size', 'range_y': [-1.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size', 'is_user_annotated_epoch':'user_sel'}
+        px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'title': f"{data_context.get_description(subset_includelist=['title_prefix'])} - '{variable_name}'"} # , 'color': 'time_bin_size', 'range_y': [-1.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size', 'is_user_annotated_epoch':'user_sel'}
+        px_scatter_kwargs['color'] = "time_bin_size"
+        # px_scatter_kwargs.pop('color')
+
+        concatenated_ripple_df['dummy_column_for_size'] = 1.0
+        px_scatter_kwargs['size'] = "dummy_column_for_size"
+        px_scatter_kwargs['size_max'] = 3
+        # px_scatter_kwargs['marker'] = dict(line=dict(width=0))
+        # Remove the white border around scatter points by setting line width to 0
+        # px_scatter_kwargs['line_width'] = 0  # <---- Correct way for Plotly Express
+
+        # px_scatter_kwargs.update(dict(marginal_x="histogram", marginal_y="rug"))
+
+        hist_kwargs = dict(color="time_bin_size")
+        # hist_kwargs = dict(color="is_user_annotated_epoch") # , histnorm='probability density'
+        # hist_kwargs.pop('color')
+        new_fig_laps, new_fig_laps_context = plotly_pre_post_delta_scatter(data_results_df=concatenated_ripple_df, out_scatter_fig=None, histogram_bins=histogram_bins,
+                                px_scatter_kwargs=px_scatter_kwargs, histogram_variable_name=variable_name, hist_kwargs=hist_kwargs, forced_range_y=None,
+                                time_delta_tuple=(earliest_delta_aligned_t_start, 0.0, latest_delta_aligned_t_end), legend_title_text=None, is_dark_mode=is_dark_mode)
+
+
+        new_fig_laps = new_fig_laps.update_layout(fig_size_kwargs)
+
+        if legend_groups_to_hide is not None:
+            # Collect all unique legend groups you want to hide
+            hidden_groups = set(legend_groups_to_hide)
+
+            # Iterate over traces and hide those in the specified legend groups
+            for trace in new_fig_laps.data:
+                if trace.legendgroup in hidden_groups:
+                    trace.visible = 'legendonly'
+                
+        # new_fig_laps.show()
+
+        _extras_output_dict = {}
+        if is_dark_mode:
+            _extras_output_dict["y_mid_line"] = new_fig_laps.add_hline(y=y_baseline_level, line=dict(color="rgba(0.8,0.8,0.8,.75)", width=2), row='all', col='all')
+        else:
+            _extras_output_dict["y_mid_line"] = new_fig_laps.add_hline(y=y_baseline_level, line=dict(color="rgba(0.2,0.2,0.2,.75)", width=2), row='all', col='all')
+
+
+        # fig_to_clipboard(new_fig_laps, **fig_size_kwargs)
+        new_fig_laps_context = new_fig_laps_context.adding_context_if_missing(**data_context.get_subset(subset_includelist=['epochs_name', 'data_grain']).to_dict(), num_sessions=num_sessions, plot_type='scatter+hist', comparison='pre-post-delta', variable_name=variable_name)
+        # figure_out_paths = save_plotly(a_fig=new_fig_laps, a_fig_context=new_fig_laps_context)
+        new_fig_laps
+
+
+
+@function_attributes(short_name=None, tags=['across-session', 'time_bin_size'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-15 00:00', related_items=[])
+def build_single_time_bin_size_dfs(all_sessions_all_scores_epochs_df, all_sessions_epochs_df, all_sessions_epochs_time_bin_df, target_time_bin_size: float, included_columns = ['delta_aligned_start_t', 'is_user_annotated_epoch', 'is_valid_epoch']):
+    """ Filters the epochs dataframe down to a single time_bin_size specified by `target_time_bin_size`. 
+     
+     from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import build_single_time_bin_size_dfs
+      
+     History: 2024-07-15 - Factored out of Across Session Notebook
+    """
+    from neuropy.utils.indexing_helpers import PandasHelpers
+
+    print(f'all_sessions_ripple_df.time_bin_size.unique(): {all_sessions_epochs_df.time_bin_size.unique()}')
+    single_time_bin_size_all_sessions_epochs_df = deepcopy(all_sessions_epochs_df[np.isclose(all_sessions_epochs_df['time_bin_size'], target_time_bin_size)])
+    print(f'np.shape(single_time_bin_size_all_sessions_ripple_df): {np.shape(single_time_bin_size_all_sessions_epochs_df)}')
+
+    print(f'all_sessions_ripple_time_bin_df.time_bin_size.unique(): {all_sessions_epochs_time_bin_df.time_bin_size.unique()}')
+    single_time_bin_size_all_sessions_epochs_time_bin_df = deepcopy(all_sessions_epochs_time_bin_df[np.isclose(all_sessions_epochs_time_bin_df['time_bin_size'], target_time_bin_size)])
+    print(f'np.shape(single_time_bin_size_all_sessions_ripple_time_bin_df): {np.shape(single_time_bin_size_all_sessions_epochs_time_bin_df)}')
+
+    # single_time_bin_size_all_sessions_ripple_time_bin_df
+    # single_time_bin_size_all_sessions_ripple_df # has ['ripple_start_t']
+    # all_sessions_all_scores_ripple_df
+
+    ## recover the important columns (user-annotation, epoch validity) from the newer `all_sessions_all_scores_ripple_df` for use in 'single_time_bin_size_all_sessions_ripple_df'
+    all_sessions_all_scores_epochs_df['delta_aligned_start_t'] = all_sessions_all_scores_epochs_df['delta_aligned_start_t'].astype(float)
+    single_time_bin_size_all_sessions_epochs_df['delta_aligned_start_t'] = single_time_bin_size_all_sessions_epochs_df['delta_aligned_start_t'].astype(float)
+
+    # Added 'delta_aligned_start_t' for the merge
+    single_time_bin_size_all_sessions_epochs_df = PandasHelpers.add_explicit_dataframe_columns_from_lookup_df(single_time_bin_size_all_sessions_epochs_df, all_sessions_all_scores_epochs_df[included_columns], join_column_name='delta_aligned_start_t')
+    single_time_bin_size_all_sessions_epochs_df.sort_values(by=['delta_aligned_start_t'], inplace=True) # Need to re-sort by timestamps once done
+    single_time_bin_size_all_sessions_epochs_df
+
+    single_time_bin_size_all_sessions_epochs_time_bin_df = PandasHelpers.add_explicit_dataframe_columns_from_lookup_df(single_time_bin_size_all_sessions_epochs_time_bin_df, all_sessions_all_scores_epochs_df[included_columns], join_column_name='delta_aligned_start_t')
+    single_time_bin_size_all_sessions_epochs_time_bin_df.sort_values(by=['t_bin_center'], inplace=True) # Need to re-sort by timestamps once done
+    
+    ## Add plotly helper columns:
+    for a_df in (all_sessions_all_scores_epochs_df, all_sessions_epochs_df, all_sessions_epochs_time_bin_df, single_time_bin_size_all_sessions_epochs_df, single_time_bin_size_all_sessions_epochs_time_bin_df):
+        a_df['pre_post_delta_category'] = 'post-delta'
+        a_df['pre_post_delta_category'][a_df['delta_aligned_start_t'] < 0.0] = 'pre-delta'
+
+    ## OUTPUTS: single_time_bin_size_all_sessions_ripple_df, single_time_bin_size_all_sessions_ripple_time_bin_df
+    return single_time_bin_size_all_sessions_epochs_df, single_time_bin_size_all_sessions_epochs_time_bin_df
+
+
+from functools import partial
+from pyphoplacecellanalysis.Pho2D.plotly.plotly_templates import PlotlyHelpers
+import plotly.io as pio
+import plotly.graph_objects as go
+from ipydatagrid import Expr, DataGrid, TextRenderer, BarRenderer # for use in DataFrameFilter
+from IPython.display import display, Javascript
+import base64
+import solara # `pip install "solara[assets]`
+import json
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
+from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
+
+def _build_solera_file_download_widget(fig, filename="figure-image.png", label="Save Figure"):
+    """ 
+    _file_download_widget = _build_solera_file_download_widget(fig=self.figure_widget, filename="figure-image.png")
+    
+    """
+    png_bytes = pio.to_image(fig, format='png')
+    mime_type="image/png"
+    data = deepcopy(png_bytes)
+    return solara.FileDownload.widget(data=data, filename=filename, label=label, mime_type=mime_type, )
+
+@custom_define(slots=False, eq=False)
+class DataframeFilterPredicates(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
+    is_enabled: bool = serialized_attribute_field(default=True)
+    
+
+@custom_define(slots=False, eq=False)
+class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
+    """ handles interactive filtering of dataframes by presenting a jupyter widget interface.
+    
+    
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import DataFrameFilter
+
+
+        assert 'best_overall_quantile' in all_sessions_all_scores_ripple_df
+        assert 'best_overall_quantile' in all_sessions_MultiMeasure_ripple_df
+
+        min_wcorr_threshold: float = 0.7
+        high_pearsonr_threshold: float = 0.9
+        high_shuffle_score_threshold: float = 0.9
+        high_shuffle_wcorr_z_score_threshold: float = 0.9
+
+        additional_filter_predicates = {
+            'high_wcorr': (lambda df: np.any((df[['long_best_wcorr', 'short_best_wcorr']].abs() > min_wcorr_threshold), axis=1)),
+            'user_selected': lambda df: np.all((df[['is_user_annotated_epoch', 'is_valid_epoch']]), axis=1),
+            'high_pearsonr_corr': (lambda df: np.any((df[['long_LR_pf_peak_x_pearsonr', 'long_RL_pf_peak_x_pearsonr', 'short_LR_pf_peak_x_pearsonr', 'short_RL_pf_peak_x_pearsonr']].abs() > high_pearsonr_threshold), axis=1)),
+            'high_shuffle_percentile_score': (lambda df: (df['best_overall_quantile'].abs() > high_shuffle_score_threshold)),
+            'high_shuffle_wcorr_z_score': (lambda df: (df['best_overall_wcorr_z'].abs() > high_shuffle_wcorr_z_score_threshold)),
+        }
+
+        ## ensure that the qclu is always before the frateThresh, reversing them if needed:
+        replay_name: str = 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0'
+        # time_bin_size: float = 0.025
+        time_bin_size: Tuple[float] = (0.025, 0.058)
+
+        _build_filter_changed_plotly_plotting_callback_fn = DataFrameFilter._build_plot_callback(earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end, save_plotly=save_plotly, resolution_multiplier=resolution_multiplier)
+
+        df_filter: DataFrameFilter = DataFrameFilter(
+            all_sessions_ripple_df=all_sessions_ripple_df,
+            all_sessions_ripple_time_bin_df=all_sessions_ripple_time_bin_df,
+            all_sessions_MultiMeasure_ripple_df=all_sessions_MultiMeasure_ripple_df,
+            all_sessions_all_scores_ripple_df=all_sessions_all_scores_ripple_df,
+            all_sessions_laps_df=all_sessions_laps_df,
+            all_sessions_laps_time_bin_df=all_sessions_laps_time_bin_df,
+            all_sessions_MultiMeasure_laps_df=all_sessions_MultiMeasure_laps_df,
+            additional_filter_predicates=additional_filter_predicates,
+            on_filtered_dataframes_changed_callback_fns={'build_filter_changed_plotly_plotting_callback_fn': _build_filter_changed_plotly_plotting_callback_fn},
+            active_plot_df_name='filtered_all_sessions_all_scores_ripple_df',
+        )
+
+        # Set initial values: ________________________________________________________________________________________________ #
+        df_filter.replay_name = replay_name # 'withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2, 4, 6, 7, 9]'
+        # df_filter.time_bin_size = (time_bin_size, )
+        df_filter.time_bin_size = time_bin_size
+        # df_filter.time_bin_size = (0.025, 0.058)
+        df_filter.update_filters()
+        df_filter.display()
+
+    """
+    # Original DataFrames passed during initialization
+    all_sessions_ripple_df: pd.DataFrame = serialized_field()
+    all_sessions_ripple_time_bin_df: pd.DataFrame = serialized_field()
+    all_sessions_MultiMeasure_ripple_df: pd.DataFrame = serialized_field()
+    all_sessions_all_scores_ripple_df: pd.DataFrame = serialized_field()
+
+    # Original DataFrames for laps
+    all_sessions_laps_df: pd.DataFrame = serialized_field()
+    all_sessions_laps_time_bin_df: pd.DataFrame = serialized_field()
+    all_sessions_MultiMeasure_laps_df: pd.DataFrame = serialized_field()
+
+    # Filtered DataFrames (initialized to None)
+    filtered_all_sessions_ripple_df: pd.DataFrame = non_serialized_field(init=False, default=None)
+    filtered_all_sessions_ripple_time_bin_df: pd.DataFrame = non_serialized_field(init=False, default=None)
+    filtered_all_sessions_MultiMeasure_ripple_df: pd.DataFrame = non_serialized_field(init=False, default=None)
+    filtered_all_sessions_all_scores_ripple_df: pd.DataFrame = non_serialized_field(init=False, default=None)
+
+    # Filtered DataFrames for laps
+    filtered_all_sessions_laps_df: pd.DataFrame = non_serialized_field(init=False, default=None)
+    filtered_all_sessions_laps_time_bin_df: pd.DataFrame = non_serialized_field(init=False, default=None)
+    filtered_all_sessions_MultiMeasure_laps_df: pd.DataFrame = non_serialized_field(init=False, default=None)
+
+    active_plot_df_name: str = serialized_attribute_field(default='filtered_all_sessions_all_scores_ripple_df')
+    active_plot_variable_name: str = serialized_attribute_field(default='P_Short')
+    active_plot_fn_kwargs: Dict = serialized_field(default=Factory(dict))
+    # Add filename attribute
+    filename: str = serialized_attribute_field(init=False, default='figure.png')
+    
+
+    additional_filter_predicates = non_serialized_field(default=Factory(dict)) # a list of boolean predicates to be applied as filters
+    on_filtered_dataframes_changed_callback_fns = non_serialized_field(default=Factory(dict)) # a list of callables that will be called when the filters are changed. 
+    
+
+    # Widgets (will be initialized in __attrs_post_init__) _______________________________________________________________ #
+    replay_name_widget = non_serialized_field(init=False)
+    time_bin_size_widget = non_serialized_field(init=False)
+    active_filter_predicate_selector_widget: widgets.SelectMultiple = non_serialized_field(init=False)
+    active_plot_df_name_selector_widget = non_serialized_field(init=False)
+    active_plot_variable_name_widget = non_serialized_field(init=False)
+    
+    output_widget: widgets.Output = non_serialized_field(init=False)
+    figure_widget: go.FigureWidget = non_serialized_field(init=False)
+    table_widget: DataGrid = non_serialized_field(init=False)
+
+    # Add button widgets as class attributes
+    button_copy: widgets.Button = non_serialized_field(init=False)
+    button_download: widgets.widget = non_serialized_field(init=False)
+    filename_label: widgets.Label = non_serialized_field(init=False)
+    # Add Output widget for JavaScript execution
+    # js_output: widgets.Output = non_serialized_field(init=False)
+    
+    # Begin Properties ___________________________________________________________________________________________________ #
+    @property
+    def replay_name(self) -> str:
+        """The replay_name property."""
+        return self.replay_name_widget.value
+    @replay_name.setter
+    def replay_name(self, value):
+        self.replay_name_widget.value = value
+
+    @property
+    def time_bin_size(self) -> str:
+        """The time_bin_size property."""
+        return self.time_bin_size_widget.value
+    @time_bin_size.setter
+    def time_bin_size(self, value):
+        # Combine all DataFrames to get unique options
+        # combined_df = self.all_sessions_ripple_df.append(self.all_sessions_laps_df, ignore_index=True)
+        # replay_name_options = sorted(combined_df['custom_replay_name'].unique())
+        # time_bin_size_options = sorted(combined_df['time_bin_size'].unique())
+
+        # Set default initial_time_bin_sizes if not provided
+        if value is None:
+            # Default to selecting all options or the first option
+            # initial_time_bin_sizes = (time_bin_size_options[0],)
+            value = tuple() # empty tuple
+            pass
+        else:
+            # Ensure initial_time_bin_sizes is a tuple
+            if isinstance(value, (float, int)):
+                value = (value,)
+            elif isinstance(value, list):
+                value = tuple(value)
+            elif isinstance(value, tuple):
+                pass  # already a tuple
+            else:
+                raise ValueError("initial_time_bin_sizes must be a float, int, list, or tuple")
+
+        self.time_bin_size_widget.value = value
+
+    
+    @property
+    def filter_context(self) -> IdentifyingContext:
+        """The time_bin_size property."""
+        return IdentifyingContext(time_bin_sizes=self.time_bin_size, custom_suffix=self.replay_name)
+    
+
+    @property
+    def original_df_list(self) -> Tuple[pd.DataFrame]:
+        """The original_df_list property."""
+        return (
+            self.all_sessions_ripple_df,
+            self.all_sessions_ripple_time_bin_df,
+            self.all_sessions_MultiMeasure_ripple_df,
+            self.all_sessions_all_scores_ripple_df,
+            self.all_sessions_laps_df,
+            self.all_sessions_laps_time_bin_df,
+            self.all_sessions_MultiMeasure_laps_df
+        )
+        
+    @property
+    def filtered_df_list(self) -> Tuple[pd.DataFrame]:
+        """The original_df_list property."""
+        return (
+            self.filtered_all_sessions_ripple_df,
+            self.filtered_all_sessions_ripple_time_bin_df,
+            self.filtered_all_sessions_MultiMeasure_ripple_df,
+            self.filtered_all_sessions_all_scores_ripple_df,
+            self.filtered_all_sessions_laps_df,
+            self.filtered_all_sessions_laps_time_bin_df,
+            self.filtered_all_sessions_MultiMeasure_laps_df
+        )
+
+
+    @property
+    def original_df_dict(self) -> Dict[str, pd.DataFrame]:
+        """The original_df_list property."""
+        return dict(
+            all_sessions_ripple_df=self.all_sessions_ripple_df,
+            all_sessions_ripple_time_bin_df=self.all_sessions_ripple_time_bin_df,
+            all_sessions_MultiMeasure_ripple_df=self.all_sessions_MultiMeasure_ripple_df,
+            all_sessions_all_scores_ripple_df=self.all_sessions_all_scores_ripple_df,
+            all_sessions_laps_df=self.all_sessions_laps_df,
+            all_sessions_laps_time_bin_df=self.all_sessions_laps_time_bin_df,
+            all_sessions_MultiMeasure_laps_df=self.all_sessions_MultiMeasure_laps_df
+        )
+        
+    @property
+    def filtered_df_dict(self) -> Dict[str, pd.DataFrame]:
+        """The original_df_list property."""
+        return dict(
+            filtered_all_sessions_ripple_df=self.filtered_all_sessions_ripple_df,
+            filtered_all_sessions_ripple_time_bin_df=self.filtered_all_sessions_ripple_time_bin_df,
+            filtered_all_sessions_MultiMeasure_ripple_df=self.filtered_all_sessions_MultiMeasure_ripple_df,
+            filtered_all_sessions_all_scores_ripple_df=self.filtered_all_sessions_all_scores_ripple_df,
+            filtered_all_sessions_laps_df=self.filtered_all_sessions_laps_df,
+            filtered_all_sessions_laps_time_bin_df=self.filtered_all_sessions_laps_time_bin_df,
+            filtered_all_sessions_MultiMeasure_laps_df=self.filtered_all_sessions_MultiMeasure_laps_df
+        )
+
+
+    @property
+    def original_df_names(self) -> List[str]:
+        return sorted(list(self.original_df_dict.keys()))
+    
+    @property
+    def filtered_df_names(self) -> List[str]:
+        return sorted(list(self.filtered_df_dict.keys()))
+    
+    @property
+    def filtered_size_info_df(self) -> pd.DataFrame:
+        """The size of the filtered dataframes with the current filters."""
+        n_records_tuples = [(name, len(df)) for name, df in self.filtered_df_dict.items() if (df is not None)]
+        return pd.DataFrame(n_records_tuples, columns=['df_name', 'n_elements'])
+
+
+    @property
+    def plot_variable_name_options(self) -> List[str]:
+        return sorted(['P_Short', 'best_overall_quantile', 'best_overall_wcorr_z'])
+    
+
+    @property
+    def active_plot_df(self) -> pd.DataFrame:
+        """The selected filtered dataframe to use with the plot."""
+        return self.filtered_df_dict[self.active_plot_df_name]
+
+
+
+
+    # ==================================================================================================================== #
+    # Initializers                                                                                                         #
+    # ==================================================================================================================== #
+    def __attrs_post_init__(self):
+        # This method runs after the generated __init__
+        self._setup_widgets()
+        # Initial filtering with default widget values
+        self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
+        
+        # Button Widget Initialize ___________________________________________________________________________________________ #
+        # Set up the buttons after figure_widget is created
+        self._setup_widgets_buttons()
+
+    def _setup_widgets(self):
+        import plotly.subplots as sp
+        from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import PlotlyFigureContainer
+        
+        # Extract unique options for the widgets
+        replay_name_options = sorted(self.all_sessions_ripple_df['custom_replay_name'].astype(str).unique())
+        time_bin_size_options = sorted(self.all_sessions_ripple_df['time_bin_size'].unique())
+        plot_df_name_options = sorted(self.filtered_df_names)
+        plot_variable_name_options = sorted(self.plot_variable_name_options)
+        
+        # Create dropdown widgets with adjusted layout and style
+        self.replay_name_widget = widgets.Dropdown(
+            options=replay_name_options,
+            description='Replay Name:',
+            disabled=False,
+            layout=widgets.Layout(width='500px'),
+            style={'description_width': 'initial'}
+        )
+        
+        self.active_plot_df_name_selector_widget = widgets.Dropdown(
+            options=plot_df_name_options,
+            description='Plot df Name:',
+            disabled=False,
+            layout=widgets.Layout(width='500px'),
+            style={'description_width': 'initial'}
+        )
+        self.active_plot_df_name_selector_widget.value = self.active_plot_df_name
+        
+        self.active_plot_variable_name_widget = widgets.Dropdown(
+            options=plot_variable_name_options,
+            description='Plot Variable Name:',
+            disabled=False,
+            layout=widgets.Layout(width='300px'),
+            style={'description_width': 'initial'}
+        )
+        self.active_plot_variable_name_widget.value = self.active_plot_variable_name
+        
+        # Use SelectMultiple widget for time_bin_size
+        self.time_bin_size_widget = widgets.SelectMultiple(
+            options=time_bin_size_options,
+            description='Time Bin Size:',
+            disabled=False,
+            layout=widgets.Layout(width='200px', height='100px'),
+            style={'description_width': 'initial'}
+        )
+
+        self.active_filter_predicate_selector_widget = widgets.SelectMultiple(
+            options=list(self.additional_filter_predicates.keys()),
+            value=[],  # Initial selection
+            description='Filter Predicates:',
+            disabled=False,
+        )
+
+        self.output_widget = widgets.Output(layout={'border': '1px solid black'})
+        # self.figure_widget = go.FigureWidget()
+        # self.figure_widget = None
+        # self.figure_widget = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=[pre_delta_label, main_title, post_delta_label], figure_class=go.FigureWidget) ## figure created here?
+        self.figure_widget, did_create_new_figure = PlotlyFigureContainer._helper_build_pre_post_delta_figure_if_needed(extant_figure=None, use_latex_labels=False, main_title='test', figure_class=go.FigureWidget)
+        
+        # extra_button_widgets = add_copy_save_action_buttons(fig=self.figure_widget)
+
+
+        # Set up observers to handle changes in widget values
+        self.replay_name_widget.observe(self._on_widget_change, names='value')
+        self.time_bin_size_widget.observe(self._on_widget_change, names='value')
+        self.active_filter_predicate_selector_widget.observe(self._on_widget_change, names='value')
+        self.active_plot_df_name_selector_widget.observe(self._on_widget_change, names='value')
+        self.active_plot_variable_name_widget.observe(self._on_widget_change, names='value')
+        
+
+        self.table_widget = DataGrid(self.filtered_size_info_df,
+                                base_row_size=15, base_column_size=300,
+                                #  renderers=renderers,
+                                )
+        # self.table_widget.transform([{"type": "sort", "columnIndex": 2, "desc": True}])
+        
+        # solara.FileDownload.widget(data=data, filename=filename, label="Save Figure", mime_type=mime_type, )
+
+        # Display the widgets
+        # display(widgets.VBox([widgets.HBox([self.replay_name_widget, self.time_bin_size_widget, self.active_filter_predicate_selector_widget]),
+        #                 widgets.HBox([self.active_plot_df_name_selector_widget, self.active_plot_variable_name_widget]),
+        #                self.output_widget,
+        #                self.figure_widget,
+        #                extra_button_widgets,
+        #                self.table_widget,
+        #                ]))
+
+    def _setup_widgets_buttons(self):
+        """Sets up the copy and download buttons."""
+        self.button_copy = widgets.Button(description="Copy to Clipboard", icon='copy')
+        # self.button_download = widgets.Button(description="Download Image", icon='save')
+        self.button_download =  _build_solera_file_download_widget(fig=self.figure_widget, filename="figure-image.png")
+        
+        # @solara.component
+        # def Page():
+        #     def get_data():
+        #         # I run in a thread, so I can do some heavy processing
+        #         time.sleep(3)
+        #         # I only get called when the download is requested
+        #         return "This is the content of the file"
+        #     solara.FileDownload(get_data, "solara-lazy-download.txt")
+            
+
+        self.filename_label = widgets.Label()
+
+        def on_copy_button_click(b):
+            # Convert the figure to a PNG image
+            # Retrieve width and height if set
+            width = self.figure_widget.layout.width
+            height = self.figure_widget.layout.height
+            to_image_kwargs = {}
+            print(f"Width: {width}, Height: {height}")
+            if width is not None:
+                to_image_kwargs['width'] = width
+            if height is not None:
+                to_image_kwargs['height'] = height
+
+            png_bytes = pio.to_image(self.figure_widget, format='png', **to_image_kwargs)
+            encoded_image = base64.b64encode(png_bytes).decode('utf-8')
+
+            # JavaScript code to copy the image to the clipboard using the canvas element
+            js_code = f'''
+                const img = new Image();
+                img.src = 'data:image/png;base64,{encoded_image}';
+                img.onload = function() {{
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    canvas.toBlob(function(blob) {{
+                        const item = new ClipboardItem({{ 'image/png': blob }});
+                        navigator.clipboard.write([item]).then(function() {{
+                            console.log('Image copied to clipboard');
+                        }}).catch(function(error) {{
+                            console.error('Error copying image to clipboard: ', error);
+                        }});
+                    }});
+                }};
+            '''
+
+            display(Javascript(js_code))
+
+        # def on_download_button_click(b):
+        #     # Convert the figure to a PNG image
+        #     png_bytes = pio.to_image(self.figure_widget, format='png')
+        #     encoded_image = base64.b64encode(png_bytes).decode('utf-8')
+
+        #     # JavaScript code to trigger download with a specific filename
+        #     js_code = f'''
+        #         const link = document.createElement('a');
+        #         link.href = 'data:image/png;base64,{encoded_image}';
+        #         link.download = '{self.filename}';
+        #         document.body.appendChild(link);
+        #         link.click();
+        #         document.body.removeChild(link);
+        #     '''
+
+        #     display(Javascript(js_code))
+
+        self.button_copy.on_click(on_copy_button_click)
+        # self.button_download.on_click(on_download_button_click)
+
+        ## Finish setup:
+        self.on_widget_update_filename()  # Initialize filename and label
+        # Set up observers for figure changes
+        # self.figure_widget.layout.on_change(self.on_fig_layout_change, 'title', 'meta')
+        # Initialize the Output widget for JavaScript execution
+        # self.js_output = widgets.Output()
+
+
+        # self.button_copy.on_click(self.on_copy_button_click)
+        # self.button_download.on_click(self.on_download_button_click)
+
+    # ==================================================================================================================== #
+    # Widget Update Functions                                                                                              #
+    # ==================================================================================================================== #
+    def on_widget_update_filename(self):
+        """Updates the filename and label based on the figure's title or metadata."""
+        fig = self.figure_widget
+        preferred_filename = fig.layout.meta.get('preferred_filename') if fig.layout.meta else None
+        if preferred_filename:
+            self.filename = f"{preferred_filename}.png"
+            self.filename_label.value = preferred_filename
+        else:
+            title = fig.layout.title.text if fig.layout.title and fig.layout.title.text else "figure"
+            self.filename = f"{title.replace(' ', '_')}.png"
+            self.filename_label.value = title
+
+        ## rebuild the download widget with the current figure
+        self.button_download =  _build_solera_file_download_widget(fig=self.figure_widget, filename=Path(self.filename).with_suffix('.png').as_posix())
+
+
+    def on_fig_layout_change(self, layout, *args):
+        """Callback for when the figure's layout changes."""
+        self.on_widget_update_filename()
+
+
+    def _on_widget_change(self, change):
+        active_plot_df_name = self.active_plot_df_name_selector_widget.value
+        self.active_plot_df_name = self.active_plot_df_name_selector_widget.value
+        self.active_plot_variable_name = self.active_plot_variable_name_widget.value
+        
+        # Update filtered DataFrames when widget values change
+        self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
+
+
+    def display(self):
+        """Displays the widgets."""
+        # Arrange your widgets as needed
+        display(widgets.VBox([
+            widgets.HBox([
+                self.replay_name_widget, 
+                self.time_bin_size_widget, 
+                self.active_filter_predicate_selector_widget
+            ]),
+            widgets.HBox([
+                self.active_plot_df_name_selector_widget, 
+                self.active_plot_variable_name_widget
+            ]),
+            self.output_widget,
+            self.figure_widget,
+            widgets.HBox([self.button_copy, self.button_download, self.filename_label]),
+            # self.js_output,  # Include the Output widget to allow the buttons to perform their actions
+            self.table_widget,
+        ]))
+        
+
+    # ==================================================================================================================== #
+    # Plot Updating Functions                                                                                              #
+    # ==================================================================================================================== #
+
+
+    @classmethod
+    def _build_plot_callback(cls, earliest_delta_aligned_t_start, latest_delta_aligned_t_end, save_plotly, should_save: bool = False, resolution_multiplier=1):
+        # fig_size_kwargs = {'width': 1650, 'height': 480}
+        
+        # fig_size_kwargs = {'width': resolution_multiplier*1650, 'height': resolution_multiplier*480}
+        ## set up figure size
+        fig_size_kwargs = {'width': (resolution_multiplier * 1800), 'height': (resolution_multiplier*480)}
+        # fig_size_kwargs = {'width': (resolution_multiplier * 1080), 'height': resolution_multiplier*480}
+        is_dark_mode, template = PlotlyHelpers.get_plotly_template(is_dark_mode=False)
+        pio.templates.default = template
+
+        ## INPUTS: earliest_delta_aligned_t_start, latest_delta_aligned_t_end
+        # should_save: bool = True        
+
+        _new_perform_plot_pre_post_delta_scatter = partial(
+            _perform_plot_pre_post_delta_scatter,
+            time_delta_tuple=(earliest_delta_aligned_t_start, 0.0, latest_delta_aligned_t_end),
+            fig_size_kwargs=fig_size_kwargs,
+            is_dark_mode=is_dark_mode,
+            save_plotly=save_plotly,
+        )
+
+        _new_perform_plot_pre_post_delta_scatter_with_embedded_context = partial(
+            _new_perform_plot_pre_post_delta_scatter,
+            data_context=None,
+        )
+
+        def _build_filter_changed_plotly_plotting_callback_fn(df_filter: "DataFrameFilter", should_save:bool=False, **kwargs):
+            """ `filtered_all_sessions_all_scores_ripple_df` versions -
+            captures: _perform_plot_pre_post_delta_scatter_with_embedded_context, should_save, 
+            
+            """
+            # df_filter.output_widget.clear_output(wait=True)
+            active_plot_df_name: str = df_filter.active_plot_df_name
+            active_plot_df: pd.DataFrame = df_filter.active_plot_df
+            plot_variable_name: str = df_filter.active_plot_variable_name
+            
+            assert plot_variable_name in active_plot_df.columns, f"plot_variable_name: '{plot_variable_name}' is not present in active_plot_df.columns! Cannot plot!"
+            # fig, new_fig_context, _extras_output_dict, figure_out_paths = _perform_plot_pre_post_delta_scatter_with_embedded_context(concatenated_ripple_df=deepcopy(df_filter.filtered_all_sessions_all_scores_ripple_df), is_dark_mode=False, should_save=should_save,
+            #                                                                                                                        custom_output_widget=df_filter.output_widget)
+            fig, new_fig_context, _extras_output_dict, figure_out_paths = _new_perform_plot_pre_post_delta_scatter_with_embedded_context(concatenated_ripple_df=deepcopy(active_plot_df), is_dark_mode=False, should_save=should_save, extant_figure=df_filter.figure_widget,
+                                                                                                                                    variable_name=plot_variable_name, **kwargs) # , enable_custom_widget_buttons=True
+            
+            # Customize the hovertemplate
+            fig.update_traces(
+                hovertemplate="<b>sess:</b> %{customdata[0]}<br>"
+                            # "<b>X:</b> %{x}<br>"
+                            "<b>start, duration:</b> %{customdata[2]}, %{customdata[3]}<br>"
+                            "<b>Y:</b> %{y}<br>"
+                            "<b>custom_replay:</b> %{customdata[1]}",
+                customdata=active_plot_df[["session_name", "custom_replay_name", "start", "duration"]].values
+            )
+
+            # create our callback function
+            # def update_point(trace, points, selector):
+            #     c = list(scatter.marker.color)
+            #     s = list(scatter.marker.size)
+            #     for i in points.point_inds:
+            #         c[i] = '#bae2be'
+            #         s[i] = 20
+            #         with f.batch_update():
+            #             scatter.marker.color = c
+            #             scatter.marker.size = s
+
+            def on_click(trace, points, selector):
+                if points.point_inds:
+                    ind = points.point_inds[0]
+                    session_name = df_filter.active_plot_df['session_name'].iloc[ind]
+                    custom_replay_name = df_filter.active_plot_df['custom_replay_name'].iloc[ind]
+                    start_t = df_filter.active_plot_df['start'].iloc[ind]
+                    stop_t = df_filter.active_plot_df['stop'].iloc[ind]
+                    
+
+                    df_filter.output_widget.clear_output()
+                    with df_filter.output_widget:
+                        print(f"Clicked point index: {ind}")
+                        print(f'start_t, stop_t: {start_t}, {stop_t}')
+                        print(f"session_name: {session_name}")
+                        print(f"custom_replay_name: {custom_replay_name}")
+                else:
+                    # print(f'NOPE! points: {points}, trace: {trace}')
+                    df_filter.output_widget.clear_output()
+                    with df_filter.output_widget:
+                        print(f'NOPE! points: {points}, trace: {trace}')
+                    
+
+            fig.layout.hovermode = 'closest'
+            fig.data[0].on_click(on_click)
+
+            scatter_traces = list(fig.select_traces(selector=None, row=1, col=2))
+            for trace in scatter_traces:
+                trace.on_click(on_click)
+
+            if fig is not None:
+                df_filter.figure_widget = fig
+
+        ## end def _build_filter_changed_plotly_plotting_callback_fn(...)
+        
+        return _build_filter_changed_plotly_plotting_callback_fn
+
+
+    # ==================================================================================================================== #
+    # Data Update Functions                                                                                                #
+    # ==================================================================================================================== #
+    def update_filtered_dataframes(self, replay_name, time_bin_sizes):
+        """ Perform filtering on each DataFrame
+        """
+        if not time_bin_sizes:
+            print("Please select at least one Time Bin Size.")
+            return
+        
+        # Convert time_bin_sizes to a list if it's not already
+        if isinstance(time_bin_sizes, (float, int)):
+            time_bin_sizes = [time_bin_sizes]
+        elif isinstance(time_bin_sizes, tuple):
+            time_bin_sizes = list(time_bin_sizes)
+            
+
+        enabled_filter_predicate_list = self.active_filter_predicate_selector_widget.value
+        
+        ## Update the 'is_filter_included' column on the original dataframes
+        for name, df in self.original_df_dict.items():
+            if 'is_filter_included' not in df.columns:
+                df['is_filter_included'] = False  # Initialize with default value
+            # Update based on conditions
+            df['is_filter_included'] = (df['custom_replay_name'] == replay_name) & (df['time_bin_size'].isin(time_bin_sizes))
+
+            for a_predicate_name, a_predicate_fn in self.additional_filter_predicates.items():
+                if a_predicate_name in enabled_filter_predicate_list:
+                    try:
+                        is_predicate_true = a_predicate_fn(df)
+                    except KeyError as e:
+                        print(f'failed to apply predicate "{a_predicate_name}" to df: {name}')
+                        is_predicate_true = False
+                    except Exception as e:
+                        raise
+                    # is_predicate_true = a_predicate_fn(df)
+                    df['is_filter_included'] = (df['is_filter_included'] & is_predicate_true)
+
+            filtered_name: str = f"filtered_{name}"
+            setattr(self, filtered_name, deepcopy(df[df['is_filter_included']]))
+
+        # self.output_widget.clear_output()
+        # with self.output_widget:
+        # Provide feedback to the user
+        # print(f"DataFrames filtered with Replay Name: '{replay_name}' and Time Bin Sizes: {time_bin_sizes}")
+        # n_records_dict = {name:len(df) for name, df in self.filtered_df_dict.items()}
+        # display(n_records_dict)
+        # n_records: int = len(self.filtered_all_sessions_all_scores_ripple_df)
+        # print(f'n_rows: {n_records}')
+        # self.update_calling_namespace_locals()
+        # display(self.filtered_all_sessions_all_scores_ripple_df.head())
+
+        ## Update sizes table:
+        self.table_widget.data = self.filtered_size_info_df
+        
+        for k, a_callback_fn in self.on_filtered_dataframes_changed_callback_fns.items():
+            # print(f'k: {k}')
+            try:
+                a_callback_fn(self)
+            except Exception as e:
+                raise
+        
+        ## Update the preferred_filename from the dataframe metadata:
+        self.on_widget_update_filename()
+        
+        # ## rebuild the download widget with the current figure
+        # self.button_download =  _build_solera_file_download_widget(fig=self.figure_widget, filename=Path(self.filename).with_suffix('.png').as_posix())
+    
+    def update_filters(self):
+        self.update_filtered_dataframes(replay_name=self.replay_name, time_bin_sizes=self.time_bin_size)
+
+    def update_calling_namespace_locals(self):
+        """ dangerous!! Updates the calling namespace (such as a jupyter notebook cell) """
+        # Update the variables in the notebook's user namespace
+        ipython = get_ipython()
+        user_ns = ipython.user_ns
+
+        # Update ripple DataFrames
+        user_ns['filtered_all_sessions_ripple_df'] = self.filtered_all_sessions_ripple_df
+        user_ns['filtered_all_sessions_ripple_time_bin_df'] = self.filtered_all_sessions_ripple_time_bin_df
+        user_ns['filtered_all_sessions_MultiMeasure_ripple_df'] = self.filtered_all_sessions_MultiMeasure_ripple_df
+        user_ns['filtered_all_sessions_all_scores_ripple_df'] = self.filtered_all_sessions_all_scores_ripple_df
+        
+        # Update laps DataFrames
+        user_ns['filtered_all_sessions_laps_df'] = self.filtered_all_sessions_laps_df
+        user_ns['filtered_all_sessions_laps_time_bin_df'] = self.filtered_all_sessions_laps_time_bin_df
+        user_ns['filtered_all_sessions_MultiMeasure_laps_df'] = self.filtered_all_sessions_MultiMeasure_laps_df
+
+    # Update instance values from a dictionary
+    def update_instance_from_dict(self, update_dict):
+        # Filter the dictionary to match only fields in the class
+        field_names = {field.name for field in self.__attrs_attrs__}
+        filtered_dict = {k: v for k, v in update_dict.items() if k in field_names}
+        for k, v in filtered_dict.items():
+            setattr(self, k, v)
+        # return evolve(self, **filtered_dict)
+
+
+    # Accessor methods for the filtered DataFrames _______________________________________________________________________ #
+    # Accessor methods for ripple DataFrames
+    def get_filtered_all_sessions_ripple_df(self):
+        return self.filtered_all_sessions_ripple_df
+    
+    def get_filtered_all_sessions_ripple_time_bin_df(self):
+        return self.filtered_all_sessions_ripple_time_bin_df
+    
+    def get_filtered_all_sessions_MultiMeasure_ripple_df(self):
+        return self.filtered_all_sessions_MultiMeasure_ripple_df
+    
+    def get_filtered_all_sessions_all_scores_ripple_df(self):
+        return self.filtered_all_sessions_all_scores_ripple_df
+    
+    # Accessor methods for laps DataFrames
+    def get_filtered_all_sessions_laps_df(self):
+        return self.filtered_all_sessions_laps_df
+    
+    def get_filtered_all_sessions_laps_time_bin_df(self):
+        return self.filtered_all_sessions_laps_time_bin_df
+    
+    def get_filtered_all_sessions_MultiMeasure_laps_df(self):
+        return self.filtered_all_sessions_MultiMeasure_laps_df
+
+
+    @classmethod
+    def safe_boolean_predicate_wrapper(cls, predicate_fn, df):
+        """ returns False if predicate can't be evaluated"""
+        try:
+            return predicate_fn(df)
+        except Exception as e:
+            # raise e
+            print(f'failed to apply predicate to df')
+            return False
+
+
+    # ==================================================================================================================== #
+    # Serialization                                                                                                        #
+    # ==================================================================================================================== #
+    #TODO 2024-11-20 08:26: - [ ] These were written by ChatGPT and I'm using them instead of my normal HDFSerialization stuff.    
+
+    # Class variables for attribute names
+    DATAFRAME_ATTR_NAMES = [
+        'all_sessions_ripple_df',
+        'all_sessions_ripple_time_bin_df',
+        'all_sessions_MultiMeasure_ripple_df',
+        'all_sessions_all_scores_ripple_df',
+        'all_sessions_laps_df',
+        'all_sessions_laps_time_bin_df',
+        'all_sessions_MultiMeasure_laps_df',
+        'filtered_all_sessions_ripple_df',
+        'filtered_all_sessions_ripple_time_bin_df',
+        'filtered_all_sessions_MultiMeasure_ripple_df',
+        'filtered_all_sessions_all_scores_ripple_df',
+        'filtered_all_sessions_laps_df',
+        'filtered_all_sessions_laps_time_bin_df',
+        'filtered_all_sessions_MultiMeasure_laps_df'
+    ]
+
+    SCALAR_ATTR_NAMES = [
+        'active_plot_df_name',
+        'active_plot_variable_name',
+        'active_plot_fn_kwargs',
+        'filename'
+    ]
+
+
+    def save_to_hdf(self, filename):
+        """Saves the data (excluding widgets) to a single .hdf file."""
+        import json
+        with pd.HDFStore(filename, 'w') as store:
+            # Save dataframes
+            for attr_name in self.DATAFRAME_ATTR_NAMES:
+                df = getattr(self, attr_name, None)
+                if df is not None:
+                    store.put(attr_name, df)
+            # Save scalar attributes
+            scalar_attrs = {}
+            for attr_name in self.SCALAR_ATTR_NAMES:
+                attr_value = getattr(self, attr_name)
+                try:
+                    json.dumps(attr_value)
+                    scalar_attrs[attr_name] = attr_value
+                except (TypeError, ValueError):
+                    # Not serializable, skip or set to None
+                    scalar_attrs[attr_name] = None
+
+            # Serialize scalar_attrs to JSON and store in root attributes
+            store.get_storer('all_sessions_ripple_df').attrs.scalar_attrs = json.dumps(scalar_attrs)
+            # Save additional_filter_predicates keys (since we can't save functions)
+            store.get_storer('all_sessions_ripple_df').attrs.additional_filter_predicates_keys = list(self.additional_filter_predicates.keys())
+
+
+    @classmethod
+    def load_from_hdf(cls, filename) -> "DataFrameFilter":
+        """Loads data from a .hdf file and returns a new instance."""
+        import json
+        with pd.HDFStore(filename, 'r') as store:
+            # Load dataframes
+            dataframes = {}
+            for attr_name in cls.DATAFRAME_ATTR_NAMES:
+                if attr_name in store:
+                    dataframes[attr_name] = store[attr_name]
+                else:
+                    dataframes[attr_name] = None
+
+            # Load scalar attributes from the attributes of the first dataframe
+            attrs = store.get_storer('all_sessions_ripple_df').attrs
+            scalar_attrs = json.loads(attrs.scalar_attrs)
+
+            # Create a new instance with loaded data
+            instance = cls(
+                all_sessions_ripple_df=dataframes.get('all_sessions_ripple_df', None),
+                all_sessions_ripple_time_bin_df=dataframes.get('all_sessions_ripple_time_bin_df', None),
+                all_sessions_MultiMeasure_ripple_df=dataframes.get('all_sessions_MultiMeasure_ripple_df', None),
+                all_sessions_all_scores_ripple_df=dataframes.get('all_sessions_all_scores_ripple_df', None),
+                all_sessions_laps_df=dataframes.get('all_sessions_laps_df', None),
+                all_sessions_laps_time_bin_df=dataframes.get('all_sessions_laps_time_bin_df', None),
+                all_sessions_MultiMeasure_laps_df=dataframes.get('all_sessions_MultiMeasure_laps_df', None),
+                additional_filter_predicates={}  # Functions can't be serialized
+            )
+
+            # Set filtered dataframes
+            for attr_name in cls.DATAFRAME_ATTR_NAMES:
+                if attr_name.startswith('filtered_'):
+                    setattr(instance, attr_name, dataframes.get(attr_name, None))
+
+            # Set scalar attributes
+            for attr_name in cls.SCALAR_ATTR_NAMES:
+                if attr_name in scalar_attrs:
+                    setattr(instance, attr_name, scalar_attrs[attr_name])
+                else:
+                    setattr(instance, attr_name, None)
+
+            return instance
+        
