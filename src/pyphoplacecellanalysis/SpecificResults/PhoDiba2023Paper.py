@@ -1497,7 +1497,7 @@ def main_complete_figure_generations(curr_active_pipeline, enable_default_neptun
 # ==================================================================================================================== #
 
 from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import plotly_pre_post_delta_scatter
-
+from pyphocorehelpers.Filesystem.path_helpers import sanitize_filename_for_Windows
 
 
 @metadata_attributes(short_name=None, tags=['plotly', 'scatter', 'notebook', 'figure', 'outputs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-08 15:10', related_items=[])
