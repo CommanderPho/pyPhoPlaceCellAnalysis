@@ -1432,7 +1432,7 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
 
 @function_attributes(short_name=None, tags=['wcorr', 'shuffle', 'replay', 'epochs', 'alternative_replays'], input_requires=[], output_provides=[], uses=['compute_all_replay_epoch_variations', 'overwrite_replay_epochs_and_recompute'], used_by=[], creation_date='2024-06-28 01:50', related_items=[])
 def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-																					  included_qclu_values = [1,2,4,6,7,9], minimum_inclusion_fr_Hz=5.0, ripple_decoding_time_bin_size: float = 0.058, num_wcorr_shuffles: int = 1024, drop_previous_result_and_compute_fresh:bool=True, enable_plot_wcorr_hist_figure:bool=False) -> dict:
+																					  included_qclu_values = [1,2,4,6,7,9], minimum_inclusion_fr_Hz=5.0, ripple_decoding_time_bin_size: float = 0.025, num_wcorr_shuffles: int = 2048, drop_previous_result_and_compute_fresh:bool=True, enable_plot_wcorr_hist_figure:bool=False) -> dict:
 	"""  Computes several different alternative replay-detection variants and computes and exports the shuffled wcorrs for each of them
 	from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function
 	
