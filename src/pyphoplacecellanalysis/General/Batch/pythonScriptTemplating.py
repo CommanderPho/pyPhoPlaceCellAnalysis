@@ -346,6 +346,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
                                                     curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
                                                     curr_session_basedir=curr_session_basedir, 
                                                     batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
+                                                    custom_user_completion_function_override_kwargs_dict=(custom_user_completion_function_override_kwargs_dict or {}),
                                                     should_use_neptune_logging=should_use_neptune_logging, should_use_file_redirected_output_logging=should_use_file_redirected_output_logging,
                                                     **(compute_as_needed_script_generation_kwargs | dict(should_perform_figure_generation_to_file=False)))
             # script_file.write(script_content)
@@ -359,6 +360,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
                                                     curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
                                                     curr_session_basedir=curr_session_basedir,
                                                     batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
+                                                    custom_user_completion_function_override_kwargs_dict=(custom_user_completion_function_override_kwargs_dict or {}),
                                                     should_use_neptune_logging=should_use_neptune_logging, should_use_file_redirected_output_logging=should_use_file_redirected_output_logging,
                                                     **(no_recomputing_script_generation_kwargs | dict(should_perform_figure_generation_to_file=True)))
 
