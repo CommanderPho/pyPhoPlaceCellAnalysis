@@ -165,6 +165,8 @@ class BatchSessionCompletionHandler:
 
     # a list of functions to be called upon completion, will be called sequentially. 
     completion_functions: List[Callable] = field(default=Factory(list))
+    override_user_completion_function_kwargs_dict: Dict[Union[Callable, str], Dict] = field(default=Factory(dict))
+
     # override_session_computation_results_pickle_filename: Optional[str] = field(default=None) # 'output/loadedSessPickle.pkl'
     BATCH_DATE_TO_USE: str = field(default='0000-00-00_Fake') # BATCH_DATE_TO_USE = '2024-03-27_Apogee'
     collected_outputs_path: Path = field(default=None) # collected_outputs_path = Path(r'C:\Users\pho\repos\Spike3DWorkEnv\Spike3D\output\collected_outputs').resolve()
@@ -511,7 +513,7 @@ class BatchSessionCompletionHandler:
                 # # 2023-01-* - Call extended computations to build `_display_short_long_firing_rate_index_comparison` figures:
                 with ExceptionPrintingContext(suppress=(not self.fail_on_exception)):
                     curr_active_pipeline.reload_default_computation_functions()
-					#TODO 2024-11-06 13:44: - [ ] `force_recompute_override_computations_includelist` is actually comming in with the specified override (when I was just trying to override the parameters)`
+                    #TODO 2024-11-06 13:44: - [ ] `force_recompute_override_computations_includelist` is actually comming in with the specified override (when I was just trying to override the parameters)`
                     newly_computed_values += batch_extended_computations(curr_active_pipeline, include_includelist=active_extended_computations_include_includelist, include_global_functions=True, fail_on_exception=True, progress_print=True, # #TODO 2024-11-01 19:33: - [ ] self.force_recompute is True for some reason!?!
                                                                         force_recompute=self.force_global_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist,
                                                                         computation_kwargs_dict=force_recompute_override_computation_kwargs_dict, debug_print=False)
@@ -728,13 +730,24 @@ class BatchSessionCompletionHandler:
         # On large ram systems, we can return the whole pipeline? No, because the whole pipeline can't be pickled.
         across_session_results_extended_dict = {}
 
+        ## get override kwargs
+        override_user_completion_function_kwargs_dict = {}
+        
         ## run external completion functions:
         for a_fn in self.completion_functions:
             print(f'\t>> calling external computation function: {a_fn.__name__}')
             with ExceptionPrintingContext():
-                across_session_results_extended_dict = a_fn(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict)
-            
+                a_found_override_kwargs = {} ## start empty
+                if a_fn.__name__ in override_user_completion_function_kwargs_dict:
+                    ## found kwargs
+                    a_found_override_kwargs = override_user_completion_function_kwargs_dict.pop(a_fn.__name__, {})
+                elif a_fn in override_user_completion_function_kwargs_dict:
+                    a_found_override_kwargs = override_user_completion_function_kwargs_dict.pop(a_fn, {})
+                else:
+                    a_found_override_kwargs = {} # no override
 
+                across_session_results_extended_dict = a_fn(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict, **a_found_override_kwargs)
+            
 
         return PipelineCompletionResult(long_epoch_name=long_epoch_name, long_laps=long_laps, long_replays=long_replays,
                                            short_epoch_name=short_epoch_name, short_laps=short_laps, short_replays=short_replays,

@@ -240,7 +240,8 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
          create_slurm_scripts:bool=False, create_non_slurm_bash_scripts:bool=False, should_create_vscode_workspace:bool=True, should_use_neptune_logging:bool=True,  should_generate_run_scripts = True, should_generate_figure_scripts = True, should_generate_run_notebooks: bool = False,
          job_suffix:Optional[str]=None, should_use_file_redirected_output_logging:bool=False, # , should_create_powershell_scripts:bool=True
          separate_execute_and_figure_gen_scripts:bool=True, should_perform_figure_generation_to_file:bool=False, force_recompute_override_computations_includelist: Optional[List[str]]=None, force_recompute_override_computation_kwargs_dict: Optional[Dict[str, Dict]]=None, 
-        batch_session_completion_handler_kwargs=None, **renderer_script_generation_kwargs) -> BatchScriptsCollection:
+         custom_user_completion_function_override_kwargs_dict: Optional[Dict]=None,
+        batch_session_completion_handler_kwargs: Optional[Dict]=None, **renderer_script_generation_kwargs) -> BatchScriptsCollection:
     """ Creates a series of standalone scripts (one for each included_session_contexts) in the `output_directory`
 
     output_directory
@@ -250,6 +251,8 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
     session_batch_basedirs: Dict[IdentifyingContext, Path]
 
     batch_session_completion_handler_kwargs: Optional[Dict] - the values to be passed to batch_session_completion_handler
+    custom_user_completion_function_override_kwargs_dict - the kwarg overrides for the user_computation_functions
+    
     
     Usage:
     
@@ -396,6 +399,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
                                                         curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
                                                         curr_session_basedir=curr_session_basedir, 
                                                         batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
+                                                        custom_user_completion_function_override_kwargs_dict=(custom_user_completion_function_override_kwargs_dict or {}),
                                                         # should_use_neptune_logging=should_use_neptune_logging, should_use_file_redirected_output_logging=should_use_file_redirected_output_logging,
                                                         should_use_neptune_logging=False, should_use_file_redirected_output_logging=False,
                                                         **(compute_as_needed_script_generation_kwargs | dict(should_perform_figure_generation_to_file=False)))

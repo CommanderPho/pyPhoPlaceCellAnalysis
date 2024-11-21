@@ -216,6 +216,8 @@ result_handler.collected_outputs_path = collected_outputs_path
 for a_custom_custom_user_completion_function in custom_user_completion_functions:
     result_handler.completion_functions.append(a_custom_custom_user_completion_function)
 
+## Add any overriden kwargs:
+result_handler.override_user_completion_function_kwargs_dict = {{custom_user_completion_function_override_kwargs_dict|default('{}')}}
 
 {% if should_use_neptune_logging %}
 for k, v in {'BATCH_DATE_TO_USE': str(BATCH_DATE_TO_USE), 'collected_outputs_path': collected_outputs_path.as_posix(), 'custom_user_completion_functions': stringify_unsupported(custom_user_completion_functions)}.items():
