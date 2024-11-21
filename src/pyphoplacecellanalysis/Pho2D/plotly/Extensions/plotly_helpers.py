@@ -507,7 +507,13 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
         # data_results_df[categorical_color_shared_color_key] = data_results_df[categorical_color_shared_color_key].map(lambda x: f'{x:.3f}').astype(str) # string type
         # category_orders = {shared_color_key: [f'{v:.3f}' for v in sorted(data_results_df[categorical_color_shared_color_key].astype(float).unique())]} # should this be `categorical_color_shared_color_key` or `shared_color_key`
         data_results_df[categorical_color_shared_color_key] = data_results_df[categorical_color_shared_color_key].map(lambda x: f'{x}').astype(str) # string type
-        category_orders = {shared_color_key: [f'{v}' for v in sorted(data_results_df[categorical_color_shared_color_key].astype(float).unique())]} # should this be `categorical_color_shared_color_key` or `shared_color_key`
+        try:
+            category_orders = {shared_color_key: [f'{v}' for v in sorted(data_results_df[categorical_color_shared_color_key].astype(float).unique())]} # should this be `categorical_color_shared_color_key` or `shared_color_key`
+        except ValueError as e:
+            # "ValueError: could not convert string to float: 'kdiba_gor01_one_2006-6-08_14-26-15'"
+            category_orders = {shared_color_key: sorted(data_results_df[categorical_color_shared_color_key].unique())} # use the raw sorted strings        
+        except Exception as e:
+            raise
         
         # color_sequence = px.colors.qualitative.Plotly # `color_discrete_sequence`
         # Get the original colors and remove red and blue

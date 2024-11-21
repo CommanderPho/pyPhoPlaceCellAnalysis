@@ -1595,7 +1595,8 @@ def _perform_dual_hist_plot(grainularity_desc: str, laps_df: pd.DataFrame, rippl
 
 
 @function_attributes(short_name=None, tags=['MAIN', 'CRITICAL', 'FINAL', 'plotly'], input_requires=[], output_provides=[], uses=['plotly_pre_post_delta_scatter'], used_by=[], creation_date='2024-10-23 20:04', related_items=[])
-def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, concatenated_ripple_df: pd.DataFrame, time_delta_tuple: Tuple[float, float, float], fig_size_kwargs: Dict, save_plotly: Callable, is_dark_mode: bool=False, enable_custom_widget_buttons:bool=True, extant_figure=None, custom_output_widget=None, legend_groups_to_hide=['0.03', '0.044', '0.05'], should_save: bool = True, variable_name = 'P_Short', y_baseline_level: float = 0.5):
+def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, concatenated_ripple_df: pd.DataFrame, time_delta_tuple: Tuple[float, float, float], fig_size_kwargs: Dict, save_plotly: Callable, is_dark_mode: bool=False, enable_custom_widget_buttons:bool=True,
+                                          extant_figure=None, custom_output_widget=None, legend_groups_to_hide=['0.03', '0.044', '0.05'], should_save: bool = True, variable_name = 'P_Short', y_baseline_level: float = 0.5, **kwargs):
     """ plots the stacked histograms for both laps and ripples
 
     Usage:
@@ -1635,7 +1636,7 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
     data_context.overwriting_context(n_events=num_events) # adds 'n_events' context
     # .025 .03 .044 .05 .058
     # Define the legend groups you want to hide on startup
-    legend_groups_to_hide = ['0.03', '0.044', '0.05'] # '0.025', , '0.058'
+    legend_groups_to_hide = kwargs.pop('legend_groups_to_hide', ['0.03', '0.044', '0.05'])  # '0.025', , '0.058'
 
     # y_baseline_level: float = 0.5 # for P(short), etc
     # y_baseline_level: float = 0.0 # for wcorr, etc
@@ -1644,6 +1645,7 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
     px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'title': f"{data_context.get_description(subset_includelist=['dataframe_name', 'title_prefix', 'num_events'], separator=' - ')} - '{variable_name}'"} # , 'color': 'time_bin_size', 'range_y': [-1.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size', 'is_user_annotated_epoch':'user_sel'}
     px_scatter_kwargs['color'] = "time_bin_size"
     # px_scatter_kwargs.pop('color')
+
 
     # Controls scatterplot point size
     concatenated_ripple_df['dummy_column_for_size'] = 1.0
@@ -1659,6 +1661,9 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
     # hist_kwargs = dict(color="is_user_annotated_epoch") # , histnorm='probability density'
     # hist_kwargs.pop('color')
     
+    px_scatter_kwargs = px_scatter_kwargs | kwargs.pop('px_scatter_kwargs', {})
+    hist_kwargs = hist_kwargs | kwargs.pop('hist_kwargs', {})
+
     figure_sup_huge_title_text: str = data_context.get_description(subset_includelist=['epochs_name', 'data_grain', 'dataframe_name', 'n_events'], separator=' | ')
     if data_context.has_keys(keys_list=['custom_suffix']):
         custom_suffix_description: str = data_context.get_description(subset_includelist=['custom_suffix'])
@@ -1674,6 +1679,7 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
                             time_delta_tuple=time_delta_tuple, legend_title_text=None, is_dark_mode=is_dark_mode,
                             # figure_sup_huge_title_text=data_context.get_description(subset_excludelist=['title_prefix'], separator=' | '),
                             figure_sup_huge_title_text=figure_sup_huge_title_text, figure_footer_text=figure_footer_text,
+                            **kwargs,
     )
 
     new_fig = new_fig.update_layout(fig_size_kwargs)
@@ -2345,7 +2351,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
     @function_attributes(short_name=None, tags=['plotting'], input_requires=[], output_provides=[], uses=['_perform_plot_pre_post_delta_scatter'], used_by=[], creation_date='2024-11-20 13:08', related_items=[])
     @classmethod
-    def _build_plot_callback(cls, earliest_delta_aligned_t_start, latest_delta_aligned_t_end, save_plotly, should_save: bool = False, resolution_multiplier=1, enable_debug_print=False):
+    def _build_plot_callback(cls, earliest_delta_aligned_t_start, latest_delta_aligned_t_end, save_plotly, should_save: bool = False, resolution_multiplier=1, enable_debug_print=False, **extra_plot_kwargs):
         # fig_size_kwargs = {'width': 1650, 'height': 480}
         
         # fig_size_kwargs = {'width': resolution_multiplier*1650, 'height': resolution_multiplier*480}
@@ -2370,10 +2376,12 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             _new_perform_plot_pre_post_delta_scatter,
             data_context=None,
         )
+        
+        extra_plot_kwargs = deepcopy(extra_plot_kwargs)
 
         def _build_filter_changed_plotly_plotting_callback_fn(df_filter: "DataFrameFilter", should_save:bool=False, **kwargs):
             """ `filtered_all_sessions_all_scores_ripple_df` versions -
-            captures: _perform_plot_pre_post_delta_scatter_with_embedded_context, should_save, 
+            captures: _perform_plot_pre_post_delta_scatter_with_embedded_context, should_save, extra_plot_kwargs
             
             """
             # df_filter.output_widget.clear_output(wait=True)
@@ -2382,10 +2390,11 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             plot_variable_name: str = df_filter.active_plot_variable_name
             
             assert plot_variable_name in active_plot_df.columns, f"plot_variable_name: '{plot_variable_name}' is not present in active_plot_df.columns! Cannot plot!"
-            # fig, new_fig_context, _extras_output_dict, figure_out_paths = _perform_plot_pre_post_delta_scatter_with_embedded_context(concatenated_ripple_df=deepcopy(df_filter.filtered_all_sessions_all_scores_ripple_df), is_dark_mode=False, should_save=should_save,
-            #                                                                                                                        custom_output_widget=df_filter.output_widget)
+            
+            # extra_plot_kwargs = deepcopy(extra_plot_kwargs)
+            active_plot_kwargs = (extra_plot_kwargs | kwargs) 
             fig, new_fig_context, _extras_output_dict, figure_out_paths = _new_perform_plot_pre_post_delta_scatter_with_embedded_context(concatenated_ripple_df=deepcopy(active_plot_df), is_dark_mode=False, should_save=should_save, extant_figure=df_filter.figure_widget,
-                                                                                                                                    variable_name=plot_variable_name, **kwargs) # , enable_custom_widget_buttons=True
+                                                                                                                                    variable_name=plot_variable_name, **active_plot_kwargs) # , enable_custom_widget_buttons=True
             
             # Customize the hovertemplate
             fig.update_traces(
