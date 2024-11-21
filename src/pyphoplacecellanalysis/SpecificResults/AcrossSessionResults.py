@@ -3979,3 +3979,26 @@ class AcrossSessionIdentityDataframeAccessor:
         """
         df: pd.DataFrame = deepcopy(self._obj)
         return self.perform_add_session_df_columns(df=df, session_name=session_name, time_bin_size=time_bin_size, custom_replay_source=custom_replay_source, t_start=t_start, curr_session_t_delta=curr_session_t_delta, t_end=t_end, time_col=time_col, end_time_col_name=end_time_col_name)
+
+
+    def split_session_key_col_to_fmt_animal_exper_cols(self, session_key_col: str = 'session_name') -> pd.DataFrame:
+        """ Split 'session_name' to the individual columns:
+            adds columns ['format_name', 'animal', 'exper_name'] based on 'session_name'
+            
+            Usage: 
+                from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor
+                
+                df = df.across_session_identity.split_session_key_col_to_fmt_animal_exper_cols(session_key_col='session_name')
+            
+        """
+        df: pd.DataFrame = deepcopy(self._obj)
+        if session_key_col in df:
+            if 'format_name' not in df.columns:
+                df['format_name'] = df[session_key_col].map(lambda x: x.split('_', maxsplit=3)[0]) ## add animal name
+            if 'animal' not in df.columns:
+                df['animal'] = df[session_key_col].map(lambda x: x.split('_', maxsplit=3)[1]) ## add animal name
+                ## strip the '01' suffix from each
+            if 'exper_name' not in df.columns:
+                df['exper_name'] = df[session_key_col].map(lambda x: x.split('_', maxsplit=3)[2]) # not needed
+                
+        return df
