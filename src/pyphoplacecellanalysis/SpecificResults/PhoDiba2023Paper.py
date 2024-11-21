@@ -2028,7 +2028,12 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             else:
                 raise ValueError("initial_time_bin_sizes must be a float, int, list, or tuple")
 
-        self.time_bin_size_widget.value = value
+        try:
+            self.time_bin_size_widget.value = value
+        except Exception as e:
+            print(f'value: {value} is no in the list of valid options: {self.time_bin_size_widget.options}')
+            raise e
+        
 
     
     @property
