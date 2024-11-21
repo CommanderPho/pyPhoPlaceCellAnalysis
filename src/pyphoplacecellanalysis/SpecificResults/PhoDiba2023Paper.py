@@ -1648,9 +1648,12 @@ def _perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, conca
 
 
     # Controls scatterplot point size
-    concatenated_ripple_df['dummy_column_for_size'] = 1.0
+    if 'dummy_column_for_size' not in concatenated_ripple_df.columns:
+        concatenated_ripple_df['dummy_column_for_size'] = 2.0
+        
     px_scatter_kwargs['size'] = "dummy_column_for_size"
-    px_scatter_kwargs['size_max'] = 3
+    px_scatter_kwargs.setdefault('size_max', 5) # don't override tho
+    
     # px_scatter_kwargs['marker'] = dict(line=dict(width=0))
     # Remove the white border around scatter points by setting line width to 0
     # px_scatter_kwargs['line_width'] = 0  # <---- Correct way for Plotly Express
