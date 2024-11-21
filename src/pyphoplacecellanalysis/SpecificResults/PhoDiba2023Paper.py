@@ -2345,11 +2345,10 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                 self.active_plot_df_name_selector_widget, 
                 self.active_plot_variable_name_widget
             ]),
-            self.output_widget,
             self.figure_widget,
             widgets.HBox([self.button_copy, self.button_download, self.filename_label]),
             # self.js_output,  # Include the Output widget to allow the buttons to perform their actions
-            self.table_widget,
+            widgets.HBox([self.output_widget, self.table_widget, ]),
         ]))
         
 
