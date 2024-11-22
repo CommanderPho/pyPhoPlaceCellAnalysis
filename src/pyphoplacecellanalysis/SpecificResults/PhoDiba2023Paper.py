@@ -2268,25 +2268,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
             display(Javascript(js_code))
 
-        # def on_download_button_click(b):
-        #     # Convert the figure to a PNG image
-        #     png_bytes = pio.to_image(self.figure_widget, format='png')
-        #     encoded_image = base64.b64encode(png_bytes).decode('utf-8')
-
-        #     # JavaScript code to trigger download with a specific filename
-        #     js_code = f'''
-        #         const link = document.createElement('a');
-        #         link.href = 'data:image/png;base64,{encoded_image}';
-        #         link.download = '{self.filename}';
-        #         document.body.appendChild(link);
-        #         link.click();
-        #         document.body.removeChild(link);
-        #     '''
-
-        #     display(Javascript(js_code))
-
         self.button_copy.on_click(on_copy_button_click)
-        # self.button_download.on_click(on_download_button_click)
 
         ## Finish setup:
         self.on_widget_update_filename()  # Initialize filename and label
