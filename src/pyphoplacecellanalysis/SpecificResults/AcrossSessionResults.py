@@ -1714,11 +1714,13 @@ def parse_filename(path: Path, debug_print:bool=False) -> Tuple[datetime, str, O
     """
     filename: str = path.stem   # Get filename without extension
     final_parsed_output_dict = try_parse_chain(basename=filename) ## previous implementation
-    
+    # final_parsed_output_dict = try_iterative_parse_chain(basename=filename)
     export_file_type = (final_parsed_output_dict or {}).get('export_file_type', None)
-    if ((export_file_type is not None) and (export_file_type == '_withNormalComputedReplays')):
+    session_str = (final_parsed_output_dict or {}).get('session_str', None)
+    if ((export_file_type is not None) and (export_file_type in ['_withNormalComputedReplays'])) or ((session_str is not None) and (session_str in ['kdiba'])):
         ## do the new 2024-11-15 19:01 parse instead    
         print(f'for file "{filename}" using more modern parse method...')
+        # final_parsed_output_dict = try_parse_chain(basename=filename) ## previous implementation
         final_parsed_output_dict = try_iterative_parse_chain(basename=filename)
     # if final_parsed_output_dict is None:
     #     ## this version failed, fall-back to the older implementation
@@ -1827,7 +1829,7 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
     """
     # Function 'parse_filename' should be defined in the global scope
     parsed_paths: List[Tuple] = [(*parse_filename(p), p) for p in found_session_export_paths if (parse_filename(p)[0] is not None)] # note we append path p to the end of the tuple
-
+    # '2024-11-22_GL-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025.csv' in [v.name for v in found_session_export_paths]
     # Function that helps sort tuples by handling None values.
     def sort_key(tup):
         # Assign a boolean for each element, True if it's None, to ensure None values are sorted last.
@@ -1840,11 +1842,16 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
             tup[-1]                         # Finally by path which should handle None by itself
         )
 
+    # '2024-11-22_GL-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025.csv' in [v[-1].name for v in parsed_paths] # true
+    
     # Now we sort the data using our custom sort key
     parsed_paths = sorted(parsed_paths, key=sort_key, reverse=True)
     # parsed_paths.sort(key=lambda x: (x[3] is not None, x), reverse=True)
     # parsed_paths.sort(reverse=True) # old way
 
+    # '2024-11-22_GL-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025.csv' in [v[-1].name for v in parsed_paths] # true
+    #  '2024-11-22_GL-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025.csv' in [v.name for v in found_session_export_paths]
+    
     if debug_print:
         print(f'parsed_paths: {parsed_paths}')
 
@@ -1868,9 +1875,14 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
     # Sort by columns: 'session' (ascending), 'custom_replay_name' (ascending) and 3 other columns
     parsed_paths_df = parsed_paths_df.sort_values(['session', 'file_type', compare_custom_replay_name_col_name, 'decoding_time_bin_size_str', 'export_datetime']).reset_index(drop=True)
     ## #TODO 2024-09-27 01:49: - [ ] Confirmed that `parsed_paths_df` still has the `laps_time_bin_marginals` outputs in the list
+    # '2024-11-22_GL-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025.csv' in [Path(v).name for v in parsed_paths_df['path'].to_list()]
+    # parsed_paths_df['filename'] = [Path(v).name for v in parsed_paths_df['path'].to_list()]    
+    # _test_df = parsed_paths_df[parsed_paths_df['filename'] == '2024-11-22_GL-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025.csv']
+
     ## This is where we drop all but the most recent:
     filtered_parsed_paths_df = get_only_most_recent_csv_sessions(parsed_paths_df=deepcopy(parsed_paths_df), group_column_names=['session', compare_custom_replay_name_col_name, 'file_type', 'decoding_time_bin_size_str']) ## `filtered_parsed_paths_df` still has it
-
+    
+    # '2024-11-22_GL-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025.csv' in [Path(v).name for v in filtered_parsed_paths_df['path'].to_list()]
     # Drop rows with export_datetime less than or equal to cutoff_date
     if cuttoff_date is not None:
         filtered_parsed_paths_df = filtered_parsed_paths_df[filtered_parsed_paths_df['export_datetime'] >= cuttoff_date] ## fails HERE?!?
@@ -2964,7 +2976,8 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
         # final_sessions_loaded_extra_dfs[k] = _concat_all_dicts_to_dfs(v)
         final_sessions_loaded_extra_dfs[file_type] = _concat_custom_dict_to_df(v)
         ## udpate the metadata:
-        final_sessions_loaded_extra_dfs[file_type].attrs.update(**dict(file_type=deepcopy(file_type)))
+        if final_sessions_loaded_extra_dfs[file_type] is not None:
+            final_sessions_loaded_extra_dfs[file_type].attrs.update(**dict(file_type=deepcopy(file_type)))
         # final_sessions_loaded_extra_dfs[file_type].metadata = final_sessions_loaded_extra_dfs[file_type].get('metadata', {})
         # final_sessions_loaded_extra_dfs[file_type].metadata.update(**{'file_type': file_type, })
         
@@ -3655,73 +3668,73 @@ class AcrossSessionHelpers:
         return an_epoch_time_bin_df
     
 
-    @function_attributes(short_name=None, tags=['DEPRICATED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-13 00:00', related_items=[])
-    @classmethod
-    def _older_subfn_perform_add_merged_complete_epoch_stats_df(cls, a_paired_main_ripple_df: pd.DataFrame, an_all_sessions_merged_complete_epoch_stats_df: pd.DataFrame, t_delta_dict=None):
-        """ adds the columns ['Long_BestDir_quantile', 'Short_BestDir_quantile', 'best_overall_quantile'] to the dataframe `a_paired_main_ripple_df`
+    # @function_attributes(short_name=None, tags=['DEPRICATED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-13 00:00', related_items=[])
+    # @classmethod
+    # def _older_subfn_perform_add_merged_complete_epoch_stats_df(cls, a_paired_main_ripple_df: pd.DataFrame, an_all_sessions_merged_complete_epoch_stats_df: pd.DataFrame, t_delta_dict=None):
+    #     """ adds the columns ['Long_BestDir_quantile', 'Short_BestDir_quantile', 'best_overall_quantile'] to the dataframe `a_paired_main_ripple_df`
 
-        ## INPUTS: all_sessions_merged_complete_epoch_stats_df
-        all_sessions_all_scores_ripple_df = AcrossSessionHelpers._older_subfn_perform_add_merged_complete_epoch_stats_df(a_paired_main_ripple_df=all_sessions_all_scores_ripple_df, an_all_sessions_merged_complete_epoch_stats_df=all_sessions_merged_complete_epoch_stats_df, t_delta_dict=t_delta_dict)
-        all_sessions_all_scores_ripple_df
-        # all_sessions_MultiMeasure_ripple_df = _subfn_perform_add_merged_complete_epoch_stats_df(a_paired_main_ripple_df=all_sessions_MultiMeasure_ripple_df, a_all_sessions_merged_complete_epoch_stats_df=all_sessions_merged_complete_epoch_stats_df)
+    #     ## INPUTS: all_sessions_merged_complete_epoch_stats_df
+    #     all_sessions_all_scores_ripple_df = AcrossSessionHelpers._older_subfn_perform_add_merged_complete_epoch_stats_df(a_paired_main_ripple_df=all_sessions_all_scores_ripple_df, an_all_sessions_merged_complete_epoch_stats_df=all_sessions_merged_complete_epoch_stats_df, t_delta_dict=t_delta_dict)
+    #     all_sessions_all_scores_ripple_df
+    #     # all_sessions_MultiMeasure_ripple_df = _subfn_perform_add_merged_complete_epoch_stats_df(a_paired_main_ripple_df=all_sessions_MultiMeasure_ripple_df, a_all_sessions_merged_complete_epoch_stats_df=all_sessions_merged_complete_epoch_stats_df)
 
 
-        """
-        # all_sessions_merged_complete_epoch_stats_df['time_bin_size'] = 0.25 # 'time_bin_size', 'session_experience_rank', 'session_experience_orientation_rank', 'custom_replay_name'-- all missing for this df
-        # all_sessions_merged_complete_epoch_stats_df['custom_replay_name'] = 'withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2, 4, 6, 7, 9]'
-        # all_sessions_merged_complete_epoch_stats_df['Long_BestDir_quantile'] # 'Long_BestDir_quantile', 'Short_BestDir_quantile'
-        a_paired_main_ripple_df = deepcopy(a_paired_main_ripple_df)
-        an_all_sessions_merged_complete_epoch_stats_df = deepcopy(an_all_sessions_merged_complete_epoch_stats_df)
+    #     """
+    #     # all_sessions_merged_complete_epoch_stats_df['time_bin_size'] = 0.25 # 'time_bin_size', 'session_experience_rank', 'session_experience_orientation_rank', 'custom_replay_name'-- all missing for this df
+    #     # all_sessions_merged_complete_epoch_stats_df['custom_replay_name'] = 'withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2, 4, 6, 7, 9]'
+    #     # all_sessions_merged_complete_epoch_stats_df['Long_BestDir_quantile'] # 'Long_BestDir_quantile', 'Short_BestDir_quantile'
+    #     a_paired_main_ripple_df = deepcopy(a_paired_main_ripple_df)
+    #     an_all_sessions_merged_complete_epoch_stats_df = deepcopy(an_all_sessions_merged_complete_epoch_stats_df)
         
-        an_all_sessions_merged_complete_epoch_stats_df = an_all_sessions_merged_complete_epoch_stats_df[an_all_sessions_merged_complete_epoch_stats_df['custom_replay_name'] != ''] # only non-blank values
+    #     an_all_sessions_merged_complete_epoch_stats_df = an_all_sessions_merged_complete_epoch_stats_df[an_all_sessions_merged_complete_epoch_stats_df['custom_replay_name'] != ''] # only non-blank values
 
-        ## need to match 'start' and the other
-        # all_sessions_merged_complete_epoch_stats_relevant_df: pd.DataFrame = deepcopy(all_sessions_merged_complete_epoch_stats_df.epochs.matching_epoch_times_slice(epoch_times=all_sessions_all_scores_ripple_df.ripple_start_t))
-        all_sessions_merged_complete_epoch_stats_relevant_df: pd.DataFrame = deepcopy(an_all_sessions_merged_complete_epoch_stats_df.epochs.matching_epoch_times_slice(epoch_times=a_paired_main_ripple_df.ripple_start_t))
+    #     ## need to match 'start' and the other
+    #     # all_sessions_merged_complete_epoch_stats_relevant_df: pd.DataFrame = deepcopy(all_sessions_merged_complete_epoch_stats_df.epochs.matching_epoch_times_slice(epoch_times=all_sessions_all_scores_ripple_df.ripple_start_t))
+    #     all_sessions_merged_complete_epoch_stats_relevant_df: pd.DataFrame = deepcopy(an_all_sessions_merged_complete_epoch_stats_df.epochs.matching_epoch_times_slice(epoch_times=a_paired_main_ripple_df.ripple_start_t))
         
-        ## INPUTS: all_sessions_merged_complete_epoch_stats_relevant_df
-        # all_sessions_merged_complete_epoch_stats_relevant_df # 'Long_BestDir_quantile', 'Short_BestDir_quantile'
+    #     ## INPUTS: all_sessions_merged_complete_epoch_stats_relevant_df
+    #     # all_sessions_merged_complete_epoch_stats_relevant_df # 'Long_BestDir_quantile', 'Short_BestDir_quantile'
         
-        if 'delta_aligned_start_t' not in all_sessions_merged_complete_epoch_stats_relevant_df.columns:
-            session_name_t_delta_dict = {'_'.join(k.split('_')[-2:]):v['t_delta'] for k, v in t_delta_dict.items()} # '2006-6-08_21-16-25'
-            all_sessions_merged_complete_epoch_stats_relevant_df['delta_aligned_start_t'] = all_sessions_merged_complete_epoch_stats_relevant_df['start'] - all_sessions_merged_complete_epoch_stats_relevant_df['session_name'].map(lambda x: session_name_t_delta_dict[x])
-        all_sessions_merged_complete_epoch_stats_relevant_df['best_overall_quantile'] = np.nanmax(all_sessions_merged_complete_epoch_stats_relevant_df[['Long_BestDir_quantile', 'Short_BestDir_quantile']], axis=1)
+    #     if 'delta_aligned_start_t' not in all_sessions_merged_complete_epoch_stats_relevant_df.columns:
+    #         session_name_t_delta_dict = {'_'.join(k.split('_')[-2:]):v['t_delta'] for k, v in t_delta_dict.items()} # '2006-6-08_21-16-25'
+    #         all_sessions_merged_complete_epoch_stats_relevant_df['delta_aligned_start_t'] = all_sessions_merged_complete_epoch_stats_relevant_df['start'] - all_sessions_merged_complete_epoch_stats_relevant_df['session_name'].map(lambda x: session_name_t_delta_dict[x])
+    #     all_sessions_merged_complete_epoch_stats_relevant_df['best_overall_quantile'] = np.nanmax(all_sessions_merged_complete_epoch_stats_relevant_df[['Long_BestDir_quantile', 'Short_BestDir_quantile']], axis=1)
 
 
-        ## INPUTS: df_filter, all_sessions_merged_complete_epoch_stats_relevant_df, 
+    #     ## INPUTS: df_filter, all_sessions_merged_complete_epoch_stats_relevant_df, 
 
-        #TODO 2024-11-15 12:02: - [ ] We also need to constrain based on the time_bin_size and replay_name in addition to just searching for matching epoch start times.
+    #     #TODO 2024-11-15 12:02: - [ ] We also need to constrain based on the time_bin_size and replay_name in addition to just searching for matching epoch start times.
 
-        initial_row_count: int = len(a_paired_main_ripple_df)
-        print(f'initial_row_count: {initial_row_count}')
-        # relevent_column_names = ['start', 'stop', 'label', 'duration', 'LR_Long_ActuallyIncludedAclus', 'LR_Long_rel_num_cells', 'RL_Long_ActuallyIncludedAclus', 'RL_Long_rel_num_cells', 'LR_Short_ActuallyIncludedAclus', 'LR_Short_rel_num_cells', 'RL_Short_ActuallyIncludedAclus', 'RL_Short_rel_num_cells', 'combined_best_direction_indicies', 'long_relative_direction_likelihoods', 'short_relative_direction_likelihoods', 'long_best_direction_indices', 'short_best_direction_indices', 'LR_Short_spearman', 'LR_Long_spearman', 'RL_Short_pearson', 'RL_Long_spearman', 'LR_Short_pearson', 'RL_Long_pearson', 'LR_Long_pearson', 'RL_Short_spearman', 'LR_Short_spearman_Z', 'LR_Long_spearman_Z', 'RL_Short_pearson_Z', 'RL_Long_spearman_Z', 'LR_Short_pearson_Z', 'RL_Long_pearson_Z', 'LR_Long_pearson_Z', 'RL_Short_spearman_Z', 'Long_BestDir_spearman', 'Short_BestDir_spearman', 'LR_Short_spearman_percentile', 'LR_Long_spearman_percentile', 'RL_Short_pearson_percentile', 'RL_Long_spearman_percentile', 'LR_Short_pearson_percentile', 'RL_Long_pearson_percentile', 'LR_Long_pearson_percentile', 'RL_Short_spearman_percentile', 'LR_Long_percentile', 'RL_Long_percentile', 'LR_Short_percentile', 'RL_Short_percentile', 'Long_BestDir_quantile', 'Short_BestDir_quantile', 'LongShort_BestDir_quantile_diff', 'LongShort_LR_quantile_diff', 'LongShort_RL_quantile_diff', 'session_name', 'custom_replay_name', 'time_bin_size', 'session_experience_rank', 'session_experience_orientation_rank', 'is_novel_exposure', 'delta_aligned_start_t', 'best_overall_quantile']
-        relevent_column_names = ['start', 'stop', 'label', 'duration', 'delta_aligned_start_t', 'Long_BestDir_quantile', 'Short_BestDir_quantile', 'best_overall_quantile']
-        shuffle_column_names = ['Long_BestDir_quantile', 'Short_BestDir_quantile', 'best_overall_quantile']
-        # paired_main_ripple_df.delta_aligned_start_t
+    #     initial_row_count: int = len(a_paired_main_ripple_df)
+    #     print(f'initial_row_count: {initial_row_count}')
+    #     # relevent_column_names = ['start', 'stop', 'label', 'duration', 'LR_Long_ActuallyIncludedAclus', 'LR_Long_rel_num_cells', 'RL_Long_ActuallyIncludedAclus', 'RL_Long_rel_num_cells', 'LR_Short_ActuallyIncludedAclus', 'LR_Short_rel_num_cells', 'RL_Short_ActuallyIncludedAclus', 'RL_Short_rel_num_cells', 'combined_best_direction_indicies', 'long_relative_direction_likelihoods', 'short_relative_direction_likelihoods', 'long_best_direction_indices', 'short_best_direction_indices', 'LR_Short_spearman', 'LR_Long_spearman', 'RL_Short_pearson', 'RL_Long_spearman', 'LR_Short_pearson', 'RL_Long_pearson', 'LR_Long_pearson', 'RL_Short_spearman', 'LR_Short_spearman_Z', 'LR_Long_spearman_Z', 'RL_Short_pearson_Z', 'RL_Long_spearman_Z', 'LR_Short_pearson_Z', 'RL_Long_pearson_Z', 'LR_Long_pearson_Z', 'RL_Short_spearman_Z', 'Long_BestDir_spearman', 'Short_BestDir_spearman', 'LR_Short_spearman_percentile', 'LR_Long_spearman_percentile', 'RL_Short_pearson_percentile', 'RL_Long_spearman_percentile', 'LR_Short_pearson_percentile', 'RL_Long_pearson_percentile', 'LR_Long_pearson_percentile', 'RL_Short_spearman_percentile', 'LR_Long_percentile', 'RL_Long_percentile', 'LR_Short_percentile', 'RL_Short_percentile', 'Long_BestDir_quantile', 'Short_BestDir_quantile', 'LongShort_BestDir_quantile_diff', 'LongShort_LR_quantile_diff', 'LongShort_RL_quantile_diff', 'session_name', 'custom_replay_name', 'time_bin_size', 'session_experience_rank', 'session_experience_orientation_rank', 'is_novel_exposure', 'delta_aligned_start_t', 'best_overall_quantile']
+    #     relevent_column_names = ['start', 'stop', 'label', 'duration', 'delta_aligned_start_t', 'Long_BestDir_quantile', 'Short_BestDir_quantile', 'best_overall_quantile']
+    #     shuffle_column_names = ['Long_BestDir_quantile', 'Short_BestDir_quantile', 'best_overall_quantile']
+    #     # paired_main_ripple_df.delta_aligned_start_t
 
-        # paired_main_ripple_df.start
+    #     # paired_main_ripple_df.start
 
-        # all_sessions_merged_complete_epoch_stats_relevant_df.start
+    #     # all_sessions_merged_complete_epoch_stats_relevant_df.start
 
-        ## Just need to obtain shuffle scores for each of the epochs in the filtered df:
-        filtered_temp: pd.DataFrame = all_sessions_merged_complete_epoch_stats_relevant_df.loc[all_sessions_merged_complete_epoch_stats_relevant_df.epochs.find_data_indicies_from_epoch_times(a_paired_main_ripple_df.start)].reset_index(drop=True)[relevent_column_names] ## get only the matching entries
-        # filtered_temp
-        # print(list(filtered_temp.columns))
-        ## Filll NaNs first:
-        a_paired_main_ripple_df[shuffle_column_names] = np.nan
+    #     ## Just need to obtain shuffle scores for each of the epochs in the filtered df:
+    #     filtered_temp: pd.DataFrame = all_sessions_merged_complete_epoch_stats_relevant_df.loc[all_sessions_merged_complete_epoch_stats_relevant_df.epochs.find_data_indicies_from_epoch_times(a_paired_main_ripple_df.start)].reset_index(drop=True)[relevent_column_names] ## get only the matching entries
+    #     # filtered_temp
+    #     # print(list(filtered_temp.columns))
+    #     ## Filll NaNs first:
+    #     a_paired_main_ripple_df[shuffle_column_names] = np.nan
 
-        ## Need to assign to `df_filter.all_sessions_MultiMeasure_ripple_df`
-        _relevent_indexes = a_paired_main_ripple_df.epochs.find_data_indicies_from_epoch_times(filtered_temp.start) # indexes into `paired_main_ripple_df`, but wait, not all indicies are guarnateed to be in here right?
-        # _relevent_indexes
+    #     ## Need to assign to `df_filter.all_sessions_MultiMeasure_ripple_df`
+    #     _relevent_indexes = a_paired_main_ripple_df.epochs.find_data_indicies_from_epoch_times(filtered_temp.start) # indexes into `paired_main_ripple_df`, but wait, not all indicies are guarnateed to be in here right?
+    #     # _relevent_indexes
 
-        ## Sanity checks:
-        # len(_relevent_indexes)
-        assert np.sum(np.isnan(_relevent_indexes)) == 0 # no NaNs
-        assert np.sum(_relevent_indexes < 0) == 0 # no -1 (not found sentinal value)s
-        ## assign the relevent values
-        a_paired_main_ripple_df.loc[_relevent_indexes, shuffle_column_names] = deepcopy(filtered_temp[shuffle_column_names]) ## only copy the shuffle columns
-        assert initial_row_count == len(a_paired_main_ripple_df)
-        return a_paired_main_ripple_df
+    #     ## Sanity checks:
+    #     # len(_relevent_indexes)
+    #     assert np.sum(np.isnan(_relevent_indexes)) == 0 # no NaNs
+    #     assert np.sum(_relevent_indexes < 0) == 0 # no -1 (not found sentinal value)s
+    #     ## assign the relevent values
+    #     a_paired_main_ripple_df.loc[_relevent_indexes, shuffle_column_names] = deepcopy(filtered_temp[shuffle_column_names]) ## only copy the shuffle columns
+    #     assert initial_row_count == len(a_paired_main_ripple_df)
+    #     return a_paired_main_ripple_df
 
 
 
