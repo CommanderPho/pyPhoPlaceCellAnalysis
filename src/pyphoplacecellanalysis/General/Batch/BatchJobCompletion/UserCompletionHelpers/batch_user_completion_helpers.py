@@ -766,35 +766,44 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 	track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only # TrackTemplates
 
 
-	directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']
-	pos_bin_size: float = directional_decoders_epochs_decode_result.pos_bin_size
-	ripple_decoding_time_bin_size: float = directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size
-	laps_decoding_time_bin_size: float = directional_decoders_epochs_decode_result.laps_decoding_time_bin_size
-	needs_recompute: bool = False
-	if ripple_decoding_time_bin_size_override is not None:
-		if ripple_decoding_time_bin_size_override != ripple_decoding_time_bin_size:
-			print(f'ripple_decoding_time_bin_size_override is specfied ({ripple_decoding_time_bin_size_override}) and is not equal to the computed value ({ripple_decoding_time_bin_size}). Will recompmute!')
-			needs_recompute = True
-		else: 
-			print(f'ripple_decoding_time_bin_size_override is the same size as computed ({ripple_decoding_time_bin_size_override})')
+	directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = curr_active_pipeline.global_computation_results.computed_data.get('DirectionalDecodersEpochsEvaluations', None)
+	if directional_decoders_epochs_decode_result is None:
+		needs_recompute: bool = True # need to recompute if we're lacking result
+	else:
+		needs_recompute: bool = False
+		pos_bin_size: float = directional_decoders_epochs_decode_result.pos_bin_size
+		prev_computed_ripple_decoding_time_bin_size: float = directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size
+		prev_computed_laps_decoding_time_bin_size: float = directional_decoders_epochs_decode_result.laps_decoding_time_bin_size
+		if ripple_decoding_time_bin_size_override is not None:
+			if ripple_decoding_time_bin_size_override != prev_computed_ripple_decoding_time_bin_size:
+				print(f'ripple_decoding_time_bin_size_override is specfied ({ripple_decoding_time_bin_size_override}) and is not equal to the computed value ({prev_computed_ripple_decoding_time_bin_size}). Will recompmute!')
+				needs_recompute = True
+			else: 
+				print(f'ripple_decoding_time_bin_size_override is the same size as computed ({ripple_decoding_time_bin_size_override})')
 
-	if laps_decoding_time_bin_size_override is not None:
-		if laps_decoding_time_bin_size_override != laps_decoding_time_bin_size:
-			print(f'laps_decoding_time_bin_size_override is specfied ({laps_decoding_time_bin_size_override}) and is not equal to the computed value ({laps_decoding_time_bin_size}). Will recompmute!')
-			needs_recompute = True
-		else:
-			print(f'laps_decoding_time_bin_size_override is the same size as computed ({laps_decoding_time_bin_size_override})')
+		if laps_decoding_time_bin_size_override is not None:
+			if laps_decoding_time_bin_size_override != prev_computed_laps_decoding_time_bin_size:
+				print(f'laps_decoding_time_bin_size_override is specfied ({laps_decoding_time_bin_size_override}) and is not equal to the computed value ({prev_computed_laps_decoding_time_bin_size}). Will recompmute!')
+				needs_recompute = True
+			else:
+				print(f'laps_decoding_time_bin_size_override is the same size as computed ({laps_decoding_time_bin_size_override})')
 			
+		if needs_recompute:
+			## Drop 'DirectionalDecodersEpochsEvaluations', and recompute
+			global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['DirectionalDecodersEpochsEvaluations'], debug_print=True) # don't need to drop 'DirectionalMergedDecoders', , just recompute it
+		
 
 	if needs_recompute:
 		print(f'recompute is needed!')
-		# raise NotImplementedError(f'needs_recompute needs to be implemented!')
-		## Drop 'DirectionalDecodersEpochsEvaluations', and recompute
-		global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['DirectionalDecodersEpochsEvaluations'], debug_print=True)
+		curr_active_pipeline.reload_default_computation_functions()
 
+		curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields'],
+														computation_kwargs_list=[{'laps_decoding_time_bin_size': None, 'ripple_decoding_time_bin_size': ripple_decoding_time_bin_size_override},],
+														enabled_filter_names=None, fail_on_exception=True, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
+		
+		global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['DirectionalDecodersEpochsEvaluations'], debug_print=True)
 		curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_evaluate_epochs'], # ,  'directional_decoders_epoch_heuristic_scoring'
 						computation_kwargs_list=[{'should_skip_radon_transform': False}], enabled_filter_names=None, fail_on_exception=True, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
-			
 		needs_recompute_heuristics = True
 
 		# curr_active_pipeline.drop
@@ -821,7 +830,6 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 
 	## FILTERING FOR GOOD ROWS:
 	
-
 	## INPUTS: decoder_ripple_filter_epochs_decoder_result_dict
 
 	# 2024-03-04 - Filter out the epochs based on the criteria:
