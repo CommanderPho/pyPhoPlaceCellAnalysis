@@ -187,7 +187,7 @@ class BatchCompletionHelpers:
 	@classmethod
 	def overwrite_replay_epochs_and_recompute(cls, curr_active_pipeline, new_replay_epochs: Epoch, ripple_decoding_time_bin_size: float = 0.025, 
 											num_wcorr_shuffles: int=25, fail_on_exception=True,
-											enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=False, enable_save_h5: bool = False, user_completion_dummy=None, drop_previous_result_and_compute_fresh:bool=True):
+											enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=False, enable_save_h5: bool = True, user_completion_dummy=None, drop_previous_result_and_compute_fresh:bool=True):
 		""" Recomputes the replay epochs using a custom implementation of the criteria in Diba 2007.
 
 		, included_qclu_values=[1,2], minimum_inclusion_fr_Hz=5.0
