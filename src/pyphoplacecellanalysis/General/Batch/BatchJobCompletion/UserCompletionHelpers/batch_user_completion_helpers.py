@@ -707,7 +707,8 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
 
 @function_attributes(short_name=None, tags=['CSVs', 'export', 'across-sessions', 'batch', 'single-time-bin-size', 'ripple_all_scores_merged_df'], input_requires=['DirectionalLaps', 'RankOrder', 'DirectionalDecodersEpochsEvaluations'], output_provides=[], uses=['filter_and_update_epochs_and_spikes', 'DecoderDecodedEpochsResult', 'DecoderDecodedEpochsResult.export_csvs'], used_by=[], creation_date='2024-04-27 21:20', related_items=[])
-def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
+def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
+										       ripple_decoding_time_bin_size_override: Optional[float]=None, laps_decoding_time_bin_size_override: Optional[float]=None, needs_recompute_heuristics: bool = False) -> dict:
 	"""
 	Aims to export the results of the global 'directional_decoders_evaluate_epochs' calculation
 
@@ -754,9 +755,14 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 	
 	## Extract Data:
 	directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'] # DirectionalLapsResult
-	rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
-	minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
-	included_qclu_values: float = rank_order_results.included_qclu_values
+	rank_order_results = curr_active_pipeline.global_computation_results.computed_data.get('RankOrder', None)
+	if rank_order_results is not None:
+		minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+		included_qclu_values: List[int] = rank_order_results.included_qclu_values
+	else:        
+		## get from parameters:
+		minimum_inclusion_fr_Hz: float = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+		included_qclu_values: List[int] = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
 	track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only # TrackTemplates
 
 
@@ -764,6 +770,36 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 	pos_bin_size: float = directional_decoders_epochs_decode_result.pos_bin_size
 	ripple_decoding_time_bin_size: float = directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size
 	laps_decoding_time_bin_size: float = directional_decoders_epochs_decode_result.laps_decoding_time_bin_size
+	needs_recompute: bool = False
+	if ripple_decoding_time_bin_size_override is not None:
+		if ripple_decoding_time_bin_size_override != ripple_decoding_time_bin_size:
+			print(f'ripple_decoding_time_bin_size_override is specfied ({ripple_decoding_time_bin_size_override}) and is not equal to the computed value ({ripple_decoding_time_bin_size}). Will recompmute!')
+			needs_recompute = True
+		else: 
+			print(f'ripple_decoding_time_bin_size_override is the same size as computed ({ripple_decoding_time_bin_size_override})')
+
+	if laps_decoding_time_bin_size_override is not None:
+		if laps_decoding_time_bin_size_override != laps_decoding_time_bin_size:
+			print(f'laps_decoding_time_bin_size_override is specfied ({laps_decoding_time_bin_size_override}) and is not equal to the computed value ({laps_decoding_time_bin_size}). Will recompmute!')
+			needs_recompute = True
+		else:
+			print(f'laps_decoding_time_bin_size_override is the same size as computed ({laps_decoding_time_bin_size_override})')
+			
+
+	if needs_recompute:
+		print(f'recompute is needed!')
+		# raise NotImplementedError(f'needs_recompute needs to be implemented!')
+		## Drop 'DirectionalDecodersEpochsEvaluations', and recompute
+		global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['DirectionalDecodersEpochsEvaluations'], debug_print=True)
+
+		curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_evaluate_epochs'], # ,  'directional_decoders_epoch_heuristic_scoring'
+						computation_kwargs_list=[{'should_skip_radon_transform': False}], enabled_filter_names=None, fail_on_exception=True, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
+			
+		needs_recompute_heuristics = True
+
+		# curr_active_pipeline.drop
+	
+	
 	# decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_epochs_decode_result.decoder_laps_filter_epochs_decoder_result_dict
 	# decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict
 
@@ -803,10 +839,12 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 	## run 'directional_decoders_epoch_heuristic_scoring',
 	directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(curr_active_pipeline, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=True)
 
+	
 	# 🟪 2024-02-29 - `compute_pho_heuristic_replay_scores`
-	if (not _workaround_validate_has_directional_decoded_epochs_heuristic_scoring(curr_active_pipeline)):
+	if (needs_recompute_heuristics or (not _workaround_validate_has_directional_decoded_epochs_heuristic_scoring(curr_active_pipeline))):
 		print(f'\tmissing heuristic columns. Recomputing:')
-		directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict)
+		directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates,
+																				     a_decoded_filter_epochs_decoder_result_dict=directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict)
 		print(f'\tdone recomputing heuristics.')
 
 	print(f'\tComputation complete. Exporting .CSVs...')
