@@ -3,7 +3,7 @@ import numpy as np
 from pathlib import Path
 import pandas as pd
 from functools import partial
-from attrs import astuple, asdict, field, define # used in `UnpackableMixin`
+from attrs import astuple, asdict, field, define, Factory # used in `UnpackableMixin`
 from silx.gui import qt
 from silx.gui.plot import Plot2D, Plot1D
 from silx.gui.colors import Colormap
@@ -113,12 +113,14 @@ class EpochHeuristicDebugger:
     active_single_epoch_result: SingleEpochDecodedResult = field(default=None)
     p_x_given_n_masked: NDArray = field(default=None) # deepcopy(p_x_given_n_masked) # .T
     heuristic_scores: HeuristicScoresTuple = field(default=None)
+    bin_by_bin_heuristic_scores: Dict = field(default=Factory(dict))
     debug_print: bool = field(default=False)
 
     xbin: NDArray = field(default=None)
     xbin_centers: NDArray = field(default=None)
     pos_bin_size: float = field(default=None)
     time_bin_size: float = field(default=None)
+    decoder_track_length: float = field(default=None)
     time_bin_centers: NDArray = field(default=None)
 
     position_derivatives: PositionDerivativesContainer = field(default=None)    
@@ -155,11 +157,30 @@ class EpochHeuristicDebugger:
     def filter_epochs(self) -> pd.DataFrame:
         return self.active_decoder_decoded_epochs_result.filter_epochs
     
+    # @property
+    # def active_most_likely_position_indicies(self) -> NDArray:
+    #     """The most_likely_position_indicies property."""
+    #     assert len(self.active_single_epoch_result.most_likely_position_indicies) == 1, f" for some reason the list should be double-wrapped: [[37  0 28 52 56 28 55]], meaning it has length 1"
+    #     return self.active_single_epoch_result.most_likely_position_indicies[0] # the [0] is to handle the fact that for some reason the list is double-wrapped: [[37  0 28 52 56 28 55]]
+
     @property
-    def active_most_likely_position_indicies(self) -> NDArray:
+    def active_most_likely_position_arr(self) -> NDArray:
         """The most_likely_position_indicies property."""
-        assert len(self.active_single_epoch_result.most_likely_position_indicies) == 1, f" the [0] is to handle the fact that for some reason the list is double-wrapped: [[37  0 28 52 56 28 55]]"
-        return self.active_single_epoch_result.most_likely_position_indicies[0] # the [0] is to handle the fact that for some reason the list is double-wrapped: [[37  0 28 52 56 28 55]]
+        if self.use_bin_units_instead_of_realworld:
+            ## bin units
+            assert len(self.active_single_epoch_result.most_likely_position_indicies) == 1, f" for some reason the list should be double-wrapped: [[37  0 28 52 56 28 55]], meaning it has length 1"
+            active_active_most_likely_position_arr = deepcopy(self.active_single_epoch_result.most_likely_position_indicies[0]) # the [0] is to handle the fact that for some reason the list is double-wrapped: [[37  0 28 52 56 28 55]]
+            # active_active_most_likely_position_arr = deepcopy(self.active_most_likely_position_indicies)
+        else:
+            ## real-world units
+            # assert len(self.active_single_epoch_result.most_likely_positions) == 1, f" for some reason the list should be double-wrapped: [[37  0 28 52 56 28 55]], meaning it has length 1"
+            # active_active_most_likely_position_arr = deepcopy(self.active_single_epoch_result.most_likely_positions[0]) # the [0] is to handle the fact that for some reason the list is double-wrapped: [[37  0 28 52 56 28 55]]
+            active_active_most_likely_position_arr = deepcopy(self.active_single_epoch_result.most_likely_positions)            
+
+        # assert len(active_active_most_likely_position_arr) == 1, f" the [0] is to handle the fact that for some reason the list is double-wrapped: [[37  0 28 52 56 28 55]]"
+        return active_active_most_likely_position_arr
+
+
 
 
     @property
@@ -168,7 +189,10 @@ class EpochHeuristicDebugger:
         """
         common_plot_config_dict = dict(symbol='o', linestyle=':', color=(0.0, 0.0, 1.0, 0.2,)) # , fillColor="rgba(0, 0, 255, 50)"
 
-        return {"Position": dict(legend="Position", xlabel='t (tbin)', ylabel='x_pos (bin)', **common_plot_config_dict),
+        return {"Position": dict(legend="Position", xlabel='t (tbin)',
+                                #   ylabel='x_pos (bin)',
+                                ylabel='x_pos (cm)',
+                                **common_plot_config_dict),
             "Velocity": dict(legend="Velocity", xlabel='t (tbin)', ylabel='velocity (bin/tbin)', baseline=0.0, fill=True, **common_plot_config_dict),
             "Acceleration": dict(legend="Acceleration", xlabel='t (tbin)', ylabel='accel. (bin/tbin^2)', baseline=0.0, fill=True, **common_plot_config_dict),
             "Extra": dict(legend="Extra", xlabel='t (tbin)', ylabel='Extra', baseline=0.0, fill=True, **common_plot_config_dict),
@@ -180,6 +204,23 @@ class EpochHeuristicDebugger:
         """
         position_plots_list = [self.plot_position, self.plot_velocity, self.plot_acceleration, self.plot_extra]
         return dict(zip(['Position', 'Velocity', 'Acceleration', 'Extra'], position_plots_list))
+
+
+    @property
+    def plot_configs_dict(self) -> Dict[str, Dict]:
+        """ convenince access to the dict of position plots 
+        """
+        common_plot_config_dict = dict(symbol='o', linestyle=':', color=(0.0, 0.0, 1.0, 0.2,)) # , fillColor="rgba(0, 0, 255, 50)"
+
+        return {"Position": dict(legend="Position", xlabel='t (tbin)',
+                                #   ylabel='x_pos (bin)',
+                                ylabel='x_pos (cm)',
+                                **common_plot_config_dict),
+            "Velocity": dict(legend="Velocity", xlabel='t (tbin)', ylabel='velocity (bin/tbin)', baseline=0.0, fill=True, **common_plot_config_dict),
+            "Acceleration": dict(legend="Acceleration", xlabel='t (tbin)', ylabel='accel. (bin/tbin^2)', baseline=0.0, fill=True, **common_plot_config_dict),
+            "Extra": dict(legend="Extra", xlabel='t (tbin)', ylabel='Extra', baseline=0.0, fill=True, **common_plot_config_dict),
+        }
+    
 
 
     @classmethod
@@ -203,21 +244,54 @@ class EpochHeuristicDebugger:
         _obj.update_active_epoch(active_epoch_idx=active_epoch_idx)
         return _obj
         
-    def build_ui(self):
-        """ builds the ui and plots. Called only once on startup.
-        """
-        self.ui = PhoUIContainer()
-        
-        ## Build Image:
-        img_origin = (0.0, 0.0)
-        img_scale = (1.0, 1.0)
 
+    def _build_image_scale_and_origin(self):
+        """ updates: self.plot,
+        
+        """
+        xmin, xmax = self.xbin[0], self.xbin[-1]
+        n_tbins, n_pos_bins = np.shape(self.p_x_given_n_masked)
+        print(f'n_tbins: {n_tbins}, n_pos_bins: {n_pos_bins}')    
+        ## Build Image:
+        if self.use_bin_units_instead_of_realworld:
+            img_origin = (0.0, 0.0)
+            img_scale = (1.0, 1.0)
+            img_bounds = ((0, n_tbins,), (0, n_pos_bins,))
+        else:
+            x_range: float = xmax - xmin
+            img_height_scale: float = x_range / float(n_pos_bins) # nope
+            # img_height_scale: float = float(n_pos_bins) / x_range # nope
+            print(f'x_range: {x_range}, img_height_scale: {img_height_scale}')
+            img_origin = (0.0, 0.0)
+            # img_origin = (0.0, xmin) # start at height xmin
+            # img_scale = (1.0, 1.0) # height should be x_range
+            img_scale = (1.0, img_height_scale) # height should be x_range
+            img_bounds = ((0, n_tbins,), (xmin, xmax,))
+            
         print(f'img_origin: {img_origin}')
         print(f'img_scale: {img_scale}')
+        print(f'img_bounds: {img_bounds}')
+        return img_scale, img_origin, img_bounds
+    
 
-        # label_kwargs = dict(xlabel='t (sec)', ylabel='x (cm)')
-        label_kwargs = dict(xlabel='t (tbin)', ylabel='x_pos (bin)')
+    def _build_plots(self):
+        """ updates: self.plot,
+        
+        """
+        xmin, xmax = self.xbin[0], self.xbin[-1]
+        img_scale, img_origin, img_bounds = self._build_image_scale_and_origin()        
+        if self.use_bin_units_instead_of_realworld:
+            ## bin units
+            label_kwargs = dict(xlabel='t (tbin)', ylabel='x_pos (bin)')
+
+        else:
+            ## real-world units    
+            label_kwargs = dict(xlabel='t (sec)', ylabel='x (cm)')
+
         self.plot.addImage(self.p_x_given_n_masked, legend='p_x_given_n', replace=True, colormap=self.a_cmap, origin=img_origin, scale=img_scale, **label_kwargs, resetzoom=True) # , colormap="viridis", vmin=0, vmax=1
+        self.plot.getXAxis().setLimits(img_bounds[0][0], img_bounds[0][1])
+        self.plot.getYAxis().setLimits(img_bounds[1][0], img_bounds[1][1])
+
         prev_img: ImageBase = self.plot.getImage('p_x_given_n')
         ## Setup grid:            
         pos_x_range = self.plot.getXAxis().getLimits()
@@ -248,12 +322,23 @@ class EpochHeuristicDebugger:
             a_plot.setGraphGrid(which=True) # good
             a_plot.getXAxis().setLabel(a_plot_config_dict["xlabel"])
             a_plot.getYAxis().setLabel(a_plot_config_dict["ylabel"])
-            a_plot.setXAxisAutoScale(flag=False)
+            a_plot.setXAxisAutoScale(flag=False) # then turn off
             if a_plot_name == 'Position':
                 a_plot.setYAxisAutoScale(flag=False) # position y-axis is fixed to the total bins
+                if not self.use_bin_units_instead_of_realworld:
+                    a_plot.getYAxis().setLimits(xmin, xmax)
+
             else:
                 a_plot.setYAxisAutoScale(flag=True)
 
+
+    def build_ui(self):
+        """ builds the ui and plots. Called only once on startup.
+        """
+        self.ui = PhoUIContainer()
+        
+        self._build_plots()
+        
         # Create a main widget and set a vertical layout
         self.main_widget = qt.QWidget()
         self.main_layout = qt.QVBoxLayout()
@@ -283,7 +368,7 @@ class EpochHeuristicDebugger:
         
         TODO: this could be greatly optimized.
 
-        Updates: self.p_x_given_n_masked, self.heuristic_scores
+        Updates: self.p_x_given_n_masked, self.heuristic_scores, self.bin_by_bin_heuristic_scores, self.position_derivatives
         """
         if self.debug_print:
             print(f'update_active_epoch_data(active_epoch_idx={active_epoch_idx})')
@@ -313,6 +398,13 @@ class EpochHeuristicDebugger:
         self.p_x_given_n_masked = ma.masked_array(p_x_given_n, mask=np.logical_not(is_higher_than_diffusion), fill_value=np.nan)
         
         self.heuristic_scores = HeuristicReplayScoring.compute_pho_heuristic_replay_scores(a_result=self.active_decoder_decoded_epochs_result, an_epoch_idx=self.active_single_epoch_result.epoch_data_index, debug_print=False, use_bin_units_instead_of_realworld=self.use_bin_units_instead_of_realworld)
+        # a_bin_by_bin_jump_time_window_centers, a_bin_by_bin_jump_distance = HeuristicReplayScoring.bin_by_bin_jump_distance(a_result=self.active_decoder_decoded_epochs_result, an_epoch_idx=self.active_single_epoch_result.epoch_data_index, a_decoder_track_length=self.decoder_track_length)
+
+        for k, a_bin_by_bin_fn in HeuristicReplayScoring.build_all_bin_by_bin_computation_fn_dict().items():
+            a_bin_by_bin_fn_time_window_centers, a_bin_by_bin_values = a_bin_by_bin_fn(a_result=self.active_decoder_decoded_epochs_result, an_epoch_idx=self.active_single_epoch_result.epoch_data_index, a_decoder_track_length=self.decoder_track_length)
+            self.bin_by_bin_heuristic_scores[k] = a_bin_by_bin_values
+
+
         # longest_sequence_length, longest_sequence_length_ratio, direction_change_bin_ratio, congruent_dir_bins_ratio, total_congruent_direction_change, total_variation, integral_second_derivative, stddev_of_diff, position_derivatives_df = self.heuristic_scores
         # np.diff(active_captured_single_epoch_result.most_likely_position_indicies)
         if self.debug_print:
@@ -320,8 +412,116 @@ class EpochHeuristicDebugger:
             print(f"heuristic_scores: {asdict(self.heuristic_scores, filter=(lambda an_attr, attr_value: an_attr.name not in ['position_derivatives_df']))}")
 
         # Update position data:
-        self.position_derivatives = PositionDerivativesContainer(pos=deepcopy(self.active_most_likely_position_indicies))
+        active_active_most_likely_position_arr = deepcopy(self.active_most_likely_position_arr)
+        self.position_derivatives = PositionDerivativesContainer(pos=active_active_most_likely_position_arr)
                 
+
+
+    @function_attributes(short_name=None, tags=['update'], input_requires=[], output_provides=[], uses=['update_active_epoch_data'], used_by=['on_slider_change'], creation_date='2024-07-30 15:09', related_items=[])
+    def update_active_epoch(self, active_epoch_idx: int):
+        """ called after the time-bin is updated.
+        
+        requires: self.active_decoder_decoded_epochs_result
+        
+        """
+        if self.debug_print:
+            print(f'update_active_epoch(active_epoch_idx={active_epoch_idx})')
+        assert self.active_decoder_decoded_epochs_result is not None
+        xmin, xmax = self.xbin[0], self.xbin[-1]
+        
+        # Data Update ________________________________________________________________________________________________________ #
+        self.update_active_epoch_data(active_epoch_idx=active_epoch_idx)
+        
+        # Plottings __________________________________________________________________________________________________________ #
+        prev_img: ImageBase = self.plot.getImage('p_x_given_n')
+        prev_img.setData(self.p_x_given_n_masked)
+        img_scale, img_origin, img_bounds = self._build_image_scale_and_origin()        
+        prev_img.setOrigin(img_origin)
+        prev_img.setScale(img_scale)
+        self.plot.getXAxis().setLimits(img_bounds[0][0], img_bounds[0][1])
+        self.plot.getYAxis().setLimits(img_bounds[1][0], img_bounds[1][1])
+        
+        # prev_img._setYLabel(f'epoch[{active_epoch_idx}: x (bin)')
+
+        max_path = np.nanargmax(self.p_x_given_n_masked, axis=0) # returns the x-bins that maximize the path
+        assert len(max_path) == len(self.time_bin_centers)
+        # _curve_x = time_bin_centers
+        _curve_x = np.arange(len(max_path)) + 0.5 # move forward by a half bin
+
+        # a_track_length: float = 170.0
+        # effectively_same_location_size = 0.1 * a_track_length # 10% of the track length
+        # effectively_same_location_num_bins: int = np.rint(effectively_same_location_size)
+        # effectively_same_location_num_bins: int = 4
+        # _max_path_Curve = self.plot.addCurve(x=_curve_x, y=max_path, color='r', symbol='s', legend='max_path', replace=True, yerror=effectively_same_location_num_bins)
+        # _max_path_Curve = self.plot.addCurve(x=_curve_x, y=max_path, color=(1.0, 0.0, 0.0, 0.25,), symbol='s', legend='max_path', replace=True, yerror=effectively_same_location_num_bins)
+        # _max_path_Curve = self.plot.addCurve(x=_curve_x, y=max_path, color=(1.0, 0.0, 0.0, 0.25,), symbol='s', replace=True, yerror=None) ## last working
+        
+        
+        # _max_path_Curve
+        
+        ## Update position plots:
+        # _curve_pos_t = np.arange(len(self.active_most_likely_position_indicies)) + 0.5 # move forward by a half bin
+        # pos = deepcopy(self.active_most_likely_position_indicies)
+        # _curve_vel_t = _curve_pos_t[1:] # + 0.25 # move forward by a half bin
+        # vel = np.diff(pos)
+        # _curve_accel_t = _curve_pos_t[2:] # + 0.125 # move forward by a half bin
+        # accel = np.diff(vel)
+        
+        # Update position plots
+        
+        # if self.debug_print:
+        #     print(f'_curve_t: {_curve_pos_t}')
+        #     print(f'pos: {self.position_derivatives.pos}')
+        #     print(f'vel: {vel}')
+        #     print(f'accel: {accel}')
+
+        
+        self.plot_position.getCurve("Position").setData(self.position_derivatives._curve_pos_t, self.position_derivatives.pos)
+        if not self.use_bin_units_instead_of_realworld:
+            print(f'xmin, xmax: {(xmin, xmax)}')        
+            data_xmin, data_xmax = np.nanmin(self.position_derivatives.pos), np.nanmax(self.position_derivatives.pos)
+            print(f'data_xmin, data_xmax: {(data_xmin, data_xmax)}')
+            self.plot_position.getYAxis().setLimits(xmin, xmax)
+            
+        self.plot_velocity.getCurve("Velocity").setData(self.position_derivatives._curve_vel_t, self.position_derivatives.vel)
+        self.plot_acceleration.getCurve("Acceleration").setData(self.position_derivatives._curve_accel_t, self.position_derivatives.accel)
+        # self.plot_extra.getCurve("Extra").setData(self.position_derivatives._curve_accel_t, self.position_derivatives.accel)
+        # self.plot_extra.getCurve("Extra").setData(self.position_derivatives._curve_vel_t, self.position_derivatives.kinetic_energy)
+        # self.plot_extra.getCurve("Extra").setData(self.position_derivatives._curve_accel_t, self.position_derivatives.applied_forces)      
+
+        if len(self.bin_by_bin_heuristic_scores) > 0:
+            for k, v in self.bin_by_bin_heuristic_scores.items():
+                ## plot these somehow
+                assert len(self.position_derivatives._curve_pos_t) == len(v), f"for k: '{k}' - len(self.position_derivatives._curve_pos_t): {len(self.position_derivatives._curve_pos_t)}, len(v): {len(v)}"
+                self.plot_extra.getCurve("Extra").setData(self.position_derivatives._curve_pos_t, v)    
+                # self.plot_extra.getCurve("Extra").set
+                # self.plot_extra.setGraphGrid(which=True) # good
+                # self.plot_extra.getXAxis().setLabel(a_plot_config_dict["xlabel"])
+                self.plot_extra.getYAxis().setLabel(f"{k}")
+                self.plot_extra.setXAxisAutoScale(flag=True)
+                
+
+        ## Update the limits:                
+        src_plot = self.plot # main plot (Plot2D) is the source plot
+        t_range = src_plot.getXAxis().getLimits()
+        pos_y_range = src_plot.getYAxis().getLimits()
+        
+        for a_plot_name, a_plot in self.position_plots_dict.items():
+            # a_plot.addCurve(empty_arr, empty_arr, **a_plot_config_dict, replace=True)
+            
+            ## Update plot properties:
+            a_plot.getXAxis().setLimits(*t_range)
+            if a_plot_name == 'Position':
+                if self.use_bin_units_instead_of_realworld:
+                    a_plot.getYAxis().setLimits(*pos_y_range)
+                else:
+                    a_plot.getYAxis().setLimits(xmin, xmax)
+            else:
+                a_plot.resetZoom() # reset zoom resets the y-axis only
+
+        ## Update the tables:
+        self._update_active_tables()
+        
 
 
     def _update_active_tables(self):
@@ -350,80 +550,6 @@ class EpochHeuristicDebugger:
         table_view.setModel(self.ui.models_dict[table_id_name])
         # Adjust the column widths to fit the contents
         table_view.resizeColumnsToContents()
-
-
-    @function_attributes(short_name=None, tags=['update'], input_requires=[], output_provides=[], uses=['update_active_epoch_data'], used_by=['on_slider_change'], creation_date='2024-07-30 15:09', related_items=[])
-    def update_active_epoch(self, active_epoch_idx: int):
-        """ called after the time-bin is updated.
-        
-        requires: self.active_decoder_decoded_epochs_result
-        
-        """
-        if self.debug_print:
-            print(f'update_active_epoch(active_epoch_idx={active_epoch_idx})')
-        assert self.active_decoder_decoded_epochs_result is not None
-        
-        # Data Update ________________________________________________________________________________________________________ #
-        self.update_active_epoch_data(active_epoch_idx=active_epoch_idx)
-        
-        # Plottings __________________________________________________________________________________________________________ #
-        prev_img: ImageBase = self.plot.getImage('p_x_given_n')
-        prev_img.setData(self.p_x_given_n_masked)
-        # prev_img._setYLabel(f'epoch[{active_epoch_idx}: x (bin)')
-
-        max_path = np.nanargmax(self.p_x_given_n_masked, axis=0) # returns the x-bins that maximize the path
-        assert len(max_path) == len(self.time_bin_centers)
-        # _curve_x = time_bin_centers
-        _curve_x = np.arange(len(max_path)) + 0.5 # move forward by a half bin
-
-        # a_track_length: float = 170.0
-        # effectively_same_location_size = 0.1 * a_track_length # 10% of the track length
-        # effectively_same_location_num_bins: int = np.rint(effectively_same_location_size)
-        effectively_same_location_num_bins: int = 4
-        _max_path_Curve = self.plot.addCurve(x=_curve_x, y=max_path, color='r', symbol='s', legend='max_path', replace=True, yerror=effectively_same_location_num_bins)
-        # _max_path_Curve
-        
-        ## Update position plots:
-        # _curve_pos_t = np.arange(len(self.active_most_likely_position_indicies)) + 0.5 # move forward by a half bin
-        # pos = deepcopy(self.active_most_likely_position_indicies)
-        # _curve_vel_t = _curve_pos_t[1:] # + 0.25 # move forward by a half bin
-        # vel = np.diff(pos)
-        # _curve_accel_t = _curve_pos_t[2:] # + 0.125 # move forward by a half bin
-        # accel = np.diff(vel)
-        
-        # Update position plots
-        
-        # if self.debug_print:
-        #     print(f'_curve_t: {_curve_pos_t}')
-        #     print(f'pos: {self.position_derivatives.pos}')
-        #     print(f'vel: {vel}')
-        #     print(f'accel: {accel}')
-        
-        self.plot_position.getCurve("Position").setData(self.position_derivatives._curve_pos_t, self.position_derivatives.pos)
-        self.plot_velocity.getCurve("Velocity").setData(self.position_derivatives._curve_vel_t, self.position_derivatives.vel)
-        self.plot_acceleration.getCurve("Acceleration").setData(self.position_derivatives._curve_accel_t, self.position_derivatives.accel)
-        # self.plot_extra.getCurve("Extra").setData(self.position_derivatives._curve_accel_t, self.position_derivatives.accel)
-        # self.plot_extra.getCurve("Extra").setData(self.position_derivatives._curve_vel_t, self.position_derivatives.kinetic_energy)
-        self.plot_extra.getCurve("Extra").setData(self.position_derivatives._curve_accel_t, self.position_derivatives.applied_forces)        
-
-        ## Update the limits:                
-        src_plot = self.plot # main plot (Plot2D) is the source plot
-        x_range = src_plot.getXAxis().getLimits()
-        pos_y_range = src_plot.getYAxis().getLimits()
-        
-        for a_plot_name, a_plot in self.position_plots_dict.items():
-            # a_plot.addCurve(empty_arr, empty_arr, **a_plot_config_dict, replace=True)
-            
-            ## Update plot properties:
-            a_plot.getXAxis().setLimits(*x_range)
-            if a_plot_name == 'Position':
-                a_plot.getYAxis().setLimits(*pos_y_range)
-            else:
-                a_plot.resetZoom() # reset zoom resets the y-axis only
-
-        ## Update the tables:
-        self._update_active_tables()
-        
 
 
     def on_slider_change(self, change):
