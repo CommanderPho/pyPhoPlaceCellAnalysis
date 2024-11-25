@@ -824,6 +824,27 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         return desired_total_n_timebins, updated_is_masked_bin, updated_time_bin_containers, updated_timebins_p_x_given_n
 
 
+    def find_data_indicies_from_epoch_times(self, epoch_times: NDArray) -> NDArray:
+        subset = deepcopy(self)
+        if not isinstance(subset.filter_epochs, pd.DataFrame):
+            subset.filter_epochs = subset.filter_epochs.to_dataframe()
+        return subset.filter_epochs.epochs.find_data_indicies_from_epoch_times(epoch_times=epoch_times)
+
+    def find_epoch_times_to_data_indicies_map(self, epoch_times: NDArray, atol:float=1e-3, t_column_names=None) -> Dict[Union[float, Tuple[float, float]], Union[int, NDArray]]:
+        """ returns the a Dict[Union[float, Tuple[float, float]], Union[int, NDArray]] matching data indicies corresponding to the epoch [start, stop] times 
+        epoch_times: S x 2 array of epoch start/end times
+        Returns: (S, ) array of data indicies corresponding to the times.
+
+        Uses:
+            self.find_epoch_times_to_data_indicies_map
+        
+        """
+        subset = deepcopy(self)
+        if not isinstance(subset.filter_epochs, pd.DataFrame):
+            subset.filter_epochs = subset.filter_epochs.to_dataframe()
+        return subset.filter_epochs.epochs.find_epoch_times_to_data_indicies_map(epoch_times=epoch_times, atol=atol, t_column_names=t_column_names)
+            
+
     def filtered_by_epoch_times(self, included_epoch_start_times) -> "DecodedFilterEpochsResult":
         """ Returns a copy of itself with the fields with the n_epochs related metadata sliced by the included_epoch_indicies found from the rows that match `included_epoch_start_times`.       
         """
