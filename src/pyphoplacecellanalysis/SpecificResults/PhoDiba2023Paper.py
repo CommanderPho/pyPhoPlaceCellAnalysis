@@ -1980,7 +1980,6 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     # Widgets (will be initialized in __attrs_post_init__) _______________________________________________________________ #
     replay_name_widget = non_serialized_field(init=False)
     time_bin_size_widget = non_serialized_field(init=False)
-    # active_filter_predicate_selector_widget: widgets.SelectMultiple = non_serialized_field(init=False)
     active_filter_predicate_selector_widget: CheckBoxListWidget = non_serialized_field(init=False)
     active_plot_df_name_selector_widget = non_serialized_field(init=False)
     active_plot_variable_name_widget = non_serialized_field(init=False)
