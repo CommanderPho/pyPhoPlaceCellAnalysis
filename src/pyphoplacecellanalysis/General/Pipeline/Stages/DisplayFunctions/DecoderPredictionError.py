@@ -837,8 +837,8 @@ def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_prin
 
 
 
-@function_attributes(short_name=None, tags=['epoch','slices','decoder','figure','matplotlib'], input_requires=[], output_provides=[],
-                      uses=['stacked_epoch_slices_matplotlib_build_view', '_subfn_update_decoded_epoch_slices'], used_by=['_display_plot_decoded_epoch_slices', 'DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data'], creation_date='2023-05-08 16:31', related_items=[])
+@function_attributes(short_name=None, tags=['epoch','slices','decoder','figure','matplotlib', 'MatplotlibTimeSynchronizedWidget'], input_requires=[], output_provides=[],
+                      uses=['stacked_epoch_slices_matplotlib_build_view', '_subfn_update_decoded_epoch_slices'], used_by=['_display_plot_decoded_epoch_slices', 'DecodedEpochSlicesPaginatedFigureController.init_from_decoder_data'], creation_date='2023-05-08 16:31', related_items=['MatplotlibTimeSynchronizedWidget'])
 def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, global_pos_df, included_epoch_indicies=None, variable_name:str='lin_pos', xbin=None, enable_flat_line_drawing=False,
                                 single_plot_fixed_height=100.0, debug_test_max_num_slices=20, size=(15,15), dpi=72, constrained_layout=True, scrollable_figure=True,
                                 name='stacked_epoch_slices_matplotlib_subplots', active_marginal_fn=None, debug_print=False, params_kwargs=None, **kwargs):
@@ -1062,6 +1062,9 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
     provided_plots_data: Dict[str, Any] = {'radon_transform_data': None}
     provided_plots: Dict[str, Any] = {'radon_transform': {}}
 
+    column_names: List[str] = ['score', 'velocity', 'intercept', 'speed']
+    
+
     @classmethod
     def get_provided_callbacks(cls) -> Dict[str, Dict]:
         return {'on_render_page_callbacks': 
@@ -1088,14 +1091,19 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
         
         """
         if radon_transform_column_names is None:
-            radon_transform_column_names = ['score', 'velocity', 'intercept', 'speed'] # use default
+            radon_transform_column_names = deepcopy(cls.column_names) #['score', 'velocity', 'intercept', 'speed'] # use default
             
         # `active_filter_epochs_df` native columns approach
         if not np.isin(radon_transform_column_names, active_filter_epochs_df.columns).all():
             print(f'no radon transform columns present in the the active_filter_epochs_df. Skipping.')
             radon_transform_data = None
         else:
+            if len(radon_transform_column_names) == 0:
+                return None ## no allowed columns
+            
             epochs_linear_fit_df = active_filter_epochs_df[radon_transform_column_names].copy() # get the `epochs_linear_fit_df` as a subset of the filter epochs df
+            #TODO 2024-11-25 11:59: - [ ] Error, hard-coded names assume that we want to plot all four columns!
+            
             score_col_name, velocity_col_name, intercept_col_name, speed_col_name = radon_transform_column_names # extract the column names from the provided list
             # epochs_linear_fit_df approach
             assert num_filter_epochs == np.shape(epochs_linear_fit_df)[0]
@@ -1160,9 +1168,14 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
 
     @classmethod
-    def decoder_build_single_radon_transform_data(cls, curr_results_obj):
+    def decoder_build_single_radon_transform_data(cls, curr_results_obj, included_columns=None):
         """ builds for a single decoder. """
-        curr_radon_transform_column_names: List[str] = ['score', 'velocity', 'intercept', 'speed']
+        if included_columns is not None:
+            included_columns = [v for v in deepcopy(cls.column_names) if v in included_columns] # only allow the included columns
+        else:
+            included_columns = deepcopy(cls.column_names) # allow all default column names
+        
+        curr_radon_transform_column_names: List[str] = deepcopy(included_columns) #['score', 'velocity', 'intercept', 'speed']
         num_filter_epochs:int = curr_results_obj.num_filter_epochs # AttributeError: 'LeaveOneOutDecodingAnalysisResult' object has no attribute 'num_filter_epochs'
         # num_filter_epochs:int = len(curr_results_obj.active_filter_epochs) # LeaveOneOutDecodingAnalysisResult does have this though
         
@@ -1178,7 +1191,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
     
 
     @classmethod
-    def decoder_build_radon_transform_data_dict(cls, track_templates, decoder_decoded_epochs_result_dict):
+    def decoder_build_radon_transform_data_dict(cls, track_templates, decoder_decoded_epochs_result_dict, included_columns=None):
         """ builds the Radon Transform data for each of the four decoders. 
         
         
@@ -1192,6 +1205,11 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
         from pyphocorehelpers.indexing_helpers import NumpyHelpers
 
         # INPUTS: decoder_decoded_epochs_result_dict, a_name
+        if included_columns is not None:
+            included_columns = [v for v in cls.column_names if v in included_columns] # only allow the included columns
+        else:
+            included_columns = deepcopy(cls.column_names) # allow all default column names
+
 
         ## Validate all decoders' results have the same number of filter_epochs and time_bin_containers
         assert NumpyHelpers.all_array_equal([decoder_decoded_epochs_result_dict[a_name].num_filter_epochs for a_name in track_templates.get_decoder_names()])
@@ -1209,7 +1227,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
         for a_name in track_templates.get_decoder_names():
             curr_results_obj = decoder_decoded_epochs_result_dict[a_name]
             # curr_radon_transform_column_names: List[str] = decoder_radon_transform_result_columns_dict[a_name]
-            curr_radon_transform_column_names: List[str] = ['score', 'velocity', 'intercept', 'speed']
+            curr_radon_transform_column_names: List[str] = deepcopy(included_columns) #['score', 'velocity', 'intercept', 'speed']
             # print(f'curr_radon_transform_column_names: {curr_radon_transform_column_names}')
             num_filter_epochs:int = curr_results_obj.num_filter_epochs
             time_bin_containers: List[BinningContainer] = deepcopy(curr_results_obj.time_bin_containers)
@@ -1442,8 +1460,10 @@ class WeightedCorrelationPlotData:
     # data_formatted_strings: List[str] = field(factory=list)
     data_label_value_formatting_text_properties_tuples_dict: Dict[str, Optional[str]] = field(factory=dict)
 
-
     should_include_epoch_times: bool = field(default=False)
+
+
+    column_names: List[str] = ['wcorr', 'P_decoder', 'pearsonr', 'travel', 'coverage', 'total_congruent_direction_change', 'longest_sequence_length']
 
     @classmethod
     def init_from_df_row_tuple_and_formatting_fn_dict(cls, a_tuple: Tuple, column_formatting_fn_dict: Dict[str, Optional[Callable]]) -> "WeightedCorrelationPlotData":
@@ -1458,10 +1478,18 @@ class WeightedCorrelationPlotData:
     
 
     @classmethod
-    def init_batch_from_epochs_df(cls, active_filter_epochs_df: pd.DataFrame, should_include_epoch_times:bool=False) -> Dict[float, "WeightedCorrelationPlotData"]:
+    def init_batch_from_epochs_df(cls, active_filter_epochs_df: pd.DataFrame, should_include_epoch_times:bool=False, included_columns=None) -> Dict[float, "WeightedCorrelationPlotData"]:
+        if included_columns is not None:
+            included_columns = [v for v in deepcopy(cls.column_names) if v in included_columns] # only allow the included columns
+        else:
+            included_columns = deepcopy(cls.column_names) # allow all default column names
+    
+        if len(included_columns) == 0:
+            return None ## no desired columns
+        
         basic_df_column_names = ['start', 'stop', 'label', 'duration']
-        included_columns_list = ['wcorr', 'P_decoder', 'pearsonr', 'travel', 'coverage', 'total_congruent_direction_change', 'longest_sequence_length']
-        all_df_column_names = basic_df_column_names + included_columns_list 
+        # included_columns_list = ['wcorr', 'P_decoder', 'pearsonr', 'travel', 'coverage', 'total_congruent_direction_change', 'longest_sequence_length']
+        all_df_column_names = basic_df_column_names + included_columns 
         actually_present_df_column_names = [k for k in all_df_column_names if (k in active_filter_epochs_df.columns)] # only include the entries that are actually in the dataframe
 
         wcorr_data = {}
@@ -1539,14 +1567,13 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         
 
     @classmethod
-    def decoder_build_single_weighted_correlation_data(cls, curr_results_obj):
+    def decoder_build_single_weighted_correlation_data(cls, curr_results_obj, included_columns=None):
         """ builds for a single decoder. 
         Usage:
 
         """
         active_filter_epochs_df: pd.DataFrame = ensure_dataframe(curr_results_obj.active_filter_epochs)
-        wcorr_data = WeightedCorrelationPlotData.init_batch_from_epochs_df(active_filter_epochs_df=active_filter_epochs_df.copy())
-        # wcorr_data = _subfn_wcorr_data_build(active_filter_epochs_df=active_filter_epochs_df.copy())
+        wcorr_data = WeightedCorrelationPlotData.init_batch_from_epochs_df(active_filter_epochs_df=active_filter_epochs_df.copy(), included_columns=included_columns)
         return wcorr_data
 
 
@@ -1876,7 +1903,7 @@ class DecodedPositionsPlotDataProvider(PaginatedPlotDataProvider):
 
     
     @classmethod
-    def decoder_build_single_decoded_position_curves_data(cls, curr_results_obj):
+    def decoder_build_single_decoded_position_curves_data(cls, curr_results_obj, included_columns=None):
         """ builds for a single decoder. """
         
         num_filter_epochs:int = curr_results_obj.num_filter_epochs

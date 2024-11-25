@@ -1,6 +1,6 @@
 from copy import deepcopy
 from logging import warning
-from typing import Any, Dict
+from typing import Any, Dict, List
 import numpy as np
 from nptyping import NDArray
 import pandas as pd
@@ -37,7 +37,6 @@ class SelectionsObject(SubsettableDictRepresentable):
     flat_all_data_indicies: NDArray
     is_selected: NDArray
     epoch_labels: NDArray
-
 
     @property
     def selected_indicies(self):
@@ -134,6 +133,8 @@ class PaginatedPlotDataProvider:
     provided_params: Dict[str, Any] = dict(enable_weighted_correlation_info = True)
     provided_plots_data: Dict[str, Any] = {'weighted_corr_data': None}
     provided_plots: Dict[str, Any] = {'weighted_corr': {}}
+    column_names: List[str] = []
+    
 
     @classmethod
     def get_provided_params(cls) -> Dict[str, Any]:

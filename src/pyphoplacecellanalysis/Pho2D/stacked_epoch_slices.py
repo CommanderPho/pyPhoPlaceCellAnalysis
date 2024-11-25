@@ -1013,6 +1013,10 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         return self.plots_data.epoch_slices
 
     @property
+    def matplotlib_widget(self) -> MatplotlibTimeSynchronizedWidget:
+        return self.ui.mw
+
+    @property
     def filter_epochs_decoder_result(self) -> DecodedFilterEpochsResult:
         return self.plots_data.filter_epochs_decoder_result
 
@@ -1716,18 +1720,18 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             included_columns = []
 
         # Build Radon Transforms and add them:
-        radon_transform_epochs_data = RadonTransformPlotDataProvider.decoder_build_single_radon_transform_data(deepcopy(decoder_decoded_epochs_result))
+        radon_transform_epochs_data = RadonTransformPlotDataProvider.decoder_build_single_radon_transform_data(deepcopy(decoder_decoded_epochs_result), included_columns=included_columns)
         if radon_transform_epochs_data is not None:
             RadonTransformPlotDataProvider.add_data_to_pagination_controller(self, radon_transform_epochs_data, update_controller_on_apply=False)
     
         # Build Weighted Correlation Data Info and add them:    
-        wcorr_epochs_data = WeightedCorrelationPaginatedPlotDataProvider.decoder_build_single_weighted_correlation_data(deepcopy(decoder_decoded_epochs_result))
+        wcorr_epochs_data = WeightedCorrelationPaginatedPlotDataProvider.decoder_build_single_weighted_correlation_data(deepcopy(decoder_decoded_epochs_result), included_columns=included_columns)
         if wcorr_epochs_data is not None:
             WeightedCorrelationPaginatedPlotDataProvider.add_data_to_pagination_controller(self, wcorr_epochs_data, update_controller_on_apply=False)
 
 
         # Build Decoded Positions Data and add them:    
-        decoded_position_curves_epochs_data = DecodedPositionsPlotDataProvider.decoder_build_single_decoded_position_curves_data(deepcopy(decoder_decoded_epochs_result))
+        decoded_position_curves_epochs_data = DecodedPositionsPlotDataProvider.decoder_build_single_decoded_position_curves_data(deepcopy(decoder_decoded_epochs_result), included_columns=included_columns)
         if decoded_position_curves_epochs_data is not None:
             DecodedPositionsPlotDataProvider.add_data_to_pagination_controller(self, decoded_position_curves_epochs_data, update_controller_on_apply=False)
 
