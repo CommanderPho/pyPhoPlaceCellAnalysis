@@ -368,6 +368,7 @@ def stacked_epoch_slices_view_viewbox(epoch_slices, position_times_list, positio
 # ==================================================================================================================== #
 
 # Pieces of plotting for pagination __________________________________________________________________________________ #
+@function_attributes(short_name=None, tags=['plot', 'helper', 'private'], input_requires=[], output_provides=[], uses=[], used_by=['stacked_epoch_slices_matplotlib_build_view', 'DecodedEpochSlicesPaginatedFigureController.on_jump_to_page'], creation_date='2023-01-01 00:00', related_items=[])
 def _pagination_helper_plot_single_epoch_slice(curr_ax, params, plots_data, plots, ui, a_slice_idx: int, is_first_setup=True, debug_print=False):
     """ plots the data corresponding to `a_slice_idx` on the provided axes (`curr_ax`) 
     
@@ -3054,6 +3055,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         Plots 3 connected windows: the main decoded position posteriors, the track identity posteriors, and the rasters
 
         """
+        from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import co_filter_epochs_and_spikes
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
 
@@ -3100,6 +3102,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                 # 'disable_y_label': True,
                 'isPaginatorControlWidgetBackedMode': True,
                 'enable_update_window_title_on_page_change': False, 'build_internal_callbacks': True,
+                'posterior_heatmap_imshow_kwargs': dict(cmap=get_heatmap_cmap(cmap='Oranges', bad_color='black', under_color='white', over_color='red')),
                 # 'debug_print': True,
                 **_shared_plotting_kwargs,            
         })

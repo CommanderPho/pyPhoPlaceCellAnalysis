@@ -290,6 +290,9 @@ def perform_plot_1D_single_most_likely_position_curve(ax, time_window_centers, a
     return line_most_likely_position
 
 
+
+
+
 @function_attributes(short_name=None, tags=['decoder', 'plot', '1D', 'matplotlib'], input_requires=[], output_provides=[], uses=['perform_plot_1D_single_most_likely_position_curve'], used_by=['plot_most_likely_position_comparsions', '_helper_update_decoded_single_epoch_slice_plot'], creation_date='2023-05-01 00:00', related_items=[])
 def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_centers, xbin, ax=None, posterior=None, active_most_likely_positions_1D=None, enable_flat_line_drawing=False, variable_name = 'x', debug_print=False, 
                                              skip_plotting_measured_positions=False, skip_plotting_most_likely_positions=False, posterior_heatmap_imshow_kwargs=None):
@@ -325,6 +328,8 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
         WARNING: it also make the plot not update on calls to .draw() and not appear at all on non-interactive backends!
             
     """
+    from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
+    
     with plt.ion():
         if ax is None:
             fig, ax = plt.subplots(ncols=1, nrows=1, figsize=(15,15), clear=True, sharex=True, sharey=False, constrained_layout=True)
@@ -349,12 +354,8 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
                 posterior_heatmap_imshow_kwargs = {}
 
             # Get the colormap to use and set the bad color
-            cmap = mpl.colormaps.get_cmap('viridis')  # viridis is the default colormap for imshow
-            cmap.set_bad(color='black', alpha=0.95)
-            cmap.set_under(color='white', alpha=0.0)
-            cmap.set_over(color='red', alpha=1.0)
-            # cmap = 'turbo'
-
+            # cmap = get_heatmap_cmap(cmap='viridis', bad_color='black', under_color='white', over_color='red')
+            cmap = posterior_heatmap_imshow_kwargs.get('cmap', get_heatmap_cmap(cmap='Oranges', bad_color='black', under_color='white', over_color='red'))
 
             # Compute extents for imshow:
             main_plot_kwargs = {
