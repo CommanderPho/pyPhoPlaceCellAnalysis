@@ -336,7 +336,7 @@ class HeuristicReplayScoring:
         a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
         n_time_bins: int = a_result.nbins[an_epoch_idx]
         if n_time_bins <= 1:
-            ## only a single bin, return 0.0
+            ## only a single bin, return 0.0 (perfect, no jumps)
             return 0.0
         else:
             # time_window_centers = a_result.time_bin_containers[an_epoch_idx].centers
@@ -357,6 +357,40 @@ class HeuristicReplayScoring:
             total_first_order_change_score = total_first_order_change_score / a_decoder_track_length
             ## RETURNS: total_first_order_change_score
             return total_first_order_change_score
+        
+
+    @classmethod
+    @function_attributes(short_name='max_jump', tags=['bin-size', 'score', 'replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-25 11:39', related_items=[])
+    def bin_wise_max_position_jump_distance(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float) -> float:
+        """ Bin-wise most-likely position difference. Contiguous trajectories have small deltas between adjacent time bins, while non-contiguous ones can jump wildly (up to the length of the track)
+        ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
+        """
+        a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
+        a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
+        n_time_bins: int = a_result.nbins[an_epoch_idx]
+        if n_time_bins <= 1:
+            ## only a single bin, return 0.0 (perfect, no jumps)
+            return 0.0
+        else:
+            # time_window_centers = a_result.time_bin_containers[an_epoch_idx].centers
+            # time_window_centers = a_result.time_window_centers[an_epoch_idx]
+
+            # compute the 1st-order diff of all positions
+            a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
+
+            # max_position_jump_cm = a_first_order_diff # bad
+            
+            # normalize by the number of bins to allow comparions between different Epochs (so epochs with more bins don't intrinsically have a larger score.
+            max_position_jump_cm: float = float(np.nanmax(np.abs(a_first_order_diff[1:]))) # must skip the first bin because that "jumps" to its initial position on the track
+            
+            # normalize by the track length (long v. short) to allow fair comparison of the two (so the long track decoders don't intrinsically have a larger score).
+            # max_position_jump_cm = max_position_jump_cm / a_decoder_track_length
+            
+            ## RETURNS: total_first_order_change_score
+            return max_position_jump_cm
+        
+
+
 
     @classmethod
     @function_attributes(short_name='coverage', tags=['bin-size', 'score', 'replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-12 01:05', related_items=[])
@@ -966,18 +1000,12 @@ class HeuristicReplayScoring:
         def bin_wise_wrapper_score_fn(a_fn, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, needs_times=False) -> float:
             """ """
             ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
-
             final_args = []
-
             a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
-            # a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
-            # positions = deepcopy(np.argmax(a_p_x_given_n, axis=1)) # peak indicies
             positions = deepcopy(a_most_likely_positions_list) # actual x positions
             final_args.append(positions)
 
             if needs_times:
-                # n_time_bins: int = a_result.nbins[an_epoch_idx]
-                # time_window_centers = a_result.time_bin_containers[an_epoch_idx].centers
                 time_window_centers = a_result.time_window_centers[an_epoch_idx]    
                 times = deepcopy(time_window_centers)
                 final_args.append(times)
@@ -989,8 +1017,6 @@ class HeuristicReplayScoring:
                 return np.nan
             except Exception as e:
                 raise e
-            # ValueError
-            # return a_fn(*final_args)
             
 
 
@@ -999,7 +1025,7 @@ class HeuristicReplayScoring:
         positions_fns_dict = {fn.__name__:(lambda *args, **kwargs: bin_wise_wrapper_score_fn(fn, *args, **kwargs, needs_times=False)) for fn in _positions_fns}
         positions_times_fns_dict = {fn.__name__:(lambda *args, **kwargs: bin_wise_wrapper_score_fn(fn, *args, **kwargs, needs_times=True)) for fn in _positions_times_fns}
             
-        all_score_computations_fn_dict = {'travel': cls.bin_wise_position_difference, 'coverage': cls.bin_wise_track_coverage_score_fn, 'jump': cls.bin_wise_jump_distance, **positions_fns_dict, **positions_times_fns_dict} # a_result, an_epoch_idx, a_decoder_track_length 
+        all_score_computations_fn_dict = {'travel': cls.bin_wise_position_difference, 'coverage': cls.bin_wise_track_coverage_score_fn, 'jump': cls.bin_wise_jump_distance, 'max_jump': cls.bin_wise_max_position_jump_distance, **positions_fns_dict, **positions_times_fns_dict} # a_result, an_epoch_idx, a_decoder_track_length 
         a_decoded_filter_epochs_decoder_result_dict, all_epochs_scores_df = cls._run_all_score_computations(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=a_decoded_filter_epochs_decoder_result_dict, all_score_computations_fn_dict=all_score_computations_fn_dict)
 
         _out_new_scores: Dict[str, pd.DataFrame] = {}
