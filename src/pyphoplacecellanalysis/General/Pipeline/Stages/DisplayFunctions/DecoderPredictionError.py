@@ -1896,6 +1896,8 @@ class DecodedPositionsPlotDataProvider(PaginatedPlotDataProvider):
     provided_params: Dict[str, Any] = dict(enable_decoded_most_likely_position_curve = True) # , enable_actual_position_curve = False
     provided_plots_data: Dict[str, Any] = {'decoded_position_curves_data': None}
     provided_plots: Dict[str, Any] = {'decoded_position_curves': {}}
+    column_names: List[str] = [] ## #TODO 2024-11-25 13:57: - [ ] Need column names used by this data provider
+    
 
     @classmethod
     def get_provided_callbacks(cls) -> Dict[str, Dict]:
