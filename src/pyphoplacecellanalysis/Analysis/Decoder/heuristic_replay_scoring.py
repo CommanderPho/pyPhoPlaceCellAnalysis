@@ -306,7 +306,7 @@ class HeuristicReplayScoring:
 
     @classmethod
     @function_attributes(short_name='jump', tags=['bin-size', 'score', 'replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 17:50', related_items=[])
-    def bin_wise_jump_distance(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float) -> float:
+    def bin_by_bin_jump_distance(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float) -> NDArray:
         """ provides a metric that punishes long jumps in sequential maximal prob. position bins
         """
         a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
@@ -314,17 +314,37 @@ class HeuristicReplayScoring:
         n_time_bins: int = a_result.nbins[an_epoch_idx]
         # time_window_centers = a_result.time_bin_containers[an_epoch_idx].centers
         time_window_centers = a_result.time_window_centers[an_epoch_idx]
-
         n_track_position_bins: int = np.shape(a_p_x_given_n)[0]
-        
         max_indicies = np.argmax(a_p_x_given_n, axis=0)
         a_first_order_diff = np.diff(max_indicies, n=1, prepend=[max_indicies[0]]) # max index change
+        assert len(time_window_centers) == len(a_first_order_diff)
+        ## RETURNS: total_first_order_change_score
+        return time_window_centers, a_first_order_diff
+    
+
+
+    @classmethod
+    @function_attributes(short_name='jump', tags=['bin-size', 'score', 'replay'], input_requires=[], output_provides=[], uses=['cls.each_bin_jump_distance'], used_by=[], creation_date='2024-03-07 17:50', related_items=[])
+    def bin_wise_jump_distance(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float) -> float:
+        """ provides a metric that punishes long jumps in sequential maximal prob. position bins
+        """
+        a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
+        a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
+        n_time_bins: int = a_result.nbins[an_epoch_idx]
+        # time_window_centers = a_result.time_bin_containers[an_epoch_idx].centers
+        # time_window_centers = a_result.time_window_centers[an_epoch_idx]
+        n_track_position_bins: int = np.shape(a_p_x_given_n)[0]
+        # max_indicies = np.argmax(a_p_x_given_n, axis=0)
+        # a_first_order_diff = np.diff(max_indicies, n=1, prepend=[max_indicies[0]]) # max index change
+        
+        time_window_centers, a_first_order_diff = cls.bin_by_bin_jump_distance(a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length)
         max_jump_index_distance = np.nanmax(np.abs(a_first_order_diff)) # find the maximum jump size (in number of indicies) during this period
         # normalize by the track length (long v. short) to allow fair comparison of the two (so the long track decoders don't intrinsically have a larger score).
         max_jump_index_distance_ratio = (float(max_jump_index_distance) / float(n_track_position_bins-1))
         max_jump_index_distance_score = max_jump_index_distance_ratio / a_decoder_track_length
         ## RETURNS: total_first_order_change_score
         return max_jump_index_distance_score
+    
     
     @classmethod
     @function_attributes(short_name='travel', tags=['bin-size', 'score', 'replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 17:50', related_items=[])
@@ -763,6 +783,13 @@ class HeuristicReplayScoring:
         all_score_computations_fn_dict = {'travel': cls.bin_wise_position_difference, 'coverage': cls.bin_wise_track_coverage_score_fn, 'jump': cls.bin_wise_jump_distance, 'max_jump': cls.bin_wise_max_position_jump_distance, **positions_fns_dict, **positions_times_fns_dict} # a_result, an_epoch_idx, a_decoder_track_length 
         return all_score_computations_fn_dict
     
+
+    @classmethod
+    def build_all_bin_by_bin_computation_fn_dict(cls) -> Dict[str, Callable]:
+        return {
+         'jump': cls.bin_by_bin_jump_distance,   
+        }
+
     # ==================================================================================================================== #
     # End Computation Functions                                                                                            #
     # ==================================================================================================================== #
