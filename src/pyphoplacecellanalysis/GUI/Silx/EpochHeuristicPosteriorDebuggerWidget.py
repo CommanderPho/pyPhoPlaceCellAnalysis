@@ -433,6 +433,43 @@ class EpochHeuristicDebugger:
         self.update_active_epoch(active_epoch_idx=active_epoch_idx)
         
 
+    def programmatically_update_active_epoch(self, active_epoch_idx: int):
+        """ called after the time-bin is updated.
+        
+        requires: self.active_decoder_decoded_epochs_result
+        
+        """
+        if self.debug_print:
+            print(f'programmatically_update_active_epoch(active_epoch_idx={active_epoch_idx})')
+        active_epoch_scrollbar_ctrl_widget: ScrollBarWithSpinBox = self.ui['ctrls_widget']
+        active_epoch_scrollbar_ctrl_widget.setValue(active_epoch_idx)
+        active_epoch_scrollbar_ctrl_widget.emitChanged()
+            
+            
+    # Data Indexing Helpers ______________________________________________________________________________________________ #
+    def find_data_indicies_from_epoch_times(self, epoch_times: NDArray) -> NDArray:
+        subset = deepcopy(self.active_decoder_decoded_epochs_result)
+        if not isinstance(subset.filter_epochs, pd.DataFrame):
+            subset.filter_epochs = subset.filter_epochs.to_dataframe()
+        return subset.filter_epochs.epochs.find_data_indicies_from_epoch_times(epoch_times=epoch_times)
+
+    def find_epoch_times_to_data_indicies_map(self, epoch_times: NDArray, atol:float=1e-3, t_column_names=None) -> Dict[Union[float, Tuple[float, float]], Union[int, NDArray]]:
+        """ returns the a Dict[Union[float, Tuple[float, float]], Union[int, NDArray]] matching data indicies corresponding to the epoch [start, stop] times 
+        epoch_times: S x 2 array of epoch start/end times
+        Returns: (S, ) array of data indicies corresponding to the times.
+
+        Uses:
+            epoch_time_to_index_map = deepcopy(dbgr.active_decoder_decoded_epochs_result).filter_epochs.epochs.find_epoch_times_to_data_indicies_map(epoch_times=[epoch_start_time, ])
+        
+        """
+        subset = deepcopy(self.active_decoder_decoded_epochs_result)
+        if not isinstance(subset.filter_epochs, pd.DataFrame):
+            subset.filter_epochs = subset.filter_epochs.to_dataframe()
+        return subset.filter_epochs.epochs.find_epoch_times_to_data_indicies_map(epoch_times=epoch_times, atol=atol, t_column_names=t_column_names)
+           
+
+
+    # Utility ____________________________________________________________________________________________________________ #
     def _build_utility_controls(self, main_layout):
         """ Build the utility controls at the bottom """
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, get_utility_dock_colors
