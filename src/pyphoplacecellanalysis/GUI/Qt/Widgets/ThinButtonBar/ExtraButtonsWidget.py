@@ -15,7 +15,7 @@ from pyphocorehelpers.function_helpers import function_attributes
 ## IMPORTS:
 # 
 # from .Uic_AUTOGEN_ExtraButtonsWidget import Ui_Form
-from pyphoplacecellanalysis.GUI.Qt.Widgets.ThinButtonBar.Uic_AUTOGEN_ExtraButtonsWidget import Ui_ExtraButtonsWidget as Ui_Form
+# from pyphoplacecellanalysis.GUI.Qt.Widgets.ThinButtonBar.Uic_AUTOGEN_ExtraButtonsWidget import Ui_ExtraButtonsWidget as Ui_Form
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons, silx_resources_rc
 
 @function_attributes(short_name=None, tags=['ui', 'buttons', 'widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-25 10:24', related_items=[])
