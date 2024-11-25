@@ -474,7 +474,7 @@ class PosteriorExporting:
     @classmethod
     @function_attributes(short_name=None, tags=['export', 'images', 'ESSENTIAL'], input_requires=[], output_provides=[], uses=['export_decoded_posteriors_as_images'], used_by=[], creation_date='2024-08-28 08:36', related_items=[])
     def perform_export_all_decoded_posteriors_as_images(cls, decoder_laps_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult],
-                                                         _save_context: IdentifyingContext, parent_output_folder: Path, custom_export_formats: Optional[Dict[str, HeatmapExportConfig]]=None, desired_height=None):
+                                                         _save_context: IdentifyingContext, parent_output_folder: Path, custom_export_formats: Optional[Dict[str, HeatmapExportConfig]]=None, desired_height=None, combined_img_padding=4, combined_img_separator_color=None):
         """ Exports the decoded epoch position posteriors as raw images, also includes functionality to export merged/combined images.
         
         Usage:
@@ -513,7 +513,7 @@ class PosteriorExporting:
             for i in np.arange(num_exported_epochs):
                 ## for a single epoch:
                 _single_epoch_row = [out_all_decoders_epochs_list[0][i], out_all_decoders_epochs_list[1][i], out_all_decoders_epochs_list[2][i], out_all_decoders_epochs_list[3][i]]
-                _single_epoch_combined_img = horizontal_image_stack(_single_epoch_row, padding=2)
+                _single_epoch_combined_img = horizontal_image_stack(_single_epoch_row, padding=combined_img_padding, separator_color=combined_img_separator_color)
                 _single_epoch_single_series_single_export_type_rows_list.append(_single_epoch_combined_img)
                 
                 ## Save the image:
