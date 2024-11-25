@@ -368,15 +368,29 @@ class HeuristicReplayScoring:
         a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
         a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
         n_time_bins: int = a_result.nbins[an_epoch_idx]
+        
+        ## find diffuse/uncertain bins
+        time_bin_max_certainty = np.nanmax(a_p_x_given_n, axis=0) # over all time-bins
+        
+        ## throw out bins below certainty requirements
+        peak_certainty_min_value: float = 0.2 
+        does_bin_meet_certainty_req = (time_bin_max_certainty >= peak_certainty_min_value)
+        n_valid_time_bins: int = np.sum(does_bin_meet_certainty_req)        
+        included_most_likely_positions_list = deepcopy(a_most_likely_positions_list)[does_bin_meet_certainty_req] ## only the bins meeting the certainty requirements
+        
+        # included_most_likely_positions_list = deepcopy(a_most_likely_positions_list) ## no certainty requirements
+
         if n_time_bins <= 1:
             ## only a single bin, return 0.0 (perfect, no jumps)
             return 0.0
         else:
             # time_window_centers = a_result.time_bin_containers[an_epoch_idx].centers
             # time_window_centers = a_result.time_window_centers[an_epoch_idx]
+            if n_valid_time_bins < 2:
+                return np.inf ## return infinity, meaning it never resolves position appropriately
 
             # compute the 1st-order diff of all positions
-            a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
+            a_first_order_diff = np.diff(included_most_likely_positions_list, n=1, prepend=[included_most_likely_positions_list[0]])
 
             # max_position_jump_cm = a_first_order_diff # bad
             
@@ -593,7 +607,166 @@ class HeuristicReplayScoring:
         # return ratio_bins_higher_than_diffusion_across_time
         return longest_sequence_length_ratio
     
+    @classmethod
+    def build_all_score_computations_fn_dict(cls) -> Dict[str, Callable]:
+        """ builds all combined heuristic scoring functions 
+        """
+        from neuropy.utils.indexing_helpers import PandasHelpers
 
+        # positions __________________________________________________________________________________________________________ #
+        # def directionality_ratio(positions):
+        #     """
+        #     Computes the directionality ratio (DR), which measures the degree to which the trajectory follows
+        #     a consistent direction (increasing or decreasing) in position over time. It is calculated as the
+        #     ratio of the net displacement to the total distance traveled.
+
+        #     Args:
+        #         positions (np.ndarray): 1D array of position bin indices.
+
+        #     Returns:
+        #         float: The directionality ratio, ranging from 0 to 1.
+        #     """
+        #     net_displacement = np.abs(positions[-1] - positions[0])
+        #     total_distance = np.sum(np.abs(np.diff(positions)))
+        #     return net_displacement / total_distance if total_distance != 0 else 0
+
+        def sweep_score(positions, num_pos_bins: int):
+            """
+            Computes the sweep score (SS), which measures how well the trajectory sweeps across the available
+            position bins over time. It is calculated as the number of unique position bins visited during the event,
+            divided by the total number of position bins.
+
+            Args:
+                positions (np.ndarray): 1D array of position bin indices.
+
+            Returns:
+                float: The sweep score, ranging from 0 to 1.
+            """
+            unique_positions = np.unique(positions)
+            return float(len(unique_positions)) / float(num_pos_bins)
+
+
+        # def transition_entropy(positions):
+        #     """
+        #     Computes the transition entropy (TE), which quantifies the uncertainty or randomness in the transitions
+        #     between position bins over time. It is calculated as the entropy of the transition probability matrix.
+
+        #     Args:
+        #         positions (np.ndarray): 1D array of position bin indices.
+
+        #     Returns:
+        #         float: The transition entropy score.
+        #     """
+        #     from scipy.stats import entropy
+        #     transitions = np.diff(positions)
+        #     transition_counts = np.bincount(transitions)
+        #     transition_probs = transition_counts / np.sum(transition_counts)
+        #     return entropy(transition_probs, base=2)
+
+        # _positions_fns = [sweep_score] # directionality_ratio, transition_entropy 
+        _positions_fns = []
+
+        # positions, times ___________________________________________________________________________________________________ #
+        def sequential_correlation(positions, times):
+            """
+            Computes the sequential correlation (SC) score, which quantifies the degree of sequential order
+            in the trajectory by calculating the correlation between the position bin indices and the time bins.
+
+            Args:
+                positions (np.ndarray): 1D array of position bin indices.
+                times (np.ndarray): 1D array of time bin indices.
+
+            Returns:
+                float: The sequential correlation score, ranging from -1 to 1.
+            """
+            return np.corrcoef(positions, times)[0, 1]
+
+        def monotonicity_score(positions, times):
+            """
+            Computes the monotonicity score (MS), which measures how well the trajectory follows a monotonic
+            (increasing or decreasing) pattern in position over time. It is calculated as the absolute value
+            of the correlation between the position bin indices and the time bins.
+
+            Args:
+                positions (np.ndarray): 1D array of position bin indices.
+                times (np.ndarray): 1D array of time bin indices.
+
+            Returns:
+                float: The monotonicity score, ranging from 0 to 1.
+            """
+            return np.abs(np.corrcoef(positions, times)[0, 1])
+
+        def laplacian_smoothness(positions, times):
+            """
+            Computes the Laplacian smoothness (LS) score, which quantifies how smooth or continuous the trajectory
+            is in terms of position changes over time. It is calculated as the sum of the squared differences
+            between adjacent position bin values, weighted by the time bin differences.
+
+            Args:
+                positions (np.ndarray): 1D array of position bin indices.
+                times (np.ndarray): 1D array of time bin indices.
+
+            Returns:
+                float: The Laplacian smoothness score.
+            """
+            position_diffs = np.diff(positions)
+            time_diffs = np.diff(times)
+            weighted_diffs = position_diffs ** 2 / time_diffs
+            return np.sum(weighted_diffs)
+
+        _positions_times_fns = [sequential_correlation, monotonicity_score, laplacian_smoothness]
+
+        # positions, measured_positions ______________________________________________________________________________________ #
+        # def replay_fidelity(positions, original_trajectory):
+        #     """
+        #     Computes the replay fidelity (RF) score, which measures the similarity between the decoded trajectory
+        #     and the original trajectory or environment that is being replayed. It is calculated as the correlation
+        #     between the two trajectories.
+
+        #     Args:
+        #         positions (np.ndarray): 1D array of position bin indices.
+        #         original_trajectory (np.ndarray): 1D array representing the original trajectory.
+
+        #     Returns:
+        #         float: The replay fidelity score, ranging from -1 to 1.
+        #     """
+        #     return np.corrcoef(positions, original_trajectory)[0, 1]
+
+        def bin_wise_wrapper_score_fn(a_fn, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, needs_times=False) -> float:
+            """ """
+            ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
+            final_args = []
+            a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
+            positions = deepcopy(a_most_likely_positions_list) # actual x positions
+            final_args.append(positions)
+
+            if needs_times:
+                time_window_centers = a_result.time_window_centers[an_epoch_idx]    
+                times = deepcopy(time_window_centers)
+                final_args.append(times)
+
+            try:
+                return a_fn(*final_args)
+            except ValueError as e:
+                # ValueError: 
+                return np.nan
+            except Exception as e:
+                raise e
+            
+
+
+        # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+        ## Wrap them:
+        positions_fns_dict = {fn.__name__:(lambda *args, **kwargs: bin_wise_wrapper_score_fn(fn, *args, **kwargs, needs_times=False)) for fn in _positions_fns}
+        positions_times_fns_dict = {fn.__name__:(lambda *args, **kwargs: bin_wise_wrapper_score_fn(fn, *args, **kwargs, needs_times=True)) for fn in _positions_times_fns}
+            
+        all_score_computations_fn_dict = {'travel': cls.bin_wise_position_difference, 'coverage': cls.bin_wise_track_coverage_score_fn, 'jump': cls.bin_wise_jump_distance, 'max_jump': cls.bin_wise_max_position_jump_distance, **positions_fns_dict, **positions_times_fns_dict} # a_result, an_epoch_idx, a_decoder_track_length 
+        return all_score_computations_fn_dict
+    
+    # ==================================================================================================================== #
+    # End Computation Functions                                                                                            #
+    # ==================================================================================================================== #
+    
 
     @classmethod
     @function_attributes(short_name=None, tags=['heuristic', 'replay', 'score', 'OLDER'], input_requires=[], output_provides=[],
@@ -802,7 +975,7 @@ class HeuristicReplayScoring:
                                         position_derivatives_df=position_derivatives_df)
 
     @classmethod
-    @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=['compute_all_heuristic_scores'], creation_date='2024-03-07 19:54', related_items=[])
+    @function_attributes(short_name=None, tags=['private'], input_requires=[], output_provides=[], uses=[], used_by=['compute_all_heuristic_scores'], creation_date='2024-03-07 19:54', related_items=[])
     def _run_all_score_computations(cls, track_templates: TrackTemplates, a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], all_score_computations_fn_dict: Dict):
         """ 
         Performs the score computations specified in `all_score_computations_fn_dict` 
@@ -850,7 +1023,6 @@ class HeuristicReplayScoring:
                 single_decoder_column_name = f"{score_name}"
                 unique_full_decoder_score_column_name: str = f"{score_name}_{a_name}"
                 
-                # all_epochs_scores_dict[column_name] = [bin_wise_position_difference(a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length) for an_epoch_idx in np.arange(a_result.num_filter_epochs)]
                 all_epochs_scores_dict[unique_full_decoder_score_column_name] = [computation_fn(a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length) for an_epoch_idx in np.arange(a_result.num_filter_epochs)]
                 _a_separate_decoder_new_scores_dict[single_decoder_column_name] = deepcopy(all_epochs_scores_dict[unique_full_decoder_score_column_name]) # a single column, all epochs
             # END for all_score_computations_fn_dict
@@ -866,166 +1038,19 @@ class HeuristicReplayScoring:
         return a_decoded_filter_epochs_decoder_result_dict, all_epochs_scores_df
 
     @classmethod
-    @function_attributes(short_name=None, tags=['heuristic', 'main', 'computation'], input_requires=[], output_provides=[], uses=['_run_all_score_computations', 'cls.compute_pho_heuristic_replay_scores'], used_by=[], creation_date='2024-03-12 00:59', related_items=[])
-    def compute_all_heuristic_scores(cls, track_templates: TrackTemplates, a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult]):
+    @function_attributes(short_name=None, tags=['heuristic', 'main', 'computation'], input_requires=[], output_provides=[], uses=['_run_all_score_computations', 'cls.compute_pho_heuristic_replay_scores', 'cls.build_all_score_computations_fn_dict'], used_by=[], creation_date='2024-03-12 00:59', related_items=[])
+    def compute_all_heuristic_scores(cls, track_templates: TrackTemplates, a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult]) -> Tuple[Dict[str, DecodedFilterEpochsResult], Dict[str, pd.DataFrame]]:
         """ Computes all heuristic scoring metrics (for each epoch) and adds them to the DecodedFilterEpochsResult's .filter_epochs as columns
         
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_all_heuristic_scores
 
         a_decoded_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(a_decoded_filter_epochs_decoder_result_dict=a_decoded_filter_epochs_decoder_result_dict)
 
-
+        
         """
         from neuropy.utils.indexing_helpers import PandasHelpers
-
-        # positions __________________________________________________________________________________________________________ #
-        # def directionality_ratio(positions):
-        #     """
-        #     Computes the directionality ratio (DR), which measures the degree to which the trajectory follows
-        #     a consistent direction (increasing or decreasing) in position over time. It is calculated as the
-        #     ratio of the net displacement to the total distance traveled.
-
-        #     Args:
-        #         positions (np.ndarray): 1D array of position bin indices.
-
-        #     Returns:
-        #         float: The directionality ratio, ranging from 0 to 1.
-        #     """
-        #     net_displacement = np.abs(positions[-1] - positions[0])
-        #     total_distance = np.sum(np.abs(np.diff(positions)))
-        #     return net_displacement / total_distance if total_distance != 0 else 0
-
-        def sweep_score(positions, num_pos_bins: int):
-            """
-            Computes the sweep score (SS), which measures how well the trajectory sweeps across the available
-            position bins over time. It is calculated as the number of unique position bins visited during the event,
-            divided by the total number of position bins.
-
-            Args:
-                positions (np.ndarray): 1D array of position bin indices.
-
-            Returns:
-                float: The sweep score, ranging from 0 to 1.
-            """
-            unique_positions = np.unique(positions)
-            return float(len(unique_positions)) / float(num_pos_bins)
-
-
-        # def transition_entropy(positions):
-        #     """
-        #     Computes the transition entropy (TE), which quantifies the uncertainty or randomness in the transitions
-        #     between position bins over time. It is calculated as the entropy of the transition probability matrix.
-
-        #     Args:
-        #         positions (np.ndarray): 1D array of position bin indices.
-
-        #     Returns:
-        #         float: The transition entropy score.
-        #     """
-        #     from scipy.stats import entropy
-        #     transitions = np.diff(positions)
-        #     transition_counts = np.bincount(transitions)
-        #     transition_probs = transition_counts / np.sum(transition_counts)
-        #     return entropy(transition_probs, base=2)
-
-        # _positions_fns = [sweep_score] # directionality_ratio, transition_entropy 
-        _positions_fns = []
-
-        # positions, times ___________________________________________________________________________________________________ #
-        def sequential_correlation(positions, times):
-            """
-            Computes the sequential correlation (SC) score, which quantifies the degree of sequential order
-            in the trajectory by calculating the correlation between the position bin indices and the time bins.
-
-            Args:
-                positions (np.ndarray): 1D array of position bin indices.
-                times (np.ndarray): 1D array of time bin indices.
-
-            Returns:
-                float: The sequential correlation score, ranging from -1 to 1.
-            """
-            return np.corrcoef(positions, times)[0, 1]
-
-        def monotonicity_score(positions, times):
-            """
-            Computes the monotonicity score (MS), which measures how well the trajectory follows a monotonic
-            (increasing or decreasing) pattern in position over time. It is calculated as the absolute value
-            of the correlation between the position bin indices and the time bins.
-
-            Args:
-                positions (np.ndarray): 1D array of position bin indices.
-                times (np.ndarray): 1D array of time bin indices.
-
-            Returns:
-                float: The monotonicity score, ranging from 0 to 1.
-            """
-            return np.abs(np.corrcoef(positions, times)[0, 1])
-
-        def laplacian_smoothness(positions, times):
-            """
-            Computes the Laplacian smoothness (LS) score, which quantifies how smooth or continuous the trajectory
-            is in terms of position changes over time. It is calculated as the sum of the squared differences
-            between adjacent position bin values, weighted by the time bin differences.
-
-            Args:
-                positions (np.ndarray): 1D array of position bin indices.
-                times (np.ndarray): 1D array of time bin indices.
-
-            Returns:
-                float: The Laplacian smoothness score.
-            """
-            position_diffs = np.diff(positions)
-            time_diffs = np.diff(times)
-            weighted_diffs = position_diffs ** 2 / time_diffs
-            return np.sum(weighted_diffs)
-
-        _positions_times_fns = [sequential_correlation, monotonicity_score, laplacian_smoothness]
-
-        # positions, measured_positions ______________________________________________________________________________________ #
-        # def replay_fidelity(positions, original_trajectory):
-        #     """
-        #     Computes the replay fidelity (RF) score, which measures the similarity between the decoded trajectory
-        #     and the original trajectory or environment that is being replayed. It is calculated as the correlation
-        #     between the two trajectories.
-
-        #     Args:
-        #         positions (np.ndarray): 1D array of position bin indices.
-        #         original_trajectory (np.ndarray): 1D array representing the original trajectory.
-
-        #     Returns:
-        #         float: The replay fidelity score, ranging from -1 to 1.
-        #     """
-        #     return np.corrcoef(positions, original_trajectory)[0, 1]
-
-        def bin_wise_wrapper_score_fn(a_fn, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, needs_times=False) -> float:
-            """ """
-            ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
-            final_args = []
-            a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
-            positions = deepcopy(a_most_likely_positions_list) # actual x positions
-            final_args.append(positions)
-
-            if needs_times:
-                time_window_centers = a_result.time_window_centers[an_epoch_idx]    
-                times = deepcopy(time_window_centers)
-                final_args.append(times)
-
-            try:
-                return a_fn(*final_args)
-            except ValueError as e:
-                # ValueError: 
-                return np.nan
-            except Exception as e:
-                raise e
-            
-
-
-        # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
-        ## Wrap them:
-        positions_fns_dict = {fn.__name__:(lambda *args, **kwargs: bin_wise_wrapper_score_fn(fn, *args, **kwargs, needs_times=False)) for fn in _positions_fns}
-        positions_times_fns_dict = {fn.__name__:(lambda *args, **kwargs: bin_wise_wrapper_score_fn(fn, *args, **kwargs, needs_times=True)) for fn in _positions_times_fns}
-            
-        all_score_computations_fn_dict = {'travel': cls.bin_wise_position_difference, 'coverage': cls.bin_wise_track_coverage_score_fn, 'jump': cls.bin_wise_jump_distance, 'max_jump': cls.bin_wise_max_position_jump_distance, **positions_fns_dict, **positions_times_fns_dict} # a_result, an_epoch_idx, a_decoder_track_length 
+        
+        all_score_computations_fn_dict = cls.build_all_score_computations_fn_dict()
         a_decoded_filter_epochs_decoder_result_dict, all_epochs_scores_df = cls._run_all_score_computations(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=a_decoded_filter_epochs_decoder_result_dict, all_score_computations_fn_dict=all_score_computations_fn_dict)
 
         _out_new_scores: Dict[str, pd.DataFrame] = {}
