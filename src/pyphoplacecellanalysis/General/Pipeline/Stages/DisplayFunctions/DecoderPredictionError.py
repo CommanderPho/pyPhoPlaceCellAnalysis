@@ -1459,11 +1459,12 @@ class WeightedCorrelationPlotData:
 
     # data_formatted_strings: List[str] = field(factory=list)
     data_label_value_formatting_text_properties_tuples_dict: Dict[str, Optional[str]] = field(factory=dict)
-
     should_include_epoch_times: bool = field(default=False)
-
-
-    column_names: List[str] = ['wcorr', 'P_decoder', 'pearsonr', 'travel', 'coverage', 'total_congruent_direction_change', 'longest_sequence_length']
+    
+    ## class properties:
+    @classmethod
+    def column_names(cls) -> List[str]:
+        return ['wcorr', 'P_decoder', 'pearsonr', 'travel', 'coverage', 'max_jump', 'total_congruent_direction_change', 'longest_sequence_length']
 
     @classmethod
     def init_from_df_row_tuple_and_formatting_fn_dict(cls, a_tuple: Tuple, column_formatting_fn_dict: Dict[str, Optional[Callable]]) -> "WeightedCorrelationPlotData":
@@ -1480,9 +1481,9 @@ class WeightedCorrelationPlotData:
     @classmethod
     def init_batch_from_epochs_df(cls, active_filter_epochs_df: pd.DataFrame, should_include_epoch_times:bool=False, included_columns=None) -> Dict[float, "WeightedCorrelationPlotData"]:
         if included_columns is not None:
-            included_columns = [v for v in deepcopy(cls.column_names) if v in included_columns] # only allow the included columns
+            included_columns = [v for v in deepcopy(cls.column_names()) if v in included_columns] # only allow the included columns
         else:
-            included_columns = deepcopy(cls.column_names) # allow all default column names
+            included_columns = deepcopy(cls.column_names()) # allow all default column names
     
         if len(included_columns) == 0:
             return None ## no desired columns
@@ -1505,6 +1506,7 @@ class WeightedCorrelationPlotData:
                 'pearsonr':(lambda v:f"$\\rho$: {default_float_formatting_fn(v)}"),
                 'travel':(lambda v:f"travel: {default_float_formatting_fn(v)}"),
                 'coverage':(lambda v:f"coverage: {default_float_formatting_fn(v)}"),
+                'max_jump':(lambda v:f"max_jump: {default_float_formatting_fn(v)}"),
                 'total_congruent_direction_change':(lambda v:f"tot_$\Delta$_con_dir: {default_float_formatting_fn(v)}"),
                 'longest_sequence_length':(lambda v:f"longest_seq: {default_int_formatting_fn(v)}"),
             }
@@ -1554,10 +1556,10 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
     # text_color: str = '#66FF00' # a light green
     text_color: str = '#013220' # a very dark forest green
 
-
     provided_params: Dict[str, Any] = dict(enable_weighted_correlation_info = True)
     provided_plots_data: Dict[str, Any] = {'weighted_corr_data': None}
     provided_plots: Dict[str, Any] = {'weighted_corr': {}}
+    column_names: List[str] = ['wcorr', 'P_decoder', 'pearsonr', 'travel', 'coverage', 'total_congruent_direction_change', 'longest_sequence_length']
 
     @classmethod
     def get_provided_callbacks(cls) -> Dict[str, Dict]:
