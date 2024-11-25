@@ -9,6 +9,8 @@ from PyQt5.QtWidgets import QMessageBox, QToolTip, QStackedWidget, QHBoxLayout, 
 from PyQt5.QtWidgets import QApplication, QFileSystemModel, QTreeView, QWidget, QHeaderView
 from PyQt5.QtGui import QPainter, QBrush, QPen, QColor, QFont, QIcon
 from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlot, QSize, QDir
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 
 ## IMPORTS:
 # 
@@ -16,7 +18,7 @@ from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlo
 from pyphoplacecellanalysis.GUI.Qt.Widgets.ThinButtonBar.Uic_AUTOGEN_ExtraButtonsWidget import Ui_ExtraButtonsWidget as Ui_Form
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons, silx_resources_rc
 
-
+@function_attributes(short_name=None, tags=['ui', 'buttons', 'widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-25 10:24', related_items=[])
 def add_buttons_to_existing_form(existing_form):
     """
     from pyphoplacecellanalysis.GUI.Qt.Widgets.ThinButtonBar.ExtraButtonsWidget import add_buttons_to_existing_form
@@ -48,17 +50,42 @@ def add_buttons_to_existing_form(existing_form):
     existing_form.toolButton_Clipboard.setIcon(iconClipboard)
     existing_form.toolButton_Clipboard.setObjectName("toolButton_Clipboard")
     existing_form.horizontalLayout_ButtonContainer.addWidget(existing_form.toolButton_Clipboard)
+
+    existing_form.line = QtWidgets.QFrame(existing_form.thinButtonBarWidget)
+    existing_form.line.setFrameShape(QtWidgets.QFrame.VLine)
+    existing_form.line.setFrameShadow(QtWidgets.QFrame.Sunken)
+    existing_form.line.setObjectName("line")
+    existing_form.horizontalLayout_ButtonContainer.addWidget(existing_form.line)
     existing_form.btnCopySelectedEpochs = QtWidgets.QToolButton(existing_form.thinButtonBarWidget)
     existing_form.btnCopySelectedEpochs.setEnabled(True)
     existing_form.btnCopySelectedEpochs.setToolTip("Copy Selections")
     existing_form.btnCopySelectedEpochs.setStatusTip("CopySelections")
     existing_form.btnCopySelectedEpochs.setText("Copy Selections")
-    icon1 = QtGui.QIcon()
-    icon1.addPixmap(QtGui.QPixmap(":/png/gui/icons/edit-copy.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
-    existing_form.btnCopySelectedEpochs.setIcon(icon1)
+    icon2 = QtGui.QIcon()
+    icon2.addPixmap(QtGui.QPixmap(":/png/gui/icons/edit-copy.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+    existing_form.btnCopySelectedEpochs.setIcon(icon2)
     existing_form.btnCopySelectedEpochs.setAutoRaise(True)
     existing_form.btnCopySelectedEpochs.setObjectName("btnCopySelectedEpochs")
     existing_form.horizontalLayout_ButtonContainer.addWidget(existing_form.btnCopySelectedEpochs)
+    existing_form.btnLoadUserSelectedFromAnnotations = QtWidgets.QToolButton(existing_form.thinButtonBarWidget)
+    existing_form.btnLoadUserSelectedFromAnnotations.setEnabled(True)
+    existing_form.btnLoadUserSelectedFromAnnotations.setToolTip("Load Selections from Annotations")
+    existing_form.btnLoadUserSelectedFromAnnotations.setStatusTip("LoadSelections")
+    existing_form.btnLoadUserSelectedFromAnnotations.setText("Load Selections from Annotations")
+    icon3 = QtGui.QIcon()
+    icon3.addPixmap(QtGui.QPixmap(":/png/gui/icons/document-open.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+    existing_form.btnLoadUserSelectedFromAnnotations.setIcon(icon3)
+    existing_form.btnLoadUserSelectedFromAnnotations.setAutoRaise(True)
+    existing_form.btnLoadUserSelectedFromAnnotations.setObjectName("btnLoadUserSelectedFromAnnotations")
+    existing_form.horizontalLayout_ButtonContainer.addWidget(existing_form.btnLoadUserSelectedFromAnnotations)
+    existing_form.line_2 = QtWidgets.QFrame(existing_form.thinButtonBarWidget)
+    existing_form.line_2.setFrameShape(QtWidgets.QFrame.VLine)
+    existing_form.line_2.setFrameShadow(QtWidgets.QFrame.Sunken)
+    existing_form.line_2.setObjectName("line_2")
+    existing_form.horizontalLayout_ButtonContainer.addWidget(existing_form.line_2)
+
+
+    # Tool Buttons _______________________________________________________________________________________________________ #
     existing_form.toolButton_Printer = QtWidgets.QToolButton(existing_form.thinButtonBarWidget)
     existing_form.toolButton_Printer.setToolTip("Printer")
     existing_form.toolButton_Printer.setText("Printer")
@@ -112,7 +139,7 @@ def add_buttons_to_existing_form(existing_form):
     existing_form.horizontalLayout.addLayout(existing_form.horizontalLayout_ButtonContainer)
     existing_form.horizontalLayout.setStretch(0, 1)
 
-    buttons_list = (existing_form.btnRefresh, existing_form.toolButton_Clipboard, existing_form.btnCopySelectedEpochs, existing_form.toolButton_Printer, existing_form.toolButton_Brush, existing_form.toolButton_Pencil, existing_form.toolButton_Eraser)
+    buttons_list = (existing_form.btnRefresh, existing_form.toolButton_Clipboard, existing_form.btnCopySelectedEpochs, existing_form.btnLoadUserSelectedFromAnnotations, existing_form.toolButton_Printer, existing_form.toolButton_Brush, existing_form.toolButton_Pencil, existing_form.toolButton_Eraser)
     # buttons_dict = {a_btn.objectName():a_btn for a_btn in buttons_list}
     buttons_dict = {str(a_btn.text()):a_btn for a_btn in buttons_list}
     

@@ -187,14 +187,16 @@ def set_trimmed_text(line_edit, full_text: str): # , max_length: int
 # ==================================================================================================================== #
 # Main ThinButtonBarWidget widget                                                                                      #
 # ==================================================================================================================== #
-@metadata_attributes(short_name=None, tags=['ui', 'widget', 'button-bar'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-01 08:30', related_items=[])
+@metadata_attributes(short_name=None, tags=['ui', 'widget', 'button-bar'], input_requires=[], output_provides=[], uses=['add_buttons_to_existing_form'], used_by=[], creation_date='2024-03-01 08:30', related_items=[])
 class ThinButtonBarWidget(QWidget):
     """ 
     from pyphoplacecellanalysis.GUI.Qt.Widgets.ThinButtonBar.ThinButtonBarWidget import ThinButtonBarWidget
 
+    Uses `add_buttons_to_existing_form` from `ExtraButtonsWidget` to add buttons
     
     """
     sigCopySelections = QtCore.pyqtSignal()
+    sigLoadSelections = QtCore.pyqtSignal()
     sigRefresh = QtCore.pyqtSignal()
 
     @property
@@ -232,8 +234,9 @@ class ThinButtonBarWidget(QWidget):
 
     def initUI(self):
         self.ui.btnUnusedButton.setVisible(False)
-
-        _button_callbacks_list = (self.on_perform_refresh, self.on_click_clipboard, self.on_copy_selections, self.on_click_print, self.on_click_brush, self.on_click_pencil, self.on_click_eraser)
+        self.ui.btnLoadUserSelectedFromAnnotations.setVisible(True)
+        
+        _button_callbacks_list = (self.on_perform_refresh, self.on_click_clipboard, self.on_copy_selections, self.on_click_load_selections, self.on_click_print, self.on_click_brush, self.on_click_pencil, self.on_click_eraser)
         assert len(_button_callbacks_list) == len(self.ui.buttons_list), f"len(_button_callbacks_list): {len(_button_callbacks_list)} != len(self.ui.buttons_list): {len(self.ui.buttons_list)}"
 
         # hidden_buttons_list = ['Refresh', 'Clipboard', 'Copy Selections', 'Printer', 'Brush', 'Pencil', 'Eraser']
@@ -298,6 +301,13 @@ class ThinButtonBarWidget(QWidget):
         """
         print(f'on_copy_selections()')
         self.sigCopySelections.emit()
+        
+    @pyqtExceptionPrintingSlot()
+    def on_click_load_selections(self):
+        """ 
+        """
+        print(f'on_click_load_selections()')
+        self.sigLoadSelections.emit()
         
 
     # Tools ______________________________________________________________________________________________________________ #

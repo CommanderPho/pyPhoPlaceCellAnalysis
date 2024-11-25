@@ -127,6 +127,13 @@
          </widget>
         </item>
         <item>
+         <widget class="Line" name="line">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+         </widget>
+        </item>
+        <item>
          <widget class="QToolButton" name="btnCopySelectedEpochs">
           <property name="enabled">
            <bool>true</bool>
@@ -146,6 +153,36 @@
           </property>
           <property name="autoRaise">
            <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="btnLoadUserSelectedFromAnnotations">
+          <property name="enabled">
+           <bool>true</bool>
+          </property>
+          <property name="toolTip">
+           <string notr="true">Load Selections from Annotations</string>
+          </property>
+          <property name="statusTip">
+           <string notr="true">LoadSelections</string>
+          </property>
+          <property name="text">
+           <string notr="true">Load Selections from Annotations</string>
+          </property>
+          <property name="icon">
+           <iconset resource="../../../../../../../silx/src/silx/resources/silx_resources.qrc">
+            <normaloff>:/png/gui/icons/document-open.png</normaloff>:/png/gui/icons/document-open.png</iconset>
+          </property>
+          <property name="autoRaise">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="Line" name="line_2">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
           </property>
          </widget>
         </item>

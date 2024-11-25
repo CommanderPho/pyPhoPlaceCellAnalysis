@@ -1916,7 +1916,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         # self.setup()
         # self.buildUI()
 
-
+    @function_attributes(short_name=None, tags=['ui', 'buttons', 'button_bar'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-25 11:06', related_items=[])
     @classmethod
     def _build_globally_controlled_pagination(cls, paginated_multi_decoder_decoded_epochs_window, pagination_controller_dict):
         """ 2024-07-31: Connects the all four plotter's pagination controls to a newly-instantiated global paginator so that they are directly driven.
@@ -1955,6 +1955,9 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         controlled_pagination_controllers_list = (pagination_controller_dict['long_LR'], pagination_controller_dict['long_RL'], pagination_controller_dict['short_LR'], pagination_controller_dict['short_RL'])
         new_connections_dict = PhoPaginatedMultiDecoderDecodedEpochsWindow._perform_convert_decoder_pagination_controller_dict_to_controlled(a_controlling_pagination_controller_widget=global_paginator_controller_widget,
                                                                                                                                             controlled_pagination_controllers_list=controlled_pagination_controllers_list)
+
+        ## Bind
+        global_thin_button_bar_widget.sigLoadSelections.connect(lambda *args, **kwargs: paginated_multi_decoder_decoded_epochs_window.restore_selections_from_user_annotations())  # this only successfully works when using a lambda functiton, otherwise it raises memory access errors.
 
         return new_connections_dict
 
@@ -2135,7 +2138,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         
         
     @function_attributes(short_name=None, tags=['data-overlays', 'add'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-12 00:00', related_items=['remove_data_overlays'])
-    def add_data_overlays(self, decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, included_columns=None, defer_refresh=False):
+    def add_data_overlays(self, decoder_laps_filter_epochs_decoder_result_dict=None, decoder_ripple_filter_epochs_decoder_result_dict=None, included_columns=None, defer_refresh=False):
         """ builds the Radon Transforms and Weighted Correlation data and adds them to the plot.
         
         REFINEMENT: note that it only plots either 'laps' or 'ripple', not both, so it doesn't need all this data.
@@ -2274,7 +2277,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
                 ## Build connections to buttons:
                 # a_controlled_widget.ui.thin_button_bar_widget.sigCopySelections.connect() # TODO
-                
+                # a_controlled_widget.ui.thin_button_bar_widget.sigLoadSelections.connect(lambda: a_controlled_pagination_controller.restore_selections_from_user_annotations())  # this only successfully works when using a lambda functiton, otherwise it raises memory access errors.
 
         return new_connections_dict
     
@@ -3339,6 +3342,9 @@ def build_extra_programmatic_buttons(paginated_multi_decoder_decoded_epochs_wind
 
     ]
     button_config_dict = {v['name']:v for v in button_config_list}
+
+    # a_controlled_widget.ui.thin_button_bar_widget.sigLoadSelections.connect(lambda: a_controlled_pagination_controller.restore_selections_from_user_annotations())  # this only successfully works when using a lambda functiton, otherwise it raises memory access errors.
+
 
     new_buttons_config_dict, new_buttons_dict = build_programmatic_buttons(global_thin_button_bar_widget, button_config_dict=button_config_dict, clear_all_existing=True)
 
