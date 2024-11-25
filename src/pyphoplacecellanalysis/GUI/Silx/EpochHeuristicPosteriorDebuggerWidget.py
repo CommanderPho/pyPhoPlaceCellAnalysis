@@ -155,7 +155,6 @@ class EpochHeuristicDebugger:
     def filter_epochs(self) -> pd.DataFrame:
         return self.active_decoder_decoded_epochs_result.filter_epochs
     
-    # most_likely_position_indicies
     @property
     def active_most_likely_position_indicies(self) -> NDArray:
         """The most_likely_position_indicies property."""
@@ -163,6 +162,18 @@ class EpochHeuristicDebugger:
         return self.active_single_epoch_result.most_likely_position_indicies[0] # the [0] is to handle the fact that for some reason the list is double-wrapped: [[37  0 28 52 56 28 55]]
 
 
+    @property
+    def plot_configs_dict(self) -> Dict[str, Dict]:
+        """ convenince access to the dict of position plots 
+        """
+        common_plot_config_dict = dict(symbol='o', linestyle=':', color=(0.0, 0.0, 1.0, 0.2,)) # , fillColor="rgba(0, 0, 255, 50)"
+
+        return {"Position": dict(legend="Position", xlabel='t (tbin)', ylabel='x_pos (bin)', **common_plot_config_dict),
+            "Velocity": dict(legend="Velocity", xlabel='t (tbin)', ylabel='velocity (bin/tbin)', baseline=0.0, fill=True, **common_plot_config_dict),
+            "Acceleration": dict(legend="Acceleration", xlabel='t (tbin)', ylabel='accel. (bin/tbin^2)', baseline=0.0, fill=True, **common_plot_config_dict),
+            "Extra": dict(legend="Extra", xlabel='t (tbin)', ylabel='Extra', baseline=0.0, fill=True, **common_plot_config_dict),
+        }
+        
     @property
     def position_plots_dict(self) -> Dict[str, Plot1D]:
         """ convenince access to the dict of position plots 
@@ -220,14 +231,7 @@ class EpochHeuristicDebugger:
         # Position Derivative Plots:
         empty_arr = np.array([], dtype='int64')
 
-        common_plot_config_dict = dict(symbol='o', linestyle=':', color='blue')
-
-        plot_configs_dict = {"Position": dict(legend="Position", xlabel='t (tbin)', ylabel='x_pos (bin)', **common_plot_config_dict),
-            "Velocity": dict(legend="Velocity", xlabel='t (tbin)', ylabel='velocity (bin/tbin)', baseline=0.0, fill=True, **common_plot_config_dict),
-            "Acceleration": dict(legend="Acceleration", xlabel='t (tbin)', ylabel='accel. (bin/tbin^2)', baseline=0.0, fill=True, **common_plot_config_dict),
-            "Extra": dict(legend="Extra", xlabel='t (tbin)', ylabel='Extra', baseline=0.0, fill=True, **common_plot_config_dict),
-        }
-
+        plot_configs_dict = self.plot_configs_dict
         position_plots_list = [self.plot_position, self.plot_velocity, self.plot_acceleration, self.plot_extra]
         position_plots_dict = dict(zip(list(plot_configs_dict.keys()), position_plots_list))
 
@@ -270,7 +274,9 @@ class EpochHeuristicDebugger:
         self.main_widget.show()
         
 
-    # def recompute(self):
+    # ==================================================================================================================== #
+    # Update Functions                                                                                                     #
+    # ==================================================================================================================== #
     @function_attributes(short_name=None, tags=['update', 'data'], input_requires=[], output_provides=[], uses=['HeuristicReplayScoring.compute_pho_heuristic_replay_scores'], used_by=['update_active_epoch'], creation_date='2024-07-30 15:08', related_items=[])
     def update_active_epoch_data(self, active_epoch_idx: int):
         """ Data Update only - called after the time-bin is updated.

@@ -48,6 +48,193 @@ from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
+# ==================================================================================================================== #
+# 2024-11-25 - Save/Load Heuristic Helpers                                                                             #
+# ==================================================================================================================== #
+from pyphocorehelpers.programming_helpers import function_attributes
+
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
+
+class SerializationHelperBaseClass:
+    @classmethod
+    def save(cls, *args, **kwargs):
+        raise NotImplementedError(f'Implementors must override')
+        
+    @classmethod
+    def load(cls, load_path: Path):
+        raise NotImplementedError(f'Implementors must override')
+
+
+
+class SerializationHelper_CustomDecodingResults(SerializationHelperBaseClass):
+    @function_attributes(short_name=None, tags=['save', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-25 12:58', related_items=[])
+    @classmethod
+    def save(cls, a_directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult, long_pf2D, save_path):
+        """ Used for "2024-08-01 - Heuristic Analysis.ipynb"
+        Usage:
+            directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = deepcopy(curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']) ## GENERAL
+            a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = deepcopy(directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict)
+            a_decoded_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=a_decoded_filter_epochs_decoder_result_dict)
+            save_path = curr_active_pipeline.get_output_path().joinpath(f"{DAY_DATE_TO_USE}_CustomDecodingResults.pkl").resolve()
+            save_path = save_CustomDecodingResults(a_directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result, long_pf2D=long_pf2D,
+                                                    save_path=save_path)
+            save_path
+
+
+        """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
+
+        xbin = deepcopy(long_pf2D.xbin)
+        xbin_centers = deepcopy(long_pf2D.xbin_centers)
+        ybin = deepcopy(long_pf2D.ybin)
+        ybin_centers = deepcopy(long_pf2D.ybin_centers)
+
+        print(xbin_centers)
+        save_dict = {
+        'directional_decoders_epochs_decode_result': a_directional_decoders_epochs_decode_result.__getstate__(),
+        'xbin': xbin, 'xbin_centers': xbin_centers}
+
+        saveData(save_path, save_dict)
+        print(f'save_path: {save_path}')
+        return save_path
+
+
+    @function_attributes(short_name=None, tags=['load', 'import'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-25 12:58', related_items=[])
+    @classmethod
+    def load(cls, load_path: Path):
+        """ Used for "2024-08-01 - Heuristic Analysis.ipynb"
+        Usage:
+            directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = deepcopy(curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']) ## GENERAL
+            a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = deepcopy(directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict)
+            a_decoded_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=a_decoded_filter_epochs_decoder_result_dict)
+            save_path = curr_active_pipeline.get_output_path().joinpath(f"{DAY_DATE_TO_USE}_CustomDecodingResults.pkl").resolve()
+            save_path = save_CustomDecodingResults(a_directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result, long_pf2D=long_pf2D,
+                                                    save_path=save_path)
+            save_path
+
+
+        """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData
+        assert load_path.exists()
+        # loaded_dict = loadData(load_path, debug_print=False)
+        # print_keys_if_possible('loaded_dict', loaded_dict)
+
+        base_loaded_dict = loadData(load_path, debug_print=False)
+        xbin = base_loaded_dict.pop('xbin', None)
+        xbin_centers = base_loaded_dict.pop('xbin_centers', None)
+        # ybin = deepcopy(long_pf2D.ybin)
+        # ybin_centers = deepcopy(long_pf2D.ybin_centers)
+        print(f"xbin_centers: {xbin_centers}")
+
+        loaded_dict = base_loaded_dict['directional_decoders_epochs_decode_result']
+
+        ## UNPACK HERE:
+        pos_bin_size: float = loaded_dict['pos_bin_size'] # 3.8632841399651463
+        ripple_decoding_time_bin_size = loaded_dict['ripple_decoding_time_bin_size']
+        laps_decoding_time_bin_size = loaded_dict['laps_decoding_time_bin_size']
+        decoder_laps_filter_epochs_decoder_result_dict = loaded_dict['decoder_laps_filter_epochs_decoder_result_dict']
+        decoder_ripple_filter_epochs_decoder_result_dict = loaded_dict['decoder_ripple_filter_epochs_decoder_result_dict']
+        decoder_laps_radon_transform_df_dict = loaded_dict['decoder_laps_radon_transform_df_dict']
+        decoder_ripple_radon_transform_df_dict = loaded_dict['decoder_ripple_radon_transform_df_dict']
+        ## New 2024-02-14 - Noon:
+        decoder_laps_radon_transform_extras_dict = loaded_dict['decoder_laps_radon_transform_extras_dict']
+        decoder_ripple_radon_transform_extras_dict = loaded_dict['decoder_ripple_radon_transform_extras_dict']
+
+        laps_weighted_corr_merged_df = loaded_dict['laps_weighted_corr_merged_df']
+        ripple_weighted_corr_merged_df = loaded_dict['ripple_weighted_corr_merged_df']
+        laps_simple_pf_pearson_merged_df = loaded_dict['laps_simple_pf_pearson_merged_df']
+        ripple_simple_pf_pearson_merged_df = loaded_dict['ripple_simple_pf_pearson_merged_df']
+
+        _VersionedResultMixin_version = loaded_dict.pop('_VersionedResultMixin_version', None)
+
+        directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = DecoderDecodedEpochsResult(**loaded_dict)
+        # {'ripple_decoding_time_bin_size':ripple_decoding_time_bin_size, 'laps_decoding_time_bin_size':laps_decoding_time_bin_size, 'decoder_laps_filter_epochs_decoder_result_dict':decoder_laps_filter_epochs_decoder_result_dict, 'decoder_ripple_filter_epochs_decoder_result_dict':decoder_ripple_filter_epochs_decoder_result_dict, 'decoder_laps_radon_transform_df_dict':decoder_laps_radon_transform_df_dict, 'decoder_ripple_radon_transform_df_dict':decoder_ripple_radon_transform_df_dict}
+
+        return directional_decoders_epochs_decode_result, xbin, xbin_centers
+    
+
+
+class SerializationHelper_AllCustomDecodingResults(SerializationHelperBaseClass):
+    """ 
+    
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import SerializationHelper_AllCustomDecodingResults, SerializationHelper_CustomDecodingResults
+    load_path = Path("W:/Data/KDIBA/gor01/one/2006-6-09_1-22-43/output/2024-11-25_AllCustomDecodingResults.pkl")
+    track_templates, directional_decoders_epochs_decode_result, xbin, xbin_centers =  SerializationHelper_AllCustomDecodingResults.load(load_path=load_path)
+    pos_bin_size = directional_decoders_epochs_decode_result.pos_bin_size
+    
+    """
+    @function_attributes(short_name=None, tags=['save', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-25 12:58', related_items=[])
+    @classmethod
+    def save(cls, track_templates: TrackTemplates, a_directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult,
+                                    #    a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult],
+                                    save_path: Path, **kwargs):
+        """ Used for "2024-08-01 - Heuristic Analysis.ipynb"
+        
+        """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
+        xbin = deepcopy(track_templates.long_LR_decoder.xbin)
+        xbin_centers = deepcopy(track_templates.long_LR_decoder.xbin_centers)
+        save_dict = {
+            'track_templates': deepcopy(track_templates),
+            'directional_decoders_epochs_decode_result': a_directional_decoders_epochs_decode_result.__getstate__(),
+            # 'directional_decoders_epochs_decode_result': {k:a_directional_decoders_epochs_decode_result.__getstate__() for k, a_directional_decoders_epochs_decode_result in a_decoded_filter_epochs_decoder_result_dict.items()},
+            'xbin': xbin, 'xbin_centers': xbin_centers,
+            **kwargs
+        }
+        saveData(save_path, save_dict)
+        print(f'save_path: {save_path}')
+        return save_path
+
+    @function_attributes(short_name=None, tags=['load', 'import'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-25 12:58', related_items=[])
+    @classmethod
+    def load(cls, load_path: Path):
+        """ Used for "2024-08-01 - Heuristic Analysis.ipynb"
+        Usage:
+            load_path = Path("W:/Data/KDIBA/gor01/one/2006-6-09_1-22-43/output/2024-11-25_AllCustomDecodingResults.pkl")
+            track_templates, directional_decoders_epochs_decode_result, xbin, xbin_centers =  SerializationHelper_AllCustomDecodingResults.load(load_path=load_path)
+            pos_bin_size = directional_decoders_epochs_decode_result.pos_bin_size
+
+        """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData
+        assert load_path.exists()
+        # loaded_dict = loadData(load_path, debug_print=False)
+        # print_keys_if_possible('loaded_dict', loaded_dict)
+
+        base_loaded_dict = loadData(load_path, debug_print=False)
+        xbin = base_loaded_dict.pop('xbin', None)
+        xbin_centers = base_loaded_dict.pop('xbin_centers', None)
+        # ybin = deepcopy(long_pf2D.ybin)
+        # ybin_centers = deepcopy(long_pf2D.ybin_centers)
+        print(f"xbin_centers: {xbin_centers}")
+
+        loaded_dict = base_loaded_dict['directional_decoders_epochs_decode_result']
+        
+        track_templates = base_loaded_dict['track_templates']
+
+        ## UNPACK HERE:
+        pos_bin_size: float = loaded_dict['pos_bin_size'] # 3.8632841399651463
+        ripple_decoding_time_bin_size = loaded_dict['ripple_decoding_time_bin_size']
+        laps_decoding_time_bin_size = loaded_dict['laps_decoding_time_bin_size']
+        decoder_laps_filter_epochs_decoder_result_dict = loaded_dict['decoder_laps_filter_epochs_decoder_result_dict']
+        decoder_ripple_filter_epochs_decoder_result_dict = loaded_dict['decoder_ripple_filter_epochs_decoder_result_dict']
+        decoder_laps_radon_transform_df_dict = loaded_dict['decoder_laps_radon_transform_df_dict']
+        decoder_ripple_radon_transform_df_dict = loaded_dict['decoder_ripple_radon_transform_df_dict']
+        ## New 2024-02-14 - Noon:
+        decoder_laps_radon_transform_extras_dict = loaded_dict['decoder_laps_radon_transform_extras_dict']
+        decoder_ripple_radon_transform_extras_dict = loaded_dict['decoder_ripple_radon_transform_extras_dict']
+
+        laps_weighted_corr_merged_df = loaded_dict['laps_weighted_corr_merged_df']
+        ripple_weighted_corr_merged_df = loaded_dict['ripple_weighted_corr_merged_df']
+        laps_simple_pf_pearson_merged_df = loaded_dict['laps_simple_pf_pearson_merged_df']
+        ripple_simple_pf_pearson_merged_df = loaded_dict['ripple_simple_pf_pearson_merged_df']
+
+        _VersionedResultMixin_version = loaded_dict.pop('_VersionedResultMixin_version', None)
+
+        directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = DecoderDecodedEpochsResult(**loaded_dict)
+        # {'ripple_decoding_time_bin_size':ripple_decoding_time_bin_size, 'laps_decoding_time_bin_size':laps_decoding_time_bin_size, 'decoder_laps_filter_epochs_decoder_result_dict':decoder_laps_filter_epochs_decoder_result_dict, 'decoder_ripple_filter_epochs_decoder_result_dict':decoder_ripple_filter_epochs_decoder_result_dict, 'decoder_laps_radon_transform_df_dict':decoder_laps_radon_transform_df_dict, 'decoder_ripple_radon_transform_df_dict':decoder_ripple_radon_transform_df_dict}
+
+        return track_templates, directional_decoders_epochs_decode_result, xbin, xbin_centers
 
 # ==================================================================================================================== #
 # 2024-11-07 - PhoJonathan first-spike indicator lines                                                                 #
