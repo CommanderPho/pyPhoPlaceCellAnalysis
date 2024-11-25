@@ -1873,6 +1873,7 @@ import solara # `pip install "solara[assets]`
 import json
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
+from pyphocorehelpers.gui.Jupyter.simple_widgets import CheckBoxListWidget
 
 def _build_solera_file_download_widget(fig, filename="figure-image.png", label="Save Figure"):
     """ 
@@ -1979,7 +1980,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     # Widgets (will be initialized in __attrs_post_init__) _______________________________________________________________ #
     replay_name_widget = non_serialized_field(init=False)
     time_bin_size_widget = non_serialized_field(init=False)
-    active_filter_predicate_selector_widget: widgets.SelectMultiple = non_serialized_field(init=False)
+    # active_filter_predicate_selector_widget: widgets.SelectMultiple = non_serialized_field(init=False)
+    active_filter_predicate_selector_widget: CheckBoxListWidget = non_serialized_field(init=False)
     active_plot_df_name_selector_widget = non_serialized_field(init=False)
     active_plot_variable_name_widget = non_serialized_field(init=False)
     
@@ -2186,12 +2188,10 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             style={'description_width': 'initial'},
         )
 
-        self.active_filter_predicate_selector_widget = widgets.SelectMultiple(
-            options=list(self.additional_filter_predicates.keys()),
-            value=[],  # Initial selection
-            description='Filter Predicates:',
-            disabled=False,
-        )
+        self.active_filter_predicate_selector_widget = CheckBoxListWidget(options_list=list(self.additional_filter_predicates.keys()))
+            # description='Filter Predicates:',
+            # disabled=False,
+        # )
 
         self.output_widget = widgets.Output(layout={'border': '1px solid black'})
         self.figure_widget, did_create_new_figure = PlotlyFigureContainer._helper_build_pre_post_delta_figure_if_needed(extant_figure=None, use_latex_labels=False, main_title='test', figure_class=go.FigureWidget)
