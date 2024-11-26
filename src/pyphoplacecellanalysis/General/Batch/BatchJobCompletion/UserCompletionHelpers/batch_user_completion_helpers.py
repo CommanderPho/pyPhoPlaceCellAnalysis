@@ -825,8 +825,18 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 		curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_evaluate_epochs'], # ,  'directional_decoders_epoch_heuristic_scoring'
 						computation_kwargs_list=[{'should_skip_radon_transform': False}], enabled_filter_names=None, fail_on_exception=True, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
 		needs_recompute_heuristics = True
-
-		# curr_active_pipeline.drop
+		
+		## gets the newly computed value
+		directional_decoders_epochs_decode_result = curr_active_pipeline.global_computation_results.computed_data.get('DirectionalDecodersEpochsEvaluations', None)
+		assert directional_decoders_epochs_decode_result is not None, f"directional_decoders_epochs_decode_result is None even after recompute!"
+		pos_bin_size: float = directional_decoders_epochs_decode_result.pos_bin_size
+		newly_computed_ripple_decoding_time_bin_size: float = directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size
+		newly_computed_laps_decoding_time_bin_size: float = directional_decoders_epochs_decode_result.laps_decoding_time_bin_size
+		if ripple_decoding_time_bin_size_override is not None:
+			assert ripple_decoding_time_bin_size_override == newly_computed_ripple_decoding_time_bin_size, f'ripple_decoding_time_bin_size_override is specfied ({ripple_decoding_time_bin_size_override}) and is not equal to the computed value ({newly_computed_ripple_decoding_time_bin_size}). ERROR: Should match after computation!'
+		if laps_decoding_time_bin_size_override is not None:
+			assert laps_decoding_time_bin_size_override == newly_computed_laps_decoding_time_bin_size, f'laps_decoding_time_bin_size_override is specfied ({laps_decoding_time_bin_size_override}) and is not equal to the computed value ({newly_computed_laps_decoding_time_bin_size}). ERROR: Should match after computation!'
+			
 	
 	
 	# decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_epochs_decode_result.decoder_laps_filter_epochs_decoder_result_dict
