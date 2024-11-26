@@ -139,7 +139,7 @@ class EpochHeuristicDebugger:
     plot_acceleration: Plot1D = field(factory=plot1d_factory)
     plot_extra: Plot1D = field(factory=plot1d_factory)
     
-
+    all_bin_by_bin_computation_fn_dict: Dict[str, Callable] = field(default=None) # has to be set
     programmatic_plots_config_dict: Dict[str, Dict] = field(default=Factory(dict)) ## empty dict by default
     programmatic_plots_dict: Dict[str, Plot1D] = field(default=Factory(dict)) ## empty dict by default
     
@@ -186,22 +186,6 @@ class EpochHeuristicDebugger:
         return active_active_most_likely_position_arr
 
 
-
-
-    @property
-    def plot_configs_dict(self) -> Dict[str, Dict]:
-        """ convenince access to the dict of position plots 
-        """
-        common_plot_config_dict = dict(symbol='o', linestyle=':', color=(0.0, 0.0, 1.0, 0.2,)) # , fillColor="rgba(0, 0, 255, 50)"
-
-        return {"Position": dict(legend="Position", xlabel='t (tbin)',
-                                #   ylabel='x_pos (bin)',
-                                ylabel='x_pos (cm)',
-                                **common_plot_config_dict),
-            "Velocity": dict(legend="Velocity", xlabel='t (tbin)', ylabel='velocity (bin/tbin)', baseline=0.0, fill=True, **common_plot_config_dict),
-            "Acceleration": dict(legend="Acceleration", xlabel='t (tbin)', ylabel='accel. (bin/tbin^2)', baseline=0.0, fill=True, **common_plot_config_dict),
-            "Extra": dict(legend="Extra", xlabel='t (tbin)', ylabel='Extra', baseline=0.0, fill=True, **common_plot_config_dict),
-        }
         
     @property
     def position_plots_dict(self) -> Dict[str, Plot1D]:
@@ -249,6 +233,10 @@ class EpochHeuristicDebugger:
         if _obj.time_bin_centers is None:
              _obj.time_bin_centers = deepcopy(_obj.active_single_epoch_result.time_bin_container.centers)
                
+
+        if (_obj.all_bin_by_bin_computation_fn_dict is None):
+            _obj.all_bin_by_bin_computation_fn_dict = HeuristicReplayScoring.build_all_bin_by_bin_computation_fn_dict()
+
         _obj.update_active_epoch_data(active_epoch_idx=active_epoch_idx)
         _obj.build_ui()
         _obj.update_active_epoch(active_epoch_idx=active_epoch_idx)
@@ -288,7 +276,50 @@ class EpochHeuristicDebugger:
         return img_scale, img_origin, img_bounds
     
 
-    @function_attributes(short_name=None, tags=['init', 'plots'], input_requires=[], output_provides=[], uses=['_build_image_scale_and_origin'], used_by=[], creation_date='2024-11-25 18:54', related_items=[])
+    @classmethod
+    def _subfn_helper_setup_new_plot(cls, a_plot_name: str, a_plot, a_plot_config_dict):
+        """ 
+        
+        """
+        is_visible: bool = a_plot_config_dict.pop('is_visible', True)
+        remove_all_plot_toolbars(a_plot)
+        ## add curves
+        empty_arr = np.array([], dtype='int64')
+        a_plot.addCurve(empty_arr, empty_arr, **a_plot_config_dict, replace=True)            
+        ## Update plot properties:
+        a_plot.setActiveCurve(a_plot_name)
+        a_plot.setGraphGrid(which=True) # good
+        a_plot.getXAxis().setLabel(a_plot_config_dict["xlabel"])
+        a_plot.getYAxis().setLabel(a_plot_config_dict["ylabel"])
+        a_plot.setHidden((not is_visible))
+        ## Axis auto-scaling
+        if a_plot_name in ['Position', ]:
+            a_plot.setYAxisAutoScale(flag=False) # position y-axis is fixed to the total bins
+        else:
+            a_plot.setYAxisAutoScale(flag=True)
+        
+    
+    @classmethod
+    def _perform_initialize_new_plot_and_config_if_needed(cls, dbgr: "EpochHeuristicDebugger", a_plot_name: str):
+        """ builds a new plot 
+        Updates: self.programmatic_plots_dict[a_plot_name], self.programmatic_plots_config_dict[a_plot_name]
+        """
+        a_plot = dbgr.programmatic_plots_dict.get(a_plot_name, None)
+        a_plot_config_dict = dbgr.programmatic_plots_config_dict.get(a_plot_name, None)
+        if a_plot_config_dict is None:
+            # build a new one
+            a_plot_config_dict = dict(legend=f"{a_plot_name}", xlabel='t (tbin)', ylabel=f"{a_plot_name}", baseline=0.0, fill=True, is_visible=True, symbol='o', linestyle=':', color=(0.0, 0.0, 1.0, 0.2,))
+            dbgr.programmatic_plots_config_dict[a_plot_name] = deepcopy(a_plot_config_dict) # store the config dict after creation
+        if a_plot is None:
+            # build a new plot
+            a_plot = Plot1D() ## new plot
+            dbgr.programmatic_plots_dict[a_plot_name] = a_plot # stor ethe plot in the dict after creation
+        assert a_plot is not None                
+        dbgr._subfn_helper_setup_new_plot(a_plot_name=a_plot_name, a_plot=a_plot, a_plot_config_dict=a_plot_config_dict)
+        return (a_plot, a_plot_config_dict)
+
+
+    @function_attributes(short_name=None, tags=['init', 'plots'], input_requires=[], output_provides=[], uses=['_build_image_scale_and_origin', '_perform_initialize_new_plot_and_config_if_needed'], used_by=[], creation_date='2024-11-25 18:54', related_items=[])
     def _build_plots(self):
         """ updates: self.plot,
         
@@ -304,31 +335,7 @@ class EpochHeuristicDebugger:
             label_kwargs = dict(xlabel='t (sec)', ylabel='x (cm)')
 
         empty_arr = np.array([], dtype='int64')
-        
-        def _subfn_helper_setup_new_plot(a_plot_name: str, a_plot, a_plot_config_dict):
-            """ captures: empty_arr, xmin, xmax
-            
-            """
-            is_visible: bool = a_plot_config_dict.pop('is_visible', True)
-            remove_all_plot_toolbars(a_plot)
-            ## add curves
-            a_plot.addCurve(empty_arr, empty_arr, **a_plot_config_dict, replace=True)            
-            ## Update plot properties:
-            a_plot.setActiveCurve(a_plot_name)
-            a_plot.setGraphGrid(which=True) # good
-            a_plot.getXAxis().setLabel(a_plot_config_dict["xlabel"])
-            a_plot.getYAxis().setLabel(a_plot_config_dict["ylabel"])
-            a_plot.setXAxisAutoScale(flag=False) # then turn off
-            if a_plot_name == 'Position':
-                a_plot.setYAxisAutoScale(flag=False) # position y-axis is fixed to the total bins
-                if not self.use_bin_units_instead_of_realworld:
-                    a_plot.getYAxis().setLimits(xmin, xmax)
-
-            else:
-                a_plot.setYAxisAutoScale(flag=True)
-            a_plot.setHidden((not is_visible))
-
-
+ 
         self.plot.addImage(self.p_x_given_n_masked, legend='p_x_given_n', replace=True, colormap=self.a_cmap, origin=img_origin, scale=img_scale, **label_kwargs, resetzoom=True) # , colormap="viridis", vmin=0, vmax=1
         pos_x_range = self.plot.getXAxis().getLimits()
         pos_y_range = self.plot.getYAxis().getLimits()
@@ -360,27 +367,37 @@ class EpochHeuristicDebugger:
         # Add data to the plots:
         for a_plot_name, a_plot in position_plots_dict.items():
             a_plot_config_dict = plot_configs_dict[a_plot_name]
-            _subfn_helper_setup_new_plot(a_plot_name=a_plot_name, a_plot=a_plot, a_plot_config_dict=a_plot_config_dict)
-
+            self._subfn_helper_setup_new_plot(a_plot_name=a_plot_name, a_plot=a_plot, a_plot_config_dict=a_plot_config_dict)
+            if a_plot_name == 'Position':
+                a_plot.setYAxisAutoScale(flag=False) # position y-axis is fixed to the total bins
+                if not self.use_bin_units_instead_of_realworld:
+                    a_plot.getYAxis().setLimits(xmin, xmax)
 
         # Extra Custom/Programmatic Plots ____________________________________________________________________________________ #
         # self.bin_by_bin_heuristic_scores = {} # new array
         # self.programmatic_plots_config_dict = {}
         self.programmatic_plots_dict = {}
         for k, a_bin_by_bin_values in self.bin_by_bin_heuristic_scores.items():
-            a_plot = self.programmatic_plots_dict.get(k, None)
-            a_plot_config_dict = self.programmatic_plots_config_dict.get(k, None)
-            if a_plot_config_dict is None:
-                # build a new one
-                a_plot_config_dict = dict(legend=f"{k}", xlabel='t (tbin)', ylabel=f"{k}", baseline=0.0, fill=True, is_visible=True, symbol='o', linestyle=':', color=(0.0, 0.0, 1.0, 0.2,))
-                self.programmatic_plots_config_dict[k] = deepcopy(a_plot_config_dict) # store the config dict after creation
-            if a_plot is None:
-                # build a new plot
-                a_plot = Plot1D() ## new plot
-                self.programmatic_plots_dict[k] = a_plot # stor ethe plot in the dict after creation
-            assert a_plot is not None                
-            _subfn_helper_setup_new_plot(a_plot_name=k, a_plot=a_plot, a_plot_config_dict=a_plot_config_dict)
-
+            # a_plot = self.programmatic_plots_dict.get(k, None)
+            # a_plot_config_dict = self.programmatic_plots_config_dict.get(k, None)
+            # if a_plot_config_dict is None:
+            #     # build a new one
+            #     a_plot_config_dict = dict(legend=f"{k}", xlabel='t (tbin)', ylabel=f"{k}", baseline=0.0, fill=True, is_visible=True, symbol='o', linestyle=':', color=(0.0, 0.0, 1.0, 0.2,))
+            #     self.programmatic_plots_config_dict[k] = deepcopy(a_plot_config_dict) # store the config dict after creation
+            # if a_plot is None:
+            #     # build a new plot
+            #     a_plot = Plot1D() ## new plot
+            #     self.programmatic_plots_dict[k] = a_plot # stor ethe plot in the dict after creation
+            # assert a_plot is not None
+            # self._subfn_helper_setup_new_plot(a_plot_name=k, a_plot=a_plot, a_plot_config_dict=a_plot_config_dict)
+            ## Build a new plot if needed
+            a_plot, a_plot_config_dict = self._perform_initialize_new_plot_and_config_if_needed(dbgr=self, a_plot_name=k)
+            assert a_plot is not None
+            assert a_plot_config_dict is not None
+            if a_plot_name == 'Position':
+                a_plot.setYAxisAutoScale(flag=False) # position y-axis is fixed to the total bins
+                if not self.use_bin_units_instead_of_realworld:
+                    a_plot.getYAxis().setLimits(xmin, xmax)
 
 
     @function_attributes(short_name=None, tags=['update'], input_requires=[], output_provides=[], uses=['_build_image_scale_and_origin'], used_by=['update_active_epoch'], creation_date='2024-11-25 18:54', related_items=[])
@@ -426,13 +443,6 @@ class EpochHeuristicDebugger:
         
         # _max_path_Curve
         
-        ## Update position plots:
-        # _curve_pos_t = np.arange(len(self.active_most_likely_position_indicies)) + 0.5 # move forward by a half bin
-        # pos = deepcopy(self.active_most_likely_position_indicies)
-        # _curve_vel_t = _curve_pos_t[1:] # + 0.25 # move forward by a half bin
-        # vel = np.diff(pos)
-        # _curve_accel_t = _curve_pos_t[2:] # + 0.125 # move forward by a half bin
-        # accel = np.diff(vel)
         
         # Update position plots
         
@@ -458,8 +468,6 @@ class EpochHeuristicDebugger:
             
         self.plot_velocity.getCurve("Velocity").setData(self.position_derivatives._curve_vel_t, self.position_derivatives.vel)
         self.plot_acceleration.getCurve("Acceleration").setData(self.position_derivatives._curve_accel_t, self.position_derivatives.accel)
-        # self.plot_extra.getCurve("Extra").setData(self.position_derivatives._curve_accel_t, self.position_derivatives.accel)
-        # self.plot_extra.getCurve("Extra").setData(self.position_derivatives._curve_vel_t, self.position_derivatives.kinetic_energy)
         # self.plot_extra.getCurve("Extra").setData(self.position_derivatives._curve_accel_t, self.position_derivatives.applied_forces)      
 
         # if len(self.bin_by_bin_heuristic_scores) > 0:
@@ -584,11 +592,13 @@ class EpochHeuristicDebugger:
         self.p_x_given_n_masked = ma.masked_array(p_x_given_n, mask=np.logical_not(is_higher_than_diffusion), fill_value=np.nan)
         
         self.heuristic_scores = HeuristicReplayScoring.compute_pho_heuristic_replay_scores(a_result=self.active_decoder_decoded_epochs_result, an_epoch_idx=self.active_single_epoch_result.epoch_data_index, debug_print=False, use_bin_units_instead_of_realworld=self.use_bin_units_instead_of_realworld)
-        # a_bin_by_bin_jump_time_window_centers, a_bin_by_bin_jump_distance = HeuristicReplayScoring.bin_by_bin_jump_distance(a_result=self.active_decoder_decoded_epochs_result, an_epoch_idx=self.active_single_epoch_result.epoch_data_index, a_decoder_track_length=self.decoder_track_length)
-
+        
+        if self.all_bin_by_bin_computation_fn_dict is None:
+            self.all_bin_by_bin_computation_fn_dict = HeuristicReplayScoring.build_all_bin_by_bin_computation_fn_dict()
+        
         # Extra Custom/Programmatic Plots ____________________________________________________________________________________ #
         self.bin_by_bin_heuristic_scores = {} # new dict
-        for k, a_bin_by_bin_fn in HeuristicReplayScoring.build_all_bin_by_bin_computation_fn_dict().items():
+        for k, a_bin_by_bin_fn in self.all_bin_by_bin_computation_fn_dict.items():
             a_bin_by_bin_fn_time_window_centers, a_bin_by_bin_values = a_bin_by_bin_fn(a_result=self.active_decoder_decoded_epochs_result, an_epoch_idx=self.active_single_epoch_result.epoch_data_index, a_decoder_track_length=self.decoder_track_length)
             if a_bin_by_bin_values is not None:
                 self.bin_by_bin_heuristic_scores[k] = a_bin_by_bin_values

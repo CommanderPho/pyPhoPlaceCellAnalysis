@@ -18,6 +18,8 @@ from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 
 from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
+from neuropy.utils.mixins.indexing_helpers import get_dict_subset
+
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult # used in compute_pho_heuristic_replay_scores
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult, TrackTemplates
@@ -322,8 +324,8 @@ class HeuristicReplayScoring:
         return time_window_centers, a_first_order_diff
     
     @classmethod
-    @function_attributes(short_name='jump', tags=['bin-size', 'score', 'replay'], input_requires=[], output_provides=[], uses=['cls.bin_by_bin_jump_distance'], used_by=[], creation_date='2024-03-07 17:50', related_items=[])
-    def bin_wise_jump_distance(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float) -> float:
+    @function_attributes(short_name='jump', tags=['bin-wise', 'bin-size', 'score', 'replay'], input_requires=[], output_provides=[], uses=['cls.bin_by_bin_jump_distance'], used_by=[], creation_date='2024-03-07 17:50', related_items=[])
+    def bin_wise_jump_distance_score(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float) -> float:
         """ provides a metric that punishes long jumps in sequential maximal prob. position bins
         """
         a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
@@ -342,7 +344,6 @@ class HeuristicReplayScoring:
     @function_attributes(short_name='jump_cm', tags=['bin-by-bin', 'score', 'replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-25 11:39', related_items=[])
     def bin_by_bin_position_jump_distance(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float) -> Tuple[NDArray, NDArray]:
         """ Bin-wise most-likely position difference. Contiguous trajectories have small deltas between adjacent time bins, while non-contiguous ones can jump wildly (up to the length of the track)
-        ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
         """
         time_window_centers = a_result.time_window_centers[an_epoch_idx]
         a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
@@ -364,13 +365,15 @@ class HeuristicReplayScoring:
         # compute the 1st-order diff of all positions
         bin_by_bin_jump_distance = np.diff(included_most_likely_positions_list, n=1, prepend=[included_most_likely_positions_list[0]])
 
+        ## convert to cm/sec (jump velocity) by dividing by time_bin_size
+        # bin_by_bin_jump_distance = bin_by_bin_jump_distance / time_window_centers
+        
         return included_time_window_centers, bin_by_bin_jump_distance
 
     @classmethod
-    @function_attributes(short_name='max_jump_cm', tags=['bin-size', 'score', 'replay'], input_requires=[], output_provides=[], uses=['cls.bin_by_bin_position_jump_distance'], used_by=[], creation_date='2024-11-25 11:39', related_items=[])
+    @function_attributes(short_name='max_jump_cm', tags=['bin-wise', 'bin-size', 'score', 'replay'], input_requires=[], output_provides=[], uses=['cls.bin_by_bin_position_jump_distance'], used_by=[], creation_date='2024-11-25 11:39', related_items=[])
     def bin_wise_max_position_jump_distance(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float) -> float:
         """ Bin-wise most-likely position difference. Contiguous trajectories have small deltas between adjacent time bins, while non-contiguous ones can jump wildly (up to the length of the track)
-        ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
         """
         # a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
         # a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
@@ -395,8 +398,47 @@ class HeuristicReplayScoring:
         
 
     @classmethod
-    @function_attributes(short_name='travel', tags=['bin-size', 'score', 'replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 17:50', related_items=[])
-    def bin_wise_position_difference(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float) -> float:
+    @function_attributes(short_name='jump_cm_per_sec', tags=['bin-by-bin', 'score', 'replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-25 11:39', related_items=[])
+    def bin_by_bin_position_jump_velocity(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float) -> Tuple[NDArray, NDArray]:
+        """
+        """
+        time_window_centers, bin_by_bin_jump_distance = cls.bin_by_bin_position_jump_distance(a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length)
+        assert len(time_window_centers) == len(bin_by_bin_jump_distance)
+        ## convert to cm/sec (jump velocity) by dividing by time_bin_size
+        bin_by_bin_jump_velocity = deepcopy(bin_by_bin_jump_distance) / time_window_centers
+        
+        return time_window_centers, bin_by_bin_jump_velocity
+
+    @classmethod
+    @function_attributes(short_name='max_jump_cm_per_sec', tags=['bin-wise', 'bin-size', 'score', 'replay'], input_requires=[], output_provides=[], uses=['cls.bin_by_bin_position_jump_velocity'], used_by=[], creation_date='2024-11-25 11:39', related_items=[])
+    def bin_wise_max_position_jump_velocity(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float) -> float:
+        """ 
+        """
+        n_time_bins: int = a_result.nbins[an_epoch_idx]
+        if n_time_bins <= 1:
+            ## only a single bin, return 0.0 (perfect, no jumps)
+            return 0.0
+        else:
+            time_window_centers, a_first_order_diff = cls.bin_by_bin_position_jump_velocity(a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length)
+            n_valid_time_bins = len(time_window_centers)
+            if n_valid_time_bins < 2:
+                return np.inf ## return infinity, meaning it never resolves position appropriately
+            
+            # normalize by the number of bins to allow comparions between different Epochs (so epochs with more bins don't intrinsically have a larger score.
+            max_position_jump_cm: float = float(np.nanmax(np.abs(a_first_order_diff[1:]))) # must skip the first bin because that "jumps" to its initial position on the track            
+            # normalize by the track length (long v. short) to allow fair comparison of the two (so the long track decoders don't intrinsically have a larger score).
+            # max_position_jump_cm = max_position_jump_cm / a_decoder_track_length
+            
+            ## RETURNS: total_first_order_change_score
+            return max_position_jump_cm
+        
+
+
+
+
+    @classmethod
+    @function_attributes(short_name='travel', tags=['bin-wise', 'bin-size', 'score', 'replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 17:50', related_items=[])
+    def bin_wise_position_difference_score(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float) -> float:
         """ Bin-wise most-likely position difference. Contiguous trajectories have small deltas between adjacent time bins, while non-contiguous ones can jump wildly (up to the length of the track)
         ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
         """
@@ -427,7 +469,7 @@ class HeuristicReplayScoring:
             return total_first_order_change_score
         
     @classmethod
-    @function_attributes(short_name='coverage', tags=['bin-size', 'score', 'replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-12 01:05', related_items=[])
+    @function_attributes(short_name='coverage', tags=['bin-wise', 'bin-size', 'score', 'replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-12 01:05', related_items=[])
     def bin_wise_track_coverage_score_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float) -> float:
         """ The amount of the track that is represented by the decoding. More is better (indicating a longer replay).
 
@@ -465,7 +507,7 @@ class HeuristicReplayScoring:
         return ratio_bins_higher_than_diffusion_across_time
 
     @classmethod
-    @function_attributes(short_name='continuous_seq_sort', tags=['bin-size', 'score', 'replay', 'UNFINISHED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-12 01:05', related_items=[])
+    @function_attributes(short_name='continuous_seq_sort', tags=['bin-wise', 'bin-size', 'score', 'replay', 'UNFINISHED'], input_requires=[], output_provides=[], uses=['partition_subsequences_ignoring_repeated_similar_positions'], used_by=[], creation_date='2024-03-12 01:05', related_items=[])
     def bin_wise_continuous_sequence_sort_score_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, same_thresh: float=4) -> float:
         """ The amount of the track that is represented by the decoding. More is better (indicating a longer replay).
 
@@ -574,8 +616,8 @@ class HeuristicReplayScoring:
         # longest_sequence
         split_diff_index_subsequence_index_arrays = np.split(np.arange(partition_result.n_diff_bins), partition_result.diff_split_indicies) # subtract 1 again to get the diff_split_indicies instead
         no_low_magnitude_diff_index_subsequence_indicies = [v[np.isin(v, partition_result.low_magnitude_change_indicies, invert=True)] for v in split_diff_index_subsequence_index_arrays] # get the list of indicies for each subsequence without the low-magnitude ones
-        num_subsequence_bins = np.array([len(v) for v in split_diff_index_subsequence_index_arrays])
-        num_subsequence_bins_no_repeats = np.array([len(v) for v in no_low_magnitude_diff_index_subsequence_indicies])
+        num_subsequence_bins = np.array([len(v) for v in split_diff_index_subsequence_index_arrays]) # np.array([4, 6])
+        num_subsequence_bins_no_repeats = np.array([len(v) for v in no_low_magnitude_diff_index_subsequence_indicies]) # np.array([1, 1])
 
         total_num_subsequence_bins = np.sum(num_subsequence_bins)
         total_num_subsequence_bins_no_repeats = np.sum(num_subsequence_bins_no_repeats)
@@ -584,8 +626,8 @@ class HeuristicReplayScoring:
         # longest_sequence_length: int = np.nanmax(continuous_sequence_lengths) # Now find the length of the longest non-changing sequence
         # longest_sequence_start_idx: int = np.nanargmax(continuous_sequence_lengths)
 
-        longest_sequence_length_no_repeats: int = np.nanmax(num_subsequence_bins_no_repeats) # Now find the length of the longest non-changing sequence
-        longest_sequence_no_repeats_start_idx: int = np.nanargmax(num_subsequence_bins_no_repeats)
+        longest_sequence_length_no_repeats: int = int(np.nanmax(num_subsequence_bins_no_repeats)) # Now find the length of the longest non-changing sequence
+        longest_sequence_no_repeats_start_idx: int = int(np.nanargmax(num_subsequence_bins_no_repeats))
         
         ## 
         max_ignore_bins: int = 2
@@ -627,6 +669,33 @@ class HeuristicReplayScoring:
         # return ratio_bins_higher_than_diffusion_across_time
         return longest_sequence_length_ratio
     
+
+    # ==================================================================================================================== #
+    # All Computation Fns of Type                                                                                          #
+    # ==================================================================================================================== #
+    @function_attributes(short_name=None, tags=['bin_by_bin', 'all_fns'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-25 22:15', related_items=[])
+    @classmethod
+    def build_all_bin_by_bin_computation_fn_dict(cls) -> Dict[str, Callable]:
+        return {
+         'jump': cls.bin_by_bin_jump_distance,
+         'jump_cm': cls.bin_by_bin_position_jump_distance, 
+         'jump_cm_per_sec': cls.bin_by_bin_position_jump_velocity, 
+        #  'jump_cm': cls.bin_by_bin_position_jump_distance, 
+        }
+
+    @function_attributes(short_name=None, tags=['bin_wise', 'all_fns'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-25 22:15', related_items=[])
+    @classmethod
+    def build_all_bin_wise_computation_fn_dict(cls) -> Dict[str, Callable]:
+        return {
+         'jump': cls.bin_wise_jump_distance_score,
+         'max_jump_cm': cls.bin_wise_max_position_jump_distance, 
+         'max_jump_cm_per_sec': cls.bin_wise_max_position_jump_velocity, 
+         'travel': cls.bin_wise_position_difference_score, 
+         'coverage': cls.bin_wise_track_coverage_score_fn, 
+         'continuous_seq_sort': cls.bin_wise_continuous_sequence_sort_score_fn, 
+        }
+    
+    @function_attributes(short_name=None, tags=['OLDER'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-24 00:00', related_items=[])
     @classmethod
     def build_all_score_computations_fn_dict(cls) -> Dict[str, Callable]:
         """ builds all combined heuristic scoring functions 
@@ -753,7 +822,7 @@ class HeuristicReplayScoring:
         #     return np.corrcoef(positions, original_trajectory)[0, 1]
 
         def bin_wise_wrapper_score_fn(a_fn, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, needs_times=False) -> float:
-            """ """
+            """ only used for the functions directly above within this function """
             ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
             final_args = []
             a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
@@ -779,18 +848,10 @@ class HeuristicReplayScoring:
         ## Wrap them:
         positions_fns_dict = {fn.__name__:(lambda *args, **kwargs: bin_wise_wrapper_score_fn(fn, *args, **kwargs, needs_times=False)) for fn in _positions_fns}
         positions_times_fns_dict = {fn.__name__:(lambda *args, **kwargs: bin_wise_wrapper_score_fn(fn, *args, **kwargs, needs_times=True)) for fn in _positions_times_fns}
-            
-        all_score_computations_fn_dict = {'travel': cls.bin_wise_position_difference, 'coverage': cls.bin_wise_track_coverage_score_fn, 'jump': cls.bin_wise_jump_distance, 'max_jump': cls.bin_wise_max_position_jump_distance, **positions_fns_dict, **positions_times_fns_dict} # a_result, an_epoch_idx, a_decoder_track_length 
+        all_bin_wise_computation_fn_dict = get_dict_subset(a_dict=cls.build_all_bin_wise_computation_fn_dict(), subset_excludelist=['continuous_seq_sort'])
+        all_score_computations_fn_dict = {**all_bin_wise_computation_fn_dict, **positions_fns_dict, **positions_times_fns_dict} # a_result, an_epoch_idx, a_decoder_track_length  - 'travel': cls.bin_wise_position_difference, 'coverage': cls.bin_wise_track_coverage_score_fn, 'jump': cls.bin_wise_jump_distance_score, 'max_jump': cls.bin_wise_max_position_jump_distance, 
         return all_score_computations_fn_dict
     
-
-    @classmethod
-    def build_all_bin_by_bin_computation_fn_dict(cls) -> Dict[str, Callable]:
-        return {
-         'jump': cls.bin_by_bin_jump_distance,
-         'jump_cm': cls.bin_by_bin_position_jump_distance, 
-        }
-
     # ==================================================================================================================== #
     # End Computation Functions                                                                                            #
     # ==================================================================================================================== #
