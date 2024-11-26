@@ -1,6 +1,6 @@
 from copy import deepcopy
 from pathlib import Path
-from typing import Dict, Callable, List, Tuple
+from typing import Dict, Callable, List, Optional, Tuple
 from attrs import define, field
 import numpy as np
 import pandas as pd
@@ -1874,6 +1874,49 @@ import json
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
 from pyphocorehelpers.gui.Jupyter.simple_widgets import CheckBoxListWidget
+from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
+from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
+from pyphocorehelpers.assertion_helpers import Assert
+from attrs import define, field, Factory
+
+@define(slots=False)
+class LoadedPosteriorContainer:
+    """ 
+    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import LoadedPosteriorContainer
+    """
+    ripple_data_field_dict: Dict = field(default=Factory(dict))
+
+    @property
+    def ripple_img_dict(self):
+        """The ripple_img_dict property."""
+        return self.ripple_data_field_dict['p_x_given_n_grey']
+
+    @classmethod
+    def init_from_load_path(cls, load_path: Path):
+        """ loads """
+        Assert.path_exists(load_path)
+
+        ## used for reconstituting dataset:
+        dataset_type_fields = ['p_x_given_n', 'p_x_given_n_grey', 'most_likely_positions', 'most_likely_position_indicies', 'time_bin_edges', 't_bin_centers']
+        decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+
+        _out_dict, (session_key_parts, custom_replay_parts) = PosteriorExporting.load_decoded_posteriors_from_HDF5(load_path=load_path, debug_print=True)
+        _out_ripple_only_dict = {k:v['ripple'] for k, v in _out_dict.items()} ## cut down to only the laps
+
+        ## build the final ripple data outputs:
+        ripple_data_field_dict = {}
+        # active_var_key: str = 'p_x_given_n' # dataset_type_fields	
+
+        for active_var_key in dataset_type_fields:
+            ripple_data_field_dict[active_var_key] = {
+                a_decoder_name: [v for v in _out_ripple_only_dict[a_decoder_name][active_var_key]] for a_decoder_name in decoder_names
+            }
+
+        _obj = cls(ripple_data_field_dict=ripple_data_field_dict)
+        # ripple_img_dict = ripple_data_field_dict['p_x_given_n_grey']
+
+        return _obj
+
 
 def _build_solera_file_download_widget(fig, filename="figure-image.png", label="Save Figure"):
     """ 
