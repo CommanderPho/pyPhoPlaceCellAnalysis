@@ -2192,7 +2192,9 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             # disabled=False,
         # )
 
-        self.output_widget = widgets.Output(layout={'border': '1px solid black'})
+        self.output_widget = widgets.Output(layout=widgets.Layout(width='100%', # min_width='200px', height='100px',
+                                                                  border='1px solid black'),
+                                                                  ) #  {'border': '1px solid black'}
         self.figure_widget, did_create_new_figure = PlotlyFigureContainer._helper_build_pre_post_delta_figure_if_needed(extant_figure=None, use_latex_labels=False, main_title='test', figure_class=go.FigureWidget)
         
 
@@ -2205,11 +2207,20 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         
 
         self.table_widget = DataGrid(self.filtered_size_info_df,
-                                base_row_size=15, base_column_size=300,
+                                base_row_size=15, base_column_size=300, horizontal_stripes=True,
                                 #  renderers=renderers,
                                 )
         # self.table_widget.transform([{"type": "sort", "columnIndex": 2, "desc": True}])
- 
+        # self.table_widget.auto_fit_columns = True
+        
+        # Set layout properties
+        # self.table_widget.layout = widgets.Layout(flex='0 1 auto', width='auto')
+        # self.output_widget.layout = widgets.Layout(flex='1 1 auto', width='auto')
+
+        # Combine in HBox
+        # container = widgets.HBox([shrink_widget, grow_widget], layout=widgets.Layout(width='100%'))
+
+
 
     def _setup_widgets_buttons(self):
         """Sets up the copy and download buttons."""
@@ -2327,9 +2338,9 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                 self.active_plot_variable_name_widget
             ]),
             self.figure_widget,
-            widgets.HBox([self.button_copy, self.button_download, self.filename_label]),
+            widgets.HBox([self.button_copy, self.button_download, self.filename_label], layout=widgets.Layout(width='100%')),
             # self.js_output,  # Include the Output widget to allow the buttons to perform their actions
-            widgets.HBox([self.output_widget, self.table_widget, ]),
+            widgets.HBox([self.output_widget, self.table_widget, ], layout=widgets.Layout(width='100%')),
         ]))
         
 
@@ -2458,7 +2469,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             return
 
         self.output_widget.clear_output()
-        with self.output_widget:            
+        with self.output_widget:
             # Convert time_bin_sizes to a list if it's not already
             if isinstance(time_bin_sizes, (float, int)):
                 time_bin_sizes = [time_bin_sizes]
@@ -2498,7 +2509,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                         if did_predicate_fail:
                             did_applying_predicate_fail_for_df_dict[filtered_name] = (did_applying_predicate_fail_for_df_dict[filtered_name] or did_predicate_fail)
 
-                        df['is_filter_included'] = (df['is_filter_included'] & is_predicate_true)
+                        df['is_filter_included'] = np.logical_and(df['is_filter_included'], is_predicate_true)
                         if not did_predicate_fail:
                             active_predicate_filter_name_modifier.append(a_predicate_name)
                 # END for a_predicate_name, a_predicate_fn
@@ -2519,6 +2530,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
             ## Update sizes table:
             self.table_widget.data = self.filtered_size_info_df
+            self.table_widget.auto_fit_columns = True
             
             if did_applying_predicate_fail_for_df_dict[self.active_plot_df_name]:
                 print(f'!!! Warning!!! applying predicates failed for the current active plot df (self.active_plot_df_name: {self.active_plot_df_name})!\n\tthe plotted output has NOT been filtered!')

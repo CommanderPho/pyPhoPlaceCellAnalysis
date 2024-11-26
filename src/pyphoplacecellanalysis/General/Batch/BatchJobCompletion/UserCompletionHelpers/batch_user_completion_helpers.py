@@ -719,6 +719,25 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 	
 	Updates: ['DirectionalDecodersEpochsEvaluations'
 
+
+	Exports:
+
+	"K:/scratch/collected_outputs/2024-11-26_Lab-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(laps_simple_pf_pearson_merged_df)_tbin-0.25.csv"
+	"K:/scratch/collected_outputs/2024-11-26_Lab-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(laps_weighted_corr_merged_df)_tbin-0.25.csv"
+	
+	## why using the wrong size (0.016)?
+	"K:/scratch/collected_outputs/2024-11-26_Lab-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.016.csv"
+	"K:/scratch/collected_outputs/2024-11-26_Lab-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_simple_pf_pearson_merged_df)_tbin-0.016.csv"
+	"K:/scratch/collected_outputs/2024-11-26_Lab-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_weighted_corr_merged_df)_tbin-0.016.csv"
+	
+	## why missing the custom_replay suffix?
+	"K:/scratch/collected_outputs/2024-11-26_0240AM-kdiba_gor01_one_2006-6-09_1-22-43-(ripple_all_scores_merged_df)_tbin-0.025.csv"
+	"K:/scratch/collected_outputs/2024-11-26_0240AM-kdiba_gor01_one_2006-6-09_1-22-43-(laps_simple_pf_pearson_merged_df)_tbin-0.25.csv"
+	"K:/scratch/collected_outputs/2024-11-26_0240AM-kdiba_gor01_one_2006-6-09_1-22-43-(laps_weighted_corr_merged_df)_tbin-0.25.csv"
+	"K:/scratch/collected_outputs/2024-11-26_0240AM-kdiba_gor01_one_2006-6-09_1-22-43-(ripple_simple_pf_pearson_merged_df)_tbin-0.025.csv"
+	"K:/scratch/collected_outputs/2024-11-26_0240AM-kdiba_gor01_one_2006-6-09_1-22-43-(ripple_weighted_corr_merged_df)_tbin-0.025.csv"
+	
+
 	"""
 	print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
 	print(f'compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function(global_data_root_parent_path: "{global_data_root_parent_path}", curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)') # ,across_session_results_extended_dict: {across_session_results_extended_dict}
@@ -736,11 +755,12 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 	curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
 	CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
 	print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
+	CURR_BATCH_DATE_TO_USE: str = self.BATCH_DATE_TO_USE
 
 	def _subfn_custom_export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'(laps_marginals_df)', parent_output_path: Path=None):
-		""" captures `curr_active_pipeline`
+		""" captures CURR_BATCH_DATE_TO_USE, `curr_active_pipeline`
 		"""
-		output_date_str: str = self.BATCH_DATE_TO_USE
+		output_date_str: str = deepcopy(CURR_BATCH_DATE_TO_USE)
 		if (output_date_str is None) or (len(output_date_str) < 1):
 			output_date_str = get_now_rounded_time_str(rounded_minutes=10)
 		out_path, out_filename, out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=output_date_str, data_identifier_str=data_identifier_str, parent_output_path=parent_output_path, out_extension='.csv')
