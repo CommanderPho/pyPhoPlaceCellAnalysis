@@ -2037,7 +2037,10 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     filename_label: widgets.Label = non_serialized_field(init=False)
     # Add Output widget for JavaScript execution
     # js_output: widgets.Output = non_serialized_field(init=False)
+    hover_posterior_preview_figure_widget: go.FigureWidget = non_serialized_field(init=False)
+    hover_posterior_data: LoadedPosteriorContainer = non_serialized_field()
     
+
     # Begin Properties ___________________________________________________________________________________________________ #
     @property
     def replay_name(self) -> str:
@@ -2207,7 +2210,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             options=sorted(self.filtered_df_names),
             description='Plot df Name:',
             disabled=False,
-            layout=widgets.Layout(width='500px'),
+            layout=widgets.Layout(width='400px'),
             style={'description_width': 'initial'}
         )
         self.active_plot_df_name_selector_widget.value = self.active_plot_df_name
@@ -2226,7 +2229,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             options=time_bin_size_options,
             description='Time Bin Size:',
             disabled=False,
-            layout=widgets.Layout(width='200px', height='100px'),
+            layout=widgets.Layout(width='300px', height='100px'),
             style={'description_width': 'initial'},
         )
 
@@ -2240,7 +2243,10 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                                                                   ) #  {'border': '1px solid black'}
         self.figure_widget, did_create_new_figure = PlotlyFigureContainer._helper_build_pre_post_delta_figure_if_needed(extant_figure=None, use_latex_labels=False, main_title='test', figure_class=go.FigureWidget)
         
-
+        ## initialize the preview widget:
+        self.hover_posterior_preview_figure_widget = go.FigureWidget() # .set_subplots(rows=1, cols=1, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.01, shared_yaxes=True, column_titles=[pre_delta_label, main_title, post_delta_label])
+        # self.hover_posterior_preview_figure_widget.layout
+        
         # Set up observers to handle changes in widget values
         self.replay_name_widget.observe(self._on_widget_change, names='value')
         self.time_bin_size_widget.observe(self._on_widget_change, names='value')
@@ -2374,16 +2380,25 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             widgets.HBox([
                 self.replay_name_widget, 
                 self.time_bin_size_widget, 
-                self.active_filter_predicate_selector_widget
-            ]),
+                self.active_filter_predicate_selector_widget,
+                # self.table_widget
+            ], #layout=widgets.Layout(width='100%'),
+            ),
             widgets.HBox([
                 self.active_plot_df_name_selector_widget, 
                 self.active_plot_variable_name_widget
             ]),
             self.figure_widget,
-            widgets.HBox([self.button_copy, self.button_download, self.filename_label], layout=widgets.Layout(width='100%')),
+            widgets.HBox([self.button_copy, self.button_download, self.filename_label],
+                        #   layout=widgets.Layout(width='100%'),
+                          ),
             # self.js_output,  # Include the Output widget to allow the buttons to perform their actions
-            widgets.HBox([self.output_widget, self.table_widget, ], layout=widgets.Layout(width='100%')),
+            widgets.HBox([self.output_widget, ],
+                          layout=widgets.Layout(height='300px', width='100%'),
+                          ),              
+            widgets.HBox([self.table_widget,
+                          self.hover_posterior_preview_figure_widget,
+                          ], layout=widgets.Layout(height='300px', width='100%')),
         ]))
         
 
@@ -2426,6 +2441,17 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             captures: _perform_plot_pre_post_delta_scatter_with_embedded_context, should_save, extra_plot_kwargs
             
             """
+            def _plot_hoverred_heatmap_preview_posterior(df_filter: DataFrameFilter, last_selected_idx: Optional[int] = 0):
+                # if last_selected_idx is None:
+                #     # df_filter.hover_posterior_data.ripple_img_dict
+                #     # df_filter.hover_posterior_preview_figure_widget.add_heatmap()
+
+                a_heatmap_img = df_filter.hover_posterior_data.ripple_img_dict['long_LR'][last_selected_idx]    
+                ## update the plot
+                df_filter.hover_posterior_preview_figure_widget.add_heatmap(z=a_heatmap_img, showscale=False, name='selected_posterior', )
+
+
+
             # df_filter.output_widget.clear_output(wait=True)
             active_plot_df_name: str = df_filter.active_plot_df_name
             active_plot_df: pd.DataFrame = df_filter.active_plot_df
@@ -2450,6 +2476,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
             def on_click(trace, points, selector):
                 if points.point_inds:
+                    ## has selection:
                     ind = points.point_inds[0]
                     session_name = df_filter.active_plot_df['session_name'].iloc[ind]
                     custom_replay_name = df_filter.active_plot_df['custom_replay_name'].iloc[ind]
@@ -2463,7 +2490,16 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                         print(f'start_t, stop_t: {start_t}, {stop_t}')
                         print(f"session_name: {session_name}")
                         print(f"custom_replay_name: {custom_replay_name}")
+                        
+                    ## try to update the selected heatmap posterior:
+                    try:
+                        ## try to update by start_t, stop_t
+                        _plot_hoverred_heatmap_preview_posterior(df_filter=df_filter, last_selected_idx=ind) #TODO 2024-11-26 07:32: - [ ] does this work?
+                    except Exception as e:
+                        print(f'encountered exception when trying to call `_plot_hoverred_heatmap_preview_posterior(..., last_selected_idx={ind}, start_t: {start_t}, stop_t: {stop_t}). Error {e}. Skipping.')
+                                            
                 else:
+                    ## no selection:
                     # print(f'NOPE! points: {points}, trace: {trace}')
                     df_filter.output_widget.clear_output()
                     if enable_debug_print:
@@ -2492,19 +2528,18 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     # Data Update Functions                                                                                                #
     # ==================================================================================================================== #
     
-    def _init_filtered_dataframes(self):
+    def _init_filtered_dataframes(self, enable_overwrite_is_filter_included_column: bool=True):
         """ builds the filtered dataframes from the original_df_dict. Initially they are unfiltered. """
         ## Update the 'is_filter_included' column on the original dataframes
         for name, df in self.original_df_dict.items():
-            if 'is_filter_included' not in df.columns:
+            if enable_overwrite_is_filter_included_column or ('is_filter_included' not in df.columns):
                 df['is_filter_included'] = True  # Initialize with default value
             filtered_name: str = f"filtered_{name}"
             filtered_df = deepcopy(df[df['is_filter_included']])
             setattr(self, filtered_name, filtered_df)
 
 
-
-    def update_filtered_dataframes(self, replay_name, time_bin_sizes, debug_print=True):
+    def update_filtered_dataframes(self, replay_name, time_bin_sizes, debug_print=True, enable_overwrite_is_filter_included_column: bool=True):
         """ Perform filtering on each DataFrame
         """
         if not time_bin_sizes:
@@ -2528,8 +2563,9 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                 filtered_name: str = f"filtered_{name}"
                 did_applying_predicate_fail_for_df_dict[filtered_name] = False ## start false
                 
-                if 'is_filter_included' not in df.columns:
-                    df['is_filter_included'] = False  # Initialize with default value
+                if enable_overwrite_is_filter_included_column or ('is_filter_included' not in df.columns):
+                    df['is_filter_included'] = True  # Initialize with default value
+
                 # Update based on conditions
                 df['is_filter_included'] = (df['custom_replay_name'] == replay_name) & (df['time_bin_size'].isin(time_bin_sizes))
 
@@ -2573,7 +2609,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
             ## Update sizes table:
             self.table_widget.data = self.filtered_size_info_df
-            self.table_widget.auto_fit_columns = True
+            # self.table_widget.auto_fit_columns = True
             
             if did_applying_predicate_fail_for_df_dict[self.active_plot_df_name]:
                 print(f'!!! Warning!!! applying predicates failed for the current active plot df (self.active_plot_df_name: {self.active_plot_df_name})!\n\tthe plotted output has NOT been filtered!')
