@@ -630,6 +630,22 @@ class PosteriorExporting:
                 # _curr_context = out_context.overwriting_context(epoch_idx=i)
                 _curr_context = out_context.overwriting_context(epoch_idx=epoch_data_idx_str)
                 _curr_key: str = _curr_context.get_description(separator='/')
+                
+                # #TODO 2024-11-26 09:03: - [ ] Attempt to extract and combine the relevant keys to make a good HDF_key, but gave up
+                # _curr_context_dict = _curr_context.to_dict()
+                # _curr_context_dict.subset(_curr_context._get_session_context_keys())
+                # _all_keys = _curr_context_dict.keys()
+                # _non_session_keys = _all_keys - _curr_context._get_session_context_keys()
+                # _last_session_key_index = list(_all_keys).index(_curr_context._get_session_context_keys()[-1])
+                # _resume_keypath_index = list(_all_keys).index('display_fn_name')
+                # _keys_to_merge = list(_all_keys)[(_last_session_key_index+1):_resume_keypath_index] # one after the last_session_key_index - ['epochs_source', 'included_qclu_values', 'minimum_inclusion_fr_Hz']
+                # _values_to_merge = [_curr_context_dict[k] for k in _keys_to_merge]
+                # _merged_dict = dict(zip(_keys_to_merge, _values_to_merge))
+                # epochs_source: str = _merged_dict.pop('epochs_source', None)
+                # custom_suffix_str: str = '-'.join([epochs_source, *['_'.join([k, str(v),]) for k, v in _merged_dict.items()]])
+                # custom_suffix_str ## wrong: 'normal_computed-included_qclu_values_[1, 2, 4, 6, 7, 9]-minimum_inclusion_fr_Hz_5.0'                
+                # _curr_key: str = _curr_context.get_description(separator='/') ## TODO: not finished
+
                 if not _curr_key.startswith('/'):
                     _curr_key = "/" + _curr_key
                 # active_captured_single_epoch_result.to_hdf(save_path, key=_curr_key, debug_print=True, enable_hdf_testing_mode=True)
@@ -639,7 +655,7 @@ class PosteriorExporting:
     
 
     @classmethod
-    @function_attributes(short_name=None, tags=['export'], input_requires=[], output_provides=[], uses=['save_decoded_posteriors_to_HDF5'], used_by=[], creation_date='2024-08-28 08:36', related_items=[])
+    @function_attributes(short_name=None, tags=['save', 'export', 'HDF5', 'h5'], input_requires=[], output_provides=[], uses=['save_decoded_posteriors_to_HDF5'], used_by=[], creation_date='2024-08-28 08:36', related_items=[])
     def perform_save_all_decoded_posteriors_to_HDF5(cls, decoder_laps_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], _save_context: IdentifyingContext, save_path: Path, should_overwrite_extant_file:bool=True):
         """
         
@@ -653,9 +669,12 @@ class PosteriorExporting:
         History:
             Refactored from `ComputerVisionComputations` on 2024-09-30
         """
+        _flat_all_out_paths = []
+        
         def _subfn_perform_save_single_epochs(_active_filter_epochs_decoder_result_dict, a_save_context: IdentifyingContext, epochs_name: str, save_path: Path) -> Dict[types.DecoderName, IdentifyingContext]:
             """ saves a single set of named epochs, like 'laps' or 'ripple' 
-            captures nothing
+            Captures/Updates: _flat_all_out_paths,
+        
             """
             _sub_out_contexts = {}
             for a_decoder_name, a_decoder_decoded_epochs_result in _active_filter_epochs_decoder_result_dict.items():
@@ -670,6 +689,7 @@ class PosteriorExporting:
                     allow_append = True
                 an_out_path = cls.save_decoded_posteriors_to_HDF5(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, out_context=_specific_save_context, save_path=save_path, allow_append=allow_append)
                 _sub_out_contexts[a_decoder_name] = _specific_save_context
+                _flat_all_out_paths.append(an_out_path)
                 
             return _sub_out_contexts
 
@@ -680,9 +700,11 @@ class PosteriorExporting:
             print(f'\t successfully removed.')
             
         out_contexts = {'laps': None, 'ripple': None}
-        out_contexts['laps'] = _subfn_perform_save_single_epochs(decoder_laps_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='laps', save_path=save_path)
-        out_contexts['ripple'] = _subfn_perform_save_single_epochs(decoder_ripple_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='ripple', save_path=save_path)
-        return out_contexts
+        if decoder_laps_filter_epochs_decoder_result_dict is not None:
+            out_contexts['laps'] = _subfn_perform_save_single_epochs(decoder_laps_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='laps', save_path=save_path)
+        if decoder_ripple_filter_epochs_decoder_result_dict is not None:
+            out_contexts['ripple'] = _subfn_perform_save_single_epochs(decoder_ripple_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='ripple', save_path=save_path)
+        return out_contexts, _flat_all_out_paths
 
 
     @classmethod
@@ -692,11 +714,27 @@ class PosteriorExporting:
         Load the transition matrix info from a file
         
         Usage:
-            load_path = Path('output/transition_matrix_data.h5')
-            _out_dict = PosteriorExporting.load_decoded_posteriors_from_HDF5(load_path=load_path, debug_print=False)
-            ripple_0_img = _out_dict['long_LR']['ripple']['p_x_given_n_grey'][0]
-            lap_0_img = _out_dict['long_LR']['laps']['p_x_given_n_grey'][0]
-            lap_0_img
+            load_path = Path('output/2024-11-26_Lab_newest_all_decoded_epoch_posteriors.h5')
+
+            ## used for reconstituting dataset:
+            dataset_type_fields = ['p_x_given_n', 'p_x_given_n_grey', 'most_likely_positions', 'most_likely_position_indicies', 'time_bin_edges', 't_bin_centers']
+            decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+
+            _out_dict, (session_key_parts, custom_replay_parts) = PosteriorExporting.load_decoded_posteriors_from_HDF5(load_path=load_path, debug_print=True)
+            _out_ripple_only_dict = {k:v['ripple'] for k, v in _out_dict.items()} ## cut down to only the laps
+
+            ## build the final ripple data outputs:
+            ripple_data_field_dict = {}
+            # active_var_key: str = 'p_x_given_n' # dataset_type_fields	
+
+            for active_var_key in dataset_type_fields:
+                ripple_data_field_dict[active_var_key] = {
+                    a_decoder_name: [v for v in _out_ripple_only_dict[a_decoder_name][active_var_key]] for a_decoder_name in decoder_names
+                }
+
+
+            ripple_img_dict = ripple_data_field_dict['p_x_given_n_grey']
+            ripple_img_dict['long_LR'][0]
         
         
         History:
@@ -726,24 +764,44 @@ class PosteriorExporting:
         # leaf_datasets = get_leaf_datasets(load_path)
         # print(leaf_datasets)
 
+        curr_export_result_save_properties = _save_key.split('/') # split into its path parts, like "/kdiba/gor01/one/2006-6-09_1-22-43/normal_computed/[1, 2, 4, 6, 7, 9]/5.0/save_decoded_posteriors_to_HDF5"
+        if debug_print:
+            print(f'curr_export_result_save_properties: {curr_export_result_save_properties}')
+        assert curr_export_result_save_properties[-1] == 'save_decoded_posteriors_to_HDF5', f"last component should equal 'save_decoded_posteriors_to_HDF5' but instead it equals: {curr_export_result_save_properties[-1]}"
+        session_key_parts = curr_export_result_save_properties[:4]
+        session_key_str: str = '-'.join(session_key_parts)
+        print(f'session_key_str: "{session_key_str}"')
+        
+        custom_replay_parts = curr_export_result_save_properties[4:-1]
+
+        print(f'session_key_parts: {session_key_parts}')
+        print(f'custom_replay_parts: {custom_replay_parts}')
+        if len(custom_replay_parts) == 3:
+            custom_replay_name, fr_Hz, qclus = custom_replay_parts
+        elif len(custom_replay_parts) == 1:
+            custom_suffix_str = custom_replay_parts[0]
+            
+        else:
+            raise NotImplementedError(f'could not parse curr_export_result_save_properties: {curr_export_result_save_properties}, ')            
+
+
         out_dict: Dict = {}
 
-        with h5py.File(load_path, 'r') as f:
-            
+        with h5py.File(load_path, 'r') as f:            
             main_save_group = f[_save_key]
-            if debug_print:
-                print(f'main_save_group: {main_save_group}')
+            # if debug_print:
+            #     print(f'main_save_group: {main_save_group}')
             
             for decoder_prefix in main_save_group.keys():
-                if debug_print:
-                    print(f'decoder_prefix: {decoder_prefix}')
+                # if debug_print:
+                #     print(f'decoder_prefix: {decoder_prefix}')
                 if decoder_prefix not in out_dict:
                     out_dict[decoder_prefix] = {}
 
                 decoder_group = main_save_group[decoder_prefix]
                 for known_epochs_name in decoder_group.keys():
-                    if debug_print:
-                        print(f'\tknown_epochs_name: {known_epochs_name}')
+                    # if debug_print:
+                    #     print(f'\tknown_epochs_name: {known_epochs_name}')
                     if known_epochs_name not in out_dict[decoder_prefix]:
                         out_dict[decoder_prefix][known_epochs_name] = {}
                         
@@ -753,21 +811,21 @@ class PosteriorExporting:
                     out_dict[decoder_prefix][known_epochs_name] = {k:list() for k in dataset_type_fields} # allocate a dict of empty lists for each item in `dataset_type_fields`
                     
                     for dataset_name in decoder_epochtype_group.keys():
-                        if debug_print:
-                            print(f'\t\tdataset_name: {dataset_name}')
+                        # if debug_print:
+                        #     print(f'\t\tdataset_name: {dataset_name}')
                             
                         ## the lowest-level group before the data itself
                         dataset_final_group = decoder_epochtype_group[dataset_name]
                         # dataset_type_fields
                         
                         for leaf_data_key, leaf_data in dataset_final_group.items():
-                            if debug_print:
-                                print(f'\t\t\tleaf_data_key: {leaf_data_key}')
+                            # if debug_print:
+                            #     print(f'\t\t\tleaf_data_key: {leaf_data_key}')
                             # array = decoder_epochtype_group[dataset_name][f"p_x_given_n[{dataset_name}]"][()]
                             # array = decoder_epochtype_group[dataset_name][f"p_x_given_n[{dataset_name}]"][()]
                             array = leaf_data[()] # should get the NDArray
-                            if debug_print:
-                                print(f'\t\t\t\tarray: {type(array)}')
+                            # if debug_print:
+                            #     print(f'\t\t\t\tarray: {type(array)}')
                             
                             out_dict[decoder_prefix][known_epochs_name][leaf_data_key].append(array) #
                             
@@ -790,7 +848,7 @@ class PosteriorExporting:
                     
         # END open
 
-        return out_dict
+        return out_dict, (session_key_parts, custom_replay_parts)
 
 
 
