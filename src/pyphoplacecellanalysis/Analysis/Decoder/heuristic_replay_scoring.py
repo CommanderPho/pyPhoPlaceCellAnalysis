@@ -432,6 +432,59 @@ class HeuristicReplayScoring:
             ## RETURNS: total_first_order_change_score
             return max_position_jump_cm
         
+    @classmethod
+    @function_attributes(short_name='large_jump_excluding', tags=['bin-by-bin', 'score', 'replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-25 11:39', related_items=[])
+    def bin_by_bin_large_jump_filtering_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float) -> Tuple[NDArray, NDArray]:
+        """
+        """
+        from numpy import ma
+        
+        max_position_jump_distance_cm: float = 50.0
+        # max_position_jump_velocity_cm_per_sec: float = 0.3
+        an_epoch_n_tbins: int = a_result.nbins[an_epoch_idx]
+        time_window_centers, bin_by_bin_jump_distance = HeuristicReplayScoring.bin_by_bin_position_jump_distance(a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length)
+        assert len(time_window_centers) == len(bin_by_bin_jump_distance)
+        ## convert to cm/sec (jump velocity) by dividing by time_bin_size
+        # bin_by_bin_jump_velocity = deepcopy(bin_by_bin_jump_distance) / time_window_centers
+        is_included_idx = (np.abs(bin_by_bin_jump_distance) <= max_position_jump_distance_cm)
+        does_transition_exceeds_max_jump_distance = np.logical_not(is_included_idx)
+        # is_included_idx = np.logical_not(does_transition_exceeds_max_jump_distance)
+
+        # max_excluded_bin_ratio
+
+        # ## masking
+        # arr_masked = ma.masked_array(bin_by_bin_jump_distance, mask=does_transition_exceeds_max_jump_distance, fill_value=np.nan)
+        # time_window_centers_arr_masked = ma.masked_array(time_window_centers, mask=np.logical_not(is_included_idx), fill_value=np.nan)
+
+        # return time_window_centers_arr_masked, arr_masked
+
+        ## masking
+        arr_masked = ma.masked_array(bin_by_bin_jump_distance, mask=does_transition_exceeds_max_jump_distance, fill_value=np.nan)
+        time_window_centers_arr_masked = ma.masked_array(time_window_centers, mask=does_transition_exceeds_max_jump_distance, fill_value=np.nan)
+        return time_window_centers_arr_masked, arr_masked
+
+    @classmethod
+    @function_attributes(short_name='ratio_jump_valid_bins', tags=['bin-wise', 'bin-size', 'score', 'replay'], input_requires=[], output_provides=[], uses=['cls.bin_by_bin_large_jump_filtering_fn'], used_by=[], creation_date='2024-11-25 11:39', related_items=[])
+    def bin_wise_large_jump_ratio(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float) -> float:
+        """ 
+        """
+        an_epoch_n_tbins: int = a_result.nbins[an_epoch_idx]
+        time_window_centers_arr_masked, arr_masked = cls.bin_by_bin_large_jump_filtering_fn(a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length)
+        n_valid_time_bins = len(time_window_centers_arr_masked)
+        if n_valid_time_bins < 2:
+            return np.inf ## return infinity, meaning it never resolves position appropriately
+        ## extract the mask
+        does_transition_exceeds_max_jump_distance = deepcopy(time_window_centers_arr_masked.mask)
+        is_included_idx = np.logical_not(does_transition_exceeds_max_jump_distance)
+        
+        total_n_valid_tbin_transitions: int = np.sum(is_included_idx)
+        total_n_bad_tbins: int = np.sum(does_transition_exceeds_max_jump_distance)
+        
+        assert an_epoch_n_tbins == (total_n_valid_tbin_transitions + total_n_bad_tbins), f"an_epoch_n_tbins: {an_epoch_n_tbins} should equal = (total_n_valid_tbin_transitions: {total_n_valid_tbin_transitions} + total_n_bad_tbins: {total_n_bad_tbins})"
+
+        ratio_valid_tbins: float = float(total_n_valid_tbin_transitions) / float(an_epoch_n_tbins) # a valid between 0.0-1.0
+        return ratio_valid_tbins
+
 
 
 
@@ -680,6 +733,7 @@ class HeuristicReplayScoring:
          'jump': cls.bin_by_bin_jump_distance,
          'jump_cm': cls.bin_by_bin_position_jump_distance, 
          'jump_cm_per_sec': cls.bin_by_bin_position_jump_velocity, 
+         'large_jump_excluding': cls.bin_by_bin_large_jump_filtering_fn,
         #  'jump_cm': cls.bin_by_bin_position_jump_distance, 
         }
 
@@ -690,6 +744,7 @@ class HeuristicReplayScoring:
          'jump': cls.bin_wise_jump_distance_score,
          'max_jump_cm': cls.bin_wise_max_position_jump_distance, 
          'max_jump_cm_per_sec': cls.bin_wise_max_position_jump_velocity, 
+         'ratio_jump_valid_bins': cls.bin_wise_large_jump_ratio,
          'travel': cls.bin_wise_position_difference_score, 
          'coverage': cls.bin_wise_track_coverage_score_fn, 
          'continuous_seq_sort': cls.bin_wise_continuous_sequence_sort_score_fn, 
