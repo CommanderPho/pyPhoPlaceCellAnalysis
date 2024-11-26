@@ -2717,11 +2717,14 @@ class DecoderDecodedEpochsResult(ComputedResult):
 			for a_score_col in all_df_score_column_names:
 				extracted_merged_scores_df, curr_added_column_name_tuple = self.add_score_best_dir_columns(extracted_merged_scores_df, col_name=a_score_col, should_drop_directional_columns=False, is_col_name_suffix_mode=False)
 				added_column_names.extend(curr_added_column_name_tuple)
-		except BaseException as err:
+		except Exception as err:
 			print(f'build_complete_all_scores_merged_df(...): Encountered ERROR: {err} while trying to add "a_score_col": {a_score_col}, but trying to continue, so close!')
 
 
 		extracted_merged_scores_df = extracted_merged_scores_df.rename(columns=dict(zip(['P_decoder_long_LR','P_decoder_long_RL','P_decoder_short_LR','P_decoder_short_RL'], ['P_Long_LR','P_Long_RL','P_Short_LR','P_Short_RL'])), inplace=False)
+		if 'time_bin_size' not in extracted_merged_scores_df.columns:
+			## add the column
+			extracted_merged_scores_df['time_bin_size'] = self.ripple_decoding_time_bin_size
 
 		return extracted_merged_scores_df
 
@@ -2923,6 +2926,11 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
 		## try to export the merged all_scores dataframe
 		extracted_merged_scores_df: pd.DataFrame = self.build_complete_all_scores_merged_df()
+		if 'time_bin_size' not in extracted_merged_scores_df.columns:
+			## add the column
+			print(f'WARN: adding the time_bin_size columns: {self.ripple_decoding_time_bin_size}')
+			extracted_merged_scores_df['time_bin_size'] = self.ripple_decoding_time_bin_size
+
 		export_df_dict = {'ripple_all_scores_merged_df': extracted_merged_scores_df}
 		export_files_dict = export_files_dict | self.perform_export_dfs_dict_to_csvs(extracted_dfs_dict=export_df_dict, parent_output_path=parent_output_path, active_context=active_context, session_name=session_name, curr_session_t_delta=curr_session_t_delta, user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn)
 

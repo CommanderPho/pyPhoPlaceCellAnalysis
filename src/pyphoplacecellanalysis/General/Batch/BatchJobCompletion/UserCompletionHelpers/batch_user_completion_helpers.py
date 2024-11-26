@@ -774,13 +774,19 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 		return out_path 
 	
 
-	def _subfn_build_custom_export_to_h5_path(data_identifier_str: str = f'(decoded_posteriors)', parent_output_path: Path=None):
+	def _subfn_build_custom_export_to_h5_path(data_identifier_str: str = f'(decoded_posteriors)', a_tbin_size: float=None, parent_output_path: Path=None):
 		""" captures CURR_BATCH_DATE_TO_USE, `curr_active_pipeline`
 		"""
 		output_date_str: str = deepcopy(CURR_BATCH_DATE_TO_USE)
 		if (output_date_str is None) or (len(output_date_str) < 1):
 			output_date_str = get_now_rounded_time_str(rounded_minutes=10)
-		out_path, out_filename, out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=output_date_str, data_identifier_str=data_identifier_str, parent_output_path=parent_output_path, out_extension='.h5')
+			
+		if (a_tbin_size is not None):
+			## add optional time bin suffix:
+			a_tbin_size_str: str = f"{round(a_tbin_size, ndigits=5)}"
+			a_data_identifier_str: str = f'{data_identifier_str}_tbin-{a_tbin_size_str}' ## build the identifier '(decoded_posteriors)_tbin-1.5'
+			
+		out_path, out_filename, out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=output_date_str, data_identifier_str=a_data_identifier_str, parent_output_path=parent_output_path, out_extension='.h5')
 		return out_path 
 	
 
@@ -921,7 +927,7 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 		## Exports: "2024-11-26_Lab-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(decoded_posteriors).h5"
 		print(f'save_hdf == True, so exporting posteriors to HDF file...')
 		# parent_output_path = self.collected_outputs_path.resolve()
-		save_path: Path = _subfn_build_custom_export_to_h5_path(data_identifier_str='(decoded_posteriors)', parent_output_path=self.collected_outputs_path.resolve())
+		save_path: Path = _subfn_build_custom_export_to_h5_path(data_identifier_str='(decoded_posteriors)', a_tbin_size=directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size, parent_output_path=self.collected_outputs_path.resolve())
 		# save_path = Path(f'output/{BATCH_DATE_TO_USE}_newest_all_decoded_epoch_posteriors.h5').resolve()
 		complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
 		_, _, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
@@ -936,7 +942,7 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 		out_contexts, _flat_all_HDF5_out_paths = PosteriorExporting.perform_save_all_decoded_posteriors_to_HDF5(decoder_laps_filter_epochs_decoder_result_dict=None,
 																					decoder_ripple_filter_epochs_decoder_result_dict=deepcopy(directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict),
 																					_save_context=_parent_save_context.get_raw_identifying_context(), save_path=save_path, should_overwrite_extant_file=(not allow_append_to_session_h5_file))
-		out_contexts
+
 		_flat_all_HDF5_out_paths = list(dict.fromkeys([v.as_posix() for v in _flat_all_HDF5_out_paths]).keys())
 		_output_HDF5_paths_info_str: str = '\n'.join([f'"{file_uri_from_path(a_path)}"' for a_path in _flat_all_HDF5_out_paths])
 		# print(f'\t\t\tHDF5 Paths: {_flat_all_HDF5_out_paths}\n')
@@ -2225,8 +2231,11 @@ def export_session_h5_file_completion_function(self, global_data_root_parent_pat
 	Results can be extracted from batch output by 
 	
 	# Extracts the callback results 'determine_session_t_delta_completion_function':
-	extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('determine_session_t_delta_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
+	extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('export_session_h5_file_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
 
+
+	Exports:
+		'/nfs/turbo/umms-kdiba/KDIBA/pin01/one/fet11-01_12-58-54/output/pipeline_results.h5'
 
 	"""
 	import sys
@@ -2255,7 +2264,7 @@ def export_session_h5_file_completion_function(self, global_data_root_parent_pat
 		try:
 			curr_active_pipeline.export_pipeline_to_h5()
 			was_write_good = True
-		except BaseException as e:
+		except Exception as e:
 			exception_info = sys.exc_info()
 			err = CapturedException(e, exception_info)
 			print(f"ERROR: encountered exception {err} while trying to build the session HDF output for {curr_session_context}")
@@ -2307,7 +2316,7 @@ def save_custom_session_files_completion_function(self, global_data_root_parent_
 		custom_save_filepaths = curr_active_pipeline.custom_save_pipeline_as(enable_save_pipeline_pkl=True, enable_save_global_computations_pkl=True, enable_save_h5=True)
 		was_write_good = True
 
-	except BaseException as e:
+	except Exception as e:
 		exception_info = sys.exc_info()
 		err = CapturedException(e, exception_info)
 		print(f"ERROR: encountered exception {err} while trying to backup the pipeline for {curr_session_context}")
@@ -2479,6 +2488,10 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
 	extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('compute_and_export_session_extended_placefield_peak_information_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
 
 
+	Exports
+		*_neuron_replay_stats_df.csv
+		*_neuron_replay_stats_df.json
+		
 	"""
 	import sys
 	from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
@@ -2523,7 +2536,7 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
 		
 		print(f'\t\t done (success).')
 
-	except BaseException as e:
+	except Exception as e:
 		exception_info = sys.exc_info()
 		err = CapturedException(e, exception_info)
 		print(f"WARN: on_complete_success_execution_session: encountered exception {err} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
@@ -2543,7 +2556,7 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
 			print(f'\t saving to CSV: "{csv_output_path}" done.')
 			callback_outputs['csv_output_path'] = csv_output_path
 
-		except BaseException as e:
+		except Exception as e:
 			exception_info = sys.exc_info()
 			err = CapturedException(e, exception_info)
 			print(f"ERROR: encountered exception {err} while trying to save to CSV for {curr_session_context}")
@@ -2564,7 +2577,7 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
 			print(f'\t saving to JSON: "{json_output_path}" done.')
 			callback_outputs['json_output_path'] = json_output_path
 
-		except BaseException as e:
+		except Exception as e:
 			exception_info = sys.exc_info()
 			err = CapturedException(e, exception_info)
 			print(f"ERROR: encountered exception {err} while trying to save to json for {curr_session_context}")
