@@ -917,6 +917,7 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 																			  user_annotation_selections={'ripple': any_good_selected_epoch_times},
 																			  valid_epochs_selections={'ripple': filtered_valid_epoch_times},
 																			  custom_export_df_to_csv_fn=custom_export_df_to_csv_fn,
+																			  should_export_complete_all_scores_df=True, export_df_variable_names=[], # `export_df_variable_names=[]` means export no non-complete dfs
 																			  )
 	_output_csv_paths_info_str: str = '\n'.join([f'{a_name}: "{file_uri_from_path(a_path)}"' for a_name, a_path in _output_csv_paths.items()])
 	# print(f'\t\t\tCSV Paths: {_output_csv_paths}\n')

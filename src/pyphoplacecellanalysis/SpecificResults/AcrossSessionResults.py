@@ -1775,7 +1775,7 @@ top_level_parts_separators = ['-', '__']
 #     return most_recent_files
 
 
-def get_only_most_recent_csv_sessions(parsed_paths_df: pd.DataFrame, group_column_names=['session', 'custom_replay_name', 'file_type', 'decoding_time_bin_size_str'], sort_datetime_col_name:str='export_datetime') -> pd.DataFrame:
+def get_only_most_recent_session_files(parsed_paths_df: pd.DataFrame, group_column_names=['session', 'custom_replay_name', 'file_type', 'decoding_time_bin_size_str'], sort_datetime_col_name:str='export_datetime') -> pd.DataFrame:
     """ returns a dataframe containing only the most recent '.err' and '.log' file for each session. 
     
     from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import get_only_most_recent_csv_sessions
@@ -1880,7 +1880,7 @@ def find_most_recent_files(found_session_export_paths: List[Path], cuttoff_date:
     # _test_df = parsed_paths_df[parsed_paths_df['filename'] == '2024-11-22_GL-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025.csv']
 
     ## This is where we drop all but the most recent:
-    filtered_parsed_paths_df = get_only_most_recent_csv_sessions(parsed_paths_df=deepcopy(parsed_paths_df), group_column_names=['session', compare_custom_replay_name_col_name, 'file_type', 'decoding_time_bin_size_str']) ## `filtered_parsed_paths_df` still has it
+    filtered_parsed_paths_df = get_only_most_recent_session_files(parsed_paths_df=deepcopy(parsed_paths_df), group_column_names=['session', compare_custom_replay_name_col_name, 'file_type', 'decoding_time_bin_size_str']) ## `filtered_parsed_paths_df` still has it
     
     # '2024-11-22_GL-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025.csv' in [Path(v).name for v in filtered_parsed_paths_df['path'].to_list()]
     # Drop rows with export_datetime less than or equal to cutoff_date
