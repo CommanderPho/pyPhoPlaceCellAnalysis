@@ -2418,7 +2418,9 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                     
 
             fig.layout.hovermode = 'closest'
-            fig.data[0].on_click(on_click)
+            if len(fig.data) > 0:
+                ## prevent IndexError: tuple index out of range
+                fig.data[0].on_click(on_click)
 
             scatter_traces = list(fig.select_traces(selector=None, row=1, col=2))
             for trace in scatter_traces:

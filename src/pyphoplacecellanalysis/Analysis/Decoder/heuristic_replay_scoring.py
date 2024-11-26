@@ -470,9 +470,9 @@ class HeuristicReplayScoring:
         """
         an_epoch_n_tbins: int = a_result.nbins[an_epoch_idx]
         time_window_centers_arr_masked, arr_masked = cls.bin_by_bin_large_jump_filtering_fn(a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length)
-        n_valid_time_bins = len(time_window_centers_arr_masked)
-        if n_valid_time_bins < 2:
-            return np.inf ## return infinity, meaning it never resolves position appropriately
+        # n_valid_time_bins = len(time_window_centers_arr_masked)
+        # if n_valid_time_bins < 2:
+        #     return np.inf ## return infinity, meaning it never resolves position appropriately
         ## extract the mask
         does_transition_exceeds_max_jump_distance = deepcopy(time_window_centers_arr_masked.mask)
         is_included_idx = np.logical_not(does_transition_exceeds_max_jump_distance)
