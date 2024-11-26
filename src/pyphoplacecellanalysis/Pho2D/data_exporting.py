@@ -48,7 +48,9 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 from pyphocorehelpers.plotting.media_output_helpers import vertical_image_stack, horizontal_image_stack
 from PIL import Image, ImageOps, ImageFilter # for export_array_as_image
-
+from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
+from pyphocorehelpers.assertion_helpers import Assert
+from attrs import define, field, Factory
 
 
 @define(slots=False, eq=False)
@@ -1072,3 +1074,127 @@ class PosteriorExporting:
         # _out_save_tuples.append((_out_all_decoders_posteriors_and_rasters_stack_image, _sub_img_path))
 
         return ripple_specific_folder, (out_image_save_tuple_dict, _out_rasters_save_paths, merged_img_save_path)
+
+
+
+
+
+@define(slots=False)
+class LoadedPosteriorContainer:
+    """ 
+    from pyphoplacecellanalysis.Pho2D.data_exporting import LoadedPosteriorContainer
+    """
+    file_path: Optional[Path] = field(default=None)
+    session_key_parts: List = field(default=Factory(list))
+    custom_replay_parts: List = field(default=Factory(list))
+    
+    ripple_data_field_dict: Dict = field(default=Factory(dict))
+
+    _decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+    
+
+    @property
+    def all_parts_tuple(self) -> Tuple:
+        """The ripple_img_dict property."""
+        return tuple([*self.session_key_parts, *self.custom_replay_parts])
+    
+    @property
+    def full_complete_context_key(self) -> str:
+        """The 'kdiba/gor01/one/2006-6-08_14-26-15/withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0' property."""
+        return '/' + ('/'.join(list(self.all_parts_tuple))).lstrip('/') ## ensure starting forward-slash
+    
+    @property
+    def ripple_img_dict(self):
+        """The ripple_img_dict property."""
+        return self.ripple_data_field_dict['p_x_given_n_grey']
+
+
+    @classmethod
+    def init_from_load_path(cls, load_path: Path):
+        """ loads """
+        Assert.path_exists(load_path)
+
+        ## used for reconstituting dataset:
+        dataset_type_fields = ['p_x_given_n', 'p_x_given_n_grey', 'most_likely_positions', 'most_likely_position_indicies', 'time_bin_edges', 't_bin_centers']
+        decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+
+        _out_dict, (session_key_parts, custom_replay_parts) = PosteriorExporting.load_decoded_posteriors_from_HDF5(load_path=load_path, debug_print=True)
+        _out_ripple_only_dict = {k:v['ripple'] for k, v in _out_dict.items()} ## cut down to only the laps
+
+        ## build the final ripple data outputs:
+        ripple_data_field_dict = {}
+        # active_var_key: str = 'p_x_given_n' # dataset_type_fields	
+
+        for active_var_key in dataset_type_fields:
+            ripple_data_field_dict[active_var_key] = {
+                a_decoder_name: [v for v in _out_ripple_only_dict[a_decoder_name][active_var_key]] for a_decoder_name in decoder_names
+            }
+
+        _obj = cls(file_path=load_path, 
+                   ripple_data_field_dict=ripple_data_field_dict, session_key_parts=session_key_parts, custom_replay_parts=custom_replay_parts)
+        # ripple_img_dict = ripple_data_field_dict['p_x_given_n_grey']
+
+        return _obj
+
+
+    @classmethod
+    def load_batch_hdf5_exports(cls, exported_posterior_data_h5_files) -> Dict[str, "LoadedPosteriorContainer"]:
+        """ 
+        
+        all_sessions_exported_posteriors_list = LoadedPosteriorContainer.load_batch_hdf5_exports(exported_posterior_data_h5_files=exported_posterior_data_h5_files)
+        
+        """
+        exported_posterior_data_h5_files = [Path(v).resolve() for v in exported_posterior_data_h5_files] ## should parse who name and stuff... but we don't.
+        all_sessions_exported_posteriors_list: List["LoadedPosteriorContainer"] = [cls.init_from_load_path(load_path=hdf_load_path) for hdf_load_path in exported_posterior_data_h5_files] ## need to export those globally unique identifiers for each aclu within a session
+        # _global_output_dict = {tuple([*v.session_key_parts, *v.custom_replay_parts]):v for v in all_sessions_exported_posteriors_list}
+        all_sessions_exported_posteriors_dict = {v.full_complete_context_key:v for v in all_sessions_exported_posteriors_list}
+        all_sessions_exported_posteriors_data_only_dict = {v.full_complete_context_key:deepcopy(v.ripple_data_field_dict) for v in all_sessions_exported_posteriors_list}
+
+        return all_sessions_exported_posteriors_dict, all_sessions_exported_posteriors_data_only_dict
+    
+
+        # for i, (a_path, a_first_spike_time_tuple) in enumerate(zip(first_spike_activity_data_h5_files, all_sessions_first_spike_activity_tuples)):
+        #     all_cells_first_spike_time_df_loaded, global_spikes_df_loaded, global_spikes_dict_loaded, first_spikes_dict_loaded, extra_dfs_dict_loaded = a_first_spike_time_tuple ## unpack
+
+
+
+@define(slots=False, eq=False, repr=False)
+class PosteriorPlottingDatasource:
+    """ a datasource that provides posteriors
+    
+    from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorPlottingDatasource
+    
+    """
+    data_field_dict: Dict = field(default=Factory(dict))
+    plot_heatmap_fn: Callable = field(default=None)
+
+    def get_posterior_data(self, session_name: str, custom_replay_name: str, a_variable_name:str='p_x_given_n_grey', a_decoder_name: str='long_LR', last_selected_idx: Optional[int] = 0):
+        """ 
+        
+        """
+        '/kdiba_gor01_one_2006-6-09_1-22-43/withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0'
+        '/kdiba/gor01/one/2006-6-09_1-22-43/withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0'
+
+        session_name = session_name.replace('_', '/', 3) # '/kdiba_gor01_one_2006-6-09_1-22-43' -> '/kdiba/gor01/one/2006-6-09_1-22-43'
+        # if last_selected_idx is None:
+        #     # df_filter.hover_posterior_data.ripple_img_dict
+        #     # df_filter.hover_posterior_preview_figure_widget.add_heatmap()
+        full_key: str = f'/{session_name}/{custom_replay_name}'
+        assert full_key in self.data_field_dict, f"full_key: '{full_key}' was not in self.data_field_dict: {list(self.data_field_dict.keys())}"
+        a_heatmap_img = self.data_field_dict[full_key][a_variable_name][a_decoder_name][last_selected_idx]
+        return a_heatmap_img
+
+    # def _plot_hoverred_heatmap_preview_posterior(self, session_name: str, custom_replay_name: str, last_selected_idx: Optional[int] = 0):
+    #     # if last_selected_idx is None:
+    #     #     # df_filter.hover_posterior_data.ripple_img_dict
+    #     #     # df_filter.hover_posterior_preview_figure_widget.add_heatmap()
+    #     full_key: str = f'/{session_name}/{custom_replay_name}'
+    #     assert full_key in self.data_field_dict, f"full_key: '{full_key}' was not in self.data_field_dict: {list(self.data_field_dict.keys())}"
+    #     a_heatmap_img = self.data_field_dict[full_key]['long_LR'][last_selected_idx]
+        
+    #     # a_heatmap_img = df_filter.hover_posterior_data.ripple_img_dict['long_LR'][last_selected_idx]    
+        
+    #     ## update the plot
+    #     if self.plot_heatmap_fn is not None:
+    #         self.plot_heatmap_fn(
+    #     df_filter.hover_posterior_preview_figure_widget.add_heatmap(z=a_heatmap_img, showscale=False, name='selected_posterior', )

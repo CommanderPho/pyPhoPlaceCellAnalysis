@@ -2,6 +2,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Dict, Callable, List, Optional, Tuple
 from attrs import define, field
+from nptyping import NDArray
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
@@ -1878,44 +1879,7 @@ from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
 from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
 from pyphocorehelpers.assertion_helpers import Assert
 from attrs import define, field, Factory
-
-@define(slots=False)
-class LoadedPosteriorContainer:
-    """ 
-    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import LoadedPosteriorContainer
-    """
-    ripple_data_field_dict: Dict = field(default=Factory(dict))
-
-    @property
-    def ripple_img_dict(self):
-        """The ripple_img_dict property."""
-        return self.ripple_data_field_dict['p_x_given_n_grey']
-
-    @classmethod
-    def init_from_load_path(cls, load_path: Path):
-        """ loads """
-        Assert.path_exists(load_path)
-
-        ## used for reconstituting dataset:
-        dataset_type_fields = ['p_x_given_n', 'p_x_given_n_grey', 'most_likely_positions', 'most_likely_position_indicies', 'time_bin_edges', 't_bin_centers']
-        decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
-
-        _out_dict, (session_key_parts, custom_replay_parts) = PosteriorExporting.load_decoded_posteriors_from_HDF5(load_path=load_path, debug_print=True)
-        _out_ripple_only_dict = {k:v['ripple'] for k, v in _out_dict.items()} ## cut down to only the laps
-
-        ## build the final ripple data outputs:
-        ripple_data_field_dict = {}
-        # active_var_key: str = 'p_x_given_n' # dataset_type_fields	
-
-        for active_var_key in dataset_type_fields:
-            ripple_data_field_dict[active_var_key] = {
-                a_decoder_name: [v for v in _out_ripple_only_dict[a_decoder_name][active_var_key]] for a_decoder_name in decoder_names
-            }
-
-        _obj = cls(ripple_data_field_dict=ripple_data_field_dict)
-        # ripple_img_dict = ripple_data_field_dict['p_x_given_n_grey']
-
-        return _obj
+from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorPlottingDatasource, LoadedPosteriorContainer
 
 
 def _build_solera_file_download_widget(fig, filename="figure-image.png", label="Save Figure"):
@@ -2038,7 +2002,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     # Add Output widget for JavaScript execution
     # js_output: widgets.Output = non_serialized_field(init=False)
     hover_posterior_preview_figure_widget: go.FigureWidget = non_serialized_field(init=False)
-    hover_posterior_data: LoadedPosteriorContainer = non_serialized_field()
+    # hover_posterior_data: LoadedPosteriorContainer = non_serialized_field()
+    hover_posterior_data: PosteriorPlottingDatasource = non_serialized_field()
     
 
     # Begin Properties ___________________________________________________________________________________________________ #
@@ -2411,6 +2376,9 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     def _build_plot_callback(cls, earliest_delta_aligned_t_start, latest_delta_aligned_t_end, save_plotly, should_save: bool = False, resolution_multiplier=1, enable_debug_print=False, **extra_plot_kwargs):
         # fig_size_kwargs = {'width': 1650, 'height': 480}
         
+        
+                
+
         # fig_size_kwargs = {'width': resolution_multiplier*1650, 'height': resolution_multiplier*480}
         ## set up figure size
         fig_size_kwargs = {'width': (resolution_multiplier * 1800), 'height': (resolution_multiplier*480)}
@@ -2441,12 +2409,13 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             captures: _perform_plot_pre_post_delta_scatter_with_embedded_context, should_save, extra_plot_kwargs
             
             """
-            def _plot_hoverred_heatmap_preview_posterior(df_filter: DataFrameFilter, last_selected_idx: Optional[int] = 0):
+            # def _plot_hoverred_heatmap_preview_posterior(df_filter: DataFrameFilter, last_selected_idx: Optional[int] = 0):
+            def _plot_hoverred_heatmap_preview_posterior(df_filter: DataFrameFilter, a_heatmap_img: Optional[NDArray]):
                 # if last_selected_idx is None:
                 #     # df_filter.hover_posterior_data.ripple_img_dict
                 #     # df_filter.hover_posterior_preview_figure_widget.add_heatmap()
 
-                a_heatmap_img = df_filter.hover_posterior_data.ripple_img_dict['long_LR'][last_selected_idx]    
+                # a_heatmap_img = df_filter.hover_posterior_data.ripple_img_dict['long_LR'][last_selected_idx]    
                 ## update the plot
                 df_filter.hover_posterior_preview_figure_widget.add_heatmap(z=a_heatmap_img, showscale=False, name='selected_posterior', )
 
@@ -2474,6 +2443,11 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                 customdata=active_plot_df[["session_name", "custom_replay_name", "start", "duration"]].values
             )
 
+            if df_filter.hover_posterior_data is not None:
+                if df_filter.hover_posterior_data.plot_heatmap_fn is None:
+                    df_filter.hover_posterior_data.plot_heatmap_fn = (lambda a_df_filter, a_heatmap_img, *args, **kwargs: a_df_filter.hover_posterior_preview_figure_widget.add_heatmap(z=a_heatmap_img, showscale=False, name='selected_posterior', ))
+                    
+
             def on_click(trace, points, selector):
                 if points.point_inds:
                     ## has selection:
@@ -2494,14 +2468,19 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                     ## try to update the selected heatmap posterior:
                     try:
                         ## try to update by start_t, stop_t
-                        _plot_hoverred_heatmap_preview_posterior(df_filter=df_filter, last_selected_idx=ind) #TODO 2024-11-26 07:32: - [ ] does this work?
+                        _heatmap_data = df_filter.hover_posterior_data.get_posterior_data(session_name=session_name, custom_replay_name=custom_replay_name,
+                                                                          a_decoder_name='long_LR', last_selected_idx=ind)
+                        
+                        # _plot_hoverred_heatmap_preview_posterior(df_filter=df_filter, last_selected_idx=ind) #TODO 2024-11-26 07:32: - [ ] does this work?
+                        _plot_hoverred_heatmap_preview_posterior(df_filter=df_filter, a_heatmap_img=_heatmap_data)
+
                     except Exception as e:
                         print(f'encountered exception when trying to call `_plot_hoverred_heatmap_preview_posterior(..., last_selected_idx={ind}, start_t: {start_t}, stop_t: {stop_t}). Error {e}. Skipping.')
                                             
                 else:
                     ## no selection:
                     # print(f'NOPE! points: {points}, trace: {trace}')
-                    df_filter.output_widget.clear_output()
+                    # df_filter.output_widget.clear_output()
                     if enable_debug_print:
                         with df_filter.output_widget:
                             print(f'NOPE! points: {points}, trace: {trace}')
