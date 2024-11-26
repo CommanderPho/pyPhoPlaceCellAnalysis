@@ -708,7 +708,8 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 
 @function_attributes(short_name=None, tags=['CSVs', 'export', 'across-sessions', 'batch', 'single-time-bin-size', 'ripple_all_scores_merged_df'], input_requires=['DirectionalLaps', 'RankOrder', 'DirectionalDecodersEpochsEvaluations'], output_provides=[], uses=['filter_and_update_epochs_and_spikes', 'DecoderDecodedEpochsResult', 'DecoderDecodedEpochsResult.export_csvs'], used_by=[], creation_date='2024-04-27 21:20', related_items=[])
 def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-										       ripple_decoding_time_bin_size_override: Optional[float]=None, laps_decoding_time_bin_size_override: Optional[float]=None, needs_recompute_heuristics: bool = False, save_hdf:bool=True) -> dict:
+										       ripple_decoding_time_bin_size_override: Optional[float]=None, laps_decoding_time_bin_size_override: Optional[float]=None, needs_recompute_heuristics: bool = False,
+											    save_hdf:bool=True, allow_append_to_session_h5_file:bool=True) -> dict:
 	"""
 	Aims to export the results of the global 'directional_decoders_evaluate_epochs' calculation
 
@@ -737,6 +738,8 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 	"K:/scratch/collected_outputs/2024-11-26_0240AM-kdiba_gor01_one_2006-6-09_1-22-43-(ripple_simple_pf_pearson_merged_df)_tbin-0.025.csv"
 	"K:/scratch/collected_outputs/2024-11-26_0240AM-kdiba_gor01_one_2006-6-09_1-22-43-(ripple_weighted_corr_merged_df)_tbin-0.025.csv"
 	
+	if save_hdf:
+		"2024-11-26_Lab-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(decoded_posteriors).h5"
 
 	"""
 	print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
@@ -915,6 +918,7 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 	
 	# Export HDF5 ________________________________________________________________________________________________________ #
 	if save_hdf:
+		## Exports: "2024-11-26_Lab-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(decoded_posteriors).h5"
 		print(f'save_hdf == True, so exporting posteriors to HDF file...')
 		# parent_output_path = self.collected_outputs_path.resolve()
 		save_path: Path = _subfn_build_custom_export_to_h5_path(data_identifier_str='(decoded_posteriors)', parent_output_path=self.collected_outputs_path.resolve())
@@ -931,7 +935,7 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 		}
 		out_contexts, _flat_all_HDF5_out_paths = PosteriorExporting.perform_save_all_decoded_posteriors_to_HDF5(decoder_laps_filter_epochs_decoder_result_dict=None,
 																					decoder_ripple_filter_epochs_decoder_result_dict=deepcopy(directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict),
-																					_save_context=_parent_save_context.get_raw_identifying_context(), save_path=save_path)
+																					_save_context=_parent_save_context.get_raw_identifying_context(), save_path=save_path, should_overwrite_extant_file=(not allow_append_to_session_h5_file))
 		out_contexts
 		_flat_all_HDF5_out_paths = list(dict.fromkeys([v.as_posix() for v in _flat_all_HDF5_out_paths]).keys())
 		_output_HDF5_paths_info_str: str = '\n'.join([f'"{file_uri_from_path(a_path)}"' for a_path in _flat_all_HDF5_out_paths])
