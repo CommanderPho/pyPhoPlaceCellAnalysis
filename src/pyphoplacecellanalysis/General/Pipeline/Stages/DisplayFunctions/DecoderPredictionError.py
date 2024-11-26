@@ -1464,7 +1464,7 @@ class WeightedCorrelationPlotData:
     ## class properties:
     @classmethod
     def column_names(cls) -> List[str]:
-        return ['wcorr', 'P_decoder', 'pearsonr', 'travel', 'coverage', 'max_jump', 'total_congruent_direction_change', 'longest_sequence_length']
+        return ['wcorr', 'P_decoder', 'pearsonr', 'travel', 'coverage', 'max_jump', 'max_jump_cm', 'max_jump_cm_per_sec', 'ratio_jump_valid_bins', 'total_congruent_direction_change', 'longest_sequence_length']
 
     @classmethod
     def init_from_df_row_tuple_and_formatting_fn_dict(cls, a_tuple: Tuple, column_formatting_fn_dict: Dict[str, Optional[Callable]]) -> "WeightedCorrelationPlotData":
