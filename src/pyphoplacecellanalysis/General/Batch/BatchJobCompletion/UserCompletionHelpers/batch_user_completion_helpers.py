@@ -934,10 +934,9 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 																					_save_context=_parent_save_context.get_raw_identifying_context(), save_path=save_path)
 		out_contexts
 		_flat_all_HDF5_out_paths = list(dict.fromkeys([v.as_posix() for v in _flat_all_HDF5_out_paths]).keys())
-		
-	_output_HDF5_paths_info_str: str = '\n'.join([f'{a_name}: "{file_uri_from_path(a_path)}"' for a_name, a_path in _flat_all_HDF5_out_paths.items()])
-	# print(f'\t\t\tHDF5 Paths: {_flat_all_HDF5_out_paths}\n')
-	print(f'\t\t\tHDF5 Paths: {_output_HDF5_paths_info_str}\n')
+		_output_HDF5_paths_info_str: str = '\n'.join([f'"{file_uri_from_path(a_path)}"' for a_path in _flat_all_HDF5_out_paths])
+		# print(f'\t\t\tHDF5 Paths: {_flat_all_HDF5_out_paths}\n')
+		print(f'\t\t\tHDF5 Paths: {_output_HDF5_paths_info_str}\n')
 
 	print(f'\t\tsuccessfully exported directional_decoders_epochs_decode_result to {self.collected_outputs_path}!')
 
