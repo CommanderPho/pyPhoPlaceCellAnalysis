@@ -954,7 +954,7 @@ class HeuristicReplayScoring:
     @classmethod
     @function_attributes(short_name='continuous_seq_sort', tags=['bin-wise', 'bin-size', 'score', 'replay', 'UNFINISHED'], input_requires=[], output_provides=[],
                           uses=['SubsequencesPartitioningResult', '_compute_sequences_spanning_ignored_intrusions'], used_by=[], creation_date='2024-03-12 01:05', related_items=['SubsequencesPartitioningResult'])
-    def bin_wise_continuous_sequence_sort_score_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, same_thresh: float=4, max_ignore_bins:int=2) -> float:
+    def bin_wise_continuous_sequence_sort_score_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, same_thresh_fraction_of_track: float = 0.1, max_ignore_bins:int=2) -> float:
         """ The amount of the track that is represented by the decoding. More is better (indicating a longer replay).
 
         - Finds the longest continuous sequence (perhaps with some intrusions allowed?)
@@ -999,6 +999,7 @@ class HeuristicReplayScoring:
         n_time_bins: int = a_result.nbins[an_epoch_idx]
         n_pos_bins: int = np.shape(a_p_x_given_n)[0]
         time_window_centers = a_result.time_window_centers[an_epoch_idx]
+        same_thresh_cm: float = float(same_thresh_fraction_of_track * a_decoder_track_length)
 
         ## Begin computations:
 
@@ -1020,7 +1021,7 @@ class HeuristicReplayScoring:
         # sign_change_indices = np.where(np.diff(a_first_order_diff_sign) != 0)[0] + 1  # Add 1 because np.diff reduces the index by 1
 
         ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
-        partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh)
+        partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm)
         _tmp_merge_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove) = partition_result.merge_over_ignored_intrusions(max_ignore_bins=max_ignore_bins)
         longest_sequence_length_ratio: float = partition_result.longest_sequence_length_ratio 
         
