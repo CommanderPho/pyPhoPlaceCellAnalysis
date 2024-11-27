@@ -1711,6 +1711,37 @@ def parse_filename(path: Union[Path, str], debug_print:bool=False) -> Tuple[date
 
     filename = '2024-09-11_0150PM-kdiba_gor01_two_2006-6-12_16-53-46-(ripple_all_scores_merged_df)_tbin-0.058'
     
+
+    # TESTING 2024-11-27 17:59 ___________________________________________________________________________________________ #
+    ```
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import parse_filename
+
+        test_filename_strs: Dict[str, str] = dict(date_day_only_name = "2024-11-27-kdiba_gor01_one_2006-6-12_15-55-31__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025",
+                                                date_day_only_with_suffix_name = "2024-11-27_GL-kdiba_gor01_one_2006-6-12_15-55-31__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025",
+        date_day_time_missing_custom_replay_name = "2024-11-27_1220PM-kdiba_gor01_one_2006-6-12_15-55-31-(laps_simple_pf_pearson_merged_df)_tbin-0.25",
+        date_day_time_variant_suffix_name = "2024-11-27_1220PM_GL-kdiba_gor01_one_2006-6-12_15-55-31__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025",
+        date_day_time_variant_suffix_missing_tbin_name = "2024-11-27_1220PM_GL-kdiba_gor01_one_2006-6-12_15-55-31__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)",
+        )
+
+        expected_parse_results_dict = dict(
+            date_day_only_name = (datetime(2024, 11, 27, 0, 0), 'kdiba_gor01_one_2006-6-12_15-55-31', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0', 'ripple_all_scores_merged_df', '0.025'),
+            date_day_only_with_suffix_name = (datetime(2024, 11, 27, 0, 0), 'kdiba_gor01_one_2006-6-12_15-55-31', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0', 'ripple_all_scores_merged_df', '0.025'),
+            date_day_time_missing_custom_replay_name = (datetime(2024, 11, 27, 12, 20), 'kdiba_gor01_one_2006-6-12_15-55-31', None, 'laps_simple_pf_pearson_merged_df', '0.25'),
+            date_day_time_variant_suffix_name = (datetime(2024, 11, 27, 12, 20), 'kdiba_gor01_one_2006-6-12_15-55-31', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0', 'ripple_all_scores_merged_df', '0.025'),
+            date_day_time_variant_suffix_missing_tbin_name = (datetime(2024, 11, 27, 12, 20), 'kdiba_gor01_one_2006-6-12_15-55-31', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0', 'ripple_all_scores_merged_df', None)
+        )
+
+        ## perform the actual parsing:
+        parse_result_dict = {k:parse_filename(v, debug_print=True) for k, v in test_filename_strs.items()}
+        display(parse_result_dict)
+
+        assert np.alltrue([(expected_parse_results_dict[k] == v) for k, v in parse_result_dict.items()]), f"not all parsed results match their expected results!"
+
+        print('expected_parse_results_dict = dict(')
+        print(',\n'.join([f"\t{k} = {str(v)}" for k, v in parse_result_dict.items()]))
+        print(')\n')
+
+    ```
     """
     if isinstance(path, str):
         filename: str = path  
