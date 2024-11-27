@@ -116,31 +116,33 @@ def _compute_sequences_spanning_ignored_intrusions(subsequence_list, continuous_
         left_flanking_seq_length = continuous_sequence_lengths[left_flanking_index]
         if (left_flanking_seq_length <= max_ignore_bins):
             ## only if shorter than the max_ignore_bins can the left flanking sequence can be considered
-            left_congruent_flanking_sequence = [*subsequence_list[left_flanking_index]]
+            # left_congruent_flanking_sequence = [*subsequence_list[left_flanking_index]]
             ### Need to look even FURTHER to the left to see the prev sequence:
             if (target_subsequence_idx-2) >= 0:
                 left_congruent_flanking_index = (target_subsequence_idx-2)
                 ## Have a sequence to concatenate with
-                left_congruent_flanking_sequence.extend(subsequence_list[left_congruent_flanking_index])
+                left_congruent_flanking_sequence = [*subsequence_list[left_congruent_flanking_index], *subsequence_list[left_flanking_index]]
+                # left_congruent_flanking_sequence.extend(subsequence_list[left_congruent_flanking_index])
                 # left_congruent_flanking_sequence = subsequence_list[left_congruent_flanking_index]
-            else:
-                left_congruent_flanking_index = left_flanking_index
+            # else:
+            #     left_congruent_flanking_index = left_flanking_index
             
     # Scan right:
     if ((target_subsequence_idx+1) < len(continuous_sequence_lengths)):
         right_flanking_index = (target_subsequence_idx+1)
         right_flanking_seq_length = continuous_sequence_lengths[right_flanking_index]
         if (right_flanking_seq_length <= max_ignore_bins):
-            right_congruent_flanking_sequence = [*subsequence_list[right_flanking_index]]
+            # right_congruent_flanking_sequence = [*subsequence_list[right_flanking_index]]
             
             ### Need to look even FURTHER to the left to see the prev sequence:
             if (target_subsequence_idx+2) >= 0:
                 right_congruent_flanking_index = (target_subsequence_idx+2)
                 ## Have a sequence to concatenate with
-                right_congruent_flanking_sequence.extend(subsequence_list[right_congruent_flanking_index])
+                right_congruent_flanking_sequence = [*subsequence_list[right_flanking_index], *subsequence_list[right_congruent_flanking_index]]
+                # right_congruent_flanking_sequence.extend(subsequence_list[right_congruent_flanking_index])
                 # right_congruent_flanking_sequence = subsequence_list[right_congruent_flanking_index]
-            else:
-                right_congruent_flanking_index = right_flanking_index
+            # else:
+            #     right_congruent_flanking_index = right_flanking_index
 
 
     return (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index)
