@@ -341,7 +341,7 @@ def _debug_plot_time_bins_multiple(positions_list, num='debug_plot_time_binned_p
     return fig, ax
 
 
-
+from neuropy.utils.indexing_helpers import flatten
 
 
 @define(slots=False)
@@ -617,7 +617,7 @@ class SubsequencesPartitioningResult:
                         # use left sequence
                         if debug_print:
                             print(f'\tmerge left: left_congruent_flanking_sequence: {left_congruent_flanking_sequence}, left_congruent_flanking_index: {left_congruent_flanking_index}')
-                        new_subsequence = [*left_congruent_flanking_sequence, *active_ignored_subsequence]
+                        new_subsequence = np.array([*left_congruent_flanking_sequence, *active_ignored_subsequence])
                         ## remove old
                         for an_idx_to_remove in np.arange(left_congruent_flanking_index, (a_subsequence_idx+1)):                    
                             subsequences_to_remove.append(original_split_positions_arrays[an_idx_to_remove])
@@ -630,7 +630,7 @@ class SubsequencesPartitioningResult:
                         # merge right, be biased towards merging right (due to lack of >= above)
                         if debug_print:
                             print(f'\tmerge right: right_congruent_flanking_sequence: {right_congruent_flanking_sequence}, right_congruent_flanking_index: {right_congruent_flanking_index}')
-                        new_subsequence = [*active_ignored_subsequence, *right_congruent_flanking_sequence]
+                        new_subsequence = np.array([*active_ignored_subsequence, *right_congruent_flanking_sequence])
                         ## remove old
                         for an_idx_to_remove in np.arange(a_subsequence_idx, (right_congruent_flanking_index+1)):                    
                             subsequences_to_remove.append(original_split_positions_arrays[an_idx_to_remove])
@@ -646,11 +646,30 @@ class SubsequencesPartitioningResult:
                 pass
             
         # _tmp_merge_split_positions_arrays = deepcopy(original_split_positions_arrays)
-        # for a_subsequence_idx, a_subsequence, a_n_tbins, is_ignored in zip(np.arange(len(n_tbins_list)), original_split_positions_arrays, n_tbins_list, is_ignored_subsequence):
-        #         pass
+        final_out_subsequences = []
+        replace_idxs = [v[0] for k, v in subsequence_replace_dict.items()]
+        replace_idx_value_dict = {v[0]:v[1] for k, v in subsequence_replace_dict.items()} # will there be possible duplicates?
+        
+        any_remove_idxs = flatten([k for k, v in subsequence_replace_dict.items()])
+        
+        for a_subsequence_idx, a_subsequence, a_n_tbins, is_ignored in zip(np.arange(len(n_tbins_list)), original_split_positions_arrays, n_tbins_list, is_ignored_subsequence):
+                is_curr_subsequence_idx_in_replace_list = False
+                if a_subsequence_idx in replace_idxs:
+                    # the index to be replaced
+                    replacement_subsequence = replace_idx_value_dict[a_subsequence_idx]
+                    if debug_print:
+                        print(f'final: replacing subsequence[{a_subsequence_idx}] ({a_subsequence}) with {replacement_subsequence}.')
+                    final_out_subsequences.append(replacement_subsequence)
+                    
+                elif a_subsequence_idx in any_remove_idxs:
+                    ## to be excluded only
+                    pass
+                else:
+                    # included and unmodified
+                    final_out_subsequences.append(a_subsequence)
             
         # return (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index)
-        return _tmp_merge_split_positions_arrays, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove)
+        return _tmp_merge_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove)
 
 @metadata_attributes(short_name=None, tags=['heuristic', 'replay', 'ripple', 'scoring', 'pho'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 06:00', related_items=[])
 class HeuristicReplayScoring:
