@@ -763,6 +763,17 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 	print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
 	CURR_BATCH_DATE_TO_USE: str = self.BATCH_DATE_TO_USE
 
+	across_session_results_extended_dict['compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function'] = {'ripple_decoding_time_bin_size_override': ripple_decoding_time_bin_size_override,
+		'laps_decoding_time_bin_size_override': laps_decoding_time_bin_size_override,
+		'needs_recompute_heuristics': needs_recompute_heuristics, 'save_hdf': save_hdf, 'allow_append_to_session_h5_file': allow_append_to_session_h5_file,
+		'output_csv_paths': None, 'output_hdf_paths': None, # 'allow_append_to_session_h5_file': allow_append_to_session_h5_file,
+		
+	}
+	
+	# across_session_results_extended_dict['compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function'].update({'output_csv_paths': []})
+	# across_session_results_extended_dict['compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function'].update({'output_hdf_paths': []})
+	
+
 	def _subfn_custom_export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'(laps_marginals_df)', parent_output_path: Path=None):
 		""" captures CURR_BATCH_DATE_TO_USE, `curr_active_pipeline`
 		"""
@@ -919,9 +930,12 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 																			  custom_export_df_to_csv_fn=custom_export_df_to_csv_fn,
 																			  should_export_complete_all_scores_df=True, export_df_variable_names=[], # `export_df_variable_names=[]` means export no non-complete dfs
 																			  )
-	_output_csv_paths_info_str: str = '\n'.join([f'{a_name}: "{file_uri_from_path(a_path)}"' for a_name, a_path in _output_csv_paths.items()])
+	_output_csv_paths_info_str: str = '\n'.join([f'{a_name}: "{a_path}"' for a_name, a_path in _output_csv_paths.items()])
 	# print(f'\t\t\tCSV Paths: {_output_csv_paths}\n')
 	print(f'\t\t\tCSV Paths: {_output_csv_paths_info_str}\n')
+	across_session_results_extended_dict['compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function'].update({'output_csv_paths': _output_csv_paths})
+	
+	
 	
 	# Export HDF5 ________________________________________________________________________________________________________ #
 	if save_hdf:
@@ -945,17 +959,15 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 																					_save_context=_parent_save_context.get_raw_identifying_context(), save_path=save_path, should_overwrite_extant_file=(not allow_append_to_session_h5_file))
 
 		_flat_all_HDF5_out_paths = list(dict.fromkeys([v.as_posix() for v in _flat_all_HDF5_out_paths]).keys())
-		_output_HDF5_paths_info_str: str = '\n'.join([f'"{file_uri_from_path(a_path)}"' for a_path in _flat_all_HDF5_out_paths])
+		# _output_HDF5_paths_info_str: str = '\n'.join([f'"{file_uri_from_path(a_path)}"' for a_path in _flat_all_HDF5_out_paths])
+		_output_HDF5_paths_info_str: str = '\n'.join([f'"{a_path}"' for a_path in _flat_all_HDF5_out_paths])
 		# print(f'\t\t\tHDF5 Paths: {_flat_all_HDF5_out_paths}\n')
 		print(f'\t\t\tHDF5 Paths: {_output_HDF5_paths_info_str}\n')
+		across_session_results_extended_dict['compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function'].update({'output_hdf_paths': _flat_all_HDF5_out_paths})
+		
 
 	print(f'\t\tsuccessfully exported directional_decoders_epochs_decode_result to {self.collected_outputs_path}!')
 
-
-	# directional_decoders_epochs_decode_result.export_csvs
-	
-	# add to output dict
-	# across_session_results_extended_dict['compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function'] = _out
 
 	print(f'>>\t done with {curr_session_context}')
 	print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
