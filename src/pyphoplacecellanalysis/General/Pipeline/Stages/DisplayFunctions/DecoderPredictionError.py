@@ -1465,9 +1465,11 @@ class WeightedCorrelationPlotData:
     ## class properties:
     @classmethod
     def get_column_names(cls) -> List[str]:
-        """ columns for the dataframe can be hard-coded here in each derived class 
+        """ any possible column that you might want to include from the dataframe can be hard-coded here in each derived class 
         """
-        return ['wcorr', 'P_decoder', 'pearsonr', 'travel', 'coverage', 'avg_jump_cm', 'max_jump', 'max_jump_cm', 'max_jump_cm_per_sec', 'ratio_jump_valid_bins', 'total_congruent_direction_change', 'longest_sequence_length']
+        return ['wcorr', 'P_decoder', 'pearsonr', 'travel', 'coverage', 'avg_jump_cm', 'max_jump', 'max_jump_cm', 'max_jump_cm_per_sec', 'ratio_jump_valid_bins',
+                'total_congruent_direction_change', 'longest_sequence_length','continuous_seq_sort',
+        ]
 
     @classmethod
     def init_from_df_row_tuple_and_formatting_fn_dict(cls, a_tuple: Tuple, column_formatting_fn_dict: Dict[str, Optional[Callable]]) -> "WeightedCorrelationPlotData":
@@ -1503,7 +1505,7 @@ class WeightedCorrelationPlotData:
             default_float_formatting_fn = lambda v: str(np.array([v])).lstrip("[").rstrip("]")
             default_int_formatting_fn = lambda v: str(np.array([int(v)])).lstrip("[").rstrip("]")
             
-            def default_smart_formatting_fn(v) -> str:
+            def default_smart_value_formatting_fn(v) -> str:
                 """ determines type dynamically and chooses appropriate formatter. """
                 if is_integer(v):
                     return default_int_formatting_fn(v)
@@ -1511,6 +1513,10 @@ class WeightedCorrelationPlotData:
                     return default_float_formatting_fn(v)
                 else:
                     return f"{v}" ## naieve formatting
+
+            def default_smart_formatting_fn_factory(short_name: str) -> Callable:
+                """ determines type dynamically and chooses appropriate formatter. """
+                return (lambda v:f"{short_name}: {default_smart_value_formatting_fn(v)}")
                 
 
             column_formatting_fn_dict = {'start':None, 'stop':None, 'label':None, 'duration':None,
@@ -1526,6 +1532,8 @@ class WeightedCorrelationPlotData:
                 'ratio_jump_valid_bins':(lambda v:f"max_jump_cm: {default_float_formatting_fn(v)}"),
                 'total_congruent_direction_change':(lambda v:f"tot_$\Delta$_con_dir: {default_float_formatting_fn(v)}"),
                 'longest_sequence_length':(lambda v:f"longest_seq: {default_int_formatting_fn(v)}"),
+                'continuous_seq_sort':(lambda v:f"seq_srt: {default_float_formatting_fn(v)}"),
+                # 'continuous_seq_sort':default_smart_formatting_fn_factory(short_name='seq_srt'),
             }
 
             # actually_present_column_formatting_fn_dict = {k:v for k, v in column_formatting_fn_dict.items() if k in actually_present_df_column_names} # this version requires all columns to be defined in the above  `column_formatting_fn_dict`, see below

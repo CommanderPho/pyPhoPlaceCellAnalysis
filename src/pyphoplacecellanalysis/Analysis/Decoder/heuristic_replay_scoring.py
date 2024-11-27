@@ -456,11 +456,11 @@ class SubsequencesPartitioningResult:
 
         list_parts = [np.array(l) for l in list_parts]
 
-        _result = SubsequencesPartitioningResult(first_order_diff_lst=first_order_diff_lst, list_parts=list_parts, diff_split_indicies=diff_split_indicies, split_indicies=list_split_indicies, low_magnitude_change_indicies=sub_change_threshold_change_indicies, **kwargs)
+        _result = SubsequencesPartitioningResult(first_order_diff_lst=first_order_diff_lst, list_parts=list_parts, diff_split_indicies=diff_split_indicies, split_indicies=list_split_indicies, low_magnitude_change_indicies=sub_change_threshold_change_indicies, n_pos_bins=n_pos_bins, **kwargs)
         return _result
 
     @function_attributes(short_name=None, tags=['_compute_sequences_spanning_ignored_intrusions'], input_requires=['self.split_positions_arrays'], output_provides=['self.merged_split_positions_arrays'], uses=[], used_by=[], creation_date='2024-11-27 08:17', related_items=['_compute_sequences_spanning_ignored_intrusions'])
-    def merge_over_ignored_intrusions(self, max_ignore_bins: int = 2, debug_print=True):
+    def merge_over_ignored_intrusions(self, max_ignore_bins: int = 2, debug_print=False):
         """ an "intrusion" refers to one or more time bins that interrupt a longer sequence that would be monotonic if the intrusions were removed.
 
         The quintessential example would be a straight ramp that is interrupted by a single point discontinuity intrusion.  
@@ -1225,7 +1225,7 @@ class HeuristicReplayScoring:
         ## Wrap them:
         positions_fns_dict = {fn.__name__:(lambda *args, **kwargs: bin_wise_wrapper_score_fn(fn, *args, **kwargs, needs_times=False)) for fn in _positions_fns}
         positions_times_fns_dict = {fn.__name__:(lambda *args, **kwargs: bin_wise_wrapper_score_fn(fn, *args, **kwargs, needs_times=True)) for fn in _positions_times_fns}
-        all_bin_wise_computation_fn_dict = get_dict_subset(a_dict=cls.build_all_bin_wise_computation_fn_dict(), subset_excludelist=['continuous_seq_sort'])
+        all_bin_wise_computation_fn_dict = get_dict_subset(a_dict=cls.build_all_bin_wise_computation_fn_dict()) # , subset_excludelist=['continuous_seq_sort']
         all_score_computations_fn_dict = {**all_bin_wise_computation_fn_dict, **positions_fns_dict, **positions_times_fns_dict} # a_result, an_epoch_idx, a_decoder_track_length  - 'travel': cls.bin_wise_position_difference, 'coverage': cls.bin_wise_track_coverage_score_fn, 'jump': cls.bin_wise_jump_distance_score, 'max_jump': cls.bin_wise_max_position_jump_distance, 
         return all_score_computations_fn_dict
     
