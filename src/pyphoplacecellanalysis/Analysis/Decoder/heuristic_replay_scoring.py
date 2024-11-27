@@ -444,6 +444,11 @@ class HeuristicReplayScoring:
         an_epoch_n_tbins: int = a_result.nbins[an_epoch_idx]
         time_window_centers, bin_by_bin_jump_distance = HeuristicReplayScoring.bin_by_bin_position_jump_distance(a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length)
         assert len(time_window_centers) == len(bin_by_bin_jump_distance)
+        
+        # ## average jump distance 
+        # avg_bin_by_bin_jump_distance: float = np.nanmean(bin_by_bin_jump_distance) # avg jump distance
+
+
         ## convert to cm/sec (jump velocity) by dividing by time_bin_size
         # bin_by_bin_jump_velocity = deepcopy(bin_by_bin_jump_distance) / time_window_centers
         is_included_idx = (np.abs(bin_by_bin_jump_distance) <= max_position_jump_distance_cm)
@@ -507,15 +512,13 @@ class HeuristicReplayScoring:
 
             # compute the 1st-order diff of all positions
             a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
-            a_first_order_diff
+            
             # add up the differences over all time bins
             total_first_order_change: float = np.nansum(np.abs(a_first_order_diff[1:])) # use .abs() to sum the total distance traveled in either direction
-            total_first_order_change
             ## convert to a score
 
             # normalize by the number of bins to allow comparions between different Epochs (so epochs with more bins don't intrinsically have a larger score.
             total_first_order_change_score: float = float(total_first_order_change) / float(n_time_bins - 1)
-            total_first_order_change_score
             # normalize by the track length (long v. short) to allow fair comparison of the two (so the long track decoders don't intrinsically have a larger score).
             total_first_order_change_score = total_first_order_change_score / a_decoder_track_length
             ## RETURNS: total_first_order_change_score
@@ -558,6 +561,41 @@ class HeuristicReplayScoring:
         # total_first_order_change_score = total_first_order_change_score / a_decoder_track_length
         ## RETURNS: ratio_bins_higher_than_diffusion_across_time
         return ratio_bins_higher_than_diffusion_across_time
+
+
+    @classmethod
+    @function_attributes(short_name='avg_jump_cm', tags=['bin-wise', 'bin-size', 'score', 'replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 17:50', related_items=[])
+    def bin_wise_avg_jump_distance_score(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float) -> float:
+        """ Bin-wise most-likely position difference. Contiguous trajectories have small deltas between adjacent time bins, while non-contiguous ones can jump wildly (up to the length of the track)
+        ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
+        """
+        a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
+        a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
+        n_time_bins: int = a_result.nbins[an_epoch_idx]
+        if n_time_bins <= 1:
+            ## only a single bin, return 0.0 (perfect, no jumps)
+            return 0.0
+        else:
+            # time_window_centers = a_result.time_bin_containers[an_epoch_idx].centers
+            time_window_centers = a_result.time_window_centers[an_epoch_idx]
+
+            # compute the 1st-order diff of all positions
+            a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]]) # bin_by_bin_jump_distance
+            ## average jump distance 
+            avg_bin_by_bin_jump_distance: float = np.nanmean(np.abs(a_first_order_diff)) # avg jump distance
+
+            #TODO 2024-11-26 19:56: - [ ] return the non-normalized (non-score/absolute) version
+            return avg_bin_by_bin_jump_distance
+        
+            # ## convert to a score
+            # # normalize by the number of bins to allow comparions between different Epochs (so epochs with more bins don't intrinsically have a larger score.
+            # total_first_order_change_score: float = float(avg_bin_by_bin_jump_distance) / float(n_time_bins - 1)
+            # # normalize by the track length (long v. short) to allow fair comparison of the two (so the long track decoders don't intrinsically have a larger score).
+            # total_first_order_change_score = total_first_order_change_score / a_decoder_track_length
+            # ## RETURNS: total_first_order_change_score
+            # return total_first_order_change_score
+        
+
 
     @classmethod
     @function_attributes(short_name='continuous_seq_sort', tags=['bin-wise', 'bin-size', 'score', 'replay', 'UNFINISHED'], input_requires=[], output_provides=[], uses=['partition_subsequences_ignoring_repeated_similar_positions'], used_by=[], creation_date='2024-03-12 01:05', related_items=[])
@@ -742,6 +780,7 @@ class HeuristicReplayScoring:
     def build_all_bin_wise_computation_fn_dict(cls) -> Dict[str, Callable]:
         return {
          'jump': cls.bin_wise_jump_distance_score,
+         'avg_jump_cm': cls.bin_wise_avg_jump_distance_score,
          'max_jump_cm': cls.bin_wise_max_position_jump_distance, 
          'max_jump_cm_per_sec': cls.bin_wise_max_position_jump_velocity, 
          'ratio_jump_valid_bins': cls.bin_wise_large_jump_ratio,
