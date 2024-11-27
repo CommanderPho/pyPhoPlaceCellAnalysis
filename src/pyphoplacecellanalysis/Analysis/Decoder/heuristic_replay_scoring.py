@@ -17,9 +17,8 @@ import pandas as pd
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 
-from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
-from neuropy.utils.mixins.indexing_helpers import get_dict_subset
-
+from neuropy.utils.mixins.indexing_helpers import UnpackableMixin, get_dict_subset
+from neuropy.utils.indexing_helpers import ListHelpers
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult # used in compute_pho_heuristic_replay_scores
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult, TrackTemplates
@@ -158,6 +157,122 @@ def _compute_stddev_of_diff(arr) -> float:
     return np.std(np.diff(arr, n=1))
 
 
+@function_attributes(short_name=None, tags=['plot', 'figure', 'debug'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-27 06:36', related_items=[])
+def _debug_plot_time_binned_positions(positions, num='debug_plot_time_binned_positions', ax=None):
+    """
+    Plots positions over fixed-width time bins with vertical lines separating each bin.
+    
+    Parameters:
+    positions (list or array): A 1D list or array of position values.
+    
+    Usage:
+    
+    from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import _debug_plot_time_binned_positions
+    
+    """
+    import matplotlib.pyplot as plt
+    
+    N = len(positions)
+    x_bins = np.arange(N + 1)  # Time bin edges
+
+    if ax is None:
+        fig, ax = plt.subplots(num=num, clear=True)
+    else:
+        fig = ax.figure()
+        
+    # Plot vertical lines for time bin boundaries
+    for x in x_bins:
+        ax.axvline(x=x, color='grey', linestyle='--', linewidth=0.5)
+
+    # Plot horizontal lines for position values within each time bin
+    for i, pos in enumerate(positions):
+        ax.hlines(y=pos, xmin=i, xmax=i+1, colors='blue')
+
+    # Set axis labels and limits
+    ax.set_xlabel('Time Bins')
+    ax.set_ylabel('Position')
+    ax.set_xlim(0, N)
+    ax.set_xticks(x_bins)
+
+    plt.show()
+
+@function_attributes(short_name=None, tags=['plot', 'figure', 'debug'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-27 06:36', related_items=[])
+def _debug_plot_time_bins_multiple(positions_list, num='debug_plot_time_binned_positions', ax=None):
+    """
+    Plots positions over fixed-width time bins with vertical lines separating each bin.
+    Each sublist in positions_list is plotted in a different color.
+    
+    Parameters:
+    - positions_list (list of lists/arrays): List of position arrays/lists.
+    - num (str or int): Figure number or name.
+    - ax (matplotlib.axes.Axes, optional): An existing axes object to plot on.
+    
+    Returns:
+    - fig, ax: Matplotlib figure and axes objects.
+    
+    Usage:
+    
+    ```python
+    positions_list = [np.array([119.191, 142.107, 180.3, 191.757, 245.227, 84.8181]),
+                      np.array([84.8181, 84.8181, 138.288]),
+                      np.array([134.469, 69.5411]),
+                      np.array([249.046]),
+                      np.array([249.046, 249.046])]
+
+    fig, ax = plot_time_bins_multiple(positions_list)
+    ```
+    """
+    import matplotlib.pyplot as plt
+    if ax is None:
+        fig, ax = plt.subplots(num=num, clear=True)
+    else:
+        fig = ax.figure()
+    
+    # Flatten the positions_list to get all positions for setting y-limits
+    all_positions = np.concatenate(positions_list)
+    N = len(all_positions)
+    x_bins = np.arange(N + 1)  # Time bin edges
+    
+    # Calculate y-limits with padding
+    ymin = min(all_positions) - 10
+    ymax = max(all_positions) + 10
+    
+    # Plot vertical lines for time bin boundaries
+    ax.vlines(x_bins, ymin, ymax, color='grey', linestyle='--', linewidth=0.5)
+    
+    # Define a colormap
+    cmap = plt.get_cmap('tab10')
+    num_colors = cmap.N
+    
+    # Keep track of the current x position
+    x_start = 0
+    for idx, positions in enumerate(positions_list):
+        num_positions = len(positions)
+        color = cmap(idx % num_colors)
+        
+        x_indices = np.arange(x_start, x_start + num_positions)
+        x_starts = x_indices
+        x_ends = x_indices + 1
+        
+        # Plot horizontal lines for position values within each time bin
+        ax.hlines(positions, xmin=x_starts, xmax=x_ends, colors=color, linewidth=2)
+        
+        # Update x_start for next group
+        x_start += num_positions
+    
+    # Set axis labels and limits
+    ax.set_xlabel('Time Bins')
+    ax.set_ylabel('Position')
+    ax.set_xlim(0, N)
+    ax.set_xticks(x_bins)
+    ax.set_ylim(ymin, ymax)
+    
+    plt.show()
+    return fig, ax
+
+
+
+
 
 @define(slots=False)
 class SubsequencesPartitioningResult:
@@ -213,7 +328,6 @@ def partition_subsequences_ignoring_repeated_similar_positions(first_order_diff_
     """
     n_diff_bins: int = len(first_order_diff_lst)
     n_original_bins: int = n_diff_bins + 1
-
 
     list_parts = []
     list_split_indicies = []
@@ -598,7 +712,8 @@ class HeuristicReplayScoring:
 
 
     @classmethod
-    @function_attributes(short_name='continuous_seq_sort', tags=['bin-wise', 'bin-size', 'score', 'replay', 'UNFINISHED'], input_requires=[], output_provides=[], uses=['partition_subsequences_ignoring_repeated_similar_positions'], used_by=[], creation_date='2024-03-12 01:05', related_items=[])
+    @function_attributes(short_name='continuous_seq_sort', tags=['bin-wise', 'bin-size', 'score', 'replay', 'UNFINISHED'], input_requires=[], output_provides=[],
+                          uses=['partition_subsequences_ignoring_repeated_similar_positions', '_compute_sequences_spanning_ignored_intrusions'], used_by=[], creation_date='2024-03-12 01:05', related_items=[])
     def bin_wise_continuous_sequence_sort_score_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, same_thresh: float=4) -> float:
         """ The amount of the track that is represented by the decoding. More is better (indicating a longer replay).
 
@@ -648,12 +763,14 @@ class HeuristicReplayScoring:
         ## Begin computations:
 
         # Get confidence of each position
-        each_t_bin_max_confidence = np.nanmax(a_p_x_given_n, axis=0)
+        # each_t_bin_max_confidence = np.nanmax(a_p_x_given_n, axis=0)
 
         # the confidence in the differences depends on the confidence in the two bins that the differences are taken from
-        each_t_bin_max_confidence
+        # each_t_bin_max_confidence
         # each_t_bin_max_confidence
 
+
+        # INPUTS: a_most_likely_positions_list, n_pos_bins
 
         a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
         assert len(a_first_order_diff) == len(a_most_likely_positions_list), f"the prepend above should ensure that the sequence and its first-order diff are the same length."
@@ -666,8 +783,8 @@ class HeuristicReplayScoring:
         partition_result: SubsequencesPartitioningResult = partition_subsequences_ignoring_repeated_similar_positions(a_first_order_diff, same_thresh=same_thresh)  # Add 1 because np.diff reduces the index by 1
         # sign_change_indices = np.where(np.abs(np.diff(a_first_order_diff_sign.astype(float))) > 0.0)[0] + 1  # Add 1 because np.diff reduces the index by 1 -- Oh no, is this right when I preserve length?
 
-        total_first_order_change: float = np.nansum(a_first_order_diff[1:]) # this is very susceptable to misplaced bins
-        epoch_change_direction: float = np.sign(total_first_order_change) # -1.0 or 1.0
+        # total_first_order_change: float = np.nansum(a_first_order_diff[1:]) # this is very susceptable to misplaced bins
+        # epoch_change_direction: float = np.sign(total_first_order_change) # -1.0 or 1.0
 
         # position = deepcopy(a_most_likely_positions_list)
         # velocity = a_first_order_diff / float(a_result.decoding_time_bin_size) # velocity with real world units of cm/sec
@@ -680,7 +797,7 @@ class HeuristicReplayScoring:
         # position_derivative_medians = position_derivatives_df.median(axis='index')[position_derivative_column_names].to_numpy()
         # # position_derivative_medians = position_derivatives_df(axis='index')[position_derivative_column_names].to_numpy()
 
-        position_derivatives_df: pd.DataFrame = _compute_pos_derivs(time_window_centers=time_window_centers, position=a_most_likely_positions_list, debug_print=False)
+        # position_derivatives_df: pd.DataFrame = _compute_pos_derivs(time_window_centers=time_window_centers, position=a_most_likely_positions_list, debug_print=False)
 
         # Now split the array at each point where a direction change occurs
         
@@ -695,7 +812,6 @@ class HeuristicReplayScoring:
         # split_first_order_diff_arrays = np.split(a_first_order_diff, partition_result.split_indicies)
         split_first_order_diff_arrays = np.split(a_first_order_diff, partition_result.diff_split_indicies)
 
-        
         # continuous_sequence_lengths = np.array([len(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_first_order_diff_arrays])
         # longest_sequence_length: int = np.nanmax(continuous_sequence_lengths) # Now find the length of the longest non-changing sequence
         # longest_sequence_start_idx: int = np.nanargmax(continuous_sequence_lengths)
@@ -718,7 +834,7 @@ class HeuristicReplayScoring:
         # longest_sequence_start_idx: int = np.nanargmax(continuous_sequence_lengths)
 
         longest_sequence_length_no_repeats: int = int(np.nanmax(num_subsequence_bins_no_repeats)) # Now find the length of the longest non-changing sequence
-        longest_sequence_no_repeats_start_idx: int = int(np.nanargmax(num_subsequence_bins_no_repeats))
+        longest_sequence_no_repeats_start_idx: int = int(np.nanargmax(num_subsequence_bins_no_repeats)) ## the actual start index of the longest sequence!
         
         ## 
         max_ignore_bins: int = 2
@@ -730,7 +846,7 @@ class HeuristicReplayScoring:
         # change in position over change in time. Applied at point t.
 
 
-
+        # _debug_plot_time_bins_multiple(positions_list=split_most_likely_positions_arrays)
         # longest_sequence_length_ratio: float = float(longest_sequence_length) /  float(n_time_bins) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
 
         ## Compensate for repeating bins, not counting them towards the score but also not against.
