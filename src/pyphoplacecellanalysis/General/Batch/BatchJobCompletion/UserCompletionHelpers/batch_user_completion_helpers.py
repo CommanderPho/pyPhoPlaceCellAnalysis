@@ -846,23 +846,24 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 		if needs_recompute:
 			## Drop 'DirectionalDecodersEpochsEvaluations', and recompute
 			global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['DirectionalDecodersEpochsEvaluations'], debug_print=True) # don't need to drop 'DirectionalMergedDecoders', , just recompute it
-		
+			#TODO 2024-11-27 13:24: - [ ] Can't I just use the independent version, `_perform_compute_custom_epoch_decoding(...)` or whatnot?
 
 	if needs_recompute:
 		print(f'recompute is needed!')
 		curr_active_pipeline.reload_default_computation_functions()
-
-		curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields'],
+		## This recreates the Pseudo2D placefields from the 4 directional ones, which is NOT needed and seems a bit excessive.
+		curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields'], # 'merged_directional_placefields': `_build_merged_directional_placefields`
 														computation_kwargs_list=[{'laps_decoding_time_bin_size': None, 'ripple_decoding_time_bin_size': ripple_decoding_time_bin_size_override},],
 														enabled_filter_names=None, fail_on_exception=True, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
 		
+		# 'DirectionalDecodersEpochsEvaluations': `directional_decoders_evaluate_epochs`
 		global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['DirectionalDecodersEpochsEvaluations'], debug_print=True)
 		curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_evaluate_epochs'], # ,  'directional_decoders_epoch_heuristic_scoring'
 						computation_kwargs_list=[{'should_skip_radon_transform': False}], enabled_filter_names=None, fail_on_exception=True, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
 		needs_recompute_heuristics = True
 		
 		## gets the newly computed value
-		directional_decoders_epochs_decode_result = curr_active_pipeline.global_computation_results.computed_data.get('DirectionalDecodersEpochsEvaluations', None)
+		directional_decoders_epochs_decode_result = curr_active_pipeline.global_computation_results.computed_data.get('DirectionalDecodersEpochsEvaluations', None) # 'DirectionalDecodersEpochsEvaluations': `directional_decoders_evaluate_epochs`
 		assert directional_decoders_epochs_decode_result is not None, f"directional_decoders_epochs_decode_result is None even after recompute!"
 		pos_bin_size: float = directional_decoders_epochs_decode_result.pos_bin_size
 		newly_computed_ripple_decoding_time_bin_size: float = directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size
@@ -871,7 +872,7 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 			assert ripple_decoding_time_bin_size_override == newly_computed_ripple_decoding_time_bin_size, f'ripple_decoding_time_bin_size_override is specfied ({ripple_decoding_time_bin_size_override}) and is not equal to the computed value ({newly_computed_ripple_decoding_time_bin_size}). ERROR: Should match after computation!'
 		if laps_decoding_time_bin_size_override is not None:
 			assert laps_decoding_time_bin_size_override == newly_computed_laps_decoding_time_bin_size, f'laps_decoding_time_bin_size_override is specfied ({laps_decoding_time_bin_size_override}) and is not equal to the computed value ({newly_computed_laps_decoding_time_bin_size}). ERROR: Should match after computation!'
-			
+	# end if needs_recompute
 	
 	
 	# decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_epochs_decode_result.decoder_laps_filter_epochs_decoder_result_dict
@@ -913,7 +914,7 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 	directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(curr_active_pipeline, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=True)
 
 	
-	# 🟪 2024-02-29 - `compute_pho_heuristic_replay_scores`
+	# 🟪 2024-02-29 - `compute_pho_heuristic_replay_scores` - updates `directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict`
 	if (needs_recompute_heuristics or (not _workaround_validate_has_directional_decoded_epochs_heuristic_scoring(curr_active_pipeline))):
 		print(f'\tmissing heuristic columns. Recomputing:')
 		directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates,

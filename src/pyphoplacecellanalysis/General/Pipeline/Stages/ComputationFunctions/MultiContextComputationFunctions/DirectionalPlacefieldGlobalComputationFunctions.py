@@ -2577,8 +2577,10 @@ class DecoderDecodedEpochsResult(ComputedResult):
 		pearson_col_names = ['pearsonr']
 
 		# heuristic_score_col_names = ['travel', 'coverage', 'jump', 'longest_sequence_length_ratio', 'direction_change_bin_ratio', 'congruent_dir_bins_ratio', 'total_congruent_direction_change'] + ['total_variation', 'integral_second_derivative', 'stddev_of_diff'] # , 'sequential_correlation', 'monotonicity_score', 'laplacian_smoothness', 'longest_sequence_length'
-		heuristic_score_col_names = ['travel', 'coverage'] + ['jump', 'max_jump_cm', 'max_jump_cm_per_sec', 'ratio_jump_valid_bins'] +  ['longest_sequence_length_ratio', 'direction_change_bin_ratio', 'congruent_dir_bins_ratio', 'total_congruent_direction_change'] + ['total_variation', 'integral_second_derivative', 'stddev_of_diff'] # , 'sequential_correlation', 'monotonicity_score', 'laplacian_smoothness', 'longest_sequence_length'
+		heuristic_score_col_names = ['travel', 'coverage'] + ['jump', 'max_jump_cm', 'max_jump_cm_per_sec', 'ratio_jump_valid_bins'] +  ['longest_sequence_length', 'longest_sequence_length_ratio', 'direction_change_bin_ratio', 'congruent_dir_bins_ratio', 'total_congruent_direction_change'] + ['total_variation', 'integral_second_derivative', 'stddev_of_diff'] # , 'sequential_correlation', 'monotonicity_score', 'laplacian_smoothness', 'longest_sequence_length'
 		# ['jump', 'max_jump_cm', 'max_jump_cm_per_sec', 'ratio_jump_valid_bins', 'travel', 'coverage', 'sequential_correlation', 'monotonicity_score', 'laplacian_smoothness']
+		heuristic_score_col_names += ['continuous_seq_sort', ]
+		
 
 		## All included columns:
 		all_df_shared_column_names: List[str] = basic_df_column_names + selection_col_names + session_identity_col_names # these are not replicated for each decoder, they're the same for the epoch
@@ -5199,6 +5201,11 @@ def _perform_compute_custom_epoch_decoding(curr_active_pipeline, directional_mer
 			curr_active_pipeline
 		
 		Pretty slow
+		
+		Usage:
+		
+			from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _perform_compute_custom_epoch_decoding
+		
 		"""
 		ripple_decoding_time_bin_size: float = directional_merged_decoders_result.ripple_decoding_time_bin_size
 		laps_decoding_time_bin_size: float = directional_merged_decoders_result.laps_decoding_time_bin_size
@@ -5272,7 +5279,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 												should_validate_lap_decoding_performance: bool = False,
 											):
 		""" Merges the computed directional placefields into a Pseudo2D decoder, with the pseudo last axis corresponding to the decoder index.
-		
+
+		NOTE: this builds a **decoder** not just placefields, which is why it depends on the time_bin_sizes (which will later be used for decoding)		
 
 		Requires:
 			['sess']
@@ -5360,7 +5368,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
 
 		# Decode Epochs (Laps/Ripples) Using the merged all-directional decoder): ____________________________________________ #
-
+		## this is where the time_bin_size dependent part comes in
+		
 		## Decode Laps:
 		if (laps_decoding_time_bin_size is not None):
 			global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_any_name].computation_config.pf_params.computation_epochs) # global_any_name='maze_any' (? same as global_epoch_name?)
