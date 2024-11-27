@@ -20,6 +20,7 @@ from pyphocorehelpers.assertion_helpers import Assert
 
 from neuropy.utils.mixins.indexing_helpers import UnpackableMixin, get_dict_subset
 from neuropy.utils.indexing_helpers import ListHelpers
+from neuropy.utils.indexing_helpers import flatten
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult # used in compute_pho_heuristic_replay_scores
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult, TrackTemplates
@@ -78,75 +79,6 @@ def is_valid_sequence_index(sequence, test_index: int) -> bool:
         
 
 
-def _compute_sequences_spanning_ignored_intrusions(subsequence_list, continuous_sequence_lengths, target_subsequence_idx: int, max_ignore_bins: int = 2):
-    """ an "intrusion" refers to one or more time bins that interrupt a longer sequence that would be monotonic if the intrusions were removed.
-
-    We aren't just trying to arbitrarily merge short subsequences, we're only trying to bridge over short "intrusions"
-    
-    The quintessential example would be a straight ramp that is interrupted by a single point discontinuity intrusion.  
-
-    iNPUTS:
-        split_first_order_diff_arrays: a list of split arrays of 1st order differences.
-        continuous_sequence_lengths: a list of integer sequence lengths
-        longest_sequence_start_idx: int - the sequence start index to start the scan in each direction
-        max_ignore_bins: int = 2 - this means to disolve sequences shorter than 2 time bins if the sequences on each side are in the same direction
-
-        
-    Usage:
-
-    
-    TODO: convert to use `is_valid_sequence_index(...)` and `max_ignore_bins`
-
-    """
-    ## INPUTS: split_first_order_diff_arrays, continuous_sequence_lengths, max_ignore_bins
-    # assert len(subsequence_list) == len(continuous_sequence_lengths)
-    Assert.same_length(subsequence_list, continuous_sequence_lengths)
-    
-
-    left_congruent_flanking_index = None
-    left_congruent_flanking_sequence = None
-
-    right_congruent_flanking_index = None
-    right_congruent_flanking_sequence = None        
-
-    ## from the location of the longest sequence, check for flanking sequences <= `max_ignore_bins` in each direction.
-    # Scan left:
-    if (target_subsequence_idx-1) >= 0:
-        left_flanking_index = (target_subsequence_idx-1)
-        left_flanking_seq_length = continuous_sequence_lengths[left_flanking_index]
-        if (left_flanking_seq_length <= max_ignore_bins):
-            ## only if shorter than the max_ignore_bins can the left flanking sequence can be considered
-            # left_congruent_flanking_sequence = [*subsequence_list[left_flanking_index]]
-            ### Need to look even FURTHER to the left to see the prev sequence:
-            if (target_subsequence_idx-2) >= 0:
-                left_congruent_flanking_index = (target_subsequence_idx-2)
-                ## Have a sequence to concatenate with
-                left_congruent_flanking_sequence = [*subsequence_list[left_congruent_flanking_index], *subsequence_list[left_flanking_index]]
-                # left_congruent_flanking_sequence.extend(subsequence_list[left_congruent_flanking_index])
-                # left_congruent_flanking_sequence = subsequence_list[left_congruent_flanking_index]
-            # else:
-            #     left_congruent_flanking_index = left_flanking_index
-            
-    # Scan right:
-    if ((target_subsequence_idx+1) < len(continuous_sequence_lengths)):
-        right_flanking_index = (target_subsequence_idx+1)
-        right_flanking_seq_length = continuous_sequence_lengths[right_flanking_index]
-        if (right_flanking_seq_length <= max_ignore_bins):
-            # right_congruent_flanking_sequence = [*subsequence_list[right_flanking_index]]
-            
-            ### Need to look even FURTHER to the left to see the prev sequence:
-            if (target_subsequence_idx+2) >= 0:
-                right_congruent_flanking_index = (target_subsequence_idx+2)
-                ## Have a sequence to concatenate with
-                right_congruent_flanking_sequence = [*subsequence_list[right_flanking_index], *subsequence_list[right_congruent_flanking_index]]
-                # right_congruent_flanking_sequence.extend(subsequence_list[right_congruent_flanking_index])
-                # right_congruent_flanking_sequence = subsequence_list[right_congruent_flanking_index]
-            # else:
-            #     right_congruent_flanking_index = right_flanking_index
-
-
-    return (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index)
-
 
 def _compute_diffusion_value(a_p_x_given_n: NDArray) -> float:
     """ The amount of the track that is represented by the decoding. More is better (indicating a longer replay).
@@ -193,46 +125,8 @@ def _compute_stddev_of_diff(arr) -> float:
     return np.std(np.diff(arr, n=1))
 
 
-@function_attributes(short_name=None, tags=['plot', 'figure', 'debug'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-27 06:36', related_items=[])
-def _debug_plot_time_binned_positions(positions, num='debug_plot_time_binned_positions', ax=None):
-    """
-    Plots positions over fixed-width time bins with vertical lines separating each bin.
-    
-    Parameters:
-    positions (list or array): A 1D list or array of position values.
-    
-    Usage:
-    
-    from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import _debug_plot_time_binned_positions
-    
-    """
-    import matplotlib.pyplot as plt
-    
-    N = len(positions)
-    x_bins = np.arange(N + 1)  # Time bin edges
 
-    if ax is None:
-        fig, ax = plt.subplots(num=num, clear=True)
-    else:
-        fig = ax.figure()
-        
-    # Plot vertical lines for time bin boundaries
-    for x in x_bins:
-        ax.axvline(x=x, color='grey', linestyle='--', linewidth=0.5)
-
-    # Plot horizontal lines for position values within each time bin
-    for i, pos in enumerate(positions):
-        ax.hlines(y=pos, xmin=i, xmax=i+1, colors='blue')
-
-    # Set axis labels and limits
-    ax.set_xlabel('Time Bins')
-    ax.set_ylabel('Position')
-    ax.set_xlim(0, N)
-    ax.set_xticks(x_bins)
-
-    plt.show()
-
-@function_attributes(short_name=None, tags=['plot', 'figure', 'debug'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-27 06:36', related_items=[])
+@function_attributes(short_name=None, tags=['plot', 'matplotlib', 'figure', 'debug'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-27 06:36', related_items=['SubsequencesPartitioningResult'])
 def _debug_plot_time_bins_multiple(positions_list, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True):
     """
     Plots positions over fixed-width time bins with vertical lines separating each bin.
@@ -263,6 +157,10 @@ def _debug_plot_time_bins_multiple(positions_list, num='debug_plot_time_binned_p
         fig, ax = plt.subplots(num=num, clear=True)
     else:
         fig = ax.figure()
+        
+    if not isinstance(positions_list, (list, tuple,)):
+        ## wrap in a list
+        positions_list = [positions_list, ]
     
     # Flatten the positions_list to get all positions for setting y-limits
     all_positions = np.concatenate(positions_list)
@@ -345,8 +243,6 @@ def _debug_plot_time_bins_multiple(positions_list, num='debug_plot_time_binned_p
     return fig, ax
 
 
-from neuropy.utils.indexing_helpers import flatten
-
 
 @define(slots=False)
 class SubsequencesPartitioningResult:
@@ -368,23 +264,75 @@ class SubsequencesPartitioningResult:
     low_magnitude_change_indicies: NDArray = field() # specified in diff indicies
 
     split_positions_arrays: List[NDArray] = field(default=None)
-    first_order_diff_lst: List = field()
+    merged_split_positions_arrays: List[NDArray] = field(default=None)
+    
 
+    @property
+    def num_subsequence_bins(self) -> NDArray:
+        """ number of tbins in each split sequence """
+        return np.array([len(v) for v in self.split_positions_arrays])
+
+    @property
+    def num_merged_subsequence_bins(self) -> NDArray:
+        """ number of tbins in each MERGED subsequence """
+        if self.merged_split_positions_arrays is None:
+            return None
+        return np.array([len(v) for v in self.merged_split_positions_arrays])
+    
     @property
     def n_diff_bins(self) -> int:
         return len(self.first_order_diff_lst)
-
+    
 
     @property
     def subsequence_index_lists_omitting_repeats(self):
         """The subsequence_index_lists_omitting_repeats property."""
         return np.array_split(len(self.split_indicies), self.split_indicies)
 
+
+
+    @property
+    def total_num_subsequence_bins(self) -> int:
+        """ Calculates the total number of subsequence bins. """
+        total = np.sum(self.num_subsequence_bins)
+        return int(total)
+
+    @property
+    def total_num_subsequence_bins_no_repeats(self) -> int:
+        """ Calculates the total number of subsequence bins without repeats. """
+        total_no_repeats = np.sum(self.num_merged_subsequence_bins)
+        return int(total_no_repeats)
+
+    @property
+    def longest_sequence_length_no_repeats(self) -> int:
+        """ Finds the length of the longest non-repeating subsequence. """
+        longest_length = int(np.nanmax(self.num_merged_subsequence_bins))
+        return longest_length
+
+    @property
+    def longest_sequence_no_repeats_start_idx(self) -> int:
+        """ Finds the start index of the longest non-repeating subsequence. """
+        start_idx = int(np.nanargmax(self.num_merged_subsequence_bins))
+        return start_idx
+
+
+
+    @property
+    def longest_sequence_length_ratio(self) -> float:
+        """  Compensate for repeating bins, not counting them towards the score but also not against. """
+        ## Compensate for repeating bins, not counting them towards the score but also not against.
+        if self.total_num_subsequence_bins_no_repeats > 0:
+            return float(self.longest_sequence_length_no_repeats) /  float(self.total_num_subsequence_bins_no_repeats) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
+        else:
+            return 0.0 # zero it out if they are all repeats
+
+
+
+    @function_attributes(short_name=None, tags=['sequence'], input_requires=[], output_provides=[], uses=['partition_subsequences_ignoring_repeated_similar_positions', 'merge_over_ignored_intrusions'], used_by=['bin_wise_continuous_sequence_sort_score_fn'], creation_date='2024-11-27 11:12', related_items=[])
     @classmethod
     def init_from_positions_list(cls, a_most_likely_positions_list: NDArray, n_pos_bins: int, max_ignore_bins: int = 2, same_thresh: float = 4) -> "SubsequencesPartitioningResult":
-        n_time_bins: int = len(a_most_likely_positions_list)
-        print(f'n_time_bins: {n_time_bins}')
-
+        # n_time_bins: int = len(a_most_likely_positions_list)
+        # print(f'n_time_bins: {n_time_bins}')
         # INPUTS: a_most_likely_positions_list, n_pos_bins
         a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
         assert len(a_first_order_diff) == len(a_most_likely_positions_list), f"the prepend above should ensure that the sequence and its first-order diff are the same length."
@@ -392,53 +340,16 @@ class SubsequencesPartitioningResult:
        ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
         partition_result: "SubsequencesPartitioningResult" = cls.partition_subsequences_ignoring_repeated_similar_positions(a_first_order_diff, same_thresh=same_thresh)  # Add 1 because np.diff reduces the index by 1
         
-
-        # Split the array at each index where a sign change occurs
-        relative_indicies_arr = np.arange(n_pos_bins)
+        # Set `partition_result.split_positions_arrays` ______________________________________________________________________ #
 
         # active_split_indicies = deepcopy(partition_result.split_indicies) ## this is what it should be, but all the splits are +1 later than they should be
         active_split_indicies = deepcopy(partition_result.diff_split_indicies) ## this is what it should be, but all the splits are +1 later than they should be
-
-        split_relative_indicies = np.split(relative_indicies_arr, active_split_indicies)
         split_most_likely_positions_arrays = np.split(a_most_likely_positions_list, active_split_indicies)
         partition_result.split_positions_arrays = split_most_likely_positions_arrays
         
-        ## OUTPUTS: split_most_likely_positions_arrays
-
-        # split_first_order_diff_arrays = np.split(a_first_order_diff, partition_result.split_indicies)
-        split_first_order_diff_arrays = np.split(a_first_order_diff, partition_result.diff_split_indicies)
-
-        # continuous_sequence_lengths = np.array([len(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_first_order_diff_arrays])
-        # longest_sequence_length: int = np.nanmax(continuous_sequence_lengths) # Now find the length of the longest non-changing sequence
-        # longest_sequence_start_idx: int = np.nanargmax(continuous_sequence_lengths)
-
-        # longest_sequence_indicies = split_relative_indicies[longest_sequence_start_idx]
-        # longest_sequence = split_most_likely_positions_arrays[longest_sequence_start_idx]
-        # longest_sequence_diff = split_first_order_diff_arrays[longest_sequence_start_idx]
-
-        # longest_sequence
-        split_diff_index_subsequence_index_arrays = np.split(np.arange(partition_result.n_diff_bins), partition_result.diff_split_indicies) # subtract 1 again to get the diff_split_indicies instead
-        no_low_magnitude_diff_index_subsequence_indicies = [v[np.isin(v, partition_result.low_magnitude_change_indicies, invert=True)] for v in split_diff_index_subsequence_index_arrays] # get the list of indicies for each subsequence without the low-magnitude ones
-        num_subsequence_bins = np.array([len(v) for v in split_diff_index_subsequence_index_arrays]) # np.array([4, 6])
-        num_subsequence_bins_no_repeats = np.array([len(v) for v in no_low_magnitude_diff_index_subsequence_indicies]) # np.array([1, 1])
-
-        # num_subsequence_bins: number of tbins in each split sequence
-        # num_subsequence_bins_no_repeats
-
-        total_num_subsequence_bins = np.sum(num_subsequence_bins)
-        total_num_subsequence_bins_no_repeats = np.sum(num_subsequence_bins_no_repeats)
-
-        # continuous_sequence_lengths = np.array([len(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_diff_index_subsequence_index_arrays])
-        # longest_sequence_length: int = np.nanmax(continuous_sequence_lengths) # Now find the length of the longest non-changing sequence
-        # longest_sequence_start_idx: int = np.nanargmax(continuous_sequence_lengths)
-
-        longest_sequence_length_no_repeats: int = int(np.nanmax(num_subsequence_bins_no_repeats)) # Now find the length of the longest non-changing sequence
-        longest_sequence_no_repeats_start_idx: int = int(np.nanargmax(num_subsequence_bins_no_repeats)) ## the actual start index of the longest sequence!
-        # longest_sequence_no_repeats_start_idx
-
-        # (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index) = _compute_sequences_spanning_ignored_intrusions(split_first_order_diff_arrays, continuous_sequence_lengths, longest_sequence_start_idx=longest_sequence_start_idx, max_ignore_bins=max_ignore_bins)
-        (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index) = _compute_sequences_spanning_ignored_intrusions(split_first_order_diff_arrays, num_subsequence_bins_no_repeats, target_subsequence_idx=longest_sequence_no_repeats_start_idx, max_ignore_bins=max_ignore_bins)
-
+        # Set `merged_split_positions_arrays` ________________________________________________________________________________ #
+        _tmp_merge_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove) = partition_result.merge_over_ignored_intrusions(max_ignore_bins=max_ignore_bins, debug_print=False)
+        
         # split_most_likely_positions_arrays
         return partition_result
     
@@ -538,26 +449,10 @@ class SubsequencesPartitioningResult:
 
         list_parts = [np.array(l) for l in list_parts]
 
-        # split_diff_index_subsequence_index_arrays = np.split(np.arange(n_diff_bins), diff_split_indicies) # subtract 1 again to get the diff_split_indicies instead
-        # no_low_magnitude_diff_index_subsequence_indicies = [v[np.isin(v, low_magnitude_change_indicies, invert=True)] for v in split_diff_index_subsequence_index_arrays] # get the list of indicies for each subsequence without the low-magnitude ones
-        # num_subsequence_bins = np.array([len(v) for v in split_diff_index_subsequence_index_arrays])
-        # num_subsequence_bins_no_repeats = np.array([len(v) for v in no_low_magnitude_diff_index_subsequence_indicies])
-
-        # total_num_subsequence_bins = np.sum(num_subsequence_bins)
-        # total_num_subsequence_bins_no_repeats = np.sum(num_subsequence_bins_no_repeats)
-        
-        # continuous_sequence_lengths = np.array([len(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_diff_index_subsequence_index_arrays])
-        # longest_sequence_length: int = np.nanmax(continuous_sequence_lengths) # Now find the length of the longest non-changing sequence
-        # longest_sequence_start_idx: int = np.nanargmax(continuous_sequence_lengths)
-
-        # longest_sequence_length_no_repeats: int = np.nanmax(num_subsequence_bins_no_repeats) # Now find the length of the longest non-changing sequence
-        # longest_sequence_no_repeats_start_idx: int = np.nanargmax(num_subsequence_bins_no_repeats)
-
-        # return (list_parts, list_split_indicies, )
         _result = SubsequencesPartitioningResult(first_order_diff_lst=first_order_diff_lst, list_parts=list_parts, diff_split_indicies=diff_split_indicies, split_indicies=list_split_indicies, low_magnitude_change_indicies=sub_change_threshold_change_indicies)
         return _result
 
-    @function_attributes(short_name=None, tags=['_compute_sequences_spanning_ignored_intrusions'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-27 08:17', related_items=['_compute_sequences_spanning_ignored_intrusions'])
+    @function_attributes(short_name=None, tags=['_compute_sequences_spanning_ignored_intrusions'], input_requires=['self.split_positions_arrays'], output_provides=['self.merged_split_positions_arrays'], uses=[], used_by=[], creation_date='2024-11-27 08:17', related_items=['_compute_sequences_spanning_ignored_intrusions'])
     def merge_over_ignored_intrusions(self, max_ignore_bins: int = 2, debug_print=True):
         """ an "intrusion" refers to one or more time bins that interrupt a longer sequence that would be monotonic if the intrusions were removed.
 
@@ -569,6 +464,9 @@ class SubsequencesPartitioningResult:
             longest_sequence_start_idx: int - the sequence start index to start the scan in each direction
             max_ignore_bins: int = 2 - this means to disolve sequences shorter than 2 time bins if the sequences on each side are in the same direction
 
+            
+        REQUIRES: self.split_positions_arrays
+        UPDATES: self.merged_split_positions_arrays
             
         Usage:
 
@@ -604,7 +502,7 @@ class SubsequencesPartitioningResult:
                 active_ignored_subsequence = deepcopy(self.split_positions_arrays[a_subsequence_idx])
                 if debug_print:
                     print(f'an_ignored_subsequence_idx: {a_subsequence_idx}, active_ignored_subsequence: {active_ignored_subsequence}')
-                (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index) = _compute_sequences_spanning_ignored_intrusions(original_split_positions_arrays,
+                (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index) = cls._compute_sequences_spanning_ignored_intrusions(original_split_positions_arrays,
                                                                                                                                         n_tbins_list, target_subsequence_idx=a_subsequence_idx, max_ignore_bins=max_ignore_bins)
                 if left_congruent_flanking_sequence is None:
                     left_congruent_flanking_sequence = []
@@ -672,8 +570,82 @@ class SubsequencesPartitioningResult:
                     # included and unmodified
                     final_out_subsequences.append(a_subsequence)
             
+        ## update self properties
+        self.merged_split_positions_arrays = deepcopy(final_out_subsequences)
+        
+
         # return (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index)
         return _tmp_merge_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove)
+
+
+    @classmethod
+    def _compute_sequences_spanning_ignored_intrusions(cls, subsequence_list, continuous_sequence_lengths, target_subsequence_idx: int, max_ignore_bins: int = 2):
+        """ an "intrusion" refers to one or more time bins that interrupt a longer sequence that would be monotonic if the intrusions were removed.
+
+        We aren't just trying to arbitrarily merge short subsequences, we're only trying to bridge over short "intrusions"
+        
+        The quintessential example would be a straight ramp that is interrupted by a single point discontinuity intrusion.  
+
+        iNPUTS:
+            split_first_order_diff_arrays: a list of split arrays of 1st order differences.
+            continuous_sequence_lengths: a list of integer sequence lengths
+            longest_sequence_start_idx: int - the sequence start index to start the scan in each direction
+            max_ignore_bins: int = 2 - this means to disolve sequences shorter than 2 time bins if the sequences on each side are in the same direction
+
+            
+        Usage:
+        
+        TODO: convert to use `is_valid_sequence_index(...)`?
+
+        """
+        ## INPUTS: split_first_order_diff_arrays, continuous_sequence_lengths, max_ignore_bins
+        Assert.same_length(subsequence_list, continuous_sequence_lengths)
+        
+        left_congruent_flanking_index = None
+        left_congruent_flanking_sequence = None
+
+        right_congruent_flanking_index = None
+        right_congruent_flanking_sequence = None        
+
+        ## from the location of the longest sequence, check for flanking sequences <= `max_ignore_bins` in each direction.
+        # Scan left:
+        if (target_subsequence_idx-1) >= 0:
+            left_flanking_index = (target_subsequence_idx-1)
+            left_flanking_seq_length = continuous_sequence_lengths[left_flanking_index]
+            if (left_flanking_seq_length <= max_ignore_bins):
+                ## only if shorter than the max_ignore_bins can the left flanking sequence can be considered
+                # left_congruent_flanking_sequence = [*subsequence_list[left_flanking_index]]
+                ### Need to look even FURTHER to the left to see the prev sequence:
+                if (target_subsequence_idx-2) >= 0:
+                    left_congruent_flanking_index = (target_subsequence_idx-2)
+                    ## Have a sequence to concatenate with
+                    left_congruent_flanking_sequence = [*subsequence_list[left_congruent_flanking_index], *subsequence_list[left_flanking_index]]
+                    # left_congruent_flanking_sequence.extend(subsequence_list[left_congruent_flanking_index])
+                    # left_congruent_flanking_sequence = subsequence_list[left_congruent_flanking_index]
+                # else:
+                #     left_congruent_flanking_index = left_flanking_index
+                
+        # Scan right:
+        if ((target_subsequence_idx+1) < len(continuous_sequence_lengths)):
+            right_flanking_index = (target_subsequence_idx+1)
+            right_flanking_seq_length = continuous_sequence_lengths[right_flanking_index]
+            if (right_flanking_seq_length <= max_ignore_bins):
+                # right_congruent_flanking_sequence = [*subsequence_list[right_flanking_index]]
+                
+                ### Need to look even FURTHER to the left to see the prev sequence:
+                if (target_subsequence_idx+2) >= 0:
+                    right_congruent_flanking_index = (target_subsequence_idx+2)
+                    ## Have a sequence to concatenate with
+                    right_congruent_flanking_sequence = [*subsequence_list[right_flanking_index], *subsequence_list[right_congruent_flanking_index]]
+                    # right_congruent_flanking_sequence.extend(subsequence_list[right_congruent_flanking_index])
+                    # right_congruent_flanking_sequence = subsequence_list[right_congruent_flanking_index]
+                # else:
+                #     right_congruent_flanking_index = right_flanking_index
+
+
+        return (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index)
+
+
 
 @metadata_attributes(short_name=None, tags=['heuristic', 'replay', 'ripple', 'scoring', 'pho'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 06:00', related_items=[])
 class HeuristicReplayScoring:
@@ -976,8 +948,8 @@ class HeuristicReplayScoring:
 
     @classmethod
     @function_attributes(short_name='continuous_seq_sort', tags=['bin-wise', 'bin-size', 'score', 'replay', 'UNFINISHED'], input_requires=[], output_provides=[],
-                          uses=['partition_subsequences_ignoring_repeated_similar_positions', '_compute_sequences_spanning_ignored_intrusions'], used_by=[], creation_date='2024-03-12 01:05', related_items=[])
-    def bin_wise_continuous_sequence_sort_score_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, same_thresh: float=4) -> float:
+                          uses=['SubsequencesPartitioningResult', '_compute_sequences_spanning_ignored_intrusions'], used_by=[], creation_date='2024-03-12 01:05', related_items=['SubsequencesPartitioningResult'])
+    def bin_wise_continuous_sequence_sort_score_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, same_thresh: float=4, max_ignore_bins:int=2) -> float:
         """ The amount of the track that is represented by the decoding. More is better (indicating a longer replay).
 
         - Finds the longest continuous sequence (perhaps with some intrusions allowed?)
@@ -1043,83 +1015,10 @@ class HeuristicReplayScoring:
         # sign_change_indices = np.where(np.diff(a_first_order_diff_sign) != 0)[0] + 1  # Add 1 because np.diff reduces the index by 1
 
         ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
-        partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.partition_subsequences_ignoring_repeated_similar_positions(a_first_order_diff, same_thresh=same_thresh)  # Add 1 because np.diff reduces the index by 1
-        # sign_change_indices = np.where(np.abs(np.diff(a_first_order_diff_sign.astype(float))) > 0.0)[0] + 1  # Add 1 because np.diff reduces the index by 1 -- Oh no, is this right when I preserve length?
-
-        # total_first_order_change: float = np.nansum(a_first_order_diff[1:]) # this is very susceptable to misplaced bins
-        # epoch_change_direction: float = np.sign(total_first_order_change) # -1.0 or 1.0
-
-        # position = deepcopy(a_most_likely_positions_list)
-        # velocity = a_first_order_diff / float(a_result.decoding_time_bin_size) # velocity with real world units of cm/sec
-        # acceleration = np.diff(velocity, n=1, prepend=[velocity[0]])
-
-        # position_derivatives_df: pd.DataFrame = pd.DataFrame({'t': time_window_centers, 'x': position, 'vel_x': velocity, 'accel_x': acceleration})
-
-        # position_derivative_column_names = ['x', 'vel_x', 'accel_x']
-        # position_derivative_means = position_derivatives_df.mean(axis='index')[position_derivative_column_names].to_numpy()
-        # position_derivative_medians = position_derivatives_df.median(axis='index')[position_derivative_column_names].to_numpy()
-        # # position_derivative_medians = position_derivatives_df(axis='index')[position_derivative_column_names].to_numpy()
-
-        # position_derivatives_df: pd.DataFrame = _compute_pos_derivs(time_window_centers=time_window_centers, position=a_most_likely_positions_list, debug_print=False)
-
-        # Now split the array at each point where a direction change occurs
+        partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh)
+        _tmp_merge_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove) = partition_result.merge_over_ignored_intrusions(max_ignore_bins=max_ignore_bins)
+        longest_sequence_length_ratio: float = partition_result.longest_sequence_length_ratio 
         
-        
-        # num_direction_changes: int = len(sign_change_indices)
-        # direction_change_bin_ratio: float = float(num_direction_changes) / (float(n_time_bins)-1) ## OUT: direction_change_bin_ratio
-
-        # Split the array at each index where a sign change occurs
-        relative_indicies_arr = np.arange(n_pos_bins)
-        split_relative_indicies = np.split(relative_indicies_arr, partition_result.split_indicies)
-        split_most_likely_positions_arrays = np.split(a_most_likely_positions_list, partition_result.split_indicies)
-        # split_first_order_diff_arrays = np.split(a_first_order_diff, partition_result.split_indicies)
-        split_first_order_diff_arrays = np.split(a_first_order_diff, partition_result.diff_split_indicies)
-
-        # continuous_sequence_lengths = np.array([len(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_first_order_diff_arrays])
-        # longest_sequence_length: int = np.nanmax(continuous_sequence_lengths) # Now find the length of the longest non-changing sequence
-        # longest_sequence_start_idx: int = np.nanargmax(continuous_sequence_lengths)
-
-        # longest_sequence_indicies = split_relative_indicies[longest_sequence_start_idx]
-        # longest_sequence = split_most_likely_positions_arrays[longest_sequence_start_idx]
-        # longest_sequence_diff = split_first_order_diff_arrays[longest_sequence_start_idx]
-
-        # longest_sequence
-        split_diff_index_subsequence_index_arrays = np.split(np.arange(partition_result.n_diff_bins), partition_result.diff_split_indicies) # subtract 1 again to get the diff_split_indicies instead
-        no_low_magnitude_diff_index_subsequence_indicies = [v[np.isin(v, partition_result.low_magnitude_change_indicies, invert=True)] for v in split_diff_index_subsequence_index_arrays] # get the list of indicies for each subsequence without the low-magnitude ones
-        num_subsequence_bins = np.array([len(v) for v in split_diff_index_subsequence_index_arrays]) # np.array([4, 6])
-        num_subsequence_bins_no_repeats = np.array([len(v) for v in no_low_magnitude_diff_index_subsequence_indicies]) # np.array([1, 1])
-
-        total_num_subsequence_bins = np.sum(num_subsequence_bins)
-        total_num_subsequence_bins_no_repeats = np.sum(num_subsequence_bins_no_repeats)
-        
-        # continuous_sequence_lengths = np.array([len(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_diff_index_subsequence_index_arrays])
-        # longest_sequence_length: int = np.nanmax(continuous_sequence_lengths) # Now find the length of the longest non-changing sequence
-        # longest_sequence_start_idx: int = np.nanargmax(continuous_sequence_lengths)
-
-        longest_sequence_length_no_repeats: int = int(np.nanmax(num_subsequence_bins_no_repeats)) # Now find the length of the longest non-changing sequence
-        longest_sequence_no_repeats_start_idx: int = int(np.nanargmax(num_subsequence_bins_no_repeats)) ## the actual start index of the longest sequence!
-        
-        ## 
-        max_ignore_bins: int = 2
-        # (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index) = _compute_sequences_spanning_ignored_intrusions(split_first_order_diff_arrays, continuous_sequence_lengths, longest_sequence_start_idx=longest_sequence_start_idx, max_ignore_bins=max_ignore_bins)
-        (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index) = _compute_sequences_spanning_ignored_intrusions(split_first_order_diff_arrays, num_subsequence_bins_no_repeats, target_subsequence_idx=longest_sequence_no_repeats_start_idx, max_ignore_bins=max_ignore_bins)
-
-        
-        ## alternatively can determine the direction of momentum by building an array of direction vectors between each bin.
-        # change in position over change in time. Applied at point t.
-
-
-        # _debug_plot_time_bins_multiple(positions_list=split_most_likely_positions_arrays)
-        # longest_sequence_length_ratio: float = float(longest_sequence_length) /  float(n_time_bins) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
-
-        ## Compensate for repeating bins, not counting them towards the score but also not against.
-        if total_num_subsequence_bins_no_repeats > 0:
-            longest_sequence_length_ratio: float = float(longest_sequence_length_no_repeats) /  float(total_num_subsequence_bins_no_repeats) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
-        else:
-            longest_sequence_length_ratio: float = 0.0 # zero it out if they are all repeats
-
-        
-
         # cum_pos_bin_probs = np.nansum(a_p_x_given_n, axis=1) # sum over the time bins, leaving the accumulated probability per time bin.
         
         # # Determine baseline (uniform) value for equally distributed bins
