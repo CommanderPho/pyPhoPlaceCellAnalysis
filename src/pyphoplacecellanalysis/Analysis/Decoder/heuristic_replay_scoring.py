@@ -477,9 +477,6 @@ class SubsequencesPartitioningResult:
             
         Usage:
 
-
-        TODO: convert to use `is_valid_sequence_index(...)` and `max_ignore_bins`
-
         HISTORY: 2024-11-27 08:18 based off of `_compute_sequences_spanning_ignored_intrusions`
 
         """
@@ -509,7 +506,7 @@ class SubsequencesPartitioningResult:
                 active_ignored_subsequence = deepcopy(self.split_positions_arrays[a_subsequence_idx])
                 if debug_print:
                     print(f'an_ignored_subsequence_idx: {a_subsequence_idx}, active_ignored_subsequence: {active_ignored_subsequence}')
-                (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index) = cls._compute_sequences_spanning_ignored_intrusions(original_split_positions_arrays,
+                (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index) = self._compute_sequences_spanning_ignored_intrusions(original_split_positions_arrays,
                                                                                                                                         n_tbins_list, target_subsequence_idx=a_subsequence_idx, max_ignore_bins=max_ignore_bins)
                 if left_congruent_flanking_sequence is None:
                     left_congruent_flanking_sequence = []
@@ -519,7 +516,8 @@ class SubsequencesPartitioningResult:
                 len_right_congruent_flanking_sequence = len(right_congruent_flanking_sequence)
                 if (len_left_congruent_flanking_sequence == 0) and (len_left_congruent_flanking_sequence == 0):
                     ## do nothing
-                    print(f'\tWARN: merge NULL, both flanking sequences are empty. Skipping')
+                    if debug_print:
+                        print(f'\tWARN: merge NULL, both flanking sequences are empty. Skipping')
                 else:
                     # decide on subsequence to merge                    
                     if len_left_congruent_flanking_sequence > len_right_congruent_flanking_sequence:
@@ -616,14 +614,14 @@ class SubsequencesPartitioningResult:
 
         ## from the location of the longest sequence, check for flanking sequences <= `max_ignore_bins` in each direction.
         # Scan left:
-        if (target_subsequence_idx-1) >= 0:
+        if is_valid_sequence_index(subsequence_list, (target_subsequence_idx-1)):
             left_flanking_index = (target_subsequence_idx-1)
             left_flanking_seq_length = continuous_sequence_lengths[left_flanking_index]
             if (left_flanking_seq_length <= max_ignore_bins):
                 ## only if shorter than the max_ignore_bins can the left flanking sequence can be considered
                 # left_congruent_flanking_sequence = [*subsequence_list[left_flanking_index]]
                 ### Need to look even FURTHER to the left to see the prev sequence:
-                if (target_subsequence_idx-2) >= 0:
+                if is_valid_sequence_index(subsequence_list, (target_subsequence_idx-2)):
                     left_congruent_flanking_index = (target_subsequence_idx-2)
                     ## Have a sequence to concatenate with
                     left_congruent_flanking_sequence = [*subsequence_list[left_congruent_flanking_index], *subsequence_list[left_flanking_index]]
@@ -633,14 +631,14 @@ class SubsequencesPartitioningResult:
                 #     left_congruent_flanking_index = left_flanking_index
                 
         # Scan right:
-        if ((target_subsequence_idx+1) < len(continuous_sequence_lengths)):
+        if is_valid_sequence_index(subsequence_list, (target_subsequence_idx+1)):
             right_flanking_index = (target_subsequence_idx+1)
             right_flanking_seq_length = continuous_sequence_lengths[right_flanking_index]
             if (right_flanking_seq_length <= max_ignore_bins):
                 # right_congruent_flanking_sequence = [*subsequence_list[right_flanking_index]]
                 
                 ### Need to look even FURTHER to the left to see the prev sequence:
-                if (target_subsequence_idx+2) >= 0:
+                if is_valid_sequence_index(subsequence_list, (target_subsequence_idx+2)):
                     right_congruent_flanking_index = (target_subsequence_idx+2)
                     ## Have a sequence to concatenate with
                     right_congruent_flanking_sequence = [*subsequence_list[right_flanking_index], *subsequence_list[right_congruent_flanking_index]]
