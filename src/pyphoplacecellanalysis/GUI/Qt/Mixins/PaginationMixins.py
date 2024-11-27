@@ -134,7 +134,13 @@ class PaginatedPlotDataProvider:
     provided_plots_data: Dict[str, Any] = {'weighted_corr_data': None}
     provided_plots: Dict[str, Any] = {'weighted_corr': {}}
     column_names: List[str] = []
-    
+
+    @classmethod
+    def get_column_names(cls) -> List[str]:
+        """ columns for the dataframe can be hard-coded here in each derived class 
+        """
+        return [] 
+        
 
     @classmethod
     def get_provided_params(cls) -> Dict[str, Any]:

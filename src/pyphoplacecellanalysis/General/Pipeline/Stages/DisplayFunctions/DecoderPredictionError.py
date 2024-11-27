@@ -1447,7 +1447,8 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 # ==================================================================================================================== #
 # Score: Weighted Correlation                                                                                          #
 # ==================================================================================================================== #
-
+is_integer = lambda v: isinstance(v, (int, np.integer))
+is_float = lambda v: isinstance(v, (float, np.floating))
 
 @define(slots=False, repr=False)
 class WeightedCorrelationPlotData:
@@ -1463,8 +1464,10 @@ class WeightedCorrelationPlotData:
     
     ## class properties:
     @classmethod
-    def column_names(cls) -> List[str]:
-        return ['wcorr', 'P_decoder', 'pearsonr', 'travel', 'coverage', 'max_jump', 'max_jump_cm', 'max_jump_cm_per_sec', 'ratio_jump_valid_bins', 'total_congruent_direction_change', 'longest_sequence_length']
+    def get_column_names(cls) -> List[str]:
+        """ columns for the dataframe can be hard-coded here in each derived class 
+        """
+        return ['wcorr', 'P_decoder', 'pearsonr', 'travel', 'coverage', 'avg_jump_cm', 'max_jump', 'max_jump_cm', 'max_jump_cm_per_sec', 'ratio_jump_valid_bins', 'total_congruent_direction_change', 'longest_sequence_length']
 
     @classmethod
     def init_from_df_row_tuple_and_formatting_fn_dict(cls, a_tuple: Tuple, column_formatting_fn_dict: Dict[str, Optional[Callable]]) -> "WeightedCorrelationPlotData":
@@ -1481,9 +1484,9 @@ class WeightedCorrelationPlotData:
     @classmethod
     def init_batch_from_epochs_df(cls, active_filter_epochs_df: pd.DataFrame, should_include_epoch_times:bool=False, included_columns=None) -> Dict[float, "WeightedCorrelationPlotData"]:
         if included_columns is not None:
-            included_columns = [v for v in deepcopy(cls.column_names()) if v in included_columns] # only allow the included columns
+            included_columns = [v for v in deepcopy(cls.get_column_names()) if v in included_columns] # only allow the included columns
         else:
-            included_columns = deepcopy(cls.column_names()) # allow all default column names
+            included_columns = deepcopy(cls.get_column_names()) # allow all default column names
     
         if len(included_columns) == 0:
             return None ## no desired columns
@@ -1499,6 +1502,16 @@ class WeightedCorrelationPlotData:
         with np.printoptions(precision=3, suppress=True, threshold=5):
             default_float_formatting_fn = lambda v: str(np.array([v])).lstrip("[").rstrip("]")
             default_int_formatting_fn = lambda v: str(np.array([int(v)])).lstrip("[").rstrip("]")
+            
+            def default_smart_formatting_fn(v) -> str:
+                """ determines type dynamically and chooses appropriate formatter. """
+                if is_integer(v):
+                    return default_int_formatting_fn(v)
+                elif is_float(v):
+                    return default_float_formatting_fn(v)
+                else:
+                    return f"{v}" ## naieve formatting
+                
 
             column_formatting_fn_dict = {'start':None, 'stop':None, 'label':None, 'duration':None,
                 'wcorr': (lambda v:f"wcorr: {default_float_formatting_fn(v)}"),
@@ -1506,7 +1519,11 @@ class WeightedCorrelationPlotData:
                 'pearsonr':(lambda v:f"$\\rho$: {default_float_formatting_fn(v)}"),
                 'travel':(lambda v:f"travel: {default_float_formatting_fn(v)}"),
                 'coverage':(lambda v:f"coverage: {default_float_formatting_fn(v)}"),
+                'avg_jump_cm':(lambda v:f"avg_jump_cm: {default_float_formatting_fn(v)}"),
                 'max_jump':(lambda v:f"max_jump: {default_float_formatting_fn(v)}"),
+                'max_jump_cm':(lambda v:f"max_jump_cm: {default_float_formatting_fn(v)}"),
+                'max_jump_cm_per_sec':(lambda v:f"max_jump_cm: {default_float_formatting_fn(v)}"),
+                'ratio_jump_valid_bins':(lambda v:f"max_jump_cm: {default_float_formatting_fn(v)}"),
                 'total_congruent_direction_change':(lambda v:f"tot_$\Delta$_con_dir: {default_float_formatting_fn(v)}"),
                 'longest_sequence_length':(lambda v:f"longest_seq: {default_int_formatting_fn(v)}"),
             }
@@ -1559,7 +1576,12 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
     provided_params: Dict[str, Any] = dict(enable_weighted_correlation_info = True)
     provided_plots_data: Dict[str, Any] = {'weighted_corr_data': None}
     provided_plots: Dict[str, Any] = {'weighted_corr': {}}
-    column_names: List[str] = ['wcorr', 'P_decoder', 'pearsonr', 'travel', 'coverage', 'total_congruent_direction_change', 'longest_sequence_length']
+    column_names: List[str] = ['wcorr', 'P_decoder', 'pearsonr', 'travel', 'coverage', 'total_congruent_direction_change', 'longest_sequence_length', 'avg_jump_cm']
+
+    @classmethod
+    def get_column_names(cls) -> List[str]:
+        return WeightedCorrelationPlotData.get_column_names()
+    
 
     @classmethod
     def get_provided_callbacks(cls) -> Dict[str, Dict]:
