@@ -262,6 +262,7 @@ class SubsequencesPartitioningResult:
     diff_split_indicies: NDArray = field() # for the 1st-order diff array
     split_indicies: NDArray = field() # for the original array
     low_magnitude_change_indicies: NDArray = field() # specified in diff indicies
+    n_pos_bins: int = field()
 
     split_positions_arrays: List[NDArray] = field(default=None)
     merged_split_positions_arrays: List[NDArray] = field(default=None)
@@ -303,6 +304,8 @@ class SubsequencesPartitioningResult:
         total_no_repeats = np.sum(self.num_merged_subsequence_bins)
         return int(total_no_repeats)
 
+
+    # Longest Sequence ___________________________________________________________________________________________________ #
     @property
     def longest_sequence_length_no_repeats(self) -> int:
         """ Finds the length of the longest non-repeating subsequence. """
@@ -315,6 +318,10 @@ class SubsequencesPartitioningResult:
         start_idx = int(np.nanargmax(self.num_merged_subsequence_bins))
         return start_idx
 
+    @property
+    def longest_sequence_subsequence(self) -> NDArray:
+        """ Returns the actual subsequence of positions for the longest non-repeating subsequence. """
+        return self.merged_split_positions_arrays[self.longest_sequence_no_repeats_start_idx]
 
 
     @property
@@ -339,6 +346,7 @@ class SubsequencesPartitioningResult:
 
        ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
         partition_result: "SubsequencesPartitioningResult" = cls.partition_subsequences_ignoring_repeated_similar_positions(a_first_order_diff, same_thresh=same_thresh)  # Add 1 because np.diff reduces the index by 1
+        partition_result.n_pos_bins = n_pos_bins
         
         # Set `partition_result.split_positions_arrays` ______________________________________________________________________ #
 
@@ -1233,7 +1241,7 @@ class HeuristicReplayScoring:
     @function_attributes(short_name=None, tags=['heuristic', 'replay', 'score', 'OLDER'], input_requires=[], output_provides=[],
                          uses=['_compute_pos_derivs', 'partition_subsequences_ignoring_repeated_similar_positions', '_compute_total_variation', '_compute_integral_second_derivative', '_compute_stddev_of_diff', 'HeuristicScoresTuple'],
                          used_by=['compute_all_heuristic_scores'], creation_date='2024-02-29 00:00', related_items=[])
-    def compute_pho_heuristic_replay_scores(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, debug_print=False, use_bin_units_instead_of_realworld:bool=False, **kwargs) -> HeuristicScoresTuple:
+    def compute_pho_heuristic_replay_scores(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, debug_print=False, use_bin_units_instead_of_realworld:bool=False, max_ignore_bins:float=2, same_thresh: float=4.0, **kwargs) -> HeuristicScoresTuple:
         """ 2024-02-29 - New smart replay heuristic scoring
 
         
@@ -1262,11 +1270,10 @@ class HeuristicReplayScoring:
         #TODO 2024-08-01 07:44: - [ ] `np.sign(...)` does not do what I thought it did. It returns *three* possible values for each element: {-1, 0, +1}, not just two {-1, +1} like I thought
         
         """
-        same_thresh: float = kwargs.pop('same_thresh', 4.0)
-
         # use_bin_units_instead_of_realworld: bool = True # if False, uses the real-world units (cm/seconds). If True, uses nbin units (n_posbins/n_timebins)
         a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
         n_time_bins: int = a_result.nbins[an_epoch_idx]
+        n_pos_bins: int = np.shape(a_p_x_given_n)[0]
 
         if use_bin_units_instead_of_realworld:
             time_window_centers = np.arange(n_time_bins) + 0.5 # time-bin units, plot range would then be from (0.0, (float(n_time_bins) + 0.5))
@@ -1352,7 +1359,8 @@ class HeuristicReplayScoring:
             # sign_change_indices = np.where(np.diff(a_first_order_diff_sign) != 0)[0] + 1  # Add 1 because np.diff reduces the index by 1
 
             ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
-            partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.partition_subsequences_ignoring_repeated_similar_positions(a_first_order_diff, same_thresh=same_thresh)
+            # partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.partition_subsequences_ignoring_repeated_similar_positions(a_first_order_diff, same_thresh=same_thresh)
+            partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list=a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh) # (a_first_order_diff, same_thresh=same_thresh)
             num_direction_changes: int = len(partition_result.split_indicies)
             direction_change_bin_ratio: float = float(num_direction_changes) / (float(n_time_bins)-1) ## OUT: direction_change_bin_ratio
 
@@ -1361,21 +1369,21 @@ class HeuristicReplayScoring:
                 print(f'direction_change_bin_ratio: {direction_change_bin_ratio}')
 
             # Split the array at each index where a sign change occurs
-            split_most_likely_positions_arrays = np.split(a_most_likely_positions_list, partition_result.split_indicies)
+            # split_most_likely_positions_arrays = np.split(a_most_likely_positions_list, partition_result.split_indicies)
             # split_first_order_diff_arrays = np.split(a_first_order_diff, partition_result.split_indicies)
             split_first_order_diff_arrays = np.split(a_first_order_diff, partition_result.diff_split_indicies)
 
             # Pre-2024-05-09 Sequence Determination ______________________________________________________________________________ #
-            continuous_sequence_lengths = [len(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_first_order_diff_arrays]
-            if debug_print:
-                print(f'continuous_sequence_lengths: {continuous_sequence_lengths}')
-            longest_sequence_length: int = np.nanmax(continuous_sequence_lengths) # Now find the length of the longest non-changing sequence
+            # continuous_sequence_lengths = [len(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_first_order_diff_arrays]
+            # if debug_print:
+            #     print(f'continuous_sequence_lengths: {continuous_sequence_lengths}')
+            longest_sequence_length: int = partition_result.longest_sequence_length_no_repeats
             if debug_print:
                 print("Longest sequence of time bins without a direction change:", longest_sequence_length)
-            longest_sequence_start_idx: int = np.nanargmax(continuous_sequence_lengths)
-            longest_sequence = split_first_order_diff_arrays[longest_sequence_start_idx]
+            # longest_sequence_start_idx: int = np.nanargmax(continuous_sequence_lengths)
+            # longest_sequence = split_first_order_diff_arrays[longest_sequence_start_idx]
             
-            longest_sequence_length_ratio: float = float(longest_sequence_length) /  float(n_time_bins) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
+            longest_sequence_length_ratio: float = partition_result.longest_sequence_length_ratio # float(longest_sequence_length) /  float(n_time_bins) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
 
 
             # 2024-05-09 Sequence Determination with ignored repeats (not yet working) ___________________________________________ #

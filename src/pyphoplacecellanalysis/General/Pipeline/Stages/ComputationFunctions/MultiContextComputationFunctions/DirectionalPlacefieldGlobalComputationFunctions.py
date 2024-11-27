@@ -2610,28 +2610,9 @@ class DecoderDecodedEpochsResult(ComputedResult):
 		from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _build_merged_score_metric_df
 
 		# # Column Names _______________________________________________________________________________________________________ #
-		# basic_df_column_names = ['start', 'stop', 'label', 'duration']
-		# selection_col_names = ['is_user_annotated_epoch', 'is_valid_epoch']
-
-		# # Score Columns (one value for each decoder) _________________________________________________________________________ #
-		# decoder_bayes_prob_col_names = ['P_decoder']
-
-		# radon_transform_col_names = ['score', 'velocity', 'intercept', 'speed']
-		# weighted_corr_col_names = ['wcorr']
-		# pearson_col_names = ['pearsonr']
-
-		# heuristic_score_col_names = ['travel', 'coverage', 'jump', 'longest_sequence_length_ratio', 'direction_change_bin_ratio', 'congruent_dir_bins_ratio', 'total_congruent_direction_change'] # , 'sequential_correlation', 'monotonicity_score', 'laplacian_smoothness', 'longest_sequence_length'
-
-		# ## Add in the 'wcorr' metrics:
-		# merged_conditional_prob_column_names = ['P_LR', 'P_RL', 'P_Long', 'P_Short']
-		# merged_wcorr_column_names = ['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']
 
 		# ## All included columns:
-		# all_df_shared_column_names: List[str] = basic_df_column_names + selection_col_names # these are not replicated for each decoder, they're the same for the epoch
-		# all_df_score_column_names: List[str] = decoder_bayes_prob_col_names + radon_transform_col_names + weighted_corr_col_names + pearson_col_names + heuristic_score_col_names 
-		# all_df_column_names: List[str] = all_df_shared_column_names + all_df_score_column_names ## All included columns, includes the score columns which will not be replicated
 		print(f'build_complete_all_scores_merged_df(...):')
-
 		all_df_shared_column_names, all_df_score_column_names, all_df_column_names, merged_conditional_prob_column_names, merged_wcorr_column_names, heuristic_score_col_names = self.get_all_scores_column_names()
 
 		## Extract the concrete dataframes from the results:
