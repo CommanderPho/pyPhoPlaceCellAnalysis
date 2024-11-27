@@ -2087,7 +2087,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     @property
     def original_df_dict(self) -> Dict[str, pd.DataFrame]:
         """The original_df_list property."""
-        return dict(
+        return {k:v for k, v in dict(
             all_sessions_ripple_df=self.all_sessions_ripple_df,
             all_sessions_ripple_time_bin_df=self.all_sessions_ripple_time_bin_df,
             all_sessions_MultiMeasure_ripple_df=self.all_sessions_MultiMeasure_ripple_df,
@@ -2095,12 +2095,12 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             all_sessions_laps_df=self.all_sessions_laps_df,
             all_sessions_laps_time_bin_df=self.all_sessions_laps_time_bin_df,
             all_sessions_MultiMeasure_laps_df=self.all_sessions_MultiMeasure_laps_df
-        )
+        ).items() if (v is not None)}
         
     @property
     def filtered_df_dict(self) -> Dict[str, pd.DataFrame]:
         """The original_df_list property."""
-        return dict(
+        return {k:v for k, v in dict(
             filtered_all_sessions_ripple_df=self.filtered_all_sessions_ripple_df,
             filtered_all_sessions_ripple_time_bin_df=self.filtered_all_sessions_ripple_time_bin_df,
             filtered_all_sessions_MultiMeasure_ripple_df=self.filtered_all_sessions_MultiMeasure_ripple_df,
@@ -2108,7 +2108,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             filtered_all_sessions_laps_df=self.filtered_all_sessions_laps_df,
             filtered_all_sessions_laps_time_bin_df=self.filtered_all_sessions_laps_time_bin_df,
             filtered_all_sessions_MultiMeasure_laps_df=self.filtered_all_sessions_MultiMeasure_laps_df
-        )
+        ).items() if (v is not None)}
 
 
     @property
