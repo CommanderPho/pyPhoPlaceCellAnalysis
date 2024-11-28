@@ -731,7 +731,7 @@ class BatchSessionCompletionHandler:
         across_session_results_extended_dict = {}
 
         ## get override kwargs
-        override_user_completion_function_kwargs_dict = {}
+        override_user_completion_function_kwargs_dict = deepcopy(self.override_user_completion_function_kwargs_dict) ## previously used a blank override config, making it useless. {}
         
         ## run external completion functions:
         for a_fn in self.completion_functions:
