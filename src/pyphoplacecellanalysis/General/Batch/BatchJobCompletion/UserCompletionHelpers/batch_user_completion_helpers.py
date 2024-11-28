@@ -875,6 +875,8 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 		pos_bin_size: float = directional_decoders_epochs_decode_result.pos_bin_size
 		newly_computed_ripple_decoding_time_bin_size: float = directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size
 		newly_computed_laps_decoding_time_bin_size: float = directional_decoders_epochs_decode_result.laps_decoding_time_bin_size
+		print(f'\tnewly_computed_ripple_decoding_time_bin_size: {newly_computed_ripple_decoding_time_bin_size}')
+		print(f'\tnewly_computed_laps_decoding_time_bin_size: {newly_computed_laps_decoding_time_bin_size}')
 		if ripple_decoding_time_bin_size_override is not None:
 			assert ripple_decoding_time_bin_size_override == newly_computed_ripple_decoding_time_bin_size, f'ripple_decoding_time_bin_size_override is specfied ({ripple_decoding_time_bin_size_override}) and is not equal to the computed value ({newly_computed_ripple_decoding_time_bin_size}). ERROR: Should match after computation!'
 		if laps_decoding_time_bin_size_override is not None:
@@ -928,8 +930,11 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 																				     a_decoded_filter_epochs_decoder_result_dict=directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict)
 		print(f'\tdone recomputing heuristics.')
 
-	print(f'\tComputation complete. Exporting .CSVs...')
 
+	print(f'\tComputation complete. Exporting .CSVs...')
+	print(f"\t\t ripple_decoding_time_bin_size_override: {ripple_decoding_time_bin_size_override}")
+	print(f"\t\t directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size: {directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size}")
+	# print(f"\t\t directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size: {directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size}")
 	## Export CSVs:
 	t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
 	_output_csv_paths = directional_decoders_epochs_decode_result.export_csvs(parent_output_path=self.collected_outputs_path.resolve(), active_context=active_context, session_name=curr_session_name, curr_session_t_delta=t_delta,
