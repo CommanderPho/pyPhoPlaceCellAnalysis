@@ -2359,11 +2359,13 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
         
         num_filter_epochs:int = curr_results_obj.num_filter_epochs
         time_bin_containers: List[BinningContainer] = deepcopy(curr_results_obj.time_bin_containers)
-        # active_filter_epochs_df: pd.DataFrame = curr_results_obj.active_filter_epochs
-        # if (not isinstance(active_filter_epochs_df, pd.DataFrame)):
-        #     active_filter_epochs_df = active_filter_epochs_df.to_dataframe()
+        active_filter_epochs_df: pd.DataFrame = deepcopy(ensure_dataframe(curr_results_obj.active_filter_epochs))
+        
         out_position_curves_data = {}
-        for an_epoch_idx in np.arange(num_filter_epochs):
+        for an_epoch_idx, a_tuple in enumerate(active_filter_epochs_df.itertuples(name='EpochDataTuple')):
+            ## NOTE: uses a_tuple.start as the index in to the data dict:
+
+            # for an_epoch_idx in np.arange(num_filter_epochs):
             # build the discrete line over the centered time bins:
             a_most_likely_positions_list =  np.atleast_1d(deepcopy(curr_results_obj.most_likely_positions_list[an_epoch_idx]))
             time_window_centers = np.atleast_1d(deepcopy(curr_results_obj.time_window_centers[an_epoch_idx]))
@@ -2374,7 +2376,9 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
             partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, flat_time_window_centers=time_window_centers, n_pos_bins=n_pos_bins, max_ignore_bins=2, same_thresh=same_thresh_cm)
 
             ## Build the result
-            out_position_curves_data[an_epoch_idx] = DecodedSequenceAndHeuristicsPlotData(partition_result=partition_result, time_bin_centers=time_window_centers, line_y_most_likely=a_most_likely_positions_list, line_y_actual=None)
+            # out_position_curves_data[an_epoch_idx] = DecodedSequenceAndHeuristicsPlotData(partition_result=partition_result, time_bin_centers=time_window_centers, line_y_most_likely=a_most_likely_positions_list, line_y_actual=None)
+            out_position_curves_data[a_tuple.start] = DecodedSequenceAndHeuristicsPlotData(partition_result=partition_result, time_bin_centers=time_window_centers, line_y_most_likely=a_most_likely_positions_list, line_y_actual=None)
+
 
         return out_position_curves_data
 
@@ -2395,14 +2399,34 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
         # plot_kwargs = dict(num=f'debug_plot_merged_time_binned_positions[{params.name}][{data_idx}]', )
 
         debug_print = kwargs.pop('debug_print', True)
+        if debug_print:
+            print(f'DecodedSequenceAndHeuristicsPlotDataProvider._callback_update_curr_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})')
+        
+        if epoch_slice is not None:
+            if debug_print:
+                print(f'\tepoch_slice: {epoch_slice}')
+            assert len(epoch_slice) == 2
+            epoch_start_t, epoch_end_t = epoch_slice # unpack
+            if debug_print:
+                print(f'\tepoch_start_t: {epoch_start_t}, epoch_end_t: {epoch_end_t}')
+        else:
+            raise NotImplementedError(f'epoch_slice is REQUIRED to index into the wcorr_data dict, but is None!')
+        
+        if curr_time_bin_container is not None:
+            if debug_print:
+                print(f'\tcurr_time_bin_container: {curr_time_bin_container}')
+
 
         ## Extract the visibility:
         should_enable_plot: bool = params.enable_decoded_sequence_and_heuristics_curve
         
-        if debug_print:
-            print(f'{params.name}: _callback_update_curr_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})')
+        # data_index_value = data_idx # OLD MODE
+        data_index_value = epoch_start_t
         
-        extant_plots = plots[cls.plots_group_identifier_key].get(data_idx, {})
+        if debug_print:
+            print(f'{params.name}: _callback_update_curr_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})\n\tdata_index_value: {data_index_value}')
+        
+        extant_plots = plots[cls.plots_group_identifier_key].get(data_index_value, {})
         extant_line = extant_plots.get('line', None)
         # plot the radon transform line on the epoch:    
         if (extant_line is not None):
@@ -2419,9 +2443,9 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
         ## Plot the line plot. Could update this like I did for the text?        
         if should_enable_plot:
             # Most-likely Estimated Position Plots (grey line):
-            # time_window_centers = plots_data.decoded_position_curves_data[data_idx].time_bin_centers
+            # time_window_centers = plots_data.decoded_position_curves_data[data_index_value].time_bin_centers
             time_window_centers = deepcopy(curr_time_bin_container.centers)
-            a_partition_result = plots_data.decoded_sequence_and_heuristics_curves_data[data_idx].partition_result ## get the partition result
+            a_partition_result = plots_data.decoded_sequence_and_heuristics_curves_data[data_index_value].partition_result ## get the partition result
             
             # if extant_line is not None:
             #     # extant_line.remove()
@@ -2436,16 +2460,18 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
 
             if (a_partition_result is not None):
                 # Most likely position plots:
-                out: "MatplotlibRenderPlots" = a_partition_result.plot_time_bins_multiple(ax=curr_ax, enable_position_difference_indicators=True, name=)
+                out: "MatplotlibRenderPlots" = a_partition_result.plot_time_bins_multiple(ax=curr_ax, enable_position_difference_indicators=True)
 
         else:
             # ## Remove the existing one
             # if extant_line is not None:
             #     extant_line.remove()
             # most_likely_decoded_position_plot = None
+            raise NotImplementedError(f'have not yet implemented removing')
+            pass
 
         # Store the plot objects for future updates:
-        plots[cls.plots_group_identifier_key][data_idx] = out # {'line':most_likely_decoded_position_plot}
+        plots[cls.plots_group_identifier_key][data_index_value] = out # {'line':most_likely_decoded_position_plot}
         
         if debug_print:
             print(f'\t success!')
