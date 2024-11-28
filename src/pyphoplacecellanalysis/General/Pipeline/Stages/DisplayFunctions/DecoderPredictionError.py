@@ -2436,7 +2436,7 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
 
             if (a_partition_result is not None):
                 # Most likely position plots:
-                fig, curr_ax = a_partition_result.plot_time_bins_multiple(ax=curr_ax, enable_position_difference_indicators=True)
+                out: "MatplotlibRenderPlots" = a_partition_result.plot_time_bins_multiple(ax=curr_ax, enable_position_difference_indicators=True, name=)
 
         else:
             # ## Remove the existing one
@@ -2445,7 +2445,7 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
             # most_likely_decoded_position_plot = None
 
         # Store the plot objects for future updates:
-        plots[cls.plots_group_identifier_key][data_idx] = {} # {'line':most_likely_decoded_position_plot}
+        plots[cls.plots_group_identifier_key][data_idx] = out # {'line':most_likely_decoded_position_plot}
         
         if debug_print:
             print(f'\t success!')
