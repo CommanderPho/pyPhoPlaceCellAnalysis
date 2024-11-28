@@ -410,12 +410,24 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
 	def get_RL_decoder_names(cls) -> Tuple[str, str]:
 		return ('long_RL', 'short_RL')
 	
-	def get_decoders_dict(self) -> Dict[str, BasePositionDecoder]:
+	def get_decoders_dict(self) -> Dict[types.DecoderName, BasePositionDecoder]:
 		return {'long_LR': self.long_LR_decoder,
 			'long_RL': self.long_RL_decoder,
 			'short_LR': self.short_LR_decoder,
 			'short_RL': self.short_RL_decoder,
 		}
+	
+
+	def get_track_length_dict(self) -> Dict[types.DecoderName, float]:
+		""" gets the length of the track for all four decoders """
+		from pyphoplacecellanalysis.Pho2D.track_shape_drawing import get_track_length_dict
+		decoder_grid_bin_bounds_dict = {a_name:a_decoder.pf.config.grid_bin_bounds for a_name, a_decoder in self.get_decoders_dict().items()}
+		assert NumpyHelpers.all_allclose(list(decoder_grid_bin_bounds_dict.values())), f"all decoders should have the same grid_bin_bounds (independent of whether they are built on long/short, etc but they do not! This violates following assumptions."
+		grid_bin_bounds = list(decoder_grid_bin_bounds_dict.values())[0] # tuple
+		actual_track_length_dict, idealized_track_length_dict = get_track_length_dict(grid_bin_bounds, grid_bin_bounds)
+		# idealized_track_length_dict # {'long': 214.0, 'short': 144.0}
+		return {a_name:idealized_track_length_dict[a_name.split('_', maxsplit=1)[0]] for a_name in self.get_decoder_names()} # {'long_LR': 214.0, 'long_RL': 214.0, 'short_LR': 144.0, 'short_RL': 144.0}
+	
 	
 	# Slicing/Filtering by Neuron Properties _____________________________________________________________________________ #
 	def sliced_by_neuron_id(self, included_neuron_ids: NDArray) -> "TrackTemplates":
