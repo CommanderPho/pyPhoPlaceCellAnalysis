@@ -1455,7 +1455,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                     self.ui.print(f'WARNING: exceeded data indicies (probably on last page). (for page_idx: {page_idx}, i: {i}, curr_ax: {curr_ax}).\n\tIndexError: {e}')
                 curr_ax.set_visible(False)
 
-            except BaseException as e:
+            except Exception as e:
                 raise e
             
 
@@ -1709,7 +1709,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import RadonTransformPlotDataProvider
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import WeightedCorrelationPaginatedPlotDataProvider
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DecodedPositionsPlotDataProvider
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DecodedPositionsPlotDataProvider, DecodedSequenceAndHeuristicsPlotDataProvider
         # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import TrainTestSplitPlotDataProvider, TrainTestSplitPlotData
         # self: PaginatedFigureController
 
@@ -1735,6 +1735,15 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         if decoded_position_curves_epochs_data is not None:
             DecodedPositionsPlotDataProvider.add_data_to_pagination_controller(self, decoded_position_curves_epochs_data, update_controller_on_apply=False)
 
+        decoder_track_length: float = self.params.get('track_length_cm', None)
+        assert decoder_track_length is not None
+        # Build Decoded Positions Data and add them:    
+        decoded_sequence_and_heuristics_curves_data = DecodedSequenceAndHeuristicsPlotDataProvider.decoder_build_single_decoded_sequence_and_heuristics_curves_data(deepcopy(decoder_decoded_epochs_result), decoder_track_length=decoder_track_length, included_columns=included_columns)
+        if decoded_sequence_and_heuristics_curves_data is not None:
+            DecodedSequenceAndHeuristicsPlotDataProvider.add_data_to_pagination_controller(self, decoded_sequence_and_heuristics_curves_data, update_controller_on_apply=False)
+
+
+
         if not defer_refresh:
             self.refresh_current_page()
 
@@ -1745,11 +1754,12 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import RadonTransformPlotDataProvider
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import WeightedCorrelationPaginatedPlotDataProvider
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DecodedPositionsPlotDataProvider
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DecodedPositionsPlotDataProvider, DecodedSequenceAndHeuristicsPlotDataProvider
 
         RadonTransformPlotDataProvider.remove_data_from_pagination_controller(self, update_controller_on_apply=False)
         WeightedCorrelationPaginatedPlotDataProvider.remove_data_from_pagination_controller(self, update_controller_on_apply=False)
         DecodedPositionsPlotDataProvider.remove_data_from_pagination_controller(self, update_controller_on_apply=False)
+        DecodedSequenceAndHeuristicsPlotDataProvider.remove_data_from_pagination_controller(self, update_controller_on_apply=False)
 
         if not defer_refresh:
             self.refresh_current_page()
@@ -2044,13 +2054,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         global_thin_button_bar_widget.label_message = "<shared>"
         _out_dock_widgets[utility_footer_name] = root_dockAreaWindow.add_display_dock(identifier=utility_footer_name, widget=global_thin_button_bar_widget, dockSize=(1200, 30), dockAddLocationOpts=['bottom'], display_config=dock_configs[utility_footer_name], autoOrientation=False)
 
-        # #TODO 2024-02-14 18:44: - [ ] Comgbine the separate items into one of the single `DecodedEpochSlicesPaginatedFigureController` objects (or a new one)?
-        # root_dockAreaWindow.resize(600, 900)
-
         # ## Build final .plots and .plots_data:
-        # PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, ctrl_layout=ctrl_layout, **ctrl_widgets_dict, **info_labels_widgets_dict, on_valueChanged=valueChanged, logTextEdit=logTextEdit, dock_configs=dock_configs, controlled_references=None)
-
-        # root_dockAreaWindow.ui.connections.controlled_pagination_controllers_from_leftmost = new_connections_dict #
         root_dockAreaWindow.ui._contents = PhoUIContainer(name=name, names=main_plot_identifiers_list, pagination_controllers=pagination_controller_dict, 
                                                     dock_widgets=_out_dock_widgets, dock_configs=dock_configs,
                                                     widgets=all_widgets, windows=all_windows, plots=all_separate_plots, plots_data=all_separate_plots_data, params=all_separate_params,
@@ -2060,41 +2064,16 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         ## Convert to controlled by global paginator:
         new_connections_dict = cls._build_globally_controlled_pagination(paginated_multi_decoder_decoded_epochs_window=root_dockAreaWindow, pagination_controller_dict=pagination_controller_dict)
         
-        # _obj.plots = RenderPlots(name=name, root_dockAreaWindow=root_dockAreaWindow, apps=all_apps, all_windows=all_windows, all_separate_plots=all_separate_plots,
-        #                             root_plots=all_separate_root_plots, grids=all_separate_grids, scatter_plots=all_separate_scatter_plots, debug_header_labels=all_separate_debug_header_labels,
-        #                             dock_widgets=_out_dock_widgets, text_items_dict=None) # , ctrl_widgets={'slider': slider}
-        # _obj.plots_data = RenderPlotsData(name=name, main_plot_identifiers_list=main_plot_identifiers_list,
-        #                                     seperate_all_spots_dict=all_separate_data_all_spots, seperate_all_scatterplot_tooltips_kwargs_dict=all_separate_data_all_scatterplot_tooltips_kwargs, seperate_new_sorted_rasters_dict=all_separate_data_new_sorted_rasters, seperate_spikes_dfs_dict=all_separate_data_spikes_dfs,
-        #                                     on_update_active_epoch=on_update_active_epoch, on_update_active_scatterplot_kwargs=on_update_active_scatterplot_kwargs, **{k:v for k, v in _obj.plots_data.to_dict().items() if k not in ['name']})
-        # _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, ctrl_layout=ctrl_layout, **ctrl_widgets_dict, **info_labels_widgets_dict, on_valueChanged=valueChanged, logTextEdit=logTextEdit, dock_configs=dock_configs, controlled_references=None)
-        # _obj.params = VisualizationParameters(name=name, is_laps=False, enable_show_spearman=True, enable_show_pearson=False, enable_show_Z_values=True, use_plaintext_title=False, **param_kwargs)
-
 
         # Add functions ______________________________________________________________________________________________________ #
 
         root_dockAreaWindow.ui.print = print
 
-        # ## Cleanup when done:
-        # 'disable_y_label': True
-        
-        # for a_decoder_name, a_root_plot in _obj.plots.root_plots.items():
-        #     a_root_plot.setTitle(title=a_decoder_name)
-        #     # a_root_plot.setTitle(title="")
-        #     a_left_axis = a_root_plot.getAxis('left')# axisItem
-        #     a_left_axis.setLabel(a_decoder_name)
-        #     a_left_axis.setStyle(showValues=False)
-        #     a_left_axis.setTicks([])
-        #     # a_root_plot.hideAxis('bottom')
-        #     # a_root_plot.hideAxis('bottom')
-        #     a_root_plot.hideAxis('left')
-        #     a_root_plot.setYRange(-0.5, float(_obj.max_n_neurons))
-
-        # app, root_dockAreaWindow, _out_dock_widgets, dock_configs
-
         if not defer_show:
             root_dockAreaWindow.show()
             
         return app, root_dockAreaWindow
+
 
     @classmethod
     def init_from_track_templates(cls, curr_active_pipeline, track_templates, decoder_decoded_epochs_result_dict, epochs_name:str ='laps', included_epoch_indicies=None,
@@ -2111,6 +2090,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         # 'enable_update_window_title_on_page_change'
         pagination_controller_dict =  cls._subfn_prepare_plot_multi_decoders_stacked_epoch_slices(curr_active_pipeline, track_templates, decoder_decoded_epochs_result_dict=decoder_decoded_epochs_result_dict, epochs_name=epochs_name, included_epoch_indicies=included_epoch_indicies, defer_render=True, save_figure=False, **kwargs)
         app, paginated_multi_decoder_decoded_epochs_window = cls.init_from_pagination_controller_dict(pagination_controller_dict, name=name, title=title, defer_show=defer_show) # Combine to a single figure
+        # paginated_multi_decoder_decoded_epochs_window.params['track_length_cm_dict'] = track_templates.get_track_length_dict()
         return app, paginated_multi_decoder_decoded_epochs_window, pagination_controller_dict
     
 
@@ -2209,6 +2189,9 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         max_subplots_per_page: int = kwargs.pop('max_subplots_per_page', params_kwargs.pop('max_subplots_per_page', 8)) # kwargs overrides params_kwargs
         
         decoder_names: List[str] = track_templates.get_decoder_names()
+        
+        track_length_dict = track_templates.get_track_length_dict()
+        
         controlling_pagination_item_name: str = decoder_names[0] # first item # 'long_LR'
         # controlled_pagination_controller_names_list = decoder_names[1:]
         pagination_controller_dict = {}
@@ -2223,6 +2206,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                     curr_params_kwargs['disable_y_label'] = False
                 else:
                     curr_params_kwargs['disable_y_label'] = True
+                    
+            curr_params_kwargs['track_length_cm'] = track_length_dict[a_name] ## get the track length in cm
 
             # a_name: str = 
             a_decoder_decoded_epochs_result: DecodedFilterEpochsResult = decoder_decoded_epochs_result_dict[a_name] # DecodedFilterEpochsResult
@@ -3104,7 +3089,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             included_epoch_indicies=None, debug_print=False,
             params_kwargs={'enable_per_epoch_action_buttons': False,
                 'skip_plotting_most_likely_positions': True, 'skip_plotting_measured_positions': True, 
-                'enable_decoded_most_likely_position_curve': False, 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False,
+                'enable_decoded_most_likely_position_curve': False, 'enable_decoded_sequence_and_heuristics_curve': False, 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False,
                 # 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False,
                 # 'disable_y_label': True,
                 'isPaginatorControlWidgetBackedMode': True,
