@@ -141,12 +141,12 @@ class SubsequencesPartitioningResult:
     total_num_subsequence_bins_no_repeats = np.sum(num_subsequence_bins_no_repeats)
 
     """
-    flat_positions: NDArray = field()
+    flat_positions: NDArray = field(metadata={'desc': "the list of most-likely positions (in [cm]) for each time bin in a decoded posterior"})
     first_order_diff_lst: List = field() # the original list
 
-    n_pos_bins: int = field()
-    max_ignore_bins: int = field(default=2)
-    same_thresh: float = field(default=4)
+    n_pos_bins: int = field(metadata={'desc': "the total number of unique position bins along the track, unrelated to the number of *positions* in `flat_positions` "})
+    max_ignore_bins: int = field(default=2, metadata={'desc': "the maximum number of sequential time bins that can be merged over to form a larger subsequence."})
+    same_thresh: float = field(default=4, metadata={'desc': "if the difference (in [cm]) between the positions of two sequential time bins is less than this value, it will be treated as a non-changing direction and effectively treated as a single bin."})
 
     flat_time_window_centers: Optional[NDArray] = field(default=None)
     
@@ -157,8 +157,8 @@ class SubsequencesPartitioningResult:
     split_indicies: NDArray = field(default=None, repr=False) # for the original array
     low_magnitude_change_indicies: NDArray = field(default=None, repr=False, metadata={'desc': "indicies where a change in direction occurs but it's below the threshold indicated by `same_thresh`"}) # specified in diff indicies
     
-    split_positions_arrays: List[NDArray] = field(default=None, repr=False)
-    merged_split_positions_arrays: List[NDArray] = field(default=None)
+    split_positions_arrays: List[NDArray] = field(default=None, repr=False, metadata={'desc': "the positions in `flat_positions` but partitioned into subsequences determined by changes in direction exceeding `self.same_thresh`"})
+    merged_split_positions_arrays: List[NDArray] = field(default=None, metadata={'desc': "the subsequences from `split_positions_arrays` but merged into larger subsequences by briding-over (ignoring) sequences of intrusive tbins (with the max ignored length specified by `self.max_ignore_bins`"})
     
     sequence_info_df: pd.DataFrame = field(default=None, repr=False)
     
@@ -196,13 +196,19 @@ class SubsequencesPartitioningResult:
     @property
     def total_num_subsequence_bins(self) -> int:
         """ Calculates the total number of subsequence bins. """
-        total = np.sum(self.num_subsequence_bins)
+        total = np.sum(self.num_subsequence_bins) ## NOTE: does not matter whether we use `num_subsequence_bins` or `num_merged_subsequence_bins` as the total must be the same
         return int(total)
 
     @property
     def total_num_subsequence_bins_no_repeats(self) -> int:
-        """ Calculates the total number of subsequence bins without repeats. """
-        total_no_repeats = np.sum(self.num_merged_subsequence_bins)
+        """ Calculates the total number of subsequence bins without repeats.
+        """
+        # total_no_repeats = np.sum(self.num_merged_subsequence_bins)
+        if len(self.low_magnitude_change_indicies) > 0:
+            total_num_near_repeating_bins: int =  len(self.low_magnitude_change_indicies)
+        else:
+            total_num_near_repeating_bins: int = 0
+        total_no_repeats = self.total_num_subsequence_bins - total_num_near_repeating_bins
         return int(total_no_repeats)
 
 
@@ -501,6 +507,8 @@ class SubsequencesPartitioningResult:
                 if is_ignored_intrusion:
                     # for an_ignored_subsequence_idx in ignored_subsequence_idxs:
                     active_ignored_subsequence = deepcopy(self.split_positions_arrays[a_subsequence_idx])
+                    len_active_ignored_subsequence: int = len(active_ignored_subsequence)
+                    
                     if debug_print:
                         print(f'an_ignored_subsequence_idx: {a_subsequence_idx}, active_ignored_subsequence: {active_ignored_subsequence}')
                     (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index) = self._compute_sequences_spanning_ignored_intrusions(original_split_positions_arrays,
@@ -511,10 +519,20 @@ class SubsequencesPartitioningResult:
                         right_congruent_flanking_sequence = []
                     len_left_congruent_flanking_sequence = len(left_congruent_flanking_sequence)
                     len_right_congruent_flanking_sequence = len(right_congruent_flanking_sequence)
-                    if (len_left_congruent_flanking_sequence == 0) and (len_left_congruent_flanking_sequence == 0):
+
+                    ## impose reasonable size rule
+                    # bridging over intrusions only be done when at least one of the adjacent portions to be bridged exceeds a minimum size? This prevents piecing together bad sequences.
+                    required_minimum_flanking_sequence_length: int = int((len_active_ignored_subsequence) * 2) # one must be at least twice as large as the bridged gap
+                    # required_minimum_flanking_sequence_length: int = int((len_active_ignored_subsequence) + 1) # must be at least one larger than the bridged gap                    
+                    are_flanking_sequences_too_short: bool = ((len_left_congruent_flanking_sequence < required_minimum_flanking_sequence_length) and (len_right_congruent_flanking_sequence < required_minimum_flanking_sequence_length))
+                    if are_flanking_sequences_too_short:
+                        if debug_print:
+                            print(f'flanking sequences are too short required_minimum_flanking_sequence_length: {required_minimum_flanking_sequence_length}!\n\t (len_left_congruent_flanking_sequence: {len_left_congruent_flanking_sequence}, len_active_ignored_subsequence: {len_active_ignored_subsequence}, len_right_congruent_flanking_sequence: {len_right_congruent_flanking_sequence})')
+
+                    if (are_flanking_sequences_too_short or ((len_left_congruent_flanking_sequence == 0) and (len_left_congruent_flanking_sequence == 0))):
                         ## do nothing
                         if debug_print:
-                            print(f'\tWARN: merge NULL, both flanking sequences are empty. Skipping')
+                            print(f'\tWARN: merge NULL, both flanking sequences are empty or too short. Skipping')
                     else:
                         # decide on subsequence to merge                    
                         if len_left_congruent_flanking_sequence > len_right_congruent_flanking_sequence:
@@ -542,7 +560,7 @@ class SubsequencesPartitioningResult:
                             subsequences_to_add.append(new_subsequence)
                             # subsequence_replace_dict[tuple([original_split_positions_arrays[an_idx_to_remove] for an_idx_to_remove in np.arange(a_subsequence_idx, (right_congruent_flanking_index+1))])] = new_subsequence
                             subsequence_replace_dict[tuple(np.arange(a_subsequence_idx, (right_congruent_flanking_index+1)).tolist())] = (a_subsequence_idx, new_subsequence)
-                            
+                        ## END if len_left_congruent_flanking_sequ...
                             
                         if debug_print:
                             print(f'\tnew_subsequence: {new_subsequence}')
@@ -1189,8 +1207,8 @@ class HeuristicReplayScoring:
 
         ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
         partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, flat_time_window_centers=deepcopy(time_window_centers))
-        _tmp_merge_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove) = partition_result.merge_over_ignored_intrusions(max_ignore_bins=max_ignore_bins)
         longest_sequence_length_ratio: float = partition_result.longest_sequence_length_ratio 
+        
         
         # cum_pos_bin_probs = np.nansum(a_p_x_given_n, axis=1) # sum over the time bins, leaving the accumulated probability per time bin.
         
