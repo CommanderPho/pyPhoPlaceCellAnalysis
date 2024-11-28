@@ -126,122 +126,6 @@ def _compute_stddev_of_diff(arr) -> float:
 
 
 
-@function_attributes(short_name=None, tags=['plot', 'matplotlib', 'figure', 'debug'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-27 06:36', related_items=['SubsequencesPartitioningResult'])
-def _debug_plot_time_bins_multiple(positions_list, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True):
-    """
-    Plots positions over fixed-width time bins with vertical lines separating each bin.
-    Each sublist in positions_list is plotted in a different color.
-    
-    Parameters:
-    - positions_list (list of lists/arrays): List of position arrays/lists.
-    - num (str or int): Figure number or name.
-    - ax (matplotlib.axes.Axes, optional): An existing axes object to plot on.
-    
-    Returns:
-    - fig, ax: Matplotlib figure and axes objects.
-    
-    Usage:
-    
-    ```python
-    positions_list = [np.array([119.191, 142.107, 180.3, 191.757, 245.227, 84.8181]),
-                      np.array([84.8181, 84.8181, 138.288]),
-                      np.array([134.469, 69.5411]),
-                      np.array([249.046]),
-                      np.array([249.046, 249.046])]
-
-    fig, ax = plot_time_bins_multiple(positions_list)
-    ```
-    """
-    import matplotlib.pyplot as plt
-    if ax is None:
-        fig, ax = plt.subplots(num=num, clear=True)
-    else:
-        fig = ax.figure()
-        
-    if not isinstance(positions_list, (list, tuple,)):
-        ## wrap in a list
-        positions_list = [positions_list, ]
-    
-    # Flatten the positions_list to get all positions for setting y-limits
-    all_positions = np.concatenate(positions_list)
-    N = len(all_positions)
-    x_bins = np.arange(N + 1)  # Time bin edges
-    
-    # Calculate y-limits with padding
-    ymin = min(all_positions) - 10
-    ymax = max(all_positions) + 10
-    
-    # Calculate group lengths and group end indices
-    group_lengths = [len(positions) for positions in positions_list]
-    group_end_indices = np.cumsum(group_lengths)[:-1]  # Exclude the last index
-    
-    # Plot vertical lines at regular time bins excluding group splits
-    regular_x_bins = np.setdiff1d(x_bins, group_end_indices)
-    ax.vlines(regular_x_bins, ymin, ymax, color='grey', linestyle='--', linewidth=0.5)
-    
-    # Highlight separator lines where splits occur
-    ax.vlines(group_end_indices, ymin, ymax, color='black', linestyle='-', linewidth=1)
-    
-    # Define a colormap
-    cmap = plt.get_cmap('tab10')
-    num_colors = cmap.N
-    
-    # Keep track of the current x position
-    x_start = 0
-    for idx, positions in enumerate(positions_list):
-        num_positions = len(positions)
-        color = cmap(idx % num_colors)
-        
-        x_indices = np.arange(x_start, x_start + num_positions)
-        x_starts = x_indices
-        x_ends = x_indices + 1
-        
-        # Plot horizontal lines for position values within each time bin
-        ax.hlines(positions, xmin=x_starts, xmax=x_ends, colors=color, linewidth=2)
-        
-        if enable_position_difference_indicators:
-            # Now, for each pair of adjacent positions within the group, draw arrows and labels
-            for i in range(num_positions - 1):
-                delta_pos = positions[i+1] - positions[i]
-                x0 = x_starts[i] + 0.5
-                x1 = x_starts[i+1] + 0.5
-                y0 = positions[i]
-                y1 = positions[i+1]
-                
-                # Draw an arrow from (x0, y0) to (x1, y1)
-                ax.annotate(
-                    '',
-                    xy=(x1, y1),
-                    xytext=(x0, y0),
-                    arrowprops=dict(arrowstyle='->', color='black', shrinkA=0, shrinkB=0, linewidth=1),
-                )
-                
-                # Place the label near the midpoint of the arrow
-                xm = (x0 + x1) / 2
-                ym = (y0 + y1) / 2
-                ax.text(
-                    xm, ym,
-                    f'{delta_pos:+.2f}',  # Format with sign and two decimal places
-                    fontsize=6,
-                    ha='center',
-                    va='bottom',
-                    color='black',
-                    bbox=dict(facecolor='white', edgecolor='none', alpha=0.7, pad=0.5)  # Add background for readability
-                )
-                
-        # Update x_start for next group
-        x_start += num_positions
-    
-    # Set axis labels and limits
-    ax.set_xlabel('Time Bins')
-    ax.set_ylabel('Position')
-    ax.set_xlim(0, N)
-    ax.set_xticks(x_bins)
-    ax.set_ylim(ymin, ymax)
-    
-    plt.show()
-    return fig, ax
-
 
 
 @define(slots=False)
@@ -257,16 +141,32 @@ class SubsequencesPartitioningResult:
     total_num_subsequence_bins_no_repeats = np.sum(num_subsequence_bins_no_repeats)
 
     """
+    flat_positions: NDArray = field()
     first_order_diff_lst: List = field() # the original list
+
     list_parts: List = field() # factory=list
     diff_split_indicies: NDArray = field() # for the 1st-order diff array
     split_indicies: NDArray = field() # for the original array
     low_magnitude_change_indicies: NDArray = field() # specified in diff indicies
     n_pos_bins: int = field()
 
+    # computed ___________________________________________________________________________________________________________ #
     split_positions_arrays: List[NDArray] = field(default=None)
     merged_split_positions_arrays: List[NDArray] = field(default=None)
     
+    sequence_info_df: pd.DataFrame = field(default=None)
+    
+
+    def __attrs_post_init__(self):
+        if isinstance(self.flat_positions, list):
+            self.flat_positions = np.array(self.flat_positions)        
+
+        if self.sequence_info_df is None:
+            ## initialize new
+            self.sequence_info_df = pd.DataFrame({'pos': self.flat_positions})
+            self.sequence_info_df['is_imputed'] = False
+            self.sequence_info_df['is_main_subsequence'] = False
+
 
     @property
     def num_subsequence_bins(self) -> NDArray:
@@ -284,13 +184,10 @@ class SubsequencesPartitioningResult:
     def n_diff_bins(self) -> int:
         return len(self.first_order_diff_lst)
     
-
     @property
     def subsequence_index_lists_omitting_repeats(self):
         """The subsequence_index_lists_omitting_repeats property."""
         return np.array_split(len(self.split_indicies), self.split_indicies)
-
-
 
     @property
     def total_num_subsequence_bins(self) -> int:
@@ -345,7 +242,7 @@ class SubsequencesPartitioningResult:
         assert len(a_first_order_diff) == len(a_most_likely_positions_list), f"the prepend above should ensure that the sequence and its first-order diff are the same length."
 
        ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
-        partition_result: "SubsequencesPartitioningResult" = cls.partition_subsequences_ignoring_repeated_similar_positions(a_first_order_diff, n_pos_bins=n_pos_bins, same_thresh=same_thresh)  # Add 1 because np.diff reduces the index by 1
+        partition_result: "SubsequencesPartitioningResult" = cls.partition_subsequences_ignoring_repeated_similar_positions(a_most_likely_positions_list, n_pos_bins=n_pos_bins, same_thresh=same_thresh)  # Add 1 because np.diff reduces the index by 1
         
         # Set `partition_result.split_positions_arrays` ______________________________________________________________________ #
 
@@ -364,7 +261,7 @@ class SubsequencesPartitioningResult:
         
     @function_attributes(short_name=None, tags=['partition'], input_requires=[], output_provides=[], uses=['SubsequencesPartitioningResult'], used_by=[], creation_date='2024-05-09 02:47', related_items=[])
     @classmethod
-    def partition_subsequences_ignoring_repeated_similar_positions(cls, first_order_diff_lst: Union[List, NDArray], n_pos_bins: int, same_thresh: float = 4.0, debug_print=False, **kwargs) -> "SubsequencesPartitioningResult":
+    def partition_subsequences_ignoring_repeated_similar_positions(cls, a_most_likely_positions_list: Union[List, NDArray], n_pos_bins: int, same_thresh: float = 4.0, debug_print=False, **kwargs) -> "SubsequencesPartitioningResult":
         """ function partitions the list according to an iterative rule and the direction changes, ignoring changes less than or equal to `same_thresh`.
         
         NOTE: This helps "ignore" false-positive direction changes for bins with spatially-nearby (stationary) positions that happen to be offset in the wrong direction.
@@ -385,6 +282,13 @@ class SubsequencesPartitioningResult:
             partition_result1: SubsequencesPartitioningResult = partition_subsequences_ignoring_repeated_similar_positions(lst1, same_thresh=4)
 
         """
+        if isinstance(a_most_likely_positions_list, list):
+            a_most_likely_positions_list = np.array(a_most_likely_positions_list)
+        
+    
+        first_order_diff_lst = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
+        assert len(first_order_diff_lst) == len(a_most_likely_positions_list), f"the prepend above should ensure that the sequence and its first-order diff are the same length."
+
         n_diff_bins: int = len(first_order_diff_lst)
         n_original_bins: int = n_diff_bins + 1
 
@@ -456,7 +360,7 @@ class SubsequencesPartitioningResult:
 
         list_parts = [np.array(l) for l in list_parts]
 
-        _result = SubsequencesPartitioningResult(first_order_diff_lst=first_order_diff_lst, list_parts=list_parts, diff_split_indicies=diff_split_indicies, split_indicies=list_split_indicies, low_magnitude_change_indicies=sub_change_threshold_change_indicies, n_pos_bins=n_pos_bins, **kwargs)
+        _result = SubsequencesPartitioningResult(flat_positions=deepcopy(a_most_likely_positions_list), first_order_diff_lst=first_order_diff_lst, list_parts=list_parts, diff_split_indicies=diff_split_indicies, split_indicies=list_split_indicies, low_magnitude_change_indicies=sub_change_threshold_change_indicies, n_pos_bins=n_pos_bins, **kwargs)
         return _result
 
     @function_attributes(short_name=None, tags=['_compute_sequences_spanning_ignored_intrusions'], input_requires=['self.split_positions_arrays'], output_provides=['self.merged_split_positions_arrays'], uses=[], used_by=[], creation_date='2024-11-27 08:17', related_items=['_compute_sequences_spanning_ignored_intrusions'])
@@ -649,6 +553,126 @@ class SubsequencesPartitioningResult:
 
 
         return (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index)
+
+    # Visualization/Graphical Debugging __________________________________________________________________________________ #
+    @function_attributes(short_name=None, tags=['plot', 'matplotlib', 'figure', 'debug'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-27 06:36', related_items=['SubsequencesPartitioningResult'])
+    @classmethod
+    def _debug_plot_time_bins_multiple(cls, positions_list, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True):
+        """
+        Plots positions over fixed-width time bins with vertical lines separating each bin.
+        Each sublist in positions_list is plotted in a different color.
+        
+        Parameters:
+        - positions_list (list of lists/arrays): List of position arrays/lists.
+        - num (str or int): Figure number or name.
+        - ax (matplotlib.axes.Axes, optional): An existing axes object to plot on.
+        
+        Returns:
+        - fig, ax: Matplotlib figure and axes objects.
+        
+        Usage:
+        
+        ```python
+        positions_list = [np.array([119.191, 142.107, 180.3, 191.757, 245.227, 84.8181]),
+                        np.array([84.8181, 84.8181, 138.288]),
+                        np.array([134.469, 69.5411]),
+                        np.array([249.046]),
+                        np.array([249.046, 249.046])]
+
+        fig, ax = SubsequencesPartitioningResult._debug_plot_time_bins_multiple(positions_list)
+        ```
+        """
+        import matplotlib.pyplot as plt
+        if ax is None:
+            fig, ax = plt.subplots(num=num, clear=True)
+        else:
+            fig = ax.figure()
+            
+        if not isinstance(positions_list, (list, tuple,)):
+            ## wrap in a list
+            positions_list = [positions_list, ]
+        
+        # Flatten the positions_list to get all positions for setting y-limits
+        all_positions = np.concatenate(positions_list)
+        N = len(all_positions)
+        x_bins = np.arange(N + 1)  # Time bin edges
+        
+        # Calculate y-limits with padding
+        ymin = min(all_positions) - 10
+        ymax = max(all_positions) + 10
+        
+        # Calculate group lengths and group end indices
+        group_lengths = [len(positions) for positions in positions_list]
+        group_end_indices = np.cumsum(group_lengths)[:-1]  # Exclude the last index
+        
+        # Plot vertical lines at regular time bins excluding group splits
+        regular_x_bins = np.setdiff1d(x_bins, group_end_indices)
+        ax.vlines(regular_x_bins, ymin, ymax, color='grey', linestyle='--', linewidth=0.5)
+        
+        # Highlight separator lines where splits occur
+        ax.vlines(group_end_indices, ymin, ymax, color='black', linestyle='-', linewidth=1)
+        
+        # Define a colormap
+        cmap = plt.get_cmap('tab10')
+        num_colors = cmap.N
+        
+        # Keep track of the current x position
+        x_start = 0
+        for idx, positions in enumerate(positions_list):
+            num_positions = len(positions)
+            color = cmap(idx % num_colors)
+            
+            x_indices = np.arange(x_start, x_start + num_positions)
+            x_starts = x_indices
+            x_ends = x_indices + 1
+            
+            # Plot horizontal lines for position values within each time bin
+            ax.hlines(positions, xmin=x_starts, xmax=x_ends, colors=color, linewidth=2)
+            
+            if enable_position_difference_indicators:
+                # Now, for each pair of adjacent positions within the group, draw arrows and labels
+                for i in range(num_positions - 1):
+                    delta_pos = positions[i+1] - positions[i]
+                    x0 = x_starts[i] + 0.5
+                    x1 = x_starts[i+1] + 0.5
+                    y0 = positions[i]
+                    y1 = positions[i+1]
+                    
+                    # Draw an arrow from (x0, y0) to (x1, y1)
+                    ax.annotate(
+                        '',
+                        xy=(x1, y1),
+                        xytext=(x0, y0),
+                        arrowprops=dict(arrowstyle='->', color='black', shrinkA=0, shrinkB=0, linewidth=1),
+                    )
+                    
+                    # Place the label near the midpoint of the arrow
+                    xm = (x0 + x1) / 2
+                    ym = (y0 + y1) / 2
+                    ax.text(
+                        xm, ym,
+                        f'{delta_pos:+.2f}',  # Format with sign and two decimal places
+                        fontsize=6,
+                        ha='center',
+                        va='bottom',
+                        color='black',
+                        bbox=dict(facecolor='white', edgecolor='none', alpha=0.7, pad=0.5)  # Add background for readability
+                    )
+                    
+            # Update x_start for next group
+            x_start += num_positions
+        
+        # Set axis labels and limits
+        ax.set_xlabel('Time Bins')
+        ax.set_ylabel('Position')
+        ax.set_xlim(0, N)
+        ax.set_xticks(x_bins)
+        ax.set_ylim(ymin, ymax)
+        
+        plt.show()
+        return fig, ax
+
+
 
 
 
