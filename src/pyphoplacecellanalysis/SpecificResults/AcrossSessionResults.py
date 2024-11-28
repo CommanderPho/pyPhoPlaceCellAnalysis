@@ -2862,7 +2862,9 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
     final_sessions_loaded_extra_dfs: Dict[str, pd.DataFrame] = {'ripple_WCorrShuffle_df': None,
                                       }
     
-    
+    basic_marginals_file_types = ['laps_marginals_df', 'ripple_marginals_df', 'laps_time_bin_marginals_df', 'ripple_time_bin_marginals_df',]
+    extended_file_types_list = ['laps_simple_pf_pearson_merged_df', 'ripple_simple_pf_pearson_merged_df', 'laps_weighted_corr_merged_df', 'ripple_weighted_corr_merged_df', 'laps_all_scores_merged_df', 'ripple_all_scores_merged_df', 'merged_complete_epoch_stats_df']
+
     sessions_df, (experience_rank_map_dict, experience_orientation_rank_map_dict), _callback_add_df_columns = load_and_apply_session_experience_rank_csv("./data/sessions_experiment_datetime_df.csv")
     
     # Sort by columns: 'session' (ascending), 'custom_replay_name' (ascending) and 3 other columns
@@ -2908,13 +2910,11 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
 
         
         basic_marginals_file_types = ['laps_marginals_df', 'ripple_marginals_df', 'laps_time_bin_marginals_df', 'ripple_time_bin_marginals_df',]
-        basic_marginals_file_types_dicts_list = [final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict]
-        
+        # basic_marginals_file_types_dicts_list = [final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict]
         #TODO 2024-09-27 09:43: - [ ] the 4 basic marginals return two tuples ('session_id_str', 'custom_replay_name') while all the others return 3-tuples ('session_id_str', 'custom_replay_name', time_bin_size)
         ## Basic marginals: final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict
         _is_file_valid = True # shouldn't mark unknown files as invalid
-        extended_file_types_list = ['laps_simple_pf_pearson_merged_df', 'ripple_simple_pf_pearson_merged_df', 'laps_weighted_corr_merged_df', 'ripple_weighted_corr_merged_df', 'laps_all_scores_merged_df', 'ripple_all_scores_merged_df', 'merged_complete_epoch_stats_df']
-        extended_file_types_dicts_list = [final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict, final_sessions_loaded_merged_complete_epoch_stats_df_dict]
+        # extended_file_types_dicts_list = [final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict, final_sessions_loaded_merged_complete_epoch_stats_df_dict]
         
 
         if file_type in basic_marginals_file_types:
@@ -3032,7 +3032,8 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
         df_results = (all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df, all_sessions_merged_complete_epoch_stats_df, *final_sessions_loaded_extra_dfs_list)
         sessions_df, (experience_rank_map_dict, experience_orientation_rank_map_dict), _callback_add_df_columns = load_and_apply_session_experience_rank_csv(all_session_experiment_experience_csv_path, session_uid_str_sep='_')
         # all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df = [_callback_add_df_columns(a_df, session_id_column_name='session_name') for a_df in (all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df)]
-        df_results = [_callback_add_df_columns(a_df, session_id_column_name='session_name') for a_df in df_results]
+        # df_results = [_callback_add_df_columns(a_df, session_id_column_name='session_name') for a_df in df_results if (a_df is not None)]
+        df_results = [_callback_add_df_columns(a_df, session_id_column_name='session_name') if (a_df is not None) else None for a_df in df_results ]
         all_sessions_laps_df, all_sessions_ripple_df, all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df, all_sessions_simple_pearson_laps_df, all_sessions_simple_pearson_ripple_df, all_sessions_wcorr_laps_df, all_sessions_wcorr_ripple_df, all_sessions_all_scores_ripple_df, all_sessions_merged_complete_epoch_stats_df, *final_sessions_loaded_extra_dfs_list = df_results # unpack again
     except Exception as e:
         print(f'WARNING: failed to add the session_experience_rank CSV results to the dataframes. Failed with error: {e}. Skipping and continuing.') 
