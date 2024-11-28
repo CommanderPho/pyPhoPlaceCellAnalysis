@@ -2319,11 +2319,11 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
     `.add_data_to_pagination_controller(...)` adds the result to the pagination controller
 
     Data:
-        plots_data.decoded_position_curves_data
+        plots_data.decoded_sequence_and_heuristics_curves_data
     Plots:
         plots['decoded_position_curves']
         
-            _out_pagination_controller.plots_data.decoded_position_curves_data = decoded_position_curves_data
+            _out_pagination_controller.plots_data.decoded_sequence_and_heuristics_curves_data = decoded_position_curves_data
         _out_pagination_controller.plots['radon_transform'] = {}
 
 
@@ -2391,13 +2391,8 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
         self.params, self.plots_data, self.plots, self.ui = a_callback(curr_ax, self.params, self.plots_data, self.plots, self.ui, curr_slice_idxs, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=self.params.debug_print)
 
         
-        """        
-        line_alpha = 0.8  # Faint line
-        marker_alpha = 0.8  # More opaque markers
-        # plot_kwargs = dict(enable_flat_line_drawing=True, scalex=False, scaley=False, label=f'most-likely pos', linewidth=1, color='grey', alpha=line_alpha, # , linestyle='none', markerfacecolor='#e5ff00', markeredgecolor='#e5ff00'
-        #                         marker='+', markersize=3, animated=False) # , markerfacealpha=marker_alpha, markeredgealpha=marker_alpha
-        plot_kwargs = dict(enable_flat_line_drawing=False, scalex=False, scaley=False, label=f'most-likely pos', linestyle='none', linewidth=1, color='#a6a6a6', alpha=line_alpha, # , linestyle='none', markerfacecolor='#e5ff00', markeredgecolor='#e5ff00'
-                                marker="_", markersize=9, animated=False)
+        """
+        # plot_kwargs = dict(num=f'debug_plot_merged_time_binned_positions[{params.name}][{data_idx}]', )
 
         debug_print = kwargs.pop('debug_print', True)
 
@@ -2426,33 +2421,31 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
             # Most-likely Estimated Position Plots (grey line):
             # time_window_centers = plots_data.decoded_position_curves_data[data_idx].time_bin_centers
             time_window_centers = deepcopy(curr_time_bin_container.centers)
-            active_most_likely_positions_1D = plots_data.decoded_position_curves_data[data_idx].line_y_most_likely
+            a_partition_result = plots_data.decoded_sequence_and_heuristics_curves_data[data_idx].partition_result ## get the partition result
             
-            if extant_line is not None:
-                # extant_line.remove()
-                if extant_line.axes is None:
-                    # Re-add the line to the axis if necessary
-                    curr_ax.add_artist(extant_line)
+            # if extant_line is not None:
+            #     # extant_line.remove()
+            #     if extant_line.axes is None:
+            #         # Re-add the line to the axis if necessary
+            #         curr_ax.add_artist(extant_line)
             
-                extant_line.set_data(time_window_centers, active_most_likely_positions_1D)
-                most_likely_decoded_position_plot = extant_line
-            else:
-                # exception from below: `ValueError: x and y must have same first dimension, but have shapes (4,) and (213,)`
+            #     extant_line.set_data(time_window_centers, active_most_likely_positions_1D)
+            #     most_likely_decoded_position_plot = extant_line
+            # else:
+            #     # exception from below: `ValueError: x and y must have same first dimension, but have shapes (4,) and (213,)`
 
-                if (active_most_likely_positions_1D is not None):
-                    # Most likely position plots:
-                    most_likely_decoded_position_plot, = perform_plot_1D_single_most_likely_position_curve(curr_ax, time_window_centers, active_most_likely_positions_1D, **plot_kwargs)                
-                else:
-                    most_likely_decoded_position_plot = None
-                                
+            if (a_partition_result is not None):
+                # Most likely position plots:
+                fig, curr_ax = a_partition_result.plot_time_bins_multiple(ax=curr_ax, enable_position_difference_indicators=True)
+
         else:
-            ## Remove the existing one
-            if extant_line is not None:
-                extant_line.remove()
-            most_likely_decoded_position_plot = None
+            # ## Remove the existing one
+            # if extant_line is not None:
+            #     extant_line.remove()
+            # most_likely_decoded_position_plot = None
 
         # Store the plot objects for future updates:
-        plots[cls.plots_group_identifier_key][data_idx] = {'line':most_likely_decoded_position_plot}
+        plots[cls.plots_group_identifier_key][data_idx] = {} # {'line':most_likely_decoded_position_plot}
         
         if debug_print:
             print(f'\t success!')

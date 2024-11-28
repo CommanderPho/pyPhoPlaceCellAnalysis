@@ -489,6 +489,7 @@ class SubsequencesPartitioningResult:
         # (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove)
         if (should_skip_epoch_with_only_short_subsequences and (np.all(is_ignored_intrusion_subsequence))):
             if debug_print:
+                #TODO 2024-11-28 10:23: - [ ] This was previously thought to be the cause of an assertion, but it was later found that merging wasn't working properly in general and this was fixed by `_subfn_resolve_overlapping_replacement_indicies`
                 print(f'WARN: all subsequences are smaller than or equal in length to `max_ignore_bins`: {max_ignore_bins}, n_tbins_list: {n_tbins_list}. Not attempting to merge since we cannot tell which are intrusions.')
             final_out_subsequences = deepcopy(original_split_positions_arrays)
 
@@ -699,6 +700,8 @@ class SubsequencesPartitioningResult:
         fig, ax = SubsequencesPartitioningResult._debug_plot_time_bins_multiple(positions_list)
         ```
         """
+        out_dict = {'time_bin_edges_vlines': None, 'split_vlines': None, 'split_vlines': None, 
+                    }
         import matplotlib.pyplot as plt
         if ax is None:
             fig, ax = plt.subplots(num=num, clear=True)
@@ -724,15 +727,20 @@ class SubsequencesPartitioningResult:
         
         # Plot vertical lines at regular time bins excluding group splits
         regular_x_bins = np.setdiff1d(x_bins, group_end_indices)
-        ax.vlines(regular_x_bins, ymin, ymax, color='grey', linestyle='--', linewidth=0.5)
+        out_dict['time_bin_edges_vlines'] = ax.vlines(regular_x_bins, ymin, ymax, color='grey', linestyle='--', linewidth=0.5)
         
         # Highlight separator lines where splits occur
-        ax.vlines(group_end_indices, ymin, ymax, color='black', linestyle='-', linewidth=1)
+        out_dict['split_vlines'] = ax.vlines(group_end_indices, ymin, ymax, color='black', linestyle='-', linewidth=1)
         
         # Define a colormap
         cmap = plt.get_cmap('tab10')
         num_colors = cmap.N
         
+
+        # Plot horizontal lines with customizable color
+        # ax.hlines(positions, xmin=np.arange(N), xmax=np.arange(1, N+1), colors=line_color)
+        
+        out_dict['subsequences'] = {} 
         # Keep track of the current x position
         x_start = 0
         for idx, positions in enumerate(positions_list):
@@ -743,8 +751,11 @@ class SubsequencesPartitioningResult:
             x_starts = x_indices
             x_ends = x_indices + 1
             
+            out_dict['subsequences'][idx] = {'time_bin_edges_vlines': None, 'arrows': [], 'arrow_labels': [],
+                                             } # initialize new dict
+            
             # Plot horizontal lines for position values within each time bin
-            ax.hlines(positions, xmin=x_starts, xmax=x_ends, colors=color, linewidth=2)
+            out_dict['subsequences'][idx]['positions_hlines'] = ax.hlines(positions, xmin=x_starts, xmax=x_ends, colors=color, linewidth=2)
             
             if enable_position_difference_indicators:
                 # Now, for each pair of adjacent positions within the group, draw arrows and labels
@@ -756,17 +767,18 @@ class SubsequencesPartitioningResult:
                     y1 = positions[i+1]
                     
                     # Draw an arrow from (x0, y0) to (x1, y1)
-                    ax.annotate(
+                    arrow = ax.annotate(
                         '',
                         xy=(x1, y1),
                         xytext=(x0, y0),
                         arrowprops=dict(arrowstyle='->', color='black', shrinkA=0, shrinkB=0, linewidth=1),
                     )
-                    
+                    out_dict['subsequences'][idx]['arrows'].append(arrow)
+                                        
                     # Place the label near the midpoint of the arrow
                     xm = (x0 + x1) / 2
                     ym = (y0 + y1) / 2
-                    ax.text(
+                    txt = ax.text(
                         xm, ym,
                         f'{delta_pos:+.2f}',  # Format with sign and two decimal places
                         fontsize=6,
@@ -775,6 +787,7 @@ class SubsequencesPartitioningResult:
                         color='black',
                         bbox=dict(facecolor='white', edgecolor='none', alpha=0.7, pad=0.5)  # Add background for readability
                     )
+                    out_dict['subsequences'][idx]['arrow_labels'].append(txt)
                     
             # Update x_start for next group
             x_start += num_positions
