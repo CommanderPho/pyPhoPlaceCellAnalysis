@@ -148,6 +148,8 @@ class SubsequencesPartitioningResult:
     max_ignore_bins: int = field(default=2)
     same_thresh: float = field(default=4)
 
+    flat_time_window_centers: Optional[NDArray] = field(default=None)
+    
     # computed ___________________________________________________________________________________________________________ #
     
     list_parts: List = field(default=None, repr=False) # factory=list
@@ -240,7 +242,11 @@ class SubsequencesPartitioningResult:
         # self.sequence_info_df['is_main_subsequence'] = False
         self.sequence_info_df['is_intrusion'] = False
         self.sequence_info_df['is_treated_as_same'] = False # is change ignored because it's below `self.same_thresh`
-        
+
+        if self.flat_time_window_centers is not None:
+            assert len(self.flat_time_window_centers) == len(self.flat_positions)
+            self.sequence_info_df['t_center'] = self.flat_time_window_centers 
+
         if self.split_positions_arrays is not None:
             self.sequence_info_df['orig_subsequence_idx'] = flatten([[i] * len(v) for i, v in enumerate(self.split_positions_arrays)])
             subsequence_n_tbins_dict = {idx:(n_tbins <= self.max_ignore_bins) for idx, n_tbins in enumerate(deepcopy(self.split_positions_arrays))}
@@ -259,14 +265,14 @@ class SubsequencesPartitioningResult:
 
     @function_attributes(short_name=None, tags=['sequence'], input_requires=[], output_provides=[], uses=['partition_subsequences_ignoring_repeated_similar_positions', 'merge_over_ignored_intrusions'], used_by=['bin_wise_continuous_sequence_sort_score_fn'], creation_date='2024-11-27 11:12', related_items=[])
     @classmethod
-    def init_from_positions_list(cls, a_most_likely_positions_list: NDArray, n_pos_bins: int, max_ignore_bins: int = 2, same_thresh: float = 4) -> "SubsequencesPartitioningResult":
+    def init_from_positions_list(cls, a_most_likely_positions_list: NDArray, n_pos_bins: int, max_ignore_bins: int = 2, same_thresh: float = 4, flat_time_window_centers=None) -> "SubsequencesPartitioningResult":
         """ main initializer """
         # INPUTS: a_most_likely_positions_list, n_pos_bins
         a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
         assert len(a_first_order_diff) == len(a_most_likely_positions_list), f"the prepend above should ensure that the sequence and its first-order diff are the same length."
 
        ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
-        partition_result: "SubsequencesPartitioningResult" = cls.partition_subsequences_ignoring_repeated_similar_positions(a_most_likely_positions_list, n_pos_bins=n_pos_bins, same_thresh=same_thresh, max_ignore_bins=max_ignore_bins)  # Add 1 because np.diff reduces the index by 1
+        partition_result: "SubsequencesPartitioningResult" = cls.partition_subsequences_ignoring_repeated_similar_positions(a_most_likely_positions_list, n_pos_bins=n_pos_bins, flat_time_window_centers=flat_time_window_centers, same_thresh=same_thresh, max_ignore_bins=max_ignore_bins)  # Add 1 because np.diff reduces the index by 1
         
         # Set `partition_result.split_positions_arrays` ______________________________________________________________________ #
 
@@ -702,7 +708,8 @@ class SubsequencesPartitioningResult:
         return fig, ax
 
 
-
+    def plot_time_bins_multiple(self, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True, **kwargs):
+        return self._debug_plot_time_bins_multiple(positions_list=self.merged_split_positions_arrays, num=num, ax=ax, enable_position_difference_indicators=enable_position_difference_indicators, **kwargs)
 
 
 @metadata_attributes(short_name=None, tags=['heuristic', 'replay', 'ripple', 'scoring', 'pho'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 06:00', related_items=[])
