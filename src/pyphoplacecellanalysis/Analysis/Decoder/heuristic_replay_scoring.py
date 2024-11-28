@@ -675,7 +675,7 @@ class SubsequencesPartitioningResult:
     # Visualization/Graphical Debugging __________________________________________________________________________________ #
     @function_attributes(short_name=None, tags=['plot', 'matplotlib', 'figure', 'debug'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-27 06:36', related_items=['SubsequencesPartitioningResult'])
     @classmethod
-    def _debug_plot_time_bins_multiple(cls, positions_list, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True):
+    def _debug_plot_time_bins_multiple(cls, positions_list, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True, defer_show:bool=False, **kwargs):
         """
         Plots positions over fixed-width time bins with vertical lines separating each bin.
         Each sublist in positions_list is plotted in a different color.
@@ -700,13 +700,17 @@ class SubsequencesPartitioningResult:
         fig, ax = SubsequencesPartitioningResult._debug_plot_time_bins_multiple(positions_list)
         ```
         """
-        out_dict = {'time_bin_edges_vlines': None, 'split_vlines': None, 'split_vlines': None, 
-                    }
+        from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
         import matplotlib.pyplot as plt
+        
+        out_dict = {'time_bin_edges_vlines': None, 'split_vlines': None, 'subsequence_positions_hlines_dict': None, 
+                    'subsequence_arrows_dict': None, 'subsequence_arrow_labels_dict': None,
+                    }
+
         if ax is None:
             fig, ax = plt.subplots(num=num, clear=True)
         else:
-            fig = ax.figure()
+            fig = ax.get_figure()
             
         if not isinstance(positions_list, (list, tuple,)):
             ## wrap in a list
@@ -740,31 +744,36 @@ class SubsequencesPartitioningResult:
         # Plot horizontal lines with customizable color
         # ax.hlines(positions, xmin=np.arange(N), xmax=np.arange(1, N+1), colors=line_color)
         
-        out_dict['subsequences'] = {} 
+        out_dict['subsequence_positions_hlines_dict'] = {} 
+        out_dict['subsequence_arrows_dict'] = {} 
+        out_dict['subsequence_arrow_labels_dict'] = {} 
         # Keep track of the current x position
         x_start = 0
-        for idx, positions in enumerate(positions_list):
-            num_positions = len(positions)
-            color = cmap(idx % num_colors)
+        for subsequence_idx, subsequence_positions in enumerate(positions_list):
+            num_positions = len(subsequence_positions)
+            color = cmap(subsequence_idx % num_colors)
             
             x_indices = np.arange(x_start, x_start + num_positions)
             x_starts = x_indices
             x_ends = x_indices + 1
             
-            out_dict['subsequences'][idx] = {'time_bin_edges_vlines': None, 'arrows': [], 'arrow_labels': [],
-                                             } # initialize new dict
+            # out_dict['subsequences'][subsequence_idx] = {'time_bin_edges_vlines': None, 'arrows': [], 'arrow_labels': [],
+            #                                  } # initialize new dict
             
             # Plot horizontal lines for position values within each time bin
-            out_dict['subsequences'][idx]['positions_hlines'] = ax.hlines(positions, xmin=x_starts, xmax=x_ends, colors=color, linewidth=2)
+            out_dict['subsequence_positions_hlines_dict'][subsequence_idx] = ax.hlines(subsequence_positions, xmin=x_starts, xmax=x_ends, colors=color, linewidth=2)
             
             if enable_position_difference_indicators:
+                out_dict['subsequence_arrows_dict'][subsequence_idx] = []
+                out_dict['subsequence_arrow_labels_dict'][subsequence_idx] = []
+                
                 # Now, for each pair of adjacent positions within the group, draw arrows and labels
                 for i in range(num_positions - 1):
-                    delta_pos = positions[i+1] - positions[i]
+                    delta_pos = subsequence_positions[i+1] - subsequence_positions[i]
                     x0 = x_starts[i] + 0.5
                     x1 = x_starts[i+1] + 0.5
-                    y0 = positions[i]
-                    y1 = positions[i+1]
+                    y0 = subsequence_positions[i]
+                    y1 = subsequence_positions[i+1]
                     
                     # Draw an arrow from (x0, y0) to (x1, y1)
                     arrow = ax.annotate(
@@ -773,7 +782,7 @@ class SubsequencesPartitioningResult:
                         xytext=(x0, y0),
                         arrowprops=dict(arrowstyle='->', color='black', shrinkA=0, shrinkB=0, linewidth=1),
                     )
-                    out_dict['subsequences'][idx]['arrows'].append(arrow)
+                    out_dict['subsequence_arrows_dict'][subsequence_idx].append(arrow)
                                         
                     # Place the label near the midpoint of the arrow
                     xm = (x0 + x1) / 2
@@ -787,7 +796,7 @@ class SubsequencesPartitioningResult:
                         color='black',
                         bbox=dict(facecolor='white', edgecolor='none', alpha=0.7, pad=0.5)  # Add background for readability
                     )
-                    out_dict['subsequences'][idx]['arrow_labels'].append(txt)
+                    out_dict['subsequence_arrow_labels_dict'][subsequence_idx].append(txt)
                     
             # Update x_start for next group
             x_start += num_positions
@@ -799,8 +808,11 @@ class SubsequencesPartitioningResult:
         ax.set_xticks(x_bins)
         ax.set_ylim(ymin, ymax)
         
-        plt.show()
-        return fig, ax
+        out = MatplotlibRenderPlots(name='test', figures=[fig, ], axes=ax, plots=out_dict, **kwargs)
+        if not defer_show:
+            plt.show()
+            
+        return out # fig, ax, out_dict
 
 
     def plot_time_bins_multiple(self, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True, **kwargs):
