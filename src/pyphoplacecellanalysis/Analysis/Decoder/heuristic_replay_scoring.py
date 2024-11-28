@@ -144,17 +144,21 @@ class SubsequencesPartitioningResult:
     flat_positions: NDArray = field()
     first_order_diff_lst: List = field() # the original list
 
-    list_parts: List = field() # factory=list
-    diff_split_indicies: NDArray = field() # for the 1st-order diff array
-    split_indicies: NDArray = field() # for the original array
-    low_magnitude_change_indicies: NDArray = field() # specified in diff indicies
     n_pos_bins: int = field()
+    max_ignore_bins: int = field(default=2)
+    same_thresh: float = field(default=4)
 
     # computed ___________________________________________________________________________________________________________ #
-    split_positions_arrays: List[NDArray] = field(default=None)
+    
+    list_parts: List = field(default=None, repr=False) # factory=list
+    diff_split_indicies: NDArray = field(default=None, repr=False) # for the 1st-order diff array
+    split_indicies: NDArray = field(default=None, repr=False) # for the original array
+    low_magnitude_change_indicies: NDArray = field(default=None, repr=False, metadata={'desc': "indicies where a change in direction occurs but it's below the threshold indicated by `same_thresh`"}) # specified in diff indicies
+    
+    split_positions_arrays: List[NDArray] = field(default=None, repr=False)
     merged_split_positions_arrays: List[NDArray] = field(default=None)
     
-    sequence_info_df: pd.DataFrame = field(default=None)
+    sequence_info_df: pd.DataFrame = field(default=None, repr=False)
     
 
     def __attrs_post_init__(self):
@@ -163,9 +167,7 @@ class SubsequencesPartitioningResult:
 
         if self.sequence_info_df is None:
             ## initialize new
-            self.sequence_info_df = pd.DataFrame({'pos': self.flat_positions})
-            self.sequence_info_df['is_imputed'] = False
-            self.sequence_info_df['is_main_subsequence'] = False
+            self.sequence_info_df = self.rebuild_sequence_info_df()
 
 
     @property
@@ -231,18 +233,40 @@ class SubsequencesPartitioningResult:
             return 0.0 # zero it out if they are all repeats
 
 
+    def rebuild_sequence_info_df(self) -> pd.DataFrame:
+        ## initialize new
+        self.sequence_info_df = pd.DataFrame({'pos': self.flat_positions})
+        # self.sequence_info_df['is_imputed'] = False
+        # self.sequence_info_df['is_main_subsequence'] = False
+        self.sequence_info_df['is_intrusion'] = False
+        self.sequence_info_df['is_treated_as_same'] = False # is change ignored because it's below `self.same_thresh`
+        
+        if self.split_positions_arrays is not None:
+            self.sequence_info_df['orig_subsequence_idx'] = flatten([[i] * len(v) for i, v in enumerate(self.split_positions_arrays)])
+            subsequence_n_tbins_dict = {idx:(n_tbins <= self.max_ignore_bins) for idx, n_tbins in enumerate(deepcopy(self.split_positions_arrays))}
+            is_subsequence_intrusion_dict = {idx:len(v) for idx, v in subsequence_n_tbins_dict.items()}
+            self.sequence_info_df['is_intrusion'] = self.sequence_info_df['orig_subsequence_idx'].map(is_subsequence_intrusion_dict) #  (n_tbins_list <= self.max_ignore_bins)            
+
+        if self.merged_split_positions_arrays is not None:
+            self.sequence_info_df['subsequence_idx'] = flatten([[i] * len(v) for i, v in enumerate(self.merged_split_positions_arrays)])
+            
+        if self.low_magnitude_change_indicies is not None:
+            self.sequence_info_df.loc[self.low_magnitude_change_indicies, 'is_treated_as_same'] = True
+        
+
+        return self.sequence_info_df
+    
 
     @function_attributes(short_name=None, tags=['sequence'], input_requires=[], output_provides=[], uses=['partition_subsequences_ignoring_repeated_similar_positions', 'merge_over_ignored_intrusions'], used_by=['bin_wise_continuous_sequence_sort_score_fn'], creation_date='2024-11-27 11:12', related_items=[])
     @classmethod
     def init_from_positions_list(cls, a_most_likely_positions_list: NDArray, n_pos_bins: int, max_ignore_bins: int = 2, same_thresh: float = 4) -> "SubsequencesPartitioningResult":
-        # n_time_bins: int = len(a_most_likely_positions_list)
-        # print(f'n_time_bins: {n_time_bins}')
+        """ main initializer """
         # INPUTS: a_most_likely_positions_list, n_pos_bins
         a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
         assert len(a_first_order_diff) == len(a_most_likely_positions_list), f"the prepend above should ensure that the sequence and its first-order diff are the same length."
 
        ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
-        partition_result: "SubsequencesPartitioningResult" = cls.partition_subsequences_ignoring_repeated_similar_positions(a_most_likely_positions_list, n_pos_bins=n_pos_bins, same_thresh=same_thresh)  # Add 1 because np.diff reduces the index by 1
+        partition_result: "SubsequencesPartitioningResult" = cls.partition_subsequences_ignoring_repeated_similar_positions(a_most_likely_positions_list, n_pos_bins=n_pos_bins, same_thresh=same_thresh, max_ignore_bins=max_ignore_bins)  # Add 1 because np.diff reduces the index by 1
         
         # Set `partition_result.split_positions_arrays` ______________________________________________________________________ #
 
@@ -254,12 +278,14 @@ class SubsequencesPartitioningResult:
         # Set `merged_split_positions_arrays` ________________________________________________________________________________ #
         _tmp_merge_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove) = partition_result.merge_over_ignored_intrusions(max_ignore_bins=max_ignore_bins, debug_print=False)
         
+        partition_result.rebuild_sequence_info_df()
+        
         # split_most_likely_positions_arrays
         return partition_result
     
 
         
-    @function_attributes(short_name=None, tags=['partition'], input_requires=[], output_provides=[], uses=['SubsequencesPartitioningResult'], used_by=[], creation_date='2024-05-09 02:47', related_items=[])
+    @function_attributes(short_name=None, tags=['partition'], input_requires=[], output_provides=[], uses=['SubsequencesPartitioningResult', 'rebuild_sequence_info_df'], used_by=[], creation_date='2024-05-09 02:47', related_items=[])
     @classmethod
     def partition_subsequences_ignoring_repeated_similar_positions(cls, a_most_likely_positions_list: Union[List, NDArray], n_pos_bins: int, same_thresh: float = 4.0, debug_print=False, **kwargs) -> "SubsequencesPartitioningResult":
         """ function partitions the list according to an iterative rule and the direction changes, ignoring changes less than or equal to `same_thresh`.
@@ -360,7 +386,8 @@ class SubsequencesPartitioningResult:
 
         list_parts = [np.array(l) for l in list_parts]
 
-        _result = SubsequencesPartitioningResult(flat_positions=deepcopy(a_most_likely_positions_list), first_order_diff_lst=first_order_diff_lst, list_parts=list_parts, diff_split_indicies=diff_split_indicies, split_indicies=list_split_indicies, low_magnitude_change_indicies=sub_change_threshold_change_indicies, n_pos_bins=n_pos_bins, **kwargs)
+        _result = SubsequencesPartitioningResult(flat_positions=deepcopy(a_most_likely_positions_list), first_order_diff_lst=first_order_diff_lst, list_parts=list_parts, diff_split_indicies=diff_split_indicies, split_indicies=list_split_indicies, low_magnitude_change_indicies=sub_change_threshold_change_indicies,
+                                                  n_pos_bins=n_pos_bins, same_thresh=same_thresh, **kwargs)
         return _result
 
     @function_attributes(short_name=None, tags=['_compute_sequences_spanning_ignored_intrusions'], input_requires=['self.split_positions_arrays'], output_provides=['self.merged_split_positions_arrays'], uses=[], used_by=[], creation_date='2024-11-27 08:17', related_items=['_compute_sequences_spanning_ignored_intrusions'])
@@ -482,7 +509,9 @@ class SubsequencesPartitioningResult:
         ## update self properties
         self.merged_split_positions_arrays = deepcopy(final_out_subsequences)
         
-
+        ## update dataframe
+        self.rebuild_sequence_info_df()
+        
         # return (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index)
         return _tmp_merge_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove)
 
