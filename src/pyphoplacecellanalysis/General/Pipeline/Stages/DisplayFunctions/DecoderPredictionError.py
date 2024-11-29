@@ -2310,6 +2310,7 @@ from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import Sub
 class DecodedSequenceAndHeuristicsPlotData:
     partition_result: SubsequencesPartitioningResult = field()
     time_bin_centers: NDArray = field()
+    time_bin_edges: NDArray = field()
     line_y_most_likely: NDArray = field()
     line_y_actual: NDArray = field()
 
@@ -2369,15 +2370,16 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
             # build the discrete line over the centered time bins:
             a_most_likely_positions_list =  np.atleast_1d(deepcopy(curr_results_obj.most_likely_positions_list[an_epoch_idx]))
             time_window_centers = np.atleast_1d(deepcopy(curr_results_obj.time_window_centers[an_epoch_idx]))
+            time_window_edges = np.atleast_1d(deepcopy(curr_results_obj.time_bin_edges[an_epoch_idx]))
             assert len(a_most_likely_positions_list) == len(time_window_centers)
             a_p_x_given_n = curr_results_obj.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
             n_time_bins: int = curr_results_obj.nbins[an_epoch_idx]
             n_pos_bins: int = np.shape(a_p_x_given_n)[0]
-            partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, flat_time_window_centers=time_window_centers, n_pos_bins=n_pos_bins, max_ignore_bins=2, same_thresh=same_thresh_cm)
+            partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, flat_time_window_centers=time_window_centers, n_pos_bins=n_pos_bins, max_ignore_bins=2, same_thresh=same_thresh_cm, flat_time_window_edges=time_window_edges)
 
             ## Build the result
             # out_position_curves_data[an_epoch_idx] = DecodedSequenceAndHeuristicsPlotData(partition_result=partition_result, time_bin_centers=time_window_centers, line_y_most_likely=a_most_likely_positions_list, line_y_actual=None)
-            out_position_curves_data[a_tuple.start] = DecodedSequenceAndHeuristicsPlotData(partition_result=partition_result, time_bin_centers=time_window_centers, line_y_most_likely=a_most_likely_positions_list, line_y_actual=None)
+            out_position_curves_data[a_tuple.start] = DecodedSequenceAndHeuristicsPlotData(partition_result=partition_result, time_bin_centers=time_window_centers, time_bin_edges=time_window_edges, line_y_most_likely=a_most_likely_positions_list, line_y_actual=None)
 
 
         return out_position_curves_data
@@ -2445,6 +2447,9 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
             # Most-likely Estimated Position Plots (grey line):
             # time_window_centers = plots_data.decoded_position_curves_data[data_index_value].time_bin_centers
             time_window_centers = deepcopy(curr_time_bin_container.centers)
+            time_window_edges = deepcopy(curr_time_bin_container.edges)
+            
+            
             a_partition_result = plots_data.decoded_sequence_and_heuristics_curves_data[data_index_value].partition_result ## get the partition result
             
             # if extant_line is not None:
@@ -2460,7 +2465,7 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
 
             if (a_partition_result is not None):
                 # Most likely position plots:
-                out: "MatplotlibRenderPlots" = a_partition_result.plot_time_bins_multiple(ax=curr_ax, enable_position_difference_indicators=True)
+                out: "MatplotlibRenderPlots" = a_partition_result.plot_time_bins_multiple(ax=curr_ax, enable_position_difference_indicators=True, flat_time_window_centers=time_window_centers, flat_time_window_edges=time_window_edges)
 
         else:
             # ## Remove the existing one

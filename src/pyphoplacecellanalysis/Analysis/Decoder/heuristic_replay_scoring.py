@@ -149,6 +149,7 @@ class SubsequencesPartitioningResult:
     same_thresh: float = field(default=4, metadata={'desc': "if the difference (in [cm]) between the positions of two sequential time bins is less than this value, it will be treated as a non-changing direction and effectively treated as a single bin."})
 
     flat_time_window_centers: Optional[NDArray] = field(default=None)
+    flat_time_window_edges: Optional[NDArray] = field(default=None)
     
     # computed ___________________________________________________________________________________________________________ #
     
@@ -271,14 +272,14 @@ class SubsequencesPartitioningResult:
 
     @function_attributes(short_name=None, tags=['sequence'], input_requires=[], output_provides=[], uses=['partition_subsequences_ignoring_repeated_similar_positions', 'merge_over_ignored_intrusions'], used_by=['bin_wise_continuous_sequence_sort_score_fn'], creation_date='2024-11-27 11:12', related_items=[])
     @classmethod
-    def init_from_positions_list(cls, a_most_likely_positions_list: NDArray, n_pos_bins: int, max_ignore_bins: int = 2, same_thresh: float = 4, flat_time_window_centers=None) -> "SubsequencesPartitioningResult":
+    def init_from_positions_list(cls, a_most_likely_positions_list: NDArray, n_pos_bins: int, max_ignore_bins: int = 2, same_thresh: float = 4, flat_time_window_centers=None, flat_time_window_edges=None) -> "SubsequencesPartitioningResult":
         """ main initializer """
         # INPUTS: a_most_likely_positions_list, n_pos_bins
         a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
         assert len(a_first_order_diff) == len(a_most_likely_positions_list), f"the prepend above should ensure that the sequence and its first-order diff are the same length."
 
        ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
-        partition_result: "SubsequencesPartitioningResult" = cls.partition_subsequences_ignoring_repeated_similar_positions(a_most_likely_positions_list, n_pos_bins=n_pos_bins, flat_time_window_centers=flat_time_window_centers, same_thresh=same_thresh, max_ignore_bins=max_ignore_bins)  # Add 1 because np.diff reduces the index by 1
+        partition_result: "SubsequencesPartitioningResult" = cls.partition_subsequences_ignoring_repeated_similar_positions(a_most_likely_positions_list, n_pos_bins=n_pos_bins, flat_time_window_centers=flat_time_window_centers, same_thresh=same_thresh, max_ignore_bins=max_ignore_bins, flat_time_window_edges=flat_time_window_edges)  # Add 1 because np.diff reduces the index by 1
         
         # Set `partition_result.split_positions_arrays` ______________________________________________________________________ #
 
@@ -693,7 +694,7 @@ class SubsequencesPartitioningResult:
     # Visualization/Graphical Debugging __________________________________________________________________________________ #
     @function_attributes(short_name=None, tags=['plot', 'matplotlib', 'figure', 'debug'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-27 06:36', related_items=['SubsequencesPartitioningResult'])
     @classmethod
-    def _debug_plot_time_bins_multiple(cls, positions_list, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True, defer_show:bool=False, **kwargs):
+    def _debug_plot_time_bins_multiple(cls, positions_list, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True, defer_show:bool=False, flat_time_window_centers=None, flat_time_window_edges=None, **kwargs):
         """
         Plots positions over fixed-width time bins with vertical lines separating each bin.
         Each sublist in positions_list is plotted in a different color.
@@ -737,14 +738,28 @@ class SubsequencesPartitioningResult:
         # Flatten the positions_list to get all positions for setting y-limits
         all_positions = np.concatenate(positions_list)
         N = len(all_positions)
-        x_bins = np.arange(N + 1)  # Time bin edges
-        
+
+        if flat_time_window_edges is not None:
+            ## prefer edges over centers
+            assert (len(flat_time_window_edges)-1) == N, f"(len(flat_time_window_edges)-1): {(len(flat_time_window_edges)-1)} and len(all_positions): {len(all_positions)}"
+            x_bins = deepcopy(flat_time_window_edges)[:-1] ## all but the last to get left aligned bins
+            bin_width: float = np.median(np.diff(x_bins))
+            
+        elif flat_time_window_centers is not None:
+            assert len(flat_time_window_centers) == N, f"flat_time_window_centers must have the same length as positions, but len(flat_time_window_centers): {len(flat_time_window_centers)} and len(all_positions): {len(all_positions)}"
+            x_bins = deepcopy(flat_time_window_centers)
+            bin_width: float = np.median(np.diff(x_bins))
+        else:
+            ## use indicies as the x_bins
+            x_bins = np.arange(N + 1)  # Time bin edges
+            bin_width: float = 1.0
+            
         # Calculate y-limits with padding
         ymin = min(all_positions) - 10
         ymax = max(all_positions) + 10
         
         # Calculate group lengths and group end indices
-        group_lengths = [len(positions) for positions in positions_list]
+        group_lengths = (float(bin_width) * np.array([len(positions) for positions in positions_list])) ## TODO: these won't be indicies anymore, is that okay?
         group_end_indices = np.cumsum(group_lengths)[:-1]  # Exclude the last index
         
         # Plot vertical lines at regular time bins excluding group splits
@@ -766,65 +781,66 @@ class SubsequencesPartitioningResult:
         out_dict['subsequence_arrows_dict'] = {} 
         out_dict['subsequence_arrow_labels_dict'] = {} 
         # Keep track of the current x position
-        x_start = 0
+        x_start = x_bins[0] # - (bin_width / 2.0) # the first tbin, should be zero indicies case
         for subsequence_idx, subsequence_positions in enumerate(positions_list):
             num_positions = len(subsequence_positions)
+            # curr_offset: float = float(num_positions-1) * bin_width # the total duration of this subsequence -- this version is perfectly aligned
+            curr_offset: float = float(num_positions) * bin_width # the total duration of this subsequence -- this version is perfectly aligned
             color = cmap(subsequence_idx % num_colors)
             
-            x_indices = np.arange(x_start, x_start + num_positions)
+            # x_indices = np.arange(x_start, x_start + num_positions)
+            x_indices = np.linspace(x_start, (x_start + curr_offset), num=num_positions)
+            # x_indices = np.arange(x_start, x_start + curr_offset)
             x_starts = x_indices
-            x_ends = x_indices + 1
-            
-            # out_dict['subsequences'][subsequence_idx] = {'time_bin_edges_vlines': None, 'arrows': [], 'arrow_labels': [],
-            #                                  } # initialize new dict
+            x_ends = x_indices + bin_width # shift by one bin_width
             
             # Plot horizontal lines for position values within each time bin
             out_dict['subsequence_positions_hlines_dict'][subsequence_idx] = ax.hlines(subsequence_positions, xmin=x_starts, xmax=x_ends, colors=color, linewidth=2)
             
-            if enable_position_difference_indicators:
-                out_dict['subsequence_arrows_dict'][subsequence_idx] = []
-                out_dict['subsequence_arrow_labels_dict'][subsequence_idx] = []
+            # if enable_position_difference_indicators:
+            #     out_dict['subsequence_arrows_dict'][subsequence_idx] = []
+            #     out_dict['subsequence_arrow_labels_dict'][subsequence_idx] = []
                 
-                # Now, for each pair of adjacent positions within the group, draw arrows and labels
-                for i in range(num_positions - 1):
-                    delta_pos = subsequence_positions[i+1] - subsequence_positions[i]
-                    x0 = x_starts[i] + 0.5
-                    x1 = x_starts[i+1] + 0.5
-                    y0 = subsequence_positions[i]
-                    y1 = subsequence_positions[i+1]
+            #     # Now, for each pair of adjacent positions within the group, draw arrows and labels
+            #     for i in range(num_positions - 1):
+            #         delta_pos = subsequence_positions[i+1] - subsequence_positions[i]
+            #         x0 = x_starts[i] + (bin_width / 2.0)
+            #         x1 = x_starts[i+1] + (bin_width / 2.0)
+            #         y0 = subsequence_positions[i]
+            #         y1 = subsequence_positions[i+1]
                     
-                    # Draw an arrow from (x0, y0) to (x1, y1)
-                    arrow = ax.annotate(
-                        '',
-                        xy=(x1, y1),
-                        xytext=(x0, y0),
-                        arrowprops=dict(arrowstyle='->', color='black', shrinkA=0, shrinkB=0, linewidth=1),
-                    )
-                    out_dict['subsequence_arrows_dict'][subsequence_idx].append(arrow)
+            #         # Draw an arrow from (x0, y0) to (x1, y1)
+            #         arrow = ax.annotate(
+            #             '',
+            #             xy=(x1, y1),
+            #             xytext=(x0, y0),
+            #             arrowprops=dict(arrowstyle='->', color='black', shrinkA=0, shrinkB=0, linewidth=1),
+            #         )
+            #         out_dict['subsequence_arrows_dict'][subsequence_idx].append(arrow)
                                         
-                    # Place the label near the midpoint of the arrow
-                    xm = (x0 + x1) / 2
-                    ym = (y0 + y1) / 2
-                    txt = ax.text(
-                        xm, ym,
-                        f'{delta_pos:+.2f}',  # Format with sign and two decimal places
-                        fontsize=6,
-                        ha='center',
-                        va='bottom',
-                        color='black',
-                        bbox=dict(facecolor='white', edgecolor='none', alpha=0.7, pad=0.5)  # Add background for readability
-                    )
-                    out_dict['subsequence_arrow_labels_dict'][subsequence_idx].append(txt)
+            #         # Place the label near the midpoint of the arrow
+            #         xm = (x0 + x1) / 2
+            #         ym = (y0 + y1) / 2
+            #         txt = ax.text(
+            #             xm, ym,
+            #             f'{delta_pos:+.2f}',  # Format with sign and two decimal places
+            #             fontsize=6,
+            #             ha='center',
+            #             va='bottom',
+            #             color='black',
+            #             bbox=dict(facecolor='white', edgecolor='none', alpha=0.7, pad=0.5)  # Add background for readability
+            #         )
+            #         out_dict['subsequence_arrow_labels_dict'][subsequence_idx].append(txt)
                     
             # Update x_start for next group
-            x_start += num_positions
+            x_start += curr_offset
         
         # Set axis labels and limits
         ax.set_xlabel('Time Bins')
         ax.set_ylabel('Position')
-        ax.set_xlim(0, N)
-        ax.set_xticks(x_bins)
-        ax.set_ylim(ymin, ymax)
+        # ax.set_xlim(0, N)
+        # ax.set_xticks(x_bins)
+        # ax.set_ylim(ymin, ymax)
         
         out = MatplotlibRenderPlots(name='test', figures=[fig, ], axes=ax, plots=out_dict, **kwargs)
         if not defer_show:
@@ -834,7 +850,9 @@ class SubsequencesPartitioningResult:
 
 
     def plot_time_bins_multiple(self, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True, **kwargs):
-        return self._debug_plot_time_bins_multiple(positions_list=self.merged_split_positions_arrays, num=num, ax=ax, enable_position_difference_indicators=enable_position_difference_indicators, **kwargs)
+        return self._debug_plot_time_bins_multiple(positions_list=self.merged_split_positions_arrays, num=num, ax=ax, enable_position_difference_indicators=enable_position_difference_indicators,
+                                                    flat_time_window_centers=kwargs.pop('flat_time_window_centers', self.flat_time_window_centers), flat_time_window_edges=kwargs.pop('flat_time_window_edges', self.flat_time_window_edges),
+                                                     **kwargs)
 
 
 @metadata_attributes(short_name=None, tags=['heuristic', 'replay', 'ripple', 'scoring', 'pho'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 06:00', related_items=[])
