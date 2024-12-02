@@ -2436,12 +2436,16 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             
             # Customize the hovertemplate
             fig.update_traces(
-                hovertemplate="<b>sess:</b> %{customdata[0]}<br>"
-                            # "<b>X:</b> %{x}<br>"
-                            "<b>start, duration:</b> %{customdata[2]}, %{customdata[3]}<br>"
-                            "<b>Y:</b> %{y}<br>"
-                            "<b>custom_replay:</b> %{customdata[1]}",
-                customdata=active_plot_df[["session_name", "custom_replay_name", "time_bin_size", "start", "duration"]].values
+                # hovertemplate="<b>sess:</b> %{customdata[0]}<br>"
+                #             # "<b>X:</b> %{x}<br>"
+                #             "<b>start, duration:</b> %{customdata[3]}, %{customdata[4]}<br>"
+                #             "<b>Y:</b> %{y}<br>"
+                #             "<b>custom_replay:</b> %{customdata[1]}",
+                
+                hovertemplate="<b>sess:</b> %{customdata[0]} | <b>replay_name:</b> %{customdata[1]} | <b>time_bin_size:</b> %{customdata[2]}<br>"
+                            "<b>start:</b> %{customdata[3]}<br>",
+                customdata=active_plot_df[["session_name", "custom_replay_name", "time_bin_size", "start", "duration"]].values,
+                hoverlabel=dict(bgcolor="rgba(255, 255, 255, 0.4)", font=dict(color="black")),
             )
 
             if df_filter.hover_posterior_data is not None:
