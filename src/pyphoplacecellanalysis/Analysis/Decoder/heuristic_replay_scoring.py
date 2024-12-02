@@ -694,7 +694,7 @@ class SubsequencesPartitioningResult:
     # Visualization/Graphical Debugging __________________________________________________________________________________ #
     @function_attributes(short_name=None, tags=['plot', 'matplotlib', 'figure', 'debug'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-27 06:36', related_items=['SubsequencesPartitioningResult'])
     @classmethod
-    def _debug_plot_time_bins_multiple(cls, positions_list, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True, defer_show:bool=False, flat_time_window_centers=None, flat_time_window_edges=None, **kwargs):
+    def _debug_plot_time_bins_multiple(cls, positions_list, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True, defer_show:bool=False, flat_time_window_centers=None, flat_time_window_edges=None, enable_axes_formatting:bool=False, **kwargs):
         """
         Plots positions over fixed-width time bins with vertical lines separating each bin.
         Each sublist in positions_list is plotted in a different color.
@@ -797,50 +797,56 @@ class SubsequencesPartitioningResult:
             # Plot horizontal lines for position values within each time bin
             out_dict['subsequence_positions_hlines_dict'][subsequence_idx] = ax.hlines(subsequence_positions, xmin=x_starts, xmax=x_ends, colors=color, linewidth=2)
             
-            # if enable_position_difference_indicators:
-            #     out_dict['subsequence_arrows_dict'][subsequence_idx] = []
-            #     out_dict['subsequence_arrow_labels_dict'][subsequence_idx] = []
+            if enable_position_difference_indicators:
+                ## If enabled, draws "change" arrows between each adjacent bin showing the amount of y-pos change
+                arrow_opacity: float = 0.4
+                arrow_color = (0, 0, 0, arrow_opacity,)
+                arrow_text_outline_color = (1.0, 1.0, 1.0, arrow_opacity)
                 
-            #     # Now, for each pair of adjacent positions within the group, draw arrows and labels
-            #     for i in range(num_positions - 1):
-            #         delta_pos = subsequence_positions[i+1] - subsequence_positions[i]
-            #         x0 = x_starts[i] + (bin_width / 2.0)
-            #         x1 = x_starts[i+1] + (bin_width / 2.0)
-            #         y0 = subsequence_positions[i]
-            #         y1 = subsequence_positions[i+1]
+                out_dict['subsequence_arrows_dict'][subsequence_idx] = []
+                out_dict['subsequence_arrow_labels_dict'][subsequence_idx] = []
+                
+                # Now, for each pair of adjacent positions within the group, draw arrows and labels
+                for i in range(num_positions - 1):
+                    delta_pos = subsequence_positions[i+1] - subsequence_positions[i]
+                    x0 = x_starts[i] + (bin_width / 2.0)
+                    x1 = x_starts[i+1] + (bin_width / 2.0)
+                    y0 = subsequence_positions[i]
+                    y1 = subsequence_positions[i+1]
                     
-            #         # Draw an arrow from (x0, y0) to (x1, y1)
-            #         arrow = ax.annotate(
-            #             '',
-            #             xy=(x1, y1),
-            #             xytext=(x0, y0),
-            #             arrowprops=dict(arrowstyle='->', color='black', shrinkA=0, shrinkB=0, linewidth=1),
-            #         )
-            #         out_dict['subsequence_arrows_dict'][subsequence_idx].append(arrow)
+                    # Draw an arrow from (x0, y0) to (x1, y1)
+                    arrow = ax.annotate(
+                        '',
+                        xy=(x1, y1),
+                        xytext=(x0, y0),
+                        arrowprops=dict(arrowstyle='->', color=arrow_color, shrinkA=0, shrinkB=0, linewidth=1),
+                    )
+                    out_dict['subsequence_arrows_dict'][subsequence_idx].append(arrow)
                                         
-            #         # Place the label near the midpoint of the arrow
-            #         xm = (x0 + x1) / 2
-            #         ym = (y0 + y1) / 2
-            #         txt = ax.text(
-            #             xm, ym,
-            #             f'{delta_pos:+.2f}',  # Format with sign and two decimal places
-            #             fontsize=6,
-            #             ha='center',
-            #             va='bottom',
-            #             color='black',
-            #             bbox=dict(facecolor='white', edgecolor='none', alpha=0.7, pad=0.5)  # Add background for readability
-            #         )
-            #         out_dict['subsequence_arrow_labels_dict'][subsequence_idx].append(txt)
+                    # Place the label near the midpoint of the arrow
+                    xm = (x0 + x1) / 2
+                    ym = (y0 + y1) / 2
+                    txt = ax.text(
+                        xm, ym,
+                        f'{delta_pos:+.2f}',  # Format with sign and two decimal places
+                        fontsize=6,
+                        ha='center',
+                        va='bottom',
+                        color=arrow_color,
+                        bbox=dict(facecolor=arrow_text_outline_color, edgecolor='none', alpha=arrow_opacity, pad=0.5)  # Add background for readability
+                    )
+                    out_dict['subsequence_arrow_labels_dict'][subsequence_idx].append(txt)
                     
             # Update x_start for next group
             x_start += curr_subsequence_end_position
         
-        # Set axis labels and limits
-        ax.set_xlabel('Time Bins')
-        ax.set_ylabel('Position')
-        # ax.set_xlim(0, N)
-        # ax.set_xticks(x_bins)
-        # ax.set_ylim(ymin, ymax)
+        if enable_axes_formatting:
+            # Set axis labels and limits
+            ax.set_xlabel('Time Bins')
+            ax.set_ylabel('Position')
+            # ax.set_xlim(0, N)
+            # ax.set_xticks(x_bins)
+            # ax.set_ylim(ymin, ymax)
         
         out = MatplotlibRenderPlots(name='test', figures=[fig, ], axes=ax, plots=out_dict, **kwargs)
         if not defer_show:
@@ -849,10 +855,10 @@ class SubsequencesPartitioningResult:
         return out # fig, ax, out_dict
 
 
-    def plot_time_bins_multiple(self, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True, **kwargs):
+    def plot_time_bins_multiple(self, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True, enable_axes_formatting=False, **kwargs):
         return self._debug_plot_time_bins_multiple(positions_list=self.merged_split_positions_arrays, num=num, ax=ax, enable_position_difference_indicators=enable_position_difference_indicators,
                                                     flat_time_window_centers=kwargs.pop('flat_time_window_centers', self.flat_time_window_centers), flat_time_window_edges=kwargs.pop('flat_time_window_edges', self.flat_time_window_edges),
-                                                     **kwargs)
+                                                     enable_axes_formatting=enable_axes_formatting, **kwargs)
 
 
 @metadata_attributes(short_name=None, tags=['heuristic', 'replay', 'ripple', 'scoring', 'pho'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 06:00', related_items=[])
