@@ -721,7 +721,9 @@ class SubsequencesPartitioningResult:
         """
         from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
         import matplotlib.pyplot as plt
+        from neuropy.utils.matplotlib_helpers import modify_colormap_alpha
         
+
         out_dict = {'time_bin_edges_vlines': None, 'split_vlines': None, 'subsequence_positions_hlines_dict': None, 
                     'subsequence_arrows_dict': None, 'subsequence_arrow_labels_dict': None,
                     }
@@ -771,9 +773,9 @@ class SubsequencesPartitioningResult:
         
         # Define a colormap
         cmap = plt.get_cmap('tab10')
-        num_colors = cmap.N
+        cmap = modify_colormap_alpha(cmap=cmap, alpha=0.55)
+        num_colors: int = cmap.N
         
-
         # Plot horizontal lines with customizable color
         # ax.hlines(positions, xmin=np.arange(N), xmax=np.arange(1, N+1), colors=line_color)
         
@@ -781,17 +783,14 @@ class SubsequencesPartitioningResult:
         out_dict['subsequence_arrows_dict'] = {} 
         out_dict['subsequence_arrow_labels_dict'] = {} 
         # Keep track of the current x position
-        x_start = x_bins[0] # - (bin_width / 2.0) # the first tbin, should be zero indicies case
+        x_start = x_bins[0]
         for subsequence_idx, subsequence_positions in enumerate(positions_list):
             num_positions: int = len(subsequence_positions)
-            # curr_subsequence_end_position: float = float(num_positions-1) * bin_width # the total duration of this subsequence -- this version is perfectly aligned
             curr_subsequence_end_position: float = float(num_positions) * bin_width # the total duration of this subsequence -- this version is perfectly aligned
             color = cmap(subsequence_idx % num_colors)
             
             x_rel_indicies = np.arange(num_positions) # [0, 1, ... (n_pos - 1)]
             x_indices = x_start + (x_rel_indicies * bin_width) # np.arange(x_start, x_start + num_positions)
-            # x_indices = np.linspace(x_start, (x_start + curr_subsequence_end_position), num=num_positions, endpoint=False)
-            # x_indices = np.arange(x_start, x_start + curr_subsequence_end_position)
             x_starts = x_indices
             x_ends = x_indices + bin_width # shift by one bin_width
             
