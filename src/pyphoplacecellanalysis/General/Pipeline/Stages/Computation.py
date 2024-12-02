@@ -539,9 +539,35 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
 
 
+    def get_failed_computations(self, enabled_filter_names=None):
+        """ gets a dictionary of the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result
+        
+        """
+        if enabled_filter_names is None:
+            enabled_filter_names = list(self.filtered_sessions.keys()) # all filters if specific enabled names aren't specified
+        all_accumulated_errors = {}
+        for a_select_config_name, a_filtered_session in self.filtered_sessions.items():                
+            if a_select_config_name in enabled_filter_names:
+                # print(f'Performing rerun_failed_computations_single_context on filtered_session with filter named "{a_select_config_name}"...')
+                previous_computation_result = self.computation_results[a_select_config_name]
+                # curr_active_pipeline.computation_results[a_select_config_name] = curr_active_pipeline.rerun_failed_computations_single_context(previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)    
+                active_computation_errors = previous_computation_result.accumulated_errors
+                if len(active_computation_errors) > 0:
+                    # all_accumulated_errors[a_select_config_name] = active_computation_errors
+                    all_accumulated_errors[a_select_config_name] = {}
+                    for failed_computation_fn, error in active_computation_errors.items():
+                        a_failed_fn_name: str = failed_computation_fn.__name__
+                        all_accumulated_errors[a_select_config_name][a_failed_fn_name] = error
+
+        return all_accumulated_errors
+
 
     def rerun_failed_computations(self, enabled_filter_names=None, fail_on_exception:bool=False, debug_print=False):
-        """ retries the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result """
+        """ retries the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result
+        
+        TODO: Parallelization opportunity
+        
+        """
         if enabled_filter_names is None:
             enabled_filter_names = list(self.filtered_sessions.keys()) # all filters if specific enabled names aren't specified
         for a_select_config_name, a_filtered_session in self.filtered_sessions.items():                
