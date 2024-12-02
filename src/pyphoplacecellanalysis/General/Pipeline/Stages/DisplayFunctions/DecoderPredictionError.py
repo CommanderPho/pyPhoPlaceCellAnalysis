@@ -898,6 +898,8 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
     else:
         raise NotImplementedError
     
+    num_original_epochs: int = len(epochs_df)
+    
     if included_epoch_indicies is not None:
         # Allow specifying a subset of the epochs to be plotted
         if not isinstance(included_epoch_indicies, np.ndarray):
@@ -907,9 +909,11 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
         is_included_in_subset = np.isin(epochs_df.index, included_epoch_indicies)
         epochs_df = epochs_df[is_included_in_subset]
         filter_epochs_decoder_result = filter_epochs_decoder_result.filtered_by_epochs(included_epoch_indicies)
-
-
-
+        num_filtered_epochs: int = len(epochs_df)
+        diff_all_to_filtered_epochs: int = num_original_epochs - num_filtered_epochs
+        if diff_all_to_filtered_epochs > 0:
+            print(f'plot_decoded_epoch_slices(...): filteredd {diff_all_to_filtered_epochs} epochs using `included_epoch_indicies`.\n\tnum_original_epochs: {num_original_epochs}\n\tnum_filtered_epochs: {num_filtered_epochs}\n')
+            
     # if 'label' not in epochs_df.columns:
     epochs_df['label'] = epochs_df.index.to_numpy() # integer ripple indexing
     epoch_slices = epochs_df[['start', 'stop']].to_numpy()

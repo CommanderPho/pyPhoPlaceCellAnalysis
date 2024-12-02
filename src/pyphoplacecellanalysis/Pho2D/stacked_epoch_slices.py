@@ -1062,6 +1062,15 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
 
         new_obj = cls(params, plots_data, plots, ui)
         
+
+        ## extract and replace: filter_epochs_decoder_result, active_filter_epochs, with potentially filtered ones 
+        filter_epochs_decoder_result = plots_data.filter_epochs_decoder_result
+        active_filter_epochs = filter_epochs_decoder_result.filter_epochs
+        if isinstance(active_filter_epochs, pd.DataFrame):
+            # convert to native epoch object.
+            active_filter_epochs = Epoch(epochs=deepcopy(active_filter_epochs)) # convert to native Epoch object
+    
+
         epochs_name: str = kwargs.get('epochs_name', None)
         if epochs_name is not None:
             new_obj.params.epochs_name = epochs_name
