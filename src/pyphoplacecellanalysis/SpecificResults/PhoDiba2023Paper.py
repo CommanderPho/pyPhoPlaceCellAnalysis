@@ -1983,6 +1983,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     additional_filter_predicates = non_serialized_field(default=Factory(dict)) # a list of boolean predicates to be applied as filters
     on_filtered_dataframes_changed_callback_fns = non_serialized_field(default=Factory(dict)) # a list of callables that will be called when the filters are changed. 
     
+    selected_points = non_serialized_field(default=Factory(dict))
 
     # Widgets (will be initialized in __attrs_post_init__) _______________________________________________________________ #
     replay_name_widget = non_serialized_field(init=False)
@@ -2440,7 +2441,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                             "<b>start, duration:</b> %{customdata[2]}, %{customdata[3]}<br>"
                             "<b>Y:</b> %{y}<br>"
                             "<b>custom_replay:</b> %{customdata[1]}",
-                customdata=active_plot_df[["session_name", "custom_replay_name", "start", "duration"]].values
+                customdata=active_plot_df[["session_name", "custom_replay_name", "time_bin_size", "start", "duration"]].values
             )
 
             if df_filter.hover_posterior_data is not None:
@@ -2454,17 +2455,34 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                     ind = points.point_inds[0]
                     session_name = df_filter.active_plot_df['session_name'].iloc[ind]
                     custom_replay_name = df_filter.active_plot_df['custom_replay_name'].iloc[ind]
+                    time_bin_size = df_filter.active_plot_df['time_bin_size'].iloc[ind]
                     start_t = df_filter.active_plot_df['start'].iloc[ind]
                     stop_t = df_filter.active_plot_df['stop'].iloc[ind]
                     
-
                     df_filter.output_widget.clear_output()
                     with df_filter.output_widget:
                         print(f"Clicked point index: {ind}")
                         print(f'start_t, stop_t: {start_t}, {stop_t}')
                         print(f"session_name: {session_name}")
                         print(f"custom_replay_name: {custom_replay_name}")
+                        print(f"time_bin_size: {time_bin_size}")
+
+                    selected_event_session_context: IdentifyingContext = IdentifyingContext(session_name=session_name, custom_replay_name=custom_replay_name, time_bin_size=time_bin_size)
+                    
+                    selected_event_context: IdentifyingContext = IdentifyingContext(start_t=start_t, stop_t=stop_t)
+                    
+                    curr_selected_points_dict = df_filter.selected_points.get(selected_event_session_context, None)
+                    if curr_selected_points_dict is None:
+                        df_filter.selected_points[selected_event_session_context] = [] # [start_t, ] ## add start_t only
                         
+
+                    if selected_event_context not in df_filter.selected_points[selected_event_session_context]:
+                        df_filter.selected_points[selected_event_session_context].append(selected_event_context) # add to the selection points list
+                        
+                    
+                 ## update selected points
+                    
+
                     ## try to update the selected heatmap posterior:
                     try:
                         ## try to update by start_t, stop_t
