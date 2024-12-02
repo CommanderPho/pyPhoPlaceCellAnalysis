@@ -242,6 +242,9 @@ class SubsequencesPartitioningResult:
             return 0.0 # zero it out if they are all repeats
 
 
+    # ==================================================================================================================== #
+    # Update/Recompute Functions                                                                                           #
+    # ==================================================================================================================== #
     def rebuild_sequence_info_df(self) -> pd.DataFrame:
         ## initialize new
         self.sequence_info_df = pd.DataFrame({'pos': self.flat_positions})
@@ -694,7 +697,8 @@ class SubsequencesPartitioningResult:
     # Visualization/Graphical Debugging __________________________________________________________________________________ #
     @function_attributes(short_name=None, tags=['plot', 'matplotlib', 'figure', 'debug'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-27 06:36', related_items=['SubsequencesPartitioningResult'])
     @classmethod
-    def _debug_plot_time_bins_multiple(cls, positions_list, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True, defer_show:bool=False, flat_time_window_centers=None, flat_time_window_edges=None, enable_axes_formatting:bool=False, **kwargs):
+    def _debug_plot_time_bins_multiple(cls, positions_list, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True, defer_show:bool=False, flat_time_window_centers=None, flat_time_window_edges=None, enable_axes_formatting:bool=False,
+                                       arrow_alpha: float = 0.4, subsequence_line_color_alpha: float=0.55,  **kwargs):
         """
         Plots positions over fixed-width time bins with vertical lines separating each bin.
         Each sublist in positions_list is plotted in a different color.
@@ -773,7 +777,7 @@ class SubsequencesPartitioningResult:
         
         # Define a colormap
         cmap = plt.get_cmap('tab10')
-        cmap = modify_colormap_alpha(cmap=cmap, alpha=0.55)
+        cmap = modify_colormap_alpha(cmap=cmap, alpha=subsequence_line_color_alpha)
         num_colors: int = cmap.N
         
         # Plot horizontal lines with customizable color
@@ -799,9 +803,9 @@ class SubsequencesPartitioningResult:
             
             if enable_position_difference_indicators:
                 ## If enabled, draws "change" arrows between each adjacent bin showing the amount of y-pos change
-                arrow_opacity: float = 0.4
-                arrow_color = (0, 0, 0, arrow_opacity,)
-                arrow_text_outline_color = (1.0, 1.0, 1.0, arrow_opacity)
+                
+                arrow_color = (0, 0, 0, arrow_alpha,)
+                arrow_text_outline_color = (1.0, 1.0, 1.0, arrow_alpha)
                 
                 out_dict['subsequence_arrows_dict'][subsequence_idx] = []
                 out_dict['subsequence_arrow_labels_dict'][subsequence_idx] = []
@@ -833,7 +837,7 @@ class SubsequencesPartitioningResult:
                         ha='center',
                         va='bottom',
                         color=arrow_color,
-                        bbox=dict(facecolor=arrow_text_outline_color, edgecolor='none', alpha=arrow_opacity, pad=0.5)  # Add background for readability
+                        bbox=dict(facecolor=arrow_text_outline_color, edgecolor='none', alpha=arrow_alpha, pad=0.5)  # Add background for readability
                     )
                     out_dict['subsequence_arrow_labels_dict'][subsequence_idx].append(txt)
                     
@@ -855,10 +859,17 @@ class SubsequencesPartitioningResult:
         return out # fig, ax, out_dict
 
 
-    def plot_time_bins_multiple(self, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True, enable_axes_formatting=False, **kwargs):
-        return self._debug_plot_time_bins_multiple(positions_list=self.merged_split_positions_arrays, num=num, ax=ax, enable_position_difference_indicators=enable_position_difference_indicators,
-                                                    flat_time_window_centers=kwargs.pop('flat_time_window_centers', self.flat_time_window_centers), flat_time_window_edges=kwargs.pop('flat_time_window_edges', self.flat_time_window_edges),
-                                                     enable_axes_formatting=enable_axes_formatting, **kwargs)
+    def plot_time_bins_multiple(self, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True, enable_axes_formatting=False, override_positions_list=None, flat_time_window_edges=None,
+                                 arrow_alpha: float = 0.4, subsequence_line_color_alpha: float=0.55, **kwargs):
+        if override_positions_list is None:
+            override_positions_list = self.merged_split_positions_arrays
+        if flat_time_window_edges is None:
+            flat_time_window_edges = self.flat_time_window_edges            
+
+
+        return self._debug_plot_time_bins_multiple(positions_list=override_positions_list, num=num, ax=ax, enable_position_difference_indicators=enable_position_difference_indicators,
+                                                    flat_time_window_centers=kwargs.pop('flat_time_window_centers', self.flat_time_window_centers), flat_time_window_edges=flat_time_window_edges,
+                                                     enable_axes_formatting=enable_axes_formatting, arrow_alpha=arrow_alpha, subsequence_line_color_alpha=subsequence_line_color_alpha, **kwargs)
 
 
 @metadata_attributes(short_name=None, tags=['heuristic', 'replay', 'ripple', 'scoring', 'pho'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 06:00', related_items=[])
