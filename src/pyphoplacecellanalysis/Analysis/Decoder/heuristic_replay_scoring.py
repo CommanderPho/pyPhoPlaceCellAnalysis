@@ -783,59 +783,58 @@ class SubsequencesPartitioningResult:
         # Keep track of the current x position
         x_start = x_bins[0] # - (bin_width / 2.0) # the first tbin, should be zero indicies case
         for subsequence_idx, subsequence_positions in enumerate(positions_list):
-            if subsequence_idx == 0:
-                num_positions: int = len(subsequence_positions)
-                # curr_subsequence_end_position: float = float(num_positions-1) * bin_width # the total duration of this subsequence -- this version is perfectly aligned
-                curr_subsequence_end_position: float = float(num_positions) * bin_width # the total duration of this subsequence -- this version is perfectly aligned
-                color = cmap(subsequence_idx % num_colors)
+            num_positions: int = len(subsequence_positions)
+            # curr_subsequence_end_position: float = float(num_positions-1) * bin_width # the total duration of this subsequence -- this version is perfectly aligned
+            curr_subsequence_end_position: float = float(num_positions) * bin_width # the total duration of this subsequence -- this version is perfectly aligned
+            color = cmap(subsequence_idx % num_colors)
+            
+            x_rel_indicies = np.arange(num_positions) # [0, 1, ... (n_pos - 1)]
+            x_indices = x_start + (x_rel_indicies * bin_width) # np.arange(x_start, x_start + num_positions)
+            # x_indices = np.linspace(x_start, (x_start + curr_subsequence_end_position), num=num_positions, endpoint=False)
+            # x_indices = np.arange(x_start, x_start + curr_subsequence_end_position)
+            x_starts = x_indices
+            x_ends = x_indices + bin_width # shift by one bin_width
+            
+            # Plot horizontal lines for position values within each time bin
+            out_dict['subsequence_positions_hlines_dict'][subsequence_idx] = ax.hlines(subsequence_positions, xmin=x_starts, xmax=x_ends, colors=color, linewidth=2)
+            
+            # if enable_position_difference_indicators:
+            #     out_dict['subsequence_arrows_dict'][subsequence_idx] = []
+            #     out_dict['subsequence_arrow_labels_dict'][subsequence_idx] = []
                 
-                x_rel_indicies = np.arange(num_positions) # [0, 1, ... (n_pos - 1)]
-                x_indices = x_start + (x_rel_indicies * bin_width) # np.arange(x_start, x_start + num_positions)
-                # x_indices = np.linspace(x_start, (x_start + curr_subsequence_end_position), num=num_positions, endpoint=False)
-                # x_indices = np.arange(x_start, x_start + curr_subsequence_end_position)
-                x_starts = x_indices
-                x_ends = x_indices + bin_width # shift by one bin_width
-                
-                # Plot horizontal lines for position values within each time bin
-                out_dict['subsequence_positions_hlines_dict'][subsequence_idx] = ax.hlines(subsequence_positions, xmin=x_starts, xmax=x_ends, colors=color, linewidth=2)
-                
-                # if enable_position_difference_indicators:
-                #     out_dict['subsequence_arrows_dict'][subsequence_idx] = []
-                #     out_dict['subsequence_arrow_labels_dict'][subsequence_idx] = []
+            #     # Now, for each pair of adjacent positions within the group, draw arrows and labels
+            #     for i in range(num_positions - 1):
+            #         delta_pos = subsequence_positions[i+1] - subsequence_positions[i]
+            #         x0 = x_starts[i] + (bin_width / 2.0)
+            #         x1 = x_starts[i+1] + (bin_width / 2.0)
+            #         y0 = subsequence_positions[i]
+            #         y1 = subsequence_positions[i+1]
                     
-                #     # Now, for each pair of adjacent positions within the group, draw arrows and labels
-                #     for i in range(num_positions - 1):
-                #         delta_pos = subsequence_positions[i+1] - subsequence_positions[i]
-                #         x0 = x_starts[i] + (bin_width / 2.0)
-                #         x1 = x_starts[i+1] + (bin_width / 2.0)
-                #         y0 = subsequence_positions[i]
-                #         y1 = subsequence_positions[i+1]
-                        
-                #         # Draw an arrow from (x0, y0) to (x1, y1)
-                #         arrow = ax.annotate(
-                #             '',
-                #             xy=(x1, y1),
-                #             xytext=(x0, y0),
-                #             arrowprops=dict(arrowstyle='->', color='black', shrinkA=0, shrinkB=0, linewidth=1),
-                #         )
-                #         out_dict['subsequence_arrows_dict'][subsequence_idx].append(arrow)
-                                            
-                #         # Place the label near the midpoint of the arrow
-                #         xm = (x0 + x1) / 2
-                #         ym = (y0 + y1) / 2
-                #         txt = ax.text(
-                #             xm, ym,
-                #             f'{delta_pos:+.2f}',  # Format with sign and two decimal places
-                #             fontsize=6,
-                #             ha='center',
-                #             va='bottom',
-                #             color='black',
-                #             bbox=dict(facecolor='white', edgecolor='none', alpha=0.7, pad=0.5)  # Add background for readability
-                #         )
-                #         out_dict['subsequence_arrow_labels_dict'][subsequence_idx].append(txt)
-                        
-                # Update x_start for next group
-                x_start += curr_subsequence_end_position
+            #         # Draw an arrow from (x0, y0) to (x1, y1)
+            #         arrow = ax.annotate(
+            #             '',
+            #             xy=(x1, y1),
+            #             xytext=(x0, y0),
+            #             arrowprops=dict(arrowstyle='->', color='black', shrinkA=0, shrinkB=0, linewidth=1),
+            #         )
+            #         out_dict['subsequence_arrows_dict'][subsequence_idx].append(arrow)
+                                        
+            #         # Place the label near the midpoint of the arrow
+            #         xm = (x0 + x1) / 2
+            #         ym = (y0 + y1) / 2
+            #         txt = ax.text(
+            #             xm, ym,
+            #             f'{delta_pos:+.2f}',  # Format with sign and two decimal places
+            #             fontsize=6,
+            #             ha='center',
+            #             va='bottom',
+            #             color='black',
+            #             bbox=dict(facecolor='white', edgecolor='none', alpha=0.7, pad=0.5)  # Add background for readability
+            #         )
+            #         out_dict['subsequence_arrow_labels_dict'][subsequence_idx].append(txt)
+                    
+            # Update x_start for next group
+            x_start += curr_subsequence_end_position
         
         # Set axis labels and limits
         ax.set_xlabel('Time Bins')
