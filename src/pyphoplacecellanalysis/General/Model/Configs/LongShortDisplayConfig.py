@@ -128,7 +128,7 @@ class DisplayColorsEnum:
             else:
                 fg_color = '#666' # White
                 
-            # a purplish-royal-blue 
+            # a yellowish-green
             if is_dim:
                 bg_color = '#c1db7a' 
                 border_color = '#b0b89b' 

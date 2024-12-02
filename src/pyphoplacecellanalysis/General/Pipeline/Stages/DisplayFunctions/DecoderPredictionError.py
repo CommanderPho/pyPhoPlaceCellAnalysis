@@ -2387,7 +2387,7 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
 
     @classmethod
     def _callback_update_curr_single_epoch_slice_plot(cls, curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", data_idx:int, curr_time_bins, *args, epoch_slice=None, curr_time_bin_container=None, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
-        """ 2023-05-30 - Based off of `_helper_update_decoded_single_epoch_slice_plot` to enable plotting radon transform lines on paged decoded epochs
+        """ 2023-05-30 - Based off of `_helper_update_decoded_single_epoch_slice_plot` to enable plotting subsequence identities (as separate colors) for each time bin's most-likely decoded position lines 
 
         Needs only: curr_time_bins, plots_data, i
         Accesses: plots_data.epoch_slices[i,:], plots_data.global_pos_df, params.variable_name, params.xbin, params.enable_flat_line_drawing
@@ -2465,7 +2465,8 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
 
             if (a_partition_result is not None):
                 # Most likely position plots:
-                out: "MatplotlibRenderPlots" = a_partition_result.plot_time_bins_multiple(ax=curr_ax, enable_position_difference_indicators=True, flat_time_window_centers=time_window_centers, flat_time_window_edges=time_window_edges)
+                out: "MatplotlibRenderPlots" = a_partition_result.plot_time_bins_multiple(ax=curr_ax, enable_position_difference_indicators=False, flat_time_window_centers=time_window_centers, flat_time_window_edges=time_window_edges,
+                                                                                           enable_axes_formatting=False, defer_show=True)
 
         else:
             # ## Remove the existing one
