@@ -2450,7 +2450,8 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
 
 	@classmethod
-	def add_score_best_dir_columns(cls, df: pd.DataFrame, col_name: str = 'pf_peak_x_pearsonr', should_drop_directional_columns:bool=False, is_col_name_suffix_mode: bool = False) -> pd.DataFrame:
+	def add_score_best_dir_columns(cls, df: pd.DataFrame, col_name: str = 'pf_peak_x_pearsonr', should_drop_directional_columns:bool=False, is_col_name_suffix_mode: bool = False, 
+								include_LS_diff_col: bool=True, include_best_overall_score_col: bool=True) -> pd.DataFrame:
 		""" adds in a single "*_diff" and the 'long_best_*', 'short_best_*' columns
 		Generalized from `merge_decoded_epochs_result_dfs`
 
@@ -2465,12 +2466,14 @@ class DecoderDecodedEpochsResult(ComputedResult):
 			directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(curr_active_pipeline, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=False)
 
 		"""
+		added_col_names = []
 		direction_max_indices = df[['P_LR', 'P_RL']].values.argmax(axis=1)
 		track_identity_max_indices = df[['P_Long', 'P_Short']].values.argmax(axis=1)
 		# Get only the best direction long/short values for each metric:
 		long_best_col_name: str = f'long_best_{col_name}'
 		short_best_col_name: str = f'short_best_{col_name}'
-
+		overall_best_col_name: str = f'overall_best_{col_name}'
+		
 		
 		if is_col_name_suffix_mode:
 			long_LR_string = f'long_LR_{col_name}'
@@ -2485,14 +2488,25 @@ class DecoderDecodedEpochsResult(ComputedResult):
 		
 		df[long_best_col_name] = np.where(direction_max_indices, df[long_LR_string], df[long_RL_string])
 		df[short_best_col_name] = np.where(direction_max_indices, df[short_LR_string], df[short_RL_string])
+		added_col_names.append(long_best_col_name)
+		added_col_names.append(short_best_col_name)
+		
 		if should_drop_directional_columns:
 			df = df.drop(columns=['P_LR', 'P_RL','best_decoder_index', long_LR_string, long_RL_string, short_LR_string, short_RL_string]) # drop the directional column names
 
 		## Add differences:
-		LS_diff_col_name: str = f'{col_name}_diff'
-		df[LS_diff_col_name] = df[long_best_col_name].abs() - df[short_best_col_name].abs()
+		if include_LS_diff_col:
+			LS_diff_col_name: str = f'{col_name}_diff'
+			df[LS_diff_col_name] = df[long_best_col_name].abs() - df[short_best_col_name].abs()
+			added_col_names.append(LS_diff_col_name)
+		
 
-		return df, (long_best_col_name, short_best_col_name, LS_diff_col_name)
+		## adds an "overall_best_{col_name}" column that includes the maximum between long and short
+		if include_best_overall_score_col and (long_best_col_name in df) and (short_best_col_name in df):
+			df[overall_best_col_name] = df[[long_best_col_name, short_best_col_name]].max(axis=1, skipna=True)
+			added_col_names.append(overall_best_col_name)
+
+		return df, tuple(added_col_names)
 
 
 	@classmethod
@@ -2528,7 +2542,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
 					merged_conditional_prob_column_names, merged_wcorr_column_names, heuristic_score_col_names)
 
 	@function_attributes(short_name=None, tags=['merged', 'all_scores', 'df', 'epochs'], input_requires=[], output_provides=[], uses=['.decoder_ripple_filter_epochs_decoder_result_dict'], used_by=[], creation_date='2024-03-14 19:10', related_items=[])
-	def build_complete_all_scores_merged_df(self) -> pd.DataFrame:
+	def build_complete_all_scores_merged_df(self, debug_print=False) -> pd.DataFrame:
 		""" Builds a single merged dataframe from the four separate .filter_epochs dataframes from the result for each decoder, merging them into a single dataframe with ['_long_LR','_long_RL','_short_LR','_short_RL'] suffixes for the combined columns.
 		2024-03-14 19:04 
 
@@ -2547,7 +2561,8 @@ class DecoderDecodedEpochsResult(ComputedResult):
 		# # Column Names _______________________________________________________________________________________________________ #
 
 		# ## All included columns:
-		print(f'build_complete_all_scores_merged_df(...):')
+		if debug_print:
+			print(f'build_complete_all_scores_merged_df(...):')
 		all_df_shared_column_names, all_df_score_column_names, all_df_column_names, merged_conditional_prob_column_names, merged_wcorr_column_names, heuristic_score_col_names = self.get_all_scores_column_names()
 
 		## Extract the concrete dataframes from the results:
@@ -2572,7 +2587,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
 		conditional_prob_df = deepcopy(self.ripple_weighted_corr_merged_df[merged_conditional_prob_column_names]) ## just use the columns from this
 		conditional_prob_df_shape = np.shape(conditional_prob_df)
 		if (base_shape[0] != conditional_prob_df_shape[0]):
-			print(f'build_complete_all_scores_merged_df(...): warning: all dfs should have same number of rows, but conditional_prob_df_shape: {conditional_prob_df_shape} != base_shape: {base_shape}. Skipping adding `conditional_prob_df`.')
+			print(f'\tbuild_complete_all_scores_merged_df(...): warning: all dfs should have same number of rows, but conditional_prob_df_shape: {conditional_prob_df_shape} != base_shape: {base_shape}. Skipping adding `conditional_prob_df`.')
 		else:
 			## add it 
 			included_merge_dfs_list.append(conditional_prob_df)
@@ -2588,7 +2603,8 @@ class DecoderDecodedEpochsResult(ComputedResult):
 		# if np.any([(a_col not in extracted_merged_scores_df) for a_col in P_decoder_column_names]):
 		if np.any([(a_col not in extracted_merged_scores_df) for a_col in P_decoder_marginals_column_names]):
 			# needs Marginalized Probability columns: ['P_LR', 'P_RL'], ['P_Long', 'P_Short']
-			print(f'needs Marginalized Probability columns. adding.')
+			if debug_print:
+				print(f'\tneeds Marginalized Probability columns. adding.')
 			# assert np.any([(a_col not in extracted_merged_scores_df) for a_col in P_decoder_column_names]), f"missing marginals and cannot recompute them because we're also missing the raw probabilities. extracted_merged_scores_df.columns: {list(extracted_merged_scores_df.columns)}"
 			## They remain normalized because they all already sum to one.
 			extracted_merged_scores_df['P_Long'] = extracted_merged_scores_df['P_decoder_long_LR'] + extracted_merged_scores_df['P_decoder_long_RL']
@@ -2600,7 +2616,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
 		extracted_merged_scores_df_shape = np.shape(extracted_merged_scores_df)
 		if (base_shape[0] != extracted_merged_scores_df_shape[0]):
-			print(f'build_complete_all_scores_merged_df(...): warning: all dfs should have same number of rows, but extracted_merged_scores_df_shape: {extracted_merged_scores_df_shape} != base_shape: {base_shape}. Skipping adding `extracted_merged_scores_df`.')
+			print(f'\tbuild_complete_all_scores_merged_df(...): warning: all dfs should have same number of rows, but extracted_merged_scores_df_shape: {extracted_merged_scores_df_shape} != base_shape: {base_shape}. Skipping adding `extracted_merged_scores_df`.')
 		else:
 			## add it
 			included_merge_dfs_list.append(extracted_merged_scores_df)
@@ -2614,7 +2630,8 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
 		if np.any([(a_col not in extracted_merged_scores_df) for a_col in merged_wcorr_column_names]):
 			# needs wcorr columns
-			print(f'build_complete_all_scores_merged_df(...): needs wcorr columns. adding.')
+			if debug_print:
+				print(f'\tbuild_complete_all_scores_merged_df(...): needs wcorr columns. adding.')
 			wcorr_columns_df = deepcopy(self.ripple_weighted_corr_merged_df[merged_wcorr_column_names]) ## just use the columns from this
 			assert np.shape(wcorr_columns_df)[0] == np.shape(extracted_merged_scores_df)[0], f"should have same number of columns"
 			extracted_merged_scores_df: pd.DataFrame = pd.concat((extracted_merged_scores_df, wcorr_columns_df), axis='columns')
@@ -2631,10 +2648,10 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
 		try:
 			for a_score_col in all_df_score_column_names:
-				extracted_merged_scores_df, curr_added_column_name_tuple = self.add_score_best_dir_columns(extracted_merged_scores_df, col_name=a_score_col, should_drop_directional_columns=False, is_col_name_suffix_mode=False)
+				extracted_merged_scores_df, curr_added_column_name_tuple = self.add_score_best_dir_columns(extracted_merged_scores_df, col_name=a_score_col, should_drop_directional_columns=False, is_col_name_suffix_mode=False, include_LS_diff_col=True, include_best_overall_score_col=True)
 				added_column_names.extend(curr_added_column_name_tuple)
 		except Exception as err:
-			print(f'build_complete_all_scores_merged_df(...): Encountered ERROR: {err} while trying to add "a_score_col": {a_score_col}, but trying to continue, so close!')
+			print(f'\tbuild_complete_all_scores_merged_df(...): Encountered ERROR: {err} while trying to add "a_score_col": {a_score_col}, but trying to continue, so close!')
 
 
 		extracted_merged_scores_df = extracted_merged_scores_df.rename(columns=dict(zip(['P_decoder_long_LR','P_decoder_long_RL','P_decoder_short_LR','P_decoder_short_RL'], ['P_Long_LR','P_Long_RL','P_Short_LR','P_Short_RL'])), inplace=False)
