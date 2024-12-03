@@ -824,7 +824,8 @@ class SubsequencesPartitioningResult:
         self.merged_split_positions_arrays = deepcopy(final_out_subsequences)
         
         if len(final_intrusion_idxs) > 0:
-            print(f'final_intrusion_idxs: {final_intrusion_idxs}')
+            if debug_print:
+                print(f'final_intrusion_idxs: {final_intrusion_idxs}')
         
         ## update dataframe
         self.rebuild_sequence_info_df()
