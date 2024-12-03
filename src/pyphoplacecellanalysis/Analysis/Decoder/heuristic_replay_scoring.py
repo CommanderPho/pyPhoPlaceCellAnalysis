@@ -326,9 +326,9 @@ class SubsequencesPartitioningResult:
         partition_result.split_positions_arrays = split_most_likely_positions_arrays
         
         # Set `merged_split_positions_arrays` ________________________________________________________________________________ #
-        _tmp_merge_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_idxs) = partition_result.merge_over_ignored_intrusions(max_ignore_bins=max_ignore_bins, debug_print=False)
-        flat_positions_list = deepcopy(partition_result.flat_positions.to_list())
-        partition_result.bridged_intrusion_bin_indicies = np.array([flat_positions_list.index(v) for v in final_intrusion_idxs])
+        _tmp_merge_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_values_list) = partition_result.merge_over_ignored_intrusions(max_ignore_bins=max_ignore_bins, debug_print=False)
+        # flat_positions_list = deepcopy(partition_result.flat_positions.tolist())
+        partition_result.bridged_intrusion_bin_indicies = deepcopy(final_intrusion_values_list) # np.array([flat_positions_list.index(v) for v in final_intrusion_idxs])
         
         partition_result.rebuild_sequence_info_df()
         
