@@ -453,7 +453,7 @@ class SubsequencesPartitioningResult:
         
         return (sub_change_equivalency_groups, sub_change_equivalency_group_values), (list_parts, list_split_indicies, sub_change_threshold_change_indicies)
 
-
+    @function_attributes(short_name=None, tags=['near_equal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-03 11:15', related_items=[])
     @classmethod
     def find_value_equiv_groups(cls, longest_sequence_subsequence: Union[List, NDArray], same_thresh_cm: float) -> Tuple[List, List]:
         """ returns the positions grouped by whether they are considered the same based on `same_thresh_cm`
@@ -702,12 +702,13 @@ class SubsequencesPartitioningResult:
 
         else:
             # try to merge over intrusions
-            for a_subsequence_idx, a_subsequence, a_n_tbins, is_ignored_intrusion in zip(np.arange(len(n_tbins_list)), original_split_positions_arrays, n_tbins_list, is_ignored_intrusion_subsequence):
+            for a_subsequence_idx, a_subsequence, a_n_tbins, is_potentially_ignored_intrusion in zip(np.arange(len(n_tbins_list)), original_split_positions_arrays, n_tbins_list, is_ignored_intrusion_subsequence):
                 ## loop through ignored subsequences to find out how to merge them
                 #TODO 2024-11-27 08:36: - [ ] 
-                if is_ignored_intrusion:
+                if is_potentially_ignored_intrusion:
                     # for an_ignored_subsequence_idx in ignored_subsequence_idxs:
                     active_ignored_subsequence = deepcopy(self.split_positions_arrays[a_subsequence_idx])
+                    # active_ignored_subsequence_indicies = deepcopy(self.split_indicies[a_subsequence_idx])
                     len_active_ignored_subsequence: int = len(active_ignored_subsequence)
                     final_is_subsequence_intrusion: bool = False
                     
@@ -766,7 +767,7 @@ class SubsequencesPartitioningResult:
                         ## END if len_left_congruent_flanking_sequ...
                             
                         if final_is_subsequence_intrusion:
-                            # final_intrusion_idxs.append(a_subsequence)
+                            # final_intrusion_idxs.append(deepcopy(active_ignored_subsequence_indicies))
                             final_intrusion_idxs.append(active_ignored_subsequence)
                         
                         if debug_print:
@@ -794,7 +795,7 @@ class SubsequencesPartitioningResult:
             
             any_remove_idxs = flatten([k for k, v in subsequence_replace_dict.items()])
             
-            for a_subsequence_idx, a_subsequence, a_n_tbins, is_ignored_intrusion in zip(np.arange(len(n_tbins_list)), original_split_positions_arrays, n_tbins_list, is_ignored_intrusion_subsequence):
+            for a_subsequence_idx, a_subsequence, a_n_tbins, is_potentially_ignored_intrusion in zip(np.arange(len(n_tbins_list)), original_split_positions_arrays, n_tbins_list, is_ignored_intrusion_subsequence):
                     is_curr_subsequence_idx_in_replace_list = False
                     if a_subsequence_idx in replace_idxs:
                         # the index to be replaced
@@ -817,9 +818,6 @@ class SubsequencesPartitioningResult:
         final_out_subsequences_n_total_tbins: int = np.sum(final_out_subsequences_n_tbins_list)
         assert final_out_subsequences_n_total_tbins == n_total_tbins, f"final_out_subsequences_n_total_tbins ({final_out_subsequences_n_total_tbins}) should equal the original n_total_tbins ({n_total_tbins}) but it does not!\n\t: final_out_subsequences: {final_out_subsequences}\n\toriginal_split_positions_arrays: {original_split_positions_arrays}"
 
-
-
-
         ## update self properties
         self.merged_split_positions_arrays = deepcopy(final_out_subsequences)
         
@@ -831,7 +829,7 @@ class SubsequencesPartitioningResult:
         self.rebuild_sequence_info_df()
         
         # return (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index)
-        return original_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove)
+        return original_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_idxs)
 
 
     @classmethod
@@ -1428,7 +1426,7 @@ class HeuristicReplayScoring:
 
 
     @classmethod
-    @function_attributes(short_name='continuous_seq_sort', tags=['bin-wise', 'bin-size', 'score', 'replay', 'UNFINISHED'], input_requires=[], output_provides=[],
+    @function_attributes(short_name='continuous_seq_sort', tags=['bin-wise', 'bin-size', 'score', 'replay', 'sequence_length'], input_requires=[], output_provides=[],
                           uses=['SubsequencesPartitioningResult', '_compute_sequences_spanning_ignored_intrusions'], used_by=[], creation_date='2024-03-12 01:05', related_items=['SubsequencesPartitioningResult'])
     def bin_wise_continuous_sequence_sort_score_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, same_thresh_fraction_of_track: float = 0.025, max_ignore_bins:int=2) -> float:
         """ The amount of the track that is represented by the decoding. More is better (indicating a longer replay).
@@ -1489,13 +1487,6 @@ class HeuristicReplayScoring:
 
         # INPUTS: a_most_likely_positions_list, n_pos_bins
 
-        # a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
-        # assert len(a_first_order_diff) == len(a_most_likely_positions_list), f"the prepend above should ensure that the sequence and its first-order diff are the same length."
-        # Calculate the signs of the differences
-        # a_first_order_diff_sign = np.sign(a_first_order_diff)
-        # Calculate where the sign changes occur (non-zero after taking diff of signs)
-        # sign_change_indices = np.where(np.diff(a_first_order_diff_sign) != 0)[0] + 1  # Add 1 because np.diff reduces the index by 1
-
         ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
         partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, flat_time_window_centers=deepcopy(time_window_centers))
         longest_sequence_length_ratio: float = partition_result.longest_sequence_length_ratio 
@@ -1523,7 +1514,7 @@ class HeuristicReplayScoring:
     
 
     @classmethod
-    @function_attributes(short_name='continuous_seq_len_ratio_no_repeats', tags=['bin-wise', 'bin-size', 'score', 'replay', 'UNFINISHED'], input_requires=[], output_provides=[],
+    @function_attributes(short_name='continuous_seq_len_ratio_no_repeats', tags=['bin-wise', 'bin-size', 'score', 'replay', 'sequence_length'], input_requires=[], output_provides=[],
                           uses=['SubsequencesPartitioningResult', '_compute_sequences_spanning_ignored_intrusions'], used_by=[], creation_date='2024-03-12 01:05', related_items=['SubsequencesPartitioningResult'])
     def bin_wise_continuous_sequence_sort_excluding_near_repeats_score_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, same_thresh_fraction_of_track: float = 0.025, max_ignore_bins:int=2) -> float:
         """ The amount of the track that is represented by the decoding. More is better (indicating a longer replay).
