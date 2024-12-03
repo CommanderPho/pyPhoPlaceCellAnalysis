@@ -1472,7 +1472,7 @@ class WeightedCorrelationPlotData:
         """ any possible column that you might want to include from the dataframe can be hard-coded here in each derived class 
         """
         return ['wcorr', 'P_decoder', 'pearsonr', 'travel', 'coverage', 'avg_jump_cm', 'max_jump', 'max_jump_cm', 'max_jump_cm_per_sec', 'ratio_jump_valid_bins',
-                'total_congruent_direction_change', 'longest_sequence_length','continuous_seq_sort',
+                'total_congruent_direction_change', 'longest_sequence_length', 'continuous_seq_sort',
         ]
 
     @classmethod
@@ -1783,7 +1783,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         
 
         def _helper_build_text_kwargs_adjacent_right_lots_of_text(a_curr_ax):
-            """ captures nothing. """
+            """ captures: found_matplotlib_font_name. """
             # Get the axes bounding box in figure coordinates
             a_fig = a_curr_ax.get_figure()
             bbox = a_curr_ax.get_position()
@@ -1816,20 +1816,21 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         
 
         def _helper_build_text_kwargs_outside_right(a_curr_ax):
-            """ Text kwargs to render outside and to the right of the axes. """
-            text_kwargs = dict(
-                stroke_alpha=0.8, strokewidth=4, stroke_foreground='w', text_foreground=f'{cls.text_color}', font_size=9.5, text_alpha=0.75
-            )
+            """ Text kwargs to render outside and to the right of the axes. 
+            captures: found_matplotlib_font_name
+            """
+            text_kwargs = dict(stroke_alpha=0.8, strokewidth=4, stroke_foreground='w', text_foreground=f'{cls.text_color}', font_size=9.5, text_alpha=0.75)
 
-            font_prop = font_manager.FontProperties(family='Source Code Pro', weight='bold')
+            font_prop = font_manager.FontProperties(family=found_matplotlib_font_name, weight='bold')
             text_kwargs['fontproperties'] = font_prop
 
             # Positioning outside to the right:
             text_kwargs |= dict(
                 loc='upper right',
                 horizontalalignment='left',
-                bbox_to_anchor=(1.05, 0.5),  # Outside and centered vertically
-                bbox_transform=a_curr_ax.transAxes,
+                # horizontalalignment='right', # breaks it
+                bbox_to_anchor=(1.35, 1.0), bbox_transform=a_curr_ax.transAxes, transform=a_fig.transFigure, # Outside right, kinda working
+                # bbox_to_anchor=(1.0, 0.5), bbox_transform=a_fig.transFigure, transform=a_fig.transFigure, # Outside right, figure coordinates, fully working -- except for rows because they're all centered vertically w.r.t figure
             )
             return text_kwargs
         
@@ -1841,16 +1842,8 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         layout_engine = a_fig.get_layout_engine()
         if isinstance(layout_engine, mpl.layout_engine.ConstrainedLayoutEngine):
             print("Constrained layout is active.")
-            # Get the current constrained layout pads
-            # pads = a_fig.get_constrained_layout_pads() # (0.04167, 0.04167, 0.02, 0.02)
-            # pads_dict = dict(zip(['w_pad', 'h_pad', 'wspace', 'hspace'], pads))
-            # print("w_pad:", pads_dict['w_pad'])
-            # print("h_pad:", pads_dict['h_pad'])
-            # print("wspace:", pads_dict['wspace'])
-            # print("hspace:", pads_dict['hspace'])
 
             # Adjust the right margin
-            # a_fig.set_constrained_layout_pads(right=0.8) # wspace=0.05, hspace=0.05,
             curr_layout_rect = deepcopy(layout_engine.__dict__['_params'].get('rect', None)) # {'_params': {'h_pad': 0.04167, 'w_pad': 0.04167, 'hspace': 0.02, 'wspace': 0.02, 'rect': (0, 0, 1, 1)}, '_compress': False}
             ## original rect to restore upon remove
             if(weighted_corr_text_original_figure_rect is None) and (not params.weighted_corr_text_was_axes_rect_modified):
