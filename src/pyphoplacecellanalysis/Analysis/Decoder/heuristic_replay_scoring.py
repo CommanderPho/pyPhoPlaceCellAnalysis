@@ -157,6 +157,9 @@ class SubsequencesPartitioningResult:
     diff_split_indicies: NDArray = field(default=None, repr=False) # for the 1st-order diff array
     split_indicies: NDArray = field(default=None, repr=False) # for the original array
     low_magnitude_change_indicies: NDArray = field(default=None, repr=False, metadata={'desc': "indicies where a change in direction occurs but it's below the threshold indicated by `same_thresh`"}) # specified in diff indicies
+    bridged_intrusion_bin_indicies: NDArray = field(default=None, repr=False, metadata={'desc': "indicies where an intrusion previously existed that was bridged. "}) # specified in diff indicies
+    
+
     
     split_positions_arrays: List[NDArray] = field(default=None, repr=False, metadata={'desc': "the positions in `flat_positions` but partitioned into subsequences determined by changes in direction exceeding `self.same_thresh`"})
     merged_split_positions_arrays: List[NDArray] = field(default=None, metadata={'desc': "the subsequences from `split_positions_arrays` but merged into larger subsequences by briding-over (ignoring) sequences of intrusive tbins (with the max ignored length specified by `self.max_ignore_bins`"})
@@ -323,7 +326,9 @@ class SubsequencesPartitioningResult:
         partition_result.split_positions_arrays = split_most_likely_positions_arrays
         
         # Set `merged_split_positions_arrays` ________________________________________________________________________________ #
-        _tmp_merge_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove) = partition_result.merge_over_ignored_intrusions(max_ignore_bins=max_ignore_bins, debug_print=False)
+        _tmp_merge_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_idxs) = partition_result.merge_over_ignored_intrusions(max_ignore_bins=max_ignore_bins, debug_print=False)
+        flat_positions_list = deepcopy(partition_result.flat_positions.to_list())
+        partition_result.bridged_intrusion_bin_indicies = np.array([flat_positions_list.index(v) for v in final_intrusion_idxs])
         
         partition_result.rebuild_sequence_info_df()
         
