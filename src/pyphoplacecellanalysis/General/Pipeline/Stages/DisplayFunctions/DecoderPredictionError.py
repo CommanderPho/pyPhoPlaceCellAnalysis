@@ -1585,7 +1585,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
     # text_color: str = '#66FF00' # a light green
     text_color: str = '#013220' # a very dark forest green
 
-    provided_params: Dict[str, Any] = dict(enable_weighted_correlation_info = True)
+    provided_params: Dict[str, Any] = dict(enable_weighted_correlation_info = True, weighted_corr_text_original_figure_rect=None, weighted_corr_text_was_axes_rect_modified=False)
     provided_plots_data: Dict[str, Any] = {'weighted_corr_data': None}
     provided_plots: Dict[str, Any] = {'weighted_corr': {}}
     column_names: List[str] = ['wcorr', 'P_decoder', 'pearsonr', 'travel', 'coverage', 'total_congruent_direction_change', 'longest_sequence_length', 'avg_jump_cm']
@@ -1630,6 +1630,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             plots['weighted_corr']
 
         """
+        import matplotlib as mpl
         from matplotlib import font_manager
         from neuropy.utils.matplotlib_helpers import add_inner_title # plot_decoded_epoch_slices_paginated
         from matplotlib.offsetbox import AnchoredText
@@ -1663,6 +1664,11 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
 
         else:
             custom_value_formatter = None
+
+
+        weighted_corr_text_original_figure_rect = params.weighted_corr_text_original_figure_rect
+        weighted_corr_text_was_axes_rect_modified: bool = params.weighted_corr_text_was_axes_rect_modified
+
 
         def _helper_build_text_kwargs_angled_upper_right_corner(a_curr_ax):
             """ captures nothing. """
@@ -1809,14 +1815,62 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             return text_kwargs
         
 
+        def _helper_build_text_kwargs_outside_right(a_curr_ax):
+            """ Text kwargs to render outside and to the right of the axes. """
+            text_kwargs = dict(
+                stroke_alpha=0.8, strokewidth=4, stroke_foreground='w', text_foreground=f'{cls.text_color}', font_size=9.5, text_alpha=0.75
+            )
+
+            font_prop = font_manager.FontProperties(family='Source Code Pro', weight='bold')
+            text_kwargs['fontproperties'] = font_prop
+
+            # Positioning outside to the right:
+            text_kwargs |= dict(
+                loc='upper right',
+                horizontalalignment='left',
+                bbox_to_anchor=(1.05, 0.5),  # Outside and centered vertically
+                bbox_transform=a_curr_ax.transAxes,
+            )
+            return text_kwargs
         
         
+
+
+        ## first try to adjust the subplots
+        a_fig = curr_ax.get_figure()
+        layout_engine = a_fig.get_layout_engine()
+        if isinstance(layout_engine, mpl.layout_engine.ConstrainedLayoutEngine):
+            print("Constrained layout is active.")
+            # Get the current constrained layout pads
+            # pads = a_fig.get_constrained_layout_pads() # (0.04167, 0.04167, 0.02, 0.02)
+            # pads_dict = dict(zip(['w_pad', 'h_pad', 'wspace', 'hspace'], pads))
+            # print("w_pad:", pads_dict['w_pad'])
+            # print("h_pad:", pads_dict['h_pad'])
+            # print("wspace:", pads_dict['wspace'])
+            # print("hspace:", pads_dict['hspace'])
+
+            # Adjust the right margin
+            # a_fig.set_constrained_layout_pads(right=0.8) # wspace=0.05, hspace=0.05,
+            curr_layout_rect = deepcopy(layout_engine.__dict__['_params'].get('rect', None)) # {'_params': {'h_pad': 0.04167, 'w_pad': 0.04167, 'hspace': 0.02, 'wspace': 0.02, 'rect': (0, 0, 1, 1)}, '_compress': False}
+            ## original rect to restore upon remove
+            if(weighted_corr_text_original_figure_rect is None) and (not params.weighted_corr_text_was_axes_rect_modified):
+                ## set the curr_layout_rect
+                weighted_corr_text_original_figure_rect = curr_layout_rect
+                params.weighted_corr_text_original_figure_rect = curr_layout_rect ## update the params
+                layout_engine.set(rect=(0.0, 0.0, 0.8, 1.0)) # ConstrainedLayoutEngine uses rect = (left, bottom, width, height)
+                params.weighted_corr_text_was_axes_rect_modified = True
+                print(f'\t updating layout! params.weighted_corr_text_was_axes_rect_modified will be set to True')
+            else:
+                print(f'\t will not re-layout, params.weighted_corr_text_was_axes_rect_modified is already True')
+        else:
+            print("Other layout engine or none is active.")
 
         # text_kwargs = _helper_build_text_kwargs_angled_upper_right_corner(a_curr_ax=curr_ax)
         # text_kwargs = _helper_build_text_kwargs_flat_top(a_curr_ax=curr_ax)
         # text_kwargs = _helper_build_text_kwargs_adjacent_right(a_curr_ax=curr_ax)
-        text_kwargs = _helper_build_text_kwargs_adjacent_right_lots_of_text(a_curr_ax=curr_ax)
-        
+        # text_kwargs = _helper_build_text_kwargs_adjacent_right_lots_of_text(a_curr_ax=curr_ax)
+        text_kwargs = _helper_build_text_kwargs_outside_right(a_curr_ax=curr_ax)
+
         # data_index_value = data_idx # OLD MODE
         data_index_value = epoch_start_t
 
@@ -1878,6 +1932,8 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
 
     @classmethod
     def _callback_remove_curr_single_epoch_slice_plot(cls, curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", data_idx:int, curr_time_bins, *args, epoch_slice=None, curr_time_bin_container=None, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
+        import matplotlib as mpl
+
         assert cls.plots_group_identifier_key in plots, f"ERROR: key cls.plots_group_identifier_key: {cls.plots_group_identifier_key} is not in plots. plots.keys(): {list(plots.keys())}"
         extant_plots_dict = plots[cls.plots_group_identifier_key].get(curr_ax, {}) ## 2024-02-29 ERROR: there should only be one item per axes (a single page worth), not one per data_index
         extant_wcorr_text_label = extant_plots_dict.get('wcorr_text', None)
@@ -1890,6 +1946,31 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             ## Weighted Correlation info not wanted, clear/hide or remove the label
             anchored_text.remove()
             anchored_text = None
+
+        ## first try to adjust the subplots
+        a_fig = curr_ax.get_figure()
+        layout_engine = a_fig.get_layout_engine()
+        if isinstance(layout_engine, mpl.layout_engine.ConstrainedLayoutEngine):
+            weighted_corr_text_original_figure_rect = params.weighted_corr_text_original_figure_rect
+            weighted_corr_text_was_axes_rect_modified: bool = params.weighted_corr_text_was_axes_rect_modified
+            # Adjust the right margin
+            # curr_layout_rect = deepcopy(layout_engine.__dict__['_params'].get('rect', None)) # {'_params': {'h_pad': 0.04167, 'w_pad': 0.04167, 'hspace': 0.02, 'wspace': 0.02, 'rect': (0, 0, 1, 1)}, '_compress': False}
+            ## original rect to restore upon remove
+            if params.weighted_corr_text_was_axes_rect_modified:
+                ## restore the original rect
+                # assert (weighted_corr_text_original_figure_rect is not None) 
+                print(f'\t restoring original layout! params.weighted_corr_text_was_axes_rect_modified will be set to False')
+
+                # layout_engine.set(rect=weighted_corr_text_original_figure_rect) # ConstrainedLayoutEngine uses rect = (left, bottom, width, height)
+                ## hardcoded
+                layout_engine.set(rect=(0.0, 0.0, 1.0, 1.0)) # ConstrainedLayoutEngine uses rect = (left, bottom, width, height)
+                params.weighted_corr_text_original_figure_rect = None # None
+                params.weighted_corr_text_was_axes_rect_modified = False
+            else:
+                print(f'\t params.weighted_corr_text_was_axes_rect_modified was False!')
+        else:
+            print("Other layout engine or none is active.")
+
 
 
 
