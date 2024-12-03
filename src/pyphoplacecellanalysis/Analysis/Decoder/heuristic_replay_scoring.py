@@ -215,6 +215,13 @@ class SubsequencesPartitioningResult:
 
     # Longest Sequence ___________________________________________________________________________________________________ #
     @property
+    def longest_subsequence_length(self) -> int:
+        """ Finds the length of the longest non-repeating subsequence. """
+        longest_length = int(np.nanmax(self.num_merged_subsequence_bins))
+        return longest_length
+
+
+    @property
     def longest_sequence_length_no_repeats(self) -> int:
         """ Finds the length of the longest non-repeating subsequence. """
         longest_length = int(np.nanmax(self.num_merged_subsequence_bins))
@@ -236,10 +243,19 @@ class SubsequencesPartitioningResult:
     def longest_sequence_length_ratio(self) -> float:
         """  Compensate for repeating bins, not counting them towards the score but also not against. """
         ## Compensate for repeating bins, not counting them towards the score but also not against.
-        if self.total_num_subsequence_bins_no_repeats > 0:
-            return float(self.longest_sequence_length_no_repeats) /  float(self.total_num_subsequence_bins_no_repeats) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
+        should_use_no_repeat_values: bool = False
+        if should_use_no_repeat_values:
+            ## version that DOES ignore repeats:
+            if self.total_num_subsequence_bins_no_repeats > 0:
+                return float(self.longest_sequence_length_no_repeats) / float(self.total_num_subsequence_bins_no_repeats) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
+            else:
+                return 0.0 # zero it out if they are all repeats
         else:
-            return 0.0 # zero it out if they are all repeats
+            ## version that doesn't ignore repeats:
+            if self.total_num_subsequence_bins > 0:
+                return float(self.longest_subsequence_length) / float(self.total_num_subsequence_bins) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
+            else:
+                return 0.0 # zero it out if they are all repeats
 
 
     # ==================================================================================================================== #
@@ -300,7 +316,131 @@ class SubsequencesPartitioningResult:
         return partition_result
     
 
+
+    @classmethod
+    def detect_repeated_similar_positions(cls, a_most_likely_positions_list: Union[List, NDArray], same_thresh: float = 4.0, debug_print=False, **kwargs) -> "SubsequencesPartitioningResult":
+        """ function partitions the list according to an iterative rule and the direction changes, ignoring changes less than or equal to `same_thresh`.
         
+        NOTE: This helps "ignore" false-positive direction changes for bins with spatially-nearby (stationary) positions that happen to be offset in the wrong direction.
+            It does !NOT! "bridge" discontiguous subsequences like `_compute_sequences_spanning_ignored_intrusions` was intended to do, that's a different problem.
+
+            
+        Usage:
+            from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import partition_subsequences_ignoring_repeated_similar_positions
+
+            # lst1 = [0, 3.80542, -3.80542, -19.0271, 0, -19.0271]
+            # list_parts1, list_split_indicies1 = partition_subsequences_ignoring_repeated_similar_positions(lst=lst1) # [[0, 3.80542, -3.80542, 0, -19.0271]]
+
+            # lst2 = [0, 3.80542, 5.0, -3.80542, -19.0271, 0, -19.0271]
+            # list_parts2, list_split_indicies2 = partition_subsequences_ignoring_repeated_similar_positions(lst=lst2) # [[0, 3.80542, -3.80542], [-19.0271, 0, -19.0271]]
+
+            
+            ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
+            partition_result1: SubsequencesPartitioningResult = partition_subsequences_ignoring_repeated_similar_positions(lst1, same_thresh=4)
+
+        """
+        if isinstance(a_most_likely_positions_list, list):
+            a_most_likely_positions_list = np.array(a_most_likely_positions_list)
+        
+    
+        first_order_diff_lst = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
+        assert len(first_order_diff_lst) == len(a_most_likely_positions_list), f"the prepend above should ensure that the sequence and its first-order diff are the same length."
+
+        n_diff_bins: int = len(first_order_diff_lst)
+        n_original_bins: int = n_diff_bins + 1
+
+        list_parts = []
+        list_split_indicies = []
+        sub_change_threshold_change_diff_indicies = [] # indicies where a change in direction occurs but it's below the threshold indicated by `same_thresh`
+
+        sub_change_equivalency_groups = []
+        
+
+        prev_i = None
+        prev_v = None
+        prev_accum_dir = None # sentinal value
+        prev_accum_idxs = []
+        prev_accum = []
+
+        for i, v in enumerate(first_order_diff_lst):
+            curr_dir = np.sign(v)
+            did_accum_dir_change: bool = (prev_accum_dir != curr_dir)# and (prev_accum_dir is not None) and (prev_accum_dir != 0)
+            if debug_print:
+                print(f'i: {i}, v: {v}, curr_dir: {curr_dir}, prev_accum_dir: {prev_accum_dir}')
+
+
+            if did_accum_dir_change: 
+                if (np.abs(v) > same_thresh):
+                    ## Exceeds the `same_thresh` indicating we want to use the change
+                    ## sign changed, split here.
+                    should_split: bool = True # (prev_accum_dir is None)
+                    if (curr_dir != 0):
+                        # only for non-zero directions should we set the prev_accum_dir, otherwise leave it what it was (or blank)
+                        if prev_accum_dir is None:
+                            should_split = False # don't split for the first direction change (since it's a change from None/0.0
+                        if debug_print:
+                            print(f'\t accum_dir changing! {prev_accum_dir} -> {curr_dir}')
+                        prev_accum_dir = curr_dir
+                        
+                    if should_split:
+                        if debug_print:
+                            print(f'\t splitting.')
+                        list_parts.append(prev_accum)
+                        list_split_indicies.append(i)
+                        sub_change_equivalency_groups.append(prev_accum_idxs)
+                        
+                        prev_accum = [] # zero the accumulator part
+                        prev_accum_idxs = [] 
+                        
+                        # prev_accum_dir = None # reset the accum_dir
+                else:
+                    # direction changed but it didn't exceed the threshold, a so-called "low-magnitude" change
+                    sub_change_threshold_change_diff_indicies.append(i)
+                    ## continue the current `sub_change_equivalency_group`
+                    
+
+                # END if (np.abs(v) > same_thresh)
+                
+                ## accumulate the new entry, and potentially the change direction
+                prev_accum.append(v)
+                prev_accum_idxs.append(i)
+            else:
+                ## either below the threshold or the direction didn't change, continue accumulating
+                prev_accum.append(v)
+                prev_accum_idxs.append(i)
+
+                # if curr_dir != 0:
+                #     # only for non-zero directions should we set the prev_accum_dir, otherwise leave it what it was (or blank)
+                #     prev_accum_dir = curr_dir
+
+            ## update prev variables
+            prev_i = i
+            prev_v = v
+            
+        if len(prev_accum) > 0:
+            # finish up with any points remaining
+            list_parts.append(prev_accum)
+
+
+        diff_split_indicies = np.array(list_split_indicies)
+        list_split_indicies = diff_split_indicies + 1 # the +1 is because we pass a diff list/array which has one less index than the original array.
+        # sub_change_threshold_change_indicies = np.array(sub_change_threshold_change_indicies)
+        sub_change_threshold_change_diff_indicies = np.array(sub_change_threshold_change_diff_indicies)
+        sub_change_threshold_change_indicies = sub_change_threshold_change_diff_indicies + 1
+        
+        ## convert to non-diff idxs?
+        # sub_change_equivalency_groups
+        sub_change_equivalency_groups = [np.array(v) for i, v in enumerate(sub_change_equivalency_groups)]
+        sub_change_equivalency_group_values = [a_most_likely_positions_list[v] for i, v in enumerate(sub_change_equivalency_groups)]
+        
+
+        list_parts = [np.array(l) for l in list_parts]
+        
+        return (sub_change_equivalency_groups, sub_change_equivalency_group_values), (list_parts, list_split_indicies, sub_change_threshold_change_indicies)
+
+
+
+
     @function_attributes(short_name=None, tags=['partition'], input_requires=[], output_provides=[], uses=['SubsequencesPartitioningResult', 'rebuild_sequence_info_df'], used_by=[], creation_date='2024-05-09 02:47', related_items=[])
     @classmethod
     def partition_subsequences_ignoring_repeated_similar_positions(cls, a_most_likely_positions_list: Union[List, NDArray], n_pos_bins: int, same_thresh: float = 4.0, debug_print=False, **kwargs) -> "SubsequencesPartitioningResult":
@@ -405,6 +545,7 @@ class SubsequencesPartitioningResult:
         _result = SubsequencesPartitioningResult(flat_positions=deepcopy(a_most_likely_positions_list), first_order_diff_lst=first_order_diff_lst, list_parts=list_parts, diff_split_indicies=diff_split_indicies, split_indicies=list_split_indicies, low_magnitude_change_indicies=sub_change_threshold_change_indicies,
                                                   n_pos_bins=n_pos_bins, same_thresh=same_thresh, **kwargs)
         return _result
+
 
     @function_attributes(short_name=None, tags=['_compute_sequences_spanning_ignored_intrusions'], input_requires=['self.split_positions_arrays'], output_provides=['self.merged_split_positions_arrays'], uses=[], used_by=[], creation_date='2024-11-27 08:17', related_items=['_compute_sequences_spanning_ignored_intrusions'])
     def merge_over_ignored_intrusions(self, max_ignore_bins: int = 2, should_skip_epoch_with_only_short_subsequences: bool = False, debug_print=False):
@@ -870,6 +1011,11 @@ class SubsequencesPartitioningResult:
         return self._debug_plot_time_bins_multiple(positions_list=override_positions_list, num=num, ax=ax, enable_position_difference_indicators=enable_position_difference_indicators,
                                                     flat_time_window_centers=kwargs.pop('flat_time_window_centers', self.flat_time_window_centers), flat_time_window_edges=flat_time_window_edges,
                                                      enable_axes_formatting=enable_axes_formatting, arrow_alpha=arrow_alpha, subsequence_line_color_alpha=subsequence_line_color_alpha, **kwargs)
+
+
+
+
+
 
 
 @metadata_attributes(short_name=None, tags=['heuristic', 'replay', 'ripple', 'scoring', 'pho'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 06:00', related_items=[])
