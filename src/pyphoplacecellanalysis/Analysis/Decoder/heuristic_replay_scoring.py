@@ -1769,6 +1769,12 @@ class HeuristicReplayScoring:
         all_score_computations_fn_dict = {**all_bin_wise_computation_fn_dict, **positions_fns_dict, **positions_times_fns_dict} # a_result, an_epoch_idx, a_decoder_track_length  - 'travel': cls.bin_wise_position_difference, 'coverage': cls.bin_wise_track_coverage_score_fn, 'jump': cls.bin_wise_jump_distance_score, 'max_jump': cls.bin_wise_max_position_jump_distance, 
         return all_score_computations_fn_dict
     
+
+    @classmethod
+    def get_all_score_computation_col_names(cls) -> List[str]:
+        return list(cls.build_all_score_computations_fn_dict().keys())
+     
+
     # ==================================================================================================================== #
     # End Computation Functions                                                                                            #
     # ==================================================================================================================== #
@@ -1978,6 +1984,7 @@ class HeuristicReplayScoring:
             return HeuristicScoresTuple(longest_sequence_length, longest_sequence_length_ratio, direction_change_bin_ratio, congruent_dir_bins_ratio, total_congruent_direction_change,
                                         total_variation=total_variation, integral_second_derivative=integral_second_derivative, stddev_of_diff=stddev_of_diff,
                                         position_derivatives_df=position_derivatives_df)
+        
 
     @classmethod
     @function_attributes(short_name=None, tags=['private'], input_requires=[], output_provides=[], uses=[], used_by=['compute_all_heuristic_scores'], creation_date='2024-03-07 19:54', related_items=[])
@@ -2035,6 +2042,7 @@ class HeuristicReplayScoring:
         ## OUTPUTS: all_epochs_scores_dict, all_epochs_scores_df
         all_epochs_scores_df = pd.DataFrame(all_epochs_scores_dict)
         return a_decoded_filter_epochs_decoder_result_dict, all_epochs_scores_df
+
 
     @classmethod
     @function_attributes(short_name=None, tags=['heuristic', 'main', 'computation'], input_requires=[], output_provides=[], uses=['_run_all_score_computations', 'cls.compute_pho_heuristic_replay_scores', 'cls.build_all_score_computations_fn_dict'], used_by=[], creation_date='2024-03-12 00:59', related_items=[])
