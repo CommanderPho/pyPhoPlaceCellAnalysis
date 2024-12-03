@@ -2003,14 +2003,13 @@ class HeuristicReplayScoring:
         from pyphoplacecellanalysis.Pho2D.track_shape_drawing import get_track_length_dict
 
         ## INPUTS: track_templates, a_decoded_filter_epochs_decoder_result_dict
-        decoder_grid_bin_bounds_dict = {a_name:a_decoder.pf.config.grid_bin_bounds for a_name, a_decoder in track_templates.get_decoders_dict().items()}
-        assert NumpyHelpers.all_allclose(list(decoder_grid_bin_bounds_dict.values())), f"all decoders should have the same grid_bin_bounds (independent of whether they are built on long/short, etc but they do not! This violates following assumptions."
-        grid_bin_bounds = list(decoder_grid_bin_bounds_dict.values())[0] # tuple
-        actual_track_length_dict, idealized_track_length_dict = get_track_length_dict(grid_bin_bounds, grid_bin_bounds)
+        # decoder_grid_bin_bounds_dict = {a_name:a_decoder.pf.config.grid_bin_bounds for a_name, a_decoder in track_templates.get_decoders_dict().items()}
+        # assert NumpyHelpers.all_allclose(list(decoder_grid_bin_bounds_dict.values())), f"all decoders should have the same grid_bin_bounds (independent of whether they are built on long/short, etc but they do not! This violates following assumptions."
+        # grid_bin_bounds = list(decoder_grid_bin_bounds_dict.values())[0] # tuple
+        # actual_track_length_dict, idealized_track_length_dict = get_track_length_dict(grid_bin_bounds, grid_bin_bounds)
         # idealized_track_length_dict # {'long': 214.0, 'short': 144.0}
-        decoder_track_length_dict = {a_name:idealized_track_length_dict[a_name.split('_', maxsplit=1)[0]] for a_name, a_result in a_decoded_filter_epochs_decoder_result_dict.items()} # 
-        decoder_track_length_dict # {'long_LR': 214.0, 'long_RL': 214.0, 'short_LR': 144.0, 'short_RL': 144.0}
-        ## OUTPUTS: decoder_track_length_dict
+        # decoder_track_length_dict =  {a_name:idealized_track_length_dict[a_name.split('_', maxsplit=1)[0]] for a_name, a_result in a_decoded_filter_epochs_decoder_result_dict.items()}
+        decoder_track_length_dict = track_templates.get_track_length_dict()  # {'long_LR': 214.0, 'long_RL': 214.0, 'short_LR': 144.0, 'short_RL': 144.0}
 
         ## INPUTS: a_decoded_filter_epochs_decoder_result_dict, decoder_track_length_dict
         all_epochs_scores_dict = {} # holds a single flat dataframe with scores from across all decoders
