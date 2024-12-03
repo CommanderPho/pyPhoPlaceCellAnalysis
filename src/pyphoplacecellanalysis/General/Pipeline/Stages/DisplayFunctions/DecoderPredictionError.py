@@ -1471,8 +1471,9 @@ class WeightedCorrelationPlotData:
     def get_column_names(cls) -> List[str]:
         """ any possible column that you might want to include from the dataframe can be hard-coded here in each derived class 
         """
-        return ['wcorr', 'P_decoder', 'pearsonr', 'travel', 'coverage', 'avg_jump_cm', 'max_jump', 'max_jump_cm', 'max_jump_cm_per_sec', 'ratio_jump_valid_bins',
-                'total_congruent_direction_change', 'longest_sequence_length', 'continuous_seq_sort',
+        return ['wcorr', 'P_decoder', 'pearsonr',
+                'travel', 'coverage', 'avg_jump_cm', 'max_jump', 'max_jump_cm', 'max_jump_cm_per_sec', 'ratio_jump_valid_bins',
+                'total_congruent_direction_change', 'longest_sequence_length', 'continuous_seq_sort', 'continuous_seq_len_ratio_no_repeats',
         ]
 
     @classmethod
@@ -1536,8 +1537,9 @@ class WeightedCorrelationPlotData:
                 'ratio_jump_valid_bins':(lambda v:f"max_jump_cm: {default_float_formatting_fn(v)}"),
                 'total_congruent_direction_change':(lambda v:f"tot_$\Delta$_con_dir: {default_float_formatting_fn(v)}"),
                 'longest_sequence_length':(lambda v:f"longest_seq: {default_int_formatting_fn(v)}"),
-                'continuous_seq_sort':(lambda v:f"seq_srt: {default_float_formatting_fn(v)}"),
-                # 'continuous_seq_sort':default_smart_formatting_fn_factory(short_name='seq_srt'),
+                # 'continuous_seq_sort':(lambda v:f"seq_srt: {default_float_formatting_fn(v)}"),
+                'continuous_seq_sort':default_smart_formatting_fn_factory(short_name='seq_srt'),
+                'continuous_seq_len_ratio_no_repeats':default_smart_formatting_fn_factory(short_name='seq_srt_no_rep'),
             }
 
             # actually_present_column_formatting_fn_dict = {k:v for k, v in column_formatting_fn_dict.items() if k in actually_present_df_column_names} # this version requires all columns to be defined in the above  `column_formatting_fn_dict`, see below
@@ -1650,14 +1652,18 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
 
         ## get the figure
         a_fig = curr_ax.get_figure()
-        curr_ax_bbox_fig_coords = curr_ax.get_position()  # Returns a Bbox object
-        curr_ax_x0, curr_ax_y0, curr_ax_width, curr_ax_height = curr_ax_bbox_fig_coords.bounds  # Extract bounds as (x0, y0, width, height)
+        curr_ax_bbox_fig_coords = curr_ax.get_position()  # Returns a Bbox object - Bbox(x0=0.06948103896103897, y0=0.8775788563568475, x1=0.7663807411543679, y1=0.9697376616231088)
+        print(f'curr_ax_bbox_fig_coords: {curr_ax_bbox_fig_coords}')
+        curr_ax_x0, curr_ax_y0, curr_ax_width, curr_ax_height = curr_ax_bbox_fig_coords.bounds  # Extract bounds as (x0, y0, width, height) - curr_ax_x0: 0.06948103896103897, curr_ax_y0: 0.8775788563568475, curr_ax_width: 0.696899702193329, curr_ax_height: 0.0921588052662613
+        print(f'curr_ax_x0: {curr_ax_x0}, curr_ax_y0: {curr_ax_y0}, curr_ax_width: {curr_ax_width}, curr_ax_height: {curr_ax_height}')
         curr_ax_top_edge = curr_ax_bbox_fig_coords.y1  # Top edge in figure coordinates
         curr_ax_bottom_edge = curr_ax_bbox_fig_coords.y0  # Bottom edge in figure coordinates
         curr_ax_mid_y = (curr_ax_bottom_edge + curr_ax_top_edge) / 2.0
         curr_ax_right_edge = curr_ax_bbox_fig_coords.x1  # Right edge in figure coordinates
-
-
+        print(f'curr_ax_bottom_edge: {curr_ax_bottom_edge}, curr_ax_mid_y: {curr_ax_mid_y}, curr_ax_top_edge: {curr_ax_top_edge}') # curr_ax_bottom_edge: 0.8775788563568475, curr_ax_mid_y: 0.9236582589899782, curr_ax_top_edge: 0.9697376616231088
+        print(f'curr_ax_right_edge: {curr_ax_right_edge}') # curr_ax_right_edge: 0.7663807411543679
+        # print(f'curr_ax_right_edge: {curr_ax_right_edge}')
+        
         ## Extract the visibility:
         should_enable_weighted_correlation_info: bool = params.enable_weighted_correlation_info
         use_AnchoredCustomText: bool = params.setdefault('use_AnchoredCustomText', True)
@@ -1822,6 +1828,8 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             """ Text kwargs to render outside and to the right of the axes. 
             captures: found_matplotlib_font_name
             """
+            a_curr_fig = a_curr_ax.get_figure()
+            
             text_kwargs = dict(stroke_alpha=0.8, strokewidth=4, stroke_foreground='w', text_foreground=f'{cls.text_color}', font_size=9.5, text_alpha=0.75)
 
             font_prop = font_manager.FontProperties(family=found_matplotlib_font_name, weight='bold')
@@ -1832,9 +1840,10 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
                 loc='upper right',
                 horizontalalignment='left',
                 # horizontalalignment='right', # breaks it
-                # bbox_to_anchor=(1.35, 1.0), bbox_transform=a_curr_ax.transAxes, transform=a_fig.transFigure, # Outside right, kinda working
+                bbox_to_anchor=(1.35, 1.0), bbox_transform=a_curr_ax.transAxes, transform=a_fig.transFigure, # Outside right, kinda working
                 # bbox_to_anchor=(1.0, 0.5), bbox_transform=a_fig.transFigure, transform=a_fig.transFigure, # Outside right, figure coordinates, fully working -- except for rows because they're all centered vertically w.r.t figure
-                bbox_to_anchor=(1.0, curr_ax_mid_y), bbox_transform=a_fig.transFigure, transform=a_fig.transFigure, # Outside right, figure coordinates, fully working -- except for rows because they're all centered vertically w.r.t figure
+                # bbox_to_anchor=(0.95, curr_ax_top_edge), bbox_transform=a_curr_fig.transFigure, transform=a_curr_fig.transFigure, # Outside right, figure coordinates, fully working -- fixed rows
+                # bbox_to_anchor=(0.9, curr_ax_top_edge), bbox_transform=a_curr_fig.transFigure, transform=a_curr_fig.transFigure, # Outside right, figure coordinates, fully working -- except for rows because they're all centered vertically w.r.t figure
             )
             return text_kwargs
         
@@ -1852,6 +1861,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             ## original rect to restore upon remove
             if(weighted_corr_text_original_figure_rect is None) and (not params.weighted_corr_text_was_axes_rect_modified):
                 ## set the curr_layout_rect
+                print(f'\t curr_layout_rect: {curr_layout_rect}')
                 weighted_corr_text_original_figure_rect = curr_layout_rect
                 params.weighted_corr_text_original_figure_rect = curr_layout_rect ## update the params
                 layout_engine.set(rect=(0.0, 0.0, 0.8, 1.0)) # ConstrainedLayoutEngine uses rect = (left, bottom, width, height)
@@ -1945,6 +1955,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             anchored_text = None
 
         ## first try to adjust the subplots
+        should_force_restore_original_layout: bool = True
         a_fig = curr_ax.get_figure()
         layout_engine = a_fig.get_layout_engine()
         if isinstance(layout_engine, mpl.layout_engine.ConstrainedLayoutEngine):
@@ -1953,7 +1964,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             # Adjust the right margin
             # curr_layout_rect = deepcopy(layout_engine.__dict__['_params'].get('rect', None)) # {'_params': {'h_pad': 0.04167, 'w_pad': 0.04167, 'hspace': 0.02, 'wspace': 0.02, 'rect': (0, 0, 1, 1)}, '_compress': False}
             ## original rect to restore upon remove
-            if params.weighted_corr_text_was_axes_rect_modified:
+            if (should_force_restore_original_layout or params.weighted_corr_text_was_axes_rect_modified):
                 ## restore the original rect
                 # assert (weighted_corr_text_original_figure_rect is not None) 
                 print(f'\t restoring original layout! params.weighted_corr_text_was_axes_rect_modified will be set to False')

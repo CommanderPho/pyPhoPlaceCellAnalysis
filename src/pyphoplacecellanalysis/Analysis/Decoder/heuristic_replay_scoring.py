@@ -205,12 +205,14 @@ class SubsequencesPartitioningResult:
         """ Calculates the total number of subsequence bins without repeats.
         """
         # total_no_repeats = np.sum(self.num_merged_subsequence_bins)
-        if len(self.low_magnitude_change_indicies) > 0:
-            total_num_near_repeating_bins: int =  len(self.low_magnitude_change_indicies)
-        else:
-            total_num_near_repeating_bins: int = 0
-        total_no_repeats = self.total_num_subsequence_bins - total_num_near_repeating_bins
-        return int(total_no_repeats)
+        # if len(self.low_magnitude_change_indicies) > 0:
+        #     total_num_near_repeating_bins: int =  len(self.low_magnitude_change_indicies)
+        # else:
+        #     total_num_near_repeating_bins: int = 0
+        # total_no_repeats = self.total_num_subsequence_bins - total_num_near_repeating_bins
+        _, all_value_equiv_group_idxs_list = SubsequencesPartitioningResult.find_value_equiv_groups(self.flat_positions, same_thresh_cm=self.same_thresh)
+        total_num_equiv_values: int = len(all_value_equiv_group_idxs_list) # the number of equivalence value sets in the longest subsequence
+        return int(total_num_equiv_values)
 
 
     # Longest Sequence ___________________________________________________________________________________________________ #
@@ -224,8 +226,11 @@ class SubsequencesPartitioningResult:
     @property
     def longest_sequence_length_no_repeats(self) -> int:
         """ Finds the length of the longest non-repeating subsequence. """
-        longest_length = int(np.nanmax(self.num_merged_subsequence_bins))
-        return longest_length
+        # longest_length = int(np.nanmax(self.num_merged_subsequence_bins))
+        _, value_equiv_group_idxs_list = SubsequencesPartitioningResult.find_value_equiv_groups(self.longest_sequence_subsequence, same_thresh_cm=self.same_thresh)
+        # num_items_per_equiv_list: List[int] = [len(v) for v in value_equiv_group_idxs_list] ## number of items in each equiv-list
+        num_equiv_values: int = len(value_equiv_group_idxs_list) # the number of equivalence value sets in the longest subsequence
+        return num_equiv_values
 
     @property
     def longest_sequence_no_repeats_start_idx(self) -> int:
@@ -449,6 +454,46 @@ class SubsequencesPartitioningResult:
         return (sub_change_equivalency_groups, sub_change_equivalency_group_values), (list_parts, list_split_indicies, sub_change_threshold_change_indicies)
 
 
+    @classmethod
+    def find_value_equiv_groups(cls, longest_sequence_subsequence: Union[List, NDArray], same_thresh_cm: float) -> Tuple[List, List]:
+        """ returns the positions grouped by whether they are considered the same based on `same_thresh_cm`
+        
+        Usage:
+        
+        value_equiv_group_list, value_equiv_group_idxs_list = SubsequencesPartitioningResult.find_value_equiv_groups(longest_sequence_subsequence, same_thresh_cm=same_thresh_cm)
+        
+        """
+        ## INPUTS: longest_sequence_subsequence
+        value_equiv_group_list = []
+        curr_accum_value_equiv_group = []
+
+        value_equiv_group_idxs_list = []
+        curr_accum_value_equiv_group_idxs = []
+
+        initial_v = None
+        for i, v in enumerate(longest_sequence_subsequence):
+            if initial_v is None:
+                initial_v = v
+                curr_accum_value_equiv_group.append(v) ## add to equiv group
+                curr_accum_value_equiv_group_idxs.append(i)
+            else:
+                if np.abs((v - initial_v)) > same_thresh_cm:
+                    # end this group
+                    value_equiv_group_list.append(curr_accum_value_equiv_group) ## add this group to the groups list
+                    value_equiv_group_idxs_list.append(curr_accum_value_equiv_group_idxs)
+                    
+                    curr_accum_value_equiv_group = [v, ] # reset accum
+                    curr_accum_value_equiv_group_idxs = [i, ]
+                    initial_v = v
+                else:
+                    # continue this group
+                    curr_accum_value_equiv_group.append(v) ## add to equiv group
+                    curr_accum_value_equiv_group_idxs.append(i)
+                    initial_v = v
+
+        ## end for i, v ...
+        ## OUTPUTS: value_equiv_group_list, value_equiv_group_idxs_list
+        return value_equiv_group_list, value_equiv_group_idxs_list
 
 
     @function_attributes(short_name=None, tags=['partition'], input_requires=[], output_provides=[], uses=['SubsequencesPartitioningResult', 'rebuild_sequence_info_df'], used_by=[], creation_date='2024-05-09 02:47', related_items=[])
@@ -1466,6 +1511,82 @@ class HeuristicReplayScoring:
         return longest_sequence_length_ratio
     
 
+    @classmethod
+    @function_attributes(short_name='continuous_seq_len_ratio_no_repeats', tags=['bin-wise', 'bin-size', 'score', 'replay', 'UNFINISHED'], input_requires=[], output_provides=[],
+                          uses=['SubsequencesPartitioningResult', '_compute_sequences_spanning_ignored_intrusions'], used_by=[], creation_date='2024-03-12 01:05', related_items=['SubsequencesPartitioningResult'])
+    def bin_wise_continuous_sequence_sort_excluding_near_repeats_score_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, same_thresh_fraction_of_track: float = 0.025, max_ignore_bins:int=2) -> float:
+        """ The amount of the track that is represented by the decoding. More is better (indicating a longer replay).
+
+        - Finds the longest continuous sequence (perhaps with some intrusions allowed?)
+                Intrusions!
+        - Do something with the start/end periods
+        - 
+
+        TODO 2024-03-27 - Not yet working:  
+
+        # 2024-03-27 - Finish `bin_wise_continuous_sequence_sort_score_fn`
+            from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring, is_valid_sequence_index, _compute_sequences_spanning_ignored_intrusions
+
+            # track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict
+
+            a_result: DecodedFilterEpochsResult = deepcopy(directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict['short_RL'])
+            an_epoch_idx: int = 8
+            a_decoder_track_length = 144.0 # {'long_LR': 214.0, 'long_RL': 214.0, 'short_LR': 144.0, 'short_RL': 144.0}
+            HeuristicReplayScoring.bin_wise_continuous_sequence_sort_score_fn(a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length)
+            start_t: float = 105.4005
+
+            active_filter_epochs: pd.DataFrame = deepcopy(a_result.active_filter_epochs)
+            active_filter_epochs
+            active_filter_epochs.epochs.find_data_indicies_from_epoch_times(epoch_times=np.array([start_t])) # array([8], dtype=int64)
+            active_filter_epochs
+
+            an_epoch_idx: int = 8
+
+            a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
+            a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
+            n_time_bins: int = a_result.nbins[an_epoch_idx]
+            n_pos_bins: int = np.shape(a_p_x_given_n)[0]
+            time_window_centers = a_result.time_window_centers[an_epoch_idx]
+
+            a_most_likely_positions_list
+
+            # n_time_bins
+
+        """
+        ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
+        a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
+        a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
+        n_time_bins: int = a_result.nbins[an_epoch_idx]
+        n_pos_bins: int = np.shape(a_p_x_given_n)[0]
+        time_window_centers = a_result.time_window_centers[an_epoch_idx]
+        same_thresh_cm: float = float(same_thresh_fraction_of_track * a_decoder_track_length)
+
+        ## Begin computations:
+
+        ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
+        partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, flat_time_window_centers=deepcopy(time_window_centers))
+        longest_no_repeats_sequence_length_ratio: float = partition_result.longest_no_repeats_sequence_length_ratio      
+        longest_sequence_subsequence = deepcopy(partition_result.longest_sequence_subsequence)
+        
+        ## INPUTS: longest_sequence_subsequence, same_thresh_cm: float
+        ## end for i, v ...
+        value_equiv_group_list, value_equiv_group_idxs_list = SubsequencesPartitioningResult.find_value_equiv_groups(longest_sequence_subsequence, same_thresh_cm=same_thresh_cm)
+        ## OUTPUTS: value_equiv_group_list, value_equiv_group_idxs_list
+        value_equiv_group_list, value_equiv_group_idxs_list
+
+
+        all_value_equiv_group_list, all_value_equiv_group_idxs_list = SubsequencesPartitioningResult.find_value_equiv_groups(a_most_likely_positions_list, same_thresh_cm=same_thresh_cm)
+        all_num_equiv_values: int = len(all_value_equiv_group_idxs_list) # the number of equivalence value sets in the longest subsequence
+        all_num_equiv_values
+        
+        partition_result.subsequence_index_lists_omitting_repeats
+           
+        assert longest_no_repeats_sequence_length_ratio <= 1.0, f"longest_no_repeats_sequence_length_ratio should not be greater than 1.0, but it is {longest_no_repeats_sequence_length_ratio}!!"
+        return longest_no_repeats_sequence_length_ratio
+    
+
+    
+
     # ==================================================================================================================== #
     # All Computation Fns of Type                                                                                          #
     # ==================================================================================================================== #
@@ -1491,7 +1612,8 @@ class HeuristicReplayScoring:
          'ratio_jump_valid_bins': cls.bin_wise_large_jump_ratio,
          'travel': cls.bin_wise_position_difference_score, 
          'coverage': cls.bin_wise_track_coverage_score_fn, 
-         'continuous_seq_sort': cls.bin_wise_continuous_sequence_sort_score_fn, 
+         'continuous_seq_sort': cls.bin_wise_continuous_sequence_sort_score_fn,
+         'continuous_seq_len_ratio_no_repeats': cls.bin_wise_continuous_sequence_sort_excluding_near_repeats_score_fn, 
         }
     
     @function_attributes(short_name=None, tags=['OLDER'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-24 00:00', related_items=[])
