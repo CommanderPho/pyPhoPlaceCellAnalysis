@@ -37,7 +37,7 @@ from neuropy.core.epoch import find_data_indicies_from_epoch_times
 from neuropy.utils.indexing_helpers import union_of_arrays # `paired_incremental_sort_neurons`
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field, keys_only_repr
 from neuropy.utils.mixins.HDF5_representable import HDFMixin
-from neuropy.utils.indexing_helpers import PandasHelpers
+from neuropy.utils.indexing_helpers import PandasHelpers, NumpyHelpers, flatten
  
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder # used for `complete_directional_pfs_computations`
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult # needed in DirectionalPseudo2DDecodersResult
@@ -2659,6 +2659,8 @@ class DecoderDecodedEpochsResult(ComputedResult):
 			## add the column
 			extracted_merged_scores_df['time_bin_size'] = self.ripple_decoding_time_bin_size
 
+		extracted_merged_scores_df = PandasHelpers.dropping_duplicated_df_columns(df=extracted_merged_scores_df)
+
 		return extracted_merged_scores_df
 
 
@@ -4477,6 +4479,9 @@ def _build_merged_score_metric_df(decoder_epochs_score_metric_df_dict: Dict[str,
 
 	## only get columns that are actually included in each:
 	valid_columns = intersection_of_arrays(*[list(a_df.columns) for a_decoder_name, a_df in decoder_epochs_score_metric_df_dict.items()])
+	## de-duplicate columns
+	valid_columns = list(dict.fromkeys(valid_columns).keys()) # de-duplicate valid_columns
+	columns = list(dict.fromkeys(columns).keys()) # de-duplicate user-provided columns
 	valid_columns = [v for v in valid_columns if v in columns] # only include column_names that are in columns
 
 
