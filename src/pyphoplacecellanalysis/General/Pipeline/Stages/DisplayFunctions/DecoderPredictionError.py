@@ -1556,13 +1556,6 @@ class WeightedCorrelationPlotData:
         return "\n".join(formatted_data_strings_values)
     
 
-    # def build_display_text(self) -> str:
-    #     """ builds the final display string to be rendered in the label. """
-    #     formatted_data_strings_values: List[str] = [v for v in self.data_formatted_strings_dict.values() if ((v is not None) and (len(v) > 0))]
-    #     return "\n".join(formatted_data_strings_values)
-
-
-
     
 
 # @define(slots=False, repr=False)
@@ -1653,6 +1646,16 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         if curr_time_bin_container is not None:
             if debug_print:
                 print(f'\tcurr_time_bin_container: {curr_time_bin_container}')
+
+
+        ## get the figure
+        a_fig = curr_ax.get_figure()
+        curr_ax_bbox_fig_coords = curr_ax.get_position()  # Returns a Bbox object
+        curr_ax_x0, curr_ax_y0, curr_ax_width, curr_ax_height = curr_ax_bbox_fig_coords.bounds  # Extract bounds as (x0, y0, width, height)
+        curr_ax_top_edge = curr_ax_bbox_fig_coords.y1  # Top edge in figure coordinates
+        curr_ax_bottom_edge = curr_ax_bbox_fig_coords.y0  # Bottom edge in figure coordinates
+        curr_ax_mid_y = (curr_ax_bottom_edge + curr_ax_top_edge) / 2.0
+        curr_ax_right_edge = curr_ax_bbox_fig_coords.x1  # Right edge in figure coordinates
 
 
         ## Extract the visibility:
@@ -1829,8 +1832,9 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
                 loc='upper right',
                 horizontalalignment='left',
                 # horizontalalignment='right', # breaks it
-                bbox_to_anchor=(1.35, 1.0), bbox_transform=a_curr_ax.transAxes, transform=a_fig.transFigure, # Outside right, kinda working
+                # bbox_to_anchor=(1.35, 1.0), bbox_transform=a_curr_ax.transAxes, transform=a_fig.transFigure, # Outside right, kinda working
                 # bbox_to_anchor=(1.0, 0.5), bbox_transform=a_fig.transFigure, transform=a_fig.transFigure, # Outside right, figure coordinates, fully working -- except for rows because they're all centered vertically w.r.t figure
+                bbox_to_anchor=(1.0, curr_ax_mid_y), bbox_transform=a_fig.transFigure, transform=a_fig.transFigure, # Outside right, figure coordinates, fully working -- except for rows because they're all centered vertically w.r.t figure
             )
             return text_kwargs
         
@@ -1838,7 +1842,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
 
 
         ## first try to adjust the subplots
-        a_fig = curr_ax.get_figure()
+        
         layout_engine = a_fig.get_layout_engine()
         if isinstance(layout_engine, mpl.layout_engine.ConstrainedLayoutEngine):
             print("Constrained layout is active.")

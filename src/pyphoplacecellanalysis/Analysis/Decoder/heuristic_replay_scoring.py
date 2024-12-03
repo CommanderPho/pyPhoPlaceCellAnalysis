@@ -240,10 +240,21 @@ class SubsequencesPartitioningResult:
 
 
     @property
-    def longest_sequence_length_ratio(self) -> float:
+    def longest_no_repeats_sequence_length_ratio(self) -> float:
         """  Compensate for repeating bins, not counting them towards the score but also not against. """
         ## Compensate for repeating bins, not counting them towards the score but also not against.
-        should_use_no_repeat_values: bool = False
+        return self.get_longest_sequence_length_ratio(should_use_no_repeat_values=True)
+            
+    @property
+    def longest_sequence_length_ratio(self) -> float:
+        """  Compensate for repeating bins, not counting them towards the score but also not against. """
+        return self.get_longest_sequence_length_ratio(should_use_no_repeat_values=False)
+            
+
+    
+    def get_longest_sequence_length_ratio(self, should_use_no_repeat_values: bool = False) -> float:
+        """  Compensate for repeating bins, not counting them towards the score but also not against. """
+        ## Compensate for repeating bins, not counting them towards the score but also not against.
         if should_use_no_repeat_values:
             ## version that DOES ignore repeats:
             if self.total_num_subsequence_bins_no_repeats > 0:
@@ -256,8 +267,7 @@ class SubsequencesPartitioningResult:
                 return float(self.longest_subsequence_length) / float(self.total_num_subsequence_bins) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
             else:
                 return 0.0 # zero it out if they are all repeats
-
-
+            
     # ==================================================================================================================== #
     # Update/Recompute Functions                                                                                           #
     # ==================================================================================================================== #
@@ -316,7 +326,7 @@ class SubsequencesPartitioningResult:
         return partition_result
     
 
-
+    @function_attributes(short_name=None, tags=['NOT_COMPLETE', 'NOT_NEEDED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-03 04:17', related_items=[])
     @classmethod
     def detect_repeated_similar_positions(cls, a_most_likely_positions_list: Union[List, NDArray], same_thresh: float = 4.0, debug_print=False, **kwargs) -> "SubsequencesPartitioningResult":
         """ function partitions the list according to an iterative rule and the direction changes, ignoring changes less than or equal to `same_thresh`.
@@ -1014,6 +1024,50 @@ class SubsequencesPartitioningResult:
 
 
 
+    def _plot_step_by_step_subsequence_partition_process(self):
+        """ diagnostic for debugging the step-by-step sequence partitioning heuristics 
+        
+        out: MatplotlibRenderPlots = partition_result._plot_step_by_step_subsequence_partition_process()
+        out
+
+        """
+        from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
+        import matplotlib.pyplot as plt
+        
+        fig = plt.figure(layout="constrained")
+        ax_dict = fig.subplot_mosaic(
+            [
+                ["ax_ungrouped_seq"],
+                ["ax_grouped_seq"], # "ax_SHORT_activity_v_time", "ax_SHORT_pf_tuning_curve"],
+            ],
+            # set the height ratios between the rows
+            # height_ratios=[8, 1],
+            # height_ratios=[1, 1],
+            # set the width ratios between the columns
+            # width_ratios=[1, 8, 8, 1],
+            sharex=True, sharey=True,
+            gridspec_kw=dict(wspace=0, hspace=0.15) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+        )
+
+        flat_time_window_edges = np.arange(self.total_num_subsequence_bins+1)
+        
+        split_most_likely_positions_arrays = deepcopy(self.flat_positions) ## unsplit positions
+        # out: MatplotlibRenderPlots = SubsequencesPartitioningResult._debug_plot_time_bins_multiple(positions_list=split_most_likely_positions_arrays, ax=ax_dict["ax_ungrouped_seq"])
+        out: MatplotlibRenderPlots = self.plot_time_bins_multiple(num='debug_plot_merged_time_binned_positions', ax=ax_dict["ax_ungrouped_seq"], enable_position_difference_indicators=True,
+            flat_time_window_edges=flat_time_window_edges, override_positions_list=split_most_likely_positions_arrays, subsequence_line_color_alpha=0.95, arrow_alpha=0.9,
+        )
+
+
+        ## Add re-sequenced (merged) result:
+        out2: MatplotlibRenderPlots = self.plot_time_bins_multiple(num='debug_plot_merged_time_binned_positions', ax=ax_dict["ax_grouped_seq"], enable_position_difference_indicators=True,
+            flat_time_window_edges=flat_time_window_edges, subsequence_line_color_alpha=0.95, arrow_alpha=0.9, 
+        )
+        # ax = out.ax
+        
+        # out2: MatplotlibRenderPlots = SubsequencesPartitioningResult._debug_plot_time_bins_multiple(positions_list=final_out_subsequences, num='debug_plot_merged_time_binned_positions')
+        return out
+
+
 
 
 
@@ -1379,8 +1433,8 @@ class HeuristicReplayScoring:
 
         # INPUTS: a_most_likely_positions_list, n_pos_bins
 
-        a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
-        assert len(a_first_order_diff) == len(a_most_likely_positions_list), f"the prepend above should ensure that the sequence and its first-order diff are the same length."
+        # a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
+        # assert len(a_first_order_diff) == len(a_most_likely_positions_list), f"the prepend above should ensure that the sequence and its first-order diff are the same length."
         # Calculate the signs of the differences
         # a_first_order_diff_sign = np.sign(a_first_order_diff)
         # Calculate where the sign changes occur (non-zero after taking diff of signs)
@@ -1390,6 +1444,7 @@ class HeuristicReplayScoring:
         partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, flat_time_window_centers=deepcopy(time_window_centers))
         longest_sequence_length_ratio: float = partition_result.longest_sequence_length_ratio 
         
+        assert longest_sequence_length_ratio <= 1.0, f"longest_sequence_length_ratio should not be greater than 1.0, but it is {longest_sequence_length_ratio}!!"
         
         # cum_pos_bin_probs = np.nansum(a_p_x_given_n, axis=1) # sum over the time bins, leaving the accumulated probability per time bin.
         
