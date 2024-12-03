@@ -1653,16 +1653,19 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         ## get the figure
         a_fig = curr_ax.get_figure()
         curr_ax_bbox_fig_coords = curr_ax.get_position()  # Returns a Bbox object - Bbox(x0=0.06948103896103897, y0=0.8775788563568475, x1=0.7663807411543679, y1=0.9697376616231088)
-        print(f'curr_ax_bbox_fig_coords: {curr_ax_bbox_fig_coords}')
+        if debug_print:
+            print(f'curr_ax_bbox_fig_coords: {curr_ax_bbox_fig_coords}')
         curr_ax_x0, curr_ax_y0, curr_ax_width, curr_ax_height = curr_ax_bbox_fig_coords.bounds  # Extract bounds as (x0, y0, width, height) - curr_ax_x0: 0.06948103896103897, curr_ax_y0: 0.8775788563568475, curr_ax_width: 0.696899702193329, curr_ax_height: 0.0921588052662613
-        print(f'curr_ax_x0: {curr_ax_x0}, curr_ax_y0: {curr_ax_y0}, curr_ax_width: {curr_ax_width}, curr_ax_height: {curr_ax_height}')
+        if debug_print:
+            print(f'curr_ax_x0: {curr_ax_x0}, curr_ax_y0: {curr_ax_y0}, curr_ax_width: {curr_ax_width}, curr_ax_height: {curr_ax_height}')
         curr_ax_top_edge = curr_ax_bbox_fig_coords.y1  # Top edge in figure coordinates
         curr_ax_bottom_edge = curr_ax_bbox_fig_coords.y0  # Bottom edge in figure coordinates
         curr_ax_mid_y = (curr_ax_bottom_edge + curr_ax_top_edge) / 2.0
         curr_ax_right_edge = curr_ax_bbox_fig_coords.x1  # Right edge in figure coordinates
-        print(f'curr_ax_bottom_edge: {curr_ax_bottom_edge}, curr_ax_mid_y: {curr_ax_mid_y}, curr_ax_top_edge: {curr_ax_top_edge}') # curr_ax_bottom_edge: 0.8775788563568475, curr_ax_mid_y: 0.9236582589899782, curr_ax_top_edge: 0.9697376616231088
-        print(f'curr_ax_right_edge: {curr_ax_right_edge}') # curr_ax_right_edge: 0.7663807411543679
-        # print(f'curr_ax_right_edge: {curr_ax_right_edge}')
+        if debug_print:
+            print(f'curr_ax_bottom_edge: {curr_ax_bottom_edge}, curr_ax_mid_y: {curr_ax_mid_y}, curr_ax_top_edge: {curr_ax_top_edge}') # curr_ax_bottom_edge: 0.8775788563568475, curr_ax_mid_y: 0.9236582589899782, curr_ax_top_edge: 0.9697376616231088
+            print(f'curr_ax_right_edge: {curr_ax_right_edge}') # curr_ax_right_edge: 0.7663807411543679
+            # print(f'curr_ax_right_edge: {curr_ax_right_edge}')
         
         ## Extract the visibility:
         should_enable_weighted_correlation_info: bool = params.enable_weighted_correlation_info
@@ -1854,23 +1857,28 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         
         layout_engine = a_fig.get_layout_engine()
         if isinstance(layout_engine, mpl.layout_engine.ConstrainedLayoutEngine):
-            print("Constrained layout is active.")
+            if debug_print:
+                print("Constrained layout is active.")
 
             # Adjust the right margin
             curr_layout_rect = deepcopy(layout_engine.__dict__['_params'].get('rect', None)) # {'_params': {'h_pad': 0.04167, 'w_pad': 0.04167, 'hspace': 0.02, 'wspace': 0.02, 'rect': (0, 0, 1, 1)}, '_compress': False}
             ## original rect to restore upon remove
             if(weighted_corr_text_original_figure_rect is None) and (not params.weighted_corr_text_was_axes_rect_modified):
                 ## set the curr_layout_rect
-                print(f'\t curr_layout_rect: {curr_layout_rect}')
+                if debug_print:
+                    print(f'\t curr_layout_rect: {curr_layout_rect}')
                 weighted_corr_text_original_figure_rect = curr_layout_rect
                 params.weighted_corr_text_original_figure_rect = curr_layout_rect ## update the params
-                layout_engine.set(rect=(0.0, 0.0, 0.8, 1.0)) # ConstrainedLayoutEngine uses rect = (left, bottom, width, height)
+                layout_engine.set(rect=(0.0, 0.0, 0.9, 1.0)) # ConstrainedLayoutEngine uses rect = (left, bottom, width, height)
                 params.weighted_corr_text_was_axes_rect_modified = True
-                print(f'\t updating layout! params.weighted_corr_text_was_axes_rect_modified will be set to True')
+                if debug_print:
+                    print(f'\t updating layout! params.weighted_corr_text_was_axes_rect_modified will be set to True')
             else:
-                print(f'\t will not re-layout, params.weighted_corr_text_was_axes_rect_modified is already True')
+                if debug_print:
+                    print(f'\t will not re-layout, params.weighted_corr_text_was_axes_rect_modified is already True')
         else:
-            print("Other layout engine or none is active.")
+            if debug_print:
+                print("Other layout engine or none is active.")
 
         # text_kwargs = _helper_build_text_kwargs_angled_upper_right_corner(a_curr_ax=curr_ax)
         # text_kwargs = _helper_build_text_kwargs_flat_top(a_curr_ax=curr_ax)
@@ -1939,6 +1947,10 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
 
     @classmethod
     def _callback_remove_curr_single_epoch_slice_plot(cls, curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", data_idx:int, curr_time_bins, *args, epoch_slice=None, curr_time_bin_container=None, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
+        debug_print = kwargs.pop('debug_print', True)
+        if debug_print:
+            print(f'WeightedCorrelationPaginatedPlotDataProvider._callback_remove_curr_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})')
+            
         import matplotlib as mpl
 
         assert cls.plots_group_identifier_key in plots, f"ERROR: key cls.plots_group_identifier_key: {cls.plots_group_identifier_key} is not in plots. plots.keys(): {list(plots.keys())}"
@@ -1967,7 +1979,8 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             if (should_force_restore_original_layout or params.weighted_corr_text_was_axes_rect_modified):
                 ## restore the original rect
                 # assert (weighted_corr_text_original_figure_rect is not None) 
-                print(f'\t restoring original layout! params.weighted_corr_text_was_axes_rect_modified will be set to False')
+                if debug_print:
+                    print(f'\t restoring original layout! params.weighted_corr_text_was_axes_rect_modified will be set to False')
 
                 # layout_engine.set(rect=weighted_corr_text_original_figure_rect) # ConstrainedLayoutEngine uses rect = (left, bottom, width, height)
                 ## hardcoded
@@ -1975,9 +1988,11 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
                 params.weighted_corr_text_original_figure_rect = None # None
                 params.weighted_corr_text_was_axes_rect_modified = False
             else:
-                print(f'\t params.weighted_corr_text_was_axes_rect_modified was False!')
+                if debug_print:
+                    print(f'\t params.weighted_corr_text_was_axes_rect_modified was False!')
         else:
-            print("Other layout engine or none is active.")
+            if debug_print:
+                print("Other layout engine or none is active.")
 
 
 

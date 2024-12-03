@@ -191,7 +191,7 @@ class SubsequencesPartitioningResult:
     
     @property
     def subsequence_index_lists_omitting_repeats(self):
-        """The subsequence_index_lists_omitting_repeats property."""
+        """The subsequence_index_lists_omitting_repeats property. BROKEN """
         return np.array_split(len(self.split_indicies), self.split_indicies)
 
     @property
@@ -691,6 +691,7 @@ class SubsequencesPartitioningResult:
         subsequences_to_remove = [] # not used
         subsequence_replace_dict = {}
         
+        final_intrusion_idxs = []
         
         # (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove)
         if (should_skip_epoch_with_only_short_subsequences and (np.all(is_ignored_intrusion_subsequence))):
@@ -708,6 +709,7 @@ class SubsequencesPartitioningResult:
                     # for an_ignored_subsequence_idx in ignored_subsequence_idxs:
                     active_ignored_subsequence = deepcopy(self.split_positions_arrays[a_subsequence_idx])
                     len_active_ignored_subsequence: int = len(active_ignored_subsequence)
+                    final_is_subsequence_intrusion: bool = False
                     
                     if debug_print:
                         print(f'an_ignored_subsequence_idx: {a_subsequence_idx}, active_ignored_subsequence: {active_ignored_subsequence}')
@@ -747,7 +749,7 @@ class SubsequencesPartitioningResult:
                             subsequences_to_add.append(new_subsequence)
                             # subsequence_replace_dict[tuple([original_split_positions_arrays[an_idx_to_remove] for an_idx_to_remove in np.arange(left_congruent_flanking_index, (a_subsequence_idx+1))])] = new_subsequence
                             subsequence_replace_dict[tuple(np.arange(left_congruent_flanking_index, (a_subsequence_idx+1)).tolist())] = (a_subsequence_idx, new_subsequence)
-                            
+                            final_is_subsequence_intrusion = True
                         else:
                             # merge RIGHT, be biased towards merging right (due to lack of >= above) _____________________________________________ #
                             if debug_print:
@@ -760,8 +762,13 @@ class SubsequencesPartitioningResult:
                             subsequences_to_add.append(new_subsequence)
                             # subsequence_replace_dict[tuple([original_split_positions_arrays[an_idx_to_remove] for an_idx_to_remove in np.arange(a_subsequence_idx, (right_congruent_flanking_index+1))])] = new_subsequence
                             subsequence_replace_dict[tuple(np.arange(a_subsequence_idx, (right_congruent_flanking_index+1)).tolist())] = (a_subsequence_idx, new_subsequence)
+                            final_is_subsequence_intrusion = True
                         ## END if len_left_congruent_flanking_sequ...
                             
+                        if final_is_subsequence_intrusion:
+                            # final_intrusion_idxs.append(a_subsequence)
+                            final_intrusion_idxs.append(active_ignored_subsequence)
+                        
                         if debug_print:
                             print(f'\tnew_subsequence: {new_subsequence}')
                 else:
@@ -815,6 +822,9 @@ class SubsequencesPartitioningResult:
 
         ## update self properties
         self.merged_split_positions_arrays = deepcopy(final_out_subsequences)
+        
+        if len(final_intrusion_idxs) > 0:
+            print(f'final_intrusion_idxs: {final_intrusion_idxs}')
         
         ## update dataframe
         self.rebuild_sequence_info_df()
@@ -1565,22 +1575,7 @@ class HeuristicReplayScoring:
 
         ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
         partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, flat_time_window_centers=deepcopy(time_window_centers))
-        longest_no_repeats_sequence_length_ratio: float = partition_result.longest_no_repeats_sequence_length_ratio      
-        longest_sequence_subsequence = deepcopy(partition_result.longest_sequence_subsequence)
-        
-        ## INPUTS: longest_sequence_subsequence, same_thresh_cm: float
-        ## end for i, v ...
-        value_equiv_group_list, value_equiv_group_idxs_list = SubsequencesPartitioningResult.find_value_equiv_groups(longest_sequence_subsequence, same_thresh_cm=same_thresh_cm)
-        ## OUTPUTS: value_equiv_group_list, value_equiv_group_idxs_list
-        value_equiv_group_list, value_equiv_group_idxs_list
-
-
-        all_value_equiv_group_list, all_value_equiv_group_idxs_list = SubsequencesPartitioningResult.find_value_equiv_groups(a_most_likely_positions_list, same_thresh_cm=same_thresh_cm)
-        all_num_equiv_values: int = len(all_value_equiv_group_idxs_list) # the number of equivalence value sets in the longest subsequence
-        all_num_equiv_values
-        
-        partition_result.subsequence_index_lists_omitting_repeats
-           
+        longest_no_repeats_sequence_length_ratio: float = partition_result.longest_no_repeats_sequence_length_ratio         
         assert longest_no_repeats_sequence_length_ratio <= 1.0, f"longest_no_repeats_sequence_length_ratio should not be greater than 1.0, but it is {longest_no_repeats_sequence_length_ratio}!!"
         return longest_no_repeats_sequence_length_ratio
     
