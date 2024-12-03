@@ -1580,7 +1580,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
     # text_color: str = '#66FF00' # a light green
     text_color: str = '#013220' # a very dark forest green
 
-    provided_params: Dict[str, Any] = dict(enable_weighted_correlation_info = True, weighted_corr_text_original_figure_rect=None, weighted_corr_text_was_axes_rect_modified=False)
+    provided_params: Dict[str, Any] = dict(enable_weighted_correlation_info=True, enable_weighted_corr_data_provider_modify_axes_rect=False, weighted_corr_text_original_figure_rect=None, weighted_corr_text_was_axes_rect_modified=False)
     provided_plots_data: Dict[str, Any] = {'weighted_corr_data': None}
     provided_plots: Dict[str, Any] = {'weighted_corr': {}}
     column_names: List[str] = ['wcorr', 'P_decoder', 'pearsonr', 'travel', 'coverage', 'total_congruent_direction_change', 'longest_sequence_length', 'avg_jump_cm']
@@ -1669,6 +1669,8 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         
         ## Extract the visibility:
         should_enable_weighted_correlation_info: bool = params.enable_weighted_correlation_info
+        enable_weighted_corr_data_provider_modify_axes_rect: bool = params.enable_weighted_corr_data_provider_modify_axes_rect
+
         use_AnchoredCustomText: bool = params.setdefault('use_AnchoredCustomText', True)
         if use_AnchoredCustomText:
             custom_value_formatter = ValueFormatter()
@@ -1854,38 +1856,43 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
 
 
         ## first try to adjust the subplots
-        
-        layout_engine = a_fig.get_layout_engine()
-        if isinstance(layout_engine, mpl.layout_engine.ConstrainedLayoutEngine):
-            if debug_print:
-                print("Constrained layout is active.")
+        if enable_weighted_corr_data_provider_modify_axes_rect:
+            layout_engine = a_fig.get_layout_engine()
+            if isinstance(layout_engine, mpl.layout_engine.ConstrainedLayoutEngine):
+                if debug_print:
+                    print("Constrained layout is active.")
 
-            # Adjust the right margin
-            curr_layout_rect = deepcopy(layout_engine.__dict__['_params'].get('rect', None)) # {'_params': {'h_pad': 0.04167, 'w_pad': 0.04167, 'hspace': 0.02, 'wspace': 0.02, 'rect': (0, 0, 1, 1)}, '_compress': False}
-            ## original rect to restore upon remove
-            if(weighted_corr_text_original_figure_rect is None) and (not params.weighted_corr_text_was_axes_rect_modified):
-                ## set the curr_layout_rect
-                if debug_print:
-                    print(f'\t curr_layout_rect: {curr_layout_rect}')
-                weighted_corr_text_original_figure_rect = curr_layout_rect
-                params.weighted_corr_text_original_figure_rect = curr_layout_rect ## update the params
-                layout_engine.set(rect=(0.0, 0.0, 0.9, 1.0)) # ConstrainedLayoutEngine uses rect = (left, bottom, width, height)
-                params.weighted_corr_text_was_axes_rect_modified = True
-                if debug_print:
-                    print(f'\t updating layout! params.weighted_corr_text_was_axes_rect_modified will be set to True')
+                # Adjust the right margin
+                curr_layout_rect = deepcopy(layout_engine.__dict__['_params'].get('rect', None)) # {'_params': {'h_pad': 0.04167, 'w_pad': 0.04167, 'hspace': 0.02, 'wspace': 0.02, 'rect': (0, 0, 1, 1)}, '_compress': False}
+                ## original rect to restore upon remove
+                if(weighted_corr_text_original_figure_rect is None) and (not params.weighted_corr_text_was_axes_rect_modified):
+                    ## set the curr_layout_rect
+                    if debug_print:
+                        print(f'\t curr_layout_rect: {curr_layout_rect}')
+                    weighted_corr_text_original_figure_rect = curr_layout_rect
+                    params.weighted_corr_text_original_figure_rect = curr_layout_rect ## update the params
+                    layout_engine.set(rect=(0.0, 0.0, 0.9, 1.0)) # ConstrainedLayoutEngine uses rect = (left, bottom, width, height)
+                    params.weighted_corr_text_was_axes_rect_modified = True
+                    if debug_print:
+                        print(f'\t updating layout! params.weighted_corr_text_was_axes_rect_modified will be set to True')
+                else:
+                    if debug_print:
+                        print(f'\t will not re-layout, params.weighted_corr_text_was_axes_rect_modified is already True')
             else:
                 if debug_print:
-                    print(f'\t will not re-layout, params.weighted_corr_text_was_axes_rect_modified is already True')
-        else:
-            if debug_print:
-                print("Other layout engine or none is active.")
+                    print("Other layout engine or none is active.")
 
+            # end if isinst...
+            text_kwargs = _helper_build_text_kwargs_outside_right(a_curr_ax=curr_ax)
+        else:
+            ## Inset internally
+            text_kwargs = _helper_build_text_kwargs_adjacent_right_lots_of_text(a_curr_ax=curr_ax)
+            
         # text_kwargs = _helper_build_text_kwargs_angled_upper_right_corner(a_curr_ax=curr_ax)
         # text_kwargs = _helper_build_text_kwargs_flat_top(a_curr_ax=curr_ax)
         # text_kwargs = _helper_build_text_kwargs_adjacent_right(a_curr_ax=curr_ax)
-        # text_kwargs = _helper_build_text_kwargs_adjacent_right_lots_of_text(a_curr_ax=curr_ax)
-        text_kwargs = _helper_build_text_kwargs_outside_right(a_curr_ax=curr_ax)
 
+        
         # data_index_value = data_idx # OLD MODE
         data_index_value = epoch_start_t
 
@@ -1950,7 +1957,11 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         debug_print = kwargs.pop('debug_print', True)
         if debug_print:
             print(f'WeightedCorrelationPaginatedPlotDataProvider._callback_remove_curr_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})')
-            
+
+
+        enable_weighted_corr_data_provider_modify_axes_rect: bool = params.enable_weighted_corr_data_provider_modify_axes_rect
+
+
         import matplotlib as mpl
 
         assert cls.plots_group_identifier_key in plots, f"ERROR: key cls.plots_group_identifier_key: {cls.plots_group_identifier_key} is not in plots. plots.keys(): {list(plots.keys())}"
@@ -1966,33 +1977,36 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             anchored_text.remove()
             anchored_text = None
 
-        ## first try to adjust the subplots
-        should_force_restore_original_layout: bool = True
-        a_fig = curr_ax.get_figure()
-        layout_engine = a_fig.get_layout_engine()
-        if isinstance(layout_engine, mpl.layout_engine.ConstrainedLayoutEngine):
-            weighted_corr_text_original_figure_rect = params.weighted_corr_text_original_figure_rect
-            weighted_corr_text_was_axes_rect_modified: bool = params.weighted_corr_text_was_axes_rect_modified
-            # Adjust the right margin
-            # curr_layout_rect = deepcopy(layout_engine.__dict__['_params'].get('rect', None)) # {'_params': {'h_pad': 0.04167, 'w_pad': 0.04167, 'hspace': 0.02, 'wspace': 0.02, 'rect': (0, 0, 1, 1)}, '_compress': False}
-            ## original rect to restore upon remove
-            if (should_force_restore_original_layout or params.weighted_corr_text_was_axes_rect_modified):
-                ## restore the original rect
-                # assert (weighted_corr_text_original_figure_rect is not None) 
-                if debug_print:
-                    print(f'\t restoring original layout! params.weighted_corr_text_was_axes_rect_modified will be set to False')
 
-                # layout_engine.set(rect=weighted_corr_text_original_figure_rect) # ConstrainedLayoutEngine uses rect = (left, bottom, width, height)
-                ## hardcoded
-                layout_engine.set(rect=(0.0, 0.0, 1.0, 1.0)) # ConstrainedLayoutEngine uses rect = (left, bottom, width, height)
-                params.weighted_corr_text_original_figure_rect = None # None
-                params.weighted_corr_text_was_axes_rect_modified = False
+        ## first try to adjust the subplots
+        if enable_weighted_corr_data_provider_modify_axes_rect:
+            should_force_restore_original_layout: bool = True
+            a_fig = curr_ax.get_figure()
+            layout_engine = a_fig.get_layout_engine()
+            if isinstance(layout_engine, mpl.layout_engine.ConstrainedLayoutEngine):
+                weighted_corr_text_original_figure_rect = params.weighted_corr_text_original_figure_rect
+                weighted_corr_text_was_axes_rect_modified: bool = params.weighted_corr_text_was_axes_rect_modified
+                # Adjust the right margin
+                # curr_layout_rect = deepcopy(layout_engine.__dict__['_params'].get('rect', None)) # {'_params': {'h_pad': 0.04167, 'w_pad': 0.04167, 'hspace': 0.02, 'wspace': 0.02, 'rect': (0, 0, 1, 1)}, '_compress': False}
+                ## original rect to restore upon remove
+                if (should_force_restore_original_layout or params.weighted_corr_text_was_axes_rect_modified):
+                    ## restore the original rect
+                    # assert (weighted_corr_text_original_figure_rect is not None) 
+                    if debug_print:
+                        print(f'\t restoring original layout! params.weighted_corr_text_was_axes_rect_modified will be set to False')
+
+                    # layout_engine.set(rect=weighted_corr_text_original_figure_rect) # ConstrainedLayoutEngine uses rect = (left, bottom, width, height)
+                    ## hardcoded
+                    layout_engine.set(rect=(0.0, 0.0, 1.0, 1.0)) # ConstrainedLayoutEngine uses rect = (left, bottom, width, height)
+                    params.weighted_corr_text_original_figure_rect = None # None
+                    params.weighted_corr_text_was_axes_rect_modified = False
+                else:
+                    if debug_print:
+                        print(f'\t params.weighted_corr_text_was_axes_rect_modified was False!')
             else:
                 if debug_print:
-                    print(f'\t params.weighted_corr_text_was_axes_rect_modified was False!')
-        else:
-            if debug_print:
-                print("Other layout engine or none is active.")
+                    print("Other layout engine or none is active.")
+        # end if enable_wei...
 
 
 
