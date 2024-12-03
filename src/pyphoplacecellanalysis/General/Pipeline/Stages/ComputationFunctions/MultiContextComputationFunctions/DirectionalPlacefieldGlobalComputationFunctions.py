@@ -2511,6 +2511,8 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
 	@classmethod
 	def get_all_scores_column_names(cls) -> Tuple:
+		from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring
+		
 		# Column Names _______________________________________________________________________________________________________ #
 		basic_df_column_names = ['start', 'stop', 'label', 'duration']
 		selection_col_names = ['is_user_annotated_epoch', 'is_valid_epoch']
@@ -2528,6 +2530,8 @@ class DecoderDecodedEpochsResult(ComputedResult):
 		# ['jump', 'max_jump_cm', 'max_jump_cm_per_sec', 'ratio_jump_valid_bins', 'travel', 'coverage', 'sequential_correlation', 'monotonicity_score', 'laplacian_smoothness']
 		# heuristic_score_col_names += ['continuous_seq_sort', 'continuous_seq_len_ratio_no_repeats']
 		
+		heuristic_score_col_names = HeuristicReplayScoring.get_all_score_computation_col_names()
+		print(f'heuristic_score_col_names: {heuristic_score_col_names}')
 
 		## All included columns:
 		all_df_shared_column_names: List[str] = basic_df_column_names + selection_col_names + session_identity_col_names # these are not replicated for each decoder, they're the same for the epoch
@@ -2556,6 +2560,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
 		"""
 		from neuropy.core.epoch import ensure_dataframe
+		from neuropy.utils.indexing_helpers import flatten, NumpyHelpers, PandasHelpers
 		from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _build_merged_score_metric_df
 
 		# # Column Names _______________________________________________________________________________________________________ #
@@ -2660,7 +2665,6 @@ class DecoderDecodedEpochsResult(ComputedResult):
 			extracted_merged_scores_df['time_bin_size'] = self.ripple_decoding_time_bin_size
 
 		extracted_merged_scores_df = PandasHelpers.dropping_duplicated_df_columns(df=extracted_merged_scores_df)
-
 		return extracted_merged_scores_df
 
 
