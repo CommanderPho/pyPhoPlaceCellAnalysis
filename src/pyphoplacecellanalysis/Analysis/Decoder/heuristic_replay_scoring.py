@@ -2088,52 +2088,6 @@ class HeuristicReplayScoring:
     #     # a_first_order_diff = np.diff(max_indicies, n=1, prepend=[max_indicies[0]])
     #     pass
 
-    @classmethod
-    @function_attributes(short_name=None, tags=['DEP', 'OLD'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 19:54', related_items=[])
-    def _DEP_run_all_compute_pho_heuristic_replay_scores(cls, filter_epochs: pd.DataFrame, a_decoded_filter_epochs_decoder_result_dict, t_start, t_delta, t_end, labels_column_name='lap_id'):
-        """ 
-        
-        version from earlier in the day that only computes `compute_pho_heuristic_replay_scores`. The `_run_score_computations` was generalized from this one.
-
-        Usage:    
-            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _run_all_compute_pho_heuristic_replay_scores
-
-            ## INPUTS: all_directional_laps_filter_epochs_decoder_result_value, labels_column_name
-            # Creates Columns: 'maze_id', 'truth_decoder_name':
-            labels_column_name='label'
-            # labels_column_name='lap_id'
-
-            # all_directional_laps_filter_epochs_decoder_result_value.filter_epochs # has 'lap_id',  'lap_dir', -- needs 'maze_id'
-            filter_epochs = all_directional_laps_filter_epochs_decoder_result_value.filter_epochs.to_dataframe()
-            filter_epochs, all_epochs_position_derivatives_df = _run_all_compute_pho_heuristic_replay_scores(filter_epochs, labels_column_name=labels_column_name)
-            filter_epochs
-
-        """
-        from neuropy.core.epoch import Epoch, ensure_dataframe
-        ## INPUTS: filter_epochs: pd.DataFrame
-        filter_epochs = ensure_dataframe(filter_epochs).epochs.adding_maze_id_if_needed(t_start, t_delta, t_end, replace_existing=True, labels_column_name=labels_column_name)
-        # # Creates Columns: 'truth_decoder_name':
-        # filter_epochs = _add_lap_extended_info_columns(filter_epochs, t_start, t_delta, t_end, labels_column_name=labels_column_name)
-        # # # Update result's .filter_epochs
-        # # all_directional_laps_filter_epochs_decoder_result_value.filter_epochs = filter_epochs.epochs.to_Epoch()
-
-        # ## INPUT: a_decoded_filter_epochs_decoder_result_dict, all_directional_laps_filter_epochs_decoder_result_value
-        # # num_filter_epochs: int = all_directional_laps_filter_epochs_decoder_result_value
-
-        _out_true_decoder_new_scores = {}
-
-        for i, row in enumerate(filter_epochs.itertuples()): # np.arange(num_filter_epochs)
-            ## For each epoch, it gets the known-true decoder so that it can be compared to all the others.
-            # print(row.truth_decoder_name)
-            curr_decoder_name: str = row.truth_decoder_name
-            a_result = a_decoded_filter_epochs_decoder_result_dict[curr_decoder_name]
-            _out_true_decoder_new_scores[i] = cls.compute_pho_heuristic_replay_scores(a_result=a_result, an_epoch_idx=i)
-
-            # all_directional_laps_filter_epochs_decoder_result_value.it
-
-        all_epochs_position_derivatives_df = pd.concat([a_scores.position_derivatives_df for a_scores in _out_true_decoder_new_scores.values()], ignore_index=True)
-        return filter_epochs, _out_true_decoder_new_scores, all_epochs_position_derivatives_df
-
 
     @staticmethod
     def _add_lap_extended_info_columns(filter_epochs: pd.DataFrame, t_start, t_delta, t_end, labels_column_name='lap_id'):
