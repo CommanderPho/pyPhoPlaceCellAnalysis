@@ -6,9 +6,9 @@ import tables as tb
 from typing import List, Dict
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loadData
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import WCorrShuffle, SequenceBasedComputationsContainer
-from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrialByTrialActivityResult
+# from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import WCorrShuffle, SequenceBasedComputationsContainer
+# from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
+# from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrialByTrialActivityResult
 
 
 
@@ -83,6 +83,8 @@ directional_active_lap_pf_results_dicts
 class TestPickleUnpickle(unittest.TestCase):
 
     def setUp(self):
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrialByTrialActivityResult
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import WCorrShuffle, SequenceBasedComputationsContainer
         # Setup for WCorrShuffle
         self.wcorr_tool = WCorrShuffle.init_from_templates(curr_active_pipeline=curr_active_pipeline)
         self.wcorr_tool.compute_shuffles(num_shuffles=2)

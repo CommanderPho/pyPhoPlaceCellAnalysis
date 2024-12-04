@@ -627,9 +627,9 @@ class SubsequencesPartitioningResult:
         HISTORY: 2024-11-27 08:18 based off of `_compute_sequences_spanning_ignored_intrusions`
         
         """
-        def _subfn_resolve_overlapping_replacement_indicies(original_split_positions_arrays, replace_dict):
+        def _subfn_resolve_overlapping_replacement_indicies(original_split_positions_arrays, replace_dict, debug_print=False):
             """ De-duplicates the replacement indicies. Prevents an issue that occurs when the replace keys overlap in indicies in `subsequence_replace_dict` that results in a net increase in number of bins in the merged output.
-            captures: debug_print
+            captures: None
             
 
                         
@@ -705,15 +705,15 @@ class SubsequencesPartitioningResult:
                 for a_subsequence_idx, a_subsequence, a_n_tbins, is_potentially_ignored_intrusion in zip(np.arange(len(n_tbins_list)), original_split_positions_arrays, n_tbins_list, is_subsequence_potential_intrusion):
                     ## loop through ignored subsequences to find out how to merge them
                     #TODO 2024-11-27 08:36: - [ ] 
-                    if is_potentially_ignored_intrusion:
+                    if (not is_potentially_ignored_intrusion):
                         # for an_ignored_subsequence_idx in ignored_subsequence_idxs:
-                        active_ignored_subsequence = deepcopy(original_split_positions_arrays[a_subsequence_idx])
+                        active_subsequence_pos = deepcopy(original_split_positions_arrays[a_subsequence_idx])
                         # active_ignored_subsequence_indicies = deepcopy(self.split_indicies[a_subsequence_idx])
-                        len_active_ignored_subsequence: int = len(active_ignored_subsequence)
+                        len_active_subsequence: int = len(active_subsequence_pos)
                         final_is_subsequence_intrusion: bool = False
                         
                         if debug_print:
-                            print(f'an_ignored_subsequence_idx: {a_subsequence_idx}, active_ignored_subsequence: {active_ignored_subsequence}')
+                            print(f'an_ignored_subsequence_idx: {a_subsequence_idx}, active_ignored_subsequence: {active_subsequence_pos}')
                         (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index) = self._compute_sequences_spanning_ignored_intrusions(original_split_positions_arrays,
                                                                                                                                                 n_tbins_list, target_subsequence_idx=a_subsequence_idx, max_ignore_bins=max_ignore_bins)
                         if left_congruent_flanking_sequence is None:
@@ -725,12 +725,12 @@ class SubsequencesPartitioningResult:
 
                         ## impose reasonable size rule
                         # bridging over intrusions only be done when at least one of the adjacent portions to be bridged exceeds a minimum size? This prevents piecing together bad sequences.
-                        required_minimum_flanking_sequence_length: int = int((len_active_ignored_subsequence) * 2) # one must be at least twice as large as the bridged gap
+                        required_minimum_flanking_sequence_length: int = int((len_active_subsequence) * 2) # one must be at least twice as large as the bridged gap
                         # required_minimum_flanking_sequence_length: int = int((len_active_ignored_subsequence) + 1) # must be at least one larger than the bridged gap                    
                         are_both_flanking_sequences_too_short: bool = ((len_left_congruent_flanking_sequence < required_minimum_flanking_sequence_length) and (len_right_congruent_flanking_sequence < required_minimum_flanking_sequence_length))
                         if are_both_flanking_sequences_too_short:
                             if debug_print:
-                                print(f'flanking sequences are too short required_minimum_flanking_sequence_length: {required_minimum_flanking_sequence_length}!\n\t (len_left_congruent_flanking_sequence: {len_left_congruent_flanking_sequence}, len_active_ignored_subsequence: {len_active_ignored_subsequence}, len_right_congruent_flanking_sequence: {len_right_congruent_flanking_sequence})')
+                                print(f'flanking sequences are too short required_minimum_flanking_sequence_length: {required_minimum_flanking_sequence_length}!\n\t (len_left_congruent_flanking_sequence: {len_left_congruent_flanking_sequence}, len_active_ignored_subsequence: {len_active_subsequence}, len_right_congruent_flanking_sequence: {len_right_congruent_flanking_sequence})')
 
                         if (are_both_flanking_sequences_too_short or ((len_left_congruent_flanking_sequence == 0) and (len_right_congruent_flanking_sequence == 0))):
                             ## do nothing
@@ -742,7 +742,7 @@ class SubsequencesPartitioningResult:
                                 # merge LEFT sequence ________________________________________________________________________________________________ #
                                 if debug_print:
                                     print(f'\tmerge LEFT: left_congruent_flanking_sequence: {left_congruent_flanking_sequence}, left_congruent_flanking_index: {left_congruent_flanking_index}')
-                                new_subsequence = np.array([*left_congruent_flanking_sequence, *active_ignored_subsequence])
+                                new_subsequence = np.array([*left_congruent_flanking_sequence, *active_subsequence_pos])
                                 ## remove old
                                 for an_idx_to_remove in np.arange(left_congruent_flanking_index, (a_subsequence_idx+1)):                    
                                     subsequences_to_remove.append(original_split_positions_arrays[an_idx_to_remove])
@@ -755,7 +755,7 @@ class SubsequencesPartitioningResult:
                                 # merge RIGHT, be biased towards merging right (due to lack of >= above) _____________________________________________ #
                                 if debug_print:
                                     print(f'\tmerge RIGHT: right_congruent_flanking_sequence: {right_congruent_flanking_sequence}, right_congruent_flanking_index: {right_congruent_flanking_index}')
-                                new_subsequence = np.array([*active_ignored_subsequence, *right_congruent_flanking_sequence])
+                                new_subsequence = np.array([*active_subsequence_pos, *right_congruent_flanking_sequence])
                                 ## remove old
                                 for an_idx_to_remove in np.arange(a_subsequence_idx, (right_congruent_flanking_index+1)):                    
                                     subsequences_to_remove.append(original_split_positions_arrays[an_idx_to_remove])
@@ -770,7 +770,7 @@ class SubsequencesPartitioningResult:
 
                             if final_is_subsequence_intrusion:
                                 # final_intrusion_idxs.append(deepcopy(active_ignored_subsequence_indicies))
-                                final_intrusion_idxs.append(active_ignored_subsequence)
+                                final_intrusion_idxs.append(active_subsequence_pos)
                             
                             if debug_print:
                                 print(f'\tnew_subsequence: {new_subsequence}')
@@ -782,7 +782,7 @@ class SubsequencesPartitioningResult:
                 ## detect and prevent overlaps in the replacements, could also fix by finding and replacing iteratively?    
                 if debug_print:
                     print(f'subsequence_replace_dict: {subsequence_replace_dict}')
-                deduplicated_replace_dict = _subfn_resolve_overlapping_replacement_indicies(original_split_positions_arrays, subsequence_replace_dict)
+                deduplicated_replace_dict = _subfn_resolve_overlapping_replacement_indicies(original_split_positions_arrays, subsequence_replace_dict, debug_print=debug_print)
                 
                 if debug_print:
                     print(f'deduplicated_replace_dict: {deduplicated_replace_dict}')
@@ -859,7 +859,7 @@ class SubsequencesPartitioningResult:
         return original_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_idxs)
 
 
-    @function_attributes(short_name=None, tags=['merge', 'intrusion', 'subsequences'], input_requires=[], output_provides=[], uses=[], used_by=['self.merge_over_ignored_intrusions'], creation_date='2024-12-04 04:43', related_items=[])
+    @function_attributes(short_name=None, tags=['merge', 'intrusion', 'subsequences', 'ISSUE'], input_requires=[], output_provides=[], uses=[], used_by=['self.merge_over_ignored_intrusions'], creation_date='2024-12-04 04:43', related_items=[])
     @classmethod
     def _compute_sequences_spanning_ignored_intrusions(cls, subsequence_list, continuous_sequence_lengths, target_subsequence_idx: int, max_ignore_bins: int = 2):
         """ an "intrusion" refers to one or more time bins that interrupt a longer sequence that would be monotonic if the intrusions were removed.
