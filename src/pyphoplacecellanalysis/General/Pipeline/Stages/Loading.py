@@ -1,4 +1,4 @@
-from typing import Callable, List, Dict, Optional
+from typing import Any, Callable, List, Dict, Optional, Union
 from types import ModuleType
 import dataclasses
 from dataclasses import dataclass
@@ -39,9 +39,13 @@ from pyphocorehelpers.print_helpers import print_filesystem_file_size, print_obj
 from pyphocorehelpers.Filesystem.path_helpers import build_unique_filename, backup_extant_file
 
 
-def safeSaveData(pkl_path, db, should_append=False, backup_file_if_smaller_than_original:bool=False, backup_minimum_difference_MB:int=5):
+def safeSaveData(pkl_path: Union[str, Path], db: Any, should_append:bool=False, backup_file_if_smaller_than_original:bool=False, backup_minimum_difference_MB:int=5):
     """ saves the output data in a way that doesn't corrupt it if the pickling fails and the original file is retained.
     
+    Saves `db` to a temporary pickle file (with the '.tmp' additional extension), which overwrites an existing pickle IFF saving completes successfully
+
+
+    db: the data to be saved
     backup_file_if_smaller_than_original:bool - if True, creates a backup of the old file if the new file is smaller.
     backup_minimum_difference_MB:int = 5 # don't backup for an increase of 5MB or less, ignored unless backup_file_if_smaller_than_original==True
     """
@@ -56,14 +60,16 @@ def safeSaveData(pkl_path, db, should_append=False, backup_file_if_smaller_than_
     _desired_final_pickle_path = None
     if pkl_path.exists():
         # file already exists:
-        
         ## Save under a temporary name in the same output directory, and then compare post-hoc
         _desired_final_pickle_path = pkl_path
         pkl_path, _ = build_unique_filename(pkl_path, additional_postfix_extension='tmp') # changes the final path to the temporary file created.
         is_temporary_file_used = True # this is the only condition where this is true
-            
+    else:
+        # it doesn't exist so the final pickle path is the real one
+        _desired_final_pickle_path = pkl_path            
+
     # Save reloaded pipeline out to pickle for future loading
-    with ProgressMessagePrinter(_desired_final_pickle_path, f"Saving (file mode '{_desired_final_pickle_path}')", 'saved session pickle file'):
+    with ProgressMessagePrinter(filepath=_desired_final_pickle_path, action=f"Saving (file mode '{file_mode}')", contents_description='pickle file', finished_message='saved pickle file', returns_string=False):
         try:
             with open(pkl_path, file_mode) as dbfile: 
                 # source, destination
@@ -86,12 +92,12 @@ def safeSaveData(pkl_path, db, should_append=False, backup_file_if_smaller_than_
                 print(f"\tmoving new output at '{pkl_path}' -> to desired location: '{_desired_final_pickle_path}'")
                 shutil.move(pkl_path, _desired_final_pickle_path) # move the temporary file to the desired destination, overwriting it
 
-        except Exception as e:
-            print(f"pickling exception occured while using safeSaveData(pkl_path: {_desired_final_pickle_path}, ..., , should_append={should_append}) but original file was NOT overwritten!\nException: {e}")
+        except BaseException as e:
+            print(f"ERROR: pickling exception occured while using safeSaveData(pkl_path: {_desired_final_pickle_path}, ..., , should_append={should_append}) but original file was NOT overwritten!\nException: {e}")
             # delete the incomplete pickle file
             if is_temporary_file_used:
                 pkl_path.unlink(missing_ok=True) # removes the incomplete file. The user's file located at _desired_final_pickle_path is still intact.
-            raise e
+            raise
     
     
         
@@ -103,6 +109,10 @@ def saveData(pkl_path, db, should_append=False, safe_save:bool=True):
     safe_save: If True, a temporary extension is added to the save path if the file already exists and the file is only overwritten if pickling doesn't throw an exception.
         This temporarily requires double the disk space.
         
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
+
+        saveData('temp.pkl', db)
     """
     if safe_save:
         safeSaveData(pkl_path, db=db, should_append=should_append)
@@ -114,7 +124,7 @@ def saveData(pkl_path, db, should_append=False, safe_save:bool=True):
         if not isinstance(pkl_path, Path):
             pkl_path = Path(pkl_path).resolve()
             
-        with ProgressMessagePrinter(pkl_path, f"Saving (file mode '{file_mode}')", 'saved session pickle file'):
+        with ProgressMessagePrinter(filepath=pkl_path, action=f"Saving (file mode '{file_mode}')", contents_description='pickle file', finished_message='saved pickle file', returns_string=False):
             with open(pkl_path, file_mode) as dbfile: 
                 # source, destination
                 # pickle.dump(db, dbfile)
@@ -136,6 +146,9 @@ global_move_modules_list:Dict={
 	# 'pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins':'pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig', # SingleNeuronPlottingExtended, 
 	'pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins.SingleNeuronPlottingExtended':'pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig.SingleNeuronPlottingExtended',
 	# 'pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.general_plotting_mixins.':'pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig', # SingleNeuronPlottingExtended, 
+    'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalMergedDecodersResult':'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalPseudo2DDecodersResult',
+    'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalDecodersDecodedResult':'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalDecodersContinuouslyDecodedResult',
+    'pyphocorehelpers.indexing_helpers.BinningInfo':'neuropy.utils.mixins.binning_helpers.BinningInfo',
 }
 
 
@@ -144,7 +157,7 @@ def loadData(pkl_path, debug_print=False, **kwargs):
     db = None
     active_move_modules_list: Dict = kwargs.pop('move_modules_list', global_move_modules_list)
     
-    with ProgressMessagePrinter(pkl_path, 'Loading', 'loaded session pickle file'):
+    with ProgressMessagePrinter(pkl_path, action='Computing', contents_description='loaded session pickle file'):
         
         with open(pkl_path, 'rb') as dbfile:
             try:
@@ -297,7 +310,7 @@ class LoadableSessionInput:
         filtered_neuron_identities = filtered_neuron_identities[['aclu', 'shank', 'cluster', 'qclu']]
         filtered_neuron_identities = filtered_neuron_identities[np.isin(filtered_neuron_identities.qclu, included_qclu_values)] # drop [6, 7], which are said to have double fields - 80 remain
         if debug_print:
-            print(f"post (qclu != [6, 7]) filtering {len(filtered_neuron_identities)}")
+            print(f"post (qclu in {included_qclu_values}) filtering {len(filtered_neuron_identities)}")
         return filtered_neuron_identities.aclu.to_numpy()
     
 
@@ -400,7 +413,7 @@ class PipelineWithInputStage:
 
         if not active_basedir.exists():
             self.logger.info(f'active_basedir: "{active_basedir}" does not exist!')
-            raise FileExistsError
+            raise FileExistsError(f'active_basedir: "{active_basedir}" does not exist!')
 
         self.session_data_type = session_data_type
         
@@ -524,12 +537,12 @@ class PipelineWithLoadableStage(RegisteredOutputsMixin):
     """ Has a lodable stage. """
     
     @property
-    def can_load(self):
+    def can_load(self) -> bool:
         """Whether load can be performed."""
         return (self.last_completed_stage >= PipelineStage.Input)
 
     @property
-    def is_loaded(self):
+    def is_loaded(self) -> bool:
         """The is_loaded property."""
         return (self.stage is not None) and (isinstance(self.stage, LoadedPipelineStage))
 

@@ -16,7 +16,7 @@ from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.indexing_helpers import join_on_index
 
 from neuropy.analyses.placefields import PfND # used in `constrain_to_laps` to construct new objects
-from neuropy.core.epoch import Epoch
+from neuropy.core.epoch import Epoch, ensure_dataframe
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder
 from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import perform_full_session_leave_one_out_decoding_analysis
@@ -44,7 +44,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.Default
 from neuropy.core.session.dataSession import DataSession # for `pipeline_complete_compute_long_short_fr_indicies`
 
 
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 from scipy.special import factorial, logsumexp
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 from nptyping import NDArray, DataFrame, Shape, assert_isinstance, Int, Structure as S
@@ -119,21 +119,34 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
     time_binned_instantaneous_unit_specific_spike_rate: DynamicParameters = non_serialized_field(is_computable=False)
     neuron_replay_stats_df: pd.DataFrame = non_serialized_field() # serialized_field(is_hdf_handled_custom=True, metadata={'tags':['custom_hdf_implementation', 'is_hdf_handled_custom']})
     
-    def get_cell_track_partitions(self, frs_index_inclusion_magnitude:float=0.5):
-        """ 2023-06-20 - Partition the neuron_replay_stats_df into subsets by seeing whether each aclu has a placefield for the long/short track.
+
+    @function_attributes(short_name=None, tags=['cell', 'partition', 'exclusivity'], input_requires=[], output_provides=[], uses=['TrackExclusivePartitionSubset'], used_by=[], creation_date='2023-06-20 00:00', related_items=[])
+    def get_cell_track_partitions(self, frs_index_inclusion_magnitude:float=0.5) -> Tuple[pd.DataFrame, TrackExclusivePartitionSubset, TrackExclusivePartitionSubset, TrackExclusivePartitionSubset, TrackExclusivePartitionSubset, TrackExclusivePartitionSubset, TrackExclusivePartitionSubset]:
+        """ 2023-06-20 - Partition the `neuron_replay_stats_df` into subsets by seeing whether each aclu has a placefield for the long/short track.
             # Four distinct subgroups are formed:  pf on neither, pf on both, pf on only long, pf on only short
             # L_only_aclus, S_only_aclus
 
-            #TODO 2023-05-23 - Can do more detailed peaks analysis with: long_results.RatemapPeaksAnalysis and short_results.RatemapPeaksAnalysis
+            #TODO 2023-05-23 - Can do more detailed peaks analysis with: `long_results.RatemapPeaksAnalysis` and `short_results.RatemapPeaksAnalysis`
 
             As a side-effect it also updates `self.neuron_replay_stats_df` with the 'is_refined_exclusive', 'is_refined_LxC', 'is_refined_SxC' column
+
+        Usage:
+            ## Refine the LxC/SxC designators using the firing rate index metric:
+            frs_index_inclusion_magnitude:float = 0.5
+
+            ## Get global `long_short_fr_indicies_analysis`:
+            long_short_fr_indicies_analysis_results = global_computation_results.computed_data['long_short_fr_indicies_analysis']
+            long_short_fr_indicies_df = long_short_fr_indicies_analysis_results['long_short_fr_indicies_df']
+            jonathan_firing_rate_analysis_result.refine_exclusivity_by_inst_frs_index(long_short_fr_indicies_df, frs_index_inclusion_magnitude=frs_index_inclusion_magnitude)
+
+            neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset = jonathan_firing_rate_analysis_result.get_cell_track_partitions(frs_index_inclusion_magnitude=frs_index_inclusion_magnitude)
+            
         """
         # needs `neuron_replay_stats_df`
         neuron_replay_stats_df = self.neuron_replay_stats_df #.copy()
         # neuron_replay_stats_df = neuron_replay_stats_df.sort_values(by=['long_pf_peak_x'], inplace=False, ascending=True)
         use_refined_aclus = True
 
-        
         if 'custom_frs_index' not in neuron_replay_stats_df.columns:
             print(f"WARNINGL: neuron_replay_stats_df must have refindments added")
             use_refined_aclus = False
@@ -216,7 +229,11 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
         NEITHER_subset = TrackExclusivePartitionSubset(is_NEITHER_pf_only, NEITHER_pf_only_aclus, NEITHER_only_df)
         
         # Sort dataframe by 'long_pf_peak_x' now so the aclus aren't out of order.
-        return neuron_replay_stats_df.sort_values(by=['long_pf_peak_x'], inplace=False, ascending=True), short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset
+        neuron_replay_stats_df = neuron_replay_stats_df.sort_values(by=['long_pf_peak_x'], inplace=False, ascending=True)
+        return neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset
+
+    
+
 
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     
@@ -276,15 +293,14 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
         aclu_to_idx_df.to_hdf(file_path, key=f'{key}/irdf/aclu_to_idx_df', format='table', data_columns=True)
 
     def refine_exclusivity_by_inst_frs_index(self, custom_SpikeRateTrends_df: pd.DataFrame, frs_index_inclusion_magnitude: float = 0.5, override_existing_frs_index_values:bool=False) -> bool: 
-        """ 2023-09-28
-        
+        """ 
         inst_frs_index_inclusion_magnitude: float = 0.5 # the magnitude of the value for a candidate LxC/SxC to be included:
 
 
         Adds ['custom_frs_index', 'is_refined_exclusive'] to both: (short_exclusive.track_exclusive_df, long_exclusive.track_exclusive_df)
 
         Returns: bool - Indiciating whether the `custom_SpikeRateTrends_df` was updated or whether it already had all of the needed columns and computation was skipped.
-        
+
         """
         if (not override_existing_frs_index_values) and np.isin(['aclu','custom_frs_index','is_rate_extrema','is_refined_exclusive','is_refined_LxC','is_refined_SxC'], custom_SpikeRateTrends_df.columns).all():
             # all columns already present. We can skip.
@@ -321,16 +337,138 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
 
         return True
 
+    @classmethod
+    def _perform_add_peak_promenance_pf_peaks(cls, neuron_replay_stats_df: pd.DataFrame, curr_active_pipeline, track_templates):
+        """ adds `active_peak_prominence_2d_results` to existing `neuron_replay_stats_df` from `jonathan_firing_rate_analysis_result`, adding the `['long_pf2D_peak_x', 'long_pf2D_peak_y'] + ['short_pf2D_peak_x', 'short_pf2D_peak_y']` columns
+
+        Updated to use directional values not just long/short 
+
+        
+        Usage:
+
+            jonathan_firing_rate_analysis_result: JonathanFiringRateAnalysisResult = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis
+            neuron_replay_stats_df: pd.DataFrame = deepcopy(jonathan_firing_rate_analysis_result.neuron_replay_stats_df)
+
+            long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any'] # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+            active_result_epoch_names = [long_LR_name, long_RL_name, short_LR_name, short_RL_name]
+
+            neuron_replay_stats_df, all_modified_columns = _add_peak_promenance_pf_peaks(neuron_replay_stats_df=neuron_replay_stats_df,
+                                                                                        curr_active_pipeline=curr_active_pipeline,
+                                                                                        #  active_result_epoch_names=active_result_epoch_names,
+                                                                                        track_templates=track_templates,
+                                                                                        )
+
+            print(f'all_modified_columns: {all_modified_columns}') # all_modified_columns: ['maze1_odd_pf2D_peak_x', 'maze1_odd_pf2D_peak_y', 'maze1_even_pf2D_peak_x', 'maze1_even_pf2D_peak_y', 'maze2_odd_pf2D_peak_x', 'maze2_odd_pf2D_peak_y', 'maze2_even_pf2D_peak_x', 'maze2_even_pf2D_peak_y']
+            neuron_replay_stats_df
+
+        all_modified_columns: ['long_LR_pf2D_peak_x', 'long_LR_pf2D_peak_y', 'long_RL_pf2D_peak_x', 'long_RL_pf2D_peak_y', 'short_LR_pf2D_peak_x', 'short_LR_pf2D_peak_y', 'short_RL_pf2D_peak_x', 'short_RL_pf2D_peak_y']
+
+        
+        History:
+            Added 2024-06-11 
+        """
+        ## INPUTS: neuron_replay_stats_df, curr_active_pipeline, track_templates
+        all_modified_columns = []
+
+        neuron_replay_stats_df = deepcopy(neuron_replay_stats_df)
+
+        # Converting between decoder names and filtered epoch names:
+        # {'long':'maze1', 'short':'maze2'}
+        # {'LR':'odd', 'RL':'even'}
+        long_LR_name, short_LR_name, long_RL_name, short_RL_name = ['maze1_odd', 'maze2_odd', 'maze1_even', 'maze2_even']
+        decoder_name_to_session_context_name: Dict[str,str] = dict(zip(track_templates.get_decoder_names(), (long_LR_name, long_RL_name, short_LR_name, short_RL_name))) # {'long_LR': 'maze1_odd', 'long_RL': 'maze1_even', 'short_LR': 'maze2_odd', 'short_RL': 'maze2_even'}
+
+        ## try to add the 2D peak information to the cells in `neuron_replay_stats_df`:
+        for a_decoder_name, a_computation_result_context_name in decoder_name_to_session_context_name.items():
+        
+            # columns should be created with the modern encoder names: (e.g. 'long_LR', ...)
+            a_peak_x_col_name: str = f'{a_decoder_name}_pf2D_peak_x'
+            a_peak_y_col_name: str = f'{a_decoder_name}_pf2D_peak_y'
+
+            a_modified_columns = [a_peak_x_col_name, a_peak_y_col_name]
+
+            # Null out existing columns or initialize them to null:
+            neuron_replay_stats_df[a_peak_x_col_name] = pd.NA
+            neuron_replay_stats_df[a_peak_y_col_name] = pd.NA
+        
+            # flat_peaks_df: pd.DataFrame = deepcopy(active_peak_prominence_2d_results['flat_peaks_df']).reset_index(drop=True)
+            a_filtered_flat_peaks_df: pd.DataFrame = deepcopy(curr_active_pipeline.computation_results[a_computation_result_context_name].computed_data['RatemapPeaksAnalysis']['PeakProminence2D']['filtered_flat_peaks_df']).reset_index(drop=True)
+            neuron_replay_stats_df.loc[np.isin(neuron_replay_stats_df['aclu'].to_numpy(), a_filtered_flat_peaks_df.neuron_id.to_numpy()), a_modified_columns] = a_filtered_flat_peaks_df[['peak_center_x', 'peak_center_y']].to_numpy()
+
+            all_modified_columns.extend(a_modified_columns)
+
+        # end for
+        
+        return neuron_replay_stats_df, all_modified_columns
 
 
+    def add_peak_promenance_pf_peaks(self, curr_active_pipeline, track_templates):
+        """ modifies `self.neuron_replay_stats_df`, adding the 2D peak information to the cells as new columns from the peak_prominence results
 
+        Adds: ['long_LR_pf2D_peak_x', 'long_LR_pf2D_peak_y', 'long_RL_pf2D_peak_x', 'long_RL_pf2D_peak_y', 'short_LR_pf2D_peak_x', 'short_LR_pf2D_peak_y', 'short_RL_pf2D_peak_x', 'short_RL_pf2D_peak_y']
+
+        neuron_replay_stats_df, all_modified_columns = jonathan_firing_rate_analysis_result.add_peak_promenance_pf_peaks(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates)
+        neuron_replay_stats_df
+
+        neuron_replay_stats_df, all_modified_columns = jonathan_firing_rate_analysis_result.add_peak_promenance_pf_peaks(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates)
+        neuron_replay_stats_df
+
+        History:
+            Added 2024-06-11 
+
+        """
+        self.neuron_replay_stats_df, all_modified_columns = JonathanFiringRateAnalysisResult._perform_add_peak_promenance_pf_peaks(neuron_replay_stats_df=self.neuron_replay_stats_df,
+                                                                             curr_active_pipeline=curr_active_pipeline,
+                                                                            #  active_result_epoch_names=active_result_epoch_names,
+                                                                             track_templates=track_templates,
+                                                                             )
+        print(f'all_modified_columns: {all_modified_columns}') # all_modified_columns: ['maze1_odd_pf2D_peak_x', 'maze1_odd_pf2D_peak_y', 'maze1_even_pf2D_peak_x', 'maze1_even_pf2D_peak_y', 'maze2_odd_pf2D_peak_x', 'maze2_odd_pf2D_peak_y', 'maze2_even_pf2D_peak_x', 'maze2_even_pf2D_peak_y']
+        return self.neuron_replay_stats_df, all_modified_columns
+
+
+    @function_attributes(short_name=None, tags=['maximum-peaks', 'peaks'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-11 18:33', related_items=[])
+    def add_directional_pf_maximum_peaks(self, track_templates):
+        """ modifies `self.neuron_replay_stats_df`, adding the columns from the peak_prominence results
+
+        Adds: ['long_LR_pf1D_peak', 'long_RL_pf1D_peak', 'short_LR_pf1D_peak', 'short_RL_pf1D_peak', 'peak_diff_LR_pf1D_peak', 'peak_diff_RL_pf1D_peak']
+
+        2024-04-09 - Maximum peaks only for each template. 
+
+        neuron_replay_stats_df, all_modified_columns = jonathan_firing_rate_analysis_result.add_peak_promenance_pf_peaks(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates)
+        neuron_replay_stats_df
+
+        neuron_replay_stats_df, all_modified_columns = jonathan_firing_rate_analysis_result.add_peak_promenance_pf_peaks(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates)
+        neuron_replay_stats_df
+        """
+        all_modified_columns = []
+
+        neuron_replay_stats_df = deepcopy(self.neuron_replay_stats_df)
+        (LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df), AnyDir_decoder_aclu_MAX_peak_maps_df = track_templates.get_directional_pf_maximum_peaks_dfs(drop_aclu_if_missing_long_or_short=False)
+        additive_df_column_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL', 'peak_diff_LR', 'peak_diff_RL']
+        target_df_column_names = [f"{v}_pf1D_peak" for v in additive_df_column_names] # columns to add to `self.neuron_replay_stats_df`
+
+        a_modified_columns = target_df_column_names
+        # Null out existing columns or initialize them to null:
+        neuron_replay_stats_df[target_df_column_names] = pd.NA
+    
+        # flat_peaks_df: pd.DataFrame = deepcopy(active_peak_prominence_2d_results['flat_peaks_df']).reset_index(drop=True)
+        a_filtered_flat_peaks_df: pd.DataFrame = deepcopy(AnyDir_decoder_aclu_MAX_peak_maps_df).reset_index(drop=False, names=['aclu']) # .reset_index(drop=True)
+        neuron_replay_stats_df.loc[np.isin(neuron_replay_stats_df['aclu'].to_numpy(), a_filtered_flat_peaks_df['aclu'].to_numpy()), a_modified_columns] = a_filtered_flat_peaks_df[additive_df_column_names].to_numpy()
+
+        all_modified_columns.extend(a_modified_columns)
+        self.neuron_replay_stats_df = neuron_replay_stats_df
+        print(f'all_modified_columns: {all_modified_columns}') # all_modified_columns: ['maze1_odd_pf2D_peak_x', 'maze1_odd_pf2D_peak_y', 'maze1_even_pf2D_peak_x', 'maze1_even_pf2D_peak_y', 'maze2_odd_pf2D_peak_x', 'maze2_odd_pf2D_peak_y', 'maze2_even_pf2D_peak_x', 'maze2_even_pf2D_peak_y']
+        return self.neuron_replay_stats_df, all_modified_columns
+         
 
 @custom_define(slots=False, repr=False)
 class LeaveOneOutDecodingAnalysis(ComputedResult):
     """ 2023-05-10 - holds the results of a leave-one-out decoding analysis of the long and short track 
     Usage:
         leave_one_out_decoding_analysis_obj = LeaveOneOutDecodingAnalysis(long_decoder, short_decoder, long_replays, short_replays, global_replays, long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, shared_aclus, long_short_pf_neurons_diff, n_neurons, long_results_obj, short_results_obj)
-    """    
+    """
+    _VersionedResultMixin_version: str = "2024.01.10_0" # to be updated in your IMPLEMENTOR to indicate its version
+    
     long_decoder: BayesianPlacemapPositionDecoder = serialized_field()
     short_decoder: BayesianPlacemapPositionDecoder = serialized_field()
     long_replays: pd.DataFrame = serialized_field()
@@ -343,7 +481,7 @@ class LeaveOneOutDecodingAnalysis(ComputedResult):
     n_neurons: int = serialized_attribute_field()
     long_results_obj: LeaveOneOutDecodingAnalysisResult = serialized_field()
     short_results_obj: LeaveOneOutDecodingAnalysisResult = serialized_field()
-    is_global: bool = serialized_attribute_field(default=True)
+    is_global: bool = serialized_attribute_field(default=True, kw_only=True)
 
 
 @custom_define(slots=False, kw_only=True) # NOTE: kw_only=True prevents errors from only assigning some of the attributes with a specific field
@@ -354,6 +492,7 @@ class ExpectedVsObservedResult(ComputedResult):
     expected_v_observed_result_obj = ExpectedVsObservedResult(**expected_v_observed_result.to_dict())
     expected_v_observed_result_obj
     """
+    _VersionedResultMixin_version: str = "2024.01.10_0" # to be updated in your IMPLEMENTOR to indicate its version
 
     Flat_epoch_time_bins_mean: np.ndarray = serialized_field()
     Flat_decoder_time_bin_centers: np.ndarray
@@ -400,6 +539,8 @@ class RateRemappingResult(ComputedResult):
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import RateRemappingResult
 
     """
+    _VersionedResultMixin_version: str = "2024.01.10_0" # to be updated in your IMPLEMENTOR to indicate its version
+    
     rr_df: pd.DataFrame = serialized_field()
     high_only_rr_df: pd.DataFrame = serialized_field(is_computable=True)
     considerable_remapping_threshold: float = serialized_attribute_field(default=0.7)
@@ -467,11 +608,68 @@ class TruncationCheckingResults(ComputedResult):
         global_computation_results.computed_data['long_short_endcap'].disappearing_endcap_aclus = disappearing_endcap_cells_df.index
         
     """
+    _VersionedResultMixin_version: str = "2024.01.10_0" # to be updated in your IMPLEMENTOR to indicate its version
+    
     disappearing_endcap_aclus: pd.Index = serialized_field()
     non_disappearing_endcap_aclus: pd.Index = serialized_field()
     significant_distant_remapping_endcap_aclus: pd.Index = serialized_field()
     minor_remapping_endcap_aclus: pd.Index = serialized_field()
+
+    # @property
+    # def truncation_checking_aclus_dict(self, neuron_replay_stats_df, assign_to_df_column=True) -> Dict:
+
+    def build_truncation_checking_aclus_dict(self, neuron_replay_stats_df, assign_to_df_column: bool=True) -> Dict:
+        """The truncation_checking_aclus_dict property.
+
+        Usage:    
+            ## long_short_endcap_analysis:
+            truncation_checking_result: TruncationCheckingResults = curr_active_pipeline.global_computation_results.computed_data.long_short_endcap
+            truncation_checking_aclus_dict, jonathan_firing_rate_analysis_result.neuron_replay_stats_df = truncation_checking_result.build_truncation_checking_aclus_dict(neuron_replay_stats_df=jonathan_firing_rate_analysis_result.neuron_replay_stats_df)
+
+        Integrate 'truncation_checking_aclus_dict' into `neuron_replay_stats_df` as a 'truncation_checking' column:
+
+        """
+        from neuropy.utils.indexing_helpers import union_of_arrays
+
+        truncation_checking_result = self
+        disappearing_endcap_aclus = truncation_checking_result.disappearing_endcap_aclus.to_numpy()
+        non_disappearing_endcap_aclus = truncation_checking_result.non_disappearing_endcap_aclus.to_numpy()
+        trivially_remapping_endcap_aclus = truncation_checking_result.minor_remapping_endcap_aclus.to_numpy()
+        significant_distant_remapping_endcap_aclus = truncation_checking_result.significant_distant_remapping_endcap_aclus.to_numpy()
+        # any_aclus = union_of_arrays(disappearing_endcap_aclus, non_disappearing_endcap_aclus, trivially_remapping_endcap_aclus, significant_distant_remapping_endcap_aclus, appearing_aclus)
+
+        # truncation_checking_aclus_dict = {'disappearing': disappearing_endcap_aclus, 'non_disappearing_endcap_aclus': non_disappearing_endcap_aclus,
+        #                            'significant_distant_remapping_endcap_aclus': significant_distant_remapping_endcap_aclus, 'trivially_remapping': trivially_remapping_endcap_aclus}
+
+        truncation_checking_aclus_dict = {'disappearing': disappearing_endcap_aclus, 'non_disappearing_endcap': non_disappearing_endcap_aclus,
+                                'significant_distant_remapping_endcap': significant_distant_remapping_endcap_aclus, 'trivially_remapping': trivially_remapping_endcap_aclus}
+        
+
+        appearing_aclus = neuron_replay_stats_df[neuron_replay_stats_df['track_membership'] == SplitPartitionMembership.RIGHT_ONLY].index.to_numpy()
+        truncation_checking_aclus_dict.update({'appearing': appearing_aclus})
+
+        any_aclus = union_of_arrays(*[v for v in truncation_checking_aclus_dict.values() if len(v) > 0])
+        truncation_checking_aclus_dict.update({'any': any_aclus})
+
+        # return {'any': any_aclus, 'disappearing': disappearing_endcap_aclus, 'appearing': appearing_aclus, 'non_disappearing_endcap_aclus': non_disappearing_endcap_aclus,
+                                        # 'significant_distant_remapping_endcap_aclus': significant_distant_remapping_endcap_aclus, 'trivially_remapping': trivially_remapping_endcap_aclus}
+        
+        if assign_to_df_column:
+            ## Integrate 'truncation_checking_aclus_dict' into `neuron_replay_stats_df` as a 'truncation_checking' column:
+            neuron_replay_stats_df['truncation_checking'] = 'none'
+
+            for k, v in truncation_checking_aclus_dict.items():
+                if k != 'any':
+                    neuron_replay_stats_df.loc[np.isin(neuron_replay_stats_df['aclu'], truncation_checking_aclus_dict[k]), 'truncation_checking'] = k
+
+
+            neuron_replay_stats_df
+
+
+        return truncation_checking_aclus_dict, neuron_replay_stats_df
     
+
+
     
 
 
@@ -529,7 +727,7 @@ class LongShortPipelineTests:
             raise # unhandled exception
 
     def __call__(self, override_long_epoch_name:Optional[str]=None, override_short_epoch_name:Optional[str]=None) -> bool:
-        return self.validate(override_long_epoch_name=long_epoch_name, override_short_epoch_name=short_epoch_name)
+        return self.validate(override_long_epoch_name=override_long_epoch_name, override_short_epoch_name=override_short_epoch_name)
 
 
 
@@ -543,7 +741,8 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
     _computationPrecidence = 1003
     _is_global = True
 
-    @function_attributes(short_name='long_short_decoding_analyses', tags=['long_short', 'short_long','replay', 'decoding', 'computation'], input_requires=[], output_provides=['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis'], uses=['_long_short_decoding_analysis_from_decoders'], used_by=[], creation_date='2023-05-10 15:10',
+    @function_attributes(short_name='long_short_decoding_analyses', tags=['long_short', 'short_long', 'leave-one-out', 'replay', 'decoding', 'computation'], input_requires=['sess.replays'], output_provides=['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis'], uses=['_long_short_decoding_analysis_from_decoders'], used_by=[], creation_date='2023-05-10 15:10',
+                         requires_global_keys=[], provides_global_keys=['long_short_leave_one_out_decoding_analysis'],
                          validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'].long_results_obj, curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'].short_results_obj), is_global=True)
     def _perform_long_short_decoding_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, decoding_time_bin_size=None, perform_cache_load=False, always_recompute_replays=False, override_long_epoch_name:Optional[str]=None, override_short_epoch_name:Optional[str]=None):
         """ Performs decoding for replay epochs after ensuring that the long and short placefields are properly constrained to match one another.
@@ -555,6 +754,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             computation_result.computed_data['long_short_leave_one_out_decoding_analysis']
                 # ['long_short_leave_one_out_decoding_analysis']['short_long_neurons_diff']
                 # ['long_short_leave_one_out_decoding_analysis']['poly_overlap_df']
+
         
 
 
@@ -562,6 +762,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             - if not `is_certain_properly_constrained`, calls `compute_long_short_constrained_decoders` to build placefields and decoders constrained to the same position bins
 
 
+        #TODO 2024-03-29 20:16: - [ ] This doesn't seem to correctly validate after it has been computed, it keeps recomputing every time.
 
         """
         # # New unified `pipeline_complete_compute_long_short_fr_indicies(...)` method for entire pipeline:
@@ -584,7 +785,6 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
 
         # 2023-05-16 - Correctly initialized pipelines (pfs limited to laps, decoders already long/short constrainted by default, replays already the estimated versions:
         # is_certain_properly_constrained = True
-
 
         if not is_certain_properly_constrained:
             print(f'WARN: _perform_long_short_decoding_analyses: Not certain if pipeline results are properly constrained. Need to recompute and update.')
@@ -655,6 +855,9 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'] = leave_one_out_decoding_analysis_obj
         # TODO 2023-05-10 - Do I want long_one_step_decoder_2D, short_one_step_decoder_2D that I computed?
 
+        if not np.all([hasattr(global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'], 'long_results_obj'), hasattr(global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'], 'short_results_obj')]):
+            print(f'WARN: FIXME: `_perform_long_short_decoding_analyses` failed to validate its properties even after fresh computation! FIX THIS. 2024-03-29 20:21!')
+
         """ Getting outputs:
         
         
@@ -668,7 +871,8 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         return global_computation_results
     
 
-    @function_attributes(short_name='long_short_rate_remapping', tags=['long_short', 'short_long','replay', 'rate_remapping', 'computation'], input_requires=['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis'], output_provides=['global_computation_results.computed_data.long_short_rate_remapping'], uses=['compute_rate_remapping_stats'], used_by=[], creation_date='2023-05-31 13:57')
+    @function_attributes(short_name='long_short_rate_remapping', tags=['long_short', 'short_long','replay', 'rate_remapping', 'computation', '?BROKEN?'], input_requires=['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis'], output_provides=['global_computation_results.computed_data.long_short_rate_remapping'], uses=['compute_rate_remapping_stats'], used_by=[], creation_date='2023-05-31 13:57',
+                        requires_global_keys=['long_short_fr_indicies_analysis'], provides_global_keys=['long_short_rate_remapping'], is_global=True)
     def _perform_long_short_decoding_rate_remapping_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, decoding_time_bin_size=None, perform_cache_load=False, always_recompute_replays=False):
         """ Computes rate remapping statistics
         
@@ -692,20 +896,23 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         active_analyses_result = long_short_fr_indicies_analysis_results
 
         ## Extract variables from results object:
-        long_one_step_decoder_1D, short_one_step_decoder_1D, long_replays, short_replays, global_replays, long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, shared_aclus, long_short_pf_neurons_diff, n_neurons, long_results_obj, short_results_obj, is_global = curr_long_short_decoding_analyses.long_decoder, curr_long_short_decoding_analyses.short_decoder, curr_long_short_decoding_analyses.long_replays, curr_long_short_decoding_analyses.short_replays, curr_long_short_decoding_analyses.global_replays, curr_long_short_decoding_analyses.long_shared_aclus_only_decoder, curr_long_short_decoding_analyses.short_shared_aclus_only_decoder, curr_long_short_decoding_analyses.shared_aclus, curr_long_short_decoding_analyses.long_short_pf_neurons_diff, curr_long_short_decoding_analyses.n_neurons, curr_long_short_decoding_analyses.long_results_obj, curr_long_short_decoding_analyses.short_results_obj, curr_long_short_decoding_analyses.is_global
+        # long_one_step_decoder_1D, short_one_step_decoder_1D, long_replays, short_replays, global_replays, long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, shared_aclus, long_short_pf_neurons_diff, n_neurons, long_results_obj, short_results_obj, is_global = curr_long_short_decoding_analyses.long_decoder, curr_long_short_decoding_analyses.short_decoder, curr_long_short_decoding_analyses.long_replays, curr_long_short_decoding_analyses.short_replays, curr_long_short_decoding_analyses.global_replays, curr_long_short_decoding_analyses.long_shared_aclus_only_decoder, curr_long_short_decoding_analyses.short_shared_aclus_only_decoder, curr_long_short_decoding_analyses.shared_aclus, curr_long_short_decoding_analyses.long_short_pf_neurons_diff, curr_long_short_decoding_analyses.n_neurons, curr_long_short_decoding_analyses.long_results_obj, curr_long_short_decoding_analyses.short_results_obj, curr_long_short_decoding_analyses.is_global
         long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
         # long_epoch_context, short_epoch_context, global_epoch_context = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
         long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
         
-        
         ## Compute Rate Remapping Dataframe:
-        
-        rate_remapping_df: RateRemappingResult = compute_rate_remapping_stats(active_analyses_result, global_session.neurons.aclu_to_neuron_type_map, considerable_remapping_threshold=0.7)
-        high_remapping_cells_only = rate_remapping_df[rate_remapping_df['has_considerable_remapping']]
+        rate_remapping_result: RateRemappingResult = compute_rate_remapping_stats(active_analyses_result, global_session.neurons.aclu_to_neuron_type_map, considerable_remapping_threshold=0.7)
+
+        rate_remapping_df: pd.DataFrame = rate_remapping_result.rr_df
+        # high_remapping_cells_only = deepcopy(rate_remapping_df.high_remapping_cells_only)
+        # high_remapping_cells_only = rate_remapping_df[rate_remapping_df['has_considerable_remapping']]
 
         # Add to computed results:
-        global_computation_results.computed_data['long_short_rate_remapping'] = ComputedResult(is_global=True, rr_df=rate_remapping_df, high_only_rr_df=high_remapping_cells_only)
-        
+        # global_computation_results.computed_data['long_short_rate_remapping'] = ComputedResult(is_global=True, rr_df=rate_remapping_df, high_only_rr_df=high_remapping_cells_only)
+        global_computation_results.computed_data['long_short_rate_remapping'] = rate_remapping_result
+
+
         """ Getting outputs:
         
             ## long_short_rate_remapping:
@@ -718,6 +925,7 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
 
     
     @function_attributes(short_name='short_long_pf_overlap_analyses',  tags=['overlap', 'pf'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-05 11:10', related_items=[], 
+                         requires_global_keys=[], provides_global_keys=['short_long_pf_overlap_analyses'],
                          validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.global_computation_results.computed_data['short_long_pf_overlap_analyses']['relative_entropy_overlap_scalars_df'], curr_active_pipeline.global_computation_results.computed_data['short_long_pf_overlap_analyses']['relative_entropy_overlap_dict']), is_global=True)
     def _perform_long_short_pf_overlap_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
         """ Computes multiple forms of overlap between the short and the long placefields
@@ -726,9 +934,23 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             ['sess']
             
         Provides:
-            computation_result.computed_data['short_long_pf_overlap_analyses']
+            global_computation_results.computed_data['short_long_pf_overlap_analyses']
                 ['short_long_pf_overlap_analyses']['short_long_neurons_diff']
                 ['short_long_pf_overlap_analyses']['poly_overlap_df']
+                
+        Usage:
+        
+            ## Unwrapping `short_long_pf_overlap_analyses`:
+            short_long_pf_overlap_analyses: DynamicParameters = curr_active_pipeline.global_computation_results.computed_data['short_long_pf_overlap_analyses']
+            short_long_neurons_diff = short_long_pf_overlap_analyses['short_long_neurons_diff']
+            poly_overlap_df = short_long_pf_overlap_analyses['poly_overlap_df']
+            conv_overlap_dict = short_long_pf_overlap_analyses['conv_overlap_dict']
+            conv_overlap_scalars_df = short_long_pf_overlap_analyses['conv_overlap_scalars_df']
+            product_overlap_dict = short_long_pf_overlap_analyses['product_overlap_dict']
+            product_overlap_scalars_df = short_long_pf_overlap_analyses['product_overlap_scalars_df']
+            relative_entropy_overlap_dict = short_long_pf_overlap_analyses['relative_entropy_overlap_dict']
+            relative_entropy_overlap_scalars_df = short_long_pf_overlap_analyses['relative_entropy_overlap_scalars_df']
+
         
         """
         if include_includelist is None:
@@ -766,7 +988,8 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         return global_computation_results
 
 
-    @function_attributes(short_name='long_short_fr_indicies_analyses', tags=['short_long','firing_rate', 'computation'], input_requires=[], output_provides=['long_short_fr_indicies_analysis'], uses=['pipeline_complete_compute_long_short_fr_indicies'], used_by=[], creation_date='2023-04-11 00:00', 
+    @function_attributes(short_name='long_short_fr_indicies_analyses', tags=['short_long','firing_rate', 'computation','laps','replays'], input_requires=['laps', 'replays', 'sess.replay'], output_provides=['long_short_fr_indicies_analysis'], uses=['pipeline_complete_compute_long_short_fr_indicies'], used_by=[], creation_date='2023-04-11 00:00', 
+                         requires_global_keys=[], provides_global_keys=['long_short_fr_indicies_analysis'],
                          validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis'], curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']['long_short_fr_indicies_df']), is_global=True)
     def _perform_long_short_firing_rate_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
         """ Computes the firing rate indicies which is a measure of the changes in firing rate (rate-remapping) between the long and the short track
@@ -787,7 +1010,8 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         return global_computation_results
 
 
-    @function_attributes(short_name='jonathan_firing_rate_analysis', input_requires=['_perform_long_short_firing_rate_analyses'],
+    @function_attributes(short_name='jonathan_firing_rate_analysis', tags=['replay'], input_requires=['_perform_long_short_firing_rate_analyses'],
+                          requires_global_keys=['long_short_fr_indicies_analysis'], provides_global_keys=['jonathan_firing_rate_analysis'],
                           validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis'].neuron_replay_stats_df, curr_active_pipeline.global_computation_results.computed_data['jonathan_firing_rate_analysis'].neuron_replay_stats_df['is_refined_exclusive']), is_global=True)
     def _perform_jonathan_replay_firing_rate_analyses(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
         """ Ported from Jonathan's `Gould_22-09-29.ipynb` Notebook
@@ -832,13 +1056,16 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             include_includelist = owning_pipeline_reference.active_completed_computation_result_names # ['maze', 'sprinkle']
 
         # Epoch dataframe stuff:
-        long_epoch_name = include_includelist[0] # 'maze1_PYR'
-        short_epoch_name = include_includelist[1] # 'maze2_PYR'
-        if len(include_includelist) > 2:
-            global_epoch_name = include_includelist[-1] # 'maze_PYR'
-        else:
-            print(f'WARNING: no global_epoch detected.')
-            global_epoch_name = '' # None
+        # long_epoch_name = include_includelist[0] # 'maze1_PYR'
+        # short_epoch_name = include_includelist[1] # 'maze2_PYR'
+        # if len(include_includelist) > 2:
+        #     global_epoch_name = include_includelist[-1] # 'maze_PYR'
+        # else:
+        #     print(f'WARNING: no global_epoch detected.')
+        #     global_epoch_name = '' # None
+        long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+        t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
+        # t_split = sess.paradigm[0][0,1] # passed to _make_pho_jonathan_batch_plots(t_split, ...)
 
         if debug_print:
             print(f'include_includelist: {include_includelist}\nlong_epoch_name: {long_epoch_name}, short_epoch_name: {short_epoch_name}, global_epoch_name: {global_epoch_name}')
@@ -875,13 +1102,14 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             sess.pbe = new_pbe_epochs # copy the detected PBEs to the session
             replays_df = sess.pbe.to_dataframe()
             # replays_df = sess.ripple.to_dataframe()
-        except Exception as e:
+        except BaseException as e:
             raise e
         # else:
         #     replays_df = replays_df.copy() # make a copy of the provided df
 
-
-        rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess, replays_df)
+        replays_df = ensure_dataframe(replays_df)
+        
+        rdf, aclu_to_idx, irdf, aclu_to_idx_irdf = _final_compute_jonathan_replay_fr_analyses(sess, replays_df, t_start=t_start, t_delta=t_delta, t_end=t_end)
         rdf, neuron_replay_stats_df = _compute_neuron_replay_stats(rdf, aclu_to_idx) # neuron_replay_stats_df is joined with `final_jonathan_df` after that is built
 
         ## time_binned_unit_specific_binned_spike_rate mode:
@@ -984,8 +1212,9 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         return global_computation_results
 
 
-    @function_attributes(short_name='long_short_post_decoding', tags=['long_short', 'short_long','replay', 'decoding', 'computation'], input_requires=['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis', 'global_computation_results.computed_data.long_short_fr_indicies_analysis'], output_provides=[],
+    @function_attributes(short_name='long_short_post_decoding', tags=['long_short', 'short_long','replay', 'decoding', 'computation', 'radon_transforms', 'expected_v_observed'], input_requires=['global_computation_results.computed_data.long_short_leave_one_out_decoding_analysis', 'global_computation_results.computed_data.long_short_fr_indicies_analysis'], output_provides=[],
                           uses=['compute_rate_remapping_stats', 'compute_measured_vs_expected_firing_rates', 'simpler_compute_measured_vs_expected_firing_rates', 'compute_radon_transforms'], used_by=[], creation_date='2023-05-31 13:57',
+                          requires_global_keys=['long_short_fr_indicies_analysis', 'long_short_leave_one_out_decoding_analysis'], provides_global_keys=['long_short_post_decoding'],
                           validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding'].rate_remapping.rr_df, is_global=True)
     def _perform_long_short_post_decoding_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
         """ Must be performed after `_perform_long_short_decoding_analyses` and `_perform_long_short_firing_rate_analyses`
@@ -1014,15 +1243,15 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         ## long_short_decoding_analyses:
         long_short_fr_indicies_analysis_results = global_computation_results.computed_data['long_short_fr_indicies_analysis']
         # x_frs_dict, y_frs_dict = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
-
         curr_long_short_decoding_analyses = global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis'] 
+
+
         ## Extract variables from results object:
         long_one_step_decoder_1D, short_one_step_decoder_1D, long_replays, short_replays, global_replays, long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, shared_aclus, long_short_pf_neurons_diff, n_neurons, long_results_obj, short_results_obj, is_global = curr_long_short_decoding_analyses.long_decoder, curr_long_short_decoding_analyses.short_decoder, curr_long_short_decoding_analyses.long_replays, curr_long_short_decoding_analyses.short_replays, curr_long_short_decoding_analyses.global_replays, curr_long_short_decoding_analyses.long_shared_aclus_only_decoder, curr_long_short_decoding_analyses.short_shared_aclus_only_decoder, curr_long_short_decoding_analyses.shared_aclus, curr_long_short_decoding_analyses.long_short_pf_neurons_diff, curr_long_short_decoding_analyses.n_neurons, curr_long_short_decoding_analyses.long_results_obj, curr_long_short_decoding_analyses.short_results_obj, curr_long_short_decoding_analyses.is_global
         long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
         # long_epoch_context, short_epoch_context, global_epoch_context = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
         long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
         
-
         ## Common to both Long and Short:
         active_pos_df = global_session.position.to_dataframe()
         assert (long_results_obj.active_filter_epochs.as_array() == short_results_obj.active_filter_epochs.as_array()).all() # ensure that the active_filter_epochs for both are the same.
@@ -1100,13 +1329,13 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import compute_radon_transforms
 
         ## 2023-05-25 - Get the 1D Posteriors for each replay epoch so they can be analyzed via score_posterior(...) with a Radon Transform approch to find the line of best fit (which gives the velocity).
-        epochs_linear_fit_df_LONG = compute_radon_transforms(long_results_obj.original_1D_decoder, long_results_obj.all_included_filter_epochs_decoder_result)
+        epochs_linear_fit_df_LONG, *extra_outputs = compute_radon_transforms(long_results_obj.original_1D_decoder, long_results_obj.all_included_filter_epochs_decoder_result)
         assert long_results_obj.active_filter_epochs.n_epochs == np.shape(epochs_linear_fit_df_LONG)[0]
         long_results_obj.active_filter_epochs._df.drop(columns=['score', 'velocity', 'intercept', 'speed'], inplace=True, errors='ignore') # 'ignore' doesn't raise an exception if the columns don't already exist.
         long_results_obj.active_filter_epochs._df = long_results_obj.active_filter_epochs.to_dataframe().join(epochs_linear_fit_df_LONG) # add the newly computed columns to the Epochs object
         # epochs_linear_fit_df_LONG
 
-        epochs_linear_fit_df_SHORT = compute_radon_transforms(short_results_obj.original_1D_decoder, short_results_obj.all_included_filter_epochs_decoder_result)
+        epochs_linear_fit_df_SHORT, *extra_outputs = compute_radon_transforms(short_results_obj.original_1D_decoder, short_results_obj.all_included_filter_epochs_decoder_result)
         assert short_results_obj.active_filter_epochs.n_epochs == np.shape(epochs_linear_fit_df_SHORT)[0]
         short_results_obj.active_filter_epochs._df.drop(columns=['score', 'velocity', 'intercept', 'speed'], inplace=True, errors='ignore') # 'ignore' doesn't raise an exception if the columns don't already exist.
         short_results_obj.active_filter_epochs._df = short_results_obj.active_filter_epochs.to_dataframe().join(epochs_linear_fit_df_SHORT) # add the newly computed columns to the Epochs object
@@ -1157,9 +1386,10 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
 
 
     # InstantaneousSpikeRateGroupsComputation
-    @function_attributes(short_name='long_short_inst_spike_rate_groups', tags=['long_short', 'LxC', 'SxC', 'Figure2','replay', 'decoding', 'computation'], input_requires=['global_computation_results.computed_data.jonathan_firing_rate_analysis', 'global_computation_results.computed_data.long_short_fr_indicies_analysis'], output_provides=['global_computation_results.computed_data.long_short_inst_spike_rate_groups'], uses=[], used_by=[], creation_date='2023-08-21 16:52', related_items=[],
-                        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': curr_active_pipeline.global_computation_results.computed_data['long_short_inst_spike_rate_groups'], is_global=True)
-    def _perform_long_short_instantaneous_spike_rate_groups_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
+    @function_attributes(short_name='long_short_inst_spike_rate_groups', tags=['long_short', 'LxC', 'SxC', 'Figure2','replay', 'decoding', 'computation'], input_requires=['global_computation_results.computed_data.jonathan_firing_rate_analysis', 'global_computation_results.computed_data.long_short_fr_indicies_analysis'], output_provides=['global_computation_results.computed_data.long_short_endcap'], uses=[], used_by=[], creation_date='2023-08-21 16:52', related_items=[],
+        requires_global_keys=['jonathan_firing_rate_analysis', 'long_short_fr_indicies_analysis'], provides_global_keys=['long_short_inst_spike_rate_groups'],
+        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': curr_active_pipeline.global_computation_results.computed_data['long_short_inst_spike_rate_groups'], is_global=True)
+    def _perform_long_short_instantaneous_spike_rate_groups_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, instantaneous_time_bin_size_seconds: Optional[float]=0.01):
         """ Must be performed after `_perform_jonathan_replay_firing_rate_analyses`
         
         Factoring out of `InstantaneousSpikeRateGroupsComputation`
@@ -1175,19 +1405,25 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.SpikeAnalysis import SpikeRateTrends # for `_perform_long_short_instantaneous_spike_rate_groups_analysis`
         from neuropy.utils.dynamic_container import DynamicContainer
 
-        if global_computation_results.computation_config is None:
-            # Create a DynamicContainer-backed computation_config
-            print(f'_perform_long_short_instantaneous_spike_rate_groups_analysis is lacking a required computation config parameter! creating a new curr_active_pipeline.global_computation_results.computation_config')
-            global_computation_results.computation_config = DynamicContainer(instantaneous_time_bin_size_seconds=0.01)
-        else:
-            print(f'have an existing `global_computation_results.computation_config`: {global_computation_results.computation_config}')	
+
+        if instantaneous_time_bin_size_seconds is None:
+            instantaneous_time_bin_size_seconds = 0.01 # set to default
+
+        # if global_computation_results.computation_config is None:
+        #     # Create a DynamicContainer-backed computation_config
+        #     print(f'_perform_long_short_instantaneous_spike_rate_groups_analysis is lacking a required computation config parameter! creating a new curr_active_pipeline.global_computation_results.computation_config')
+        #     global_computation_results.computation_config.long_short_inst_spike_rate_groups.instantaneous_time_bin_size_seconds = 0.01
+        # else:
+        #     print(f'have an existing `global_computation_results.computation_config`: {global_computation_results.computation_config}')	
+            
 
         # Could also use `owning_pipeline_reference.global_computation_results.computation_config`
-        assert (global_computation_results.computation_config is not None), f"requires `global_computation_results.computation_config.instantaneous_time_bin_size_seconds`"
-        assert ('instantaneous_time_bin_size_seconds' in global_computation_results.computation_config)
-        ## TODO: get from active_configs or something similar
-        instantaneous_time_bin_size_seconds: float = global_computation_results.computation_config.instantaneous_time_bin_size_seconds # 0.01 # 10ms
+        assert (global_computation_results.computation_config is not None), f"requires `global_computation_results.computation_config.long_short_inst_spike_rate_groups`"
+        assert (global_computation_results.computation_config.get('long_short_inst_spike_rate_groups', None) is not None), f"requires `global_computation_results.computation_config.long_short_inst_spike_rate_groups`"
+
+        global_computation_results.computation_config.long_short_inst_spike_rate_groups.instantaneous_time_bin_size_seconds = instantaneous_time_bin_size_seconds # 0.01 # 10ms
         
+        ## INPUTS: instantaneous_time_bin_size_seconds
         sess = owning_pipeline_reference.sess 
         # Get the provided context or use the session context:
         active_context = sess.get_context()
@@ -1199,36 +1435,6 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         # inst_spike_rate_groups_result.Fig2_Laps_FR, inst_spike_rate_groups_result.Fig2_Replay_FR can only be done at the end probably
 
         # Find instantaneous firing rate for spikes outside of replays
-        # 2023-09-06 - Method Kamran and I dicusssed in his office last Thursday
-        #TODO 2023-09-08 10:53: - [ ] Refactored into `pipeline_complete_compute_long_short_fr_indicies`
-
-        # Uses instantaneous firing rates for each cell computed during any non-replay epoch. Kamran was concerned that some cells fire spikes on the end platforms during either short or long, but because we're only considering spikes that contribute to placefeields (of which the endcap spikes are omitted due to velocity requirements) these cells are said to be long/short exclusive despite firing frequently on the end caps.
-        #TODO 2023-09-06 00:56: - [ ] Add the results to the output structure somehow:
-
-        # long_epoch_obj, short_epoch_obj = [Epoch(owning_pipeline_reference.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name)) for an_epoch_name in [long_epoch_name, short_epoch_name]]
-        
-        # # non_running_periods = Epoch.from_PortionInterval(owning_pipeline_reference.sess.laps.as_epoch_obj().to_PortionInterval().complement())
-        # non_replay_periods: Epoch = Epoch(Epoch.from_PortionInterval(owning_pipeline_reference.sess.replay.epochs.to_PortionInterval().complement()).time_slice(t_start=long_epoch_obj.t_start, t_stop=short_epoch_obj.t_stop).to_dataframe()[:-1]) #[:-1] # any period except the replay ones, drop the infinite last entry
-        # long_only_non_replay_periods: Epoch  = non_replay_periods.time_slice(t_start=long_epoch_obj.t_start, t_stop=long_epoch_obj.t_stop) # any period except the replay ones
-        # short_only_non_replay_periods: Epoch  = non_replay_periods.time_slice(t_start=short_epoch_obj.t_start, t_stop=short_epoch_obj.t_stop) # any period except the replay ones
-
-        
-        # # custom_InstSpikeRateTrends: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df),
-        # #                                                                                            filter_epochs=non_replay_periods,
-        # #                                                                                         #    included_neuron_ids=long_exclusive.track_exclusive_aclus,
-        # #                                                                                            instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds)
-
-        # # ~20sec computation
-        # long_custom_InstSpikeRateTrends: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df),
-        #                                                                                         filter_epochs=long_only_non_replay_periods,
-        #                                                                                         #    included_neuron_ids=long_exclusive.track_exclusive_aclus,
-        #                                                                                         instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds)
-
-        # short_custom_InstSpikeRateTrends: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df),
-        #                                                                                         filter_epochs=short_only_non_replay_periods,
-        #                                                                                         #    included_neuron_ids=long_exclusive.track_exclusive_aclus,
-        #                                                                                         instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds)
-
 
         # Add to computed results:
         global_computation_results.computed_data['long_short_inst_spike_rate_groups'] = inst_spike_rate_groups_result
@@ -1244,7 +1450,8 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
         return global_computation_results
 
 
-    @function_attributes(short_name='long_short_endcap_analysis', tags=['long_short_endcap_analysis'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-15 10:37', related_items=[],
+    @function_attributes(short_name='long_short_endcap_analysis', tags=['long_short_endcap_analysis', 'endcap'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-15 10:37', related_items=[],
+                         requires_global_keys=['jonathan_firing_rate_analysis'], provides_global_keys=['long_short_endcap'],
                          validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.global_computation_results.computed_data['long_short_endcap']), is_global=True)
     def _perform_long_short_endcap_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
         """  2023-09-14 - Find cells outside the bounds of the short track
@@ -1258,15 +1465,42 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
             global_computation_results.computed_data['long_short_endcap']
         
         """
+        
+        loaded_track_limits = deepcopy(owning_pipeline_reference.sess.config.loaded_track_limits) # {'long_xlim': array([59.0774, 228.69]), 'short_xlim': array([94.0156, 193.757]), 'long_ylim': array([138.164, 146.12]), 'short_ylim': array([138.021, 146.263])}
+        x_midpoint: float = owning_pipeline_reference.sess.config.x_midpoint
+        pix2cm: float = owning_pipeline_reference.sess.config.pix2cm
+
+        ## INPUTS: loaded_track_limits
+        print(f'loaded_track_limits: {loaded_track_limits}')
+
+
+        long_xlim = loaded_track_limits['long_xlim']
+        # long_ylim = loaded_track_limits['long_ylim']
+        short_xlim = loaded_track_limits['short_xlim']
+        # short_ylim = loaded_track_limits['short_ylim']
+
+        occupancy_midpoint: float = x_midpoint # 142.7512402496278 # 150.0
+        left_cap_x_bound: float = (long_xlim[0] - x_midpoint) #-shift by midpoint - 72.0 # on long track
+        right_cap_x_bound: float = (long_xlim[1] - x_midpoint) # 72.0 # on long track
+        min_significant_remapping_x_distance: float = 40.0 # from long->short track
+
+
+        ## STATIC:
+        # occupancy_midpoint: float = 142.7512402496278 # 150.0
+        # left_cap_x_bound: float = -72.0 # on long track
+        # right_cap_x_bound: float = 72.0 # on long track
+        # min_significant_remapping_x_distance: float = 40.0 # from long->short track
+
+
         jonathan_firing_rate_analysis_result: JonathanFiringRateAnalysisResult = global_computation_results.computed_data.jonathan_firing_rate_analysis
 
         # Modifies the `jonathan_firing_rate_analysis_result.neuron_replay_stats_df` in-place instead of creating a copy:
         # neuron_replay_stats_df = deepcopy(jonathan_firing_rate_analysis_result.neuron_replay_stats_df)
         neuron_replay_stats_df = jonathan_firing_rate_analysis_result.neuron_replay_stats_df
         # Extract the peaks of the long placefields to find ones that have peaks outside the boundaries
-        long_pf_peaks = neuron_replay_stats_df[neuron_replay_stats_df['has_long_pf']]['long_pf_peak_x'] - 150.0 # this shift of 150.0 is to center the midpoint of the track at 0. 
-        is_left_cap = (long_pf_peaks < -72.0)
-        is_right_cap = (long_pf_peaks > 72.0)
+        long_pf_peaks = neuron_replay_stats_df[neuron_replay_stats_df['has_long_pf']]['long_pf_peak_x'] - occupancy_midpoint # this shift of `occupancy_midpoint` is to center the midpoint of the track at 0. 
+        is_left_cap = (long_pf_peaks < left_cap_x_bound)
+        is_right_cap = (long_pf_peaks > right_cap_x_bound)
         # is_either_cap =  np.logical_or(is_left_cap, is_right_cap)
 
         # Adds ['is_long_peak_left_cap', 'is_long_peak_right_cap', 'is_long_peak_either_cap'] columns: 
@@ -1279,7 +1513,6 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
 
         # adds ['LS_pf_peak_x_diff'] column
         neuron_replay_stats_df['LS_pf_peak_x_diff'] = neuron_replay_stats_df['long_pf_peak_x'] - neuron_replay_stats_df['short_pf_peak_x']
-
 
         cap_cells_df = neuron_replay_stats_df[np.logical_and(neuron_replay_stats_df['has_long_pf'], neuron_replay_stats_df['is_long_peak_either_cap'])]
         num_total_endcap_cells = len(cap_cells_df)
@@ -1299,10 +1532,9 @@ class LongShortTrackComputations(AllFunctionEnumeratingMixin, metaclass=Computat
 
         # Classify the non_disappearing cells into two groups:
         # 1. Those that exhibit significant remapping onto somewhere else on the track
-        non_disappearing_endcap_cells_df['has_significant_distance_remapping'] = (np.abs(non_disappearing_endcap_cells_df['LS_pf_peak_x_diff']) >= 40.0) # The most a placefield could translate intwards would be (35 + (pf_width/2.0)) I think.
+        non_disappearing_endcap_cells_df['has_significant_distance_remapping'] = (np.abs(non_disappearing_endcap_cells_df['LS_pf_peak_x_diff']) >= min_significant_remapping_x_distance) # The most a placefield could translate intwards would be (35 + (pf_width/2.0)) I think.
         num_significant_position_remappping_endcap_cells = len(non_disappearing_endcap_cells_df[non_disappearing_endcap_cells_df['has_significant_distance_remapping'] == True])
         print(f'num_significant_position_remappping_endcap_cells/num_non_disappearing_endcap_cells: {num_significant_position_remappping_endcap_cells}/{num_non_disappearing_endcap_cells}')
-
 
         # 2. Those that seem to remain where they were on the long track, perhaps being "sampling-clipped" or translated adjacent to the platform. These two subcases can be distinguished by a change in the placefield's length (truncated cells would be a fraction of the length, although might need to account for scaling with new track length)
         minorly_changed_endcap_cells_df = non_disappearing_endcap_cells_df[non_disappearing_endcap_cells_df['has_significant_distance_remapping'] == False]
@@ -1365,10 +1597,8 @@ def extrapolate_short_curve_to_long(long_xbins, short_xbins, short_curve, debug_
 ## 2023-04-07 - Builds the laps using estimation_session_laps(...) if needed for each epoch, and then sets the decoder's .epochs property to the laps object so the occupancy is correct.
 
 from neuropy.core.laps import Laps # used in `DirectionalLapsHelpers`
-from neuropy.analyses.laps import build_lap_computation_epochs # used in `DirectionalLapsHelpers.split_to_directional_laps`
 
-
-
+@function_attributes(short_name=None, tags=['laps', 'constrain', 'placefields'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-07 00:00', related_items=[])
 def constrain_to_laps(curr_active_pipeline):
     """ 2023-04-07 - Constrains the placefields to just the laps, computing the laps if needed.
     Other laps-related things?
@@ -1399,7 +1629,7 @@ def constrain_to_laps(curr_active_pipeline):
     long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
 
     for a_name, a_sess, a_result in zip((long_epoch_name, short_epoch_name, global_epoch_name), (long_session, short_session, global_session), (long_results, short_results, global_results)):
-        # a_sess = estimate_session_laps(a_sess, should_plot_laps_2d=True)
+        # replace laps with estimates:
         a_sess = a_sess.replace_session_laps_with_estimates(should_plot_laps_2d=False)
         
         ## The filter the laps specifically for use in the placefields with non-overlapping, duration, constraints:
@@ -1415,7 +1645,7 @@ def constrain_to_laps(curr_active_pipeline):
         else:
             # Must recompute since the computation_epochs changed
             print(f'setting new computation epochs because laps changed.')
-            curr_active_pipeline.active_configs[a_name].computation_config.pf_params.computation_epochs = curr_laps_obj # TODO: does this change the config that's used for computations? I think it should. 
+            curr_active_pipeline.active_configs[a_name].computation_config.pf_params.computation_epochs = deepcopy(curr_laps_obj) # TODO: does this change the config that's used for computations? I think it should. 
             
             # Get existing placefields:
             curr_pf1D, curr_pf2D = a_result.pf1D, a_result.pf2D
@@ -1462,7 +1692,7 @@ def constrain_to_laps(curr_active_pipeline):
     return curr_active_pipeline, directional_lap_specific_configs
 
 
-@function_attributes(short_name=None, tags=['long_short', 'decoder', 'constrained', 'important'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-25 08:32', related_items=[])
+@function_attributes(short_name=None, tags=['long_short', 'decoder', 'constrained', 'important'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-14 00:00', related_items=[])
 def compute_long_short_constrained_decoders(curr_active_pipeline, long_epoch_name:str, short_epoch_name:str, enable_two_step_decoders:bool = False, recalculate_anyway:bool=True):
     """ 2023-04-14 - Computes both 1D & 2D Decoders constrained to each other's position bins 
     Usage:
@@ -1542,7 +1772,7 @@ def compute_long_short_constrained_decoders(curr_active_pipeline, long_epoch_nam
 # 2023-05-10 - Long Short Decoding Analysis                                                                            #
 # ==================================================================================================================== #
 
-@function_attributes(short_name=None, tags=['decoding', 'loo', 'surprise'], input_requires=[], output_provides=[], uses=['LeaveOneOutDecodingAnalysis', 'perform_full_session_leave_one_out_decoding_analysis'], used_by=[], creation_date='2023-09-21 17:25', related_items=[])
+@function_attributes(short_name=None, tags=['decoding', 'loo', 'surprise', 'replay'], input_requires=['long_session.replay', 'short_session.replay', 'global_session.replay'], output_provides=[], uses=['LeaveOneOutDecodingAnalysis', 'perform_full_session_leave_one_out_decoding_analysis'], used_by=[], creation_date='2023-09-21 17:25', related_items=[])
 def _long_short_decoding_analysis_from_decoders(long_one_step_decoder_1D, short_one_step_decoder_1D, long_session, short_session, global_session, decoding_time_bin_size = 0.025, perform_cache_load=False) -> LeaveOneOutDecodingAnalysis:
     """ Uses existing decoders and other long/short variables to run `perform_full_session_leave_one_out_decoding_analysis` on each. """
     # Get existing long/short decoders from the cell under "# 2023-02-24 Decoders"
@@ -1570,9 +1800,25 @@ def _long_short_decoding_analysis_from_decoders(long_one_step_decoder_1D, short_
     # with VizTracer(output_file=f"viztracer_{get_now_time_str()}-full_session_LOO_decoding_analysis.json", min_duration=200, tracer_entries=3000000, ignore_frozen=True) as tracer:
     long_results_obj = perform_full_session_leave_one_out_decoding_analysis(global_session, original_1D_decoder=long_shared_aclus_only_decoder, decoding_time_bin_size=decoding_time_bin_size, cache_suffix = '_long', perform_cache_load=perform_cache_load) # , perform_cache_load=False
     short_results_obj = perform_full_session_leave_one_out_decoding_analysis(global_session, original_1D_decoder=short_shared_aclus_only_decoder, decoding_time_bin_size=decoding_time_bin_size, cache_suffix = '_short', perform_cache_load=perform_cache_load) # , perform_cache_load=False
-
-    leave_one_out_decoding_analysis_obj = LeaveOneOutDecodingAnalysis(long_decoder, short_decoder, long_replays, short_replays, global_replays, long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, shared_aclus, long_short_pf_neurons_diff, n_neurons, long_results_obj, short_results_obj, is_global=True)
-
+    ## This is very verboose but the new version properties mess up the *arg attribute initializer
+    # Potentially useful assingment kwargs string: `# long_decoder=long_decoder, short_decoder=short_decoder, long_replays=long_replays, short_replays=short_replays, global_replays=global_replays, long_shared_aclus_only_decoder=long_shared_aclus_only_decoder, short_shared_aclus_only_decoder=short_shared_aclus_only_decoder, shared_aclus=shared_aclus, long_short_pf_neurons_diff=long_short_pf_neurons_diff, n_neurons=n_neurons, long_results_obj=long_results_obj, short_results_obj=short_results_obj`
+    leave_one_out_decoding_analysis_obj: LeaveOneOutDecodingAnalysis = LeaveOneOutDecodingAnalysis(is_global=True)
+    leave_one_out_decoding_analysis_obj.long_decoder = long_decoder
+    leave_one_out_decoding_analysis_obj.short_decoder = short_decoder
+    leave_one_out_decoding_analysis_obj.long_replays = long_replays
+    leave_one_out_decoding_analysis_obj.short_replays = short_replays
+    leave_one_out_decoding_analysis_obj.global_replays = global_replays
+    leave_one_out_decoding_analysis_obj.long_shared_aclus_only_decoder = long_shared_aclus_only_decoder
+    leave_one_out_decoding_analysis_obj.short_shared_aclus_only_decoder = short_shared_aclus_only_decoder
+    leave_one_out_decoding_analysis_obj.shared_aclus = shared_aclus
+    leave_one_out_decoding_analysis_obj.long_short_pf_neurons_diff = long_short_pf_neurons_diff
+    leave_one_out_decoding_analysis_obj.n_neurons = n_neurons
+    leave_one_out_decoding_analysis_obj.long_results_obj = long_results_obj
+    leave_one_out_decoding_analysis_obj.short_results_obj = short_results_obj
+    
+    # long_decoder=long_decoder, short_decoder=short_decoder, long_replays, short_replays, global_replays, long_shared_aclus_only_decoder, short_shared_aclus_only_decoder, shared_aclus, long_short_pf_neurons_diff, n_neurons, long_results_obj, short_results_obj
+    # long_decoder=long_decoder, short_decoder=short_decoder, long_replays=long_replays, short_replays=short_replays, global_replays=global_replays, long_shared_aclus_only_decoder=long_shared_aclus_only_decoder, short_shared_aclus_only_decoder=short_shared_aclus_only_decoder, shared_aclus=shared_aclus, long_short_pf_neurons_diff=long_short_pf_neurons_diff, n_neurons=n_neurons, long_results_obj=long_results_obj, short_results_obj=short_results_obj
+    
     return leave_one_out_decoding_analysis_obj
 
 # ==================================================================================================================== #
@@ -1645,7 +1891,7 @@ def _fr_index(long_fr, short_fr):
     return ((long_fr - short_fr) / (long_fr + short_fr))
 
 
-@function_attributes(short_name=None, tags=['long_short', 'compute', 'fr_index'], input_requires=[], output_provides=[], uses=[], used_by=['pipeline_complete_compute_long_short_fr_indicies'], creation_date='2023-09-07 19:49', related_items=[])
+@function_attributes(short_name=None, tags=['long_short', 'compute', 'fr_index'], input_requires=[], output_provides=[], uses=['_epoch_unit_avg_firing_rates', 'SpikeRateTrends'], used_by=['pipeline_complete_compute_long_short_fr_indicies'], creation_date='2023-09-07 19:49', related_items=[])
 def _generalized_compute_long_short_firing_rate_indicies(spikes_df, instantaneous_time_bin_size_seconds: Optional[float]=None, save_path=None, **kwargs):
     """A computation for the long/short firing rate index that Kamran and I discussed as one of three metrics during our meeting on 2023-01-19.
 
@@ -1664,10 +1910,10 @@ def _generalized_compute_long_short_firing_rate_indicies(spikes_df, instantaneou
 
     Aims to replace:
 
-        x_frs_index, y_frs_index, updated_all_results_dict = _compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays, save_path=temp_save_filename) # 'temp_2023-01-24_results.pkl'
+        x_frs_index, y_frs_index, updated_all_results_dict = _compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays, save_path=temp_save_filename) # 'temp_2023-01-24_results.pkl' ## OLD VERSION
 
     With:
-        x_frs_index, y_frs_index, updated_all_results_dict = _generalized_compute_long_short_firing_rate_indicies(spikes_df, **{'laps': (long_laps, short_laps), 'replays': (long_replays, short_replays)}, save_path=temp_save_filename)
+        x_frs_index, y_frs_index, updated_all_results_dict = _generalized_compute_long_short_firing_rate_indicies(spikes_df, **{'laps': (long_laps, short_laps), 'replays': (long_replays, short_replays)}, save_path=temp_save_filename) ## NEW VERSION
 
 
 
@@ -1688,7 +1934,6 @@ def _generalized_compute_long_short_firing_rate_indicies(spikes_df, instantaneou
         long_mean_epochs_all_frs, long_mean_epochs_frs = _epoch_unit_avg_firing_rates(spikes_df, long_epochs)
         short_mean_epochs_all_frs, short_mean_epochs_frs = _epoch_unit_avg_firing_rates(spikes_df, short_epochs)
     
-
         all_results_dict.update(dict(zip([f'long_mean_{key}_frs', f'short_mean_{key}_frs'], [long_mean_epochs_frs, short_mean_epochs_frs]))) # all variables
         all_results_dict.update(dict(zip([f'long_mean_{key}_all_frs', f'short_mean_{key}_all_frs'], [long_mean_epochs_all_frs, short_mean_epochs_all_frs]))) # all variables
 
@@ -1723,9 +1968,6 @@ def _generalized_compute_long_short_firing_rate_indicies(spikes_df, instantaneou
             # Compute the single-dimensional firing rate index for the custom epochs and add it as a column to the dataframe:
             # custom_InstSpikeRateTrends_df['custom_frs_index'] = _fr_index(long_fr=long_custom_InstSpikeRateTrends.cell_agg_inst_fr_list, short_fr=short_custom_InstSpikeRateTrends.cell_agg_inst_fr_list)
 
-
-        
-    
     # long_mean_laps_all_frs, long_mean_replays_all_frs, short_mean_laps_all_frs, short_mean_replays_all_frs = [np.array(list(fr_dict.values())) for fr_dict in [long_mean_laps_all_frs, long_mean_replays_all_frs, short_mean_laps_all_frs, short_mean_replays_all_frs]]	
 
     # Save a backup of the data:
@@ -1754,7 +1996,7 @@ def _compute_epochs_num_aclu_inclusions(all_epochs_frs_mat, min_inclusion_fr_thr
     # num_cells_included_in_epoch_mat
     return num_cells_included_in_epoch_mat
 
-@function_attributes(short_name='pipeline_complete_compute_long_short_fr_indicies', tags=['long_short', 'top_level', 'compute', 'fr_index'], input_requires=[], output_provides=[], uses=['_compute_long_short_firing_rate_indicies'], used_by=[], creation_date='2023-01-19 00:00')
+@function_attributes(short_name='pipeline_complete_compute_long_short_fr_indicies', tags=['long_short', 'top_level', 'compute', 'fr_index', 'laps', 'replays'], input_requires=['laps', 'replays', 'filtered_sessions[an_epoch_name].replay'], output_provides=[], uses=['_compute_long_short_firing_rate_indicies'], used_by=[], creation_date='2023-01-19 00:00')
 def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_save_filename=None):
     """ wraps `compute_long_short_firing_rate_indicies(...)` to compute the long_short_fr_index for the complete pipeline
 
@@ -1770,6 +2012,17 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
 
     Returns:
         _type_: _description_
+        
+        # all_results_dict keys:
+            ['long_laps', 'long_replays', 'short_laps', 'short_replays', 'global_laps', 'global_replays', 'long_non_replays', 'short_non_replays', 'global_non_replays', # epochs
+            'long_mean_laps_frs', 'short_mean_laps_frs', 'long_mean_replays_frs', 'short_mean_replays_frs', 'long_mean_non_replays_frs', 'short_mean_non_replays_frs',  # raw mean firing rate variables 
+            'long_mean_laps_all_frs', 'short_mean_laps_all_frs', 'long_mean_replays_all_frs', 'short_mean_replays_all_frs', 'long_mean_non_replays_all_frs', 'short_mean_non_replays_all_frs', # each epoch array of firing rates
+            'laps_frs_index', 'replays_frs_index', 'non_replays_frs_index', 'x_frs_index', 'y_frs_index', 'z_frs_index', # fri variables  
+            'long_short_fr_indicies_df', # dataframe
+            ]
+
+
+
     """
     from neuropy.core.epoch import Epoch
     from neuropy.utils.dynamic_container import DynamicContainer # for instantaneous firing rate versions
@@ -1784,13 +2037,14 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
         print(f'have an existing `global_computation_results.computation_config`: {curr_active_pipeline.global_computation_results.computation_config}')	
 
     # Could also use `owning_pipeline_reference.global_computation_results.computation_config`
+    
+    
     assert (curr_active_pipeline.global_computation_results.computation_config is not None), f"requires `global_computation_results.computation_config.instantaneous_time_bin_size_seconds`"
-    assert ('instantaneous_time_bin_size_seconds' in curr_active_pipeline.global_computation_results.computation_config)
+    assert (hasattr(curr_active_pipeline.global_computation_results.computation_config.long_short_inst_spike_rate_groups, 'instantaneous_time_bin_size_seconds'))
     ## TODO: get from active_configs or something similar
-    instantaneous_time_bin_size_seconds: float = curr_active_pipeline.global_computation_results.computation_config.instantaneous_time_bin_size_seconds # 0.01 # 10ms
+    instantaneous_time_bin_size_seconds: float = curr_active_pipeline.global_computation_results.computation_config.long_short_inst_spike_rate_groups.get('instantaneous_time_bin_size_seconds', None) # 0.01 # 10ms
 
     # Setting `instantaneous_time_bin_size_seconds = None` disables instantaneous computations
-
 
     ## Begin Original:
     active_identifying_session_ctx = curr_active_pipeline.sess.get_context() # 'bapun_RatN_Day4_2019-10-15_11-30-06' # curr_sess_ctx # IdentifyingContext<('kdiba', 'gor01', 'one', '2006-6-07_11-26-53')>
@@ -1806,7 +2060,7 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
 
     active_context = active_identifying_session_ctx.adding_context(collision_prefix='fn', fn_name='long_short_firing_rate_indicies')
 
-    spikes_df = curr_active_pipeline.sess.spikes_df # TODO: CORRECTNESS: should I be using this spikes_df instead of the filtered ones?
+    spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.spikes_df) # TODO: CORRECTNESS: should I be using this spikes_df instead of the filtered ones?
 
     # Get existing laps from session:
     # long_laps, short_laps, global_laps = [curr_active_pipeline.filtered_sessions[an_epoch_name].laps.as_epoch_obj() for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
@@ -1833,10 +2087,9 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
         # New sess.compute_estimated_replay_epochs(...) based method:
         # raise NotImplementedError(f'estimate_replay_epochs is invalid because it does not properly use the parameters!')
         assert curr_active_pipeline.sess.config.preprocessing_parameters.replays is not None
+        raise ValueError(f"2024-07-02 - Overwriting internal replays with estimates, not what was intended!")
         long_replays, short_replays, global_replays = [curr_active_pipeline.filtered_sessions[an_epoch_name].estimate_replay_epochs(*curr_active_pipeline.sess.config.preprocessing_parameters.replays) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
 
-
-    
 
     # non_running_periods = Epoch.from_PortionInterval(owning_pipeline_reference.sess.laps.as_epoch_obj().to_PortionInterval().complement())
     global_non_replays: Epoch = Epoch(Epoch.from_PortionInterval(global_replays.to_PortionInterval().complement()).time_slice(t_start=long_epoch_obj.t_start, t_stop=short_epoch_obj.t_stop).to_dataframe()[:-1]) #[:-1] # any period except the replay ones, drop the infinite last entry
@@ -1856,10 +2109,10 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
     if temp_save_filename is not None:
         print(f'temp_save_filename: {temp_save_filename}')
 
-    # x_frs_index, y_frs_index, updated_all_results_dict = _compute_long_short_firing_rate_indicies(spikes_df, long_laps, long_replays, short_laps, short_replays, save_path=temp_save_filename) # 'temp_2023-01-24_results.pkl'
 
-
-    x_frs_index, y_frs_index, z_frs_index, updated_all_results_dict = _generalized_compute_long_short_firing_rate_indicies(spikes_df, **{'laps': (long_laps, short_laps), 'replays': (long_replays, short_replays), 'non_replays': (long_non_replays, global_non_replays)}, instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, save_path=temp_save_filename)
+    ## Now have the epoch periods to calculate the firing rates for, next compute the firing rates.
+    x_frs_index, y_frs_index, z_frs_index, updated_all_results_dict = _generalized_compute_long_short_firing_rate_indicies(spikes_df, **{'laps': (long_laps, short_laps), 'replays': (long_replays, short_replays), 'non_replays': (long_non_replays, global_non_replays)},
+                                                                                                                           instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, save_path=temp_save_filename)
 
     all_results_dict.update(updated_all_results_dict) # append the results dict
     
@@ -1873,6 +2126,9 @@ def pipeline_complete_compute_long_short_fr_indicies(curr_active_pipeline, temp_
     # long_short_fr_indicies_analysis_results['x_frs_index'] = long_short_fr_indicies_analysis_results['replays_inst_frs_index'].copy()
     # long_short_fr_indicies_analysis_results['y_frs_index'] = long_short_fr_indicies_analysis_results['non_replays_inst_frs_index'].copy()
     # all_results_dict.update(dict(zip(['x_frs_index', 'y_frs_index'], [x_frs_index, y_frs_index]))) # append the indicies to the results dict
+    
+    curr_active_pipeline.global_computation_results.computation_config.long_short_inst_spike_rate_groups.instantaneous_time_bin_size_seconds = instantaneous_time_bin_size_seconds ## update the property with the used value after computation
+    
     return active_context, all_results_dict # TODO: add to computed_data instead
 
 @function_attributes(short_name=None, tags=['rr', 'rate_remapping', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-18 18:58', related_items=[])
@@ -1953,7 +2209,7 @@ def compute_rate_remapping_stats(long_short_fr_indicies_analysis, aclu_to_neuron
 # ==================================================================================================================== #
 # Jonathan's helper functions                                                                                          #
 # ==================================================================================================================== #
-def _final_compute_jonathan_replay_fr_analyses(sess, replays_df, debug_print=False):
+def _final_compute_jonathan_replay_fr_analyses(sess, replays_df: pd.DataFrame, t_start: float, t_delta: float, t_end: float, debug_print=False):
     """_summary_
 
     Args:
@@ -1981,7 +2237,7 @@ def _final_compute_jonathan_replay_fr_analyses(sess, replays_df, debug_print=Fal
         replays_df['end'] = replays_df['stop']
 
     ### Make `rdf` (replay dataframe)
-    rdf: pd.DataFrame = make_rdf(sess, replays_df) # this creates the replay dataframe variable
+    rdf: pd.DataFrame = make_rdf(sess, replays_df, t_start=t_start, t_delta=t_delta, t_end=t_end) # this creates the replay dataframe variable
     rdf = remove_repeated_replays(rdf)
     rdf, aclu_to_idx = add_spike_counts(sess, rdf)
 
@@ -1991,7 +2247,7 @@ def _final_compute_jonathan_replay_fr_analyses(sess, replays_df, debug_print=Fal
         print(f"RDF has {len(rdf)} rows.")
 
     ### Make `irdf` (inter-replay dataframe)
-    irdf: pd.DataFrame = make_irdf(sess, rdf)
+    irdf: pd.DataFrame = make_irdf(sess, rdf, t_start=t_start, t_delta=t_delta, t_end=t_end)
     irdf = remove_repeated_replays(irdf) # TODO: make the removal process more meaningful
     irdf, aclu_to_idx_irdf = add_spike_counts(sess, irdf)
     irdf['duration'] = irdf['end'] - irdf['start']
@@ -2097,10 +2353,10 @@ def add_spike_counts(sess, rdf):
     return rdf, aclu_to_idx
 
 # Make `rdf` (replay dataframe) ______________________________________________________________________________________ #
-def make_rdf(sess, replays_df):
+def make_rdf(sess, replays_df, t_start: float, t_delta: float, t_end: float):
     """ recieves `replays_df`, but uses `sess.paradigm[1][0,0]` """
     rdf = replays_df.copy()[["start", "end"]]
-    rdf["short_track"] = rdf["start"] > sess.paradigm[1][0,0]
+    rdf["short_track"] = rdf["start"] > t_delta
     return rdf
 
 def remove_nospike_replays(rdf):
@@ -2114,14 +2370,14 @@ def remove_low_p_replays(rdf):
     return rdf
 
 # Make `irdf` (inter-replay dataframe) _______________________________________________________________________________ #
-def make_irdf(sess, rdf):
-    starts = [sess.paradigm[0][0,0]]
+def make_irdf(sess, rdf, t_start: float, t_delta: float, t_end: float):
+    starts = [t_start]
     ends = []
     for i, row in rdf.iterrows():
         ends.append(row.start)
         starts.append(row.end)
-    ends.append(sess.paradigm[1][0,1])
-    short_track = [s > sess.paradigm[1][0,0] for s in starts]
+    ends.append(t_end)
+    short_track = [s > t_delta for s in starts]
     return pd.DataFrame(dict(start=starts, end=ends, short_track=short_track))
 
 def remove_repeated_replays(rdf):
@@ -2745,12 +3001,15 @@ def _InstantaneousSpikeRateGroupsComputation_convert_Fig2_ANY_FR_to_hdf_fn(f, ke
 class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     """ class to handle spike rate computations
 
-    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import InstantaneousSpikeRateGroupsComputation
+    Appears to only be for the XxC (LxC, SxC) cells.
+    
+
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import SingleBarResult, InstantaneousSpikeRateGroupsComputation
 
     """
     instantaneous_time_bin_size_seconds: float = serialized_attribute_field(default=0.01) # 10ms
-    active_identifying_session_ctx: IdentifyingContext = serialized_attribute_field(init=False, serialization_fn=(lambda f, k, v: HDF_Converter._convert_dict_to_hdf_attrs_fn(f, k, v.to_dict()))) # need to write custom serialization to attributes I think
-
+    active_identifying_session_ctx: IdentifyingContext = serialized_attribute_field(init=False, repr=True, default=None, is_computable=False, serialization_fn=(lambda f, k, v: HDF_Converter._convert_dict_to_hdf_attrs_fn(f, k, v.to_dict()))) # , serialization_fn=(lambda f, k, v: HDF_Converter._convert_dict_to_hdf_attrs_fn(f, k, v.to_dict()))
+    
     LxC_aclus: np.ndarray = serialized_field(init=False, hdf_metadata={'track_eXclusive_cells': 'LxC'}) # the list of long-eXclusive cell aclus
     SxC_aclus: np.ndarray = serialized_field(init=False, hdf_metadata={'track_eXclusive_cells': 'SxC'}) # the list of short-eXclusive cell aclus
 
@@ -2786,31 +3045,16 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
         # Get the provided context or use the session context:
         active_context = kwargs.get('active_context', sess.get_context())
 
+
+        epoch_handling_mode:str = kwargs.get('epoch_handling_mode', 'DropShorterMode')
+        
+        
         self.active_identifying_session_ctx = active_context
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] # only uses global_session
 
-        ## Use the `JonathanFiringRateAnalysisResult` to get info about the long/short placefields:
-        if not isinstance(curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis, JonathanFiringRateAnalysisResult):
-            jonathan_firing_rate_analysis_result = JonathanFiringRateAnalysisResult(**curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis.to_dict())
-        else:
-            jonathan_firing_rate_analysis_result = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis
-
-
-        # jonathan_firing_rate_analysis_result.refine_exclusivity_by_inst_frs_index(long_short_fr_indicies_df, frs_index_inclusion_magnitude=0.5) ## This has to be done first. No clue where to do it.
-        # neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset = jonathan_firing_rate_analysis_result.get_cell_track_partitions(frs_index_inclusion_magnitude=0.5)
-
         long_short_fr_indicies_analysis_results = curr_active_pipeline.global_computation_results.computed_data['long_short_fr_indicies_analysis']
         long_laps, long_replays, short_laps, short_replays, global_laps, global_replays = [long_short_fr_indicies_analysis_results[k] for k in ['long_laps', 'long_replays', 'short_laps', 'short_replays', 'global_laps', 'global_replays']]
-
-        # Store the Long and Short exclusive ACLUs:
-        # self.LxC_aclus = long_exclusive.track_exclusive_aclus
-        # self.SxC_aclus = short_exclusive.track_exclusive_aclus
-
-        # ## get_refined_track_exclusive_aclus() mode:
-        # self.LxC_aclus = long_exclusive.get_refined_track_exclusive_aclus()
-        # self.SxC_aclus = short_exclusive.get_refined_track_exclusive_aclus()
-        
 
         ## Manual User-annotation mode:
         annotation_man: UserAnnotationsManager = UserAnnotationsManager()
@@ -2819,42 +3063,31 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
             print(f'setting LxC_aclus/SxC_aclus from user annotation.')
             self.LxC_aclus = session_cell_exclusivity.LxC
             self.SxC_aclus = session_cell_exclusivity.SxC
-            # Make sure those aclus are included in the valid placefields
-            # self.LxC_aclus = session_cell_exclusivity.LxC[np.isin(session_cell_exclusivity.LxC, EITHER_subset.track_exclusive_aclus)]
-            # self.SxC_aclus = session_cell_exclusivity.SxC[np.isin(session_cell_exclusivity.SxC, EITHER_subset.track_exclusive_aclus)]
         else:
             print(f'WARN: no user annotation for session_cell_exclusivity')
 
 
         # Common:
-        are_LxC_empty: bool = (len(self.LxC_aclus) == 0)
-        are_SxC_empty: bool = (len(self.SxC_aclus) == 0)
-
-        # if ((len(self.LxC_aclus) == 0) or (len(self.SxC_aclus) == 0)):
-        #     print(f"Note: this fails when SxC or LxC are empty for this session (as it's not meaningful to produce a comparison bar plot). In this case, aggregate across multiple sessions.")
-        #     raise ValueError(f"Note: this fails when SxC or LxC are empty for this session (as it's not meaningful to produce a comparison bar plot). In this case, aggregate across multiple sessions.\n\tself.SxC_aclus: {self.SxC_aclus}\n\tself.LxC_aclus: {self.LxC_aclus}\n")
-        # assert ((len(self.LxC_aclus) > 0) and (len(self.SxC_aclus) > 0)), f"Note: this fails when SxC or LxC are empty for this session (as it's not meaningful to produce a comparison bar plot). In this case, aggregate across multiple sessions.\n\tself.SxC_aclus: {self.SxC_aclus}\n\tself.LxC_aclus: {self.LxC_aclus}\n"
+        are_LxC_empty: bool = (self.LxC_aclus is None) or (len(self.LxC_aclus) == 0)
+        are_SxC_empty: bool = (self.SxC_aclus is None) or (len(self.SxC_aclus) == 0)
 
         # Replays: Uses `global_session.spikes_df`, `long_exclusive.track_exclusive_aclus, `short_exclusive.track_exclusive_aclus`, `long_replays`, `short_replays`
         # LxC: `long_exclusive.track_exclusive_aclus`
         # ReplayDeltaMinus: `long_replays`
-        self.LxC_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_replays, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds)
+        self.LxC_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_replays, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
         # ReplayDeltaPlus: `short_replays`
-        self.LxC_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_replays, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds)
+        self.LxC_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_replays, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
 
         # SxC: `short_exclusive.track_exclusive_aclus`
         # ReplayDeltaMinus: `long_replays`
-        self.SxC_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_replays, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds)
+        self.SxC_ReplayDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_replays, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
         # ReplayDeltaPlus: `short_replays`
-        self.SxC_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_replays, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds)
+        self.SxC_ReplayDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_replays, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
 
         # Note that in general LxC and SxC might have differing numbers of cells.
-        # self.Fig2_Replay_FR: list[tuple[Any, Any]] = [(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list) for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus)]
-        # self.Fig2_Replay_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus, None, None) for v in (self.LxC_ReplayDeltaMinus, self.LxC_ReplayDeltaPlus, self.SxC_ReplayDeltaMinus, self.SxC_ReplayDeltaPlus)]
         if (are_LxC_empty or are_SxC_empty):
             # self.Fig2_Replay_FR = None # None mode
             # initialize with an empty array and None values for the mean and std.
-            # self.Fig2_Replay_FR: list[SingleBarResult] = [SingleBarResult(None, None, np.array([], dtype=float), self.LxC_aclus, self.SxC_aclus, None, None) for v in (LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus)]
             self.Fig2_Replay_FR: list[SingleBarResult] = []
             for v in (self.LxC_ReplayDeltaMinus, self.LxC_ReplayDeltaPlus, self.SxC_ReplayDeltaMinus, self.SxC_ReplayDeltaPlus):
                 if v is not None:
@@ -2868,15 +3101,15 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
         # Laps/Theta: Uses `global_session.spikes_df`, `long_exclusive.track_exclusive_aclus, `short_exclusive.track_exclusive_aclus`, `long_laps`, `short_laps`
         # LxC: `long_exclusive.track_exclusive_aclus`
         # ThetaDeltaMinus: `long_laps`
-        self.LxC_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_laps, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds)
+        self.LxC_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_laps, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
         # ThetaDeltaPlus: `short_laps`
-        self.LxC_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_laps, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds)
+        self.LxC_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_laps, included_neuron_ids=self.LxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
 
         # SxC: `short_exclusive.track_exclusive_aclus`
         # ThetaDeltaMinus: `long_laps`
-        self.SxC_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_laps, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds)
+        self.SxC_ThetaDeltaMinus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=long_laps, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
         # ThetaDeltaPlus: `short_laps`
-        self.SxC_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_laps, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds)
+        self.SxC_ThetaDeltaPlus: SpikeRateTrends = SpikeRateTrends.init_from_spikes_and_epochs(spikes_df=global_session.spikes_df, filter_epochs=short_laps, included_neuron_ids=self.SxC_aclus, instantaneous_time_bin_size_seconds=self.instantaneous_time_bin_size_seconds, epoch_handling_mode=epoch_handling_mode)
 
         # Note that in general LxC and SxC might have differing numbers of cells.
         if are_LxC_empty or are_SxC_empty:
@@ -2892,7 +3125,6 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
             # Note that in general LxC and SxC might have differing numbers of cells.
             self.Fig2_Laps_FR: list[SingleBarResult] = [SingleBarResult(v.cell_agg_inst_fr_list.mean(), v.cell_agg_inst_fr_list.std(), v.cell_agg_inst_fr_list, self.LxC_aclus, self.SxC_aclus, None, None) for v in (self.LxC_ThetaDeltaMinus, self.LxC_ThetaDeltaPlus, self.SxC_ThetaDeltaMinus, self.SxC_ThetaDeltaPlus)]
         
-
     def get_summary_dataframe(self) -> pd.DataFrame:
         """ Returns a summary datatable for each neuron with one entry for each cell in (self.LxC_aclus + self.SxC_aclus)
 
@@ -2908,6 +3140,7 @@ class InstantaneousSpikeRateGroupsComputation(HDF_SerializationMixin, AttrsBased
 
         # Concatenate the two dataframes
         df_combined = pd.concat([df_LxC_aclus, df_SxC_aclus], ignore_index=True)
+        df_combined['inst_time_bin_seconds'] = float(self.instantaneous_time_bin_size_seconds)
         return df_combined
 
 

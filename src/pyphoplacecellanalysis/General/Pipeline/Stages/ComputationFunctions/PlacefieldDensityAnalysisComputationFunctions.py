@@ -145,6 +145,8 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
     active_ratemap_peaks_analysis = curr_active_pipeline.computation_results[active_config_name].computed_data.get('RatemapPeaksAnalysis', None)
     active_peak_prominence_2d_results = curr_active_pipeline.computation_results[active_config_name].computed_data.get('RatemapPeaksAnalysis', {}).get('PeakProminence2D', None)
     
+    provides: ['EloyAnalysis', 'SimplerNeuronMeetingThresholdFiringAnalysis', 'RatemapPeaksAnalysis', 'placefield_overlap']
+
     """
     _computationPrecidence = 2 # must be done after PlacefieldComputations and DefaultComputationFunctions
     _is_global = False
@@ -250,7 +252,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             return computation_result
         
 
-    @function_attributes(short_name='velocity_vs_pf_simplified_count_density', tags=['pf_density', 'velocity', 'simplified'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-07-06 00:00', related_items=[],
+    @function_attributes(short_name='velocity_vs_pf_simplified_count_density', tags=['pf_density', 'velocity', 'simplified'], input_requires=[], output_provides=["computed_data['SimplerNeuronMeetingThresholdFiringAnalysis']"], uses=[], used_by=[], creation_date='2022-07-06 00:00', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['SimplerNeuronMeetingThresholdFiringAnalysis'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['SimplerNeuronMeetingThresholdFiringAnalysis']['sorted_n_neurons_meeting_firing_critiera_by_position_bins_2D']), is_global=False)
     def _perform_velocity_vs_pf_simplified_count_density_computation(computation_result: ComputationResult, debug_print=False):
             """ Builds the simplified density analysis suggested by Kamran at the 2022-07-06 lab meeting related analysis to test Eloy's Pf-Density/Velocity Hypothesis for 2D Placefields
@@ -306,7 +308,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             computation_result.computed_data['SimplerNeuronMeetingThresholdFiringAnalysis'] = DynamicParameters.init_from_dict({'n_neurons_meeting_firing_critiera_by_position_bins_2D': n_neurons_meeting_firing_critiera_by_position_bins_2D, 'sorted_n_neurons_meeting_firing_critiera_by_position_bins_2D': sorted_n_neurons_meeting_firing_critiera_by_position_bins_2D})
             return computation_result
         
-    @function_attributes(short_name='_DEP_ratemap_peaks', tags=['pf','ratemap', 'peaks', 'DEPRICATED'], input_requires=[], output_provides=[], uses=['findpeaks'], used_by=[], creation_date='2023-09-12 17:24', related_items=[],
+    @function_attributes(short_name='_DEP_ratemap_peaks', tags=['pf','ratemap', 'peaks', 'DEPRICATED'], input_requires=[], output_provides=["computed_data['RatemapPeaksAnalysis']"], uses=['findpeaks'], used_by=[], creation_date='2023-09-12 17:24', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['RatemapPeaksAnalysis'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['RatemapPeaksAnalysis']['final_filtered_results']), is_global=False)
     def _DEP_perform_pf_find_ratemap_peaks_computation(computation_result: ComputationResult, debug_print=False, peak_score_inclusion_percent_threshold=0.25):
             """ Uses the `findpeaks` library to compute the topographical peak locations and information with the intent of doing an extended pf size/density analysis.
@@ -352,7 +354,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             
             return computation_result
 
-    @function_attributes(short_name='ratemap_peaks_prominence2d', tags=['pf', 'peaks', 'promienence', '2d', 'ratemap'], input_requires=["computed_data['pf2D']"], output_provides=["computed_data['RatemapPeaksAnalysis']['PeakProminence2D']"], uses=["compute_prominence_contours"], used_by=[], creation_date='2023-09-12 17:21', related_items=[],
+    @function_attributes(short_name='ratemap_peaks_prominence2d', tags=['pf', 'peaks', 'promienence', '2d', 'ratemap', 'Eloy'], input_requires=["computed_data['pf2D']"], output_provides=["computed_data['RatemapPeaksAnalysis']['PeakProminence2D']"], uses=["compute_prominence_contours"], used_by=[], creation_date='2023-09-12 17:21', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['RatemapPeaksAnalysis'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['RatemapPeaksAnalysis']['PeakProminence2D']), is_global=False)
     def _perform_pf_find_ratemap_peaks_peak_prominence2d_computation(computation_result: ComputationResult, step=0.01, peak_height_multiplier_probe_levels=(0.5, 0.9), minimum_included_peak_height = 0.2, uniform_blur_size = 3, gaussian_blur_sigma = 3, debug_print=False):
             """ Uses the peak_prominence2d package to find the peaks and promenences of 2D placefields
@@ -378,7 +380,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                     computed_data['RatemapPeaksAnalysis']['PeakProminence2D']['result_tuples']: (slab, peaks, idmap, promap, parentmap)
                     
                     flat_peaks_df
-                    
+                    filtered_flat_peaks_df
                     
                     peak_counts
                         raw
@@ -673,6 +675,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
                 
                 return peak_nearest_directional_boundary_bins, peak_nearest_directional_boundary_displacements, peak_nearest_directional_boundary_distances
 
+
             # ==================================================================================================================== #
             # begin main function body ___________________________________________________________________________________________ #
             active_pf_2D = computation_result.computed_data['pf2D']
@@ -691,7 +694,7 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             n_slices = len(peak_height_multiplier_probe_levels)
 
             for neuron_idx in np.arange(n_neurons):
-                neuron_id = active_pf_2D.neuron_extended_ids[neuron_idx].id
+                neuron_id = active_pf_2D.neuron_extended_ids[neuron_idx].id #  Inner exception: 'NeuronExtendedIdentity' object has no attribute 'id'
                 neuron_tuning_curve_peak_firing_rate = tuning_curve_peak_firing_rates[neuron_idx]
                 slab = active_tuning_curves[neuron_idx].T
                 _, _, slab, cell_peaks_dict, id_map, prominence_map, parent_map = compute_prominence_contours(xbin_centers=active_pf_2D.xbin_centers, ybin_centers=active_pf_2D.ybin_centers, slab=slab, step=step, min_area=None, min_depth=0.2, include_edge=True, verbose=False)
@@ -801,26 +804,30 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             pf_peak_counts_map_blurred_gaussian = gaussian_filter(pf_peak_counts_map.astype('float'), sigma=gaussian_blur_sigma)
             pf_peak_counts_results = DynamicParameters(raw=pf_peak_counts_map, uniform_blurred=pf_peak_counts_map_blurred, gaussian_blurred=pf_peak_counts_map_blurred_gaussian)
 
-            ## Add distance to boundary by computing the distance to the nearest never-occupied bin
-            peak_nearest_directional_boundary_bins, peak_nearest_directional_boundary_displacements, peak_nearest_directional_boundary_distances = _compute_distances_from_peaks_to_boundary(active_pf_2D, filtered_summits_analysis_df, debug_print=debug_print)
+            try:
+                ## Add distance to boundary by computing the distance to the nearest never-occupied bin
+                peak_nearest_directional_boundary_bins, peak_nearest_directional_boundary_displacements, peak_nearest_directional_boundary_distances = _compute_distances_from_peaks_to_boundary(active_pf_2D, filtered_summits_analysis_df, debug_print=debug_print)
 
-            ## Add the output columns to the peaks dataframe:
-            # Output Columns:
-            # ['peak_nearest_boundary_bin_negX', 'peak_nearest_boundary_bin_posX', 'peak_nearest_boundary_bin_negY', 'peak_nearest_boundary_bin_posY'] # separate
-            # ['peak_nearest_directional_boundary_bins', 'peak_nearest_directional_boundary_displacements', 'peak_nearest_directional_boundary_distances'] # combined tuple columns
-            filtered_summits_analysis_df['peak_nearest_directional_boundary_bins'] = peak_nearest_directional_boundary_bins
-            filtered_summits_analysis_df['peak_nearest_directional_boundary_displacements'] = peak_nearest_directional_boundary_displacements
-            filtered_summits_analysis_df['peak_nearest_directional_boundary_distances'] = peak_nearest_directional_boundary_distances
-            filtered_summits_analysis_df['nearest_directional_boundary_direction_idx'] = np.argmin(peak_nearest_directional_boundary_distances, axis=1) # an index [0,1,2,3] corresponding to the direction of travel to the nearest index. Corresponds to (down, up, left, right)
-            filtered_summits_analysis_df['nearest_directional_boundary_direction_distance'] = np.min(peak_nearest_directional_boundary_distances, axis=1) # the distance in the minimal dimension towards the nearest boundary
+                ## Add the output columns to the peaks dataframe:
+                # Output Columns:
+                # ['peak_nearest_boundary_bin_negX', 'peak_nearest_boundary_bin_posX', 'peak_nearest_boundary_bin_negY', 'peak_nearest_boundary_bin_posY'] # separate
+                # ['peak_nearest_directional_boundary_bins', 'peak_nearest_directional_boundary_displacements', 'peak_nearest_directional_boundary_distances'] # combined tuple columns
+                filtered_summits_analysis_df['peak_nearest_directional_boundary_bins'] = peak_nearest_directional_boundary_bins
+                filtered_summits_analysis_df['peak_nearest_directional_boundary_displacements'] = peak_nearest_directional_boundary_displacements
+                filtered_summits_analysis_df['peak_nearest_directional_boundary_distances'] = peak_nearest_directional_boundary_distances
+                filtered_summits_analysis_df['nearest_directional_boundary_direction_idx'] = np.argmin(peak_nearest_directional_boundary_distances, axis=1) # an index [0,1,2,3] corresponding to the direction of travel to the nearest index. Corresponds to (down, up, left, right)
+                filtered_summits_analysis_df['nearest_directional_boundary_direction_distance'] = np.min(peak_nearest_directional_boundary_distances, axis=1) # the distance in the minimal dimension towards the nearest boundary
 
-            # ['peak_nearest_boundary_bin_negX', 'peak_nearest_boundary_bin_posX', 'peak_nearest_boundary_bin_negY', 'peak_nearest_boundary_bin_posY'] # separate
-            distances = np.vstack([np.asarray(a_tuple) for a_tuple in peak_nearest_directional_boundary_distances])
-            x_distances = np.min(distances[:,3:], axis=1) # find the distance to nearest wall vertically
-            y_distances = np.min(distances[:,:2], axis=1) # find the distance to nearest wall horizontally
+                # ['peak_nearest_boundary_bin_negX', 'peak_nearest_boundary_bin_posX', 'peak_nearest_boundary_bin_negY', 'peak_nearest_boundary_bin_posY'] # separate
+                distances = np.vstack([np.asarray(a_tuple) for a_tuple in peak_nearest_directional_boundary_distances])
+                x_distances = np.min(distances[:,3:], axis=1) # find the distance to nearest wall vertically
+                y_distances = np.min(distances[:,:2], axis=1) # find the distance to nearest wall horizontally
 
-            filtered_summits_analysis_df['nearest_x_boundary_distance'] = x_distances # the distance in the minimal dimension towards the nearest x boundary
-            filtered_summits_analysis_df['nearest_y_boundary_distance'] = y_distances # the distance in the minimal dimension towards the nearest y boundary
+                filtered_summits_analysis_df['nearest_x_boundary_distance'] = x_distances # the distance in the minimal dimension towards the nearest x boundary
+                filtered_summits_analysis_df['nearest_y_boundary_distance'] = y_distances # the distance in the minimal dimension towards the nearest y boundary
+            except (BaseException, NotImplementedError) as err:
+                print(f'could not find distances to nearest boundary in `ratemap_peaks_prominence2d`. Some columns will be missing from the output dataframe. Error: {err}')
+
 
             ## Build function output:
             if 'RatemapPeaksAnalysis' not in computation_result.computed_data:

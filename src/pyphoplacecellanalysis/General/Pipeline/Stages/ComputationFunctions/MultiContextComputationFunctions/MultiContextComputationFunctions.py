@@ -1,3 +1,4 @@
+from neuropy.core.epoch import NamedTimerange
 import numpy as np
 import pandas as pd
 from functools import wraps
@@ -13,9 +14,9 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import ZhangReconstr
 def _wrap_multi_context_computation_function(global_comp_fcn):
     """ captures global_comp_fcn and unwraps its arguments: owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False """
     @wraps(global_comp_fcn) # @wraps ensures that the functions name, docs, etc are accessible in the wrapped version of the function.
-    def _(x):
-        assert len(x) > 4, f"{x}"
-        x[1] = global_comp_fcn(*x) # update global_computation_results
+    def _(x, **kwargs):
+        assert len(x) > 4, f"looks like it ensures we have more than four (at least 5) positional arguments provided. {x}"
+        x[1] = global_comp_fcn(*x, **kwargs) # update global_computation_results
         return x
     return _
 

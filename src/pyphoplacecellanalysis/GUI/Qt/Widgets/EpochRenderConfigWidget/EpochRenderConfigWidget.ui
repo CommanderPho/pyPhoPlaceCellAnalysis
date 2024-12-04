@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <author>Pho Hale</author>
- <class>rootForm</class>
- <widget class="QWidget" name="rootForm">
+ <class>epochRenderConfigWidget</class>
+ <widget class="QWidget" name="epochRenderConfigWidget">
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
     <width>94</width>
-    <height>137</height>
+    <height>80</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -140,6 +140,76 @@ QToolButton:!checked{
       </item>
       <item>
        <layout class="QHBoxLayout" name="horizontalLayout">
+        <property name="spacing">
+         <number>2</number>
+        </property>
+        <item>
+         <widget class="QToolButton" name="chkbtnVisible">
+          <property name="minimumSize">
+           <size>
+            <width>20</width>
+            <height>25</height>
+           </size>
+          </property>
+          <property name="baseSize">
+           <size>
+            <width>20</width>
+            <height>25</height>
+           </size>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">QToolButton {
+    /*background-color: green;*/
+    color: rgb(244, 244, 244);
+    /*border: 2px green;*/
+    /*border-radius: 22px;*/
+    /*border-style: outset;*/
+	/*border-style: inset;*/
+}
+QToolButton:disabled {
+    color: gray;
+    background-color: gray;
+    border: 1px black;
+    border-style: outset;                
+}
+QToolButton:checked{
+    color: rgb(255, 170, 0); 
+    /*font:  12px; */  
+    font: bold;
+    /*background-color: red;*/
+    border: 1px white;
+    border-style: outset;
+}
+QToolButton:!checked{
+    /*color: black; */
+    /*background-color: green;*/
+    /*border: 1px black;*/
+    /*border-style: outset;*/
+	/*border-style: dashed;*/
+}</string>
+          </property>
+          <property name="text">
+           <string>Is Visible</string>
+          </property>
+          <property name="icon">
+           <iconset resource="../../../../Resources/ActionIcons.qrc">
+            <normaloff>:/State/Icons/actions/eye-close.png</normaloff>
+            <normalon>:/State/Icons/actions/eye.png</normalon>:/State/Icons/actions/eye-close.png</iconset>
+          </property>
+          <property name="checkable">
+           <bool>true</bool>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
+          </property>
+          <property name="popupMode">
+           <enum>QToolButton::DelayedPopup</enum>
+          </property>
+          <property name="toolButtonStyle">
+           <enum>Qt::ToolButtonIconOnly</enum>
+          </property>
+         </widget>
+        </item>
         <item>
          <widget class="ColorButton" name="btnPenColor">
           <property name="enabled">
@@ -178,92 +248,73 @@ QToolButton:!checked{
        </layout>
       </item>
       <item>
-       <widget class="QDoubleSpinBox" name="doubleSpinBoxHeight">
-        <property name="toolTip">
-         <string>Height</string>
+       <layout class="QHBoxLayout" name="horizontalLayout_2">
+        <property name="spacing">
+         <number>2</number>
         </property>
-        <property name="decimals">
-         <number>1</number>
-        </property>
-        <property name="value">
-         <double>1.000000000000000</double>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QDoubleSpinBox" name="doubleSpinBoxOffset">
-        <property name="toolTip">
-         <string>Position Offset</string>
-        </property>
-        <property name="decimals">
-         <number>1</number>
-        </property>
-        <property name="minimum">
-         <double>-100.000000000000000</double>
-        </property>
-        <property name="maximum">
-         <double>100.000000000000000</double>
-        </property>
-        <property name="value">
-         <double>-5.000000000000000</double>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QToolButton" name="chkbtnVisible">
-        <property name="minimumSize">
-         <size>
-          <width>48</width>
-          <height>25</height>
-         </size>
-        </property>
-        <property name="styleSheet">
-         <string notr="true">QToolButton {
-    /*background-color: green;*/
-    color: rgb(244, 244, 244);
-    /*border: 2px green;*/
-    /*border-radius: 22px;*/
-    /*border-style: outset;*/
-	/*border-style: inset;*/
-}
-QToolButton:disabled {
-    color: gray;
-    background-color: gray;
-    border: 1px black;
-    border-style: outset;                
-}
-QToolButton:checked{
-    color: rgb(255, 170, 0); 
-    /*font:  12px; */  
-    font: bold;
-    /*background-color: red;*/
-    border: 1px white;
-    border-style: outset;
-}
-QToolButton:!checked{
-    /*color: black; */
-    /*background-color: green;*/
-    /*border: 1px black;*/
-    /*border-style: outset;*/
-	/*border-style: dashed;*/
-}</string>
-        </property>
-        <property name="text">
-         <string>Is Visible</string>
-        </property>
-        <property name="checkable">
-         <bool>true</bool>
-        </property>
-        <property name="checked">
-         <bool>true</bool>
-        </property>
-        <property name="popupMode">
-         <enum>QToolButton::DelayedPopup</enum>
-        </property>
-        <property name="toolButtonStyle">
-         <enum>Qt::ToolButtonTextOnly</enum>
-        </property>
-       </widget>
+        <item>
+         <widget class="QDoubleSpinBox" name="doubleSpinBoxHeight">
+          <property name="toolTip">
+           <string>Height</string>
+          </property>
+          <property name="statusTip">
+           <string>Height</string>
+          </property>
+          <property name="whatsThis">
+           <string>Height</string>
+          </property>
+          <property name="frame">
+           <bool>false</bool>
+          </property>
+          <property name="buttonSymbols">
+           <enum>QAbstractSpinBox::NoButtons</enum>
+          </property>
+          <property name="keyboardTracking">
+           <bool>false</bool>
+          </property>
+          <property name="decimals">
+           <number>1</number>
+          </property>
+          <property name="value">
+           <double>1.000000000000000</double>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QDoubleSpinBox" name="doubleSpinBoxOffset">
+          <property name="toolTip">
+           <string>Position Offset</string>
+          </property>
+          <property name="statusTip">
+           <string>Position Offset</string>
+          </property>
+          <property name="whatsThis">
+           <string>Position Offset</string>
+          </property>
+          <property name="frame">
+           <bool>false</bool>
+          </property>
+          <property name="buttonSymbols">
+           <enum>QAbstractSpinBox::NoButtons</enum>
+          </property>
+          <property name="keyboardTracking">
+           <bool>false</bool>
+          </property>
+          <property name="decimals">
+           <number>1</number>
+          </property>
+          <property name="minimum">
+           <double>-100.000000000000000</double>
+          </property>
+          <property name="maximum">
+           <double>100.000000000000000</double>
+          </property>
+          <property name="value">
+           <double>-5.000000000000000</double>
+          </property>
+         </widget>
+        </item>
+       </layout>
       </item>
      </layout>
     </widget>
@@ -277,6 +328,8 @@ QToolButton:!checked{
    <header location="global">pyqtgraph.widgets.ColorButton</header>
   </customwidget>
  </customwidgets>
- <resources/>
+ <resources>
+  <include location="../../../../Resources/ActionIcons.qrc"/>
+ </resources>
  <connections/>
 </ui>

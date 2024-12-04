@@ -39,7 +39,7 @@ class MainWindow(QtWidgets.QMainWindow):
         plotItem.addItem(correlogram)    # display correlogram
         
         # show full frame, label tick marks at top and left sides, with some extra space for labels:
-        plotItem.showAxes( True, showValues=(True, True, False, False), size=20 )
+        plotItem.showAxes(True, showValues=(True, True, False, False), size=20 )
 
         # define major tick marks and labels:
         ticks = [ (idx, label) for idx, label in enumerate( columns ) ]

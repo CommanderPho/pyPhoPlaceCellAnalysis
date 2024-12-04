@@ -1,8 +1,14 @@
 from copy import copy, deepcopy
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing_extensions import TypeAlias
+from nptyping import NDArray
+
 import numpy as np
 import pandas as pd
 
+import neuropy.utils.type_aliases as types
 from neuropy.core import Epoch
+from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
 
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore
 from pyphoplacecellanalysis.General.Model.Datasources.Datasources import BaseDatasource, DataframeDatasource
@@ -41,6 +47,11 @@ class IntervalsDatasource(BaseDatasource):
     
     _required_interval_visualization_columns = ['t_start', 't_duration', 'series_vertical_offset', 'series_height', 'pen', 'brush']
     
+    _time_column_name_synonyms = {"t_start":{'begin','start','start_t'},
+        't_end':['end','stop','stop_t'],
+        "t_duration":['duration'],
+    }
+
     
     @property
     def time_column_names(self):
@@ -116,12 +127,18 @@ class IntervalsDatasource(BaseDatasource):
     def __init__(self, df, datasource_name='default_intervals_datasource'):
         # Initialize the datasource as a BaseDatasource
         BaseDatasource.__init__(self, datasource_name=datasource_name)
-        self._df = df
+        
+        if not np.isin(IntervalsDatasource._required_interval_time_columns, df.columns).all():
+            ## try to do the rename
+            df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(df=df, required_columns_synonym_dict=self.__class__._time_column_name_synonyms)
+
         ## Validate that it has all required columns:
         assert np.isin(IntervalsDatasource._required_interval_time_columns, df.columns).all(), f"dataframe is missing required columns:\n Required: {IntervalsDatasource._required_interval_time_columns}, current: {df.columns} "
+        self._df = df
+
+
         
-        
-    def update_visualization_properties(self, dataframe_vis_columns_function):
+    def update_visualization_properties(self, dataframe_vis_columns_function: Union[callable, Dict]):
         """ called to update the current visualization columns of the df by applying the provided function
         
         Usage:
@@ -148,6 +165,11 @@ class IntervalsDatasource(BaseDatasource):
             datasource_to_update.update_visualization_properties(_updated_custom_interval_dataframe_visualization_columns_general_epoch)
 
         """
+        if isinstance(dataframe_vis_columns_function, dict):
+            ## a dict instead of a callable function. Build the callable function from the dict
+            an_epoch_formatting_dict = dataframe_vis_columns_function
+            dataframe_vis_columns_function = lambda active_df, **kwargs: self.__class__._update_df_visualization_columns(active_df, **(an_epoch_formatting_dict | kwargs))
+
         self._df = dataframe_vis_columns_function(self._df)
         self.source_data_changed_signal.emit(self) # Emit the data changed signal
 
@@ -190,7 +212,6 @@ class IntervalsDatasource(BaseDatasource):
             series_compressed_positioning_update_dict = None
 
         return series_positioning_df, series_compressed_positioning_df, series_compressed_positioning_update_dict
-
 
 
     def get_serialized_data(self, drop_duplicates=False):

@@ -1,3 +1,4 @@
+from typing import Optional, Dict, List, Tuple
 from collections import OrderedDict
 from enum import Enum
 
@@ -6,6 +7,8 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidget
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 
 from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock, DockDisplayConfig
+from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
+
 # from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget.DockPlanningHelperWidget import DockPlanningHelperWidget
 
@@ -30,9 +33,20 @@ class CustomDockDisplayConfig(DockDisplayConfig):
     def custom_get_colors_callback(self, value):
         self._custom_get_colors_callback_fn = value
 
-    def __init__(self, showCloseButton=True, fontSize='12px', corner_radius='3px', custom_get_colors_callback_fn=None):
+
+    @property
+    def orientation(self) -> str:
+        """The orientation property."""
+        return self._orientation or 'auto'    
+    @orientation.setter
+    def orientation(self, value):
+        self._orientation = value
+
+    def __init__(self, showCloseButton=True, fontSize='12px', corner_radius='3px', custom_get_colors_callback_fn=None, orientation=None):
         super(CustomDockDisplayConfig, self).__init__(showCloseButton=showCloseButton, fontSize=fontSize, corner_radius=corner_radius)
         self._custom_get_colors_callback_fn = custom_get_colors_callback_fn
+        self._orientation = orientation
+
 
     def get_colors(self, orientation, is_dim):
         if self.custom_get_colors_callback is not None:
@@ -152,8 +166,8 @@ class CustomCyclicColorsDockDisplayConfig(CustomDockDisplayConfig):
     def named_color_scheme(self, value):
         self._named_color_scheme = value
     
-    def __init__(self, showCloseButton=True, fontSize='12px', corner_radius='3px', named_color_scheme=NamedColorScheme.red):
-        super(CustomCyclicColorsDockDisplayConfig, self).__init__(showCloseButton=showCloseButton, fontSize=fontSize, corner_radius=corner_radius)
+    def __init__(self, showCloseButton=True, fontSize='12px', corner_radius='3px', orientation=None, named_color_scheme=NamedColorScheme.red):
+        super(CustomCyclicColorsDockDisplayConfig, self).__init__(showCloseButton=showCloseButton, fontSize=fontSize, corner_radius=corner_radius, orientation=orientation)
         self._named_color_scheme = named_color_scheme
 
     def get_colors(self, orientation, is_dim):
@@ -218,7 +232,7 @@ class DynamicDockDisplayAreaContentMixin:
     """
     
     @property
-    def dynamic_display_dict(self):
+    def dynamic_display_dict(self) -> OrderedDict:
         """The dynamic_display_dict property."""
         return self._dynamic_display_output_dict
     @dynamic_display_dict.setter
@@ -226,7 +240,7 @@ class DynamicDockDisplayAreaContentMixin:
         self._dynamic_display_output_dict = value
     
     @property
-    def displayDockArea(self):
+    def displayDockArea(self) -> "DockArea":
         """The displayDockArea property."""
         return self.ui.area
     @displayDockArea.setter
@@ -318,10 +332,20 @@ class DynamicDockDisplayAreaContentMixin:
         
         if display_config is None:
             display_config = CustomDockDisplayConfig()
+
+        if (display_config.orientation is not None):
+            if display_config.orientation == 'auto':
+                kwargs['autoOrientation'] = True
+            else:
+                kwargs['autoOrientation'] = False
             
         # {'autoOrientation':True}
         dDisplayItem = Dock(unique_identifier, size=dockSize, widget=widget, display_config=display_config, **kwargs) # add the new display item
-        
+        if isinstance(dockAddLocationOpts, str):
+            print(f'WARN: dockAddLocationOpts should be a tuple containing a string (like `("left", )`), not a string itself! Interpretting dockAddLocationOpts: "{dockAddLocationOpts}" as `dockAddLocationOpts = ("{dockAddLocationOpts}", )`')
+            dockAddLocationOpts = (dockAddLocationOpts, )
+            assert isinstance(dockAddLocationOpts, tuple)
+    
         if len(dockAddLocationOpts) < 1:
             dockAddLocationOpts = [dDisplayItem, 'bottom']
         elif len(dockAddLocationOpts) == 1:
@@ -344,6 +368,8 @@ class DynamicDockDisplayAreaContentMixin:
             else:
                 raise NotImplementedError
         else:
+
+                
             raise NotImplementedError
         
         # print(f'dockAddLocationOpts: {dockAddLocationOpts}')
@@ -355,6 +381,11 @@ class DynamicDockDisplayAreaContentMixin:
         # if widget is not None:
         #     dDisplayItem.addWidget(widget)
         
+
+        if (display_config.orientation is not None) and (display_config.orientation != 'auto'):
+            assert display_config.orientation in ['horizontal', 'vertical'], f"display_config.orientation should be either ['horizontal', 'vertical'] but display_config.orientation: '{display_config.orientation}'"
+            dDisplayItem.setOrientation(o=display_config.orientation, force=True)
+
         if extant_group_items is not None:
             # Item was found with this identifier, implement one of the strategies
             extant_group_items[unique_identifier] = {"dock":dDisplayItem, "widget":widget} # add the unique item to the group's dict
@@ -371,7 +402,7 @@ class DynamicDockDisplayAreaContentMixin:
         # self.dynamic_display_dict[identifier] = {"dock":dDisplayItem, "widget":new_view_widget}        
         return widget, dDisplayItem
     
-    def find_display_dock(self, identifier):
+    def find_display_dock(self, identifier) -> Optional[Dock]:
         """ returns the first found Dock with the specified title equal to the identifier , or None if it doesn't exist. """
         curr_display_dock_items = self.displayDockArea.findChildren(Dock) # find all dock-type children
         for a_dock_item in curr_display_dock_items:
@@ -407,7 +438,28 @@ class DynamicDockDisplayAreaContentMixin:
                     # del extant_group_items[unique_identifier]
                 
                 # once done with all children, remove the extant_group_items group:
-                del self.dynamic_display_dict[identifier]
+                try:
+                    del self.dynamic_display_dict[identifier]
+                except KeyError as e:
+                    """ 
+                    on_dock_closed(closing_dock: <Dock long_LR (430, 700)>)
+                        closing_dock_identifier: long_LR
+                        found by simple title identifier and removed!
+                    Uncaught Exception in slot
+                    Traceback (most recent call last):
+                    line 260, in DynamicDockDisplayAreaContentMixin_on_destroy
+                        self.clear_all_display_docks()
+                    line 429, in clear_all_display_docks
+                        self.remove_display_dock(group_identifier)
+                    line 413, in remove_display_dock
+                        del self.dynamic_display_dict[identifier]
+                    KeyError: 'long_LR'
+                    """
+                    # seems to always happen, not sure why
+                    print(f'WARNING: identifier: {identifier} not found in dynamic_display_dict.keys(): {list(self.dynamic_display_dict.keys())}')
+                except Exception as e:
+                    # Unhandled exception
+                    raise e
                 
             else:
                 # group was found and valid but already empty prior to remove:

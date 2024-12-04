@@ -1,7 +1,7 @@
 [tool.poetry.group.remote.dependencies]
 neuropy = {path = "../NeuroPy", develop=true} # , rev = "main", extras = ["acceleration"]
 pyphocorehelpers = {path = "../pyPhoCoreHelpers", develop=true}
-pyqode-core = {path = "../pyqode.core/dist/pyqode_core-3.0.0-py2.py3-none-any.whl"}
+pyqode-core = {path = "../pyqode.core/dist/current.whl"} # pyqode_core-3.0.0-py2.py3-none-any.whl
 pyqode-python = {path = "../pyqode.python/dist/current.whl"}
 # pycscope = {path = "../pycscope/dist/current.whl"}
 # haesleinhuepf-pyqode-python = {path = "../pyqode.python/dist/current.whl"}

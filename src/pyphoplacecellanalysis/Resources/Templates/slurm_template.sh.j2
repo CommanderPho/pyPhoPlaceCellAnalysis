@@ -1,74 +1,57 @@
 #!/bin/bash
-#SBATCH --job-name=job_{{ curr_session_context }}
-#SBATCH --output==/home/%u/%x-%j.log
-#SBATCH --workdir='{{ curr_batch_script_rundir }}'
+#SBATCH --job-name=job_{{ curr_session_context }}{% if job_suffix %}_{{ job_suffix }}{% endif %}
+#SBATCH --output=slurm_%x-%j.out
+#SBATCH --chdir='{{ curr_batch_script_rundir }}'
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --mem=16000m
-#SBATCH --time=01:00:00
-#SBATCH --account=kdiba0
+#SBATCH --mem=48000m
+#SBATCH --time=12:00:00
+#SBATCH --account=kdiba1
 #SBATCH --partition=standard
-{# #SBATCH --error=err_{{ curr_session_context }}.txt #}
-
-{# Environment (exported from `env` ran in interactive session`):
-VIRTUAL_ENV=/home/halechr/repos/Spike3D/.venv
-SLURM_MEM_PER_NODE=327680
-SLURM_JOB_USER=halechr
-SLURM_JOB_ACCOUNT=kdiba0
-#}
-
-
-{# Job Info from running job
-	{
-	"job_name": "ondemand/sys/dashboard/sys/bc_desktop_basic",
-	"workdir": "/home/halechr/ondemand/data/sys/dashboard/batch_connect/sys/bc_desktop_basic/output/b66eb914-c85d-4b41-ab1d-40bf646fb242",
-	"output_path": "/home/halechr/ondemand/data/sys/dashboard/batch_connect/sys/bc_desktop_basic/output/b66eb914-c85d-4b41-ab1d-40bf646fb242/output.log",
-	"shell_path": "/bin/bash",
-	"email_on_started": false,
-	"accounting_id": "kdiba0",
-	"queue_name": "largemem",
-	"wall_time": 86400,
-	"native": [
-		"--nodes=1",
-		"--cpus-per-task=16",
-		"--mem=320G",
-		"--gpus-per-node=",
-		"--licenses=",
-		"--partition=largemem"
-	],
-	"job_environment": {
-		"SLURM_EXPORT_ENV": "ALL"
-	}
-	}
-
-
-	{
-		"non_gpus_partitions_hidden": "standard, standard-oc, largemem, debug",
-		"bc_email_on_started": "0",
-		"auto_accounts": "kdiba0",
-		"auto_queues": "largemem",
-		"bc_num_hours": "24",
-		"cores": "16",
-		"mem": "320",
-		"gpus": "",
-		"cmode": "exclusive",
-		"license": ""
-	}
-
-#}
 
 export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
 module load python/3.9.12
-module load globus-cli
 
-{# Activate Poetry Environment
-	/home/halechr/repos/Spike3D/.venv/bin/python
-	/home/halechr/repos/Spike3D/.venv/bin:/home/halechr/.local/bin:/home/halechr/bin
-	source "$( poetry env list --full-path | grep Activated | cut -d' ' -f1 )/bin/activate"
-#}
+{# source '/home/halechr/repos/Spike3D/.venv_green/bin/activate' #}
 source '/home/halechr/repos/Spike3D/.venv/bin/activate'
-srun '/home/halechr/repos/Spike3D/.venv/bin/python' '{{ python_script_path }}'
 
+# Set Matplotlib backend to 'Agg' to prevent GUI issues
+export MPLBACKEND=Agg
+export PYVISTA_OFF_SCREEN=true
+export QT_QPA_PLATFORM=offscreen
+
+{% if should_use_virtual_framebuffer %}
+# Load Xvfb module if available
+{# module load Xvfb #}
+# Start Xvfb
+export DISPLAY=:99
+Xvfb :99 -screen 0 1024x768x16 &
+# Store the PID of Xvfb to kill it later
+XVFB_PID=$!
+# Optional: Wait a bit for Xvfb to start
+sleep 2
+{% endif %}
+
+{# Redirect all output to a single file
+exec > >(tee -a slurm_${SLURM_JOB_NAME}-${SLURM_JOB_ID}.log) 2>&1
+#}
+
+# Run the Python script
+python '{{ python_script_path }}'
+
+# Capture the exit status of the Python script
+exit_code=$?
+
+{# # Deactivate the virtual environment when done (optional here but good practice)
+deactivate #}
+
+{% if should_use_virtual_framebuffer %}
+# Kill Xvfb
+kill $XVFB_PID
+{% endif %}
+
+# Exit with the captured exit code
+exit $exit_code
 

@@ -125,7 +125,7 @@ border-color: rgb(0, 0, 0);</string>
         <enum>Qt::ToolButtonIconOnly</enum>
        </property>
        <property name="arrowType">
-        <enum>Qt::LeftArrow</enum>
+        <enum>Qt::RightArrow</enum>
        </property>
       </widget>
      </item>
@@ -143,7 +143,7 @@ border-color: rgb(0, 0, 0);</string>
  </customwidgets>
  <resources>
   <include location="../../../Resources/ActionIcons.qrc"/>
-  <include location="../../../Resources/RemoteIcons.qrc"/>
+  <include location="../../../Resources/ActionIcons.qrc"/>
   <include location="../../../Resources/GuiResources.qrc"/>
  </resources>
  <connections/>

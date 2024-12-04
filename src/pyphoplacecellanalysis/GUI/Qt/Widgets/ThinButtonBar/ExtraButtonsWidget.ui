@@ -1,0 +1,334 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ExtraButtonsWidget</class>
+ <widget class="QWidget" name="ExtraButtonsWidget">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>692</width>
+    <height>21</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string notr="true">ExtraButtonsWidget</string>
+  </property>
+  <layout class="QGridLayout" name="gridLayout">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <property name="spacing">
+    <number>0</number>
+   </property>
+   <item row="0" column="0">
+    <widget class="QFrame" name="thinButtonBarWidget">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+       <horstretch>1</horstretch>
+       <verstretch>1</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="minimumSize">
+      <size>
+       <width>120</width>
+       <height>21</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>16777215</width>
+       <height>21</height>
+      </size>
+     </property>
+     <property name="baseSize">
+      <size>
+       <width>120</width>
+       <height>21</height>
+      </size>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout" stretch="1,0,0,0">
+      <property name="spacing">
+       <number>0</number>
+      </property>
+      <property name="leftMargin">
+       <number>0</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <item>
+       <spacer name="horizontalSpacer">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QToolButton" name="toolButton_2">
+        <property name="text">
+         <string>...</string>
+        </property>
+        <property name="icon">
+         <iconset resource="../../../../../../../silx/src/silx/resources/silx_resources.qrc">
+          <normaloff>:/png/gui/icons/image-select-erase.png</normaloff>:/png/gui/icons/image-select-erase.png</iconset>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QToolButton" name="toolButton_AddOverlay">
+        <property name="text">
+         <string>...</string>
+        </property>
+        <property name="icon">
+         <iconset resource="../../../../../../../silx/src/silx/resources/silx_resources.qrc">
+          <normaloff>:/png/gui/icons/image-select-add.png</normaloff>:/png/gui/icons/image-select-add.png</iconset>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout_ButtonContainer">
+        <property name="spacing">
+         <number>2</number>
+        </property>
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <item>
+         <widget class="Line" name="line_3">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="btnRefresh">
+          <property name="toolTip">
+           <string notr="true">Refresh</string>
+          </property>
+          <property name="statusTip">
+           <string notr="true">Refresh</string>
+          </property>
+          <property name="text">
+           <string notr="true">Refresh</string>
+          </property>
+          <property name="icon">
+           <iconset resource="../../../../../../../silx/src/silx/resources/silx_resources.qrc">
+            <normaloff>:/png/gui/icons/view-refresh.png</normaloff>:/png/gui/icons/view-refresh.png</iconset>
+          </property>
+          <property name="autoRaise">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="toolButton_Clipboard">
+          <property name="toolTip">
+           <string notr="true">Clipboard</string>
+          </property>
+          <property name="text">
+           <string notr="true">Clipboard</string>
+          </property>
+          <property name="icon">
+           <iconset resource="../../../../../../../silx/src/silx/resources/silx_resources.qrc">
+            <normaloff>:/png/gui/icons/clipboard.png</normaloff>:/png/gui/icons/clipboard.png</iconset>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="Line" name="line">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="btnCopySelectedEpochs">
+          <property name="enabled">
+           <bool>true</bool>
+          </property>
+          <property name="toolTip">
+           <string notr="true">Copy Selections</string>
+          </property>
+          <property name="statusTip">
+           <string notr="true">CopySelections</string>
+          </property>
+          <property name="text">
+           <string notr="true">Copy Selections</string>
+          </property>
+          <property name="icon">
+           <iconset resource="../../../../../../../silx/src/silx/resources/silx_resources.qrc">
+            <normaloff>:/png/gui/icons/edit-copy.png</normaloff>:/png/gui/icons/edit-copy.png</iconset>
+          </property>
+          <property name="autoRaise">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="btnLoadUserSelectedFromAnnotations">
+          <property name="enabled">
+           <bool>true</bool>
+          </property>
+          <property name="toolTip">
+           <string notr="true">Load Selections from Annotations</string>
+          </property>
+          <property name="statusTip">
+           <string notr="true">LoadSelections</string>
+          </property>
+          <property name="text">
+           <string notr="true">Load Selections from Annotations</string>
+          </property>
+          <property name="icon">
+           <iconset resource="../../../../../../../silx/src/silx/resources/silx_resources.qrc">
+            <normaloff>:/png/gui/icons/document-open.png</normaloff>:/png/gui/icons/document-open.png</iconset>
+          </property>
+          <property name="autoRaise">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="Line" name="line_2">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="toolButton_Printer">
+          <property name="toolTip">
+           <string notr="true">Printer</string>
+          </property>
+          <property name="text">
+           <string notr="true">Printer</string>
+          </property>
+          <property name="icon">
+           <iconset resource="../../../../../../../silx/src/silx/resources/silx_resources.qrc">
+            <normaloff>:/png/gui/icons/document-print.png</normaloff>:/png/gui/icons/document-print.png</iconset>
+          </property>
+          <property name="autoRaise">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="horizontalSpacer_fixedSmall">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeType">
+           <enum>QSizePolicy::Ignored</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>10</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item>
+         <widget class="QToolButton" name="toolButton_Brush">
+          <property name="toolTip">
+           <string notr="true">Brush</string>
+          </property>
+          <property name="text">
+           <string notr="true">Brush</string>
+          </property>
+          <property name="icon">
+           <iconset resource="../../../../../../../silx/src/silx/resources/silx_resources.qrc">
+            <normaloff>:/png/gui/icons/draw-brush.png</normaloff>:/png/gui/icons/draw-brush.png</iconset>
+          </property>
+          <property name="checkable">
+           <bool>true</bool>
+          </property>
+          <property name="autoExclusive">
+           <bool>true</bool>
+          </property>
+          <attribute name="buttonGroup">
+           <string notr="true">buttonGroup_ActiveTool</string>
+          </attribute>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="toolButton_Pencil">
+          <property name="toolTip">
+           <string notr="true">Pencil</string>
+          </property>
+          <property name="text">
+           <string notr="true">Pencil</string>
+          </property>
+          <property name="icon">
+           <iconset resource="../../../../../../../silx/src/silx/resources/silx_resources.qrc">
+            <normaloff>:/png/gui/icons/draw-pencil.png</normaloff>:/png/gui/icons/draw-pencil.png</iconset>
+          </property>
+          <property name="checkable">
+           <bool>true</bool>
+          </property>
+          <property name="autoExclusive">
+           <bool>true</bool>
+          </property>
+          <attribute name="buttonGroup">
+           <string notr="true">buttonGroup_ActiveTool</string>
+          </attribute>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="toolButton_Eraser">
+          <property name="toolTip">
+           <string notr="true">Eraser</string>
+          </property>
+          <property name="text">
+           <string notr="true">Eraser</string>
+          </property>
+          <property name="icon">
+           <iconset resource="../../../../../../../silx/src/silx/resources/silx_resources.qrc">
+            <normaloff>:/png/gui/icons/draw-rubber.png</normaloff>:/png/gui/icons/draw-rubber.png</iconset>
+          </property>
+          <property name="checkable">
+           <bool>true</bool>
+          </property>
+          <property name="autoExclusive">
+           <bool>true</bool>
+          </property>
+          <attribute name="buttonGroup">
+           <string notr="true">buttonGroup_ActiveTool</string>
+          </attribute>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources>
+  <include location="../../../../../../../silx/src/silx/resources/silx_resources.qrc"/>
+ </resources>
+ <connections/>
+ <buttongroups>
+  <buttongroup name="buttonGroup_ActiveTool"/>
+ </buttongroups>
+</ui>

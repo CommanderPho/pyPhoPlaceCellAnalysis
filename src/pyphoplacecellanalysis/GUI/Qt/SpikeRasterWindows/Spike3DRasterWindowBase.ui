@@ -101,6 +101,10 @@ border-color: rgb(0, 0, 0);</string>
           <verstretch>1</verstretch>
          </sizepolicy>
         </property>
+        <property name="styleSheet">
+         <string notr="true">background-color: rgb(85, 0, 0);
+</string>
+        </property>
         <property name="frameShape">
          <enum>QFrame::StyledPanel</enum>
         </property>
@@ -148,6 +152,9 @@ border-color: rgb(0, 0, 0);</string>
            <width>0</width>
            <height>200</height>
           </size>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">background-color:rgb(85, 85, 0);</string>
          </property>
         </widget>
        </widget>

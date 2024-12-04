@@ -1,9 +1,13 @@
 from copy import copy, deepcopy
 from neuropy.core import Epoch
+from pyphocorehelpers.function_helpers import function_attributes
 import numpy as np
 import pandas as pd
 
 from qtpy import QtCore
+
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from nptyping import NDArray
 
 from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable, iPythonKeyCompletingMixin
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
@@ -172,13 +176,13 @@ class EpochRenderingMixin:
     #######################################################################################################################################
     
     @QtCore.Slot(object)
-    def EpochRenderingMixin_on_interval_datasource_changed(self, datasource):
+    def EpochRenderingMixin_on_interval_datasource_changed(self, datasource: IntervalsDatasource):
         """ emit our own custom signal when the general datasource update method returns """
         # print(f'datasource: {datasource.custom_datasource_name}')
         self.add_rendered_intervals(datasource, name=datasource.custom_datasource_name, debug_print=False) # updates the rendered intervals on the change
         
         
-    def add_rendered_intervals(self, interval_datasource, name=None, child_plots=None, debug_print=False):
+    def add_rendered_intervals(self, interval_datasource: IntervalsDatasource, name=None, child_plots=None, debug_print=False):
         """ adds or updates the intervals specified by the interval_datasource to the plots 
         
         Inputs: 
@@ -311,7 +315,7 @@ class EpochRenderingMixin:
         for a_plot, a_rect_item in extant_rects_plot_item.items():
             if not isinstance(a_plot, str):
                 if child_plots_removal_list is not None:
-                    if a_plot in child_plots_removal_list:
+                    if (a_plot in child_plots_removal_list):
                         # only remove if the plot is in the child plots:
                         self._perform_remove_render_item(a_plot, a_rect_item)
                         items_to_remove_from_rendered_epochs.append(a_plot)
@@ -401,8 +405,69 @@ class EpochRenderingMixin:
     
         return out_dict
 
+
+    def get_all_rendered_intervals_dict(self, debug_print=False) -> Dict[str, Dict[str, IntervalRectsItem]]:
+        """ Returns a dictionary containing the hierarchy of all the members. Can optionally also print. 
+        
+        Example:
+            interval_info = active_2d_plot.list_all_rendered_intervals()
+            >>> CONSOLE OUTPUT >>>        
+                rendered_epoch_names: ['PBEs', 'Laps']
+                    name: PBEs - 0 plots:
+                    name: Laps - 2 plots:
+                        background_static_scroll_window_plot: plot[42 intervals]
+                        main_plot_widget: plot[42 intervals]
+                out_dict: {'PBEs': {}, 'Laps': {'background_static_scroll_window_plot': 'plot[42 intervals]', 'main_plot_widget': 'plot[42 intervals]'}}
+            <<<
+        
+            interval_info
+                {'PBEs': {},
+                'Laps': {'background_static_scroll_window_plot': 'plot[42 intervals]',
+                'main_plot_widget': 'plot[42 intervals]'}}
+        """
+        out_dict = {}
+        rendered_epoch_names = self.interval_datasource_names
+        if debug_print:
+            print(f'rendered_epoch_names: {rendered_epoch_names}')
+        for a_name in rendered_epoch_names:
+            out_dict[a_name] = {}
+            a_render_container = self.rendered_epochs[a_name]
+            render_container_items = {key:value for key, value in a_render_container.items() if (not isinstance(key, str))}
+            if debug_print:
+                print(f'\tname: {a_name} - {len(render_container_items)} plots:')
+                # print(f'\t\ta_render_container: {a_render_container}')
+            curr_plots_dict = {}
+            
+            for a_plot, a_rect_item in render_container_items.items():
+                if isinstance(a_plot, str):
+                    ## This is still happening due to the '__class__' item!
+                    print(f'WARNING: there was an item in a_render_container of type string: (a_plot: {a_plot} <{type(a_plot)}>, a_rect_item: {type(a_rect_item)}')
+                    # pass 
+                else:
+                    if isinstance(a_rect_item, IntervalRectsItem):
+                        num_intervals = len(a_rect_item.data)
+                    else:
+                        num_intervals = len(a_rect_item) # for 3D plots, for example, we have a list of meshes which we will use len(...) to get the number of
+                        
+                    if debug_print:
+                        print(f'\t\t{a_plot.objectName()}: plot[{num_intervals} intervals]')
+
+                    # curr_plots_dict[a_plot.objectName()] = f'plot[{num_intervals} intervals]'
+
+                    curr_plots_dict[a_plot.objectName()] = a_rect_item
+
+
+            out_dict[a_name] = curr_plots_dict
+            
+        if debug_print:
+            print(f'out_dict: {out_dict}')
+
+        return out_dict
+
+
+
     def update_rendered_intervals_visualization_properties(self, update_dict):
-        """ Updates the interval datasources from the provided update_dict
+        """ Updates the interval datasources (and thus the actual rendered rectangles) from the provided `update_dict`
 
         Args:
             update_dict (_type_): _description_
@@ -535,7 +600,7 @@ class EpochRenderingMixin:
         return ( _temp_active_effective_series_extreme_vertical_offsets.min(), _temp_active_effective_series_extreme_vertical_offsets.max()), all_series_positioning_dfs # (-24.16666666666667, -5.0)
 
 
-
+    @function_attributes(short_name=None, tags=['layout', 'epochs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-03 11:23', related_items=[])
     def apply_stacked_epoch_layout(self, rendered_interval_keys, desired_interval_height_ratios, epoch_render_stack_height=20.0, interval_stack_location='below', debug_print=True):
         """ Builds and applies a stacked layout for the list of specified epochs
 
@@ -586,13 +651,13 @@ class EpochRenderingMixin:
         """ adds a thick separator line between the spikes and the epochs. """
         _out_lines_dict = {}
         for a_dest_plot in self.interval_rendering_plots:
-            _out_lines_dict[a_dest_plot.objectName()] = a_dest_plot.addLine(x=None, y=0.0, pen={'color':'w', 'width':3.0}, name='EpochDividerLine') # pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.InfiniteLine.InfiniteLine
+            _out_lines_dict[a_dest_plot.objectName()] = a_dest_plot.addLine(x=None, y=0.0, pen={'color':'w', 'width':4.0}, name='EpochDividerLine') # pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.InfiniteLine.InfiniteLine
         return _out_lines_dict
 
 
 
     # 2023-10-16 - Interval `EpochDisplayConfig` extraction from datasources: ____________________________________________ #
-    def extract_interval_display_config_lists(self):
+    def extract_interval_display_config_lists(self) -> Dict: #[str, EpochDisplayConfig]:
         """ Build the EpochDisplayConfig lists for each interval datasource
 
         
@@ -615,6 +680,73 @@ class EpochRenderingMixin:
 
         return out_configs_dict
     
+
+    @function_attributes(short_name=None, tags=['epoch', 'epoch_render_config_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-02 03:38', related_items=[])
+    def build_or_update_epoch_render_configs_widget(self, parent=None):
+        """
+        Called to update the render epoch configuration manager from the internal epoch datasources
+        """
+        from pyphoplacecellanalysis.GUI.Qt.Widgets.EpochRenderConfigWidget.EpochRenderConfigWidget import EpochRenderConfigsListWidget
+
+        epoch_display_configs = self.extract_interval_display_config_lists()
+        an_epochs_display_list_widget = self.ui.get('epochs_render_configs_widget', None)
+        if an_epochs_display_list_widget is None:
+            # create a new one:    
+            an_epochs_display_list_widget:EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(epoch_display_configs, parent=parent)
+            self.ui.epochs_render_configs_widget = an_epochs_display_list_widget
+        else:
+            an_epochs_display_list_widget.update_from_configs(configs=epoch_display_configs)
+
+
+    @function_attributes(short_name=None, tags=['epochs', 'epoch_render_configs', 'update', 'sync'], input_requires=[], output_provides=[], uses=['self.extract_interval_display_config_lists'], used_by=[], creation_date='2024-07-03 11:27', related_items=['update_epochs_from_configs_widget'])
+    def build_or_update_epoch_render_configs_widget(self, parent=None):
+        """ `Plotted Rects` -> `configs widget`
+        Called to update the render epoch configuration manager from the internal epoch datasources
+        """
+        epoch_display_configs = self.extract_interval_display_config_lists()
+        an_epochs_display_list_widget = self.ui.get('epochs_render_configs_widget', None)
+        if an_epochs_display_list_widget is None:
+            # create a new one:    
+            print(f'no epochs_render_configs_widget exists, creating a new one...')
+            an_epochs_display_list_widget:EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(epoch_display_configs, parent=parent)
+            self.ui.epochs_render_configs_widget = an_epochs_display_list_widget
+        else:
+            an_epochs_display_list_widget.update_from_configs(configs=epoch_display_configs)
+
+
+    @function_attributes(short_name=None, tags=['epochs', 'epoch_render_configs', 'update', 'sync'], input_requires=[], output_provides=[], uses=['self.update_rendered_intervals_visualization_properties'], used_by=[], creation_date='2024-07-03 11:27', related_items=['build_or_update_epoch_render_configs_widget'])
+    def update_epochs_from_configs_widget(self):
+        """ Update plots from configs:
+        configs widget -> `Plotted Rects` 
+        
+        Usage:
+        update_epochs_from_configs_widget(active_2d_plot)
+
+        """
+        an_epochs_display_list_widget = self.ui.get('epochs_render_configs_widget', None)
+        if an_epochs_display_list_widget is None:
+            # create a new one:    
+            raise NotImplementedError
+            # an_epochs_display_list_widget:EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(active_2d_plot.extract_interval_display_config_lists(), parent=active_2d_plot)
+            # active_2d_plot.ui.epochs_render_configs_widget = an_epochs_display_list_widget
+        # else:
+        #     an_epochs_display_list_widget.update_from_configs(configs=epoch_display_configs)
+
+        ## get the configs from the configs widget
+        _out_configs = an_epochs_display_list_widget.configs_from_states()
+        update_dict = {k:v.to_dict() for k, v in _out_configs.items()}
+        self.update_rendered_intervals_visualization_properties(update_dict=update_dict)
+
+
+
+
+
+
+
+
+
+
+
 
     # ---------------------------------------------------------------------------- #
     #                          Private Implementor Methods                         #
@@ -778,3 +910,6 @@ class EpochRenderingMixin:
 
         return required_vertical_offsets, required_interval_heights
 
+
+
+    

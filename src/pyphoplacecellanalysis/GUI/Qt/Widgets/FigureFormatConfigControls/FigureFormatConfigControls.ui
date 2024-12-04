@@ -14,7 +14,7 @@
    <string>Figure Format Configuration</string>
   </property>
   <property name="windowIcon">
-   <iconset resource="../../../../External/breeze_style_sheets/dist/qrc/breeze.qrc">
+   <iconset>
     <normaloff>:/light/file_dialog_detailed.svg</normaloff>:/light/file_dialog_detailed.svg</iconset>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
@@ -107,7 +107,7 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>248</width>
+              <width>252</width>
               <height>210</height>
              </rect>
             </property>
@@ -186,7 +186,7 @@
         <x>0</x>
         <y>0</y>
         <width>428</width>
-        <height>126</height>
+        <height>127</height>
        </rect>
       </property>
       <property name="sizePolicy">
@@ -196,7 +196,7 @@
        </sizepolicy>
       </property>
       <attribute name="icon">
-       <iconset resource="../../../../External/breeze_style_sheets/dist/qrc/breeze.qrc">
+       <iconset>
         <normaloff>:/light/desktop.svg</normaloff>:/light/desktop.svg</iconset>
       </attribute>
       <attribute name="label">
@@ -246,8 +246,8 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>100</width>
-        <height>130</height>
+        <width>428</width>
+        <height>267</height>
        </rect>
       </property>
       <property name="sizePolicy">
@@ -257,7 +257,7 @@
        </sizepolicy>
       </property>
       <attribute name="icon">
-       <iconset resource="../../../../External/breeze_style_sheets/dist/qrc/breeze.qrc">
+       <iconset>
         <normaloff>:/light/file_dialog_list.svg</normaloff>:/light/file_dialog_list.svg</iconset>
       </attribute>
       <attribute name="label">

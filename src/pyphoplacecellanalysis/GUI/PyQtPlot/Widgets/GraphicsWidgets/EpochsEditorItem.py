@@ -81,8 +81,17 @@ class EpochsEditor:
         if ('lap_color' not in curr_laps_df.columns) or ('lap_accent_color' not in curr_laps_df.columns):
             curr_laps_df['lap_color'] = DisplayColorsEnum.Laps.RL
             curr_laps_df['lap_accent_color'] = '#6227ffde'
-            curr_laps_df.loc[(curr_laps_df['lap_dir'] > 0), 'lap_color'] = DisplayColorsEnum.Laps.LR
-            curr_laps_df.loc[(curr_laps_df['lap_dir'] > 0), 'lap_accent_color'] = '#c4ff26de'
+
+            # lap_direction_df_key: str = 'lap_dir'
+            lap_direction_df_key: str = 'is_LR_dir'
+            assert lap_direction_df_key in curr_laps_df.columns, f"lap_direction_df_key ({lap_direction_df_key}) missing from curr_laps_df.columns: {list(curr_laps_df.columns)}"
+            curr_laps_df.loc[(curr_laps_df['is_LR_dir']), 'lap_color'] = DisplayColorsEnum.Laps.LR
+            curr_laps_df.loc[(curr_laps_df['is_LR_dir']), 'lap_accent_color'] = '#c4ff26de'
+
+            # assert 'lap_dir' in curr_laps_df.columns, f"'lap_dir' missing from curr_laps_df.columns: {list(curr_laps_df.columns)}"
+            # curr_laps_df.loc[(curr_laps_df['lap_dir'] > 0), 'lap_color'] = DisplayColorsEnum.Laps.LR
+            # curr_laps_df.loc[(curr_laps_df['lap_dir'] > 0), 'lap_accent_color'] = '#c4ff26de'
+
         return curr_laps_df
 
     @classmethod

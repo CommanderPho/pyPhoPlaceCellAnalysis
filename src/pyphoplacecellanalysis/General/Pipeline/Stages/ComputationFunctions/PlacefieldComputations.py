@@ -9,7 +9,7 @@ from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent, perf
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder, computation_precidence_specifying_function, global_function
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 
 
@@ -43,7 +43,7 @@ class PlacefieldComputations(AllFunctionEnumeratingMixin, metaclass=ComputationF
         return _initial_placefield_computation(computation_result.sess, computation_result.computation_config.pf_params, computation_result)
     
     
-
+    @computation_precidence_specifying_function(overriden_computation_precidence=9)
     @function_attributes(short_name='pfdt_computation', tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-30 19:58', related_items=[],
                          validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf1D_dt'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf2D_dt']))
     def _perform_time_dependent_placefield_computation(computation_result: ComputationResult, debug_print=False):

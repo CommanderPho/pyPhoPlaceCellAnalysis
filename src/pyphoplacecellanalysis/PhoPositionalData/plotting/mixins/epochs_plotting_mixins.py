@@ -75,6 +75,20 @@ class EpochDisplayConfig(BasePlotDataParams):
     height = param.Number(default=7.5, bounds=(0.1, 50.0), step=0.1)
     y_location = param.Number(default=-12.0, bounds=(-200.0, 1000.0), step=2.0)
 
+    @staticmethod
+    def _config_update_watch_labels():
+        ## any updates
+        return ['pen_color', 'pen_opacity', 'brush_color', 'brush_opacity', 'desired_height_ratio', 'height', 'y_location', 'desired_height_ratio', 'height', 'y_location', 'isVisible']
+    @staticmethod
+    def _config_display_watch_labels():
+        return ['pen_color', 'pen_opacity', 'brush_color', 'brush_opacity', 'desired_height_ratio', 'height', 'y_location']
+    @staticmethod
+    def _config_layout_watch_labels():
+        return ['desired_height_ratio', 'height', 'y_location']
+    @staticmethod
+    def _config_visibility_watch_labels():
+        return ['isVisible']
+    
 
     @classmethod
     def init_from_config_dict(cls, name: str, config_dict: dict):
@@ -153,7 +167,6 @@ class EpochDisplayConfig(BasePlotDataParams):
         return cls(name=name, isVisible=True, y_location=y_location, height=height, pen_color=pen_color, pen_opacity=pen_opacity, brush_color=brush_color, brush_opacity=brush_opacity)
 
 
-
     @classmethod
     def init_configs_list_from_interval_datasource_df(cls, name: str, a_ds) -> List["EpochDisplayConfig"]:
         """
@@ -220,7 +233,7 @@ class EpochDisplayConfig(BasePlotDataParams):
 
 
 
-def _get_default_epoch_configs():
+def _get_default_epoch_configs() -> Dict[str, EpochDisplayConfig]:
     epochs_update_dict = {
         # 'SessionEpochs': EpochDisplayConfig(brush_color='#00ffff', brush_opacity=0.5, name='SessionEpochs', pen_color='#00ffff', pen_opacity=0.8, height=2.469135802469136, y_location=-12.34567901234568),
         'Laps': EpochDisplayConfig(brush_color='#ff0000', brush_opacity=0.5, name='Laps', pen_color='#ff0000', pen_opacity=0.8, height=4.938271604938272, y_location=-9.876543209876544),	

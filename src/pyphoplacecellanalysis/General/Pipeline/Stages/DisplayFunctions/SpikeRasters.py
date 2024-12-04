@@ -545,16 +545,23 @@ class NewSimpleRaster:
     
     """
     neuron_IDs: NDArray = field(repr=True)
-    neuron_colors: Dict[int, QColor] = field(init=False, repr=False)
-    neuron_y_pos: Dict[int, float] = field(init=False, repr=True)
+    neuron_colors: Dict[int, QColor] = field(init=False, repr=False) # , default=Factory(dict)
+    neuron_y_pos: Dict[int, float] = field(init=False, repr=True) # , default=Factory(dict)
+
+    def __attrs_post_init__(self):
+        self.neuron_colors = dict()
+        self.neuron_y_pos = dict()
 
     @classmethod
     def init_from_neuron_ids(cls, neuron_IDs, neuron_colors=None):
         _obj = cls(neuron_IDs=neuron_IDs)
         n_cells = len(_obj.neuron_IDs)
+        # _obj.neuron_colors = None
+        # _obj.neuron_y_pos = None
         
         if neuron_colors is None:	
             neuron_qcolors_list = DataSeriesColorHelpers._build_cell_qcolor_list(np.arange(n_cells), mode=UnitColoringMode.PRESERVE_FRAGILE_LINEAR_NEURON_IDXS, provided_cell_colors=None)
+            _obj.neuron_colors = dict(zip(_obj.neuron_IDs, neuron_qcolors_list))
         else:
             
             if isinstance(neuron_colors, dict):
@@ -675,7 +682,7 @@ class NewSimpleRaster:
         # config_fragile_linear_neuron_IDX_map values are of the form: (i, fragile_linear_neuron_IDX, curr_pen, self._series_identity_lower_y_values[i], self._series_identity_upper_y_values[i])
         # Emphasis/Deemphasis-Dependent Pens:
         # curr_spike_pens = [config_fragile_linear_neuron_IDX_map[a_fragile_linear_neuron_IDX][2][a_spike_emphasis_state] for a_fragile_linear_neuron_IDX, a_spike_emphasis_state in zip(filtered_spikes_df['fragile_linear_neuron_IDX'].to_numpy(), filtered_spikes_df['visualization_raster_emphasis_state'].to_numpy())] # get the pens for each spike from the configs map
-        curr_spike_pens = [pg.mkPen(self.neuron_colors[aclu], width=1) for aclu, a_spike_emphasis_state in zip(filtered_spikes_df['aclu'].to_numpy(), filtered_spikes_df['visualization_raster_emphasis_state'].to_numpy())] # ignores emphasis state
+        curr_spike_pens = [pg.mkPen(self.neuron_colors[aclu], width=1) for aclu, a_spike_emphasis_state in zip(filtered_spikes_df['aclu'].to_numpy(), filtered_spikes_df['visualization_raster_emphasis_state'].to_numpy())] # ignores emphasis state ## 2024-11-05 12:36 AttributeError: 'NewSimpleRaster' object has no attribute 'neuron_colors'
         curr_spikes_brushes = [pg.mkBrush(self.neuron_colors[aclu]) for aclu, a_spike_emphasis_state in zip(filtered_spikes_df['aclu'].to_numpy(), filtered_spikes_df['visualization_raster_emphasis_state'].to_numpy())] # ignores emphasis state
 
         curr_n = len(curr_spike_t) # curr number of spikes
@@ -1254,7 +1261,7 @@ def _prepare_spikes_df_from_filter_epochs(spikes_df: pd.DataFrame, filter_epochs
 
 
 @function_attributes(short_name=None, tags=['neuron_ID', 'color'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-28 11:07', related_items=[])
-def build_shared_sorted_neuron_color_maps(neuron_IDs_lists) -> Tuple[Dict, Dict]:
+def build_shared_sorted_neuron_color_maps(neuron_IDs_lists, return_255_array: bool=True) -> Tuple[Dict, Dict]:
     """ builds the shared colors for all neuron_IDs in any of the lists. This approach lends itself to globally-unique color mapping, like would be done when wanting to compare between different spike raster plots. 
 
     Outputs:
@@ -1268,7 +1275,7 @@ def build_shared_sorted_neuron_color_maps(neuron_IDs_lists) -> Tuple[Dict, Dict]
     any_list_neuron_IDs = np.sort(union_of_arrays(*neuron_IDs_lists)) # neuron_IDs as they appear in any list
     ## build color values from these:
     any_list_n_neurons = len(any_list_neuron_IDs)
-    _neuron_qcolors_list, neuron_colors_ndarray = DataSeriesColorHelpers.build_cell_colors(any_list_n_neurons, colormap_name='PAL-relaxed_bright', colormap_source=None)
+    _neuron_qcolors_list, neuron_colors_ndarray = DataSeriesColorHelpers.build_cell_colors(any_list_n_neurons, colormap_name='PAL-relaxed_bright', colormap_source=None, return_255_array=return_255_array)
     unit_colors_ndarray_map: Dict = dict(zip(any_list_neuron_IDs, neuron_colors_ndarray.copy().T)) # Int:NDArray[(4,)] - {5: array([255, 157, 0.278431, 1]), 7: array([252.817, 175.545, 0.202502, 1]), ...}
     unit_qcolors_map: Dict = dict(zip(any_list_neuron_IDs, _neuron_qcolors_list.copy())) # Int:NDArray[(4,)] - {5: array([255, 157, 0.278431, 1]), 7: array([252.817, 175.545, 0.202502, 1]), ...}
     # `unit_colors_map` is main colors output
@@ -1483,66 +1490,67 @@ def _build_additional_spikeRaster2D_menus(spike_raster_plt_2d, owning_pipeline_r
 
 @function_attributes(short_name=None, tags=['menu', 'spike_raster', 'gui'], input_requires=[], output_provides=[], uses=['_build_additional_spikeRaster2D_menus'], used_by=['_display_spike_rasters_window'], creation_date='2023-11-09 19:32', related_items=[])
 def _build_additional_window_menus(spike_raster_window, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx):
-        assert owning_pipeline_reference is not None
-        active_config_name: str = _recover_filter_config_name_from_display_context(owning_pipeline_reference, active_display_fn_identifying_ctx) # recover active_config_name from the context
+    assert owning_pipeline_reference is not None
+    active_config_name: str = _recover_filter_config_name_from_display_context(owning_pipeline_reference, active_display_fn_identifying_ctx) # recover active_config_name from the context
 
-        ## SpikeRaster2D Specific Items:
-        output_references = _build_additional_spikeRaster2D_menus(spike_raster_window.spike_raster_plt_2d, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx)
+    ## SpikeRaster2D Specific Items:
+    output_references = _build_additional_spikeRaster2D_menus(spike_raster_window.spike_raster_plt_2d, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx)
 
-        ## Note that curr_main_menu_window is usually not the same as spike_raster_window, instead curr_main_menu_window wraps it and produces the final output window
-        curr_main_menu_window, menuConnections, connections_actions_dict = ConnectionControlsMenuMixin.try_add_connections_menu(spike_raster_window)
+    ## Note that curr_main_menu_window is usually not the same as spike_raster_window, instead curr_main_menu_window wraps it and produces the final output window
+    curr_main_menu_window, menuConnections, connections_actions_dict = ConnectionControlsMenuMixin.try_add_connections_menu(spike_raster_window)
+    spike_raster_window.main_menu_window = curr_main_menu_window # to retain the changes
+
+    if owning_pipeline_reference is not None:
+        if active_display_fn_identifying_ctx not in owning_pipeline_reference.display_output:
+            owning_pipeline_reference.display_output[active_display_fn_identifying_ctx] = PhoUIContainer() # create a new context
+        
+        display_output = owning_pipeline_reference.display_output[active_display_fn_identifying_ctx]
+        # print(f'display_output: {display_output}')
+        curr_main_menu_window, menuCreateNewConnectedWidget, createNewConnected_actions_dict = CreateNewConnectedWidgetMenuHelper.try_add_create_new_connected_widget_menu(spike_raster_window, owning_pipeline_reference, active_config_name, display_output) 
         spike_raster_window.main_menu_window = curr_main_menu_window # to retain the changes
         
+    else:
+        print(f'ERROR: _build_additional_window_menus(...) has no owning_pipeline_reference in its parameters, so it cannot add the CreateNewConnectedWidgetMenuMixin menus.')
+        menuCreateNewConnectedWidget = None
+        createNewConnected_actions_dict = None
+        
+    # Debug Menu
+    _debug_menu_provider = DebugMenuProviderMixin(render_widget=spike_raster_window)
+    spike_raster_window.main_menu_window.ui.menus.global_window_menus.debug.menu_provider_obj = _debug_menu_provider
+
+    # Docked Menu
+    _docked_menu_provider = DockedWidgets_MenuProvider(render_widget=spike_raster_window)
+    _docked_menu_provider.DockedWidgets_MenuProvider_on_buildUI(spike_raster_window=spike_raster_window, owning_pipeline_reference=owning_pipeline_reference, context=active_display_fn_identifying_ctx, active_config_name=active_config_name, display_output=owning_pipeline_reference.display_output[active_display_fn_identifying_ctx])
+    spike_raster_window.main_menu_window.ui.menus.global_window_menus.docked_widgets.menu_provider_obj = _docked_menu_provider
+
+    # Create Linked Widget Menu
+    ## Adds the custom renderable menu to the top-level menu of the plots in Spike2DRaster
+    active_pf_2D_dt = computation_result.computed_data.get('pf2D_dt', None)
+    if active_pf_2D_dt is not None:
+        active_pf_2D_dt.reset()
+        active_pf_2D_dt.update(t=45.0, start_relative_t=True)
+
+        # _createLinkedWidget_menus = LocalMenus_AddRenderable.add_Create_Paired_Widget_menu(spike_raster_window, active_pf_2D_dt)  # Adds the custom context menus for SpikeRaster2D
+        _createLinkedWidget_menu_provider = CreateLinkedWidget_MenuProvider(render_widget=spike_raster_window)
         if owning_pipeline_reference is not None:
             if active_display_fn_identifying_ctx not in owning_pipeline_reference.display_output:
                 owning_pipeline_reference.display_output[active_display_fn_identifying_ctx] = PhoUIContainer() # create a new context
-            
+        
             display_output = owning_pipeline_reference.display_output[active_display_fn_identifying_ctx]
-            # print(f'display_output: {display_output}')
-            curr_main_menu_window, menuCreateNewConnectedWidget, createNewConnected_actions_dict = CreateNewConnectedWidgetMenuHelper.try_add_create_new_connected_widget_menu(spike_raster_window, owning_pipeline_reference, active_config_name, display_output) 
-            spike_raster_window.main_menu_window = curr_main_menu_window # to retain the changes
-            
+            _createLinkedWidget_menu_provider.CreateLinkedWidget_MenuProvider_on_buildUI(spike_raster_window=spike_raster_window, active_pf_2D_dt=active_pf_2D_dt, context=active_display_fn_identifying_ctx, display_output=display_output)
         else:
-            print(f'WARNING: _display_spike_rasters_window(...) has no owning_pipeline_reference in its parameters, so it cannot add the CreateNewConnectedWidgetMenuMixin menus.')
-            menuCreateNewConnectedWidget = None
-            createNewConnected_actions_dict = None
+            print(f'WARNING: owning_pipeline_reference is NONE in  _display_spike_rasters_window!')   
             
-        # Debug Menu
-        _debug_menu_provider = DebugMenuProviderMixin(render_widget=spike_raster_window)
-        spike_raster_window.main_menu_window.ui.menus.global_window_menus.debug.menu_provider_obj = _debug_menu_provider
-        
-        # Docked Menu
-        _docked_menu_provider = DockedWidgets_MenuProvider(render_widget=spike_raster_window)
-        _docked_menu_provider.DockedWidgets_MenuProvider_on_buildUI(spike_raster_window=spike_raster_window, owning_pipeline_reference=owning_pipeline_reference, context=active_display_fn_identifying_ctx, active_config_name=active_config_name, display_output=owning_pipeline_reference.display_output[active_display_fn_identifying_ctx])
-        spike_raster_window.main_menu_window.ui.menus.global_window_menus.docked_widgets.menu_provider_obj = _docked_menu_provider
-        
-        # Create Linked Widget Menu
-        ## Adds the custom renderable menu to the top-level menu of the plots in Spike2DRaster
-        active_pf_2D_dt = computation_result.computed_data.get('pf2D_dt', None)
-        if active_pf_2D_dt is not None:
-            active_pf_2D_dt.reset()
-            active_pf_2D_dt.update(t=45.0, start_relative_t=True)
+        spike_raster_window.main_menu_window.ui.menus.global_window_menus.create_linked_widget.menu_provider_obj = _createLinkedWidget_menu_provider # KeyError: 'create_linked_widget' was occuring before, so I moved it into the condition where dts were had and the menus were created 
+    else:
+        print(f'active_pf_2D_dt is None! Skipping Create Paired Widget Menu...')
+        _createLinkedWidget_menu_provider = None
 
-            # _createLinkedWidget_menus = LocalMenus_AddRenderable.add_Create_Paired_Widget_menu(spike_raster_window, active_pf_2D_dt)  # Adds the custom context menus for SpikeRaster2D
-            _createLinkedWidget_menu_provider = CreateLinkedWidget_MenuProvider(render_widget=spike_raster_window)
-            if owning_pipeline_reference is not None:
-                if active_display_fn_identifying_ctx not in owning_pipeline_reference.display_output:
-                    owning_pipeline_reference.display_output[active_display_fn_identifying_ctx] = PhoUIContainer() # create a new context
-            
-                display_output = owning_pipeline_reference.display_output[active_display_fn_identifying_ctx]
-                _createLinkedWidget_menu_provider.CreateLinkedWidget_MenuProvider_on_buildUI(spike_raster_window=spike_raster_window, active_pf_2D_dt=active_pf_2D_dt, context=active_display_fn_identifying_ctx, display_output=display_output)
-            else:
-                print(f'WARNING: owning_pipeline_reference is NONE in  _display_spike_rasters_window!')   
-        else:
-            print(f'active_pf_2D_dt is None! Skipping Create Paired Widget Menu...')
-            _createLinkedWidget_menu_provider = None
     
-        spike_raster_window.main_menu_window.ui.menus.global_window_menus.create_linked_widget.menu_provider_obj = _createLinkedWidget_menu_provider
-
-        output_references = output_references.extend([curr_main_menu_window, menuConnections, connections_actions_dict,
-            curr_main_menu_window, menuCreateNewConnectedWidget, createNewConnected_actions_dict,
-            _debug_menu_provider,
-            _docked_menu_provider,
-            _createLinkedWidget_menu_provider
-        ])
-        return output_references
+    output_references.extend([curr_main_menu_window, menuConnections, connections_actions_dict, # note .extend(...) function works in-place and does not return a result, which is why this function was returning None originally.
+        curr_main_menu_window, menuCreateNewConnectedWidget, createNewConnected_actions_dict,
+        _debug_menu_provider,
+        _docked_menu_provider,
+        _createLinkedWidget_menu_provider
+    ])
+    return output_references

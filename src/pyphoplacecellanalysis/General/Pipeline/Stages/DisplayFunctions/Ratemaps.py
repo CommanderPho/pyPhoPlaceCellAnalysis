@@ -17,7 +17,7 @@ from neuropy.plotting.placemaps import plot_all_placefields
 from neuropy.plotting.ratemaps import BackgroundRenderingOptions # for _plot_latent_recursive_pfs_depth_level
 from neuropy.utils.matplotlib_helpers import enumTuningMap2DPlotVariables # for getting the variant name from the dict
 from neuropy.utils.mixins.unwrap_placefield_computation_parameters import unwrap_placefield_computation_parameters
-from neuropy.utils.dynamic_container import overriding_dict_with
+from neuropy.utils.mixins.dict_representable import overriding_dict_with
 
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
 from pyphocorehelpers.DataStructure.RenderPlots.PyqtgraphRenderPlots import PyqtgraphRenderPlots
@@ -218,7 +218,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         # return occupancy_fig, active_pf_2D_figures
         return MatplotlibRenderPlots(figures=[occupancy_fig, active_pf_2D_figures])   
 
-    @function_attributes(short_name='placemaps_pyqtplot_2D', tags=['display', 'placefields', '2D', 'pyqtgraph', 'pyqtplot'], conforms_to=['context_returning'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-11 03:05')
+    @function_attributes(short_name='placemaps_pyqtplot_2D', tags=['display', 'placefields', '2D', 'pyqtgraph', 'pyqtplot'], conforms_to=['context_returning'], input_requires=[], output_provides=[], uses=['display_all_pf_2D_pyqtgraph_binned_image_rendering'], used_by=[], creation_date='2023-04-11 03:05')
     def _display_placemaps_pyqtplot_2D(computation_result, active_config, enable_saving_to_disk=False, active_context=None, defer_show:bool=False, **kwargs):
         """  displays 2D placefields in a pyqtgraph window
         """

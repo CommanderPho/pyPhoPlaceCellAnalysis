@@ -62,6 +62,11 @@ class InteractivePyvistaPlotterBuildIfNeededMixin:
         return pActiveTuningCurvesPlotter
 
 
+    @property
+    def is_multiplotter(self) -> bool:
+        return (hasattr(self.p, '__getitem__') and hasattr(self.p, '_nrows') and hasattr(self.p, '_ncols'))
+    
+
 class InteractivePyvistaPlotter_ObjectManipulationMixin:
     """ Has a self.plots dict that uses string keys to access named plots
         This mixin adds functions that enables interactive manipulation of plotted objects post-hoc
@@ -119,7 +124,7 @@ class InteractivePyvistaPlotter_PointAndPathPlottingMixin:
         self.plots_data[plot_name] = {'pdata_current_point':pdata_current_point, 'pc_current_point':pc_current_point}
         self.plots[plot_name] = self.p.add_mesh(pc_current_point, name=plot_name, render=render, **({'color':'green', 'ambient':0.6, 'opacity':0.5,
                         'show_edges':True, 'edge_color':[0.05, 0.8, 0.08], 'line_width':3.0, 'nan_opacity':0.0, 'render_lines_as_tubes':True,
-                        'show_scalar_bar':False, 'use_transparency':True} | kwargs))
+                        'show_scalar_bar':False, 'use_transparency':True, 'reset_camera':False} | kwargs))
         return self.plots[plot_name], self.plots_data[plot_name]
 
 
@@ -145,7 +150,7 @@ class InteractivePyvistaPlotter_PointAndPathPlottingMixin:
         pc_positionTrail = pdata_positionTrail.glyph(scale=point_size_scale_arg, geom=point_location_trail_circle)
         self.plots_data[plot_name] = {'point_cloud_fixedSegements_positionTrail':point_cloud_fixedSegements_positionTrail, 'pdata_positionTrail':pdata_positionTrail, 'pc_positionTrail':pc_positionTrail}
         self.plots[plot_name] = self.p.add_mesh(pc_positionTrail, name=plot_name, render=render, **({'ambient':0.6, 'opacity':'linear_r', 'scalars':scalars_arg, 'nan_opacity':0.0,
-                                                'show_edges':False, 'render_lines_as_tubes':True, 'show_scalar_bar':False, 'use_transparency':True} | kwargs))
+                                                'show_edges':False, 'render_lines_as_tubes':True, 'show_scalar_bar':False, 'use_transparency':True, 'reset_camera':False} | kwargs))
         return self.plots[plot_name], self.plots_data[plot_name]
             
             

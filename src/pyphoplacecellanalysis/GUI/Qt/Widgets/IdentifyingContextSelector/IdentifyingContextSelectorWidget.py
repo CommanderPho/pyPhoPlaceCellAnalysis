@@ -43,16 +43,35 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwningMixin, PipelineOwningMi
 
     sigContextChanged = pyqtSignal(object, object) # newKey: str, newContext: IdentifyingContext
     sigMultiContextChanged = pyqtSignal(dict) #contexts: dict<str:IdentifyingContext> 
-
     
     # ==================================================================================================================== #
-    def __init__(self, parent=None, owning_pipeline=None, enable_multi_context_select:bool=False):
-        super().__init__(parent=parent) # Call the inherited classes __init__ method
-        self.ui = uic.loadUi(uiFile, self) # Load the .ui file
+    # def __init__(self, parent=None, owning_pipeline=None, enable_multi_context_select:bool=False):
+    #     super().__init__(parent=parent) # Call the inherited classes __init__ method
+    #     self.ui = uic.loadUi(uiFile, self) # Load the .ui file
 
+    #     ## Set member properties:
+    #     self._enable_multi_context_select = enable_multi_context_select
+    #     self._owning_pipeline = owning_pipeline
+
+    #     self.initUI()
+    #     # self.show() # Show the GUI
+
+    @property
+    def has_valid_pipeline(self) -> bool:
+        """ Whether there is a currently an item selected or not. """
+        if self.owning_pipeline is None:
+            return False
+        else:
+            return True
+        
+
+    def __init__(self, parent=None): # owning_pipeline=None, enable_multi_context_select:bool=False
+        super().__init__(parent=parent) # Call the inherited classes __init__ method
         ## Set member properties:
-        self._enable_multi_context_select = enable_multi_context_select
-        self._owning_pipeline = owning_pipeline
+        self._enable_multi_context_select = False
+        self._owning_pipeline = None
+        self._last_context_table_rows = None
+        self.ui = uic.loadUi(uiFile, self) # Load the .ui file
 
         self.initUI()
         # self.show() # Show the GUI
@@ -65,14 +84,31 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwningMixin, PipelineOwningMi
         ## Setup checktable:
         if self._enable_multi_context_select:
             self._programmaticallyBuildCheckTable()
-        self.updateUi()
+
+        if self._owning_pipeline is not None:
+            self.updateUi()
     
+
     def updateUi(self):
-        self._tryUpdateComboItemsUi()
-        if self._enable_multi_context_select:
-            self._tryUpdateCheckTableUi()
+        if self._owning_pipeline is not None:
+            self._tryUpdateComboItemsUi()
+            if self._enable_multi_context_select:
+                self._tryUpdateCheckTableUi()
 
     
+    def build_for_pipeline(self, curr_active_pipeline):
+        self._owning_pipeline = curr_active_pipeline
+        if self._owning_pipeline is not None:
+            self.updateUi()
+        
+
+    def enable_context_selection(self, is_enabled: bool):
+        self.ui.groupBox.setEnabled(is_enabled)
+        action_buttons_list = (self.ui.btnConfirm, self.ui.btnRefresh, self.ui.btnRevert)
+        for a_btn in action_buttons_list:
+            a_btn.setEnabled(is_enabled)
+        self.ui.cmbIdentifyingContext.setEnabled(is_enabled)
+
     # ==================================================================================================================== #
     # Single-context ComboBox Dropdown                                                                                         #
     # ==================================================================================================================== #
@@ -81,6 +117,9 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwningMixin, PipelineOwningMi
     def current_selected_context_key(self):
         """The current_selected_context property."""
         ## Capture the previous selection:
+        if not hasattr(self, 'ui'):
+            return None
+
         active_keys_list = self.all_filtered_session_keys.copy()
         selected_index, selected_item_text = self.get_current_combo_item_selection(self.ui.cmbIdentifyingContext)
         if selected_index < 0:
@@ -119,11 +158,14 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwningMixin, PipelineOwningMi
         had_previous_selected_item = (selected_item_text is not None)
 
         # Build updated list:
-        # active_list_items = self.all_filtered_session_keys
-        active_list_items = self.all_filtered_session_context_descriptions
-        ## Build updated list:
-        updated_list = active_list_items
-        # updated_list.append('Custom...')
+        if self.has_valid_pipeline:
+            # active_list_items = self.all_filtered_session_keys
+            active_list_items = self.all_filtered_session_context_descriptions
+            ## Build updated list:
+            updated_list = active_list_items
+            # updated_list.append('Custom...')
+        else:
+            updated_list = []
 
         self.replace_combo_items(curr_combo_box, updated_list)
         
@@ -168,13 +210,19 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwningMixin, PipelineOwningMi
     @property
     def check_table_ctrl(self):
         """ The multi-context checkbox table widget """
-        return self.ui.checkTable
+        if self._enable_multi_context_select:
+            return self.ui.checkTable
+        else:
+            return None
 
     @property
     def current_selected_multi_context_indicies(self):
         """The indicies of the currently selected contexts (in the multi-context checkbox list).
             e.g. [0, 1]
         """
+        if self.check_table_ctrl is None:
+            ## pre-init, probably during the `self.ui = uic.loadUi(uiFile, self)` phase which for some reason tries to resolve all of the properties
+            return None
         return self.check_table_ctrl.getCheckedRows()
 
     @property
@@ -286,6 +334,9 @@ class IdentifyingContextSelectorWidget(ComboBoxCtrlOwningMixin, PipelineOwningMi
 ## Start Qt event loop
 if __name__ == '__main__':
     app = QApplication([])
-    widget = IdentifyingContextSelectorWidget()
+    from pyphoplacecellanalysis.GUI.Qt.Widgets.IdentifyingContextSelector.IdentifyingContextSelectorWidget import IdentifyingContextSelectorWidget
+
+    widget = IdentifyingContextSelectorWidget(owning_pipeline=curr_active_pipeline)
     widget.show()
+
     sys.exit(app.exec_())

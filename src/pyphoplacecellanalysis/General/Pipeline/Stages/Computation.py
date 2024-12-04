@@ -1,9 +1,10 @@
 from collections import OrderedDict
+from pickle import PicklingError
 import sys
 from copy import deepcopy
 from datetime import datetime, timedelta
 import typing
-from typing import Optional, Dict, List
+from typing import Any, Callable, Optional, Dict, List, Tuple, Union
 from warnings import warn
 import numpy as np
 import pandas as pd
@@ -11,13 +12,13 @@ from pathlib import Path
 from enum import Enum # for EvaluationActions
 from datetime import datetime
 from attrs import define, field, Factory
-
+from functools import partial
 
 # NeuroPy (Diba Lab Python Repo) Loading
 from neuropy import core
 from neuropy.core.epoch import Epoch
 from neuropy.analyses.placefields import PlacefieldComputationParameters, perform_compute_placefields
-from neuropy.utils.result_context import IdentifyingContext
+from neuropy.utils.result_context import IdentifyingContext, DisplaySpecifyingIdentifyingContext
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters # to replace simple PlacefieldComputationParameters, `load_pickled_global_computation_results`
 from pyphocorehelpers.function_helpers import compose_functions, compose_functions_with_error_handling
@@ -39,7 +40,7 @@ import pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.MultiContextComputationFunctions import _wrap_multi_context_computation_function
 
-from pyphocorehelpers.print_helpers import CapturedException # used in _execute_computation_functions for error handling
+from pyphocorehelpers.exception_helpers import CapturedException, ExceptionPrintingContext # used in _execute_computation_functions for error handling
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 
@@ -67,6 +68,47 @@ class FunctionsSearchMode(Enum):
                 return cls.GLOBAL_ONLY
             else:
                 return cls.NON_GLOBAL_ONLY
+
+
+
+def session_context_filename_formatting_fn(ctxt: DisplaySpecifyingIdentifyingContext, subset_includelist=None, subset_excludelist=None, parts_separator:str='-') -> str:
+    """ `neuropy.utils.result_context.ContextFormatRenderingFn` protocol format callable 
+    specific_purpose='filename_prefix'
+    renders a custom_prefix from the context
+    
+        
+        final_filename like "2024-10-31_1020PM-kdiba_pin01_one_11-03_12-3-25__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]-(ripple_simple_pf_pearson_merged_df)_tbin-0.025.csv"
+    only handles the "_withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]" part
+    
+    History: duplicated from `_get_custom_suffix_for_filename_from_computation_metadata` 2024-11-01 08:16 
+    """
+    to_filename_conversion_dict = {'compute_diba_quiescent_style_replay_events':'_withNewComputedReplays', 'diba_evt_file':'_withNewKamranExportedReplays', 'initial_loaded': '_withOldestImportedReplays', 'normal_computed': '_withNormalComputedReplays'}
+
+    if subset_includelist is None:
+        assert subset_includelist is None, f"subset_includelist is not supported for this formatting function but was provided as subset_includelist: {subset_includelist}"
+        # subset_includelist = []
+    if subset_excludelist is None:
+        subset_excludelist = []
+    
+    custom_suffix_string_parts = []
+    custom_suffix: str = ''
+    basic_session_property_names = ['format_name', 'animal', 'exper_name', 'session_name']
+    for a_key in basic_session_property_names:
+        if (ctxt.get(a_key, None) is not None) and (len(str(ctxt.get(a_key, None))) > 0) and (a_key not in subset_excludelist):
+            # custom_suffix_string_parts.append(f"{a_key}_{ctxt.get(a_key, None)}")
+            custom_suffix_string_parts.append(f"{ctxt.get(a_key, None)}") ## no key names
+
+    if (ctxt.get('epochs_source', None) is not None) and (len(str(ctxt.get('epochs_source', None))) > 0) and ('epochs_source' not in subset_excludelist):
+        custom_suffix_string_parts.append(to_filename_conversion_dict[ctxt.get('epochs_source', None)])
+    if (ctxt.get('included_qclu_values', None) is not None) and (len(str(ctxt.get('included_qclu_values', None))) > 0) and ('included_qclu_values' not in subset_excludelist):
+        custom_suffix_string_parts.append(f"qclu_{ctxt.get('included_qclu_values', None)}")
+    if (ctxt.get('minimum_inclusion_fr_Hz', None) is not None) and (len(str(ctxt.get('minimum_inclusion_fr_Hz', None))) > 0) and ('minimum_inclusion_fr_Hz' not in subset_excludelist):
+        custom_suffix_string_parts.append(f"frateThresh_{ctxt.get('minimum_inclusion_fr_Hz', None):.1f}")
+    # custom_suffix = parts_separator.join([custom_suffix, *custom_suffix_string_parts])
+    custom_suffix = parts_separator.join(custom_suffix_string_parts)
+    return custom_suffix
+
+
 
 # ==================================================================================================================== #
 # PIPELINE STAGE                                                                                                       #
@@ -142,31 +184,31 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         return self._get_computation_results_progress()[1] # get [0] because it returns complete_computed_config_names_list, incomplete_computed_config_dict
 
     @property
-    def registered_computation_functions(self):
+    def registered_computation_functions(self) -> List[Callable]:
         return list(self.registered_computation_function_dict.values())
     @property
-    def registered_computation_function_names(self):
+    def registered_computation_function_names(self) -> List[str]:
         return list(self.registered_computation_function_dict.keys()) 
 
 
     @property
-    def registered_global_computation_functions(self):
+    def registered_global_computation_functions(self) -> List[Callable]:
         return list(self.registered_global_computation_function_dict.values())
     @property
-    def registered_global_computation_function_names(self):
+    def registered_global_computation_function_names(self) -> List[str]:
         return list(self.registered_global_computation_function_dict.keys()) 
 
 
     # 'merged' refers to the fact that both global and non-global computation functions are included _____________________ #
     @property
-    def registered_merged_computation_function_dict(self):
+    def registered_merged_computation_function_dict(self) -> Dict[str, Callable]:
         """build a merged function dictionary containing both global and non-global functions:"""
         return (self.registered_global_computation_function_dict | self.registered_computation_function_dict)
     @property
-    def registered_merged_computation_functions(self):
+    def registered_merged_computation_functions(self) -> List[Callable]:
         return list(self.registered_merged_computation_function_dict.values())
     @property
-    def registered_merged_computation_function_names(self):
+    def registered_merged_computation_function_names(self) -> List[str]:
         return list(self.registered_merged_computation_function_dict.keys()) 
 
 
@@ -176,17 +218,12 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         # Sort by precidence:
             _computationPrecidence
         """
-        # Non-Global Items:
-        for (a_computation_class_name, a_computation_class) in reversed(ComputationFunctionRegistryHolder.get_non_global_registry_items().items()):
-            for (a_computation_fn_name, a_computation_fn) in reversed(a_computation_class.get_all_functions(use_definition_order=True)):
-                self.register_computation(a_computation_fn_name, a_computation_fn, is_global=False)
-        # Global Items:
-        for (a_computation_class_name, a_computation_class) in reversed(ComputationFunctionRegistryHolder.get_global_registry_items().items()):
-            for (a_computation_fn_name, a_computation_fn) in reversed(a_computation_class.get_all_functions(use_definition_order=True)):
-                self.register_computation(a_computation_fn_name, a_computation_fn, is_global=True)
+        for (a_computation_fn_key, a_computation_fn) in ComputationFunctionRegistryHolder.get_ordered_registry_items_functions(include_local=True, include_global=True).items():
+                self.register_computation(a_computation_fn.__name__, a_computation_fn, is_global=a_computation_fn.is_global)
+
 
         
-    def register_computation(self, registered_name, computation_function, is_global:bool):
+    def register_computation(self, registered_name: str, computation_function, is_global:bool):
         # Set the .is_global attribute on the function object itself, since functions are 1st-class objects in Python:
         computation_function.is_global = is_global
 
@@ -282,6 +319,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
     # ==================================================================================================================== #
     # Specific Context Computation Helpers                                                                                 #
     # ==================================================================================================================== #
+    @function_attributes(short_name=None, tags=['compute'], input_requires=[], output_provides=[], uses=['find_registered_computation_functions', 'cls._execute_computation_functions'], used_by=['perform_action_for_all_contexts'], creation_date='2024-10-07 15:07', related_items=[])
     def perform_registered_computations_single_context(self, previous_computation_result=None, computation_functions_name_includelist=None, computation_functions_name_excludelist=None, fail_on_exception:bool=False, progress_logger_callback=None, are_global:bool=False, debug_print=False):
         """ Executes all registered computations for a single filter
         
@@ -325,7 +363,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         """ re-runs just a specific computation provided by computation_functions_name_includelist """
         active_computation_functions = self.find_registered_computation_functions(computation_functions_name_includelist, search_mode=FunctionsSearchMode.initFromIsGlobal(are_global))
         if progress_logger_callback is not None:
-            progress_logger_callback(f'run_specific_computations_single_context(including only {len(active_computation_functions)} out of {len(self.registered_computation_function_names)} registered computation functions): active_computation_functions: {active_computation_functions}...')
+            progress_logger_callback(f'\trun_specific_computations_single_context(including only {len(active_computation_functions)} out of {len(self.registered_computation_function_names)} registered computation functions): active_computation_functions: {active_computation_functions}...')
         # Perform the computations:
         return ComputedPipelineStage._execute_computation_functions(active_computation_functions, previous_computation_result=previous_computation_result, computation_kwargs_list=computation_kwargs_list, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, are_global=are_global, debug_print=debug_print)
 
@@ -377,19 +415,37 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         Usage:
             any_most_recent_computation_time, each_epoch_latest_computation_time, each_epoch_each_result_computation_completion_times, (global_computations_latest_computation_time, global_computation_completion_times) = curr_active_pipeline.stage.get_computation_times()
             each_epoch_latest_computation_time
+
+            # If you want to simplify the names:
+            # Get the names of the global and non-global computations:
+            all_validators_dict = curr_active_pipeline.get_merged_computation_function_validators()
+            global_only_validators_dict = {k:v for k, v in all_validators_dict.items() if v.is_global}
+            non_global_only_validators_dict = {k:v for k, v in all_validators_dict.items() if (not v.is_global)}
+            non_global_comp_names: List[str] = [v.short_name for k, v in non_global_only_validators_dict.items() if (not v.short_name.startswith('_DEP'))] # ['firing_rate_trends', 'spike_burst_detection', 'pf_dt_sequential_surprise', 'extended_stats', 'placefield_overlap', 'ratemap_peaks_prominence2d', 'velocity_vs_pf_simplified_count_density', 'EloyAnalysis', '_perform_specific_epochs_decoding', 'recursive_latent_pf_decoding', 'position_decoding_two_step', 'position_decoding', 'lap_direction_determination', 'pfdt_computation', 'pf_computation']
+            global_comp_names: List[str] = [v.short_name for k, v in global_only_validators_dict.items() if (not v.short_name.startswith('_DEP'))] # ['long_short_endcap_analysis', 'long_short_inst_spike_rate_groups', 'long_short_post_decoding', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_decoding_analyses', 'PBE_stats', 'rank_order_shuffle_analysis', 'directional_decoders_epoch_heuristic_scoring', 'directional_decoders_evaluate_epochs', 'directional_decoders_decode_continuous', 'merged_directional_placefields', 'split_to_directional_laps']
+
+            # mappings between the long computation function names and their short names:
+            non_global_comp_names_map: Dict[str, str] = {v.computation_fn_name:v.short_name for k, v in non_global_only_validators_dict.items() if (not v.short_name.startswith('_DEP'))}
+            global_comp_names_map: Dict[str, str] = {v.computation_fn_name:v.short_name for k, v in global_only_validators_dict.items() if (not v.short_name.startswith('_DEP'))} # '_perform_long_short_endcap_analysis': 'long_short_endcap_analysis', '_perform_long_short_instantaneous_spike_rate_groups_analysis': 'long_short_inst_spike_rate_groups', ...}
+
+
         """
+        
+        # inverse_computation_times_key_fn = lambda fn_key: str(fn_key.__name__) # to be used if raw-function references are used.
+        inverse_computation_times_key_fn = lambda fn_key: fn_key # Use only the functions name. I think this makes the .computation_times field picklable
+        
         each_epoch_each_result_computation_completion_times = {}
         each_epoch_latest_computation_time = {} # the most recent computation for each of the epochs
         # find update time of latest function:
         for k, v in self.computation_results.items():
-            extracted_computation_times_dict = v['computation_times']
-            each_epoch_each_result_computation_completion_times[k] = {k.__name__:v for k,v in extracted_computation_times_dict.items()}
+            extracted_computation_times_dict = v.computation_times
+            each_epoch_each_result_computation_completion_times[k] = {inverse_computation_times_key_fn(k):v for k,v in extracted_computation_times_dict.items()}
             each_epoch_latest_computation_time[k] = max(list(each_epoch_each_result_computation_completion_times[k].values()), default=datetime.min)
 
         non_global_any_most_recent_computation_time: datetime = max(list(each_epoch_latest_computation_time.values()), default=datetime.min) # newest computation out of any of the epochs
 
         ## Global computations:
-        global_computation_completion_times = {k.__name__:v for k,v in self.global_computation_results.computation_times.items()}
+        global_computation_completion_times = {inverse_computation_times_key_fn(k):v for k,v in self.global_computation_results.computation_times.items()}
         global_computations_latest_computation_time: datetime = max(list(global_computation_completion_times.values()), default=datetime.min)
 
         ## Any (global or non-global) computation most recent time):
@@ -461,8 +517,57 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         return long_epoch_name, short_epoch_name, global_epoch_name
 
 
+    def find_LongShortDelta_times(self) -> Tuple[float, float, float]:
+        """ Helper function to returns the [t_start, t_delta, t_end] session times. They must exist.
+        Usage:
+            t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        """
+        long_epoch_name, short_epoch_name, global_epoch_name = self.find_LongShortGlobal_epoch_names()
+        long_epoch_obj, short_epoch_obj = [Epoch(self.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name.removesuffix('_any'))) for an_epoch_name in [long_epoch_name, short_epoch_name]] #TODO 2023-11-10 20:41: - [ ] Issue with getting actual Epochs from sess.epochs for directional laps: emerges because long_epoch_name: 'maze1_any' and the actual epoch label in curr_active_pipeline.sess.epochs is 'maze1' without the '_any' part.
+        if ((short_epoch_obj.n_epochs == 0) or (short_epoch_obj.n_epochs == 0)):
+            ## Epoch names now are 'long' and 'short'
+            long_epoch_obj, short_epoch_obj = [self.filtered_epochs[an_epoch_name].to_Epoch() for an_epoch_name in [long_epoch_name, short_epoch_name]]
+
+        
+        assert short_epoch_obj.n_epochs > 0, f'long_epoch_obj: {long_epoch_obj}, short_epoch_obj: {short_epoch_obj}'
+        assert long_epoch_obj.n_epochs > 0, f'long_epoch_obj: {long_epoch_obj}, short_epoch_obj: {short_epoch_obj}'
+        # Uses: long_epoch_obj, short_epoch_obj
+        t_start = long_epoch_obj.t_start
+        t_delta = short_epoch_obj.t_start
+        t_end = short_epoch_obj.t_stop
+        return t_start, t_delta, t_end
+
+
+
+    def get_failed_computations(self, enabled_filter_names=None):
+        """ gets a dictionary of the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result
+        
+        """
+        if enabled_filter_names is None:
+            enabled_filter_names = list(self.filtered_sessions.keys()) # all filters if specific enabled names aren't specified
+        all_accumulated_errors = {}
+        for a_select_config_name, a_filtered_session in self.filtered_sessions.items():                
+            if a_select_config_name in enabled_filter_names:
+                # print(f'Performing rerun_failed_computations_single_context on filtered_session with filter named "{a_select_config_name}"...')
+                previous_computation_result = self.computation_results[a_select_config_name]
+                # curr_active_pipeline.computation_results[a_select_config_name] = curr_active_pipeline.rerun_failed_computations_single_context(previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)    
+                active_computation_errors = previous_computation_result.accumulated_errors
+                if len(active_computation_errors) > 0:
+                    # all_accumulated_errors[a_select_config_name] = active_computation_errors
+                    all_accumulated_errors[a_select_config_name] = {}
+                    for failed_computation_fn, error in active_computation_errors.items():
+                        a_failed_fn_name: str = failed_computation_fn.__name__
+                        all_accumulated_errors[a_select_config_name][a_failed_fn_name] = error
+
+        return all_accumulated_errors
+
+
     def rerun_failed_computations(self, enabled_filter_names=None, fail_on_exception:bool=False, debug_print=False):
-        """ retries the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result """
+        """ retries the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result
+        
+        TODO: Parallelization opportunity
+        
+        """
         if enabled_filter_names is None:
             enabled_filter_names = list(self.filtered_sessions.keys()) # all filters if specific enabled names aren't specified
         for a_select_config_name, a_filtered_session in self.filtered_sessions.items():                
@@ -472,7 +577,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                 self.computation_results[a_select_config_name] = self.rerun_failed_computations_single_context(previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)    
 
 
-    @function_attributes(short_name=None, tags=['action', 'computation'], input_requires=[], output_provides=[], uses=['perform_registered_computations_single_context'], used_by=['perform_computations'], creation_date='2023-07-21 18:22', related_items=[])
+    @function_attributes(short_name=None, tags=['action', 'computation'], input_requires=[], output_provides=[], uses=['perform_registered_computations_single_context', 'cls._build_initial_computationResult'], used_by=['perform_computations'], creation_date='2023-07-21 18:22', related_items=[])
     def perform_action_for_all_contexts(self, action: EvaluationActions, enabled_filter_names=None, active_computation_params: Optional[DynamicParameters]=None, overwrite_extant_results=False, computation_functions_name_includelist=None, computation_functions_name_excludelist=None,
                                                  fail_on_exception:bool=False, progress_logger_callback=None, are_global:bool=False, debug_print=False):
         """ Aims to generalize the `evaluate_computations_for_single_params(...)` function's functionality (such as looping over each context and passing/updating appropriate results, to all three of the computation functions:
@@ -555,10 +660,10 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                     else:
                         # Otherwise it already exists and is not None, so don't overwrite it:
                         if progress_logger_callback is not None:
-                            progress_logger_callback(f'WARNING: skipping computation because overwrite_extant_results={overwrite_extant_results} and active_computation_results[{a_select_config_name}] already exists and is non-None')
+                            progress_logger_callback(f'WARNING: skipping computation because overwrite_extant_results={overwrite_extant_results} and `active_computation_results[{a_select_config_name}]` already exists and is non-None')
                             progress_logger_callback('\t TODO: this will prevent recomputation even when the excludelist/includelist or computation function definitions change. Rework so that this is smarter.')
                         
-                        print(f'WARNING: skipping computation because overwrite_extant_results={overwrite_extant_results} and active_computation_results[{a_select_config_name}] already exists and is non-None')
+                        print(f'WARNING: skipping computation because overwrite_extant_results={overwrite_extant_results} and `active_computation_results[{a_select_config_name}]` already exists and is non-None')
                         print('\t TODO: this will prevent recomputation even when the excludelist/includelist or computation function definitions change. Rework so that this is smarter.')
                         # active_computation_results.setdefault(a_select_config_name, ComputedPipelineStage._build_initial_computationResult(a_filtered_session, curr_active_computation_params)) # returns a computation result. This stores the computation config used to compute it.
                         skip_computations_for_this_result = True
@@ -608,8 +713,8 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                 print(f'done.')
 
 
-    @function_attributes(short_name=None, tags=['computation', 'specific'], input_requires=[], output_provides=[], uses=['run_specific_computations_single_context'], used_by=[], creation_date='2023-07-21 18:21', related_items=[])
-    def perform_specific_computation(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_includelist=None, computation_kwargs_list=None, fail_on_exception:bool=False, debug_print=False):
+    @function_attributes(short_name=None, tags=['computation', 'specific'], input_requires=[], output_provides=[], uses=['run_specific_computations_single_context', 'cls._build_initial_computationResult'], used_by=[], creation_date='2023-07-21 18:21', related_items=[])
+    def perform_specific_computation(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_includelist=None, computation_kwargs_list=None, fail_on_exception:bool=False, debug_print=False, progress_logger_callback=None):
         """ perform a specific computation (specified in computation_functions_name_includelist) in a minimally destructive manner using the previously recomputed results:
         Ideally would already have access to the:
         - Previous computation result
@@ -622,7 +727,11 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
         Updates:
             curr_active_pipeline.computation_results
+            curr_active_pipeline.global_computation_results
         """
+        if progress_logger_callback is None:
+            progress_logger_callback = print
+
         if enabled_filter_names is None:
             enabled_filter_names = list(self.filtered_sessions.keys()) # all filters if specific enabled names aren't specified
 
@@ -642,7 +751,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         if contains_any_global_functions:
             assert np.all([v.is_global for v in active_computation_functions]), 'ERROR: cannot mix global and non-global functions in a single call to perform_specific_computation'
 
-            if self.global_computation_results is None or not isinstance(self.global_computation_results, ComputationResult):
+            if (self.global_computation_results is None) or (not isinstance(self.global_computation_results, ComputationResult)):
                 print(f'global_computation_results is None. Building initial global_computation_results...')
                 self.global_computation_results = None # clear existing results
                 self.global_computation_results = ComputedPipelineStage._build_initial_computationResult(self.sess, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
@@ -650,8 +759,8 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
         if contains_any_global_functions:
             # global computation functions:
-            if self.global_computation_results is None or not isinstance(self.global_computation_results, ComputationResult):
-                print(f'global_computation_results is None. Building initial global_computation_results...')
+            if (self.global_computation_results is None) or (not isinstance(self.global_computation_results, ComputationResult)):
+                print(f'global_computation_results is None or not a `ComputationResult` object. Building initial global_computation_results...') #TODO 2024-01-10 15:12: - [ ] Check that `self.global_computation_results.keys()` are empty
                 self.global_computation_results = None # clear existing results
                 self.global_computation_results = ComputedPipelineStage._build_initial_computationResult(self.sess, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
             ## TODO: what is this about?
@@ -660,15 +769,13 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             ## TODO: ERROR: `owning_pipeline_reference=self` is not CORRECT as self is of type `ComputedPipelineStage` (or `DisplayPipelineStage`) and not `NeuropyPipeline`
                 # this has been fine for all the global functions so far because the majority of the properties are defined on the stage anyway, but any pipeline properties will be missing! 
             global_kwargs = dict(owning_pipeline_reference=self, global_computation_results=previous_computation_result, computation_results=self.computation_results, active_configs=self.active_configs, include_includelist=enabled_filter_names, debug_print=debug_print)
-    
-            assert (not has_custom_kwargs_list), f"#TODO 2023-11-22 23:41: - [ ] perform_specific_computation(...) computation_kwargs_list seems to have no effect in global functions, maybe fix? For now, just throw an error so you don't think your custom kwargs are working when they aren't."
-
-            self.global_computation_results = self.run_specific_computations_single_context(global_kwargs, computation_functions_name_includelist=computation_functions_name_includelist, are_global=True, fail_on_exception=fail_on_exception, debug_print=debug_print) # was there a reason I didn't pass `computation_kwargs_list` to the global version?
+            print(f'for global computations: Performing run_specific_computations_single_context(..., computation_functions_name_includelist={computation_functions_name_includelist}, ...)...')
+            self.global_computation_results = self.run_specific_computations_single_context(global_kwargs, computation_functions_name_includelist=computation_functions_name_includelist, computation_kwargs_list=computation_kwargs_list, are_global=True, fail_on_exception=fail_on_exception, debug_print=debug_print, progress_logger_callback=progress_logger_callback) # was there a reason I didn't pass `computation_kwargs_list` to the global version?
         else:
             # Non-global functions:
             for a_select_config_name, a_filtered_session in self.filtered_sessions.items():                
                 if a_select_config_name in enabled_filter_names:
-                    print(f'Performing run_specific_computations_single_context on filtered_session with filter named "{a_select_config_name}"...')
+                    print(f'===>|> for filtered_session with filter named "{a_select_config_name}": Performing run_specific_computations_single_context(..., computation_functions_name_includelist={computation_functions_name_includelist})...')
                     if active_computation_params is None:
                         curr_active_computation_params = self.active_configs[a_select_config_name].computation_config # get the previously set computation configs
                     else:
@@ -678,14 +785,14 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
                     ## Here is an issue, we need to get the appropriate computation result depending on whether it's global or not 
                     previous_computation_result = self.computation_results[a_select_config_name]
-                    self.computation_results[a_select_config_name] = self.run_specific_computations_single_context(previous_computation_result, computation_functions_name_includelist=computation_functions_name_includelist, computation_kwargs_list=computation_kwargs_list, are_global=False, fail_on_exception=fail_on_exception, debug_print=debug_print)
+                    self.computation_results[a_select_config_name] = self.run_specific_computations_single_context(previous_computation_result, computation_functions_name_includelist=computation_functions_name_includelist, computation_kwargs_list=computation_kwargs_list, are_global=False, fail_on_exception=fail_on_exception, debug_print=debug_print, progress_logger_callback=progress_logger_callback)
         
         ## IMPLEMENTATION FAULT: the global computations/results should not be ran within the filter/config loop. It applies to all config names and should be ran last. Also don't allow mixing local/global functions.
 
 
     ## Computation Helpers: 
     # perform_computations: The main computation function for the computation stage
-    @function_attributes(short_name=None, tags=['main', 'computation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-25 12:26', related_items=[])
+    @function_attributes(short_name=None, tags=['main', 'computation'], input_requires=[], output_provides=[], uses=['perform_action_for_all_contexts'], used_by=[], creation_date='2023-10-25 12:26', related_items=[])
     def perform_computations(self, active_computation_params: Optional[DynamicParameters]=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_includelist=None, computation_functions_name_excludelist=None, fail_on_exception:bool=False, debug_print=False, progress_logger_callback=None):
         """The main computation function for the pipeline.
 
@@ -716,7 +823,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
     # CLASS/STATIC METHODS                                                                                                 #
     # ==================================================================================================================== #
 
-
+    @function_attributes(short_name=None, tags=['computationResult'], input_requires=[], output_provides=[], uses=[], used_by=['cls.continue_computations_if_needed', 'perform_specific_computation', 'perform_action_for_all_contexts'], creation_date='2024-10-07 15:12', related_items=[])
     @classmethod
     def _build_initial_computationResult(cls, active_session, computation_config) -> ComputationResult:
         """Conceptually, a single computation consists of a specific active_session and a specific computation_config object
@@ -739,13 +846,18 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         
         return output_result
 
+    @function_attributes(short_name=None, tags=['compute', 'main'], input_requires=[], output_provides=[],
+                          uses=[], used_by=['perform_registered_computations_single_context', 'rerun_failed_computations_single_context', 'run_specific_computations_single_context'], creation_date='2024-10-07 15:08', related_items=[])
     @staticmethod
-    def _execute_computation_functions(active_computation_functions, previous_computation_result=None, computation_kwargs_list=None, fail_on_exception:bool = False, progress_logger_callback=None, are_global:bool=False, debug_print=False):
+    def _execute_computation_functions(active_computation_functions, previous_computation_result=None, computation_kwargs_list=None, fail_on_exception:bool = False, progress_logger_callback=None, are_global:bool=False, debug_print=False) -> ComputationResult:
         """ actually performs the provided computations in active_computation_functions """
         if computation_kwargs_list is None:
             computation_kwargs_list = [{} for _ in active_computation_functions]
         assert len(computation_kwargs_list) == len(active_computation_functions)
 
+        # computation_times_key_fn = lambda fn: fn
+        computation_times_key_fn = lambda fn: str(fn.__name__) # Use only the functions name. I think this makes the .computation_times field picklable
+        
         if (len(active_computation_functions) > 0):
             if debug_print:
                 print(f'Performing _execute_computation_functions(...) with {len(active_computation_functions)} registered_computation_functions...')
@@ -765,12 +877,12 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             if fail_on_exception:
                 ## normal version that fails on any exception:
                 total_num_funcs = len(active_computation_functions)
-                for i, f in enumerate(reversed(active_computation_functions)):
+                for i, f in enumerate(active_computation_functions):
                     if progress_logger_callback is not None:
                         progress_logger_callback(f'Executing [{i}/{total_num_funcs}]: {f}')
-                    previous_computation_result = f(previous_computation_result, **computation_kwargs_list[i])
+                    previous_computation_result = f(previous_computation_result, **computation_kwargs_list[i]) # call the function `f` directly here
                     # Log the computation copmlete time:
-                    computation_times[f] = datetime.now()
+                    computation_times[computation_times_key_fn(f)] = datetime.now()
                 
                 # Since there's no error handling, gettin ghere means that there were no accumulated errors
                 accumulated_errors = None
@@ -783,12 +895,12 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                 accumulated_errors = dict() # empty list for keeping track of exceptions
                 
                 total_num_funcs = len(active_computation_functions)
-                for i, f in enumerate(reversed(active_computation_functions)):
+                for i, f in enumerate(active_computation_functions):
                     if progress_logger_callback is not None:
                         progress_logger_callback(f'Executing [{i}/{total_num_funcs}]: {f}')
                     try:
                         # evaluate the function 'f' using the result provided from the previous output or the initial input
-                        temp_result = f(previous_computation_result, **computation_kwargs_list[i]) 
+                        temp_result = f(previous_computation_result, **computation_kwargs_list[i]) # call the function `f` directly here
                     except (TypeError, ValueError, NameError, AttributeError, KeyError, NotImplementedError) as e:
                         exception_info = sys.exc_info()
                         accumulated_errors[f] = CapturedException(e, exception_info, previous_computation_result)
@@ -805,8 +917,8 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                         previous_computation_result = temp_result
                         if progress_logger_callback is not None:
                             progress_logger_callback('\t done.')
-                        # Log the computation copmlete time:
-                        computation_times[f] = datetime.now()
+                        # Log the computation complete time:
+                        computation_times[computation_times_key_fn(f)] = datetime.now()
 
             
             if debug_print:
@@ -821,7 +933,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                 assert isinstance(previous_computation_result, ComputationResult)
 
             # Add the computation_time to the computation result:
-            previous_computation_result.computation_times |= (computation_times or {})
+            previous_computation_result.computation_times |= (computation_times or {}) # are they not being set?
             # for k,v in (computation_times or {}).items():
             #     previous_computation_result.computation_times[k] = v
         
@@ -854,7 +966,8 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             if debug_print:
                 print(f'No registered_computation_functions, skipping extended computations.')
             return previous_computation_result # just return the unaltered result
-                
+
+    @function_attributes(short_name=None, tags=['compute'], input_requires=[], output_provides=[], uses=['cls._build_initial_computationResult'], used_by=[], creation_date='2024-10-07 15:11', related_items=[])
     @classmethod    
     def continue_computations_if_needed(cls, curr_active_pipeline, active_computation_params=None, enabled_filter_names=None, overwrite_extant_results=False, computation_functions_name_includelist=None, computation_functions_name_excludelist=None, fail_on_exception:bool=False, debug_print=False):
         """ continues computations for a pipeline 
@@ -900,21 +1013,96 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             ## Then look for previously complete computation results that are missing computations that have been registered after they were computed, or that were previously part of the excludelist but now are not:
 
 
+    @function_attributes(short_name=None, tags=['valid_track_times'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-05 16:18', related_items=[])
+    @classmethod
+    def perform_find_first_and_last_valid_position_times(cls, pos_df, loaded_track_limits):
+        """ uses the positions and the loaded_track_limits to determine the first and last valid times for each session. 
         
+        Usage:
+            pos_df: pd.DataFrame = deepcopy(global_session.position.to_dataframe())
+            active_sess_config = deepcopy(curr_active_pipeline.active_sess_config)
+            # absolute_start_timestamp: float = active_sess_config.absolute_start_timestamp
+            loaded_track_limits = active_sess_config.loaded_track_limits # x_midpoint, 
+
+            (first_valid_pos_time, last_valid_pos_time) = _find_first_and_last_valid_position_times(pos_df, loaded_track_limits)
+            (first_valid_pos_time, last_valid_pos_time)
+            
+        """
+        # loaded_track_limits
+        xlim_min, xlim_max = loaded_track_limits['long_xlim'] # [138.393 146.947]
+        ylim_min, ylim_max = loaded_track_limits['long_ylim']
+
+        pos_df['is_outside_xlim'] = np.logical_or((pos_df['x'] < xlim_min), (pos_df['x'] > xlim_max))
+        pos_df['is_outside_ylim'] = np.logical_or((pos_df['y'] < ylim_min), (pos_df['y'] > ylim_max))
+        pos_df['is_outside_bounds'] = np.logical_or(pos_df['is_outside_xlim'], pos_df['is_outside_ylim'])
+
+        valid_pos_df = pos_df[np.logical_not(pos_df['is_outside_bounds'])]
+        first_valid_pos_time: float = valid_pos_df['t'].min()
+        last_valid_pos_time: float = valid_pos_df['t'].max()
+        return (first_valid_pos_time, last_valid_pos_time)
+
+    @function_attributes(short_name=None, tags=['valid_track_times'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-05 16:18', related_items=[])
+    def find_first_and_last_valid_position_times(self):
+        """ uses the positions and the loaded_track_limits to determine the first and last valid times for each session. 
+        
+        Usage:
+        
+            active_sess_config = deepcopy(curr_active_pipeline.active_sess_config)
+            # absolute_start_timestamp: float = active_sess_config.absolute_start_timestamp
+            loaded_track_limits = active_sess_config.loaded_track_limits # x_midpoint, 
+
+            (first_valid_pos_time, last_valid_pos_time) = curr_active_pipeline.find_first_and_last_valid_position_times()
+            (first_valid_pos_time, last_valid_pos_time)
+            
+        """
+        # pos_df: pd.DataFrame = deepcopy(self.global_session.position.to_dataframe())
+        pos_df: pd.DataFrame = deepcopy(self.sess.position.to_dataframe())
+        active_sess_config = deepcopy(self.active_sess_config)
+        # absolute_start_timestamp: float = active_sess_config.absolute_start_timestamp
+        loaded_track_limits = active_sess_config.loaded_track_limits # x_midpoint, 
+        # active_sess_config.
+        # curr_config.pf_params.grid_bin_bounds = grid_bin_bounds # same bounds for all
+        # if override_dict.get('track_start_t', None) is not None:
+        # 	track_start_t = override_dict['track_start_t']
+        # 	curr_config.pf_params.track_start_t = track_start_t
+        # else:
+        # 	curr_config.pf_params.track_start_t = None
+
+        # if override_dict.get('track_end_t', None) is not None:
+        # 	track_end_t = override_dict['track_end_t']
+        # 	curr_config.pf_params.track_end_t = track_end_t
+        # else:
+        # 	curr_config.pf_params.track_end_t = None
+        (first_valid_pos_time, last_valid_pos_time) = self.perform_find_first_and_last_valid_position_times(pos_df, loaded_track_limits)
+        return (first_valid_pos_time, last_valid_pos_time)
+        
+
+
+        
+
+# self
+
+
 # ==================================================================================================================== #
 # PIPELINE MIXIN                                                                                                       #
 # ==================================================================================================================== #
 class PipelineWithComputedPipelineStageMixin:
     """ To be added to the pipeline to enable conveninece access ot its pipeline stage post Computed stage. """
+    # @property
+    # def stage(self) -> ComputedPipelineStage:
+    #     """The stage property."""
+    #     return self._stage
+    
+
     ## Computed Properties:
     @property
-    def is_computed(self):
+    def is_computed(self) -> bool:
         """The is_computed property. TODO: Needs validation/Testing """
         return (self.can_compute and (self.computation_results is not None) and (len(self.computation_results) > 0))
         # return (self.stage is not None) and (isinstance(self.stage, ComputedPipelineStage) and (self.computation_results is not None) and (len(self.computation_results) > 0))
 
     @property
-    def can_compute(self):
+    def can_compute(self) -> bool:
         """The can_compute property."""
         return (self.last_completed_stage >= PipelineStage.Filtered)
 
@@ -922,7 +1110,7 @@ class PipelineWithComputedPipelineStageMixin:
     def computation_results(self):
         """The computation_results property, accessed through the stage."""
         return self.stage.computation_results
-
+    
     @property
     def active_completed_computation_result_names(self):
         """The this list of all computed configs."""
@@ -933,31 +1121,37 @@ class PipelineWithComputedPipelineStageMixin:
         return self.stage.active_incomplete_computation_result_status_dicts
     
     @property
-    def registered_computation_functions(self):
+    def registered_computation_functions(self) -> List[Callable]:
         """The registered_computation_functions property."""
         return self.stage.registered_computation_functions
         
     @property
-    def registered_computation_function_names(self):
+    def registered_computation_function_names(self) -> List[str]:
         """The registered_computation_function_names property."""
         return self.stage.registered_computation_function_names
     
     @property
-    def registered_computation_function_dict(self):
+    def registered_computation_function_dict(self) -> Dict[str, Callable]:
         """The registered_computation_function_dict property can be used to get the corresponding function from the string name."""
         return self.stage.registered_computation_function_dict
     
     @property
-    def registered_computation_function_docs_dict(self):
+    def registered_computation_function_docs_dict(self) -> Dict[str, str]:
         """Returns the doc strings for each registered computation function. This is taken from their docstring at the start of the function defn, and provides an overview into what the function will do."""
         return {a_fn_name:a_fn.__doc__ for a_fn_name, a_fn in self.registered_computation_function_dict.items()}
 
     # Global Computation Properties ______________________________________________________________________________________ #
     @property
-    def global_computation_results(self):
+    def global_computation_results(self) -> Optional[ComputationResult]:
         """The global_computation_results property, accessed through the stage."""
         return self.stage.global_computation_results
     
+    @property
+    def global_computation_config(self):
+        """The global_computation_results.config property, accessed through the stage."""
+        return self.stage.global_computation_results.computation_config
+
+
 
     # @property
     # def active_completed_global_computation_result_names(self):
@@ -971,41 +1165,185 @@ class PipelineWithComputedPipelineStageMixin:
     #     return self.stage._get_global_computation_results_progress()[1] # get [0] because it returns complete_computed_config_names_list, incomplete_computed_config_dict
     
     @property
-    def registered_global_computation_functions(self):
+    def registered_global_computation_functions(self) -> List[Callable]:
         """The registered_global_computation_functions property."""
         return self.stage.registered_global_computation_functions
         
     @property
-    def registered_global_computation_function_names(self):
+    def registered_global_computation_function_names(self) -> List[str]:
         """The registered_global_computation_function_names property."""
         return self.stage.registered_global_computation_function_names
     
     @property
-    def registered_global_computation_function_dict(self):
+    def registered_global_computation_function_dict(self) -> Dict[str, Callable]:
         """The registered_global_computation_function_dict property can be used to get the corresponding function from the string name."""
         return self.stage.registered_global_computation_function_dict
     
     @property
-    def registered_global_computation_function_docs_dict(self):
+    def registered_global_computation_function_docs_dict(self) -> Dict[str, str]:
         """Returns the doc strings for each registered computation function. This is taken from their docstring at the start of the function defn, and provides an overview into what the function will do."""
         return {a_fn_name:a_fn.__doc__ for a_fn_name, a_fn in self.registered_global_computation_function_dict.items()}
     
 
     # 'merged' refers to the fact that both global and non-global computation functions are included _____________________ #
     @property
-    def registered_merged_computation_function_dict(self):
+    def registered_merged_computation_function_dict(self) -> Dict[str, Callable]:
         """build a merged function dictionary containing both global and non-global functions:"""
         return self.stage.registered_merged_computation_function_dict
     @property
-    def registered_merged_computation_functions(self):
+    def registered_merged_computation_functions(self) -> List[Callable]:
         return self.stage.registered_merged_computation_functions
     @property
-    def registered_merged_computation_function_names(self):
+    def registered_merged_computation_function_names(self) -> List[str]:
         return self.stage.registered_merged_computation_function_names
 
     def get_merged_computation_function_validators(self) -> Dict[str, SpecificComputationValidator]:
         ## From the registered computation functions, gather any validators and build the SpecificComputationValidator for them, then append them to `_comp_specifiers`:
         return {k:SpecificComputationValidator.init_from_decorated_fn(v) for k,v in self.registered_merged_computation_function_dict.items() if hasattr(v, 'validate_computation_test') and (v.validate_computation_test is not None)}
+
+
+    # ==================================================================================================================== #
+    # Dependency Parsing/Determination                                                                                     #
+    # ==================================================================================================================== #
+    def find_matching_validators(self, probe_fn_names: List[str], debug_print=False):
+        """
+        Usage:
+            remaining_comp_specifiers_dict, found_matching_validators, provided_global_keys = curr_active_pipeline.find_matching_validators(probe_fn_names=['long_short_decoding_analyses','long_short_fr_indicies_analyses'])
+            provided_global_keys
+        """
+        self.reload_default_computation_functions()
+        return SpecificComputationValidator.find_matching_validators(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), probe_fn_names=probe_fn_names)
+
+    def find_immediate_dependencies(self, provided_global_keys: List[str], skip_reload_computation_fcns: bool = False, debug_print=False):
+        """
+        Usage:
+
+        remaining_comp_specifiers_dict, dependent_validators, provided_global_keys = SpecificComputationValidator.find_immediate_dependencies(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict, provided_global_keys=provided_global_keys)
+        provided_global_keys
+
+        """
+        if not skip_reload_computation_fcns:
+            self.reload_default_computation_functions()
+        return SpecificComputationValidator.find_immediate_dependencies(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), provided_global_keys=provided_global_keys)
+
+
+    def find_downstream_dependencies(self, provided_local_keys: List[str]=None, provided_global_keys: List[str]=None, debug_print=False):
+        """
+        Usage:
+
+        remaining_comp_specifiers_dict, dependent_validators, provided_global_keys = SpecificComputationValidator.find_immediate_dependencies(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict, provided_global_keys=provided_global_keys)
+        provided_global_keys
+
+        """
+        from neuropy.utils.indexing_helpers import flatten
+        
+        self.reload_default_computation_functions()
+        _comp_specifiers_dict: Dict[str, SpecificComputationValidator] = self.get_merged_computation_function_validators()
+        validators = deepcopy(_comp_specifiers_dict) # { ... }  # Your validators here
+        dependent_validators = {}
+        for a_name, a_validator in validators.items():
+            if provided_global_keys is not None:
+                for a_changed_key in provided_global_keys:
+                    if (a_changed_key in a_validator.results_specification.requires_global_keys):
+                        dependent_validators[a_name] = a_validator
+            if provided_local_keys is not None:
+                for a_changed_key in provided_local_keys:
+                    if (a_changed_key in a_validator.results_specification.requires_local_keys):
+                        dependent_validators[a_name] = a_validator
+
+        # dependent_validators_names = [k for k, v in dependent_validators.items()]
+        provided_global_keys = list(set(flatten([v.provides_global_keys for v in dependent_validators.values()]))) # ['DirectionalMergedDecoders', 'DirectionalDecodersEpochsEvaluations', 'TrainTestSplit', 'TrialByTrialActivity']
+        ## OUTPUT: dependent_validators_provides, dependent_validators
+
+        ## loop until no changes
+        max_num_iterations: int = 5
+        curr_iter: int = 0
+        _prev_provided_global_keys = []
+        while ((curr_iter < max_num_iterations) and (provided_global_keys != _prev_provided_global_keys)):
+            _prev_provided_global_keys = provided_global_keys    
+            curr_order_remaining_comp_specifiers_dict, curr_order_dependent_validators, curr_order_provided_global_keys = self.find_immediate_dependencies(provided_global_keys=provided_global_keys, skip_reload_computation_fcns=True, debug_print=debug_print)
+            dependent_validators.update(curr_order_dependent_validators)
+            provided_global_keys = list(set(provided_global_keys + curr_order_provided_global_keys))
+            curr_iter = curr_iter + 1
+
+        return dependent_validators, provided_global_keys
+
+
+    def find_provided_result_keys(self, probe_fn_names: List[str]) -> List[str]:
+        """ returns a list of computed properties that the specified functions provide. 
+        
+        provided_global_keys = curr_active_pipeline.find_provided_result_keys(probe_fn_names=['perform_wcorr_shuffle_analysis',  'merged_directional_placefields', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring'])
+        provided_global_keys
+
+        """
+        self.reload_default_computation_functions()
+        return SpecificComputationValidator.find_provided_result_keys(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), probe_fn_names=probe_fn_names)
+    
+
+    def find_validators_providing_results(self, probe_provided_result_keys: List[str], return_flat_list:bool=True) -> List[str]:
+        """ returns a list of computed properties that the specified functions provide. 
+        
+            found_validators_dict = curr_active_pipeline.find_validators_providing_results(probe_provided_result_keys=['DirectionalMergedDecoders', 'DirectionalDecodersEpochsEvaluations', 'SequenceBased'])
+            [v.computation_fn_name for v in found_validators_dict]
+
+        """
+        self.reload_default_computation_functions()
+        return SpecificComputationValidator.find_validators_providing_results(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), probe_provided_result_keys=probe_provided_result_keys, return_flat_list=return_flat_list)
+
+
+    @function_attributes(short_name=None, tags=['parameters', 'update'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 18:45', related_items=[])
+    def apply_changed_parameters(self, minimum_inclusion_fr_Hz=5.0, included_qclu_values = [1, 2, 4, 9], is_dry_run: bool=True):
+        """ Applies the changed parameters to the pipeline and recomputes as needed.
+
+        Usage:
+            minimum_inclusion_fr_Hz = 5.0
+            included_qclu_values = [1, 2, 4, 9]
+
+            (dependent_validators, provided_global_keys), old_new_values_change_dict = curr_active_pipeline.apply_changed_parameters(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values,
+                                                                                                                                    is_dry_run=False)
+            old_new_values_change_dict
+
+        """
+        original_minimum_inclusion_fr_Hz: float = deepcopy(self.global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz)
+        original_included_qclu_values: List[int] = deepcopy(self.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values)
+
+
+        ## Determine which computations need to be re-ran after changing a config properity:
+        did_change_list = []
+        old_new_values_change_dict = {}
+        if minimum_inclusion_fr_Hz != original_minimum_inclusion_fr_Hz:
+            did_change_list.append('global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz')
+            old_new_values_change_dict['global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz'] = {'old': original_minimum_inclusion_fr_Hz, 'new': minimum_inclusion_fr_Hz}
+            
+        if included_qclu_values != original_included_qclu_values:
+            did_change_list.append('global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values')
+            old_new_values_change_dict['global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values'] = {'old': original_included_qclu_values, 'new': included_qclu_values}    
+        
+        did_any_change: bool = (len(did_change_list) > 0)
+        if is_dry_run:
+            print(f'did_change_list: {did_change_list}')
+            print(f'did_any_change: {did_any_change}')
+        
+        dependent_validators, provided_global_keys = self.find_downstream_dependencies(provided_local_keys=did_change_list, provided_global_keys=None)
+        # provided_global_keys: ['SequenceBased', 'TrainTestSplit', 'TrialByTrialActivity', 'DirectionalDecodersEpochsEvaluations', 'DirectionalDecodersDecoded', 'DirectionalMergedDecoders', 'RankOrder']
+        
+        if (not is_dry_run):
+            ## Apply the changes:
+            self.global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz = minimum_inclusion_fr_Hz
+            self.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values = included_qclu_values
+
+            ## recompute:
+            for k, v in dependent_validators.items():
+                v.try_remove_provided_keys(curr_active_pipeline=self)
+                v.try_computation_if_needed(curr_active_pipeline=self, computation_filter_name=None)
+                # remaining_comp_specifiers_dict, dependent_validators, provided_global_keys = SpecificComputationValidator.find_immediate_dependencies(remaining_comp_specifiers_dict=v, provided_global_keys=provided_global_keys)
+                # provided_global_keys
+        else:
+            ## dry_run:
+            print(f'provided_global_keys: {provided_global_keys}')
+            print(f'is_dry_run == True mode, so recomputations will not be performed.')
+
+        return (dependent_validators, provided_global_keys), old_new_values_change_dict
 
 
     def reload_default_computation_functions(self):
@@ -1063,6 +1401,7 @@ class PipelineWithComputedPipelineStageMixin:
         # return self.stage.perform_action_for_all_contexts(EvaluationActions.EVALUATE_COMPUTATIONS, ... # TODO: refactor to use new layout
         return self.stage.rerun_failed_computations(previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)
     
+
     def perform_specific_computation(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_includelist=None, computation_kwargs_list=None, fail_on_exception:bool=False, debug_print=False):
         """ perform a specific computation (specified in computation_functions_name_includelist) in a minimally destructive manner using the previously recomputed results:
         Passthrough wrapper to self.stage.perform_specific_computation(...) with the same arguments.
@@ -1073,6 +1412,7 @@ class PipelineWithComputedPipelineStageMixin:
         # self.stage is of type ComputedPipelineStage
         return self.stage.perform_specific_computation(active_computation_params=active_computation_params, enabled_filter_names=enabled_filter_names, computation_functions_name_includelist=computation_functions_name_includelist, computation_kwargs_list=computation_kwargs_list, fail_on_exception=fail_on_exception, debug_print=debug_print)
     
+
     # Utility/Debugging Functions:
     def perform_drop_entire_computed_config(self, config_names_to_drop = ['maze1_rippleOnly', 'maze2_rippleOnly']):
         """ Loops through all the configs and drops all results of the specified configs
@@ -1119,23 +1459,62 @@ class PipelineWithComputedPipelineStageMixin:
             # if no includelist specified, get all computed keys:
             config_names_includelist = self.active_completed_computation_result_names # ['maze1_PYR', 'maze2_PYR', 'maze_PYR']
         
+
+        ## Global:
+        global_dropped_keys = []
+        global_not_found_keys_to_drop = []
+
+        for a_key_to_drop in computed_data_keys_to_drop:
+            curr_global_computation_results = self.global_computation_results
+            curr_global_computed_data = curr_global_computation_results.computed_data
+            # curr_global_computed_data
+            a_result_to_drop = curr_global_computed_data.pop(a_key_to_drop, None) # AttributeError: 'ComputationResult' object has no attribute 'pop'
+            ## TODO: Should we drop from curr_computed_results.accumulated_errors in addition to curr_computed_results.computed_data? Probably fine not to.
+            if a_result_to_drop is not None:
+                # Successfully dropped
+                print(f"\t Dropped global_computation_results.computed_data['{a_key_to_drop}'].")
+                global_dropped_keys.append(a_key_to_drop)
+                # remove from .computation_times, .accumulated_errors as well
+                curr_global_computation_results.computation_times.pop(a_key_to_drop, None)
+                curr_global_computation_results.accumulated_errors.pop(a_key_to_drop, None)
+                
+            else:
+                print(f"\t global_computation_results.computed_data['{a_key_to_drop}'] did not exist.")
+                global_not_found_keys_to_drop.append(a_key_to_drop) # key might be local
+
+
+        # only check locals for global_not_found_keys
+        
+        
+        local_dropped_keys = []
+        local_not_found_keys_to_drop = []
+        
         ## Loop across all computed contexts
         for a_config_name, curr_computed_results in self.computation_results.items():
             if a_config_name in config_names_includelist:            
                 # remove the results from this config
-                for a_key_to_drop in computed_data_keys_to_drop:
-                    a_result_to_drop = curr_computed_results.pop(a_key_to_drop, None) # AttributeError: 'ComputationResult' object has no attribute 'pop'
+                for a_key_to_drop in global_not_found_keys_to_drop:
+                    try:
+                        a_result_to_drop = curr_computed_results.pop(a_key_to_drop, []) 
+                    except AttributeError as e:
+                        # this seems like it would always be the case because `# AttributeError: 'ComputationResult' object has no attribute 'pop'`
+                        a_result_to_drop = curr_computed_results.computed_data.pop(a_key_to_drop, [])
+
                     ## TODO: Should we drop from curr_computed_results.accumulated_errors in addition to curr_computed_results.computed_data? Probably fine not to.
-                    if a_result_to_drop is not None:
+                    if a_result_to_drop is not []:
                         # Successfully dropped
                         print(f"\t Dropped computation_results['{a_config_name}'].computed_data['{a_key_to_drop}'].")
+                        local_dropped_keys.append(a_key_to_drop)
                     else:
                         print(f"\t computation_results['{a_config_name}'].computed_data['{a_key_to_drop}'] did not exist.")
-                        pass
+                        local_not_found_keys_to_drop.append(a_key_to_drop)
             else:
                 # Otherwise skip it if it isn't in the includelist
                 if debug_print:
                     print(f'skipping {a_config_name} because it is not in the context includelist.')
+                local_not_found_keys_to_drop.append(a_key_to_drop)
+
+        return global_dropped_keys, local_dropped_keys
 
     def find_LongShortGlobal_epoch_names(self):
         """ Returns the [long, short, global] epoch names. They must exist.
@@ -1148,7 +1527,14 @@ class PipelineWithComputedPipelineStageMixin:
         """
         return self.stage.find_LongShortGlobal_epoch_names()
 
-        # print(f'\tpost keys: {list(self.active_configs.keys())}')
+
+    def find_LongShortDelta_times(self) -> Tuple[float, float, float]:
+        """ Helper function to returns the [t_start, t_delta, t_end] session times. They must exist.
+        Usage:
+            t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        """
+        return self.stage.find_LongShortDelta_times()
+
 
     def get_output_path(self) -> Path:
         """ returns the appropriate output path to store the outputs for this session. Usually '$session_folder/outputs/' """
@@ -1211,6 +1597,7 @@ class PipelineWithComputedPipelineStageMixin:
         return self.get_output_path().joinpath(desired_global_pickle_filename).resolve()
 
     ## Global Computation Result Persistance Hacks:
+    @function_attributes(short_name=None, tags=['save'], input_requires=[], output_provides=[], uses=['saveData'], used_by=[], creation_date='2024-05-29 08:20', related_items=[])
     def save_global_computation_results(self, override_global_pickle_path: Optional[Path]=None, override_global_pickle_filename:Optional[str]=None):
         """Save out the `global_computation_results` which are not currently saved with the pipeline
         Usage:
@@ -1245,18 +1632,22 @@ class PipelineWithComputedPipelineStageMixin:
         return global_computation_results_pickle_path
 
 
-    @function_attributes(short_name=None, tags=['split'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-11 08:11', related_items=[])
-    def save_split_global_computation_results(self, override_global_pickle_path: Optional[Path]=None, override_global_pickle_filename:Optional[str]=None, debug_print:bool=True):
+    @function_attributes(short_name=None, tags=['save', 'pickle', 'split'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-11 08:11', related_items=['load_split_pickled_global_computation_results'])
+    def save_split_global_computation_results(self, override_global_pickle_path: Optional[Path]=None, override_global_pickle_filename:Optional[str]=None,
+                                              include_includelist=None, continue_after_pickling_errors: bool=True, debug_print:bool=True):
         """Save out the `global_computation_results` which are not currently saved with the pipeline
+
+        Reciprocal:
+            load_pickled_global_computation_results
+
         Usage:
-            split_save_folder, split_save_paths, failed_keys = curr_active_pipeline.save_split_global_computation_results(debug_print=True)
+            split_save_folder, split_save_paths, split_save_output_types, failed_keys = curr_active_pipeline.save_split_global_computation_results(debug_print=True)
             
-        #TODO 2023-11-22 18:54: - [ ] One major is that the types are lost upon reloading, so I think we'll need to save them somewhere. They can be fixed post-hoc like:
+        #TODO 2023-11-22 18:54: - [ ] One major issue is that the types are lost upon reloading, so I think we'll need to save them somewhere. They can be fixed post-hoc like:
         # Update result with correct type:
         curr_active_pipeline.global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(**curr_active_pipeline.global_computation_results.computed_data['RankOrder'])
 
         """
-        'global_computation_results.pkl'
         ## Case 1. `override_global_pickle_path` is provided:
         if override_global_pickle_path is not None:
             ## override_global_pickle_path is provided:
@@ -1291,67 +1682,142 @@ class PipelineWithComputedPipelineStageMixin:
         # make if doesn't exist
         split_save_folder.mkdir(exist_ok=True)
         
+        if include_includelist is None:
+            ## include all keys if none are specified
+            include_includelist = list(self.global_computation_results.computed_data.keys())
+
+        ## only saves out the `global_computation_results` data:
         computed_data = self.global_computation_results.computed_data
         split_save_paths = {}
+        split_save_output_types = {}
         failed_keys = []
+        skipped_keys = []
         for k, v in computed_data.items():
-            curr_split_result_pickle_path = split_save_folder.joinpath(f'Split_{k}.pkl').resolve()
-            if debug_print:
-                print(f'curr_split_result_pickle_path: {curr_split_result_pickle_path}')
-            was_save_success = False
-            try:
-                ## try get as dict
-                v_dict = v.__dict__ #__getstate__()
-                saveData(curr_split_result_pickle_path, (v_dict))
-                was_save_success = True
-            except KeyError as e:
-                print(f'{k} encountered {e} while trying to save {k}. Skipping')
-                pass
-            if was_save_success:
-                split_save_paths[k] = curr_split_result_pickle_path
+            if k in include_includelist:
+                curr_split_result_pickle_path = split_save_folder.joinpath(f'Split_{k}.pkl').resolve()
+                if debug_print:
+                    print(f'curr_split_result_pickle_path: {curr_split_result_pickle_path}')
+                was_save_success = False
+                curr_item_type = type(v)
+                try:
+                    ## try get as dict                
+                    v_dict = v.__dict__ #__getstate__()
+                    # saveData(curr_split_result_pickle_path, (v_dict))
+                    saveData(curr_split_result_pickle_path, (v_dict, str(curr_item_type.__module__), str(curr_item_type.__name__)))    
+                    was_save_success = True
+                except KeyError as e:
+                    print(f'{k} encountered {e} while trying to save {k}. Skipping')
+                    pass
+                except PicklingError as e:
+                    if not continue_after_pickling_errors:
+                        raise
+                    else:
+                        print(f'{k} encountered {e} while trying to save {k}. Skipping')
+                        pass
+                    
+                if was_save_success:
+                    split_save_paths[k] = curr_split_result_pickle_path
+                    split_save_output_types[k] = curr_item_type
+                else:
+                    failed_keys.append(k)
             else:
-                failed_keys.append(k)
+                if debug_print:
+                    print(f'skipping key "{k}" because it is not included in include_includelist: {include_includelist}')
+                skipped_keys.append(k)
                 
         if len(failed_keys) > 0:
             print(f'WARNING: failed_keys: {failed_keys} did not save for global results! They HAVE NOT BEEN SAVED!')
-        return split_save_folder, split_save_paths, failed_keys
-        
+        return split_save_folder, split_save_paths, split_save_output_types, failed_keys
 
-    def load_pickled_global_computation_results(self, override_global_computation_results_pickle_path=None):
+    
+    def load_pickled_global_computation_results(self, override_global_computation_results_pickle_path=None, allow_overwrite_existing:bool=False, allow_overwrite_existing_allow_keys: Optional[List[str]]=None, debug_print=True):
         """ loads the previously pickled `global_computation_results` into `self.global_computation_results`, replacing the current values.
+        TODO: shouldn't replace newer values without prompting, especially if the loaded value doesn't have that computed property but the current results do
+        
+         - [X] TODO 2023-05-19 - Implemented merging into existing `self.global_computation_results` results instead of replacing with loaded values.
+                If `allow_overwrite_existing=True` all existing values in `self.global_computation_results` will be replaced with their versions in the loaded file, unless they only exist in the variable.
+                Otherwise, specific keys can be specified using `allow_overwrite_existing_allow_keys=[]` to replace the variable versions of those keys with the ones loaded from file. 
+                ?? Requires checking parameters.
+         
+        
         Usage:
             curr_active_pipeline.load_pickled_global_computation_results()
         """
+        allow_overwrite_existing_allow_keys = allow_overwrite_existing_allow_keys or []
+
         if override_global_computation_results_pickle_path is None:
             # Use the default if no override is provided.
             global_computation_results_pickle_path = self.global_computation_results_pickle_path
         else:
             global_computation_results_pickle_path = override_global_computation_results_pickle_path
 
-        loaded_global_computation_dict = loadData(global_computation_results_pickle_path)
 
-        loaded_global_computation_results = ComputationResult(**loaded_global_computation_dict)
+        loaded_global_computation_results = loadData(global_computation_results_pickle_path) # returns a dict
+        if ((self.global_computation_results is None) or (self.global_computation_results.computed_data is None)):
+            """ only if no previous global result at all """
+            loaded_global_computation_results = ComputationResult(**loaded_global_computation_results) # convert to proper object type.
+            self.stage.global_computation_results = loaded_global_computation_results # TODO 2023-05-19 - Merge results instead of replacing. Requires checking parameters.
+        else:
+            # Have extant global result of some kind:
+            
+            loaded_global_computation_result_dict = loaded_global_computation_results['computed_data']
 
-        self.stage.global_computation_results = loaded_global_computation_results # TODO 2023-05-19 - Merge results instead of replacing. Requires checking parameters.
+            # successfully_loaded_keys = list(loaded_global_computation_result_dict.keys())
+            successfully_loaded_keys = list(loaded_global_computation_result_dict.keys())
+            sucessfully_updated_keys = []
+            
+            ## append them to the extant global_computations (`curr_active_pipeline.global_computation_results.computed_data`)
+            for curr_result_key, loaded_value in loaded_global_computation_result_dict.items():
+                should_apply: bool = False
+                if curr_result_key in self.global_computation_results.computed_data:
+                    if self.global_computation_results.computed_data[curr_result_key] is None:
+                        # it exists, but is None. Overwrite the None value.
+                        print(f'WARN: key "{curr_result_key}" already exists but is None! It will be overwritten with the loaded value.')
+                        should_apply = True
+                    else:
+                        # key already exists, and is non-None. overwrite it?
+                        if not allow_overwrite_existing:
+                            if (curr_result_key in allow_overwrite_existing_allow_keys):
+                                should_apply = True
+                            else:
+                                print(f'WARN: key "{curr_result_key}" already exists in `curr_active_pipeline.global_computation_results.computed_data`. Overwrite it?')
+                                # Error:
+                                # WARN: key sess already exists in `curr_active_pipeline.global_computation_results.computed_data`. Overwrite it?
+                                # WARN: key computation_config already exists in `curr_active_pipeline.global_computation_results.computed_data`. Overwrite it?
+                                # WARN: key computed_data already exists in `curr_active_pipeline.global_computation_results.computed_data`. Overwrite it?
+                                # WARN: key accumulated_errors already exists in `curr_active_pipeline.global_computation_results.computed_data`. Overwrite it?
+                                # WARN: key computation_times already exists in `curr_active_pipeline.global_computation_results.computed_data`. Overwrite it?
+                        else:
+                            # allow_overwrite_existing: means always overwrite existing results with loaded ones
+                            should_apply = True
+                else:
+                    ## doesn't exist, add it
+                    should_apply = True
+                
+                if should_apply:
+                    # apply the loaded result to the computed_data.
+                    sucessfully_updated_keys.append(curr_result_key)
+                    self.global_computation_results.computed_data[curr_result_key] = loaded_value
 
+            return sucessfully_updated_keys, successfully_loaded_keys
+        
 
-    def load_split_pickled_global_computation_results(self, override_global_computation_results_pickle_path=None, allow_overwrite_existing:bool=False, allow_overwrite_existing_allow_keys: Optional[List[str]]=None, debug_print=True):
-        """ loads the previously pickled `global_computation_results` into `self.global_computation_results`, replacing the current values.
+    @classmethod
+    def try_load_split_pickled_global_computation_results(cls, global_computation_results_pickle_path, debug_print=True):
+        """ just tries to load the previously pickled `global_computation_results` into `self.global_computation_results`, replacing the current values.
         Reciprocal: `save_split_global_computation_results`
         
         allow_overwrite_existing_allow_keys: keys allowed to be overwritten in the current computation_results if they can be loaded from disk.
         
         Usage:
             sucessfully_updated_keys, successfully_loaded_keys, found_split_paths = curr_active_pipeline.load_split_pickled_global_computation_results(allow_overwrite_existing_allow_keys=['DirectionalLaps', 'RankOrder'])
+
+            
+        global_computation_results_pickle_path = override_global_computation_results_pickle_path or self.global_computation_results_pickle_path
+
+
         """
-        allow_overwrite_existing_allow_keys = allow_overwrite_existing_allow_keys or []
-        
-        if override_global_computation_results_pickle_path is None:
-            # Use the default if no override is provided.
-            global_computation_results_pickle_path = self.global_computation_results_pickle_path
-        else:
-            global_computation_results_pickle_path = override_global_computation_results_pickle_path
-        
+        assert global_computation_results_pickle_path is not None
         if not isinstance(global_computation_results_pickle_path, Path):
             global_computation_results_pickle_path = Path(global_computation_results_pickle_path).resolve()
             
@@ -1370,8 +1836,9 @@ class PipelineWithComputedPipelineStageMixin:
         
         found_split_paths = []
         successfully_loaded_keys = {}
-        sucessfully_updated_keys = []
-        
+        failed_loaded_keys = {}
+
+
         for p in split_save_folder.rglob('Split_*.pkl'):
             if debug_print:
                 print(f'p: {p}')
@@ -1379,17 +1846,39 @@ class PipelineWithComputedPipelineStageMixin:
             curr_result_key: str = p.stem.removeprefix('Split_') # the key name into global_computation_results, parsed back from the file name
             
             # Actually do the loading:
-            loaded_value = loadData(p)
-            loaded_global_computation_results[curr_result_key] = loaded_value
-            successfully_loaded_keys[curr_result_key] = p
+            try:
+                loaded_value = loadData(p)
+                loaded_global_computation_results[curr_result_key] = loaded_value
+                successfully_loaded_keys[curr_result_key] = p
 
+            except BaseException as e:
+                print(f'Error loading {curr_result_key} from "{p}": {e}')
+                failed_loaded_keys[curr_result_key] = p
+
+        return loaded_global_computation_results, successfully_loaded_keys, failed_loaded_keys, found_split_paths
+    
+    @function_attributes(short_name=None, tags=['load', 'split'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-29 08:18', related_items=['save_split_global_computation_results'])
+    def load_split_pickled_global_computation_results(self, override_global_computation_results_pickle_path=None, allow_overwrite_existing:bool=False, allow_overwrite_existing_allow_keys: Optional[List[str]]=None, debug_print=True):
+        """ loads the previously pickled `global_computation_results` into `self.global_computation_results`, replacing the current values.
+        Reciprocal: `save_split_global_computation_results`
+        
+        allow_overwrite_existing_allow_keys: keys allowed to be overwritten in the current computation_results if they can be loaded from disk.
+        
+        Usage:
+            sucessfully_updated_keys, successfully_loaded_keys, failed_loaded_keys, found_split_paths = curr_active_pipeline.load_split_pickled_global_computation_results(allow_overwrite_existing_allow_keys=['DirectionalLaps', 'RankOrder'])
+        """
+        allow_overwrite_existing_allow_keys = allow_overwrite_existing_allow_keys or []
+        loaded_global_computation_results, successfully_loaded_keys, failed_loaded_keys, found_split_paths = self.try_load_split_pickled_global_computation_results(global_computation_results_pickle_path=(override_global_computation_results_pickle_path or self.global_computation_results_pickle_path),
+                                                                                                                                                                    debug_print=debug_print)
+        
+        sucessfully_updated_keys = []
         ## append them to the extant global_computations (`curr_active_pipeline.global_computation_results.computed_data`)
         for curr_result_key, loaded_value in loaded_global_computation_results.items():
             should_apply: bool = False
             if curr_result_key in self.global_computation_results.computed_data:
                 # key already exists, overwrite it?
                 
-                if not allow_overwrite_existing:
+                if (not allow_overwrite_existing):
                     if (curr_result_key in allow_overwrite_existing_allow_keys):
                         should_apply = True
                     else:
@@ -1403,8 +1892,367 @@ class PipelineWithComputedPipelineStageMixin:
             if should_apply:
                 # apply the loaded result to the computed_data.
                 sucessfully_updated_keys.append(curr_result_key)
-                self.global_computation_results.computed_data[curr_result_key] = loaded_value
+                if isinstance(loaded_value, dict):
+                    loaded_result_dict = loaded_value
+                elif isinstance(loaded_value, tuple):
+                    assert len(loaded_value) == 3
+                    # saved with 2024-01-24 - (v_dict, str(curr_item_type.__module__), str(curr_item_type.__name__)
+                    loaded_result_dict, curr_item_type_module, curr_item_type_name = loaded_value
+                    print(f'curr_item_type_module: {curr_item_type_module}, curr_item_type_name: {curr_item_type_name}')
+                    # TODO: use thse to unarchive the object into the correct format:
 
-        return sucessfully_updated_keys, successfully_loaded_keys, found_split_paths
+                self.global_computation_results.computed_data[curr_result_key] = loaded_result_dict
+
+        return sucessfully_updated_keys, successfully_loaded_keys, failed_loaded_keys, found_split_paths
+    
+    @function_attributes(short_name=None, tags=['parameters', 'computaton'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-23 06:29', related_items=[])
+    def get_all_parameters(self) -> Dict:
+        """ gets all user-parameters from the pipeline
+        
+        """
+        from neuropy.core.parameters import ParametersContainer
+        from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
+        from pyphoplacecellanalysis.General.PipelineParameterClassTemplating import GlobalComputationParametersAttrsClassTemplating
+        from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters, merged_directional_placefields_Parameters, rank_order_shuffle_analysis_Parameters, directional_decoders_decode_continuous_Parameters, directional_decoders_evaluate_epochs_Parameters, directional_train_test_split_Parameters, long_short_decoding_analyses_Parameters, long_short_rate_remapping_Parameters, long_short_inst_spike_rate_groups_Parameters, wcorr_shuffle_analysis_Parameters, perform_specific_epochs_decoding_Parameters, DEP_ratemap_peaks_Parameters, ratemap_peaks_prominence2d_Parameters
+
+        preprocessing_parameters: ParametersContainer = deepcopy(self.active_sess_config)
+
+        ## Add `curr_active_pipeline.global_computation_results.computation_config` as needed:
+        if self.global_computation_results.computation_config is None:
+            print('global_computation_results.computation_config is None! Making new one!')
+            curr_global_param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters.init_from_pipeline(curr_active_pipeline=self)
+            self.global_computation_results.computation_config = curr_global_param_typed_parameters
+            print(f'\tdone. Pipeline needs resave!')
+        else:
+            curr_global_param_typed_parameters: ComputationKWargParameters = self.global_computation_results.computation_config
+            
+        ## Ensured that we have a valid `curr_global_param_typed_parameters` that was created with the kwarg defaults if it didn't exist.
+        #TODO 2024-10-23 06:45: - [ ] What about when a config was created and then later new kwarg values were added to a computation function, or the default values were updated?
+        _master_params_dict = {}
+        _master_params_dict['preprocessing'] = preprocessing_parameters.to_dict()
+        _master_params_dict.update(curr_global_param_typed_parameters.to_dict())
+        
+        # if self.global_computation_results.computation_config is not None:
+        #     curr_global_param_typed_parameters: ComputationKWargParameters = deepcopy(self.global_computation_results.computation_config)
+        #     _master_params_dict.update(curr_global_param_typed_parameters.to_dict())
+        #     ## TODO: are we sure we have all the parameters just from a global config? do we need to capture the default kwarg values that haven't been assigned or something?
+        # else:
+        #     print(f'WARNING: no global config so using kwarg defaults...')
+        #     ## only the default kwarg values:
+        #     registered_merged_computation_function_default_kwargs_dict, code_str, nested_classes_dict, (imports_dict, imports_list, imports_string) = GlobalComputationParametersAttrsClassTemplating.main_generate_params_classes(curr_active_pipeline=self)
+        #     # registered_merged_computation_function_default_kwargs_dict
+        #     _master_params_dict.update(registered_merged_computation_function_default_kwargs_dict)
+
+        # _master_params_dict
+        # {'merged_directional_placefields': {'laps_decoding_time_bin_size': 0.25, 'ripple_decoding_time_bin_size': 0.025, 'should_validate_lap_decoding_performance': False},
+        #  'rank_order_shuffle_analysis': {'num_shuffles': 500, 'minimum_inclusion_fr_Hz': 5.0, 'included_qclu_values': [1, 2], 'skip_laps': False},
+        #  'directional_decoders_decode_continuous': {'time_bin_size': None},
+        #  'directional_decoders_evaluate_epochs': {'should_skip_radon_transform': False},
+        #  'directional_train_test_split': {'training_data_portion': 0.8333333333333334, 'debug_output_hdf5_file_path': None},
+        #  'long_short_decoding_analyses': {'decoding_time_bin_size': None, 'perform_cache_load': False, 'always_recompute_replays': False, 'override_long_epoch_name': None, 'override_short_epoch_name': None},
+        #  'long_short_rate_remapping': {'decoding_time_bin_size': None, 'perform_cache_load': False, 'always_recompute_replays': False},
+        #  'long_short_inst_spike_rate_groups': {'instantaneous_time_bin_size_seconds': 0.01},
+        #  'wcorr_shuffle_analysis': {'num_shuffles': 1024, 'drop_previous_result_and_compute_fresh': False},
+        #  '_perform_specific_epochs_decoding': {'decoder_ndim': 2, 'filter_epochs': 'ripple', 'decoding_time_bin_size': 0.02},
+        #  '_DEP_ratemap_peaks': {'peak_score_inclusion_percent_threshold': 0.25},
+        #  'ratemap_peaks_prominence2d': {'step': 0.01, 'peak_height_multiplier_probe_levels': (0.5, 0.9), 'minimum_included_peak_height': 0.2, 'uniform_blur_size': 3, 'gaussian_blur_sigma': 3}}
+
+        return _master_params_dict
+
+        # ## OUTPUTS: param_typed_parameters
+        # return {
+        #     'preprocessing_parameters': preprocessing_parameters,
+        #     'curr_global_param_typed_parameters': curr_global_param_typed_parameters,
+        #     'param_typed_parameters': param_typed_parameters,
+        # }
+
+    def update_parameters(self, override_parameters_flat_keypaths_dict: Dict[str, Any]=None) -> None:
+        """ updates any of the user-parameters by keypaths for the pipeline
+        
+        """
+        from neuropy.core.parameters import ParametersContainer
+        from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters
+
+        if override_parameters_flat_keypaths_dict is None:
+            return
+        else:
+            if self.is_computed:
+                ## Add `curr_active_pipeline.global_computation_results.computation_config` as needed:
+                if self.global_computation_results.computation_config is None:
+                    print('global_computation_results.computation_config is None! Making new one!')
+                    curr_global_param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters.init_from_pipeline(curr_active_pipeline=self)
+                    self.global_computation_results.computation_config = curr_global_param_typed_parameters
+                    print(f'\tdone. Pipeline needs resave!')
+                else:
+                    curr_global_param_typed_parameters: ComputationKWargParameters = self.global_computation_results.computation_config
+                    
+
+                for k, v in override_parameters_flat_keypaths_dict.items():
+                    if k.startswith('preprocessing'):
+                        raise NotImplementedError("Updating preprocessing parameters is not yet implemented!")            
+                        preprocessing_parameters: ParametersContainer = deepcopy(self.active_sess_config)
+                    else:                
+                        # Set a value using keypath (e.g. 'directional_train_test_split.training_data_portion')
+                        curr_global_param_typed_parameters.set_by_keypath(k, v)
+
+                self.global_computation_results.computation_config = curr_global_param_typed_parameters
+                # return self.global_computation_results.computation_config # return the updated parameters
+            else:
+                print(f'too early to set the computation_config override_parameters, not yet at the computation stage!!')
+                pass
+
+
+    @function_attributes(short_name=None, tags=['UNFINSHED', 'context', 'custom', 'parameters'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-31 19:46', related_items=[])
+    def get_session_additional_parameters_context(self, parts_separator:str='-') -> DisplaySpecifyingIdentifyingContext:
+        """ gets the entire session context, including the noteworthy computation parameters that would be needed for determing which filename to save under .
+        
+        Usage:
+            active_context, session_ctxt_key, CURR_BATCH_OUTPUT_PREFIX, additional_session_context = curr_active_pipeline.get_complete_session_context(BATCH_DATE_TO_USE=self.BATCH_DATE_TO_USE)
+        
+        """
+        to_filename_conversion_dict = {'compute_diba_quiescent_style_replay_events':'_withNewComputedReplays', 'diba_evt_file':'_withNewKamranExportedReplays', 'initial_loaded': '_withOldestImportedReplays', 'normal_computed': '_withNormalComputedReplays'}
+
+        all_params_dict = self.get_all_parameters()
+
+        # preprocessing_parameters = all_params_dict['preprocessing']
+        rank_order_shuffle_analysis_parameters = all_params_dict['rank_order_shuffle_analysis']
+        included_qclu_values = deepcopy(rank_order_shuffle_analysis_parameters['included_qclu_values']) # [1, 2, 4, 6, 7, 9]
+        minimum_inclusion_fr_Hz = deepcopy(rank_order_shuffle_analysis_parameters['minimum_inclusion_fr_Hz']) # 5.0
+        
+        
+        ## TODO: Ideally would use the value passed in self.get_all_parameters():
+        active_replay_epoch_parameters = deepcopy(self.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays)
+        epochs_source: str = active_replay_epoch_parameters.get('epochs_source', 'normal_computed')
+        
+        _filename_formatting_fn = partial(
+            session_context_filename_formatting_fn,
+            parts_separator=parts_separator,
+        )
+
+        additional_session_context: DisplaySpecifyingIdentifyingContext = DisplaySpecifyingIdentifyingContext(epochs_source=epochs_source, included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz,
+            specific_purpose_display_dict={'filename_formatting': _filename_formatting_fn, 
+
+        }, display_dict={'epochs_source': lambda k, v: to_filename_conversion_dict[v],
+                'included_qclu_values': lambda k, v: f"qclu_{v}",
+                'minimum_inclusion_fr_Hz': lambda k, v: f"frateThresh_{v:.1f}",
+        })
+        return additional_session_context
     
 
+    @function_attributes(short_name=None, tags=['parameters', 'filenames', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 16:10', related_items=[])
+    def get_custom_pipeline_filenames_from_parameters(self, parts_separator:str='-') -> Tuple:
+        """ gets the custom suffix from the pipeline's parameters 
+        
+        custom_save_filepaths, custom_save_filenames, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
+        
+        """
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _get_custom_filenames_from_computation_metadata
+        
+        all_params_dict = self.get_all_parameters()
+
+        # preprocessing_parameters = all_params_dict['preprocessing']
+        rank_order_shuffle_analysis_parameters = all_params_dict['rank_order_shuffle_analysis']
+        included_qclu_values = deepcopy(rank_order_shuffle_analysis_parameters['included_qclu_values']) # [1, 2, 4, 6, 7, 9]
+        minimum_inclusion_fr_Hz = deepcopy(rank_order_shuffle_analysis_parameters['minimum_inclusion_fr_Hz']) # 5.0
+        
+        ## TODO: Ideally would use the value passed in self.get_all_parameters():
+        active_replay_epoch_parameters = deepcopy(self.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays)
+        epochs_source: str = active_replay_epoch_parameters.get('epochs_source', 'normal_computed')
+        custom_suffix: str = epochs_source
+        # custom_suffix += _get_custom_suffix_for_filename_from_computation_metadata(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
+        custom_save_filepaths, custom_save_filenames, custom_suffix = _get_custom_filenames_from_computation_metadata(epochs_source=epochs_source, included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, parts_separator=parts_separator)
+        # print(f'custom_save_filenames: {custom_save_filenames}')
+        # print(f'custom_suffix: "{custom_suffix}"')
+        
+        return custom_save_filepaths, custom_save_filenames, custom_suffix
+    
+
+    @function_attributes(short_name=None, tags=['parameters', 'filenames', 'export'], input_requires=[], output_provides=[], uses=['get_custom_pipeline_filenames_from_parameters'], used_by=[], creation_date='2024-11-08 10:36', related_items=[])
+    def get_complete_session_identifier_string(self, parts_separator:str='_', custom_parameter_keyvalue_parts_separator:str='-', session_identity_parts_separator:str='_') -> str:
+        """ returns a string like 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]', with the session context and the parameters
+        complete_session_identifier_string: str = curr_active_pipeline.get_complete_session_identifier_string()
+    
+        Used to be `parts_separator:str='_'`
+        """
+        custom_save_filepaths, custom_save_filenames, custom_suffix = self.get_custom_pipeline_filenames_from_parameters(parts_separator=custom_parameter_keyvalue_parts_separator) # 'normal_computed-frateThresh_5.0-qclu_[1, 2]'
+        complete_session_identifier_string: str = parts_separator.join([self.get_session_context().get_description(separator=session_identity_parts_separator), custom_suffix]) # 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]'
+        return complete_session_identifier_string
+
+
+    @function_attributes(short_name=None, tags=['parameters', 'filenames', 'export'], input_requires=[], output_provides=[], uses=['get_complete_session_identifier_string'], used_by=[], creation_date='2024-11-19 01:19', related_items=[])
+    def build_complete_session_identifier_filename_string(self, data_identifier_str: str, parent_output_path: Optional[Path]=None, extra_parts: Optional[List[str]]=None, out_extension: Optional[str]='.csv', suffix_string: Optional[str]=None,
+            output_date_str: Optional[str]=None, parts_separator:str='_', custom_parameter_keyvalue_parts_separator:str='-', session_identity_parts_separator:str='_', ensure_no_duplicate_parts: bool = True) -> Tuple[Path, str, str]:
+        """ returns a string like 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]', with the session context and the parameters
+        complete_session_identifier_string: str = curr_active_pipeline.get_complete_session_identifier_string()
+    
+        Used to be `parts_separator:str='_'`
+        
+        Usage:
+        
+        out_path, out_filename, out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=None, data_identifier_str="(ripple_WCorrShuffle_df)", parent_output_path=None, out_extension='.csv', extra_parts=None, ensure_no_duplicate_parts=False)
+        out_filename # '2024-11-19_0148AM-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_WCorrShuffle_df).csv'
+
+        out_path, out_filename, out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(data_identifier_str="(ripple_WCorrShuffle_df)", parent_output_path=None, out_extension='.csv', extra_parts=['tbin-0.025'])
+        out_filename  # '2024-11-19_0148AM-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_WCorrShuffle_df)-tbin-0.025.csv'
+
+        out_path, out_filename, out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(data_identifier_str="(ripple_WCorrShuffle_df)", parent_output_path=None, out_extension='.csv', suffix_string='_tbin-0.025')
+        out_filename  # '2024-11-19_0148AM-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_WCorrShuffle_df)_tbin-0.025.csv'
+
+        
+        """
+        from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
+
+        session_identifier_str: str = self.get_complete_session_identifier_string(parts_separator=parts_separator, custom_parameter_keyvalue_parts_separator=custom_parameter_keyvalue_parts_separator, session_identity_parts_separator=session_identity_parts_separator)
+
+        # custom_save_filepaths, custom_save_filenames, custom_suffix = self.get_custom_pipeline_filenames_from_parameters(parts_separator=sub_parts_separator) # 'normal_computed-frateThresh_5.0-qclu_[1, 2]'
+        # complete_session_identifier_string: str = parts_separator.join([self.get_session_context().get_description(separator=session_identity_parts_separator), custom_suffix]) # 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]'
+        if output_date_str is None:
+            output_date_str = get_now_rounded_time_str()
+            # output_date_str = get_now_day_str()
+
+        _all_parts = []
+
+        # _all_parts = [output_date_str, session_identifier_str, data_identifier_str]
+
+        if (output_date_str is not None) and (len(output_date_str) > 0):
+            _all_parts.append(output_date_str)
+            
+        if (session_identifier_str is not None) and (len(session_identifier_str) > 0):
+            _all_parts.append(session_identifier_str)
+            
+        if (data_identifier_str is not None) and (len(data_identifier_str) > 0):
+            _all_parts.append(data_identifier_str)
+
+        # assert output_date_str is not None
+        if extra_parts is not None:
+            for a_part in extra_parts:
+                if (a_part is not None) and (len(a_part) > 0):
+                    _all_parts.append(a_part)
+
+            # _all_parts.extend(extra_parts)
+
+        
+        if ensure_no_duplicate_parts:
+            # _all_parts = list(set(_all_parts)) ## drop duplicate parts
+            # _all_parts = np.unique(_all_parts).tolist()
+            _all_parts = list(dict.fromkeys(_all_parts))
+            
+            
+        # out_basename: str = '-'.join([output_date_str, session_identifier_str, data_identifier_str]) # '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
+        out_basename: str = custom_parameter_keyvalue_parts_separator.join(_all_parts) # '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
+        if (suffix_string is not None) and (len(suffix_string) > 0):
+            if ensure_no_duplicate_parts:
+                assert (not out_basename.endswith(suffix_string)), f"out_basename: '{out_basename}', suffix_string: '{suffix_string}'"
+            out_basename = f"{out_basename}{suffix_string}" ## append suffix string before extension
+        
+        if out_extension is None:
+            out_extension = ''
+        out_filename: str = f"{out_basename}{out_extension}"
+        if parent_output_path is not None:
+            out_path: Path = parent_output_path.joinpath(out_filename).resolve()
+        else:
+            out_path: Path = Path(out_filename)
+        return out_path, out_filename, out_basename
+
+
+
+
+
+    @function_attributes(short_name=None, tags=['context', 'custom', 'parameters'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-01 00:00', related_items=[])
+    def get_complete_session_context(self, parts_separator:str='_') -> Tuple[DisplaySpecifyingIdentifyingContext, Tuple[DisplaySpecifyingIdentifyingContext]]:
+        """ gets the entire session context, including the noteworthy computation parameters that would be needed for determing which filename to save under .
+        
+        Usage:
+            complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
+        
+        """
+        _filename_formatting_fn = partial(
+            session_context_filename_formatting_fn,
+            parts_separator=parts_separator,
+        )
+
+        curr_session_context: DisplaySpecifyingIdentifyingContext = DisplaySpecifyingIdentifyingContext.init_from_context(a_context=self.get_session_context(),
+        specific_purpose_display_dict={'filename_formatting': _filename_formatting_fn,},
+        # display_dict={'epochs_source': lambda k, v: to_filename_conversion_dict[v],
+        #         'included_qclu_values': lambda k, v: f"qclu_{v}",
+        #         'minimum_inclusion_fr_Hz': lambda k, v: f"frateThresh_{v:.1f}",
+        # },
+        ) # **_obj.to_dict(),
+        additional_session_context: DisplaySpecifyingIdentifyingContext = self.get_session_additional_parameters_context(parts_separator=parts_separator)
+        # complete_session_context: DisplaySpecifyingIdentifyingContext = curr_session_context | additional_session_context # hoping this merger works
+        complete_session_context: DisplaySpecifyingIdentifyingContext = curr_session_context.adding_context(collision_prefix='_additional', **additional_session_context.to_dict()) # hoping this merger works
+        
+        return complete_session_context, (curr_session_context,  additional_session_context)
+
+    @function_attributes(short_name=None, tags=['valid_track_times'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-05 16:18', related_items=[])
+    def find_first_and_last_valid_position_times(self):
+        """ uses the positions and the loaded_track_limits to determine the first and last valid times for each session. 
+        
+        Usage:
+        
+            active_sess_config = deepcopy(curr_active_pipeline.active_sess_config)
+            # absolute_start_timestamp: float = active_sess_config.absolute_start_timestamp
+            loaded_track_limits = active_sess_config.loaded_track_limits # x_midpoint, 
+
+            (first_valid_pos_time, last_valid_pos_time) = curr_active_pipeline.find_first_and_last_valid_position_times()
+            (first_valid_pos_time, last_valid_pos_time)
+            
+        """
+        return self.stage.find_first_and_last_valid_position_times()
+        
+
+    # @function_attributes(short_name=None, tags=['UNFINSHED', 'context', 'custom', 'parameters'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-31 19:46', related_items=[])
+    # def get_complete_session_context_description_str(self, BATCH_DATE_TO_USE: Optional[str]=None):
+    # 	""" gets the entire session context, including the noteworthy computation parameters that would be needed for determing which filename to save under .
+        
+    # 	Usage:
+    # 		# active_context, session_ctxt_key, CURR_BATCH_OUTPUT_PREFIX, additional_session_context = curr_active_pipeline.get_complete_session_context(BATCH_DATE_TO_USE=self.BATCH_DATE_TO_USE)
+        
+    # 	"""
+    # 	# curr_session_name: str = self.session_name # '2006-6-08_14-26-15'
+    # 	# _, _, custom_suffix = self.get_custom_pipeline_filenames_from_parameters()
+        
+    # 	# additional_session_context
+
+
+    # 	# if len(custom_suffix) > 0:
+    # 	# 	if additional_session_context is not None:
+    # 	# 		if isinstance(additional_session_context, dict):
+    # 	# 			additional_session_context = IdentifyingContext(**additional_session_context)
+
+    # 	# 		## easiest to update as dict:	
+    # 	# 		additional_session_context = additional_session_context.to_dict()
+    # 	# 		additional_session_context['custom_suffix'] = (additional_session_context.get('custom_suffix', '') or '') + custom_suffix
+    # 	# 		additional_session_context = IdentifyingContext(**additional_session_context)
+                
+    # 	# 	else:
+    # 	# 		additional_session_context = IdentifyingContext(custom_suffix=custom_suffix)
+        
+    # 	# assert (additional_session_context is not None), f"perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function: additional_session_context is None even after trying to add the computation params as additional_session_context"
+    # 	# # active_context = curr_active_pipeline.get_session_context()
+    # 	# if additional_session_context is not None:
+    # 	# 	if isinstance(additional_session_context, dict):
+    # 	# 		additional_session_context = IdentifyingContext(**additional_session_context)
+    # 	# 	active_context: IdentifyingContext = (self.get_session_context() | additional_session_context)
+    # 	# 	# if len(custom_suffix) == 0:
+    # 	# 	session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=(IdentifyingContext._get_session_context_keys() + list(additional_session_context.keys())))
+    # 	# 	CURR_BATCH_OUTPUT_PREFIX: str = f"{curr_session_name}-{additional_session_context.get_description()}"
+    # 	# 	# else:
+    # 	# 	# 	session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=(IdentifyingContext._get_session_context_keys() + list(additional_session_context.keys()))) + f'|{custom_suffix}'
+    # 	# 	# 	CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}-{additional_session_context.get_description()}-{custom_suffix}"
+    # 	# else:
+    # 	# 	active_context: IdentifyingContext = self.get_session_context()
+    # 	# 	session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
+    # 	# 	# if len(custom_suffix) == 0:
+    # 	# 	CURR_BATCH_OUTPUT_PREFIX: str = f"{curr_session_name}"
+    # 	# 	# else:
+    # 	# 	# 	session_ctxt_key:str = session_ctxt_key + custom_suffix
+    # 	# 	# 	CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}-{custom_suffix}"
+            
+    # 	# if BATCH_DATE_TO_USE is not None and len(BATCH_DATE_TO_USE) > 0:
+    # 	# 	CURR_BATCH_OUTPUT_PREFIX = f"{BATCH_DATE_TO_USE}-{CURR_BATCH_OUTPUT_PREFIX}"
+
+    # 	# print(f'\tactive_context: {active_context}')
+        
+    # 	# return active_context, session_ctxt_key, CURR_BATCH_OUTPUT_PREFIX, additional_session_context
+    

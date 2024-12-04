@@ -31,7 +31,7 @@ from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSer
 # Pipeline Logging:
 import logging
 # from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import pipeline_module_logger
-from pyphocorehelpers.print_helpers import build_module_logger
+from pyphocorehelpers.print_helpers import build_run_log_task_identifier, build_logger
 _GLOBAL_spike_raster_logger = None 
 
 """ 
@@ -256,10 +256,9 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         """
         super(SpikeRasterBase, self).__init__(**kwargs)
         # Initialize member variables:
-        _GLOBAL_spike_raster_logger = build_module_logger('Spike3D.display.SpikeRasterBase') # Only now do we build the module logger. This way it isn't made when the SpikeRaster plots aren't even used.
+        _GLOBAL_spike_raster_logger = build_logger('Spike3D.display.SpikeRasterBase', file_logging_dir=None, debug_print=False) # Only now do we build the module logger. This way it isn't made when the SpikeRaster plots aren't even used.
         self._logger = _GLOBAL_spike_raster_logger
         self.logger.info(f'SpikeRasterBase.__init__(...)')
-        
         
         # Helper container variables
         self.params = params

@@ -54,7 +54,7 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
     _computationPrecidence = 3
     _is_global = False
 
-    @function_attributes(short_name='extended_stats', tags=['statistics'], 
+    @function_attributes(short_name='extended_stats', tags=['position', 'resample', 'time_binned', 'statistics'], 
         input_requires=["computation_result.sess.position", "computation_result.computation_config.pf_params.time_bin_size"], 
         output_provides=["computation_result.computed_data['extended_stats']['time_binned_positioned_resampler']", "computation_result.computed_data['extended_stats']['time_binned_position_df']", "computation_result.computed_data['extended_stats']['time_binned_position_mean']", "computation_result.computed_data['extended_stats']['time_binned_position_covariance']"],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['extended_stats']['time_binned_position_df']), is_global=False)
@@ -77,7 +77,7 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
         time_binned_position_resampler = build_position_df_resampled_to_time_windows(computation_result.sess.position.to_dataframe(), time_bin_size=computation_result.computation_config.pf_params.time_bin_size) # TimedeltaIndexResampler
         time_binned_position_df = time_binned_position_resampler.nearest() # an actual dataframe
         computation_result.computed_data['extended_stats'] = DynamicParameters.init_from_dict({
-         'time_binned_positioned_resampler': time_binned_position_resampler,
+         'time_binned_positioned_resampler': time_binned_position_resampler, # this might be the unpicklable object? 
          'time_binned_position_df': time_binned_position_df,
          'time_binned_position_mean': time_binned_position_df.resample("1min").mean(), # 3 minutes
          'time_binned_position_covariance': time_binned_position_df.cov(min_periods=12)
@@ -95,6 +95,7 @@ class ExtendedStatsComputations(AllFunctionEnumeratingMixin, metaclass=Computati
 
     @function_attributes(short_name='pf_dt_sequential_surprise', tags=['surprise', 'time_dependent_pf'], 
         uses=['compute_snapshot_relative_entropy_surprise_differences'], used_by=[], related_items=[], conforms_to=[],
+        computation_precidence=9.01,
         input_requires=["computed_data['firing_rate_trends']", "computed_data['pf1D_dt']", "computation_result.sess.position", "computation_result.computation_config.pf_params.time_bin_size"], 
         output_provides=["computation_result.computed_data['extended_stats']['time_binned_positioned_resampler']", "computation_result.computed_data['extended_stats']['time_binned_position_df']", "computation_result.computed_data['extended_stats']['time_binned_position_mean']", "computation_result.computed_data['extended_stats']['time_binned_position_covariance']"],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['extended_stats']['pf_dt_sequential_surprise'], np.sum(curr_active_pipeline.computation_results[computation_filter_name].computed_data['extended_stats']['pf_dt_sequential_surprise']['flat_relative_entropy_results'], axis=1),  np.sum(curr_active_pipeline.computation_results[computation_filter_name].computed_data['extended_stats']['pf_dt_sequential_surprise']['flat_jensen_shannon_distance_results'], axis=1)),

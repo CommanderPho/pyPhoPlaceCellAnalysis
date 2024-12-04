@@ -1,5 +1,6 @@
 from enum import Enum
 from pathlib import Path
+from typing import Optional
 import numpy as np
 
 from pyphocorehelpers.function_helpers import function_attributes
@@ -9,6 +10,32 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 from pyphoplacecellanalysis.GUI.Qt.MainApplicationWindows.PhoMainAppWindowBase import PhoMainAppWindowBase # for pyqtplot_plot_image
+
+
+# Function to set small titles with minimal padding
+@function_attributes(short_name=None, tags=['title', 'IMPORTANT', 'pyqtgraph', 'title', 'spacing'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-05 16:43', related_items=[])
+def set_small_title(plotItem: pg.PlotItem, title_row_fixed_height: int = 10):
+    """ Adjusts the size and padding of the plotItem's title. Removes the excessive margins that are present by default.
+    title_row_fixed_height: int = 10 - the height of the title row in px, (default 30)
+    
+    Usage:
+        
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import set_small_title
+
+        title_row_fixed_height: int = 10 #the height of the title row in px, (default 30)
+        for newPlotItem in _a_trial_by_trial_window.plots['plot_array']:
+            set_small_title(newPlotItem, title_row_fixed_height)
+
+
+    """
+    plotItem.layout.setRowMinimumHeight(0, title_row_fixed_height)
+    plotItem.layout.setRowMaximumHeight(0, title_row_fixed_height)
+    plotItem.layout.setRowFixedHeight(0, title_row_fixed_height) # 0 is the fixed row index in the plotItem's layout
+    plotItem.layout.setRowPreferredHeight(0, title_row_fixed_height)
+
+
+
+
 
 
 def pyqtplot_build_image_bounds_extent(xbin_edges, ybin_edges, margin = 2.0, debug_print=False):
@@ -81,7 +108,8 @@ def pyqtplot_plot_image(xbin_edges, ybin_edges, image, enable_LUT_Histogram=Fals
     root_render_widget.setImage(image, xvals=xbin_edges)
     # Set the color map:
     # cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
-    cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
+    # cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
+    cmap = pg.colormap.get('Oranges','matplotlib') # prepare a linear color map
     root_render_widget.setColorMap(cmap)
     
     # if enable_LUT_Histogram:
@@ -119,6 +147,7 @@ class LayoutScrollability(ExtendedEnum):
         return cls.build_member_value_dict([False, True])
 
 
+@function_attributes(short_name=None, tags=['pyqtgraph', 'build'], input_requires=[], output_provides=[], uses=['pg.GraphicsLayoutWidget'], used_by=['BasicBinnedImageRenderingWindow'], creation_date='2023-04-18 00:00', related_items=[])
 def _perform_build_root_graphics_layout_widget_ui(ui:PhoUIContainer, is_scrollable: bool = True) -> PhoUIContainer:
     """ just adds the widgets required to make the main graphics layoutr scrollable
 
@@ -328,4 +357,118 @@ def build_pyqtgraph_epoch_indicator_regions(win: pg.PlotWidget, t_start:float, t
 #     # return ui, add_heading, add_bar
 #     return ui
 
+
+
+# ==================================================================================================================== #
+# 2023-12-19 PyQtGraphCrosshairs                                                                                       #
+# ==================================================================================================================== #
+
+"""
+Demonstrates some customized mouse interaction by drawing a crosshair that follows 
+the mouse.
+"""
+
+from attrs import define, field
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+
+@define(slots=False, repr=False)
+class PyQtGraphCrosshairs:
+    """ a class wrapper for the simple hover crosshairs shown in the pyqtgraph examples
+    
+    """
+    vLine: pg.InfiniteLine = field()
+    hLine: pg.InfiniteLine = field()
+    proxy: pg.SignalProxy = field(init=False) 
+    p1: pg.PlotItem = field(init=False)
+    label: Optional[pg.LabelItem] = field(init=False)
+        
+    @classmethod
+    def init_from_plot_item(cls, p1, a_label):
+        _obj = cls(vLine=pg.InfiniteLine(angle=90, movable=False), 
+             hLine=pg.InfiniteLine(angle=0, movable=False))
+        _obj.p1 = p1
+        _obj.label = a_label
+        # _obj.vLine = pg.InfiniteLine(angle=90, movable=False)
+        # _obj.hLine = pg.InfiniteLine(angle=0, movable=False)
+        p1.addItem(_obj.vLine, ignoreBounds=True)
+        p1.addItem(_obj.hLine, ignoreBounds=True)
+        _obj.proxy = pg.SignalProxy(p1.scene().sigMouseMoved, rateLimit=60, slot=_obj.mouseMoved)
+        return _obj
+  
+
+    def mouseMoved(self, evt):
+        """ captures `label` """
+        pos = evt[0]  ## using signal proxy turns original arguments into a tuple
+        vb = self.p1.vb
+        if self.p1.sceneBoundingRect().contains(pos):
+            mousePoint = vb.mapSceneToView(pos)
+            index = int(mousePoint.x())
+            # if index > 0 and index < len(data1):
+            #     print(f"<span style='font-size: 12pt'>x=%0.1f,   <span style='color: red'>y1=%0.1f</span>,   <span style='color: green'>y2=%0.1f</span>" % (mousePoint.x(), data1[index], data2[index]))
+            #     if self.label is not None:
+            #         self.label.setText("<span style='font-size: 12pt'>x=%0.1f,   <span style='color: red'>y1=%0.1f</span>,   <span style='color: green'>y2=%0.1f</span>" % (mousePoint.x(), data1[index], data2[index]))
+            self.vLine.setPos(mousePoint.x())
+            self.hLine.setPos(mousePoint.y())
+
+
+
+# #generate layout
+# app = pg.mkQApp("Crosshair Example")
+# win = pg.GraphicsLayoutWidget(show=True)
+# win.setWindowTitle('pyqtgraph example: crosshair')
+# label = pg.LabelItem(justify='right')
+# win.addItem(label)
+# p1 = win.addPlot(row=1, col=0)
+# # customize the averaged curve that can be activated from the context menu:
+# p1.avgPen = pg.mkPen('#FFFFFF')
+# p1.avgShadowPen = pg.mkPen('#8080DD', width=10)
+
+# p2 = win.addPlot(row=2, col=0)
+
+# region = pg.LinearRegionItem()
+# region.setZValue(10)
+# # Add the LinearRegionItem to the ViewBox, but tell the ViewBox to exclude this 
+# # item when doing auto-range calculations.
+# p2.addItem(region, ignoreBounds=True)
+
+# #pg.dbg()
+# p1.setAutoVisible(y=True)
+
+# #create numpy arrays
+# #make the numbers large to show that the range shows data from 10000 to all the way 0
+# data1 = 10000 + 15000 * pg.gaussianFilter(np.random.random(size=10000), 10) + 3000 * np.random.random(size=10000)
+# data2 = 15000 + 15000 * pg.gaussianFilter(np.random.random(size=10000), 10) + 3000 * np.random.random(size=10000)
+
+# p1.plot(data1, pen="r")
+# p1.plot(data2, pen="g")
+
+# p2d = p2.plot(data1, pen="w")
+# # bound the LinearRegionItem to the plotted data
+# region.setClipItem(p2d)
+
+# def update():
+#     region.setZValue(10)
+#     minX, maxX = region.getRegion()
+#     p1.setXRange(minX, maxX, padding=0)    
+
+# region.sigRegionChanged.connect(update)
+
+# def updateRegion(window, viewRange):
+#     rgn = viewRange[0]
+#     region.setRegion(rgn)
+
+# p1.sigRangeChanged.connect(updateRegion)
+
+# region.setRegion([1000, 2000])
+
+# #cross hair
+# vLine = pg.InfiniteLine(angle=90, movable=False)
+# hLine = pg.InfiniteLine(angle=0, movable=False)
+# p1.addItem(vLine, ignoreBounds=True)
+# p1.addItem(hLine, ignoreBounds=True)
+# vb = p1.vb
+
+# a_crosshairs = PyQtGraphCrosshairs.init_from_plot_item(p1=p1, a_label=label)
+
+# #p1.scene().sigMouseMoved.connect(mouseMoved)
 

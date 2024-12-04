@@ -1,6 +1,7 @@
 # InteractivePyvistaPlotterBuildIfNeededMixin
 
 # from neuropy
+from copy import deepcopy
 import numpy as np
 import pyvista as pv
 from qtpy import QtCore, QtGui, QtWidgets
@@ -31,9 +32,35 @@ class InteractiveDataExplorerBase(DecoderRenderingPyVistaMixin, InteractivePyvis
         _setup_pyvista_theme()
 
     """
-    def __init__(self, active_config, active_session, extant_plotter=None, data_explorer_name='InteractiveDataExplorerBase', **kwargs):
-        QtCore.QObject.__init__(self, **kwargs) # Initialize the QObject
-        self.active_config = active_config
+    def __init__(self, active_config, active_session, extant_plotter=None, data_explorer_name='InteractiveDataExplorerBase', **kwargs):        
+        active_config_modifiying_kwargs = kwargs.pop('active_config_modifiying_kwargs', {}) # pop the possible modifications
+        params_kwargs = kwargs.pop('params_kwargs', {})
+        debug_kwargs = kwargs.pop('debug_kwargs', {})
+        plots_data_kwargs = kwargs.pop('debug_kwargs', {}) 
+        plots_kwargs = kwargs.pop('plots_kwargs', {}) 
+        ui_kwargs = kwargs.pop('ui_kwargs', {}) 
+
+        ## add these to `params_kwargs`
+        for a_key in ['owning_pipeline', 'active_config_name', 'active_context']:
+            a_val = kwargs.pop(a_key, None)
+            if a_val is not None:
+                assert (a_key not in params_kwargs), f"key '{a_key}' present both in params_kwargs and as a top-level kwarg to this init function!"
+                params_kwargs[a_key] = a_val
+
+        QtCore.QObject.__init__(self, **kwargs) # Initialize the QObject - TypeError: 'should_nan_non_visited_elements' is an unknown keyword argument, kwargs['zScalingFactor']
+        self.active_config = deepcopy(active_config)
+
+        ## If provided, apply custom `active_config_modifiying_kwargs` to the self.active_config config before setup
+        for k, v in active_config_modifiying_kwargs.items():
+            curr_subdict = self.active_config.get(k, {})
+            for sub_k, sub_v in v.items():
+                try:
+                    curr_subdict[sub_k] = sub_v # apply the update
+                except TypeError as err:
+                    # TypeError: 'PlottingConfig' object does not support item assignment
+                    setattr(curr_subdict, sub_k, sub_v)
+                    
+
         self.active_session = active_session
         self.p = extant_plotter
         self.data_explorer_name = data_explorer_name
@@ -46,11 +73,11 @@ class InteractiveDataExplorerBase(DecoderRenderingPyVistaMixin, InteractivePyvis
         
         # Helper variables
         display_class_name = f'{str(type(self))}{data_explorer_name}'
-        self.params = VisualizationParameters(name=display_class_name)
-        self.debug = DebugHelper(name=display_class_name)
-        self.plots_data = RenderPlotsData(name=display_class_name)
-        self.plots = RenderPlots(name=display_class_name)
-        self.ui = PhoUIContainer(name=display_class_name)
+        self.params = VisualizationParameters(name=display_class_name, **params_kwargs)
+        self.debug = DebugHelper(name=display_class_name, **debug_kwargs)
+        self.plots_data = RenderPlotsData(name=display_class_name, **plots_data_kwargs)
+        self.plots = RenderPlots(name=display_class_name, **plots_kwargs)
+        self.ui = PhoUIContainer(name=display_class_name, **ui_kwargs)
         
         self.params.plotter_backgrounds = get_gradients()
         

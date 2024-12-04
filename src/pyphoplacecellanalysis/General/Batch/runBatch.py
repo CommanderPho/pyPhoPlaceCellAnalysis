@@ -12,12 +12,15 @@ from copy import deepcopy
 import multiprocessing
 # import concurrent.futures
 # from tqdm import tqdm
-
+import builtins
 from enum import Enum, unique  # SessionBatchProgress
 
 ## Pho's Custom Libraries:
 from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path, set_posix_windows, convert_filelist_to_new_parent, find_matching_parent_path
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.print_helpers import get_now_time_precise_str
+from pyphocorehelpers.print_helpers import build_run_log_task_identifier, build_logger
+
 
 # NeuroPy (Diba Lab Python Repo) Loading
 ## For computation parameters:
@@ -35,12 +38,14 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loa
 
 from attrs import Factory
 
-# from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import set_environment_variables, neptune_output_figures
 from neuropy.core.user_annotations import UserAnnotationsManager
 from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults
 from pyphoplacecellanalysis.General.Batch.pythonScriptTemplating import generate_batch_single_session_scripts
 
 from pyphocorehelpers.Filesystem.path_helpers import copy_movedict
+
+
+
 
 known_global_data_root_parent_paths = [Path(r'W:\Data'), Path(r'/media/MAX/Data'), Path(r'/Volumes/MoverNew/data'), Path(r'/home/halechr/turbo/Data'), Path(r'/nfs/turbo/umms-kdiba/Data')]
 
@@ -48,22 +53,30 @@ def get_file_str_if_file_exists(v:Path)->str:
     """ returns the string representation of the resolved file if it exists, or the empty string if not """
     return (str(v.resolve()) if v.exists() else '')
 
-def build_batch_processing_session_task_identifier(session_context: IdentifyingContext) -> str:
-    """ Builds an identifier string for logging task progress like 'LNX00052.kdiba.gor01.two.2006-6-07_16-40-19' """
-    import socket
-    hostname: str = socket.gethostname() # get the system's hostname
-    # print(f"Hostname: {hostname}") # Hostname: LNX00052
-    session_component: str = session_context.get_description(separator='.') # 'kdiba.gor01.two.2006-6-07_16-40-19'
-    ## Get runtime:
-    # runtime_start_str: str = f'{datetime.now().strftime("%Y%m%d%H%M%S")}'
+def get_file_path_if_file_exists(v:Path)-> Optional[Path]:
+    """ returns the string representation of the resolved file if it exists, or the empty string if not """
+    if not v.exists():
+        return None
+    else:
+        return v
 
-    return f"{hostname}.{session_component}"
 
-def build_batch_task_logger(session_context: IdentifyingContext, additional_suffix:Optional[str]=None, file_logging_dir=Path('EXTERNAL/TESTING/Logging'), debug_print=False):
-    """ Builds a logger for a specific module that logs to console output and a file. 
+@function_attributes(short_name=None, tags=['logging', 'batch', 'task'], input_requires=[], output_provides=[], uses=['build_run_log_task_identifier', 'build_logger'], used_by=[], creation_date='2024-04-03 05:53', related_items=[])
+def build_batch_task_logger(session_context: IdentifyingContext, additional_suffix:Optional[str]=None, file_logging_dir=None, 
+                            logging_root_FQDN: str = f'com.PhoHale.PhoPy3DPositionAnalyis.Batch.runBatch.run_specific_batch',
+                            include_curr_time_str: bool = True,
+                            debug_print=False) -> logging.Logger:
+    """ Builds a logger for a specific module that logs to BOTH console output and a file. 
+    
+    Creates output files like: f'debug_com.PhoHale.PhoPy3DPositionAnalyis.Batch.runBatch.run_specific_batch.{batch_processing_session_task_identifier}.log'
+        e.g. 'debug_com.PhoHale.PhoPy3DPositionAnalyis.Batch.runBatch.run_specific_batch.Apogee.kdiba.gor01.two.2006-6-07_16-40-19.log'
+    
+    
     History:
         Built from `pyphocorehelpers.print_helpers.build_batch_task_logger` for task building
-    
+        Default used to be `file_logging_dir=Path('EXTERNAL/TESTING/Logging')`
+
+
     Testing:
     
         module_logger.debug (f'DEBUG: module_logger: "com.PhoHale.Spike3D.notebook"')
@@ -76,40 +89,18 @@ def build_batch_task_logger(session_context: IdentifyingContext, additional_suff
     batch_task_logger = build_batch_task_logger()
     """
     # logFormatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] %(name)s [%(levelname)-5.5s]  %(message)s")
-    logFormatter = logging.Formatter("%(relativeCreated)d %(name)s]  [%(levelname)-5.5s]  %(message)s")
-    
-    batch_processing_session_task_identifier:str = build_batch_processing_session_task_identifier(session_context)
-    if additional_suffix is not None:
-        batch_processing_session_task_identifier = f"{batch_processing_session_task_identifier}.{additional_suffix.lstrip('.')}"
-    batch_task_logger = logging.getLogger(f'com.PhoHale.PhoPy3DPositionAnalyis.Batch.runBatch.run_specific_batch.{batch_processing_session_task_identifier}') # create logger
-    print(f'build_batch_task_logger(module_name="{batch_processing_session_task_identifier}"):')
-    if debug_print:
-        print(f'\t batch_task_logger.handlers: {batch_task_logger.handlers}')
-    batch_task_logger.handlers = []
-    # batch_task_logger.removeHandler()
+    # logFormatter = logging.Formatter("%(relativeCreated)d %(name)s]  [%(levelname)-5.5s]  %(message)s")
+    logFormatter = logging.Formatter("%(asctime)s %(name)s]  [%(levelname)-5.5s]  %(message)s")
 
-    if file_logging_dir is not None:
-        # file logging enabled:
-        # Create logging directory if it doesn't exist
-        file_logging_dir.mkdir(parents=True, exist_ok=True)
+    logger_full_task: str = build_run_log_task_identifier(run_context=session_context, logging_root_FQDN=logging_root_FQDN, include_curr_time_str=include_curr_time_str,
+                                                          include_hostname=True, additional_suffix=additional_suffix)
 
-        # file_logging_dir = Path('EXTERNAL/TESTING/Logging') # 'C:\Users\pho\repos\PhoPy3DPositionAnalysis2021\EXTERNAL\TESTING\Logging'
-        module_logging_path = file_logging_dir.joinpath(f'debug_{batch_task_logger.name}.log') # batch_task_logger.name # 'com.PhoHale.Spike3D.notebook'
-
-        # File Logging:    
-        print(f'\t Batch Task logger {batch_task_logger.name} has file logging enabled and will log to {str(module_logging_path)}')
-        fileHandler = logging.FileHandler(module_logging_path)
-        fileHandler.setFormatter(logFormatter)
-        batch_task_logger.addHandler(fileHandler)
-
-    # consoleHandler = logging.StreamHandler(sys.stdout)
-    # consoleHandler.setFormatter(logFormatter)
-    # # batch_task_logger.addHandler(consoleHandler)
-
+    batch_task_logger: logging.Logger = build_logger(full_logger_string=logger_full_task, file_logging_dir=file_logging_dir, logFormatter=logFormatter, debug_print=False)
     # General Logger Setup:
     batch_task_logger.setLevel(logging.DEBUG)
     batch_task_logger.info(f'==========================================================================================\n========== Module Logger INIT "{batch_task_logger.name}" ==============================')
     return batch_task_logger
+
 
 @unique
 class BackupMethods(Enum):
@@ -149,7 +140,8 @@ class ConcreteSessionFolder:
         return moved_files_dict_files
 
     @classmethod
-    def build_backup_copydict(cls, good_session_concrete_folders: List["ConcreteSessionFolder"], backup_mode: BackupMethods=BackupMethods.CommonTargetDirectory, target_dir: Optional[Path]=None, rename_backup_suffix: Optional[str]=None, skip_non_extant_src_files:bool=True, only_include_file_types=['local_pkl', 'global_pkl','h5'], debug_print=False):
+    def build_backup_copydict(cls, good_session_concrete_folders: List["ConcreteSessionFolder"], backup_mode: BackupMethods=BackupMethods.CommonTargetDirectory, target_dir: Optional[Path]=None, rename_backup_suffix: Optional[str]=None, rename_backup_basename_fn: Optional[Callable]=None, skip_non_extant_src_files:bool=True,
+                               only_include_file_types=['local_pkl', 'global_pkl','h5'], custom_file_types_dict=None, debug_print=False):
         """ backs up the list of backup files to a specified target_dir. 
         
         ## Usage 1:
@@ -169,6 +161,18 @@ class ConcreteSessionFolder:
 
 
         """        
+        def _default_rename_basename_fn(session_context: Optional[IdentifyingContext], session_descr: Optional[str], basename: str, *args, separator_char: str = "_"):
+            _filename_list = []
+            if session_context is not None:
+                session_descr = session_context.session_name # '2006-6-07_16-40-19'
+            if session_descr is not None:
+                _filename_list.append(session_descr)
+            _filename_list.append(basename)
+            if len(args) > 0:
+                _filename_list.extend([str(a_part) for a_part in args if a_part is not None])
+            return separator_char.join(_filename_list)
+
+
         if rename_backup_suffix is not None:
             assert (backup_mode.name == BackupMethods.RenameInSourceDirectory.name), f"rename_backup_suffix: {rename_backup_suffix} is only used if (backup_mode.name == BackupMethods.RenameInSourceDirectory.name), but backup_mode: {backup_mode} and rename_backup_suffix is not None!"
         if backup_mode.name == BackupMethods.RenameInSourceDirectory.name:
@@ -187,18 +191,31 @@ class ConcreteSessionFolder:
             if debug_print:
                 print(f'a_session_folder: {session_descr}')
             src_files_dict = {'h5':a_session_folder.pipeline_results_h5, 'local_pkl':a_session_folder.session_pickle, 'global_pkl':a_session_folder.global_computation_result_pickle}
+            if custom_file_types_dict is not None:
+                ## add the custom filetypes if needed
+                if only_include_file_types is None:
+                    only_include_file_types = [] # empty type, we'll add the custom ones
+                    
+                for k, v in custom_file_types_dict.items():
+                    src_files_dict[k] = v(a_session_folder)
+                    only_include_file_types.append(k) ## add the custom filetype to be included
+
             for src_file_kind, src_file in src_files_dict.items():
                 if src_file_kind in (only_include_file_types or ['local_pkl', 'global_pkl','h5']):
                     if debug_print:
                         print(f'a_session_folder.src_file: {src_file}')
-                    if skip_non_extant_src_files and (not src_file.exists()):
+                    if skip_non_extant_src_files and (src_file is None) or (not src_file.exists()):
                         if debug_print:
                             print(f'src_file: "{src_file}" does not exist and skip_non_extant_src_files==True, so omitting from output copy_dict')
                     else:
                         # src_file: Path = a_session_folder.pipeline_results_h5
                         basename: str = src_file.stem
                         if backup_mode.name == BackupMethods.CommonTargetDirectory.name:
-                            final_dest_basename:str = '_'.join([session_descr, basename])
+                            if rename_backup_basename_fn is not None:
+                                final_dest_basename:str = rename_backup_basename_fn(a_session_folder.context, session_descr, basename)
+                            else:
+                                final_dest_basename:str = '_'.join([session_descr, basename])
+
                             final_dest_name:str = f'{final_dest_basename}{src_file.suffix}'
                             if debug_print:
                                 print(f'\tfinal_dest_name: {final_dest_name}')
@@ -206,7 +223,11 @@ class ConcreteSessionFolder:
                         elif backup_mode.name == BackupMethods.RenameInSourceDirectory.name:
                             assert rename_backup_suffix is not None
                             target_dir = src_file.parent
-                            final_dest_basename:str = '_'.join([basename, rename_backup_suffix])
+                            if rename_backup_basename_fn is not None:
+                                final_dest_basename:str = rename_backup_basename_fn(None, None, basename, rename_backup_suffix)
+                            else:
+                                final_dest_basename:str = '_'.join([basename, rename_backup_suffix])
+                            
                             final_dest_name:str = f'{final_dest_basename}{src_file.suffix}'
                             if debug_print:
                                 print(f'\tfinal_dest_name: {final_dest_name}')
@@ -266,8 +287,7 @@ class BatchRun(HDF_SerializationMixin):
     session_batch_status: Dict[IdentifyingContext, SessionBatchProgress] = serialized_field(default=Factory(dict)) 
     session_batch_basedirs: Dict[IdentifyingContext, Path] = serialized_field(default=Factory(dict))
     session_batch_errors: Dict[IdentifyingContext, Optional[str]] = serialized_field(default=Factory(dict))
-    session_batch_outputs: Dict[IdentifyingContext, Optional[
-        PipelineCompletionResult]] = serialized_field(default=Factory(dict)) # optional selected outputs that can hold information from the computation
+    session_batch_outputs: Dict[IdentifyingContext, Optional[PipelineCompletionResult]] = serialized_field(default=Factory(dict)) # optional selected outputs that can hold information from the computation
     enable_saving_to_disk: bool = serialized_attribute_field(default=False) 
 
     # Record the start time
@@ -344,6 +364,9 @@ class BatchRun(HDF_SerializationMixin):
     def execute_all(self, use_multiprocessing=True, num_processes=None, included_session_contexts: Optional[List[IdentifyingContext]]=None, session_inclusion_filter:Optional[Callable]=None, **kwargs):
         """ calls `run_specific_batch(...)` for each session context to actually execute the session's run. """
         allow_processing_previously_completed: bool = kwargs.pop('allow_processing_previously_completed', False)
+        
+        run_specific_batch_kwargs_fn = kwargs.pop('run_specific_batch_kwargs_fn', None) ## .execute_all(...) now supports passing `run_specific_batch_kwargs_fn`
+        
         # record the start timestamp:
         self.start_time = datetime.now()
         
@@ -379,7 +402,15 @@ class BatchRun(HDF_SerializationMixin):
             
             for curr_session_context in included_session_contexts:
                 curr_session_basedir = self.session_batch_basedirs[curr_session_context]
-                result = pool.apply_async(run_specific_batch, (self.global_data_root_parent_path, curr_session_context, curr_session_basedir), kwargs) # it can actually take a callback too.
+                ## more advanced parameters would have to be built here
+                if run_specific_batch_kwargs_fn is not None:
+                    # use the provided function to get the specific kwargs to apply:
+                    run_specific_batch_kwargs = run_specific_batch_kwargs_fn(curr_session_context=curr_session_context, curr_session_basedir=curr_session_basedir)
+                    # result = pool.apply_async(run_specific_batch, **run_specific_batch_kwargs)
+                    result = pool.apply_async(run_specific_batch, (run_specific_batch_kwargs.pop('global_data_root_parent_path'), run_specific_batch_kwargs.pop('curr_session_context'), run_specific_batch_kwargs.pop('curr_session_basedir')), run_specific_batch_kwargs)
+                else:
+                    result = pool.apply_async(run_specific_batch, (self.global_data_root_parent_path, curr_session_context, curr_session_basedir), kwargs) # it can actually take a callback too.
+
                 results[curr_session_context] = result
 
             pool.close()
@@ -390,21 +421,6 @@ class BatchRun(HDF_SerializationMixin):
                 self.session_batch_status[session_context] = status
                 self.session_batch_errors[session_context] = error
                 self.session_batch_outputs[session_context] = output
-                
-            # # `concurrent.futures` version instead of `multiprocessing` __________________________________________________________ #
-            # if num_processes is None:
-            #     num_processes = concurrent.futures.ProcessPoolExecutor().max_workers
-
-            # with concurrent.futures.ProcessPoolExecutor(max_workers=num_processes) as executor:
-            #     futures = {executor.submit(run_specific_batch, self.global_data_root_parent_path, curr_session_context, self.session_batch_basedirs[curr_session_context], **kwargs): curr_session_context for curr_session_context in included_session_contexts}
-
-            #     for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures)):
-            #         session_context = futures[future]  # get the context for this future
-            #         status, error, output = future.result()
-            #         self.session_batch_status[session_context] = status
-            #         self.session_batch_errors[session_context] = error
-            #         self.session_batch_outputs[session_context] = output
-
 
         else:
             # No multiprocessing, fall back to the normal way.
@@ -412,7 +428,13 @@ class BatchRun(HDF_SerializationMixin):
                 # evaluate a single session
                 curr_session_status = self.session_batch_status[curr_session_context]
                 curr_session_basedir = self.session_batch_basedirs[curr_session_context]
-                self.session_batch_status[curr_session_context], self.session_batch_errors[curr_session_context], self.session_batch_outputs[curr_session_context] = run_specific_batch(self.global_data_root_parent_path, curr_session_context, curr_session_basedir, **kwargs)
+                if run_specific_batch_kwargs_fn is not None:
+                    # use the provided function to get the specific kwargs to apply:
+                    run_specific_batch_kwargs = run_specific_batch_kwargs_fn(curr_session_context=curr_session_context, curr_session_basedir=curr_session_basedir)
+                    self.session_batch_status[curr_session_context], self.session_batch_errors[curr_session_context], self.session_batch_outputs[curr_session_context] = run_specific_batch(**run_specific_batch_kwargs)
+                    
+                else:                
+                    self.session_batch_status[curr_session_context], self.session_batch_errors[curr_session_context], self.session_batch_outputs[curr_session_context] = run_specific_batch(self.global_data_root_parent_path, curr_session_context, curr_session_basedir, **kwargs)
 
     # Updating ___________________________________________________________________________________________________________ #
     def change_global_root_path(self, desired_global_data_root_parent_path):
@@ -969,7 +991,8 @@ class BatchResultDataframeAccessor():
         return session_ripple_result_paths
         # global_computation_result_paths = [str(v.joinpath(f'output/global_computation_results.pkl').resolve()) for v in list(good_only_batch_progress_df.basedirs.values)]
 
-
+    @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[],
+                          uses=['ConciseSessionIdentifiers.parse_concise_abbreviated_neuron_identifying_strings'], used_by=['AcrossSessionsResults.load_across_sessions_data'], creation_date='2024-09-18 11:39', related_items=[])
     def _build_minimal_session_identifiers_list(self):
         """Build a list of short unique identifiers for the good sessions:
         Adds Column: ['context_minimal_name']
@@ -980,30 +1003,9 @@ class BatchResultDataframeAccessor():
         #TODO 2023-07-20 21:23: - [ ] This needs to only be ran on a dataframe containing all of the sessions! If it's filtered at all, the session numbers will vary depending on how it's filtered!
         
         """
-        
-        df = self._obj
-        # Extract unique values for each column
-        unique_format_names = df['format_name'].unique()
-        unique_animals = df['animal'].unique()
-        unique_exper_names = df['exper_name'].unique()
-        unique_session_names = df['session_name'].unique()
-
-        # Create mapping to shorthand notation for each column
-        format_name_mapping = {name: f'f{i}' for i, name in enumerate(unique_format_names)}
-        animal_mapping = {name: f'a{i}' for i, name in enumerate(unique_animals)}
-        exper_name_mapping = {name: f'e{i}' for i, name in enumerate(unique_exper_names)}
-        session_name_mapping = {name: f's{i}' for i, name in enumerate(unique_session_names)}
-
-        # Create a mapping for 'session_name' within each 'animal'
-        # animal_session_mapping = {animal: {session: f'{animal[0]}{i}s{j}' for j, session in enumerate(df[df['animal'] == animal]['session_name'].unique())} for i, animal in enumerate(df['animal'].unique())} # 'g0s0'
-        animal_session_mapping = {animal: {session: f'{animal_mapping[animal]}s{j}' for j, session in enumerate(df[df['animal'] == animal]['session_name'].unique())} for i, animal in enumerate(df['animal'].unique())} # 'g0s0'
-
-        # Replace original values with shorthand notation
-        for animal, session_mapping in animal_session_mapping.items():
-            # df.loc[df['animal'] == animal, 'session_name'] = df.loc[df['animal'] == animal, 'session_name'].replace(session_mapping)
-            df.loc[df['animal'] == animal, 'context_minimal_name'] = df.loc[df['animal'] == animal, 'session_name'].replace(session_mapping)
-
-        return df['context_minimal_name']
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import ConciseSessionIdentifiers        
+        df: pd.DataFrame = self._obj
+        return ConciseSessionIdentifiers._build_minimal_session_identifiers_list(df=df)
 
 
     def export_csv(self, global_data_root_parent_path: Path, csv_batch_filename:str) -> Path:
@@ -1039,7 +1041,7 @@ class BatchResultDataframeAccessor():
         return good_only_batch_progress_df, batch_progress_df
 
 
-from pyphocorehelpers.print_helpers import CapturedException
+from pyphocorehelpers.exception_helpers import CapturedException, ExceptionPrintingContext
 
 
 # ==================================================================================================================== #
@@ -1092,8 +1094,9 @@ def run_diba_batch(global_data_root_parent_path: Path, execute_all:bool = False,
     return active_batch_run
 
 
-@function_attributes(short_name='run_specific_batch', tags=['batch', 'automated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:46')
-def run_specific_batch(global_data_root_parent_path: Path, curr_session_context: IdentifyingContext, curr_session_basedir: Path, force_reload=True, post_run_callback_fn:Optional[Callable]=None, saving_mode=PipelineSavingScheme.OVERWRITE_IN_PLACE, **kwargs):
+@function_attributes(short_name='run_specific_batch', tags=['batch', 'automated', 'load', 'main', 'pipeline'], input_requires=[], output_provides=[], uses=['batch_load_session'], used_by=['python_template.py.j2'], creation_date='2023-03-28 04:46')
+def run_specific_batch(global_data_root_parent_path: Path, curr_session_context: IdentifyingContext, curr_session_basedir: Path, active_pickle_filename:str='loadedSessPickle.pkl', existing_task_logger: Optional[logging.Logger]=None, force_reload:bool=True,
+                        post_run_callback_fn:Optional[Callable]=None, saving_mode=PipelineSavingScheme.OVERWRITE_IN_PLACE, override_parameters_flat_keypaths_dict=None, **kwargs):
     """ For a specific session (identified by the session context) - calls batch_load_session(...) to get the curr_active_pipeline.
             - Then calls `post_run_callback_fn(...)
             
@@ -1102,9 +1105,18 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
         
     """
 
-    curr_task_logger = build_batch_task_logger(session_context=curr_session_context) # create logger , file_logging_dir=
+    if (existing_task_logger is not None):
+        curr_task_logger = existing_task_logger
+        
+    else:
+        curr_task_logger = build_batch_task_logger(session_context=curr_session_context) # create logger
+
     _line_sweep = '=========================='
     ## REPLACES THE `print` function within this scope
+    # if (print != builtins.print):
+    #     print(f'already replaced print function! Avoiding doing again to prevent infinite recurrsion!')
+    #     print = builtins.print ## restore the default print function before continuing
+
     def new_print(*args, **kwargs):
         # Call both regular print and logger.info
         print(*args, **kwargs)
@@ -1113,12 +1125,10 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
     # Replace the print function within this scope
     # _backup_print = print
     # print = new_print
-
-
     new_print(f'{_line_sweep} runBatch STARTING {_line_sweep}')
     new_print(f'\tglobal_data_root_parent_path: {str(global_data_root_parent_path)}')
     new_print(f'\tsession_context: {curr_session_context}')
-    new_print(f'\tsession_basedir: {str(curr_session_basedir)}')    
+    new_print(f'\tsession_basedir: "{str(curr_session_basedir)}"')    
     new_print('__________________________________________________________________')
 
     if not isinstance(global_data_root_parent_path, Path):
@@ -1148,13 +1158,18 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
     
     # saving_mode = kwargs.pop('saving_mode', None) or PipelineSavingScheme.OVERWRITE_IN_PLACE
     skip_extended_batch_computations = kwargs.pop('skip_extended_batch_computations', True)
+    # override_parameters_flat_keypaths_dict = kwargs.pop('override_parameters_flat_keypaths_dict', {}) or {} # ` or {}` part handles None values
+    if override_parameters_flat_keypaths_dict is None:
+        override_parameters_flat_keypaths_dict = {}
+    
     fail_on_exception = kwargs.pop('fail_on_exception', True)
     debug_print = kwargs.pop('debug_print', False)
 
     try:
-        curr_active_pipeline = batch_load_session(global_data_root_parent_path, active_data_mode_name, basedir, epoch_name_includelist=epoch_name_includelist,
+        curr_active_pipeline = batch_load_session(global_data_root_parent_path, active_data_mode_name, basedir, active_pickle_filename=active_pickle_filename, epoch_name_includelist=epoch_name_includelist,
                                         computation_functions_name_includelist=active_computation_functions_name_includelist,
-                                        saving_mode=saving_mode, force_reload=force_reload, skip_extended_batch_computations=skip_extended_batch_computations, debug_print=debug_print, fail_on_exception=fail_on_exception, **kwargs)
+                                        saving_mode=saving_mode, force_reload=force_reload, skip_extended_batch_computations=skip_extended_batch_computations, debug_print=debug_print, fail_on_exception=fail_on_exception,
+                                        override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict, **kwargs)
         
     except Exception as e:
         ## can fail here before callback function is even called.
@@ -1162,7 +1177,7 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
         an_error = CapturedException(e, exception_info, None)
         new_print(f'exception occured: {an_error}')
         if fail_on_exception:
-            raise e
+            raise # Re-raises the original exception with its traceback
         new_print(f'"{_line_sweep} END BATCH {_line_sweep}\n\n')
         
         return (SessionBatchProgress.FAILED, f"{an_error}", None) # return the Failed status and the exception that occured.
@@ -1171,6 +1186,7 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
 
     if post_run_callback_fn is not None:
         if fail_on_exception:
+            # run the callback without exception handling. exception in callback => exception here.
             post_run_callback_fn_output = post_run_callback_fn(global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline)
         else:
             try:

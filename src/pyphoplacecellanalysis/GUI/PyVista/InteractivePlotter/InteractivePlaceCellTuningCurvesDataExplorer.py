@@ -55,7 +55,9 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
     show_legend = True
 
     def __init__(self, active_config, active_session, active_epoch_placefields, pf_colors, extant_plotter=None, **kwargs):
-        super(InteractivePlaceCellTuningCurvesDataExplorer, self).__init__(active_config, active_session, extant_plotter, data_explorer_name='TuningMapDataExplorer')
+        should_nan_non_visited_elements = kwargs.pop('should_nan_non_visited_elements', None)
+        zScalingFactor = kwargs.pop('zScalingFactor', None)
+        super(InteractivePlaceCellTuningCurvesDataExplorer, self).__init__(active_config=active_config, active_session=active_session, extant_plotter=extant_plotter, data_explorer_name='TuningMapDataExplorer', **kwargs)
         self.params.active_epoch_placefields = deepcopy(active_epoch_placefields)
         self.params.pf_colors = deepcopy(pf_colors)
         self.params.pf_colors_hex = None
@@ -65,11 +67,11 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         # self._spikes_df = active_session.spikes_df[np.isin(active_session.spikes_df.flat_spike_idx, active_epoch_placefields.filtered_spikes_df.flat_spike_idx.to_numpy())].copy()
         self._spikes_df = deepcopy(active_session.spikes_df)
         
-        if kwargs.get('should_nan_non_visited_elements', None) is not None:
-            self.params.should_nan_non_visited_elements = kwargs['should_nan_non_visited_elements']
+        if should_nan_non_visited_elements is not None:
+            self.params.should_nan_non_visited_elements = should_nan_non_visited_elements
             
-        if kwargs.get('zScalingFactor', None) is not None:
-            self.params.zScalingFactor = kwargs['zScalingFactor']
+        if zScalingFactor is not None:
+            self.params.zScalingFactor =zScalingFactor
         
         self.use_fragile_linear_neuron_IDX_as_cell_id = False # if False, uses the normal 'aclu' value as the cell id (which I think is correct)
         
@@ -231,6 +233,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         self.setup_spike_rendering_mixin()
         self.build_tuning_curve_configs()
         self.setup_occupancy_plotting_mixin()
+        self.setup_MazeRenderingMixin()
         
 
 
@@ -292,7 +295,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         self.p.enable_depth_peeling(number_of_peels=8, occlusion_ratio=0) # drastically improves rendering but bogs down performance
         
         # Plot the flat arena
-        self.plots['maze_bg'], self.plots_data['maze_bg'] = self.perform_plot_maze() # Implemented by conformance to `InteractivePyvistaPlotter_MazeRenderingMixin`
+        self.perform_plot_maze() # Implemented by conformance to `InteractivePyvistaPlotter_MazeRenderingMixin`
 
         if self.plot_placefields():
             needs_render = True
@@ -366,7 +369,7 @@ class InteractivePlaceCellTuningCurvesDataExplorer(OccupancyPlottingMixin, Place
         safe_integer_wrapper = lambda integer_local_idx: self.ui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks']([int(integer_local_idx)])
         self.ui['interactive_unitID_slider_actor'] = PhoWidgetHelper.add_discrete_slider_widget(self.p, safe_integer_wrapper, [0, (len(self.ui['tuningCurveCombinedAllPlotActorsVisibilityCallbacks'])-1)], value=0, title='Selected Unit',event_type='end')
         ## I don't think this does anything:
-        interactive_plotter = PhoInteractivePlotter(pyvista_plotter=self.p, interactive_timestamp_slider_actor=self.ui['interactive_unitID_slider_actor'])
+        self.ui.interactive_plotter = PhoInteractivePlotter.init_from_plotter_and_slider(pyvista_plotter=self.p, interactive_timestamp_slider_actor=self.ui['interactive_unitID_slider_actor'], step_size=15)
         
         
         

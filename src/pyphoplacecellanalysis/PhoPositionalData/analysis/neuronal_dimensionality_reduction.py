@@ -4,8 +4,9 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 from neuropy import core
+from pyphocorehelpers.function_helpers import function_attributes
 
-
+@function_attributes(short_name=None, tags=['dimensionality-reduction', 'unused', 'ICA', 'PCA'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-28 02:49', related_items=[])
 def runAnalysis_PCAandICA(active_session_Neurons, bin_size=0.250, frate_thresh=0.1, should_plot=False, active_cells_colormap=None):
     """ ## ICA and PCA Analysis
     

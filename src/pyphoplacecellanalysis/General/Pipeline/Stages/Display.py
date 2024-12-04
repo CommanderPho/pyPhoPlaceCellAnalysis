@@ -5,12 +5,13 @@ from typing import Callable, Optional, List, Dict, Union
 import numpy as np
 from attrs import define, field, Factory
 
-from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap, PlotStringBrevityModeEnum
+from neuropy.core.neuron_identities import NeuronIdentity, build_units_colormap
 from neuropy.utils.result_context import IdentifyingContext
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters # to replace simple PlacefieldComputationParameters
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.programming_helpers import SourceCodeParsing
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import ComputedPipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import PipelineStage
@@ -27,6 +28,9 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContex
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import LongShortTrackComparingDisplayFunctions
 
 
+def has_good_str_value(a_str_val) -> bool:
+    return ((a_str_val is not None) and (len(a_str_val) > 0))
+
 @define(slots=False)
 class DisplayFunctionItem:
     """ for helping to render a UI display function tree.
@@ -42,14 +46,81 @@ class DisplayFunctionItem:
     is_global: bool = field()
     short_name: str = field()
     docs: str = field()
+    icon_path: Optional[str] = field()
+    vscode_jump_link: Optional[str] = field()
+
 
     @classmethod
-    def init_from_fn_object(cls, a_fn):
+    def init_from_fn_object(cls, a_fn, icon_path=None):
         _obj = cls(name=a_fn.__name__, fn_callable=a_fn, is_global=getattr(a_fn,'is_global', False), short_name=(getattr(a_fn,'short_name', a_fn.__name__) or a_fn.__name__),
-            docs=a_fn.__doc__)
+            docs=a_fn.__doc__, icon_path=icon_path, vscode_jump_link=SourceCodeParsing.build_vscode_jump_link(a_fcn_handle=a_fn))
+        
+        ## try to get the jump link:
+        # vscode_jump_link: str = SourceCodeParsing.build_vscode_jump_link(a_fcn_handle=a_fn)
+        # _obj.vscode_jump_link = vscode_jump_link
+        
         return _obj
 
+    @property
+    def best_display_name(self) -> str:
+        """ returns the best name for display """
+        if has_good_str_value(self.short_name):
+            return self.short_name
+        else:
+            return self.name
+        
 
+    @property
+    def longform_description(self) -> str:
+        """The longform_description property."""
+        out_str_arr = []
+
+        if has_good_str_value(self.short_name):
+            out_str_arr.append(f"short_name: {self.short_name}") # short name first, then
+            out_str_arr.append(f"name: {self.name}") # full name
+        else:
+            out_str_arr.append(f"name: {self.name}") # just name
+
+        if has_good_str_value(self.docs):
+            out_str_arr.append(f"docs: {self.docs}")
+            
+        if has_good_str_value(self.vscode_jump_link):
+            out_str_arr.append(f"link: {self.vscode_jump_link}")
+            
+        out_str = '\n'.join(out_str_arr)
+        return out_str
+    
+    @property
+    def longform_description_formatted_html(self) -> str:
+        """HTML-formatted (with bold labels) longform text for use in QTextBrowser via .setHtml(...) 
+        
+        # <b style='color:red;'>bold and red</b>
+
+        """
+        out_str_arr = []
+
+        if has_good_str_value(self.short_name):
+            out_str_arr.append(f"<b style='color:white;'>short_name</b>: {self.short_name}") # short name first, then
+            out_str_arr.append(f"<b style='color:white;'>name</b>: {self.name}") # full name
+        else:
+            out_str_arr.append(f"<b style='color:white;'>name</b>: {self.name}") # just name
+
+        if has_good_str_value(self.docs):
+            out_str_arr.append(f"<b style='color:white;'>docs</b>: {self.docs}")
+            
+        if has_good_str_value(self.vscode_jump_link):
+            # Create the HTML-formatted link
+            # html_link: str = f'<a href="{self.vscode_jump_link}">Open display fcn in VSCode</a>'
+            html_link: str = f'<a href="{self.vscode_jump_link}">{self.vscode_jump_link}</a>'
+            out_str_arr.append(f"<b style='color:white;'>link</b>: {html_link}")
+            
+        out_str = '<br>'.join(out_str_arr) # linebreaks with HTML's <br>
+        return out_str
+    
+
+
+
+    
 
 
 class Plot:
@@ -120,7 +191,8 @@ def get_neuron_identities(active_placefields, debug_print=False):
     
     pf_sort_ind, pf_colors, pf_colormap, pf_listed_colormap = build_units_colormap(good_placefield_neuronIDs)
     
-    pf_neuron_identities = [NeuronIdentity.init_from_NeuronExtendedIdentityTuple(an_extended_identity, a_color=pf_colors[:, neuron_IDX]) for (neuron_IDX, an_extended_identity) in enumerate(good_placefield_tuple_neuronIDs)]
+    # pf_neuron_identities = [NeuronIdentity.init_from_NeuronExtendedIdentityTuple(an_extended_identity, a_color=pf_colors[:, neuron_IDX]) for (neuron_IDX, an_extended_identity) in enumerate(good_placefield_tuple_neuronIDs)]
+    pf_neuron_identities = [NeuronIdentity.init_from_NeuronExtendedIdentity(an_extended_identity, a_color=pf_colors[:, neuron_IDX]) for (neuron_IDX, an_extended_identity) in enumerate(good_placefield_tuple_neuronIDs)]
     return pf_neuron_identities, pf_sort_ind, pf_colors, pf_colormap, pf_listed_colormap
     
 def add_neuron_identity_info_if_needed(computation_result, active_config):
@@ -505,7 +577,7 @@ class PipelineWithDisplayPipelineStageMixin:
 
             # Now have both `active_session_configuration_name`, `active_session_configuration_name`
         else:
-            raise NotImplementedError
+            raise NotImplementedError(f"type(active_session_configuration_context): {type(active_session_configuration_context)}, active_session_configuration_context: {active_session_configuration_context}")
             pass # hope that it's an IdentifyingContext, but we'll check soon.
         
 
@@ -593,14 +665,14 @@ class PipelineWithDisplaySavingMixin:
         return active_identifying_session_ctx.merging_context('display_', display_subcontext)
 
     @function_attributes(short_name=None, tags=['save','figure'], input_requires=[], output_provides=[], uses=['build_and_write_to_file'], used_by=[], creation_date='2023-06-14 19:26', related_items=[])
-    def output_figure(self, final_context: IdentifyingContext, fig, write_vector_format:bool=False, write_png:bool=True, debug_print=True):
+    def output_figure(self, final_context: IdentifyingContext, fig, context_tuple_join_character='_', write_vector_format:bool=False, write_png:bool=True, debug_print=True):
         """ outputs the figure using the provided context. """
         from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_and_write_to_file
         # fig_man: FileOutputManager = self.get_output_manager() # get the output manager
         # figures_parent_out_path, fig_save_basename = fig_man.get_figure_output_parent_and_basename(final_context, make_folder_if_needed=True)
         # active_out_figure_paths = perform_write_to_file(fig, final_context, figures_parent_out_path=figures_parent_out_path, write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=self.register_output_file)
         # final_context = final_context.adding_context_if_missing(self.sess.get_context()) # add the session context if it's missing
-        active_out_figure_paths = build_and_write_to_file(fig, final_context, self.get_output_manager(), write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=self.register_output_file)
+        active_out_figure_paths = build_and_write_to_file(fig, final_context, self.get_output_manager(), context_tuple_join_character=context_tuple_join_character, write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=self.register_output_file)
         return active_out_figure_paths, final_context
 
 

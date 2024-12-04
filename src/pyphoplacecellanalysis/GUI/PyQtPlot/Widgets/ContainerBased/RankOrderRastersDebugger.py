@@ -29,14 +29,18 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 from neuropy.utils.indexing_helpers import find_desired_sort_indicies
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import new_plot_raster_plot, NewSimpleRaster
 from pyphoplacecellanalysis.GUI.Qt.Widgets.ScrollBarWithSpinBox.ScrollBarWithSpinBox import ScrollBarWithSpinBox
+from pyphoplacecellanalysis.GUI.Qt.Widgets.LogViewerTextEdit import LogViewer
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 from pyphoplacecellanalysis.Resources.icon_helpers import try_get_icon
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import DirectionalRankOrderLikelihoods, RankOrderComputationsContainer, RankOrderResult ## Circular import?
 
-from pyphocorehelpers.gui.Qt.pandas_model import SimplePandasModel
+from pyphocorehelpers.gui.Qt.pandas_model import SimplePandasModel, create_tabbed_table_widget
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot, ExportFiletype
 
+from pyphocorehelpers.print_helpers import generate_html_string
+
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import PhoDockAreaContainingWindow
 
 
 __all__ = ['RankOrderRastersDebugger']
@@ -60,56 +64,56 @@ __all__ = ['RankOrderRastersDebugger']
 # ==================================================================================================================== #
 # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import _debug_plot_directional_template_rasters, build_selected_spikes_df, add_selected_spikes_df_points_to_scatter_plot
 
-def create_tabbed_table_widget(dataframes_dict):
-    """
-    Creates a tabbed widget with three tables within the given layout.
 
-    Args:
-    ctrl_layout: The layout to add the tab widget to.
-    dataframes: A list of three pandas.DataFrame objects to populate the tables.
-
-    Returns:
-    A QTabWidget containing the three tables.
-    """
-
-    # Create the tab widget and dictionaries
-    tab_widget = pg.QtWidgets.QTabWidget()
-    models_dict = {}
-    views_dict = {}
-
-    # Define tab names
-    
-    # Add tabs and corresponding views
-    for i, (a_name, df) in enumerate(dataframes_dict.items()):
-        # Create SimplePandasModel for each DataFrame
-        models_dict[a_name] = SimplePandasModel(df.copy())
-
-        # Create and associate view with model
-        view = pg.QtWidgets.QTableView()
-        view.setModel(models_dict[a_name])
-        views_dict[a_name] = view
-
-        # Add tab with view
-        tab_widget.addTab(view, a_name)
-
-    return tab_widget, views_dict, models_dict
-
-
-
-
-
-@metadata_attributes(short_name=None, tags=['gui'], input_requires=[], output_provides=[], uses=['_debug_plot_directional_template_rasters', 'add_selected_spikes_df_points_to_scatter_plot'], used_by=[], creation_date='2023-11-17 19:59', related_items=[])
+@metadata_attributes(short_name=None, tags=['gui', 'window', 'figure', '🖼️', '🎨'], input_requires=[], output_provides=[], uses=['_debug_plot_directional_template_rasters', 'add_selected_spikes_df_points_to_scatter_plot'], used_by=[], creation_date='2023-11-17 19:59', related_items=[])
 @define(slots=False)
 class RankOrderRastersDebugger:
     """ RankOrderRastersDebugger displays four rasters showing the same spikes but sorted according to four different templates (RL_odd, RL_even, LR_odd, LR_even)
+
+
+    # Examples ___________________________________________________________________________________________________________ #
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
 
     _out = RankOrderRastersDebugger.init_rank_order_debugger(global_spikes_df, active_epochs_dfe, track_templates, RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict)
 
+    # Example 1 __________________________________________________________________________________________________________ #
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
+
+    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
+    global_laps = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps) # .trimmed_to_non_overlapping()
+    global_laps_epochs_df = global_laps.to_dataframe()
+
+    RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict = None
+    LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict = None
+    _out_laps_rasters: RankOrderRastersDebugger = RankOrderRastersDebugger.init_rank_order_debugger(global_spikes_df, global_laps_epochs_df, track_templates, rank_order_results, RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict)
+    _out_laps_rasters
+
+    
+    # Example 2 __________________________________________________________________________________________________________ #    
+    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
+    _out_ripple_rasters: RankOrderRastersDebugger = RankOrderRastersDebugger.init_rank_order_debugger(global_spikes_df, deepcopy(filtered_ripple_simple_pf_pearson_merged_df),
+                                                                                                    track_templates, None,
+                                                                                                        None, None,
+                                                                                                        dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (['right'], ['right'], ['right'], ['right']))),
+                                                                                                        )
+    _out_ripple_rasters.set_top_info_bar_visibility(False)
+
+    # Example 3 __________________________________________________________________________________________________________ #
+    _out = curr_active_pipeline.display('_display_directional_template_debugger')
+
+    
+    
+    # Use/Updating _______________________________________________________________________________________________________ #
 
     Updating Display Epoch:
         The `self.on_update_epoch_IDX(an_epoch_idx=0)` can be used to control which Epoch is displayed, and is synchronized across all four sorts.
 
+    Updating Continuous Displayed Time: 
+        `_out_ripple_rasters.programmatically_update_epoch_IDX_from_epoch_start_time(193.65)`
+
+    
     """
     global_spikes_df: pd.DataFrame = field(repr=False)
     active_epochs_df: pd.DataFrame = field(repr=False)
@@ -125,6 +129,7 @@ class RankOrderRastersDebugger:
     params: VisualizationParameters = field(init=False, repr=keys_only_repr)
 
     active_epoch_IDX: int = field(default=0, repr=True)
+    # active_epoch_time_bin_IDX: Optional[int] = field(default=None, repr=True)
 
     on_idx_changed_callback_function_dict: Dict[str, Callable] = field(default=Factory(dict), repr=False)
 
@@ -150,6 +155,17 @@ class RankOrderRastersDebugger:
         assert str(curr_redundant_label_lookup_label) == str(curr_epoch_label), f"curr_epoch_label: {str(curr_epoch_label)} != str(curr_redundant_label_lookup_label): {str(curr_redundant_label_lookup_label)}"
         return curr_epoch_label
 
+
+    def find_nearest_time_index(self, target_time: float) -> Optional[int]:
+        """ finds the index of the nearest time from the active epochs
+        """
+        from neuropy.utils.indexing_helpers import find_nearest_time
+        df = self.active_epochs_df
+        df, closest_index, closest_time, matched_time_difference = find_nearest_time(df=df, target_time=target_time, time_column_name='start', max_allowed_deviation=0.01, debug_print=False)
+        # df.iloc[closest_index]
+        return closest_index
+    
+
     @property
     def active_epoch_label(self):
         """ returns the epoch 'label' value corresponding to the currently selected `self.active_epoch_IDX`. """
@@ -172,8 +188,10 @@ class RankOrderRastersDebugger:
 
     # Data Convenience Accessors _________________________________________________________________________________________ #
     @property
-    def combined_epoch_stats_df(self) -> pd.DataFrame:
+    def combined_epoch_stats_df(self) -> Optional[pd.DataFrame]:
         """ returns combined_epoch_stats_df. """
+        if self.rank_order_results is None:
+            return None
         is_laps: bool = self.params.is_laps
         if is_laps:
             return self.rank_order_results.laps_combined_epoch_stats_df
@@ -181,8 +199,10 @@ class RankOrderRastersDebugger:
             return self.rank_order_results.ripple_combined_epoch_stats_df
         
     @property
-    def active_epoch_result_df(self) -> pd.DataFrame:
+    def active_epoch_result_df(self) -> Optional[pd.DataFrame]:
         """ returns a the combined_epoch_stats_df describing the single epoch corresponding to `self.active_epoch_IDX`. """
+        if self.combined_epoch_stats_df is None:
+            return None
         # curr_epoch_label = self.lookup_label_from_index(self.active_epoch_IDX)
         # return self.combined_epoch_stats_df[self.combined_epoch_stats_df.label == curr_epoch_label]
         assert np.shape(self.combined_epoch_stats_df)[0] == np.shape(self.active_epochs_df)[0], f"np.shape(self.combined_epoch_stats_df)[0]: {np.shape(self.combined_epoch_stats_df)[0]} != np.shape(self.active_epochs_df)[0]: {np.shape(self.active_epochs_df)[0]}"
@@ -216,6 +236,15 @@ class RankOrderRastersDebugger:
         return {k:v['root_plot'] for k,v in self.plots.all_separate_plots.items()} # PlotItem 
     
     
+    @property
+    def root_dockAreaWindow(self) -> "PhoDockAreaContainingWindow":
+        return self.ui.root_dockAreaWindow
+    
+    @property
+    def attached_directional_template_pfs_debugger(self): #-> Optional[TemplateDebugger]:
+        """The attached_directional_template_pfs_debugger property."""
+        return self.ui.controlled_references.get('directional_template_pfs_debugger', {}).get('obj', None)
+ 
 
     @classmethod
     def init_from_rank_order_results(cls, rank_order_results: RankOrderComputationsContainer):
@@ -239,7 +268,7 @@ class RankOrderRastersDebugger:
 
 
     @classmethod
-    def init_rank_order_debugger(cls, global_spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, track_templates: TrackTemplates, rank_order_results: RankOrderComputationsContainer, RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame], LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame], **param_kwargs):
+    def init_rank_order_debugger(cls, global_spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, track_templates: TrackTemplates, rank_order_results: RankOrderComputationsContainer, RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame], LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame], dock_add_locations=None, **param_kwargs):
         """
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
@@ -248,8 +277,7 @@ class RankOrderRastersDebugger:
 
         """
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
-        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
-
+        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, get_utility_dock_colors
 
         _obj = cls(global_spikes_df=global_spikes_df, active_epochs_df=active_epochs_df.copy(), track_templates=track_templates, rank_order_results=rank_order_results,
              RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict=RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict=LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict)
@@ -285,42 +313,39 @@ class RankOrderRastersDebugger:
         if icon is not None:
             root_dockAreaWindow.setWindowIcon(icon)
 
-        ## Build Dock Widgets:
-        def get_utility_dock_colors(orientation, is_dim):
-            """ used for CustomDockDisplayConfig for non-specialized utility docks """
-            # Common to all:
-            if is_dim:
-                fg_color = '#aaa' # Grey
-            else:
-                fg_color = '#fff' # White
-
-            # a purplish-royal-blue
-            if is_dim:
-                bg_color = '#d8d8d8'
-                border_color = '#717171'
-            else:
-                bg_color = '#9d9d9d'
-                border_color = '#3a3a3a'
-
-            return fg_color, bg_color, border_color
-
-
         # decoder_names_list = ('long_LR', 'long_RL', 'short_LR', 'short_RL')
         _out_dock_widgets = {}
         dock_configs = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=False), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, showCloseButton=False),
                         CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=False), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, showCloseButton=False))))
         # dock_add_locations = (['left'], ['left'], ['right'], ['right'])
         # dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (['right'], ['right'], ['right'], ['right'])))
-        dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (['left'], ['bottom'], ['right'], ['right'])))
+        # dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (['left'], ['bottom'], ['right'], ['right'])))
+
+        if (dock_add_locations is None):
+            # dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (['left'], ['bottom'], ['right'], ['right'])))
+            dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), ((lambda a_decoder_name: ['left']), (lambda a_decoder_name: ['bottom']), (lambda a_decoder_name: ['right']), (lambda a_decoder_name: ['bottom', root_dockAreaWindow.find_display_dock('short_LR')]))))
+
+        else:
+            assert len(dock_add_locations) == len(dock_configs), f"len(dock_add_locations): {len(dock_add_locations)} != len(dock_configs): {len(dock_configs)}"
 
         for i, (a_decoder_name, a_win) in enumerate(all_windows.items()):
-            if (a_decoder_name == 'short_RL'):
-                short_LR_dock = root_dockAreaWindow.find_display_dock('short_LR')
-                assert short_LR_dock is not None
-                dock_add_locations['short_RL'] = ['bottom', short_LR_dock]
-                print(f'using overriden dock location.')
+            active_dock_add_location_fn = dock_add_locations[a_decoder_name]
+            if callable(active_dock_add_location_fn):
+                # the value is a lambda-wrapped function that returns a list:
+                active_dock_add_location = active_dock_add_location_fn(a_decoder_name)
+            else:
+                ## the value is just a regular list of string
+                active_dock_add_location = active_dock_add_location_fn
 
-            _out_dock_widgets[a_decoder_name] = root_dockAreaWindow.add_display_dock(identifier=a_decoder_name, widget=a_win, dockSize=(300,600), dockAddLocationOpts=dock_add_locations[a_decoder_name], display_config=dock_configs[a_decoder_name], autoOrientation=False)
+            # if (a_decoder_name == 'short_RL'):
+            #     short_LR_dock = root_dockAreaWindow.find_display_dock('short_LR')
+            #     assert short_LR_dock is not None
+            #     dock_add_locations['short_RL'] = ['bottom', short_LR_dock]
+            #     print(f'using overriden dock location.')
+
+            # _out_dock_widgets[a_decoder_name] = root_dockAreaWindow.add_display_dock(identifier=a_decoder_name, widget=a_win, dockSize=(300,600), dockAddLocationOpts=dock_add_locations[a_decoder_name], display_config=dock_configs[a_decoder_name], autoOrientation=False)
+            _out_dock_widgets[a_decoder_name] = root_dockAreaWindow.add_display_dock(identifier=a_decoder_name, widget=a_win, dockSize=(300,600), dockAddLocationOpts=active_dock_add_location, display_config=dock_configs[a_decoder_name], autoOrientation=False)
+
 
 
 
@@ -347,62 +372,11 @@ class RankOrderRastersDebugger:
 
 
         ## Build the utility controls at the bottom:
-        ctrls_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False)
-
-        ctrls_widget = ScrollBarWithSpinBox()
-        ctrls_widget.setObjectName("ctrls_widget")
-        ctrls_widget.update_range(0, (_obj.n_epochs-1))
-        ctrls_widget.setValue(10)
-
-        def valueChanged(new_val:int):
-            print(f'valueChanged(new_val: {new_val})')
-            _obj.on_update_epoch_IDX(int(new_val))
-
-        ctrls_widget_connection = ctrls_widget.sigValueChanged.connect(valueChanged)
-        ctrl_layout = pg.LayoutWidget()
-        ctrl_layout.addWidget(ctrls_widget, row=1, rowspan=1, col=1, colspan=2)
-        ctrl_widgets_dict = dict(ctrls_widget=ctrls_widget, ctrls_widget_connection=ctrls_widget_connection)
-
-        # Step 4: Create DataFrame and QTableView
-        # df =  selected active_selected_spikes_df # pd.DataFrame(...)  # Replace with your DataFrame
-        # model = PandasModel(df)
-        # pandasDataFrameTableModel = SimplePandasModel(active_epochs_df.copy())
-
-        # tableView = pg.QtWidgets.QTableView()
-        # tableView.setModel(pandasDataFrameTableModel)
-        # tableView.setObjectName("pandasTablePreview")
-        # # tableView.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
-
-        # ctrl_widgets_dict['pandasDataFrameTableModel'] = pandasDataFrameTableModel
-        # ctrl_widgets_dict['tableView'] = tableView
-
-        # # Step 5: Add TableView to LayoutWidget
-        # ctrl_layout.addWidget(tableView, row=2, rowspan=1, col=1, colspan=1)
-
-
-        # Tabbled table widget:
-        tab_widget, views_dict, models_dict = create_tabbed_table_widget(dataframes_dict={'epochs': active_epochs_df.copy(),
-                                                                                                        'spikes': global_spikes_df.copy(), 
-                                                                                                        'combined_epoch_stats': pd.DataFrame()})
-        ctrl_widgets_dict['tables_tab_widget'] = tab_widget
-        ctrl_widgets_dict['views_dict'] = views_dict
-        ctrl_widgets_dict['models_dict'] = models_dict
+        utility_controls_ui_dict, ctrls_dock_widgets_dict = _obj._build_utility_controls(root_dockAreaWindow, active_epochs_df=active_epochs_df, global_spikes_df=global_spikes_df)
+        _out_dock_widgets = ctrls_dock_widgets_dict | _out_dock_widgets
         
-
         
-        # Add the tab widget to the layout
-        ctrl_layout.addWidget(tab_widget, row=2, rowspan=1, col=1, colspan=1)
-    
-
-        logTextEdit = pg.QtWidgets.QTextEdit()
-        logTextEdit.setReadOnly(True)
-        logTextEdit.setObjectName("logTextEdit")
-        # logTextEdit.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
-
-        ctrl_layout.addWidget(logTextEdit, row=2, rowspan=1, col=2, colspan=1)
-
-        _out_dock_widgets['bottom_controls'] = root_dockAreaWindow.add_display_dock(identifier='bottom_controls', widget=ctrl_layout, dockSize=(600,200), dockAddLocationOpts=['bottom'], display_config=ctrls_dock_config)
-
+        # Top Info Bar: ______________________________________________________________________________________________________ #
         ## Add two labels in the top row that show the Long/Short column values:
         long_short_info_layout = pg.LayoutWidget()
         long_short_info_layout.setObjectName('layoutLongShortInfo')
@@ -426,7 +400,7 @@ class RankOrderRastersDebugger:
         short_info_label = short_info_label
         info_labels_widgets_dict = dict(long_short_info_layout=long_short_info_layout, long_info_label=long_info_label, short_info_label=short_info_label)
 
-        root_dockAreaWindow.resize(600, 900)
+        root_dockAreaWindow.resize(1440, 360) # set the (width, height)
 
         ## Build final .plots and .plots_data:
         _obj.plots = RenderPlots(name=name, root_dockAreaWindow=root_dockAreaWindow, apps=all_apps, all_windows=all_windows, all_separate_plots=all_separate_plots,
@@ -435,9 +409,9 @@ class RankOrderRastersDebugger:
         _obj.plots_data = RenderPlotsData(name=name, main_plot_identifiers_list=main_plot_identifiers_list,
                                            seperate_all_spots_dict=all_separate_data_all_spots, seperate_all_scatterplot_tooltips_kwargs_dict=all_separate_data_all_scatterplot_tooltips_kwargs, seperate_new_sorted_rasters_dict=all_separate_data_new_sorted_rasters, seperate_spikes_dfs_dict=all_separate_data_spikes_dfs,
                                            on_update_active_epoch=on_update_active_epoch, on_update_active_scatterplot_kwargs=on_update_active_scatterplot_kwargs, **{k:v for k, v in _obj.plots_data.to_dict().items() if k not in ['name']})
-        _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, ctrl_layout=ctrl_layout, **ctrl_widgets_dict, **info_labels_widgets_dict, on_valueChanged=valueChanged, logTextEdit=logTextEdit, dock_configs=dock_configs, controlled_references=None)
+        # _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, ctrl_layout=ctrl_layout, **ctrl_widgets_dict, **info_labels_widgets_dict, on_valueChanged=valueChanged, logTextEdit=logTextEdit, dock_configs=dock_configs, controlled_references=None)
+        _obj.ui = PhoUIContainer(name=name, app=app, root_dockAreaWindow=root_dockAreaWindow, **utility_controls_ui_dict, **info_labels_widgets_dict, dock_configs=dock_configs, controlled_references={})
         _obj.params = VisualizationParameters(name=name, is_laps=False, enable_show_spearman=True, enable_show_pearson=False, enable_show_Z_values=True, use_plaintext_title=False, **param_kwargs)
-
 
         ## Add Selected Spikes:
         # try:
@@ -488,12 +462,19 @@ class RankOrderRastersDebugger:
 
         _obj.register_internal_callbacks()
 
+        try:
+            ctrl_widgets_dict = _obj.ui
+            ctrl_widgets_dict['models_dict']['combined_epoch_stats'] = SimplePandasModel(_obj.combined_epoch_stats_df.copy())
+            # Create and associate view with model
+            ctrl_widgets_dict['views_dict']['combined_epoch_stats'].setModel(ctrl_widgets_dict['models_dict']['combined_epoch_stats'])
 
-        ctrl_widgets_dict['models_dict']['combined_epoch_stats'] = SimplePandasModel(_obj.combined_epoch_stats_df.copy())
+        except AttributeError as e:
+            # AttributeError: 'NoneType' object has no attribute 'ripple_combined_epoch_stats_df'
+            print(f'WARNING: {e}')
 
-        # Create and associate view with model
-        # view = pg.QtWidgets.QTableView()
-        ctrl_widgets_dict['views_dict']['combined_epoch_stats'].setModel(ctrl_widgets_dict['models_dict']['combined_epoch_stats'])
+        except Exception as e:
+            raise e
+
         
 
         return _obj
@@ -501,6 +482,69 @@ class RankOrderRastersDebugger:
 
 
     
+    def _build_utility_controls(self, root_dockAreaWindow, active_epochs_df, global_spikes_df):
+        """ Build the utility controls at the bottom """
+        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, get_utility_dock_colors
+
+        ctrls_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False)
+
+        ctrls_widget = ScrollBarWithSpinBox()
+        ctrls_widget.setObjectName("ctrls_widget")
+        ctrls_widget.update_range(0, (self.n_epochs-1))
+        ctrls_widget.setValue(10)
+
+        def valueChanged(new_val:int):
+            print(f'ScrollBarWithSpinBox valueChanged(new_val: {new_val})')
+            self.on_update_epoch_IDX(int(new_val))
+
+        ctrls_widget_connection = ctrls_widget.sigValueChanged.connect(valueChanged)
+        ctrl_layout = pg.LayoutWidget()
+        ctrl_layout.addWidget(ctrls_widget, row=1, rowspan=1, col=1, colspan=2)
+        ctrl_widgets_dict = dict(ctrls_widget=ctrls_widget, ctrls_widget_connection=ctrls_widget_connection)
+
+        # Step 4: Create DataFrame and QTableView
+        # df =  selected active_selected_spikes_df # pd.DataFrame(...)  # Replace with your DataFrame
+        # model = PandasModel(df)
+        # pandasDataFrameTableModel = SimplePandasModel(active_epochs_df.copy())
+
+        # tableView = pg.QtWidgets.QTableView()
+        # tableView.setModel(pandasDataFrameTableModel)
+        # tableView.setObjectName("pandasTablePreview")
+        # # tableView.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
+
+        # ctrl_widgets_dict['pandasDataFrameTableModel'] = pandasDataFrameTableModel
+        # ctrl_widgets_dict['tableView'] = tableView
+
+        # # Step 5: Add TableView to LayoutWidget
+        # ctrl_layout.addWidget(tableView, row=2, rowspan=1, col=1, colspan=1)
+
+
+        # Tabbled table widget:
+        tab_widget, views_dict, models_dict = create_tabbed_table_widget(dataframes_dict={'epochs': active_epochs_df.copy(),
+                                                                                                        'spikes': global_spikes_df.copy(), 
+                                                                                                        'combined_epoch_stats': pd.DataFrame()})
+        ctrl_widgets_dict['tables_tab_widget'] = tab_widget
+        ctrl_widgets_dict['views_dict'] = views_dict
+        ctrl_widgets_dict['models_dict'] = models_dict
+
+        # Add the tab widget to the layout
+        ctrl_layout.addWidget(tab_widget, row=2, rowspan=1, col=1, colspan=1)
+    
+        logTextEdit = LogViewer() # QTextEdit subclass
+        logTextEdit.setReadOnly(True)
+        logTextEdit.setObjectName("logTextEdit")
+        # logTextEdit.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
+
+        ctrl_layout.addWidget(logTextEdit, row=2, rowspan=1, col=2, colspan=1)
+
+        # _out_dock_widgets['bottom_controls'] = root_dockAreaWindow.add_display_dock(identifier='bottom_controls', widget=ctrl_layout, dockSize=(600,200), dockAddLocationOpts=['bottom'], display_config=ctrls_dock_config)
+        ctrls_dock_widgets_dict = {}
+        ctrls_dock_widgets_dict['bottom_controls'] = root_dockAreaWindow.add_display_dock(identifier='bottom_controls', widget=ctrl_layout, dockSize=(600,200), dockAddLocationOpts=['bottom'], display_config=ctrls_dock_config)
+
+        ui_dict = dict(ctrl_layout=ctrl_layout, **ctrl_widgets_dict, on_valueChanged=valueChanged, logTextEdit=logTextEdit)
+        return ui_dict, ctrls_dock_widgets_dict
+
+
 
 
     def register_internal_callbacks(self):
@@ -508,6 +552,29 @@ class RankOrderRastersDebugger:
         # self.on_idx_changed_callback_function_dict['update_plot_titles_with_stats'] = self.update_plot_titles_with_stats
         pass
 
+
+    # ==================================================================================================================== #
+    # Programmatically Update Active Epoch Functions                                                                       #
+    # ==================================================================================================================== #
+    def programmatically_update_epoch_IDX(self, an_epoch_idx: int):
+        """ programmatically performs an update to the epoch_IDX 
+        """
+        assert an_epoch_idx is not None
+        assert an_epoch_idx >= 0 # minimum valid epoch
+        assert (an_epoch_idx < self.n_epochs) # maximum valid epoch
+        _a_ScrollBarWithSpinBox = self.ui.ctrls_widget # ScrollBarWithSpinBox 
+        _a_ScrollBarWithSpinBox.setValue(an_epoch_idx)
+
+    
+    def programmatically_update_epoch_IDX_from_epoch_start_time(self, target_time: float):
+        """ finds and selects the epoch starting nearest to the target_time
+        """
+        found_IDX = self.find_nearest_time_index(target_time)
+        if found_IDX is not None:
+            print(f'found_IDX: {found_IDX}')
+            self.programmatically_update_epoch_IDX(found_IDX)
+        else:
+            raise ValueError(f'could not find epoch near target_time: {target_time}.')
 
 
     # ==================================================================================================================== #
@@ -527,7 +594,6 @@ class RankOrderRastersDebugger:
             a_win.setWindowTitle(f'{a_decoder_name} - epoch_IDX: {int(an_epoch_idx)} - epoch: {an_epoch_string}')
 
         self.update_cell_y_labels()
-
 
     def on_update_epoch_IDX(self, an_epoch_idx: int):
         """ Calls self.on_update_epoch_IDX(...)
@@ -661,7 +727,18 @@ class RankOrderRastersDebugger:
 
     def write_to_log(self, log_messages):
         """ logs text to the text widget at the bottom """
-        self.ui.logTextEdit.append(log_messages)
+        self.ui.logTextEdit.write_to_log(log_messages)
+        # self.ui.logTextEdit.append(log_messages)
+        # # Automatically scroll to the bottom
+        # self.ui.logTextEdit.verticalScrollBar().setValue(
+        #     self.ui.logTextEdit.verticalScrollBar().maximum()
+        # )
+
+
+    def setWindowTitle(self, title: str):
+        """ updates the window's title """
+        self.ui.root_dockAreaWindow.setWindowTitle(title)
+
 
     def get_ipywidget(self):
         """ Displays a slider that allows the user to select the epoch_IDX instead of having to type it and call it manually
@@ -698,24 +775,44 @@ class RankOrderRastersDebugger:
         # display(slider)
 
 
+    def set_top_info_bar_visibility(self, is_visible=False):
+        """Hides/Shows the top info bar dock """
+        LongShortColumnsInfo_dock_layout, LongShortColumnsInfo_dock_Dock = self.plots.dock_widgets['LongShortColumnsInfo_dock']
+        # LongShortColumnsInfo_dock_layout.hide() # No use
+        # _out_ripple_rasters.ui.long_short_info_layout.hide() # No use
+        LongShortColumnsInfo_dock_Dock.setVisible(is_visible)
 
-    def save_figure(self, export_path: Path):
-        """ Exports all four rasters to a specified file path        
+    def set_bottom_controls_visibility(self, is_visible=False):
+        """Hides/Shows the top info bar dock """
+        found_dock_layout, found_dock_Dock = self.plots.dock_widgets['bottom_controls']
+        # LongShortColumnsInfo_dock_layout.hide() # No use
+        # _out_ripple_rasters.ui.long_short_info_layout.hide() # No use
+        found_dock_Dock.setVisible(is_visible)
+
+
+
+    def save_figure(self, export_path: Path, export_topmost_scene_element:bool=False, **kwargs):
+        """ Exports all four rasters to a specified file path
         
         _out_rank_order_event_raster_debugger.save_figure(export_path=export_path)
         
+        export_topmost_scene_element: False - export the PlotItem
+            True: export the parent of the PlotItem (includes the grid, a few other things).
         """
         save_paths = []
         # root_plots_dict = {k:v['root_plot'] for k,v in _out_rank_order_event_raster_debugger.plots.all_separate_plots.items()} # PlotItem 
 
         root_plots_dict = self.root_plots_dict
+        # root_plots_dict = self.root_plots_dict
         root_plots_dict['long_LR'].setYRange(-0.5, float(self.max_n_neurons))
 
         for a_decoder, a_plot in root_plots_dict.items():
             a_plot.setYRange(-0.5, float(self.max_n_neurons))
+            if export_topmost_scene_element:
+                a_plot = a_plot.parentItem()
             self.get_epoch_active_aclus()
-            out_path = export_path.joinpath(f'{a_decoder}_plot.png').resolve()
-            export_pyqtgraph_plot(a_plot, savepath=out_path, background=pg.mkColor(0, 0, 0, 0))
+            out_path = export_path.joinpath(f'{a_decoder}_raster.png').resolve()
+            export_pyqtgraph_plot(a_plot, savepath=out_path, background=pg.mkColor(0, 0, 0, 0), **kwargs)
             save_paths.append(out_path)
     
         return save_paths
@@ -723,8 +820,8 @@ class RankOrderRastersDebugger:
 
 
 
-    @function_attributes(short_name=None, tags=['figure', 'debug'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-21 19:49', related_items=[])
-    def export_figure_all_slider_values(self, export_path: Union[str,Path]):
+    @function_attributes(short_name=None, tags=['figure', 'export', 'slider', 'debug'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-21 19:49', related_items=[])
+    def export_figure_all_slider_values(self, export_path: Union[str,Path], **kwargs):
         """ sweeps the rank_order_event_raster_debugger through its various slider values, exporting all four of its plots as images for each value. 
 
         Usage:
@@ -746,8 +843,8 @@ class RankOrderRastersDebugger:
             for a_decoder, a_plot in self.root_plots_dict.items():
                 curr_filename_prefix = f'Epoch{active_epoch_label}_{a_decoder}'
                 # a_plot.setYRange(-0.5, float(self.max_n_neurons))
-                out_path = export_path.joinpath(f'{curr_filename_prefix}_plot.png').resolve()
-                export_pyqtgraph_plot(a_plot, savepath=out_path, background=pg.mkColor(0, 0, 0, 0))
+                out_path = export_path.joinpath(f'{curr_filename_prefix}_raster.png').resolve()
+                export_pyqtgraph_plot(a_plot, savepath=out_path, background=pg.mkColor(0, 0, 0, 0), **kwargs)
                 save_paths.append(out_path)
 
             all_save_paths[active_epoch_label] = save_paths
@@ -1219,25 +1316,30 @@ class RankOrderRastersDebugger:
             # a_real_value = rank_order_results_debug_values[a_decoder_name][0][an_idx]
             a_std_column_name: str = self.decoder_name_to_column_name_prefix_map[a_decoder_name]
 
-            all_column_names = curr_new_results_df.filter(regex=f'^{a_std_column_name}').columns.tolist()
-            active_column_names = []
-            # print(active_column_names)
-            if self.params.enable_show_spearman:
-                active_column_names = [col for col in all_column_names if col.endswith("_spearman")]
-                if self.params.enable_show_Z_values:
-                    active_column_names += [col for col in all_column_names if col.endswith("_spearman_Z")]
+            if (curr_new_results_df is not None):
+                all_column_names = curr_new_results_df.filter(regex=f'^{a_std_column_name}').columns.tolist()
+                active_column_names = []
+                # print(active_column_names)
+                if self.params.enable_show_spearman:
+                    active_column_names = [col for col in all_column_names if col.endswith("_spearman")]
+                    if self.params.enable_show_Z_values:
+                        active_column_names += [col for col in all_column_names if col.endswith("_spearman_Z")]
 
 
-            if self.params.enable_show_pearson:
-                active_column_names += [col for col in all_column_names if col.endswith("_pearson")]
-                if self.params.enable_show_Z_values:
-                    active_column_names += [col for col in all_column_names if col.endswith("_pearson_Z")]
+                if self.params.enable_show_pearson:
+                    active_column_names += [col for col in all_column_names if col.endswith("_pearson")]
+                    if self.params.enable_show_Z_values:
+                        active_column_names += [col for col in all_column_names if col.endswith("_pearson_Z")]
 
 
-            active_column_values = curr_new_results_df[active_column_names]
-            active_values_dict = active_column_values.iloc[0].to_dict() # {'LR_Long_spearman': -0.34965034965034975, 'LR_Long_pearson': -0.5736588716389961, 'LR_Long_spearman_Z': -0.865774983083525, 'LR_Long_pearson_Z': -1.4243571733839517}
-            active_raw_col_val_dict = {k.replace(f'{a_std_column_name}_', ''):v for k,v in active_values_dict.items()} # remove the "LR_Long" prefix so it's just the variable names
-
+                active_column_values = curr_new_results_df[active_column_names]
+                active_values_dict = active_column_values.iloc[0].to_dict() # {'LR_Long_spearman': -0.34965034965034975, 'LR_Long_pearson': -0.5736588716389961, 'LR_Long_spearman_Z': -0.865774983083525, 'LR_Long_pearson_Z': -1.4243571733839517}
+                active_raw_col_val_dict = {k.replace(f'{a_std_column_name}_', ''):v for k,v in active_values_dict.items()} # remove the "LR_Long" prefix so it's just the variable names
+            else:
+                ## No RankOrderResults
+                print(f'WARN: No RankOrderResults')
+                active_raw_col_val_dict = {}
+                
             active_formatted_col_val_list = [':'.join([generate_html_string(str(k), color='grey', bold=False), generate_html_string(f'{v:0.3f}', color='white', bold=True)]) for k,v in active_raw_col_val_dict.items()]
             final_values_string: str = '; '.join(active_formatted_col_val_list)
 
@@ -1250,7 +1352,7 @@ class RankOrderRastersDebugger:
 
             a_root_plot.setTitle(title=title_str)
 
-
+    @function_attributes(short_name=None, tags=['attached', 'templates', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-10 08:00', related_items=[])
     def plot_attached_directional_templates_pf_debugger(self, curr_active_pipeline):
         """ builds a _display_directional_template_debugger, attaches it to the provided rank_order_event_raster_debugger so it's updated on its callback, and then returns what it created. 
         
@@ -1280,6 +1382,45 @@ class RankOrderRastersDebugger:
         return _out_directional_template_pfs_debugger, debug_update_paired_directional_template_pfs_debugger
 
 
+    @function_attributes(short_name=None, tags=['indicator-regions', 'highlight', 'selection'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-10 08:51', related_items=['clear_highlighting_indicator_regions'])
+    def add_highlighting_indicator_regions(self, t_start: float, t_stop: float, identifier: str):
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.CustomLinearRegionItem import CustomLinearRegionItem
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import build_pyqtgraph_epoch_indicator_regions
+    
+        epoch_indicator_regions = self.plots.get('epoch_indicator_regions', None)
+        if epoch_indicator_regions is None:
+            self.plots.epoch_indicator_regions = {} # Initialize
+
+        extant_indicator_regions_dict = self.plots.epoch_indicator_regions.get(identifier, {})
+        for a_root_plot, a_rect_item in extant_indicator_regions_dict.items():
+            ## remove the item
+            a_root_plot.removeItem(a_rect_item)
+            a_rect_item.deleteLater()
+            # a_root_plot.remove(a_rect_item)
+        # print(f'removed all extant')
+        self.plots.epoch_indicator_regions[identifier] = {} # clear when done
+        for a_decoder_name, a_root_plot in self.plots.root_plots.items():
+            self.plots.epoch_indicator_regions[identifier][a_root_plot], epoch_region_label = build_pyqtgraph_epoch_indicator_regions(a_root_plot, t_start=t_start, t_stop=t_stop, epoch_label="", **dict(pen=pg.mkPen('#0b0049'), brush=pg.mkBrush('#0099ff42'), hoverBrush=pg.mkBrush('#fff400'), hoverPen=pg.mkPen('#00ff00')), movable=False) # no label
+    
+
+	# def select_epoch_time
+
+
+    @function_attributes(short_name=None, tags=['indicator-regions', 'highlight', 'selection'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-10 08:51', related_items=['add_highlighting_indicator_regions'])
+    def clear_highlighting_indicator_regions(self):
+        existing_indicator_regions_dict = self.plots.get('epoch_indicator_regions', None)
+        if existing_indicator_regions_dict is not None:         
+            for identifier, extant_indicator_regions_dict in existing_indicator_regions_dict.items():
+                for a_root_plot, a_rect_item in extant_indicator_regions_dict.items():
+                    ## remove the item
+                    # a_root_plot.remove(a_rect_item)
+                    a_root_plot.removeItem(a_rect_item)
+                    a_rect_item.deleteLater()
+                    # print(f'removing {identifier} for {a_root_plot}...')
+            
+            self.plots.epoch_indicator_regions = {} # clear all
+            # print(f'done clearing')
+
 
 
 ## Adding callbacks to `RankOrderRastersDebugger` when the slider changes:
@@ -1290,8 +1431,7 @@ class RankOrderRastersDebugger:
 # # ==================================================================================================================== #
 
 
-from pyphocorehelpers.print_helpers import generate_html_string
-from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
+
 
 
 
