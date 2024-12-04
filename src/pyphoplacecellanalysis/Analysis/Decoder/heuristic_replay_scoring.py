@@ -176,17 +176,17 @@ class SubsequencesPartitioningResult:
             self.sequence_info_df = self.rebuild_sequence_info_df()
 
 
-    @property
-    def num_subsequence_bins(self) -> NDArray:
-        """ number of tbins in each split sequence """
-        return np.array([len(v) for v in self.split_positions_arrays])
+    # @property
+    # def num_subsequence_bins(self) -> NDArray:
+    #     """ number of tbins in each split sequence """
+    #     return np.array([len(v) for v in self.split_positions_arrays])
 
-    @property
-    def num_merged_subsequence_bins(self) -> NDArray:
-        """ number of tbins in each MERGED subsequence """
-        if self.merged_split_positions_arrays is None:
-            return None
-        return np.array([len(v) for v in self.merged_split_positions_arrays])
+    # @property
+    # def num_merged_subsequence_bins(self) -> NDArray:
+    #     """ number of tbins in each MERGED subsequence """
+    #     if self.merged_split_positions_arrays is None:
+    #         return None
+    #     return np.array([len(v) for v in self.merged_split_positions_arrays])
     
     @property
     def n_diff_bins(self) -> int:
@@ -197,33 +197,27 @@ class SubsequencesPartitioningResult:
         """The subsequence_index_lists_omitting_repeats property. BROKEN """
         return np.array_split(np.arange(len(self.split_indicies)), self.split_indicies)
 
-    @property
-    def total_num_subsequence_bins(self) -> int:
-        """ Calculates the total number of subsequence bins. """
-        total = np.sum(self.num_subsequence_bins) ## NOTE: does not matter whether we use `num_subsequence_bins` or `num_merged_subsequence_bins` as the total must be the same
-        return int(total)
+    # @property
+    # def total_num_subsequence_bins(self) -> int:
+    #     """ Calculates the total number of subsequence bins. """
+    #     total = np.sum(self.num_subsequence_bins) ## NOTE: does not matter whether we use `num_subsequence_bins` or `num_merged_subsequence_bins` as the total must be the same
+    #     return int(total)
 
     @property
     def total_num_subsequence_bins_no_repeats(self) -> int:
         """ Calculates the total number of subsequence bins without repeats.
         """
-        # total_no_repeats = np.sum(self.num_merged_subsequence_bins)
-        # if len(self.low_magnitude_change_indicies) > 0:
-        #     total_num_near_repeating_bins: int =  len(self.low_magnitude_change_indicies)
-        # else:
-        #     total_num_near_repeating_bins: int = 0
-        # total_no_repeats = self.total_num_subsequence_bins - total_num_near_repeating_bins
         _, all_value_equiv_group_idxs_list = SubsequencesPartitioningResult.find_value_equiv_groups(self.flat_positions, same_thresh_cm=self.same_thresh)
         total_num_equiv_values: int = len(all_value_equiv_group_idxs_list) # the number of equivalence value sets in the longest subsequence
         return int(total_num_equiv_values)
 
 
     # Longest Sequence ___________________________________________________________________________________________________ #
-    @property
-    def longest_subsequence_length(self) -> int:
-        """ Finds the length of the longest non-repeating subsequence. """
-        longest_length = int(np.nanmax(self.num_merged_subsequence_bins))
-        return longest_length
+    # @property
+    # def longest_subsequence_length(self) -> int:
+    #     """ Finds the length of the longest non-repeating subsequence. """
+    #     longest_length = int(np.nanmax(self.num_merged_subsequence_bins))
+    #     return longest_length
 
 
     @property
@@ -235,16 +229,16 @@ class SubsequencesPartitioningResult:
         num_equiv_values: int = len(value_equiv_group_idxs_list) # the number of equivalence value sets in the longest subsequence
         return num_equiv_values
 
-    @property
-    def longest_sequence_no_repeats_start_idx(self) -> int:
-        """ Finds the start index of the longest non-repeating subsequence. """
-        start_idx = int(np.nanargmax(self.num_merged_subsequence_bins))
-        return start_idx
+    # @property
+    # def longest_sequence_no_repeats_start_idx(self) -> int:
+    #     """ Finds the start index of the longest non-repeating subsequence. """
+    #     start_idx = int(np.nanargmax(self.num_merged_subsequence_bins))
+    #     return start_idx
 
-    @property
-    def longest_sequence_subsequence(self) -> NDArray:
-        """ Returns the actual subsequence of positions for the longest non-repeating subsequence. """
-        return self.merged_split_positions_arrays[self.longest_sequence_no_repeats_start_idx]
+    # @property
+    # def longest_sequence_subsequence(self) -> NDArray:
+    #     """ Returns the actual subsequence of positions for the longest non-repeating subsequence. """
+    #     return self.merged_split_positions_arrays[self.longest_sequence_no_repeats_start_idx]
 
 
     @property
@@ -258,6 +252,63 @@ class SubsequencesPartitioningResult:
         """  Compensate for repeating bins, not counting them towards the score but also not against. """
         return self.get_longest_sequence_length_ratio(should_use_no_repeat_values=False)
             
+
+    # 2024-12-04 09:21 Replacement Properties ____________________________________________________________________________ #
+
+    @property
+    def num_subsequence_bins(self) -> NDArray:
+        """Number of time bins in each split sequence."""
+        if self.split_positions_arrays is None:
+            return None
+        return np.array([len(v) for v in self.split_positions_arrays])
+
+    @property
+    def num_merged_subsequence_bins(self) -> NDArray:
+        """Number of time bins in each merged subsequence."""
+        if self.merged_split_positions_arrays is None:
+            return None
+        return np.array([len(v) for v in self.merged_split_positions_arrays])
+
+    @property
+    def total_num_subsequence_bins(self) -> int:
+        """Calculates the total number of subsequence bins."""
+        if self.split_positions_arrays is None:
+            return 0
+        total = np.sum(self.num_subsequence_bins)
+        return int(total)
+
+    @property
+    def total_num_merged_subsequence_bins(self) -> int:
+        """Calculates the total number of merged subsequence bins."""
+        if self.merged_split_positions_arrays is None:
+            return 0
+        total = np.sum(self.num_merged_subsequence_bins)
+        return int(total)
+
+    @property
+    def longest_subsequence_length(self) -> int:
+        """Finds the length of the longest merged subsequence."""
+        if self.merged_split_positions_arrays is None:
+            return 0
+        longest_length = int(np.nanmax(self.num_merged_subsequence_bins))
+        return longest_length
+
+    @property
+    def longest_sequence_no_repeats_start_idx(self) -> int:
+        """Finds the start index of the longest merged subsequence."""
+        if self.merged_split_positions_arrays is None:
+            return 0
+        start_idx = int(np.nanargmax(self.num_merged_subsequence_bins))
+        return start_idx
+
+    @property
+    def longest_sequence_subsequence(self) -> NDArray:
+        """Returns the positions of the longest merged subsequence."""
+        if self.merged_split_positions_arrays is None:
+            return np.array([])
+        return self.merged_split_positions_arrays[self.longest_sequence_no_repeats_start_idx]
+
+
 
     
     def get_longest_sequence_length_ratio(self, should_use_no_repeat_values: bool = False) -> float:
@@ -279,33 +330,6 @@ class SubsequencesPartitioningResult:
     # ==================================================================================================================== #
     # Update/Recompute Functions                                                                                           #
     # ==================================================================================================================== #
-    def rebuild_sequence_info_df(self) -> pd.DataFrame:
-        ## initialize new
-        self.sequence_info_df = pd.DataFrame({'pos': self.flat_positions})
-        # self.sequence_info_df['is_imputed'] = False
-        # self.sequence_info_df['is_main_subsequence'] = False
-        self.sequence_info_df['is_intrusion'] = False
-        self.sequence_info_df['is_treated_as_same'] = False # is change ignored because it's below `self.same_thresh`
-
-        if self.flat_time_window_centers is not None:
-            assert len(self.flat_time_window_centers) == len(self.flat_positions)
-            self.sequence_info_df['t_center'] = self.flat_time_window_centers 
-
-        if self.split_positions_arrays is not None:
-            self.sequence_info_df['orig_subsequence_idx'] = flatten([[i] * len(v) for i, v in enumerate(self.split_positions_arrays)])
-            subsequence_n_tbins_dict = {idx:(n_tbins <= self.max_ignore_bins) for idx, n_tbins in enumerate(deepcopy(self.split_positions_arrays))}
-            is_subsequence_intrusion_dict = {idx:len(v) for idx, v in subsequence_n_tbins_dict.items()}
-            self.sequence_info_df['is_intrusion'] = self.sequence_info_df['orig_subsequence_idx'].map(is_subsequence_intrusion_dict) #  (n_tbins_list <= self.max_ignore_bins)            
-
-        if self.merged_split_positions_arrays is not None:
-            self.sequence_info_df['subsequence_idx'] = flatten([[i] * len(v) for i, v in enumerate(self.merged_split_positions_arrays)])
-            
-        if self.low_magnitude_change_indicies is not None:
-            self.sequence_info_df.loc[self.low_magnitude_change_indicies, 'is_treated_as_same'] = True
-        
-
-        return self.sequence_info_df
-    
 
     @function_attributes(short_name=None, tags=['sequence'], input_requires=[], output_provides=[], uses=['partition_subsequences_ignoring_repeated_similar_positions', 'merge_over_ignored_intrusions'], used_by=['bin_wise_continuous_sequence_sort_score_fn'], creation_date='2024-11-27 11:12', related_items=[])
     @classmethod
@@ -318,19 +342,22 @@ class SubsequencesPartitioningResult:
        ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
         partition_result: "SubsequencesPartitioningResult" = cls.partition_subsequences_ignoring_repeated_similar_positions(a_most_likely_positions_list, n_pos_bins=n_pos_bins, flat_time_window_centers=flat_time_window_centers, same_thresh=same_thresh, max_ignore_bins=max_ignore_bins, flat_time_window_edges=flat_time_window_edges, debug_print=debug_print)  # Add 1 because np.diff reduces the index by 1
         
-        # Set `partition_result.split_positions_arrays` ______________________________________________________________________ #
+        # # Set `partition_result.split_positions_arrays` ______________________________________________________________________ #
 
+        # # active_split_indicies = deepcopy(partition_result.split_indicies) ## this is what it should be, but all the splits are +1 later than they should be
+        # # active_split_indicies = deepcopy(partition_result.diff_split_indicies) - 1 ## this is what it should be, but all the splits are +1 later than they should be
         # active_split_indicies = deepcopy(partition_result.split_indicies) ## this is what it should be, but all the splits are +1 later than they should be
-        # active_split_indicies = deepcopy(partition_result.diff_split_indicies) - 1 ## this is what it should be, but all the splits are +1 later than they should be
-        active_split_indicies = deepcopy(partition_result.split_indicies) ## this is what it should be, but all the splits are +1 later than they should be
-        split_most_likely_positions_arrays = np.split(a_most_likely_positions_list, active_split_indicies)
-        partition_result.split_positions_arrays = split_most_likely_positions_arrays
+        # split_most_likely_positions_arrays = np.split(a_most_likely_positions_list, active_split_indicies)
+        # partition_result.split_positions_arrays = split_most_likely_positions_arrays
         
-        # Set `merged_split_positions_arrays` ________________________________________________________________________________ #
-        _tmp_merge_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_values_list) = partition_result.merge_over_ignored_intrusions(max_ignore_bins=max_ignore_bins, debug_print=debug_print)
-        # flat_positions_list = deepcopy(partition_result.flat_positions.tolist())
-        partition_result.bridged_intrusion_bin_indicies = deepcopy(final_intrusion_values_list) # np.array([flat_positions_list.index(v) for v in final_intrusion_idxs])
+        # # Set `merged_split_positions_arrays` ________________________________________________________________________________ #
+        # _tmp_merge_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_values_list) = partition_result.merge_over_ignored_intrusions(max_ignore_bins=max_ignore_bins, debug_print=debug_print)
+        # # flat_positions_list = deepcopy(partition_result.flat_positions.tolist())
+        # partition_result.bridged_intrusion_bin_indicies = deepcopy(final_intrusion_values_list) # np.array([flat_positions_list.index(v) for v in final_intrusion_idxs])
         
+
+        partition_result.partition_subsequences() ## 2024-12-04 09:15 New
+        partition_result.merge_intrusions() ## 2024-12-04 09:15 New
         partition_result.rebuild_sequence_info_df()
         
         # split_most_likely_positions_arrays
@@ -926,6 +953,122 @@ class SubsequencesPartitioningResult:
 
         return (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index)
 
+
+
+    # 2024-12-04 09:16 New ChatGPT Simplified Functions __________________________________________________________________ #
+    
+    def rebuild_sequence_info_df(self) -> pd.DataFrame:
+        """Rebuilds the sequence_info_df using the new subsequences."""
+        # Initialize the dataframe
+        self.sequence_info_df = pd.DataFrame({'pos': self.flat_positions})
+
+        if self.flat_time_window_centers is not None:
+            assert len(self.flat_time_window_centers) == len(self.flat_positions)
+            self.sequence_info_df['t_center'] = self.flat_time_window_centers
+
+        # Assign original subsequence indices
+        if self.split_positions_arrays is not None:
+            self.sequence_info_df['orig_subsequence_idx'] = flatten(
+                [[i] * len(v) for i, v in enumerate(self.split_positions_arrays)])
+            # Mark intrusions based on max_ignore_bins
+            is_intrusion = [len(v) <= self.max_ignore_bins for v in self.split_positions_arrays]
+            intrusion_dict = {idx: val for idx, val in enumerate(is_intrusion)}
+            self.sequence_info_df['is_intrusion'] = self.sequence_info_df['orig_subsequence_idx'].map(intrusion_dict)
+
+        # Assign merged subsequence indices
+        if self.merged_split_positions_arrays is not None:
+            self.sequence_info_df['subsequence_idx'] = flatten(
+                [[i] * len(v) for i, v in enumerate(self.merged_split_positions_arrays)])
+
+        return self.sequence_info_df
+
+    # Existing properties and methods remain unchanged or are adjusted as necessary
+    # Update properties that depend on split_positions_arrays and merged_split_positions_arrays
+
+    def partition_subsequences(self):
+        """
+        Partitions the positions into subsequences based on significant direction changes.
+        Small changes below the threshold are ignored.
+        Updates self.split_positions_arrays.
+        """
+        positions = self.flat_positions
+        same_thresh = self.same_thresh
+
+        # Compute first-order differences and directions
+        diffs = np.diff(positions, prepend=positions[0])
+        directions = np.sign(diffs)
+
+        subsequences = []
+        current_subseq = [positions[0]]
+        prev_dir = directions[0]
+
+        for i in range(1, len(positions)):
+            curr_dir = directions[i]
+            diff = diffs[i]
+
+            # Determine if the direction has changed significantly
+            if curr_dir != prev_dir and np.abs(diff) > same_thresh:
+                subsequences.append(np.array(current_subseq))
+                current_subseq = [positions[i]]
+                prev_dir = curr_dir
+            else:
+                current_subseq.append(positions[i])
+                # Update the direction if the change is significant
+                if np.abs(diff) > same_thresh:
+                    prev_dir = curr_dir
+
+        if current_subseq:
+            subsequences.append(np.array(current_subseq))
+
+        self.split_positions_arrays = subsequences
+
+
+    def merge_intrusions(self):
+        """
+        Merges short subsequences (intrusions) into adjacent longer sequences.
+        Updates self.merged_split_positions_arrays.
+        """
+        subsequences = self.split_positions_arrays
+        max_ignore_bins = self.max_ignore_bins
+
+        merged_subsequences = []
+        i = 0
+        while i < len(subsequences):
+            current_seq = subsequences[i]
+            if len(current_seq) <= max_ignore_bins:
+                # Potential intrusion
+                left_seq = merged_subsequences[-1] if merged_subsequences else None
+                right_seq = subsequences[i + 1] if i + 1 < len(subsequences) else None
+
+                # Decide which side to merge with
+                if left_seq is not None and right_seq is not None:
+                    # Both sides available, merge with the longer one
+                    if len(left_seq) >= len(right_seq):
+                        merged_seq = np.concatenate([left_seq, current_seq])
+                        merged_subsequences[-1] = merged_seq
+                    else:
+                        merged_seq = np.concatenate([current_seq, right_seq])
+                        i += 1  # Skip the next sequence as it's merged
+                        merged_subsequences.append(merged_seq)
+                elif left_seq is not None:
+                    # Only left side available
+                    merged_seq = np.concatenate([left_seq, current_seq])
+                    merged_subsequences[-1] = merged_seq
+                elif right_seq is not None:
+                    # Only right side available
+                    merged_seq = np.concatenate([current_seq, right_seq])
+                    i += 1  # Skip the next sequence as it's merged
+                    merged_subsequences.append(merged_seq)
+                else:
+                    # No sides to merge with
+                    merged_subsequences.append(current_seq)
+            else:
+                # Not an intrusion
+                merged_subsequences.append(current_seq)
+            i += 1
+
+        self.merged_split_positions_arrays = merged_subsequences
+        
 
     # Visualization/Graphical Debugging __________________________________________________________________________________ #
     @function_attributes(short_name=None, tags=['plot', 'matplotlib', 'figure', 'debug'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-27 06:36', related_items=['SubsequencesPartitioningResult'])
