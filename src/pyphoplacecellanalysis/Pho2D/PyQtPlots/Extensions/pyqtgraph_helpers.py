@@ -108,7 +108,8 @@ def pyqtplot_plot_image(xbin_edges, ybin_edges, image, enable_LUT_Histogram=Fals
     root_render_widget.setImage(image, xvals=xbin_edges)
     # Set the color map:
     # cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
-    cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
+    # cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
+    cmap = pg.colormap.get('Oranges','matplotlib') # prepare a linear color map
     root_render_widget.setColorMap(cmap)
     
     # if enable_LUT_Histogram:

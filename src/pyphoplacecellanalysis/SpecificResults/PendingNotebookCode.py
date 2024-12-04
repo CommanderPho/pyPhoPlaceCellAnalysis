@@ -2461,12 +2461,14 @@ class ProgrammaticDisplayFunctionTestingFolderImageLoading:
 # ==================================================================================================================== #
 from matplotlib.colors import Normalize
 
+@function_attributes(short_name=None, tags=['colormap', 'grayscale', 'image'], input_requires=[], output_provides=[], uses=[], used_by=['blend_images'], creation_date='2024-08-21 00:00', related_items=[])
 def apply_colormap(image: np.ndarray, color: tuple) -> np.ndarray:
     colored_image = np.zeros((*image.shape, 3), dtype=np.float32)
     for i in range(3):
         colored_image[..., i] = image * color[i]
     return colored_image
 
+@function_attributes(short_name=None, tags=['image'], input_requires=[], output_provides=[], uses=['apply_colormap'], used_by=[], creation_date='2024-08-21 00:00', related_items=[])
 def blend_images(images: list, cmap=None) -> np.ndarray:
     """ Tries to pre-combine images to produce an output image of the same size
     
@@ -2494,7 +2496,7 @@ def blend_images(images: list, cmap=None) -> np.ndarray:
         # colormap mode
         # Define a colormap (blue to red)
         cmap = plt.get_cmap(cmap)
-        norm = Normalize(vmin=0, vmax=len(images) - 1)
+        norm = Normalize(vmin=0, vmax=(len(images) - 1))
         
         combined_image = np.zeros((*images[0].shape, 3), dtype=np.float32)
         
@@ -2505,6 +2507,7 @@ def blend_images(images: list, cmap=None) -> np.ndarray:
 
     combined_image = np.clip(combined_image, 0, 255)  # Ensure pixel values are within valid range
     return combined_image.astype(np.uint8)
+
 
 def visualize_multiple_image_items(images: list, threshold=1e-3) -> None:
     """ Sample multiple pg.ImageItems overlayed on one another

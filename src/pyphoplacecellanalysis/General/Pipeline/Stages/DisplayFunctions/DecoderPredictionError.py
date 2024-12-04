@@ -738,7 +738,7 @@ def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_t
 # ==================================================================================================================== #
 
 @function_attributes(short_name=None, tags=['private'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions'], used_by=['_subfn_update_decoded_epoch_slices', 'plot_decoded_epoch_slices_paginated'], creation_date='2023-05-08 00:00', related_items=[])
-def _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, plots, ui, i, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=False):
+def _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, plots, ui, i, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=False, skip_set_xlim_from_epoch_slices:bool=False):
     """ 2023-05-08 - Factored out of plot_decoded_epoch_slices to enable paged via `plot_decoded_epoch_slices_paginated`
 
     Needs only: curr_time_bins, curr_posterior, curr_most_likely_positions
@@ -773,7 +773,12 @@ def _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, 
     if _temp_fig is not None:
         plots.fig = _temp_fig
     
-    curr_ax.set_xlim(*plots_data.epoch_slices[i,:])
+
+    # inferred_time_range = (curr_time_bins[0], curr_time_bins[-1])
+    if not skip_set_xlim_from_epoch_slices:
+        # curr_ax.set_xlim(*plots_data.epoch_slices[i,:]) #TODO 2024-12-03 20:01: - [ ] This is where it goes wrong
+        curr_ax.set_xlim(*plots_data.epoch_slices[i,:]) #TODO 2024-12-03 20:01: - [ ] This is where it goes wrong `plots_data.epoch_slices[i,:]`
+    
     curr_ax.set_title(f'') # needs to be set to empty string '' because this is the title that appears above each subplot/slice
     return params, plots_data, plots, ui
 
@@ -798,6 +803,8 @@ def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_prin
         
     for i, curr_ax in enumerate(plots.axs):
         curr_time_bin_container = plots_data.filter_epochs_decoder_result.time_bin_containers[i]
+        valid_epoch_slice_times = curr_time_bin_container.edge_info.variable_extents
+        
         curr_time_bins = curr_time_bin_container.centers
         curr_posterior_container = active_marginal_list[i] # why not marginal_y
         curr_posterior = curr_posterior_container.p_x_given_n
@@ -808,7 +815,11 @@ def _subfn_update_decoded_epoch_slices(params, plots_data, plots, ui, debug_prin
         if skip_plotting_most_likely_positions:
             curr_most_likely_positions = None
 
-        params, plots_data, plots, ui = _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, plots, ui, i, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=debug_print)
+        params, plots_data, plots, ui = _helper_update_decoded_single_epoch_slice_plot(curr_ax, params, plots_data, plots, ui, i, curr_time_bins, curr_posterior, curr_most_likely_positions, debug_print=debug_print, skip_set_xlim_from_epoch_slices=True)
+        #TODO 2024-12-03 20:11: - [ ] TEMP - workaround for setting proper bounds
+        potentially_invalid_epoch_slice_times = plots_data.epoch_slices[i,:]
+        curr_ax.set_xlim(*valid_epoch_slice_times) #TODO 2024-12-03 20:01: - [ ] This is where it goes wrong `plots_data.epoch_slices[i,:]`
+        
         ## Add optional time bin edges if needed:
         if should_render_time_bins:
             time_bin_edge_lines = plots.get('time_bin_edge_lines', None)
@@ -891,13 +902,7 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
 
     """
     ## Build Epochs:
-    if isinstance(filter_epochs, pd.DataFrame):
-        epochs_df = filter_epochs
-    elif isinstance(filter_epochs, Epoch):
-        epochs_df = filter_epochs.to_dataframe()
-    else:
-        raise NotImplementedError
-    
+    epochs_df = ensure_dataframe(filter_epochs)
     num_original_epochs: int = len(epochs_df)
     
     if included_epoch_indicies is not None:
@@ -906,20 +911,23 @@ def plot_decoded_epoch_slices(filter_epochs, filter_epochs_decoder_result, globa
             included_epoch_indicies = np.array(included_epoch_indicies)
             
         # Filter the active filter epochs:
-        is_included_in_subset = np.isin(epochs_df.index, included_epoch_indicies)
-        epochs_df = epochs_df[is_included_in_subset]
-        filter_epochs_decoder_result = filter_epochs_decoder_result.filtered_by_epochs(included_epoch_indicies)
+        # is_included_in_subset = np.isin(epochs_df.index, included_epoch_indicies)
+        # epochs_df = epochs_df[is_included_in_subset] ## this does NOT preserve order
+        ## preserves proper order of `included_epoch_indicies`:
+        filter_epochs_decoder_result = filter_epochs_decoder_result.filtered_by_epochs(included_epoch_indicies) ## this one preserves order of `included_epoch_indicies` I think DecodedFilterEpochsResult
+        epochs_df = ensure_dataframe(filter_epochs_decoder_result.active_filter_epochs)
         num_filtered_epochs: int = len(epochs_df)
         diff_all_to_filtered_epochs: int = num_original_epochs - num_filtered_epochs
         if diff_all_to_filtered_epochs > 0:
             print(f'plot_decoded_epoch_slices(...): filteredd {diff_all_to_filtered_epochs} epochs using `included_epoch_indicies`.\n\tnum_original_epochs: {num_original_epochs}\n\tnum_filtered_epochs: {num_filtered_epochs}\n')
             
     # if 'label' not in epochs_df.columns:
-    epochs_df['label'] = epochs_df.index.to_numpy() # integer ripple indexing
+    _bak_labels = deepcopy(epochs_df['label'])
+    epochs_df['label'] = epochs_df.index.to_numpy() # integer ripple indexing -- Is this where order is lost?
     epoch_slices = epochs_df[['start', 'stop']].to_numpy()
     # epoch_description_list = [f'ripple {epoch_tuple.label} (peakpower: {epoch_tuple.peakpower})' for epoch_tuple in epochs_df[['label', 'peakpower']].itertuples()]
 
-    epoch_labels = filter_epochs_decoder_result.epoch_description_list.copy()
+    epoch_labels = filter_epochs_decoder_result.epoch_description_list.copy() # empty for some reason?
     if debug_print:
         print(f'epoch_labels: {epoch_labels}')
     
