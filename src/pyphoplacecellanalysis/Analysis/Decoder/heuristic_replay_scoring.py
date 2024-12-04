@@ -377,9 +377,6 @@ class SubsequencesPartitioningResult:
 
         sub_change_equivalency_groups = []
         
-
-        prev_i = None
-        prev_v = None
         prev_accum_dir = None # sentinal value
         prev_accum_idxs = []
         prev_accum = []
@@ -435,9 +432,6 @@ class SubsequencesPartitioningResult:
                 #     # only for non-zero directions should we set the prev_accum_dir, otherwise leave it what it was (or blank)
                 #     prev_accum_dir = curr_dir
 
-            ## update prev variables
-            prev_i = i
-            prev_v = v
             
         if len(prev_accum) > 0:
             # finish up with any points remaining
@@ -631,11 +625,6 @@ class SubsequencesPartitioningResult:
         Usage:
 
         HISTORY: 2024-11-27 08:18 based off of `_compute_sequences_spanning_ignored_intrusions`
-
-        """
-        
-        """ 
-
         
         """
         def _subfn_resolve_overlapping_replacement_indicies(original_split_positions_arrays, replace_dict):
@@ -906,7 +895,7 @@ class SubsequencesPartitioningResult:
             left_flanking_index = (target_subsequence_idx-1)
             left_flanking_seq_length = continuous_sequence_lengths[left_flanking_index]
             if (left_flanking_seq_length <= max_ignore_bins):
-                ## only if shorter than the max_ignore_bins can the left flanking sequence can be considered
+                ## only if shorter than the max_ignore_bins can the left flanking sequence can be considered -- #TODO 2024-12-04 07:52: - [ ] Logic Error introduced here. I was imaginging a long sequence being potentially joined to shorter "intrusion" sequences, but this is the opposite of how I use the code. 
                 # left_congruent_flanking_sequence = [*subsequence_list[left_flanking_index]]
                 ### Need to look even FURTHER to the left to see the prev sequence:
                 if is_valid_sequence_index(subsequence_list, (target_subsequence_idx-2)):
@@ -935,8 +924,8 @@ class SubsequencesPartitioningResult:
                 # else:
                 #     right_congruent_flanking_index = right_flanking_index
 
-
         return (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index)
+
 
     # Visualization/Graphical Debugging __________________________________________________________________________________ #
     @function_attributes(short_name=None, tags=['plot', 'matplotlib', 'figure', 'debug'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-27 06:36', related_items=['SubsequencesPartitioningResult'])
