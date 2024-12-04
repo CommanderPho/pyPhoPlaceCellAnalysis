@@ -942,7 +942,7 @@ class SubsequencesPartitioningResult:
     @function_attributes(short_name=None, tags=['plot', 'matplotlib', 'figure', 'debug'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-27 06:36', related_items=['SubsequencesPartitioningResult'])
     @classmethod
     def _debug_plot_time_bins_multiple(cls, positions_list, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True, defer_show:bool=False, flat_time_window_centers=None, flat_time_window_edges=None, enable_axes_formatting:bool=False,
-                                       arrow_alpha: float = 0.4, subsequence_line_color_alpha: float=0.55,  **kwargs):
+                                       arrow_alpha: float = 0.4, subsequence_line_color_alpha: float=0.55, should_draw_longest_sequence_line:bool=True,  **kwargs):
         """
         Plots positions over fixed-width time bins with vertical lines separating each bin.
         Each sublist in positions_list is plotted in a different color.
@@ -970,10 +970,10 @@ class SubsequencesPartitioningResult:
         from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
         import matplotlib.pyplot as plt
         from neuropy.utils.matplotlib_helpers import modify_colormap_alpha
-        
+        import matplotlib.transforms as mtransforms
 
         out_dict = {'time_bin_edges_vlines': None, 'split_vlines': None, 'subsequence_positions_hlines_dict': None, 
-                    'subsequence_arrows_dict': None, 'subsequence_arrow_labels_dict': None,
+                    'subsequence_arrows_dict': None, 'subsequence_arrow_labels_dict': None, 'main_sequence_tbins_axhlines': None,
                     }
 
         if ax is None:
@@ -1012,6 +1012,11 @@ class SubsequencesPartitioningResult:
         group_lengths = (float(bin_width) * np.array([len(positions) for positions in positions_list])) ## TODO: these won't be indicies anymore, is that okay?
         group_end_indices = np.cumsum(group_lengths)[:-1]  # Exclude the last index
         
+        ## find maximum
+        longest_subsequence_idx: int = np.argmax(group_lengths)
+        longest_subsequence_start_x = None
+        longest_subsequence_end_x = None
+
         # Plot vertical lines at regular time bins excluding group splits
         regular_x_bins = np.setdiff1d(x_bins, group_end_indices)
         out_dict['time_bin_edges_vlines'] = ax.vlines(regular_x_bins, ymin, ymax, color='grey', linestyle='--', linewidth=0.5)
@@ -1042,6 +1047,10 @@ class SubsequencesPartitioningResult:
             x_starts = x_indices
             x_ends = x_indices + bin_width # shift by one bin_width
             
+            if (subsequence_idx == longest_subsequence_idx):
+                longest_subsequence_start_x = x_starts[0]
+                longest_subsequence_end_x = x_ends[-1]
+                
             # Plot horizontal lines for position values within each time bin
             out_dict['subsequence_positions_hlines_dict'][subsequence_idx] = ax.hlines(subsequence_positions, xmin=x_starts, xmax=x_ends, colors=color, linewidth=2)
             
@@ -1088,6 +1097,36 @@ class SubsequencesPartitioningResult:
             # Update x_start for next group
             x_start += curr_subsequence_end_position
         
+
+        if should_draw_longest_sequence_line:
+            # Add a horizontal line just below the x-axis
+            # Get the data-to-axes transformation for x and the axes-to-figure transformation for y
+            # transform = mtransforms.blended_transform_factory(ax.transData, ax.transAxes)
+            # Get the transform for the x-axis (data in x, normalized in y)
+            assert (longest_subsequence_start_x is not None) and (longest_subsequence_end_x is not None) and (longest_subsequence_start_x != longest_subsequence_end_x)
+            transform = ax.get_xaxis_transform()
+            # Define the range of x-axis values for the line
+            # longest_subsequence_idx
+            x_line_start = longest_subsequence_start_x # x_bins[0]
+            x_line_end = longest_subsequence_end_x
+            # x = x_bins.astype(float)
+            # out_dict['main_sequence_tbins_axhlines'] = ax.axhline(y=-0.05,  # Slightly below the x-axis in normalized coordinates
+            #     xmin=(x_line_start - min(x)) / (max(x) - min(x)),  # Normalize x_start to [0, 1]
+            #     xmax=(x_line_end - min(x)) / (max(x) - min(x)),    # Normalize x_end to [0, 1]
+            #     color='red',
+            #     linewidth=4, transform=transform, clip_on=False, zorder=3)
+            
+
+            # Create a blended transform (data in x, normalized in y)
+            transform = mtransforms.blended_transform_factory(ax.transData, ax.transAxes)
+
+            # Draw a horizontal line slightly below the x-axis
+            line_y_position = -0.05  # Slightly below the x-axis
+            out_dict['main_sequence_tbins_axhlines'] = ax.plot([x_line_start, x_line_end], [line_y_position, line_y_position], 
+                    color='red', linewidth=4, transform=transform, clip_on=False)
+
+
+
         if enable_axes_formatting:
             # Set axis labels and limits
             ax.set_xlabel('Time Bins')
