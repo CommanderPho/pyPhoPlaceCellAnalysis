@@ -309,14 +309,14 @@ class SubsequencesPartitioningResult:
 
     @function_attributes(short_name=None, tags=['sequence'], input_requires=[], output_provides=[], uses=['partition_subsequences_ignoring_repeated_similar_positions', 'merge_over_ignored_intrusions'], used_by=['bin_wise_continuous_sequence_sort_score_fn'], creation_date='2024-11-27 11:12', related_items=[])
     @classmethod
-    def init_from_positions_list(cls, a_most_likely_positions_list: NDArray, n_pos_bins: int, max_ignore_bins: int = 2, same_thresh: float = 4, flat_time_window_centers=None, flat_time_window_edges=None) -> "SubsequencesPartitioningResult":
+    def init_from_positions_list(cls, a_most_likely_positions_list: NDArray, n_pos_bins: int, max_ignore_bins: int = 2, same_thresh: float = 4, flat_time_window_centers=None, flat_time_window_edges=None, debug_print:bool=False) -> "SubsequencesPartitioningResult":
         """ main initializer """
         # INPUTS: a_most_likely_positions_list, n_pos_bins
         a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
         assert len(a_first_order_diff) == len(a_most_likely_positions_list), f"the prepend above should ensure that the sequence and its first-order diff are the same length."
 
        ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
-        partition_result: "SubsequencesPartitioningResult" = cls.partition_subsequences_ignoring_repeated_similar_positions(a_most_likely_positions_list, n_pos_bins=n_pos_bins, flat_time_window_centers=flat_time_window_centers, same_thresh=same_thresh, max_ignore_bins=max_ignore_bins, flat_time_window_edges=flat_time_window_edges)  # Add 1 because np.diff reduces the index by 1
+        partition_result: "SubsequencesPartitioningResult" = cls.partition_subsequences_ignoring_repeated_similar_positions(a_most_likely_positions_list, n_pos_bins=n_pos_bins, flat_time_window_centers=flat_time_window_centers, same_thresh=same_thresh, max_ignore_bins=max_ignore_bins, flat_time_window_edges=flat_time_window_edges, debug_print=debug_print)  # Add 1 because np.diff reduces the index by 1
         
         # Set `partition_result.split_positions_arrays` ______________________________________________________________________ #
 
@@ -327,7 +327,7 @@ class SubsequencesPartitioningResult:
         partition_result.split_positions_arrays = split_most_likely_positions_arrays
         
         # Set `merged_split_positions_arrays` ________________________________________________________________________________ #
-        _tmp_merge_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_values_list) = partition_result.merge_over_ignored_intrusions(max_ignore_bins=max_ignore_bins, debug_print=False)
+        _tmp_merge_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_values_list) = partition_result.merge_over_ignored_intrusions(max_ignore_bins=max_ignore_bins, debug_print=debug_print)
         # flat_positions_list = deepcopy(partition_result.flat_positions.tolist())
         partition_result.bridged_intrusion_bin_indicies = deepcopy(final_intrusion_values_list) # np.array([flat_positions_list.index(v) for v in final_intrusion_idxs])
         
@@ -841,11 +841,6 @@ class SubsequencesPartitioningResult:
         ## INPUTS: split_first_order_diff_arrays, continuous_sequence_lengths, max_ignore_bins
         assert self.split_positions_arrays is not None
         original_split_positions_arrays = deepcopy(self.split_positions_arrays)
-        # _tmp_merge_split_positions_arrays = deepcopy(original_split_positions_arrays)
-        # n_tbins_list = np.array([len(v) for v in original_split_positions_arrays])
-        # n_total_tbins: int = np.sum(n_tbins_list)
-        # is_subsequence_potential_intrusion = (n_tbins_list <= max_ignore_bins) ## any subsequence shorter than the max ignore distance
-        # ignored_subsequence_idxs = np.where(is_subsequence_potential_intrusion)[0]
 
         if debug_print:
             print(f'original_split_positions_arrays: {original_split_positions_arrays}')
@@ -854,140 +849,6 @@ class SubsequencesPartitioningResult:
         # call `_subfn_perform_merge_iteration` ______________________________________________________________________________ #
         original_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_idxs) = _subfn_perform_merge_iteration(original_split_positions_arrays,
                                                                                                                                                                             max_ignore_bins=max_ignore_bins, should_skip_epoch_with_only_short_subsequences=should_skip_epoch_with_only_short_subsequences, debug_print=debug_print)
-        
-        
-        # subsequences_to_add = [] # not used
-        # subsequences_to_remove = [] # not used
-        # subsequence_replace_dict = {}
-        
-        # final_intrusion_idxs = []
-        
-        # # (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove)
-        # if (should_skip_epoch_with_only_short_subsequences and (np.all(is_subsequence_potential_intrusion))):
-        #     if debug_print:
-        #         #TODO 2024-11-28 10:23: - [ ] This was previously thought to be the cause of an assertion, but it was later found that merging wasn't working properly in general and this was fixed by `_subfn_resolve_overlapping_replacement_indicies`
-        #         print(f'WARN: all subsequences are smaller than or equal in length to `max_ignore_bins`: {max_ignore_bins}, n_tbins_list: {n_tbins_list}. Not attempting to merge since we cannot tell which are intrusions.')
-        #     final_out_subsequences = deepcopy(original_split_positions_arrays)
-
-        # else:
-        #     # try to merge over intrusions
-        #     for a_subsequence_idx, a_subsequence, a_n_tbins, is_potentially_ignored_intrusion in zip(np.arange(len(n_tbins_list)), original_split_positions_arrays, n_tbins_list, is_subsequence_potential_intrusion):
-        #         ## loop through ignored subsequences to find out how to merge them
-        #         #TODO 2024-11-27 08:36: - [ ] 
-        #         if is_potentially_ignored_intrusion:
-        #             # for an_ignored_subsequence_idx in ignored_subsequence_idxs:
-        #             active_ignored_subsequence = deepcopy(original_split_positions_arrays[a_subsequence_idx])
-        #             # active_ignored_subsequence_indicies = deepcopy(self.split_indicies[a_subsequence_idx])
-        #             len_active_ignored_subsequence: int = len(active_ignored_subsequence)
-        #             final_is_subsequence_intrusion: bool = False
-                    
-        #             if debug_print:
-        #                 print(f'an_ignored_subsequence_idx: {a_subsequence_idx}, active_ignored_subsequence: {active_ignored_subsequence}')
-        #             (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index) = self._compute_sequences_spanning_ignored_intrusions(original_split_positions_arrays,
-        #                                                                                                                                     n_tbins_list, target_subsequence_idx=a_subsequence_idx, max_ignore_bins=max_ignore_bins)
-        #             if left_congruent_flanking_sequence is None:
-        #                 left_congruent_flanking_sequence = []
-        #             if right_congruent_flanking_sequence is None:
-        #                 right_congruent_flanking_sequence = []
-        #             len_left_congruent_flanking_sequence: int = len(left_congruent_flanking_sequence)
-        #             len_right_congruent_flanking_sequence: int = len(right_congruent_flanking_sequence)
-
-        #             ## impose reasonable size rule
-        #             # bridging over intrusions only be done when at least one of the adjacent portions to be bridged exceeds a minimum size? This prevents piecing together bad sequences.
-        #             required_minimum_flanking_sequence_length: int = int((len_active_ignored_subsequence) * 2) # one must be at least twice as large as the bridged gap
-        #             # required_minimum_flanking_sequence_length: int = int((len_active_ignored_subsequence) + 1) # must be at least one larger than the bridged gap                    
-        #             are_both_flanking_sequences_too_short: bool = ((len_left_congruent_flanking_sequence < required_minimum_flanking_sequence_length) and (len_right_congruent_flanking_sequence < required_minimum_flanking_sequence_length))
-        #             if are_both_flanking_sequences_too_short:
-        #                 if debug_print:
-        #                     print(f'flanking sequences are too short required_minimum_flanking_sequence_length: {required_minimum_flanking_sequence_length}!\n\t (len_left_congruent_flanking_sequence: {len_left_congruent_flanking_sequence}, len_active_ignored_subsequence: {len_active_ignored_subsequence}, len_right_congruent_flanking_sequence: {len_right_congruent_flanking_sequence})')
-
-        #             if (are_both_flanking_sequences_too_short or ((len_left_congruent_flanking_sequence == 0) and (len_right_congruent_flanking_sequence == 0))):
-        #                 ## do nothing
-        #                 if debug_print:
-        #                     print(f'\tWARN: merge NULL, both flanking sequences are empty or too short. Skipping')
-        #             else:
-        #                 # decide on subsequence to merge                    
-        #                 if len_left_congruent_flanking_sequence > len_right_congruent_flanking_sequence:
-        #                     # merge LEFT sequence ________________________________________________________________________________________________ #
-        #                     if debug_print:
-        #                         print(f'\tmerge LEFT: left_congruent_flanking_sequence: {left_congruent_flanking_sequence}, left_congruent_flanking_index: {left_congruent_flanking_index}')
-        #                     new_subsequence = np.array([*left_congruent_flanking_sequence, *active_ignored_subsequence])
-        #                     ## remove old
-        #                     for an_idx_to_remove in np.arange(left_congruent_flanking_index, (a_subsequence_idx+1)):                    
-        #                         subsequences_to_remove.append(original_split_positions_arrays[an_idx_to_remove])
-        #                     # _tmp_merge_split_positions_arrays[left_congruent_flanking_index:(a_subsequence_idx+1)] = [] # new_subsequence ## or [] to clear it?
-        #                     subsequences_to_add.append(new_subsequence)
-        #                     # subsequence_replace_dict[tuple([original_split_positions_arrays[an_idx_to_remove] for an_idx_to_remove in np.arange(left_congruent_flanking_index, (a_subsequence_idx+1))])] = new_subsequence
-        #                     subsequence_replace_dict[tuple(np.arange(left_congruent_flanking_index, (a_subsequence_idx+1)).tolist())] = (a_subsequence_idx, new_subsequence)
-        #                     final_is_subsequence_intrusion = True
-        #                 else:
-        #                     # merge RIGHT, be biased towards merging right (due to lack of >= above) _____________________________________________ #
-        #                     if debug_print:
-        #                         print(f'\tmerge RIGHT: right_congruent_flanking_sequence: {right_congruent_flanking_sequence}, right_congruent_flanking_index: {right_congruent_flanking_index}')
-        #                     new_subsequence = np.array([*active_ignored_subsequence, *right_congruent_flanking_sequence])
-        #                     ## remove old
-        #                     for an_idx_to_remove in np.arange(a_subsequence_idx, (right_congruent_flanking_index+1)):                    
-        #                         subsequences_to_remove.append(original_split_positions_arrays[an_idx_to_remove])
-        #                     # _tmp_merge_split_positions_arrays[a_subsequence_idx:(right_congruent_flanking_index+1)] = [] # new_subsequence ## or [] to clear it?
-        #                     subsequences_to_add.append(new_subsequence)
-        #                     # subsequence_replace_dict[tuple([original_split_positions_arrays[an_idx_to_remove] for an_idx_to_remove in np.arange(a_subsequence_idx, (right_congruent_flanking_index+1))])] = new_subsequence
-        #                     subsequence_replace_dict[tuple(np.arange(a_subsequence_idx, (right_congruent_flanking_index+1)).tolist())] = (a_subsequence_idx, new_subsequence)
-        #                     final_is_subsequence_intrusion = True
-        #                 ## END if len_left_congruent_flanking_sequ...
-                            
-        #                 #TODO 2024-12-04 04:55: - [ ] Why can't we merge both left AND then right?
-
-        #                 if final_is_subsequence_intrusion:
-        #                     # final_intrusion_idxs.append(deepcopy(active_ignored_subsequence_indicies))
-        #                     final_intrusion_idxs.append(active_ignored_subsequence)
-                        
-        #                 if debug_print:
-        #                     print(f'\tnew_subsequence: {new_subsequence}')
-        #         else:
-        #             ## not ignored, include?
-        #             pass
-                
-        #     # END for a_subsequence_idx, a_subsequence,...
-        #     ## detect and prevent overlaps in the replacements, could also fix by finding and replacing iteratively?    
-        #     if debug_print:
-        #         print(f'subsequence_replace_dict: {subsequence_replace_dict}')
-        #     deduplicated_replace_dict = _subfn_resolve_overlapping_replacement_indicies(original_split_positions_arrays, subsequence_replace_dict)
-            
-        #     if debug_print:
-        #         print(f'deduplicated_replace_dict: {deduplicated_replace_dict}')
-                
-        #     ## replace with the deduplicated replace dict
-        #     subsequence_replace_dict = deduplicated_replace_dict
-            
-
-        #     final_out_subsequences = []
-        #     replace_idxs = [v[0] for k, v in subsequence_replace_dict.items()]
-        #     replace_idx_value_dict = {v[0]:v[1] for k, v in subsequence_replace_dict.items()} # will there be possible duplicates?
-            
-        #     any_remove_idxs = flatten([k for k, v in subsequence_replace_dict.items()])
-            
-        #     for a_subsequence_idx, a_subsequence, a_n_tbins, is_potentially_ignored_intrusion in zip(np.arange(len(n_tbins_list)), original_split_positions_arrays, n_tbins_list, is_subsequence_potential_intrusion):
-        #             is_curr_subsequence_idx_in_replace_list = False
-        #             if a_subsequence_idx in replace_idxs:
-        #                 # the index to be replaced
-        #                 replacement_subsequence = replace_idx_value_dict[a_subsequence_idx]
-        #                 if debug_print:
-        #                     print(f'final: replacing subsequence[{a_subsequence_idx}] ({a_subsequence}) with {replacement_subsequence}.')
-        #                 final_out_subsequences.append(replacement_subsequence)
-                        
-        #             elif a_subsequence_idx in any_remove_idxs:
-        #                 ## to be excluded only
-        #                 pass
-        #             else:
-        #                 # included and unmodified
-        #                 final_out_subsequences.append(a_subsequence)
-        #     # END for a_subsequence_idx, a_subsequence, ...
-            
-
-        # ## check validity of merge result
-        # final_out_subsequences_n_tbins_list = np.array([len(v) for v in final_out_subsequences])
-        # final_out_subsequences_n_total_tbins: int = np.sum(final_out_subsequences_n_tbins_list)
-        # assert final_out_subsequences_n_total_tbins == n_total_tbins, f"final_out_subsequences_n_total_tbins ({final_out_subsequences_n_total_tbins}) should equal the original n_total_tbins ({n_total_tbins}) but it does not!\n\t: final_out_subsequences: {final_out_subsequences}\n\toriginal_split_positions_arrays: {original_split_positions_arrays}"
 
         ## OUTPUTS: final_out_subsequences
         
@@ -995,6 +856,8 @@ class SubsequencesPartitioningResult:
         # Update Self ________________________________________________________________________________________________________ #
         ## update self properties
         self.merged_split_positions_arrays = deepcopy(final_out_subsequences)
+        
+        # self.bridged_intrusion_bin_indicies = final_intrusion_idxs
         
         if len(final_intrusion_idxs) > 0:
             if debug_print:
