@@ -175,19 +175,7 @@ class SubsequencesPartitioningResult:
             ## initialize new
             self.sequence_info_df = self.rebuild_sequence_info_df()
 
-
-    # @property
-    # def num_subsequence_bins(self) -> NDArray:
-    #     """ number of tbins in each split sequence """
-    #     return np.array([len(v) for v in self.split_positions_arrays])
-
-    # @property
-    # def num_merged_subsequence_bins(self) -> NDArray:
-    #     """ number of tbins in each MERGED subsequence """
-    #     if self.merged_split_positions_arrays is None:
-    #         return None
-    #     return np.array([len(v) for v in self.merged_split_positions_arrays])
-    
+    # Computed Properties ________________________________________________________________________________________________ #
     @property
     def n_diff_bins(self) -> int:
         return len(self.first_order_diff_lst)
@@ -196,12 +184,6 @@ class SubsequencesPartitioningResult:
     def subsequence_index_lists_omitting_repeats(self):
         """The subsequence_index_lists_omitting_repeats property. BROKEN """
         return np.array_split(np.arange(len(self.split_indicies)), self.split_indicies)
-
-    # @property
-    # def total_num_subsequence_bins(self) -> int:
-    #     """ Calculates the total number of subsequence bins. """
-    #     total = np.sum(self.num_subsequence_bins) ## NOTE: does not matter whether we use `num_subsequence_bins` or `num_merged_subsequence_bins` as the total must be the same
-    #     return int(total)
 
     @property
     def total_num_subsequence_bins_no_repeats(self) -> int:
@@ -213,13 +195,6 @@ class SubsequencesPartitioningResult:
 
 
     # Longest Sequence ___________________________________________________________________________________________________ #
-    # @property
-    # def longest_subsequence_length(self) -> int:
-    #     """ Finds the length of the longest non-repeating subsequence. """
-    #     longest_length = int(np.nanmax(self.num_merged_subsequence_bins))
-    #     return longest_length
-
-
     @property
     def longest_sequence_length_no_repeats(self) -> int:
         """ Finds the length of the longest non-repeating subsequence. """
@@ -228,18 +203,6 @@ class SubsequencesPartitioningResult:
         # num_items_per_equiv_list: List[int] = [len(v) for v in value_equiv_group_idxs_list] ## number of items in each equiv-list
         num_equiv_values: int = len(value_equiv_group_idxs_list) # the number of equivalence value sets in the longest subsequence
         return num_equiv_values
-
-    # @property
-    # def longest_sequence_no_repeats_start_idx(self) -> int:
-    #     """ Finds the start index of the longest non-repeating subsequence. """
-    #     start_idx = int(np.nanargmax(self.num_merged_subsequence_bins))
-    #     return start_idx
-
-    # @property
-    # def longest_sequence_subsequence(self) -> NDArray:
-    #     """ Returns the actual subsequence of positions for the longest non-repeating subsequence. """
-    #     return self.merged_split_positions_arrays[self.longest_sequence_no_repeats_start_idx]
-
 
     @property
     def longest_no_repeats_sequence_length_ratio(self) -> float:
@@ -331,36 +294,15 @@ class SubsequencesPartitioningResult:
     # Update/Recompute Functions                                                                                           #
     # ==================================================================================================================== #
 
-    @function_attributes(short_name=None, tags=['sequence'], input_requires=[], output_provides=[], uses=['partition_subsequences_ignoring_repeated_similar_positions', 'merge_over_ignored_intrusions'], used_by=['bin_wise_continuous_sequence_sort_score_fn'], creation_date='2024-11-27 11:12', related_items=[])
+    @function_attributes(short_name=None, tags=['sequence'], input_requires=[], output_provides=[], uses=['partition_subsequences_ignoring_repeated_similar_positions', 'partition_subsequences', 'merge_intrusions', 'rebuild_sequence_info_df'], used_by=['bin_wise_continuous_sequence_sort_score_fn'], creation_date='2024-11-27 11:12', related_items=[])
     @classmethod
     def init_from_positions_list(cls, a_most_likely_positions_list: NDArray, n_pos_bins: int, max_ignore_bins: int = 2, same_thresh: float = 4, flat_time_window_centers=None, flat_time_window_edges=None, debug_print:bool=False) -> "SubsequencesPartitioningResult":
         """ main initializer """
-        # INPUTS: a_most_likely_positions_list, n_pos_bins
-        a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
-        assert len(a_first_order_diff) == len(a_most_likely_positions_list), f"the prepend above should ensure that the sequence and its first-order diff are the same length."
-
-       ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
+        ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
         partition_result: "SubsequencesPartitioningResult" = cls.partition_subsequences_ignoring_repeated_similar_positions(a_most_likely_positions_list, n_pos_bins=n_pos_bins, flat_time_window_centers=flat_time_window_centers, same_thresh=same_thresh, max_ignore_bins=max_ignore_bins, flat_time_window_edges=flat_time_window_edges, debug_print=debug_print)  # Add 1 because np.diff reduces the index by 1
-        
-        # # Set `partition_result.split_positions_arrays` ______________________________________________________________________ #
-
-        # # active_split_indicies = deepcopy(partition_result.split_indicies) ## this is what it should be, but all the splits are +1 later than they should be
-        # # active_split_indicies = deepcopy(partition_result.diff_split_indicies) - 1 ## this is what it should be, but all the splits are +1 later than they should be
-        # active_split_indicies = deepcopy(partition_result.split_indicies) ## this is what it should be, but all the splits are +1 later than they should be
-        # split_most_likely_positions_arrays = np.split(a_most_likely_positions_list, active_split_indicies)
-        # partition_result.split_positions_arrays = split_most_likely_positions_arrays
-        
-        # # Set `merged_split_positions_arrays` ________________________________________________________________________________ #
-        # _tmp_merge_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_values_list) = partition_result.merge_over_ignored_intrusions(max_ignore_bins=max_ignore_bins, debug_print=debug_print)
-        # # flat_positions_list = deepcopy(partition_result.flat_positions.tolist())
-        # partition_result.bridged_intrusion_bin_indicies = deepcopy(final_intrusion_values_list) # np.array([flat_positions_list.index(v) for v in final_intrusion_idxs])
-        
-
         partition_result.partition_subsequences() ## 2024-12-04 09:15 New
         partition_result.merge_intrusions() ## 2024-12-04 09:15 New
         partition_result.rebuild_sequence_info_df()
-        
-        # split_most_likely_positions_arrays
         return partition_result
     
 
@@ -562,8 +504,6 @@ class SubsequencesPartitioningResult:
         first_order_diff_list_split_indicies = []
         sub_change_threshold_change_indicies = [] # indicies where a change in direction occurs but it's below the threshold indicated by `same_thresh`
 
-        prev_i = None
-        prev_v = None
         prev_accum_dir = None # sentinal value
         prev_accum = []
 
@@ -611,9 +551,6 @@ class SubsequencesPartitioningResult:
                 #     # only for non-zero directions should we set the prev_accum_dir, otherwise leave it what it was (or blank)
                 #     prev_accum_dir = curr_dir
 
-            ## update prev variables
-            prev_i = i
-            prev_v = v
         # END for i, v in enu... 
         if len(prev_accum) > 0:
             # finish up with any points remaining
@@ -985,6 +922,7 @@ class SubsequencesPartitioningResult:
     # Existing properties and methods remain unchanged or are adjusted as necessary
     # Update properties that depend on split_positions_arrays and merged_split_positions_arrays
 
+    @function_attributes(short_name=None, tags=['private', 'ChatGPT', '2024-12-04_09:16_Simplified'], input_requires=[], output_provides=[], uses=[], used_by=['init_from_positions_list'], creation_date='2024-12-04 10:07', related_items=[])
     def partition_subsequences(self):
         """
         Partitions the positions into subsequences based on significant direction changes.
@@ -1022,7 +960,7 @@ class SubsequencesPartitioningResult:
 
         self.split_positions_arrays = subsequences
 
-
+    @function_attributes(short_name=None, tags=['private', 'ChatGPT', '2024-12-04_09:16_Simplified'], input_requires=[], output_provides=[], uses=[], used_by=['init_from_positions_list'], creation_date='2024-12-04 10:07', related_items=[])
     def merge_intrusions(self):
         """
         Merges short subsequences (intrusions) into adjacent longer sequences.
@@ -1255,17 +1193,15 @@ class SubsequencesPartitioningResult:
             # Draw a horizontal line slightly below the x-axis
             line_y_position = -0.05  # Slightly below the x-axis
             out_dict['main_sequence_tbins_axhlines'] = ax.plot([x_line_start, x_line_end], [line_y_position, line_y_position], 
-                    color='red', linewidth=4, transform=transform, clip_on=False)
-
-
+                    color=(1.0, 0.0, 0.0, 0.45), linewidth=3, transform=transform, clip_on=False) ## draws a red line with 45% opacity
 
         if enable_axes_formatting:
             # Set axis labels and limits
             ax.set_xlabel('Time Bins')
             ax.set_ylabel('Position')
-            # ax.set_xlim(0, N)
-            # ax.set_xticks(x_bins)
-            # ax.set_ylim(ymin, ymax)
+            ax.set_xlim(0, N)
+            ax.set_xticks(x_bins)
+            ax.set_ylim(ymin, ymax)
         
         out = MatplotlibRenderPlots(name='test', figures=[fig, ], axes=ax, plots=out_dict, **kwargs)
         if not defer_show:
