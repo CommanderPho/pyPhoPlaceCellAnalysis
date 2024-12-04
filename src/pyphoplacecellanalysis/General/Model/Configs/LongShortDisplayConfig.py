@@ -390,3 +390,27 @@ class PlottingHelpers:
         return output_dict
 
 
+
+
+@function_attributes(short_name=None, tags=['cmap', 'matplotlib', 'USEFUL', 'posterior', 'DEFAULT'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-04 05:45', related_items=[])
+def get_custom_orange_with_low_values_dropped_cmap():
+    """ 
+    Usage:
+    
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import get_custom_orange_with_low_values_dropped_cmap
+    
+    active_cmap = get_custom_orange_with_low_values_dropped_cmap()
+    
+    """
+    from matplotlib.colors import LinearSegmentedColormap
+    return LinearSegmentedColormap.from_list(f"dropping_low_values_oranges_colormap", [
+        [0.87306,0.62718,0.34353,0.     ],
+        #[0.33725,0.14902,0.33333,0.     ],
+        # [0.33725,0.14902,0.33333,1.     ],
+        [0.87306,0.62718,0.34353,1.     ],
+        [0.87306,0.62718,0.34353,1.     ],
+        [0.80485,0.48515,0.24302,1.     ],
+        [0.76402,0.36984,0.181  ,1.     ],
+        [0.72319,0.28559,0.13887,1.     ],
+        [0.65098,0.19608,0.10588,1.     ]])
+    
