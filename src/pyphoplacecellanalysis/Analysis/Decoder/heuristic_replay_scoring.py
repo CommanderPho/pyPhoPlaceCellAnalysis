@@ -1015,30 +1015,19 @@ class SubsequencesPartitioningResult:
     @function_attributes(short_name=None, tags=['plot', 'matplotlib', 'figure', 'debug'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-27 06:36', related_items=['SubsequencesPartitioningResult'])
     @classmethod
     def _debug_plot_time_bins_multiple(cls, positions_list, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True, defer_show:bool=False, flat_time_window_centers=None, flat_time_window_edges=None, enable_axes_formatting:bool=False,
-                                       arrow_alpha: float = 0.4, subsequence_line_color_alpha: float=0.55, should_draw_longest_sequence_line:bool=True,  **kwargs):
+                                   arrow_alpha: float = 0.4, subsequence_line_color_alpha: float=0.55, is_intrusion: Optional[NDArray] = None, **kwargs):
         """
         Plots positions over fixed-width time bins with vertical lines separating each bin.
         Each sublist in positions_list is plotted in a different color.
         
         Parameters:
         - positions_list (list of lists/arrays): List of position arrays/lists.
+        - is_intrusion (array of bools, optional): Array indicating whether each time bin is an intrusion.
         - num (str or int): Figure number or name.
         - ax (matplotlib.axes.Axes, optional): An existing axes object to plot on.
         
         Returns:
-        - fig, ax: Matplotlib figure and axes objects.
-        
-        Usage:
-        
-        ```python
-        positions_list = [np.array([119.191, 142.107, 180.3, 191.757, 245.227, 84.8181]),
-                        np.array([84.8181, 84.8181, 138.288]),
-                        np.array([134.469, 69.5411]),
-                        np.array([249.046]),
-                        np.array([249.046, 249.046])]
-
-        fig, ax = SubsequencesPartitioningResult._debug_plot_time_bins_multiple(positions_list)
-        ```
+        - out: MatplotlibRenderPlots object containing the figure, axes, and plot elements.
         """
         from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
         import matplotlib.pyplot as plt
@@ -1047,6 +1036,7 @@ class SubsequencesPartitioningResult:
 
         out_dict = {'time_bin_edges_vlines': None, 'split_vlines': None, 'subsequence_positions_hlines_dict': None, 
                     'subsequence_arrows_dict': None, 'subsequence_arrow_labels_dict': None, 'main_sequence_tbins_axhlines': None,
+                    'intrusion_shading': None,
                     }
 
         if ax is None:
@@ -1055,37 +1045,43 @@ class SubsequencesPartitioningResult:
             fig = ax.get_figure()
             
         if not isinstance(positions_list, (list, tuple,)):
-            ## wrap in a list
+            ## Wrap in a list
             positions_list = [positions_list, ]
         
         # Flatten the positions_list to get all positions for setting y-limits
         all_positions = np.concatenate(positions_list)
         N = len(all_positions)
 
+        # Prepare x-values for time bins
         if flat_time_window_edges is not None:
-            ## prefer edges over centers
+            ## Prefer edges over centers
             assert (len(flat_time_window_edges)-1) == N, f"(len(flat_time_window_edges)-1): {(len(flat_time_window_edges)-1)} and len(all_positions): {len(all_positions)}"
-            x_bins = deepcopy(flat_time_window_edges)[:-1] ## all but the last to get left aligned bins
+            x_bins = deepcopy(flat_time_window_edges[:-1])  ## Left edges of bins
             bin_width: float = np.median(np.diff(x_bins))
-            
+            x_starts = x_bins
+            x_ends = x_bins + bin_width
         elif flat_time_window_centers is not None:
             assert len(flat_time_window_centers) == N, f"flat_time_window_centers must have the same length as positions, but len(flat_time_window_centers): {len(flat_time_window_centers)} and len(all_positions): {len(all_positions)}"
             x_bins = deepcopy(flat_time_window_centers)
             bin_width: float = np.median(np.diff(x_bins))
+            x_starts = x_bins - bin_width / 2
+            x_ends = x_bins + bin_width / 2
         else:
-            ## use indicies as the x_bins
+            ## Use indices as the x_bins
             x_bins = np.arange(N + 1)  # Time bin edges
             bin_width: float = 1.0
+            x_starts = x_bins[:-1]
+            x_ends = x_bins[1:]
             
         # Calculate y-limits with padding
         ymin = min(all_positions) - 10
         ymax = max(all_positions) + 10
         
         # Calculate group lengths and group end indices
-        group_lengths = (float(bin_width) * np.array([len(positions) for positions in positions_list])) ## TODO: these won't be indicies anymore, is that okay?
+        group_lengths = (float(bin_width) * np.array([len(positions) for positions in positions_list]))
         group_end_indices = np.cumsum(group_lengths)[:-1]  # Exclude the last index
         
-        ## find maximum
+        ## Find the longest subsequence
         longest_subsequence_idx: int = np.argmax(group_lengths)
         longest_subsequence_start_x = None
         longest_subsequence_end_x = None
@@ -1102,34 +1098,47 @@ class SubsequencesPartitioningResult:
         cmap = modify_colormap_alpha(cmap=cmap, alpha=subsequence_line_color_alpha)
         num_colors: int = cmap.N
         
-        # Plot horizontal lines with customizable color
-        # ax.hlines(positions, xmin=np.arange(N), xmax=np.arange(1, N+1), colors=line_color)
+        # Initialize intrusion shading
+        out_dict['intrusion_shading'] = []
         
+        # Shade intrusion time bins
+        if is_intrusion is not None:
+            for i in range(N):
+                if is_intrusion[i]:
+                    ax.axvspan(x_starts[i], x_ends[i], facecolor='red', alpha=0.3, zorder=0)
+                    out_dict['intrusion_shading'].append((x_starts[i], x_ends[i]))
+        
+        # Plot horizontal lines with customizable color
         out_dict['subsequence_positions_hlines_dict'] = {} 
         out_dict['subsequence_arrows_dict'] = {} 
         out_dict['subsequence_arrow_labels_dict'] = {} 
+        
         # Keep track of the current x position
-        x_start = x_bins[0]
+        x_start = x_starts[0]
+        position_index = 0  # Global position index across all subsequences
+
         for subsequence_idx, subsequence_positions in enumerate(positions_list):
             num_positions: int = len(subsequence_positions)
-            curr_subsequence_end_position: float = float(num_positions) * bin_width # the total duration of this subsequence -- this version is perfectly aligned
+            curr_subsequence_end_position: float = float(num_positions) * bin_width
             color = cmap(subsequence_idx % num_colors)
             
-            x_rel_indicies = np.arange(num_positions) # [0, 1, ... (n_pos - 1)]
-            x_indices = x_start + (x_rel_indicies * bin_width) # np.arange(x_start, x_start + num_positions)
-            x_starts = x_indices
-            x_ends = x_indices + bin_width # shift by one bin_width
-            
+            x_rel_indices = np.arange(num_positions)
+            x_indices = x_start + (x_rel_indices * bin_width)
+            x_starts_subseq = x_indices
+            x_ends_subseq = x_indices + bin_width
+
             if (subsequence_idx == longest_subsequence_idx):
-                longest_subsequence_start_x = x_starts[0]
-                longest_subsequence_end_x = x_ends[-1]
-                
+                longest_subsequence_start_x = x_starts_subseq[0]
+                longest_subsequence_end_x = x_ends_subseq[-1]
+            
             # Plot horizontal lines for position values within each time bin
-            out_dict['subsequence_positions_hlines_dict'][subsequence_idx] = ax.hlines(subsequence_positions, xmin=x_starts, xmax=x_ends, colors=color, linewidth=2)
+            # Adjust colors for intrusion time bins
+            colors = [color if is_intrusion is None or not is_intrusion[position_index + i] else 'red' for i in range(num_positions)]
+            out_dict['subsequence_positions_hlines_dict'][subsequence_idx] = ax.hlines(
+                subsequence_positions, xmin=x_starts_subseq, xmax=x_ends_subseq, colors=colors, linewidth=2)
             
             if enable_position_difference_indicators:
-                ## If enabled, draws "change" arrows between each adjacent bin showing the amount of y-pos change
-                
+                ## Draw "change" arrows between each adjacent bin showing the amount of y-pos change
                 arrow_color = (0, 0, 0, arrow_alpha,)
                 arrow_text_outline_color = (1.0, 1.0, 1.0, arrow_alpha)
                 
@@ -1139,8 +1148,8 @@ class SubsequencesPartitioningResult:
                 # Now, for each pair of adjacent positions within the group, draw arrows and labels
                 for i in range(num_positions - 1):
                     delta_pos = subsequence_positions[i+1] - subsequence_positions[i]
-                    x0 = x_starts[i] + (bin_width / 2.0)
-                    x1 = x_starts[i+1] + (bin_width / 2.0)
+                    x0 = x_starts_subseq[i] + (bin_width / 2.0)
+                    x1 = x_starts_subseq[i+1] + (bin_width / 2.0)
                     y0 = subsequence_positions[i]
                     y1 = subsequence_positions[i+1]
                     
@@ -1166,65 +1175,51 @@ class SubsequencesPartitioningResult:
                         bbox=dict(facecolor=arrow_text_outline_color, edgecolor='none', alpha=arrow_alpha, pad=0.5)  # Add background for readability
                     )
                     out_dict['subsequence_arrow_labels_dict'][subsequence_idx].append(txt)
-                    
+            
             # Update x_start for next group
             x_start += curr_subsequence_end_position
-        
-
-        if should_draw_longest_sequence_line:
-            # Add a horizontal line just below the x-axis
-            # Get the data-to-axes transformation for x and the axes-to-figure transformation for y
-            # transform = mtransforms.blended_transform_factory(ax.transData, ax.transAxes)
-            # Get the transform for the x-axis (data in x, normalized in y)
-            assert (longest_subsequence_start_x is not None) and (longest_subsequence_end_x is not None) and (longest_subsequence_start_x != longest_subsequence_end_x)
-            transform = ax.get_xaxis_transform()
-            # Define the range of x-axis values for the line
-            # longest_subsequence_idx
-            x_line_start = longest_subsequence_start_x # x_bins[0]
-            x_line_end = longest_subsequence_end_x
-            # x = x_bins.astype(float)
-            # out_dict['main_sequence_tbins_axhlines'] = ax.axhline(y=-0.05,  # Slightly below the x-axis in normalized coordinates
-            #     xmin=(x_line_start - min(x)) / (max(x) - min(x)),  # Normalize x_start to [0, 1]
-            #     xmax=(x_line_end - min(x)) / (max(x) - min(x)),    # Normalize x_end to [0, 1]
-            #     color='red',
-            #     linewidth=4, transform=transform, clip_on=False, zorder=3)
-            
-
-            # Create a blended transform (data in x, normalized in y)
-            transform = mtransforms.blended_transform_factory(ax.transData, ax.transAxes)
-
-            # Draw a horizontal line slightly below the x-axis
-            line_y_position = -0.05  # Slightly below the x-axis
-            out_dict['main_sequence_tbins_axhlines'] = ax.plot([x_line_start, x_line_end], [line_y_position, line_y_position], 
-                    color=(1.0, 0.0, 0.0, 0.45), linewidth=3, transform=transform, clip_on=False) ## draws a red line with 45% opacity
+            position_index += num_positions
 
         if enable_axes_formatting:
             # Set axis labels and limits
             ax.set_xlabel('Time Bins')
             ax.set_ylabel('Position')
-            ax.set_xlim(0, N)
-            ax.set_xticks(x_bins)
-            ax.set_ylim(ymin, ymax)
+            # ax.set_xlim(0, N)
+            # ax.set_xticks(x_bins)
+            # ax.set_ylim(ymin, ymax)
         
         out = MatplotlibRenderPlots(name='test', figures=[fig, ], axes=ax, plots=out_dict, **kwargs)
         if not defer_show:
             plt.show()
             
-        return out # fig, ax, out_dict
+        return out  # Return the MatplotlibRenderPlots object
 
 
     def plot_time_bins_multiple(self, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True, enable_axes_formatting=False, override_positions_list=None, flat_time_window_edges=None,
-                                 arrow_alpha: float = 0.4, subsequence_line_color_alpha: float=0.55, **kwargs):
+                                arrow_alpha: float = 0.4, subsequence_line_color_alpha: float=0.55, **kwargs):
         if override_positions_list is None:
             override_positions_list = self.merged_split_positions_arrays
         if flat_time_window_edges is None:
-            flat_time_window_edges = self.flat_time_window_edges            
-
-
-        return self._debug_plot_time_bins_multiple(positions_list=override_positions_list, num=num, ax=ax, enable_position_difference_indicators=enable_position_difference_indicators,
-                                                    flat_time_window_centers=kwargs.pop('flat_time_window_centers', self.flat_time_window_centers), flat_time_window_edges=flat_time_window_edges,
-                                                     enable_axes_formatting=enable_axes_formatting, arrow_alpha=arrow_alpha, subsequence_line_color_alpha=subsequence_line_color_alpha, **kwargs)
-
+            flat_time_window_edges = self.flat_time_window_edges
+        
+        # Extract 'is_intrusion' array from sequence_info_df
+        is_intrusion = None
+        if self.sequence_info_df is not None and 'is_intrusion' in self.sequence_info_df.columns:
+            is_intrusion = self.sequence_info_df['is_intrusion'].values
+        
+        return self._debug_plot_time_bins_multiple(
+            positions_list=override_positions_list,
+            num=num,
+            ax=ax,
+            enable_position_difference_indicators=enable_position_difference_indicators,
+            flat_time_window_centers=kwargs.pop('flat_time_window_centers', self.flat_time_window_centers),
+            flat_time_window_edges=flat_time_window_edges,
+            enable_axes_formatting=enable_axes_formatting,
+            arrow_alpha=arrow_alpha,
+            subsequence_line_color_alpha=subsequence_line_color_alpha,
+            is_intrusion=is_intrusion,  # Pass the intrusion information
+            **kwargs
+        )
 
 
     def _plot_step_by_step_subsequence_partition_process(self):
