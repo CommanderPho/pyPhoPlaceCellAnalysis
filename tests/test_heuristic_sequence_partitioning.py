@@ -9,6 +9,10 @@ from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import Sub
 
 
 class TestSubsequenceMerging(unittest.TestCase):
+	""" #TODO 2024-12-04 12:44: - [ ] These were written by GPT and not tested in any way. Most do not pass
+       
+	"""
+
     def setUp(self):
         self.max_ignore_bins = 2
         self.same_thresh = 4  # Adjust as needed

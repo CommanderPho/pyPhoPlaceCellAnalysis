@@ -926,8 +926,9 @@ class SubsequencesPartitioningResult:
     def partition_subsequences(self):
         """
         Partitions the positions into subsequences based on significant direction changes.
-        Small changes below the threshold are ignored.
-        Updates self.split_positions_arrays.
+        Small changes below the threshold (jitter around a stationary position) are ignored.
+        Requires: self.flat_positions, self.same_thresh
+        Updates `self.split_positions_arrays`.
         """
         positions = self.flat_positions
         same_thresh = self.same_thresh
@@ -964,7 +965,8 @@ class SubsequencesPartitioningResult:
     def merge_intrusions(self):
         """
         Merges short subsequences (intrusions) into adjacent longer sequences.
-        Updates self.merged_split_positions_arrays.
+        Requires: self.split_positions_arrays, self.max_ignore_bins
+        Updates: self.merged_split_positions_arrays
         """
         subsequences = self.split_positions_arrays
         max_ignore_bins = self.max_ignore_bins
@@ -973,32 +975,33 @@ class SubsequencesPartitioningResult:
         i = 0
         while i < len(subsequences):
             current_seq = subsequences[i]
-            if len(current_seq) <= max_ignore_bins:
+            current_seq_len = len(current_seq)
+            if current_seq_len <= max_ignore_bins:
                 # Potential intrusion
                 left_seq = merged_subsequences[-1] if merged_subsequences else None
                 right_seq = subsequences[i + 1] if i + 1 < len(subsequences) else None
 
                 # Decide which side to merge with
-                if left_seq is not None and right_seq is not None:
-                    # Both sides available, merge with the longer one
-                    if len(left_seq) >= len(right_seq):
+                merged = False
+                if left_seq is not None:
+                    left_seq_len = len(left_seq)
+                    if left_seq_len >= (current_seq_len * 2):
+                        # Merge with left sequence
                         merged_seq = np.concatenate([left_seq, current_seq])
                         merged_subsequences[-1] = merged_seq
-                    else:
+                        merged = True
+
+                if not merged and right_seq is not None:
+                    right_seq_len = len(right_seq)
+                    if right_seq_len >= (current_seq_len * 2):
+                        # Merge with right sequence
                         merged_seq = np.concatenate([current_seq, right_seq])
                         i += 1  # Skip the next sequence as it's merged
                         merged_subsequences.append(merged_seq)
-                elif left_seq is not None:
-                    # Only left side available
-                    merged_seq = np.concatenate([left_seq, current_seq])
-                    merged_subsequences[-1] = merged_seq
-                elif right_seq is not None:
-                    # Only right side available
-                    merged_seq = np.concatenate([current_seq, right_seq])
-                    i += 1  # Skip the next sequence as it's merged
-                    merged_subsequences.append(merged_seq)
-                else:
-                    # No sides to merge with
+                        merged = True
+
+                if not merged:
+                    # Cannot merge, keep as is
                     merged_subsequences.append(current_seq)
             else:
                 # Not an intrusion
@@ -1234,6 +1237,12 @@ class SubsequencesPartitioningResult:
         from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
         import matplotlib.pyplot as plt
         
+
+        common_plot_time_bins_multiple_kwargs = dict(subsequence_line_color_alpha=0.95, arrow_alpha=0.4, enable_axes_formatting=True, )
+        
+
+        merged_plots_out_dict = {}
+        
         fig = plt.figure(layout="constrained", clear=True)
         ax_dict = fig.subplot_mosaic(
             [
@@ -1250,34 +1259,40 @@ class SubsequencesPartitioningResult:
             gridspec_kw=dict(wspace=0, hspace=0.15) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
         )
 
+
         flat_time_window_edges = np.arange(self.total_num_subsequence_bins+1)
         
         split_most_likely_positions_arrays = deepcopy(self.flat_positions) ## unsplit positions
         # out: MatplotlibRenderPlots = SubsequencesPartitioningResult._debug_plot_time_bins_multiple(positions_list=split_most_likely_positions_arrays, ax=ax_dict["ax_ungrouped_seq"])
         out: MatplotlibRenderPlots = self.plot_time_bins_multiple(num='debug_plot_merged_time_binned_positions', ax=ax_dict["ax_ungrouped_seq"], enable_position_difference_indicators=True,
-            flat_time_window_edges=flat_time_window_edges, override_positions_list=split_most_likely_positions_arrays, subsequence_line_color_alpha=0.95, arrow_alpha=0.9,
+            flat_time_window_edges=flat_time_window_edges, override_positions_list=split_most_likely_positions_arrays, **common_plot_time_bins_multiple_kwargs,
         )
-
+        merged_plots_out_dict["ax_ungrouped_seq"] = out.plots
         ## Add initially-sequenced result:
         split_positions_arrays = deepcopy(self.split_positions_arrays)
         out2: MatplotlibRenderPlots = self.plot_time_bins_multiple(num='debug_plot_merged_time_binned_positions', ax=ax_dict["ax_grouped_seq"], enable_position_difference_indicators=True,
-            flat_time_window_edges=flat_time_window_edges, override_positions_list=split_positions_arrays, subsequence_line_color_alpha=0.95, arrow_alpha=0.9, 
+            flat_time_window_edges=flat_time_window_edges, override_positions_list=split_positions_arrays, **common_plot_time_bins_multiple_kwargs,
         )
-
-
+        merged_plots_out_dict["ax_grouped_seq"] = out2.plots
+        
         ## Add re-sequenced (merged) result:
         merged_split_positions_arrays = deepcopy(self.merged_split_positions_arrays)
         out3: MatplotlibRenderPlots = self.plot_time_bins_multiple(num='debug_plot_merged_time_binned_positions', ax=ax_dict["ax_merged_grouped_seq"], enable_position_difference_indicators=True,
-            flat_time_window_edges=flat_time_window_edges, override_positions_list=merged_split_positions_arrays, subsequence_line_color_alpha=0.95, arrow_alpha=0.9, 
+            flat_time_window_edges=flat_time_window_edges, override_positions_list=merged_split_positions_arrays, **common_plot_time_bins_multiple_kwargs, 
         )        
+        merged_plots_out_dict["ax_merged_grouped_seq"] = out3.plots
+        
+        # out.plots = merged_plots_out_dict ## set main plots to the dict of plots
 
         # out3: MatplotlibRenderPlots = self.plot_time_bins_multiple(num='debug_plot_merged_time_binned_positions', ax=ax_dict["ax_grouped_seq"], enable_position_difference_indicators=True,
         #     flat_time_window_edges=flat_time_window_edges, subsequence_line_color_alpha=0.95, arrow_alpha=0.9, 
         # )
         # ax = out.ax
         
+        merged_out = MatplotlibRenderPlots(name='merged', figures=[fig, ], ax_dict=ax_dict, plots=merged_plots_out_dict)
+
         # out2: MatplotlibRenderPlots = SubsequencesPartitioningResult._debug_plot_time_bins_multiple(positions_list=final_out_subsequences, num='debug_plot_merged_time_binned_positions')
-        return out
+        return merged_out
 
 
 

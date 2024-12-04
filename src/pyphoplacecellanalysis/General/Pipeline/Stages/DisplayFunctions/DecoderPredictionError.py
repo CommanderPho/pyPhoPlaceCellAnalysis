@@ -2467,7 +2467,7 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
     """
     plots_group_identifier_key: str = 'decoded_sequence_and_heuristics_curves' # _out_pagination_controller.plots['weighted_corr']
     
-    provided_params: Dict[str, Any] = {'enable_decoded_sequence_and_heuristics_curve': True} # , enable_actual_position_curve = False
+    provided_params: Dict[str, Any] = {'enable_decoded_sequence_and_heuristics_curve': True, 'show_pre_merged_debug_sequences': False} # , enable_actual_position_curve = False
     provided_plots_data: Dict[str, Any] = {'decoded_sequence_and_heuristics_curves_data': None}
     provided_plots: Dict[str, Any] = {'decoded_sequence_and_heuristics_curves': {}}
     column_names: List[str] = [] ## #TODO 2024-11-25 13:57: - [ ] Need column names used by this data provider
@@ -2481,9 +2481,10 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
 
     
     @classmethod
-    def decoder_build_single_decoded_sequence_and_heuristics_curves_data(cls, curr_results_obj, decoder_track_length: float, same_thresh_fraction_of_track: float = 0.1, included_columns=None):
+    def decoder_build_single_decoded_sequence_and_heuristics_curves_data(cls, curr_results_obj, decoder_track_length: float, same_thresh_fraction_of_track: float = 0.075, included_columns=None):
         """ builds for a single decoder. 
         same_thresh_fraction_of_track: float = 0.1 ## up to 10% of the track
+        same_thresh_fraction_of_track: float = 0.075 ## up to 7.5% of the track
         
         """
         same_thresh_cm: float = (decoder_track_length * same_thresh_fraction_of_track)
@@ -2552,6 +2553,7 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
 
         ## Extract the visibility:
         should_enable_plot: bool = params.enable_decoded_sequence_and_heuristics_curve
+        show_pre_merged_debug_sequences: bool = params.show_pre_merged_debug_sequences
         
         # data_index_value = data_idx # OLD MODE
         data_index_value = epoch_start_t
@@ -2595,9 +2597,23 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
             #     # exception from below: `ValueError: x and y must have same first dimension, but have shapes (4,) and (213,)`
 
             if (a_partition_result is not None):
+                
                 # Most likely position plots:
                 out: "MatplotlibRenderPlots" = a_partition_result.plot_time_bins_multiple(ax=curr_ax, enable_position_difference_indicators=False, flat_time_window_centers=time_window_centers, flat_time_window_edges=time_window_edges,
                                                                                            enable_axes_formatting=False, defer_show=True)
+                
+                if show_pre_merged_debug_sequences:
+                    ## Add the intermediate debug values to the axes
+                    merged_plots_out_dict = {'main': out.plots}
+                    
+                    merged_split_positions_arrays = deepcopy(a_partition_result.merged_split_positions_arrays)
+                    out3: MatplotlibRenderPlots = a_partition_result.plot_time_bins_multiple(ax=curr_ax, enable_position_difference_indicators=True, flat_time_window_centers=time_window_centers, flat_time_window_edges=time_window_edges,
+                        override_positions_list=merged_split_positions_arrays, subsequence_line_color_alpha=0.95, arrow_alpha=0.9, enable_axes_formatting=False, defer_show=True,
+                    )
+                    merged_plots_out_dict['debug'] = out3.plots
+                    out.plots = merged_plots_out_dict
+                    
+
 
         else:
             # ## Remove the existing one
