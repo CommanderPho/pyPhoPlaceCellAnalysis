@@ -599,8 +599,10 @@ class SubsequencesPartitioningResult:
             list_parts.append(prev_accum)
 
 
-        diff_split_indicies = np.array(list_split_indicies)
-        list_split_indicies = diff_split_indicies + 1 # the +1 is because we pass a diff list/array which has one less index than the original array.
+        diff_split_indicies = np.array(first_order_diff_list_split_indicies)
+        split_indicies = np.array(deepcopy(first_order_diff_list_split_indicies)) - 1
+        # first_order_diff_list_split_indicies = diff_split_indicies + 1 # the +1 is because we pass a diff list/array which has one less index than the original array.
+        # first_order_diff_list_split_indicies = deepcopy(diff_split_indicies) - 1 # try -1 
         sub_change_threshold_change_indicies = np.array(sub_change_threshold_change_indicies)
 
         list_parts = [np.array(l) for l in list_parts]
