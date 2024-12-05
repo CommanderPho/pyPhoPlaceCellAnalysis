@@ -919,6 +919,42 @@ class SubsequencesPartitioningResult:
         return (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index)
 
 
+    @classmethod
+    def determine_directionality(cls, subseq: NDArray, return_normalized: bool=True) -> float:
+        """ determines the directionality of a subsequence between -1 and +1
+        
+        """
+        if isinstance(subseq, list):
+            subseq = np.array(subseq)
+
+        first_order_diff_lst = np.diff(subseq, n=1) # , prepend=[subseq[0]]
+
+        n_diff_bins: int = len(first_order_diff_lst)
+        n_original_bins: int = n_diff_bins + 1
+        
+        n_nonzero_diff_bins: int = np.sum(np.nonzero(first_order_diff_lst)) # len(first_order_diff_lst)
+    
+        sign_diff = np.sign(first_order_diff_lst) # -1, 0, +1 for each change    
+        sign_total = np.sum(sign_diff)
+        n_nonzero_sign_bins: int = np.sum(np.nonzero(sign_diff)) # len(first_order_diff_lst)
+    
+        if not return_normalized:
+            return sign_total
+        else:
+            norm_sign_total = sign_total / float(n_nonzero_sign_bins) # float(len(sign_diff))
+            return norm_sign_total
+        
+        # np.sum(first_order_diff_lst) / float(n_diff_bins))
+
+        # diffs = [subseq[i+1] - subseq[i] for i in range(len(subseq)-1)]
+        # if all(diff > 0 for diff in diffs):
+        #     return 'increasing'
+        # elif all(diff < 0 for diff in diffs):
+        #     return 'decreasing'
+        # else:
+        #     return 'none'
+        
+
 
     # 2024-12-04 09:16 New ChatGPT Simplified Functions __________________________________________________________________ #
     
