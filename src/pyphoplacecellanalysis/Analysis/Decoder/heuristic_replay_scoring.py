@@ -834,6 +834,15 @@ class SubsequencesPartitioningResult:
             print(f'original_split_positions_arrays: {original_split_positions_arrays}')
         
 
+        ## Begin by finding only the longest sequence
+        n_tbins_list = np.array([len(v) for v in original_split_positions_arrays])
+        longest_subsequence_idx: int = np.argmax(n_tbins_list)
+        
+        n_total_tbins: int = np.sum(n_tbins_list)
+        is_subsequence_potential_intrusion = (n_tbins_list <= max_ignore_bins) ## any subsequence shorter than the max ignore distance
+        ignored_subsequence_idxs = np.where(is_subsequence_potential_intrusion)[0]
+        
+
         # call `_subfn_perform_merge_iteration` ______________________________________________________________________________ #
         original_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_idxs) = _subfn_perform_merge_iteration(original_split_positions_arrays,
                                                                                                                                                                             max_ignore_bins=max_ignore_bins, should_skip_epoch_with_only_short_subsequences=should_skip_epoch_with_only_short_subsequences, debug_print=debug_print)
