@@ -509,7 +509,7 @@ class SubsequencesPartitioningResult:
 
         for i, v in enumerate(first_order_diff_lst):
             curr_dir = np.sign(v) # either [-1, 0, +1]
-            did_accum_dir_change: bool = (prev_accum_dir != curr_dir)# and (prev_accum_dir is not None) and (prev_accum_dir != 0)
+            did_accum_dir_change: bool = (prev_accum_dir != curr_dir) and (curr_dir != 0) # curr_dir == 0 means that we DEFER the split
             if debug_print:
                 print(f'i: {i}, v: {v}, curr_dir: {curr_dir}, prev_accum_dir: {prev_accum_dir}')
 
