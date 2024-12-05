@@ -556,6 +556,7 @@ class SubsequencesPartitioningResult:
                 else:
                     # direction changed but it didn't exceed the threshold, a so-called "low-magnitude" change
                     sub_change_threshold_change_indicies.append(i)
+                    prev_accum_dir = None ## HACK fixes index after low-magnitude change
                 # END if (np.abs(v) > same_thresh)
                 
                 ## accumulate the new entry, and potentially the change direction
