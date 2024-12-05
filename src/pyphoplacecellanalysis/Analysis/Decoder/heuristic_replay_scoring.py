@@ -298,8 +298,29 @@ class SubsequencesPartitioningResult:
         """ main initializer """
         ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
         partition_result: "SubsequencesPartitioningResult" = cls.partition_subsequences_ignoring_repeated_similar_positions(a_most_likely_positions_list, n_pos_bins=n_pos_bins, flat_time_window_centers=flat_time_window_centers, same_thresh=same_thresh, max_ignore_bins=max_ignore_bins, flat_time_window_edges=flat_time_window_edges, debug_print=debug_print)  # Add 1 because np.diff reduces the index by 1
-        partition_result.partition_subsequences() ## 2024-12-04 09:15 New
-        partition_result.merge_intrusions() ## 2024-12-04 09:15 New
+
+        # # ChatGPT Method 2024-11-04 - 2pm ____________________________________________________________________________________ #
+        # partition_result.partition_subsequences() ## 2024-12-04 09:15 New
+        # partition_result.merge_intrusions() ## 2024-12-04 09:15 New
+
+
+        # Pho Method 2024-11-04 - Pre 2pm ____________________________________________________________________________________ #
+        # # Set `partition_result.split_positions_arrays` ______________________________________________________________________ #
+        # active_split_indicies = deepcopy(partition_result.split_indicies) ## this is what it should be, but all the splits are +1 later than they should be
+        # active_split_indicies = deepcopy(partition_result.diff_split_indicies) - 1 ## this is what it should be, but all the splits are +1 later than they should be
+        active_split_indicies = deepcopy(partition_result.split_indicies) ## this is what it should be, but all the splits are +1 later than they should be
+        split_most_likely_positions_arrays = np.split(a_most_likely_positions_list, active_split_indicies)
+        partition_result.split_positions_arrays = split_most_likely_positions_arrays
+        
+
+
+        # Set `merged_split_positions_arrays` ________________________________________________________________________________ #
+        _tmp_merge_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_values_list) = partition_result.merge_over_ignored_intrusions(max_ignore_bins=max_ignore_bins, debug_print=debug_print)
+        # flat_positions_list = deepcopy(partition_result.flat_positions.tolist())
+        partition_result.bridged_intrusion_bin_indicies = deepcopy(final_intrusion_values_list) # np.array([flat_positions_list.index(v) for v in final_intrusion_idxs])
+        
+        
+        ## Common Post-hoc
         partition_result.rebuild_sequence_info_df()
         return partition_result
     
