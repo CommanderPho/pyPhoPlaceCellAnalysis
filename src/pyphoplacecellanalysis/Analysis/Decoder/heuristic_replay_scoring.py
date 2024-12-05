@@ -2173,7 +2173,7 @@ class HeuristicReplayScoring:
         # return longest_no_repeats_sequence_length_ratio
         # return int(partition_result.longest_subsequence_length)
         # return int(partition_result.longest_subsequence_non_intrusion_nbins) ## excluding intrusions
-        return int(partition_result.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=True, should_use_no_repeat_values=True))
+        return int(partition_result.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=True, should_use_no_repeat_values=False))
     
 
 
