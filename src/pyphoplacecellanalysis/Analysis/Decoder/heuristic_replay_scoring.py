@@ -272,8 +272,6 @@ class SubsequencesPartitioningResult:
         return self.merged_split_positions_arrays[self.longest_sequence_no_repeats_start_idx]
 
 
-
-    
     def get_longest_sequence_length_ratio(self, should_use_no_repeat_values: bool = False) -> float:
         """  Compensate for repeating bins, not counting them towards the score but also not against. """
         ## Compensate for repeating bins, not counting them towards the score but also not against.
@@ -306,7 +304,7 @@ class SubsequencesPartitioningResult:
         return partition_result
     
 
-    @function_attributes(short_name=None, tags=['NOT_COMPLETE', 'NOT_NEEDED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-03 04:17', related_items=[])
+    @function_attributes(short_name=None, tags=['NOT_COMPLETE', 'NOT_NEEDED', 'PhoOriginal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-03 04:17', related_items=[])
     @classmethod
     def detect_repeated_similar_positions(cls, a_most_likely_positions_list: Union[List, NDArray], same_thresh: float = 4.0, debug_print=False, **kwargs) -> "SubsequencesPartitioningResult":
         """ function partitions the list according to an iterative rule and the direction changes, ignoring changes less than or equal to `same_thresh`.
@@ -424,7 +422,7 @@ class SubsequencesPartitioningResult:
         return (sub_change_equivalency_groups, sub_change_equivalency_group_values), (list_parts, list_split_indicies, sub_change_threshold_change_indicies)
 
 
-    @function_attributes(short_name=None, tags=['near_equal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-03 11:15', related_items=[])
+    @function_attributes(short_name=None, tags=['near_equal', 'PhoOriginal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-03 11:15', related_items=[])
     @classmethod
     def find_value_equiv_groups(cls, longest_sequence_subsequence: Union[List, NDArray], same_thresh_cm: float) -> Tuple[List, List]:
         """ returns the positions grouped by whether they are considered the same based on `same_thresh_cm`
@@ -467,7 +465,7 @@ class SubsequencesPartitioningResult:
         return value_equiv_group_list, value_equiv_group_idxs_list
 
 
-    @function_attributes(short_name=None, tags=['partition'], input_requires=[], output_provides=[], uses=['SubsequencesPartitioningResult', 'rebuild_sequence_info_df'], used_by=['init_from_positions_list'], creation_date='2024-05-09 02:47', related_items=[])
+    @function_attributes(short_name=None, tags=['partition', 'PhoOriginal'], input_requires=[], output_provides=[], uses=['SubsequencesPartitioningResult', 'rebuild_sequence_info_df'], used_by=['init_from_positions_list'], creation_date='2024-05-09 02:47', related_items=[])
     @classmethod
     def partition_subsequences_ignoring_repeated_similar_positions(cls, a_most_likely_positions_list: Union[List, NDArray], n_pos_bins: int, same_thresh: float = 4.0, debug_print=False, **kwargs) -> "SubsequencesPartitioningResult":
         """ function partitions the list according to an iterative rule and the direction changes, ignoring changes less than or equal to `same_thresh`.
@@ -558,7 +556,7 @@ class SubsequencesPartitioningResult:
 
 
         diff_split_indicies = np.array(first_order_diff_list_split_indicies)
-        split_indicies = np.array(deepcopy(first_order_diff_list_split_indicies)) - 1
+        split_indicies = np.array(deepcopy(first_order_diff_list_split_indicies))# - 1
         # first_order_diff_list_split_indicies = diff_split_indicies + 1 # the +1 is because we pass a diff list/array which has one less index than the original array.
         # first_order_diff_list_split_indicies = deepcopy(diff_split_indicies) - 1 # try -1 
         sub_change_threshold_change_indicies = np.array(sub_change_threshold_change_indicies)
@@ -570,7 +568,7 @@ class SubsequencesPartitioningResult:
         return _result
 
 
-    @function_attributes(short_name=None, tags=['merge', '_compute_sequences_spanning_ignored_intrusions'], input_requires=['self.split_positions_arrays'], output_provides=['self.merged_split_positions_arrays'], uses=['_compute_sequences_spanning_ignored_intrusions'], used_by=[], creation_date='2024-11-27 08:17', related_items=['_compute_sequences_spanning_ignored_intrusions'])
+    @function_attributes(short_name=None, tags=['merge', '_compute_sequences_spanning_ignored_intrusions', 'PhoOriginal'], input_requires=['self.split_positions_arrays'], output_provides=['self.merged_split_positions_arrays'], uses=['_compute_sequences_spanning_ignored_intrusions'], used_by=[], creation_date='2024-11-27 08:17', related_items=['_compute_sequences_spanning_ignored_intrusions'])
     def merge_over_ignored_intrusions(self, max_ignore_bins: int = 2, should_skip_epoch_with_only_short_subsequences: bool = False, debug_print=False):
         """ an "intrusion" refers to one or more time bins that interrupt a longer sequence that would be monotonic if the intrusions were removed.
 
