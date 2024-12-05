@@ -1391,7 +1391,210 @@ class SubsequencesPartitioningResult:
         return merged_out
 
 
+# ==================================================================================================================== #
+# CHATGPT GARBAGE?                                                                                                     #
+# ==================================================================================================================== #
+class LongestSupersequenceFinder:
+    """
+    A class to find the longest possible supersequence by merging subsequences while adhering to specified constraints.
+    
+    from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import LongestSupersequenceFinder
+    
+    # Sample subsequences
+    subsequences = [
+        [38.9801, 225.446, 225.446],
+        [145.532, 137.921, 38.9801],
+        [225.446, 217.835, 175.975, 107.478],
+        [134.116, 145.532],
+        [38.9801, 38.9801],
+        [172.17],
+        [149.337],
+        [248.278],
+        [225.446, 153.143, 145.532, 111.283, 69.4234]
+    ]
 
+    max_ignore_bins = 2  # Define your maximum ignore bins
+
+    # Create an instance of the finder
+    finder = LongestSupersequenceFinder(subsequences, max_ignore_bins)
+
+    # Find the longest supersequence
+    longest_supersequence = finder.find_longest_supersequence()
+
+    print("Longest Supersequence:")
+    print(longest_supersequence)
+    print("\nLength of the longest supersequence:", len(longest_supersequence))
+
+    """
+
+    def __init__(self, subsequences, max_ignore_bins):
+        """
+        Initializes the LongestSupersequenceFinder with the provided subsequences and constraints.
+
+        Parameters:
+        - subsequences (List[List[float]]): List of subsequences, each containing position values.
+        - max_ignore_bins (int): Maximum allowable length of an intruding subsequence.
+        """
+        self.subsequences = subsequences
+        self.max_ignore_bins = max_ignore_bins
+        self.processed_subsequences = []
+        # Process subsequences to determine directionality
+        self._process_subsequences()
+
+    def _process_subsequences(self):
+        """
+        Processes each subsequence to determine its directionality and stores the result.
+        """
+        for idx, subseq in enumerate(self.subsequences):
+            direction = self._determine_directionality(subseq)
+            self.processed_subsequences.append({
+                'index': idx,
+                'subseq': subseq,
+                'length': len(subseq),
+                'direction': direction
+            })
+
+    def _determine_directionality(self, subseq):
+        """
+        Determines the directionality of a subsequence.
+
+        Parameters:
+        - subseq (List[float]): A subsequence of position values.
+
+        Returns:
+        - str: 'increasing', 'decreasing', or 'none' based on the directionality.
+        """
+        # Calculate differences between consecutive positions
+        diffs = [subseq[i + 1] - subseq[i] for i in range(len(subseq) - 1)]
+        if not diffs:
+            return 'none'  # Cannot determine directionality for single-element subsequences
+        if all(diff > 0 for diff in diffs):
+            return 'increasing'
+        elif all(diff < 0 for diff in diffs):
+            return 'decreasing'
+        else:
+            return 'none'  # Mixed differences indicate no clear directionality
+
+    def find_longest_supersequence(self):
+        """
+        Finds the longest possible supersequence by merging subsequences while adhering to the specified constraints.
+
+        Returns:
+        - List[float]: The longest merged supersequence.
+        """
+        longest_supersequence = []
+        # Try both increasing and decreasing directions to find the longest supersequence
+        for direction in ['increasing', 'decreasing']:
+            # Find the longest subsequence with the current directionality
+            starting_subseq = self._find_longest_subseq_with_direction(direction)
+            if starting_subseq:
+                # Attempt to extend the supersequence from the starting subsequence
+                superseq = self._extend_supersequence(
+                    starting_subseq['index'],
+                    direction
+                )
+                # Update the longest supersequence if a longer one is found
+                if len(superseq) > len(longest_supersequence):
+                    longest_supersequence = superseq
+        return longest_supersequence
+
+    def _find_longest_subseq_with_direction(self, direction):
+        """
+        Finds the longest subsequence with a specific directionality.
+
+        Parameters:
+        - direction (str): The desired directionality ('increasing' or 'decreasing').
+
+        Returns:
+        - dict or None: The longest subsequence with the specified directionality, or None if not found.
+        """
+        same_dir_subseqs = [s for s in self.processed_subsequences if s['direction'] == direction]
+        if not same_dir_subseqs:
+            return None
+        # Return the subsequence with the maximum length
+        return max(same_dir_subseqs, key=lambda s: s['length'])
+
+    def _extend_supersequence(self, start_idx, direction):
+        """
+        Extends a supersequence from the starting subsequence by merging adjacent subsequences.
+
+        Parameters:
+        - start_idx (int): Index of the starting subsequence.
+        - direction (str): The directionality of the supersequence ('increasing' or 'decreasing').
+
+        Returns:
+        - List[float]: The extended supersequence.
+        """
+        # Initialize the supersequence with the starting subsequence
+        supersequence = self.processed_subsequences[start_idx]['subseq'].copy()
+        total_sequence_bins = len(supersequence)
+        total_intruding_bins = 0
+
+        # Helper function to check constraints
+        def constraints_satisfied(intruding_bins, sequence_bins):
+            """
+            Checks whether the constraints are satisfied.
+
+            Constraints:
+            1. No intruding subsequence exceeds max_ignore_bins bins.
+            2. Total intruding bins do not exceed half of the candidate supersequence length.
+
+            Parameters:
+            - intruding_bins (int): Total number of intruding bins.
+            - sequence_bins (int): Total number of bins in the supersequence.
+
+            Returns:
+            - bool: True if constraints are satisfied, False otherwise.
+            """
+            return intruding_bins <= sequence_bins / 2.0
+
+        # Extend forward
+        idx = start_idx
+        while idx + 1 < len(self.processed_subsequences):
+            idx += 1
+            subseq_info = self.processed_subsequences[idx]
+            if subseq_info['direction'] == direction:
+                # Same directionality; merge subsequence
+                supersequence.extend(subseq_info['subseq'])
+                total_sequence_bins += subseq_info['length']
+            else:
+                # Intruding subsequence
+                if subseq_info['length'] > self.max_ignore_bins:
+                    # Constraint 1 violated; cannot include this intruding subsequence
+                    break
+                # Tentatively include intruding subsequence
+                total_intruding_bins += subseq_info['length']
+                if not constraints_satisfied(total_intruding_bins, total_sequence_bins + subseq_info['length']):
+                    # Constraint 2 violated; cannot include more intruding bins
+                    break
+                # Include intruding subsequence
+                supersequence.extend(subseq_info['subseq'])
+                total_sequence_bins += subseq_info['length']
+
+        # Extend backward
+        idx = start_idx
+        while idx - 1 >= 0:
+            idx -= 1
+            subseq_info = self.processed_subsequences[idx]
+            if subseq_info['direction'] == direction:
+                # Same directionality; merge subsequence at the beginning
+                supersequence = subseq_info['subseq'] + supersequence
+                total_sequence_bins += subseq_info['length']
+            else:
+                # Intruding subsequence
+                if subseq_info['length'] > self.max_ignore_bins:
+                    # Constraint 1 violated; cannot include this intruding subsequence
+                    break
+                # Tentatively include intruding subsequence
+                total_intruding_bins += subseq_info['length']
+                if not constraints_satisfied(total_intruding_bins, total_sequence_bins + subseq_info['length']):
+                    # Constraint 2 violated; cannot include more intruding bins
+                    break
+                # Include intruding subsequence
+                supersequence = subseq_info['subseq'] + supersequence
+                total_sequence_bins += subseq_info['length']
+
+        return supersequence
 
 
 
