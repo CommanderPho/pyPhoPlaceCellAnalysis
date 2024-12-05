@@ -181,6 +181,14 @@ class SubsequencesPartitioningResult:
         return len(self.first_order_diff_lst)
     
     @property
+    def flat_position_indicies(self) -> NDArray:
+        """ the list of corresponding indicies for `self.flat_positions`."""
+        if self.flat_positions is None:
+            return None
+        return np.arange(len(self.flat_positions))
+
+
+    @property
     def subsequence_index_lists_omitting_repeats(self):
         """The subsequence_index_lists_omitting_repeats property. BROKEN """
         return np.array_split(np.arange(len(self.split_indicies)), self.split_indicies)
@@ -937,6 +945,8 @@ class SubsequencesPartitioningResult:
             self.sequence_info_df['subsequence_idx'] = flatten(
                 [[i] * len(v) for i, v in enumerate(self.merged_split_positions_arrays)])
 
+
+        self.sequence_info_df['flat_idx'] = self.sequence_info_df.index.astype(int, copy=True)
         return self.sequence_info_df
 
     # Existing properties and methods remain unchanged or are adjusted as necessary
