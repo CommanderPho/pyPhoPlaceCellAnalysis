@@ -1064,6 +1064,16 @@ class SubsequencesPartitioningResult:
             from neuropy.utils.matplotlib_helpers import modify_colormap_alpha
             import matplotlib.transforms as mtransforms
 
+
+            # Plot Customization _________________________________________________________________________________________________ #
+            split_vlines_kwargs = dict(color='black', linestyle='-', linewidth=1)
+            time_bin_edges_vlines_kwargs = dict(color='grey', linestyle='--', linewidth=0.5)
+            direction_change_lines_kwargs = dict(color='yellow', linestyle=':', linewidth=2, zorder=1)
+
+            intrusion_time_bin_shading_kwargs = dict(facecolor='red', alpha=0.15, zorder=0)
+
+
+            # Begin Function Body ________________________________________________________________________________________________ #
             out_dict = {'time_bin_edges_vlines': None, 'split_vlines': None, 'subsequence_positions_hlines_dict': None,
                         'subsequence_arrows_dict': None, 'subsequence_arrow_labels_dict': None, 'main_sequence_tbins_axhlines': None,
                         'intrusion_shading': None, 'direction_change_lines': None,
@@ -1118,10 +1128,11 @@ class SubsequencesPartitioningResult:
 
             # Plot vertical lines at regular time bins excluding group splits
             regular_x_bins = np.setdiff1d(x_bins, group_end_indices)
-            out_dict['time_bin_edges_vlines'] = ax.vlines(regular_x_bins, ymin, ymax, color='grey', linestyle='--', linewidth=0.5)
+            out_dict['time_bin_edges_vlines'] = ax.vlines(regular_x_bins, ymin, ymax, **time_bin_edges_vlines_kwargs)
 
+            
             # Highlight separator lines where splits occur
-            out_dict['split_vlines'] = ax.vlines(group_end_indices, ymin, ymax, color='black', linestyle='-', linewidth=1)
+            out_dict['split_vlines'] = ax.vlines(group_end_indices, ymin, ymax, **split_vlines_kwargs)
 
             # Define a colormap
             cmap = plt.get_cmap('tab10')
@@ -1135,16 +1146,17 @@ class SubsequencesPartitioningResult:
             if is_intrusion is not None:
                 for i in range(N):
                     if is_intrusion[i]:
-                        ax.axvspan(x_starts[i], x_ends[i], facecolor='red', alpha=0.3, zorder=0)
+                        ax.axvspan(x_starts[i], x_ends[i], **intrusion_time_bin_shading_kwargs)
                         out_dict['intrusion_shading'].append((x_starts[i], x_ends[i]))
 
+            
             # Draw direction change lines
             out_dict['direction_change_lines'] = []
             if direction_changes is not None:
                 for i in range(N):
                     if direction_changes[i]:
                         x_line = x_starts[i]
-                        line = ax.axvline(x_line, color='yellow', linestyle=':', linewidth=2, zorder=1)
+                        line = ax.axvline(x_line, **direction_change_lines_kwargs)
                         out_dict['direction_change_lines'].append(line)
 
             # Plot horizontal lines with customizable color
@@ -1174,8 +1186,7 @@ class SubsequencesPartitioningResult:
                 # Adjust colors for intrusion time bins
                 # colors = [color if is_intrusion is None or not is_intrusion[position_index + i] else 'red' for i in range(num_positions)]
                 colors = [color for i in range(num_positions)]
-                out_dict['subsequence_positions_hlines_dict'][subsequence_idx] = ax.hlines(
-                    subsequence_positions, xmin=x_starts_subseq, xmax=x_ends_subseq, colors=colors, linewidth=2)
+                out_dict['subsequence_positions_hlines_dict'][subsequence_idx] = ax.hlines(subsequence_positions, xmin=x_starts_subseq, xmax=x_ends_subseq, colors=colors, linewidth=3)
 
                 if enable_position_difference_indicators:
                     ## Draw "change" arrows between each adjacent bin showing the amount of y-pos change
