@@ -1448,19 +1448,20 @@ class SubsequencesPartitioningResult:
         split_positions_arrays = deepcopy(self.split_positions_arrays)
         out2: MatplotlibRenderPlots = self.plot_time_bins_multiple(num='debug_plot_merged_time_binned_positions', ax=ax_dict["ax_grouped_seq"], enable_position_difference_indicators=True,
             flat_time_window_edges=flat_time_window_edges, override_positions_list=split_positions_arrays, **common_plot_time_bins_multiple_kwargs,
-            sequence_position_hlines_kwargs=dict(linewidth=3, linestyle='--', zorder=11, alpha=0.9),
+            sequence_position_hlines_kwargs=dict(linewidth=3, linestyle='-', zorder=11, alpha=1.0),
         )
         merged_plots_out_dict["ax_grouped_seq"] = out2.plots
         
         #(offset, (on_off_seq)). For example, (0, (3, 10, 1, 15)) means (3pt line, 10pt space, 1pt line, 15pt space) with no offset, while (5, (10, 3)), means (10pt line, 3pt space), but skip the first 5pt line.
         # linestyle = (0, (5, 1))
-        linestyle = (0, (1, 1)) # dots with 1pt dot, 0.5pt space
+        # linestyle = (0, (1, 1)) # dots with 1pt dot, 0.5pt space
+        linestyle = '-'
         # Plot only the positions themselves, as dotted overlaying lines
         pre_merged_debug_sequences_kwargs = dict(sequence_position_hlines_kwargs=dict(linewidth=2, linestyle=linestyle, zorder=10, alpha=1.0), # high-zorder to place it on-top, linestyle is "densely-dashed"
-            split_vlines_kwargs = dict(should_skip=True),
-            time_bin_edges_vlines_kwargs = dict(should_skip=True),
+            split_vlines_kwargs = dict(should_skip=False),
+            time_bin_edges_vlines_kwargs = dict(should_skip=False),
             direction_change_lines_kwargs = dict(should_skip=True),
-            intrusion_time_bin_shading_kwargs = dict(should_skip=True),
+            intrusion_time_bin_shading_kwargs = dict(should_skip=False),
         )
                     
 
