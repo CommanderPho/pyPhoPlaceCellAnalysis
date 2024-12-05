@@ -1118,12 +1118,29 @@ class SubsequencesPartitioningResult:
 
 
             # Plot Customization _________________________________________________________________________________________________ #
-            split_vlines_kwargs = dict(color='black', linestyle='-', linewidth=1)
-            time_bin_edges_vlines_kwargs = dict(color='grey', linestyle='--', linewidth=0.5)
-            direction_change_lines_kwargs = dict(color='yellow', linestyle=':', linewidth=2, zorder=1)
+            split_vlines_kwargs = dict(color='black', linestyle='-', linewidth=1) | kwargs.pop('split_vlines_kwargs', {})
+            time_bin_edges_vlines_kwargs = dict(color='grey', linestyle='--', linewidth=0.5) | kwargs.pop('time_bin_edges_vlines_kwargs', {})
+            direction_change_lines_kwargs = dict(color='yellow', linestyle=':', linewidth=2, zorder=1) | kwargs.pop('direction_change_lines_kwargs', {})
 
-            intrusion_time_bin_shading_kwargs = dict(facecolor='red', alpha=0.15, zorder=0)
+            intrusion_time_bin_shading_kwargs = dict(facecolor='red', alpha=0.15, zorder=0) | kwargs.pop('intrusion_time_bin_shading_kwargs', {})
+            sequence_position_hlines_kwargs = dict(linewidth=4, zorder=-1) | kwargs.pop('sequence_position_hlines_kwargs', {})
 
+            # Example override dict ______________________________________________________________________________________________ #
+            # dict(
+            #     split_vlines_kwargs = dict(color='black', linestyle='-', linewidth=1, should_skip=False),
+            #     time_bin_edges_vlines_kwargs = dict(color='grey', linestyle='--', linewidth=0.5, should_skip=False) 
+            #     direction_change_lines_kwargs = dict(color='yellow', linestyle=':', linewidth=2, zorder=1, should_skip=False),
+            #     intrusion_time_bin_shading_kwargs = dict(facecolor='red', alpha=0.15, zorder=0, should_skip=False),
+            #     sequence_position_hlines_kwargs = dict(linewidth=4, zorder=-1, should_skip=False),
+            # )
+            
+
+            should_skip_split_vlines: bool = split_vlines_kwargs.pop('should_skip', False)
+            should_skip_time_bin_edges_vlines: bool = time_bin_edges_vlines_kwargs.pop('should_skip', False)
+            should_skip_direction_change_lines: bool = direction_change_lines_kwargs.pop('should_skip', False)
+            should_skip_intrusion_time_bin_shading: bool = intrusion_time_bin_shading_kwargs.pop('should_skip', False)
+            should_skip_sequence_position_hlines: bool = sequence_position_hlines_kwargs.pop('should_skip', False)
+            
 
             # Begin Function Body ________________________________________________________________________________________________ #
             out_dict = {'time_bin_edges_vlines': None, 'split_vlines': None, 'subsequence_positions_hlines_dict': None,
@@ -1180,11 +1197,13 @@ class SubsequencesPartitioningResult:
 
             # Plot vertical lines at regular time bins excluding group splits
             regular_x_bins = np.setdiff1d(x_bins, group_end_indices)
-            out_dict['time_bin_edges_vlines'] = ax.vlines(regular_x_bins, ymin, ymax, **time_bin_edges_vlines_kwargs)
+            if not should_skip_time_bin_edges_vlines:
+                out_dict['time_bin_edges_vlines'] = ax.vlines(regular_x_bins, ymin, ymax, **time_bin_edges_vlines_kwargs)
 
-            
-            # Highlight separator lines where splits occur
-            out_dict['split_vlines'] = ax.vlines(group_end_indices, ymin, ymax, **split_vlines_kwargs)
+            if not should_skip_split_vlines:
+                # Highlight separator lines where splits occur
+                out_dict['split_vlines'] = ax.vlines(group_end_indices, ymin, ymax, **split_vlines_kwargs)
+
 
             # Define a colormap
             cmap = plt.get_cmap('tab10')
@@ -1195,21 +1214,23 @@ class SubsequencesPartitioningResult:
             out_dict['intrusion_shading'] = []
 
             # Shade intrusion time bins
-            if is_intrusion is not None:
-                for i in range(N):
-                    if is_intrusion[i]:
-                        ax.axvspan(x_starts[i], x_ends[i], **intrusion_time_bin_shading_kwargs)
-                        out_dict['intrusion_shading'].append((x_starts[i], x_ends[i]))
+            if not should_skip_intrusion_time_bin_shading:
+                if is_intrusion is not None:
+                    for i in range(N):
+                        if is_intrusion[i]:
+                            ax.axvspan(x_starts[i], x_ends[i], **intrusion_time_bin_shading_kwargs)
+                            out_dict['intrusion_shading'].append((x_starts[i], x_ends[i]))
 
             
-            # Draw direction change lines
-            out_dict['direction_change_lines'] = []
-            if direction_changes is not None:
-                for i in range(N):
-                    if direction_changes[i]:
-                        x_line = x_starts[i]
-                        line = ax.axvline(x_line, **direction_change_lines_kwargs)
-                        out_dict['direction_change_lines'].append(line)
+            if not should_skip_direction_change_lines:
+                # Draw direction change lines
+                out_dict['direction_change_lines'] = []
+                if direction_changes is not None:
+                    for i in range(N):
+                        if direction_changes[i]:
+                            x_line = x_starts[i]
+                            line = ax.axvline(x_line, **direction_change_lines_kwargs)
+                            out_dict['direction_change_lines'].append(line)
 
             # Plot horizontal lines with customizable color
             out_dict['subsequence_positions_hlines_dict'] = {}
@@ -1238,7 +1259,8 @@ class SubsequencesPartitioningResult:
                 # Adjust colors for intrusion time bins
                 # colors = [color if is_intrusion is None or not is_intrusion[position_index + i] else 'red' for i in range(num_positions)]
                 colors = [color for i in range(num_positions)]
-                out_dict['subsequence_positions_hlines_dict'][subsequence_idx] = ax.hlines(subsequence_positions, xmin=x_starts_subseq, xmax=x_ends_subseq, colors=colors, linewidth=3)
+                if not should_skip_sequence_position_hlines:
+                    out_dict['subsequence_positions_hlines_dict'][subsequence_idx] = ax.hlines(subsequence_positions, xmin=x_starts_subseq, xmax=x_ends_subseq, colors=colors, **sequence_position_hlines_kwargs)
 
                 if enable_position_difference_indicators:
                     ## Draw "change" arrows between each adjacent bin showing the amount of y-pos change
@@ -1377,13 +1399,26 @@ class SubsequencesPartitioningResult:
         split_positions_arrays = deepcopy(self.split_positions_arrays)
         out2: MatplotlibRenderPlots = self.plot_time_bins_multiple(num='debug_plot_merged_time_binned_positions', ax=ax_dict["ax_grouped_seq"], enable_position_difference_indicators=True,
             flat_time_window_edges=flat_time_window_edges, override_positions_list=split_positions_arrays, **common_plot_time_bins_multiple_kwargs,
+            sequence_position_hlines_kwargs=dict(linewidth=3, linestyle='--', zorder=11, alpha=0.9),
         )
         merged_plots_out_dict["ax_grouped_seq"] = out2.plots
         
+        #(offset, (on_off_seq)). For example, (0, (3, 10, 1, 15)) means (3pt line, 10pt space, 1pt line, 15pt space) with no offset, while (5, (10, 3)), means (10pt line, 3pt space), but skip the first 5pt line.
+        # linestyle = (0, (5, 1))
+        linestyle = (0, (1, 1)) # dots with 1pt dot, 0.5pt space
+        # Plot only the positions themselves, as dotted overlaying lines
+        pre_merged_debug_sequences_kwargs = dict(sequence_position_hlines_kwargs=dict(linewidth=2, linestyle=linestyle, zorder=10, alpha=1.0), # high-zorder to place it on-top, linestyle is "densely-dashed"
+            split_vlines_kwargs = dict(should_skip=True),
+            time_bin_edges_vlines_kwargs = dict(should_skip=True),
+            direction_change_lines_kwargs = dict(should_skip=True),
+            intrusion_time_bin_shading_kwargs = dict(should_skip=True),
+        )
+                    
+
         ## Add re-sequenced (merged) result:
         merged_split_positions_arrays = deepcopy(self.merged_split_positions_arrays)
         out3: MatplotlibRenderPlots = self.plot_time_bins_multiple(num='debug_plot_merged_time_binned_positions', ax=ax_dict["ax_merged_grouped_seq"], enable_position_difference_indicators=True,
-            flat_time_window_edges=flat_time_window_edges, override_positions_list=merged_split_positions_arrays, **common_plot_time_bins_multiple_kwargs, 
+            flat_time_window_edges=flat_time_window_edges, override_positions_list=merged_split_positions_arrays, **common_plot_time_bins_multiple_kwargs, **pre_merged_debug_sequences_kwargs,
         )        
         merged_plots_out_dict["ax_merged_grouped_seq"] = out3.plots
         
