@@ -2056,7 +2056,7 @@ class HeuristicReplayScoring:
     @classmethod
     @function_attributes(short_name='main_contiguous_subsequence_len', tags=['bin-wise', 'bin-size', 'score', 'replay', 'sequence_length'], input_requires=[], output_provides=[],
                           uses=['SubsequencesPartitioningResult', '_compute_sequences_spanning_ignored_intrusions'], used_by=[], creation_date='2024-03-12 01:05', related_items=['SubsequencesPartitioningResult'])
-    def bin_wise_contiguous_subsequence_num_bins_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, same_thresh_fraction_of_track: float = 0.025, max_ignore_bins:int=2) -> int:
+    def bin_wise_contiguous_subsequence_num_bins_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, same_thresh_fraction_of_track: float = 0.050, max_ignore_bins:int=2) -> int:
         """ The amount of the track that is represented by the decoding. More is better (indicating a longer replay).
 
         - Finds the longest continuous sequence (perhaps with some intrusions allowed?)
@@ -2076,7 +2076,8 @@ class HeuristicReplayScoring:
         ## Begin computations:
 
         ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
-        partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, flat_time_window_centers=deepcopy(time_window_centers))
+        partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm,
+                                                                                                                    flat_time_window_centers=deepcopy(time_window_centers))
         # longest_sequence_subsequence = deepcopy(partition_result.longest_sequence_subsequence)
         # longest_sequence_subsequence_partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(longest_sequence_subsequence, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm)
         # longest_sequence_subsequence_partition_result.merged_split_positions_arrays ## makes things worse
@@ -2290,7 +2291,7 @@ class HeuristicReplayScoring:
     @function_attributes(short_name=None, tags=['heuristic', 'replay', 'score', 'OLDER'], input_requires=[], output_provides=[],
                          uses=['_compute_pos_derivs', 'partition_subsequences_ignoring_repeated_similar_positions', '_compute_total_variation', '_compute_integral_second_derivative', '_compute_stddev_of_diff', 'HeuristicScoresTuple'],
                          used_by=['compute_all_heuristic_scores'], creation_date='2024-02-29 00:00', related_items=[])
-    def compute_pho_heuristic_replay_scores(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, debug_print=False, use_bin_units_instead_of_realworld:bool=False, max_ignore_bins:float=2, same_thresh: float=4.0, **kwargs) -> HeuristicScoresTuple:
+    def compute_pho_heuristic_replay_scores(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, debug_print=False, use_bin_units_instead_of_realworld:bool=False, max_ignore_bins:float=2, same_thresh_cm: float=6.0, **kwargs) -> HeuristicScoresTuple:
         """ 2024-02-29 - New smart replay heuristic scoring
 
         
@@ -2408,7 +2409,7 @@ class HeuristicReplayScoring:
             # sign_change_indices = np.where(np.diff(a_first_order_diff_sign) != 0)[0] + 1  # Add 1 because np.diff reduces the index by 1
 
             ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
-            partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list=a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh) # (a_first_order_diff, same_thresh=same_thresh)
+            partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list=a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm) # (a_first_order_diff, same_thresh=same_thresh)
             num_direction_changes: int = len(partition_result.split_indicies)
             direction_change_bin_ratio: float = float(num_direction_changes) / (float(n_time_bins)-1) ## OUT: direction_change_bin_ratio
 
@@ -2552,7 +2553,7 @@ class HeuristicReplayScoring:
 
     @classmethod
     @function_attributes(short_name=None, tags=['heuristic', 'main', 'computation'], input_requires=[], output_provides=[], uses=['_run_all_score_computations', 'cls.compute_pho_heuristic_replay_scores', 'cls.build_all_score_computations_fn_dict'], used_by=[], creation_date='2024-03-12 00:59', related_items=[])
-    def compute_all_heuristic_scores(cls, track_templates: TrackTemplates, a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult]) -> Tuple[Dict[str, DecodedFilterEpochsResult], Dict[str, pd.DataFrame]]:
+    def compute_all_heuristic_scores(cls, track_templates: TrackTemplates, a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], use_bin_units_instead_of_realworld:bool=False, max_ignore_bins:float=2, same_thresh_cm: float=6.0, **kwargs) -> Tuple[Dict[str, DecodedFilterEpochsResult], Dict[str, pd.DataFrame]]:
         """ Computes all heuristic scoring metrics (for each epoch) and adds them to the DecodedFilterEpochsResult's .filter_epochs as columns
         
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_all_heuristic_scores
@@ -2569,7 +2570,7 @@ class HeuristicReplayScoring:
         _out_new_scores: Dict[str, pd.DataFrame] = {}
 
         for a_name, a_result in a_decoded_filter_epochs_decoder_result_dict.items():
-            _out_new_scores[a_name] =  pd.DataFrame([asdict(cls.compute_pho_heuristic_replay_scores(a_result=a_result, an_epoch_idx=an_epoch_idx), filter=lambda a, v: a.name not in ['position_derivatives_df']) for an_epoch_idx in np.arange(a_result.num_filter_epochs)])
+            _out_new_scores[a_name] =  pd.DataFrame([asdict(cls.compute_pho_heuristic_replay_scores(a_result=a_result, an_epoch_idx=an_epoch_idx, use_bin_units_instead_of_realworld=use_bin_units_instead_of_realworld, max_ignore_bins=max_ignore_bins, same_thresh_cm=same_thresh_cm), filter=lambda a, v: a.name not in ['position_derivatives_df']) for an_epoch_idx in np.arange(a_result.num_filter_epochs)])
             assert np.shape(_out_new_scores[a_name])[0] == np.shape(a_result.filter_epochs)[0], f"np.shape(_out_new_scores[a_name])[0]: {np.shape(_out_new_scores[a_name])[0]} != np.shape(a_result.filter_epochs)[0]: {np.shape(a_result.filter_epochs)[0]}"
             a_result.filter_epochs = PandasHelpers.adding_additional_df_columns(original_df=a_result.filter_epochs, additional_cols_df=_out_new_scores[a_name]) # update the filter_epochs with the new columns
 
