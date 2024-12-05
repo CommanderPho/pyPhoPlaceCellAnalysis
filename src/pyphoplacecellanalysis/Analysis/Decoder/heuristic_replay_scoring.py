@@ -223,12 +223,12 @@ class SubsequencesPartitioningResult:
     def longest_no_repeats_sequence_length_ratio(self) -> float:
         """  Compensate for repeating bins, not counting them towards the score but also not against. """
         ## Compensate for repeating bins, not counting them towards the score but also not against.
-        return self.get_longest_sequence_length_ratio(should_use_no_repeat_values=True)
+        return self.get_longest_sequence_length(should_use_no_repeat_values=True)
             
     @property
     def longest_sequence_length_ratio(self) -> float:
         """  Compensate for repeating bins, not counting them towards the score but also not against. """
-        return self.get_longest_sequence_length_ratio(should_use_no_repeat_values=False)
+        return self.get_longest_sequence_length(should_use_no_repeat_values=False)
             
 
     # 2024-12-04 09:21 Replacement Properties ____________________________________________________________________________ #
@@ -272,7 +272,7 @@ class SubsequencesPartitioningResult:
         return longest_length
 
     @property
-    def longest_sequence_no_repeats_start_idx(self) -> int:
+    def longest_sequence_subsequence_idx(self) -> int:
         """Finds the start index of the longest merged subsequence."""
         if self.merged_split_positions_arrays is None:
             return 0
@@ -284,25 +284,74 @@ class SubsequencesPartitioningResult:
         """Returns the positions of the longest merged subsequence."""
         if self.merged_split_positions_arrays is None:
             return np.array([])
-        return self.merged_split_positions_arrays[self.longest_sequence_no_repeats_start_idx]
+        return self.merged_split_positions_arrays[self.longest_sequence_subsequence_idx]
+    
+
+    @property
+    def longest_sequence_flatindicies(self) -> NDArray:
+        """Returns the flatindicies for the elements in the longest merged subsequence."""
+        if self.merged_split_positions_arrays is None:
+            return np.array([])
+        if self.sequence_info_df is None:
+            self.rebuild_sequence_info_df()
+        is_longest_sequence_bin = (self.sequence_info_df['subsequence_idx'] == self.longest_sequence_subsequence_idx) #['flat_idx'].to_numpy()
+        return self.sequence_info_df[is_longest_sequence_bin]['flat_idx'].to_numpy()
 
 
-    def get_longest_sequence_length_ratio(self, should_use_no_repeat_values: bool = False) -> float:
+    @property
+    def longest_sequence_subsequence_excluding_intrusions(self) -> NDArray:
+        """ the longest merged subsequence excluding intrusions."""
+        if self.sequence_info_df is None:
+            self.rebuild_sequence_info_df()
+        intrusion_flat_indicies = self.sequence_info_df[self.sequence_info_df['is_intrusion']]['flat_idx'].to_numpy()
+        longest_sequence_non_intrusion_flatindicies = np.setdiff1d(self.longest_sequence_flatindicies, intrusion_flat_indicies)
+        return self.flat_positions[longest_sequence_non_intrusion_flatindicies]
+    
+
+    @property
+    def longest_subsequence_non_intrusion_nbins(self) -> int:
+        """Finds the length of the longest merged subsequence excluding intrusions."""
+        if self.merged_split_positions_arrays is None:
+            return 0
+        return len(self.longest_sequence_subsequence_excluding_intrusions)
+    
+
+    def get_longest_sequence_length(self, return_ratio:bool=True, should_use_no_repeat_values: bool = False, should_ignore_intrusion_bins: bool=True) -> float:
         """  Compensate for repeating bins, not counting them towards the score but also not against. """
         ## Compensate for repeating bins, not counting them towards the score but also not against.
+        if not should_ignore_intrusion_bins:
+            flat_positions = self.flat_positions
+            longest_subsequence = self.longest_sequence_subsequence
+        else:
+            ## Ignoring intrusion bins
+            non_intrusion_flat_indicies = self.sequence_info_df[np.logical_not(self.sequence_info_df['is_intrusion'])]['flat_idx'].to_numpy()
+            flat_positions = self.flat_positions[non_intrusion_flat_indicies]
+            longest_subsequence = self.longest_sequence_subsequence_excluding_intrusions
+            
+
         if should_use_no_repeat_values:
-            ## version that DOES ignore repeats:
-            if self.total_num_subsequence_bins_no_repeats > 0:
-                return float(self.longest_sequence_length_no_repeats) / float(self.total_num_subsequence_bins_no_repeats) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
-            else:
-                return 0.0 # zero it out if they are all repeats
+            _, all_value_equiv_group_idxs_list = SubsequencesPartitioningResult.find_value_equiv_groups(flat_positions, same_thresh_cm=self.same_thresh)
+            total_num_all_good_values: int = len(all_value_equiv_group_idxs_list) # the number of equivalence value sets in the longest subsequence
+            
+            _, value_equiv_group_idxs_list = SubsequencesPartitioningResult.find_value_equiv_groups(longest_subsequence, same_thresh_cm=self.same_thresh)
+            # num_items_per_equiv_list: List[int] = [len(v) for v in value_equiv_group_idxs_list] ## number of items in each equiv-list
+            num_longest_subsequence_good_values: int = len(value_equiv_group_idxs_list) # the number of equivalence value sets in the longest subsequence
+            
         else:
             ## version that doesn't ignore repeats:
-            if self.total_num_subsequence_bins > 0:
-                return float(self.longest_subsequence_length) / float(self.total_num_subsequence_bins) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
+            total_num_all_good_values = self.total_num_subsequence_bins
+            num_longest_subsequence_good_values = len(longest_subsequence)
+            
+
+        if not return_ratio:
+            return int(num_longest_subsequence_good_values)
+        else:
+            if total_num_all_good_values > 0:
+                return (float(num_longest_subsequence_good_values) / float(total_num_all_good_values)) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
             else:
                 return 0.0 # zero it out if they are all repeats
             
+
     # ==================================================================================================================== #
     # Update/Recompute Functions                                                                                           #
     # ==================================================================================================================== #
@@ -988,7 +1037,7 @@ class SubsequencesPartitioningResult:
             self.sequence_info_df['orig_subsequence_idx'] = flatten(
                 [[i] * len(v) for i, v in enumerate(self.split_positions_arrays)])
             # Mark intrusions based on max_ignore_bins
-            is_intrusion = [len(v) <= self.max_ignore_bins for v in self.split_positions_arrays]
+            is_intrusion: List[bool] = [len(v) <= self.max_ignore_bins for v in self.split_positions_arrays]
             intrusion_dict = {idx: val for idx, val in enumerate(is_intrusion)}
             self.sequence_info_df['is_intrusion'] = self.sequence_info_df['orig_subsequence_idx'].map(intrusion_dict)
 
@@ -2005,7 +2054,7 @@ class HeuristicReplayScoring:
 
         ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
         partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, flat_time_window_centers=deepcopy(time_window_centers))
-        longest_sequence_length_ratio: float = partition_result.longest_sequence_length_ratio 
+        longest_sequence_length_ratio: float = partition_result.get_longest_sequence_length(return_ratio=True, should_ignore_intrusion_bins=True, should_use_no_repeat_values=False) # partition_result.longest_sequence_length_ratio 
         
         assert longest_sequence_length_ratio <= 1.0, f"longest_sequence_length_ratio should not be greater than 1.0, but it is {longest_sequence_length_ratio}!!"
         
@@ -2083,7 +2132,7 @@ class HeuristicReplayScoring:
 
         ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
         partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, flat_time_window_centers=deepcopy(time_window_centers))
-        longest_no_repeats_sequence_length_ratio: float = partition_result.longest_no_repeats_sequence_length_ratio         
+        longest_no_repeats_sequence_length_ratio: float = partition_result.get_longest_sequence_length(return_ratio=True, should_ignore_intrusion_bins=True, should_use_no_repeat_values=True) # partition_result.longest_no_repeats_sequence_length_ratio         
         assert longest_no_repeats_sequence_length_ratio <= 1.0, f"longest_no_repeats_sequence_length_ratio should not be greater than 1.0, but it is {longest_no_repeats_sequence_length_ratio}!!"
         return longest_no_repeats_sequence_length_ratio
     
@@ -2121,8 +2170,11 @@ class HeuristicReplayScoring:
         # longest_no_repeats_sequence_length_ratio: float = partition_result.longest_no_repeats_sequence_length_ratio         
         # assert longest_no_repeats_sequence_length_ratio <= 1.0, f"longest_no_repeats_sequence_length_ratio should not be greater than 1.0, but it is {longest_no_repeats_sequence_length_ratio}!!"
         # return longest_no_repeats_sequence_length_ratio
-        return int(partition_result.longest_subsequence_length)
+        # return int(partition_result.longest_subsequence_length)
+        # return int(partition_result.longest_subsequence_non_intrusion_nbins) ## excluding intrusions
+        return int(partition_result.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=True, should_use_no_repeat_values=True))
     
+
 
     # ==================================================================================================================== #
     # All Computation Fns of Type                                                                                          #
