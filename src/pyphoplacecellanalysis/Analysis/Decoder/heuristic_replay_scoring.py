@@ -1142,7 +1142,8 @@ class SubsequencesPartitioningResult:
 
                 # Plot horizontal lines for position values within each time bin
                 # Adjust colors for intrusion time bins
-                colors = [color if is_intrusion is None or not is_intrusion[position_index + i] else 'red' for i in range(num_positions)]
+                # colors = [color if is_intrusion is None or not is_intrusion[position_index + i] else 'red' for i in range(num_positions)]
+                colors = [color for i in range(num_positions)]
                 out_dict['subsequence_positions_hlines_dict'][subsequence_idx] = ax.hlines(
                     subsequence_positions, xmin=x_starts_subseq, xmax=x_ends_subseq, colors=colors, linewidth=2)
 
