@@ -8,12 +8,21 @@ from pyphocorehelpers.gui.interaction_helpers import CallbackWrapper
 from pyphocorehelpers.function_helpers import function_attributes
 
 
-@function_attributes(short_name='predicted_position_difference', tags=['display', 'display_helper'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:52')
+@function_attributes(short_name='predicted_position_difference', tags=['display', 'display_helper', 'decoder', 'decoder_difference', 'position'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-03-28 04:52')
 def display_predicted_position_difference(active_one_step_decoder, active_two_step_decoder, active_resampled_measured_positions):
     """ Draw difference between predicted and measured position 
     
+    Draws an arrow from the measured position to the predicted position for each timestep
+
     NOT YET USED
-    
+    Usage:
+
+        from pyphoplacecellanalysis.Pho2D.decoder_difference import display_predicted_position_difference
+
+        active_resampled_pos_df = active_computed_data.extended_stats.time_binned_position_df.copy() # active_computed_data.extended_stats.time_binned_position_df  # 1717 rows × 16 columns
+        active_resampled_measured_positions = active_resampled_pos_df[['x','y']].to_numpy() # The measured positions resampled (interpolated) at the window centers. 
+        display_predicted_position_difference(active_one_step_decoder, active_two_step_decoder, active_resampled_measured_positions)
+
     """
     
     def _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, variable_name='p_x_given_n_and_x_prev', override_variable_value=None, update_callback_function=None):
@@ -134,6 +143,8 @@ def display_predicted_position_difference(active_one_step_decoder, active_two_st
     def perform_update_predicted_position_difference(frame, ax=None, predicted_line=None, measured_line=None, **kwargs):
         return _temp_debug_draw_update_predicted_position_difference(active_one_step_decoder.most_likely_positions, active_resampled_measured_positions, frame, ax=ax, predicted_line=predicted_line, measured_line=measured_line, **kwargs)
 
+
+    # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
     active_predicted_position_difference_plot_callback_wrapper = CallbackWrapper(perform_draw_predicted_position_difference, perform_update_predicted_position_difference, dict())
     _temp_debug_two_step_plots_animated_imshow(active_one_step_decoder, active_two_step_decoder, variable_name='p_x_given_n', update_callback_function=active_predicted_position_difference_plot_callback_wrapper)
 

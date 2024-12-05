@@ -11,6 +11,7 @@ from neuropy.utils.result_context import IdentifyingContext
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.Filesystem.path_helpers import file_uri_from_path
 
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
 
@@ -48,6 +49,7 @@ class OutputsSpecifier:
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.widgets.GraphicsView import GraphicsView
+from plotly.basedatatypes import BaseFigure as PlotlyBaseFigure ## for plotly figure detection
 
 # ==================================================================================================================== #
 # GRAPHICS/FIGURES EXPORTING                                                                                           #
@@ -98,9 +100,13 @@ def export_pyqtgraph_plot(graphics_item, savepath='fileName.png', progress_print
     if file_extension == ExportFiletype.PNG.value:
         from pyphoplacecellanalysis.External.pyqtgraph.exporters.ImageExporter import ImageExporter
         exporter = ImageExporter(graphics_item)
+        bg = pg.mkColor(0,0,0,0.0) # clear color unless a different one is specified
+        kwargs = ({'background': bg} | kwargs) # add 'width' to kwargs if not specified
         kwargs = ({'width': 4096} | kwargs) # add 'width' to kwargs if not specified
     elif file_extension == ExportFiletype.SVG.value:
         from pyphoplacecellanalysis.External.pyqtgraph.exporters.SVGExporter import SVGExporter
+        bg = pg.mkColor(0,0,0,0.0) # clear color unless a different one is specified
+        kwargs = ({'background': bg} | kwargs) # add 'width' to kwargs if not specified
         exporter = SVGExporter(graphics_item)
     else:
         print(f'Unknown file_extension: {file_extension}')
@@ -113,7 +119,8 @@ def export_pyqtgraph_plot(graphics_item, savepath='fileName.png', progress_print
     ## save to file
     exporter.export(str(savepath))
     if progress_print:
-        print(f'exported plot to {savepath}')
+        print(f'exported plot to "{savepath}"')
+    return savepath
 
 
 # ==================================================================================================================== #
@@ -209,8 +216,14 @@ class FigureOutputLocation(Enum):
         elif self.name == FigureOutputLocation.SESSION_OUTPUT_FOLDER.name:
             raise NotImplementedError
             absolute_out_path = None
+        elif self.name == FigureOutputLocation.CUSTOM.name:
+            # custom mode:        
+            assert overriding_root_path is not None, f"in FigureOutputLocation.CUSTOM mode, the `overriding_root_path` must be passed!"
+            if not isinstance(overriding_root_path, Path):
+                overriding_root_path = Path(overriding_root_path)
+            absolute_out_path = overriding_root_path
         else:
-            raise NotImplementedError
+            raise NotImplementedError(f"unknown type: {self}")
 
         # end if		
         if make_folder_if_needed:
@@ -297,17 +310,26 @@ class FileOutputManager:
     """ 2023-06-14 - Manages figure output. Singleton/not persisted.
 
     Usage:
+    
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode
         fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
         test_context = IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='one',session_name='2006-6-08_14-26-15',display_fn_name='display_long_short_laps')
         fig_man.get_figure_save_file_path(test_context, make_folder_if_needed=False)
         >>> Path('/home/halechr/repo/Spike3D/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/2023-06-14/kdiba_gor01_one_2006-6-08_14-26-15_display_long_short_laps')
     """
-    figure_output_location: FigureOutputLocation
-    context_to_path_mode: ContextToPathMode
+    figure_output_location: FigureOutputLocation = field()
+    context_to_path_mode: ContextToPathMode = field()
+    override_output_parent_path: Optional[Path] = field(default=None)
     
     def get_figure_output_parent_and_basename(self, final_context: IdentifyingContext, make_folder_if_needed:bool=True, **kwargs) -> tuple[Path, str]:
         """ gets the final output path for the figure to be saved specified by final_context """
-        figures_parent_out_path = self.figure_output_location.get_figures_output_parent_path(make_folder_if_needed=make_folder_if_needed)
+        if self.figure_output_location.name == FigureOutputLocation.CUSTOM.name:
+            assert self.override_output_parent_path is not None
+        else:
+            assert self.override_output_parent_path is None, f"for all modes other than FigureOutputLocation.CUSTOM, the override_output_parent_path should be None!"
+                        
+
+        figures_parent_out_path = self.figure_output_location.get_figures_output_parent_path(overriding_root_path=self.override_output_parent_path, make_folder_if_needed=make_folder_if_needed)            
         fig_save_path = self.context_to_path_mode.session_context_to_relative_path(figures_parent_out_path, session_ctx=final_context)
         if make_folder_if_needed:
             fig_save_path.mkdir(parents=True, exist_ok=True) # make folder if needed
@@ -323,7 +345,7 @@ class FileOutputManager:
     def get_figure_save_file_path(self, final_context: IdentifyingContext, make_folder_if_needed:bool=True, **kwargs) -> Path:
         """ Returns a complete path to a file without the extension (as a basepath). Same information output by `get_figure_output_parent_and_basename` but returns a single output path instead of the parent_path and basename.
         
-        """ 
+        """
         parent_save_path, fig_save_basename = self.get_figure_output_parent_and_basename(final_context, make_folder_if_needed=make_folder_if_needed, **kwargs)
         return parent_save_path.joinpath(fig_save_basename).resolve()
 
@@ -337,7 +359,7 @@ class FileOutputManager:
 # ==================================================================================================================== #
 
 @function_attributes(tags=['figure','pdf','context','output','path','important'], input_requires=[], output_provides=[], uses=['build_figure_basename_from_display_context'], used_by=[], creation_date='2023-05-25 12:54')
-def build_pdf_metadata_from_display_context(active_identifying_ctx, subset_includelist=None, subset_excludelist=None, debug_print=False):
+def build_pdf_metadata_from_display_context(active_identifying_ctx: IdentifyingContext, subset_includelist=None, subset_excludelist=None, debug_print=False):
     """ Internally uses `build_figure_basename_from_display_context(...)` 
     Usage:
         curr_built_pdf_metadata, curr_pdf_save_filename = build_pdf_metadata_from_display_context(active_identifying_ctx)
@@ -350,12 +372,19 @@ def build_pdf_metadata_from_display_context(active_identifying_ctx, subset_inclu
         print(f'curr_pdf_save_filename: "{curr_pdf_save_filename}"')
 
     # PDF metadata:
-    session_descriptor_string = '_'.join([active_identifying_ctx.format_name, active_identifying_ctx.session_name]) # 'kdiba_2006-6-08_14-26-15'
+    active_identifying_ctx.get_subset(subset_includelist=['format_name', 'session_name'])
+    if active_identifying_ctx.check_keys(keys_list=[['format_name', 'session_name']])[0]:
+        session_descriptor_string: str = '_'.join([active_identifying_ctx.format_name, active_identifying_ctx.session_name]) # 'kdiba_2006-6-08_14-26-15'
+    else:
+        # print(f'no session. in context (err: {err}). Just using context description')
+        session_descriptor_string: str = active_identifying_ctx.get_description(separator='_', include_property_names=False)    
     if debug_print:
         print(f'session_descriptor_string: "{session_descriptor_string}"')
     built_pdf_metadata = {'Creator': 'Spike3D - TestNeuroPyPipeline227', 'Author': 'Pho Hale', 'Title': session_descriptor_string, 'Subject': '', 'Keywords': [session_descriptor_string]}   
     built_pdf_metadata['Title'] = curr_fig_save_basename
-    built_pdf_metadata['Subject'] = active_identifying_ctx.display_fn_name
+    if active_identifying_ctx.check_keys(keys_list=['display_fn_name'])[0]:
+        built_pdf_metadata['Subject'] = active_identifying_ctx.display_fn_name
+                                                               
     built_pdf_metadata['Keywords'] = build_figure_basename_from_display_context(active_identifying_ctx, context_tuple_join_character=' | ') # ' | '.join(context_tuple)
 
     return built_pdf_metadata, curr_pdf_save_filename
@@ -585,7 +614,7 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
 
 
 @function_attributes(short_name=None, tags=['file','export','output','matplotlib','display','active','PDF','batch','automated'], input_requires=[], output_provides=[], uses=['write_to_file'], used_by=[], creation_date='2023-06-14 19:06', related_items=[])
-def build_and_write_to_file(a_fig, active_identifying_ctx, fig_man:Optional[FileOutputManager]=None, subset_includelist=None, subset_excludelist=None, write_vector_format=False, write_png=True, register_output_file_fn=None, progress_print=True, debug_print=False):
+def build_and_write_to_file(a_fig, active_identifying_ctx, fig_man:Optional[FileOutputManager]=None, subset_includelist=None, subset_excludelist=None, context_tuple_join_character='_', write_vector_format=False, write_png=True, register_output_file_fn=None, progress_print=True, debug_print=False):
     """ From the context, fig_man, and arguments builds the final save path for the figure and calls `write_to_file` with these values. """
     active_out_figure_paths = []
     write_any_figs = write_vector_format or write_png
@@ -594,7 +623,7 @@ def build_and_write_to_file(a_fig, active_identifying_ctx, fig_man:Optional[File
 
     # Use fig_man to build the path
     fig_man = fig_man or FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
-    curr_fig_save_path = fig_man.get_figure_save_file_path(active_identifying_ctx, make_folder_if_needed=True, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, context_tuple_join_character='_')
+    curr_fig_save_path = fig_man.get_figure_save_file_path(active_identifying_ctx, make_folder_if_needed=True, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, context_tuple_join_character=context_tuple_join_character)
 
     return write_to_file(a_fig, active_identifying_ctx, final_fig_save_basename_path=curr_fig_save_path, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist, write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=register_output_file_fn, progress_print=progress_print, debug_print=debug_print)
     
@@ -619,21 +648,45 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
     Inputs:
         register_output_file_fn: Callable[output_path:Path, output_metadata:dict] - function called to register outputs, by default should be `curr_active_pipeline.register_output_file`
         
+        ## Replace any '.' characters with a suitable alternative so that .with_suffix('.pdf') doesn't incorrect replace everything after the period (overwriting floating-point values in the basename, for example)
+        ·
+        •
+        •
+        ⁃
+        ∙
+        ➗
     """
+    # period_replacement_char: str = '-'
+    # period_replacement_char: str = '➗'
+    period_replacement_char: str = '•'
+    
     active_out_figure_paths = []
     write_any_figs = write_vector_format or write_png
     if not write_any_figs:
         return active_out_figure_paths # return empty list if no output formats are requested.
 
     assert final_fig_save_basename_path is not None, f"Disabled automatic parent output path generation."
-    
+    ## Replace any '.' characters with a suitable alternative so that .with_suffix('.pdf') doesn't incorrect replace everything after the period (overwriting floating-point values in the basename, for example)
+    erronious_suffixes = final_fig_save_basename_path.suffixes # ['.5']
+    if len(erronious_suffixes) > 0:
+        if debug_print:
+            print(f'final_fig_save_basename_path should have no suffixes because it is a basename, but it has erronious_suffixes: {erronious_suffixes}\nfinal_fig_save_basename_path: {final_fig_save_basename_path}')
+        filename_replaced = str(final_fig_save_basename_path).replace('.', period_replacement_char)
+        if debug_print:
+            print(f'filename_replaced: {filename_replaced}')
+        final_fig_save_basename_path = Path(filename_replaced).resolve()
+        if debug_print:
+            print(f'final_fig_save_basename_path: {final_fig_save_basename_path}')
+        # check the suffixes again:
+        erronious_suffixes = final_fig_save_basename_path.suffixes
+        assert len(erronious_suffixes) == 0, f"erronious_suffixes: {erronious_suffixes} is still not empty after renaming!"
+        
     is_matplotlib_figure = isinstance(a_fig, plt.FigureBase)
+    is_plotly_figure = isinstance(a_fig, PlotlyBaseFigure)
+
     # PDF: .pdf versions:
     if write_vector_format:
         try:
-            
-            
-
             ## MATPLOTLIB only:
             if is_matplotlib_figure:
                 active_pdf_metadata, _unused_old_pdf_save_filename = build_pdf_metadata_from_display_context(active_identifying_ctx, subset_includelist=subset_includelist, subset_excludelist=subset_excludelist) # ignores `active_pdf_save_filename`
@@ -643,6 +696,13 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
                     pdf.savefig(a_fig)
                     
                 additional_output_metadata = {'fig_format':'matplotlib', 'pdf_metadata': active_pdf_metadata}
+
+            elif is_plotly_figure:
+                ## Plotly only:
+                fig_vector_save_path = final_fig_save_basename_path.with_suffix('.svg')
+                a_fig.write_image(fig_vector_save_path)
+                additional_output_metadata = {'fig_format':'plotly'}
+
             else:
                 # pyqtgraph figure: pyqtgraph's exporter can't currently do PDF, so we'll do .svg instead:
                 fig_vector_save_path = final_fig_save_basename_path.with_suffix('.svg')
@@ -652,10 +712,10 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
             if register_output_file_fn is not None:
                 register_output_file_fn(output_path=fig_vector_save_path, output_metadata={'context': active_identifying_ctx, 'fig': (a_fig), **additional_output_metadata})
             if progress_print:
-                print(f'\t saved {fig_vector_save_path}')
+                print(f'\t saved "{file_uri_from_path(fig_vector_save_path)}"')
             active_out_figure_paths.append(fig_vector_save_path)
 
-        except Exception as e:
+        except BaseException as e:
             print(f'Error occured while writing vector format for fig. {e}. Skipping.')
 
     # PNG: .png versions:
@@ -664,9 +724,15 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
         try:
             fig_png_out_path = final_fig_save_basename_path.with_suffix('.png')
             # fig_png_out_path = fig_png_out_path.with_stem(f'{curr_pdf_save_path.stem}_{curr_page_str}') # note this replaces the current .pdf extension with .png, resulting in a good filename for a .png
-            ## MATPLOTLIB only:
             if is_matplotlib_figure:
+                ## MATPLOTLIB only:
                 a_fig.savefig(fig_png_out_path)
+            
+            elif is_plotly_figure:
+                ## Plotly only:
+                a_fig.write_image(fig_png_out_path)
+                additional_output_metadata = {'fig_format':'plotly'} # Unused here
+
             else:
                 # pyqtgraph
                 export_pyqtgraph_plot(a_fig, savepath=fig_png_out_path)
@@ -674,7 +740,7 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
             if register_output_file_fn is not None:
                 register_output_file_fn(output_path=fig_png_out_path, output_metadata={'context': active_identifying_ctx, 'fig': (a_fig)})
             if progress_print:
-                print(f'\t saved {fig_png_out_path}')
+                print(f'\t saved "{file_uri_from_path(fig_png_out_path)}"')
             active_out_figure_paths.append(fig_png_out_path)
         except Exception as e:
             print(f'Error occured while writing .png for fig. {e}. Skipping.')

@@ -11,6 +11,7 @@ from pyphocorehelpers.DataStructure.data_structure_builders import Width_Height_
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphocorehelpers.indexing_helpers import compute_paginated_grid_config
 from pyphocorehelpers.geometry_helpers import compute_data_aspect_ratio, compute_data_extent
+from pyphocorehelpers.print_helpers import generate_html_string
 
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPlotterBase import TimeSynchronizedPlotterBase
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import pyqtplot_build_image_bounds_extent
@@ -134,10 +135,12 @@ class TimeSynchronizedPlacefieldsPlotter(AnimalTrajectoryPlottingMixin, TimeSync
             
             img_item = pg.ImageItem(image=image, levels=(0,1), border='w')
             
-            curr_plot = self.ui.root_graphics_layout_widget.addPlot(row=curr_row, col=curr_col, title=curr_cell_identifier_string) #, font_size=8, font= font , name=curr_plot_identifier_string
+            # curr_plot = self.ui.root_graphics_layout_widget.addPlot(row=curr_row, col=curr_col, title=curr_cell_identifier_string) #, font_size=8, font= font , name=curr_plot_identifier_string
+            curr_plot = self.ui.root_graphics_layout_widget.addPlot(row=curr_row, col=curr_col, title=generate_html_string(input_str=curr_cell_identifier_string, font_size=2, color='grey')) # use a formatted string so it's smaller and grey
             curr_plot.setObjectName(curr_plot_identifier_string)
             curr_plot.addItem(img_item, defaultPadding=0.0)  # add ImageItem to PlotItem
             
+
             #TODO 2023-08-31 15:39: - [ ] Tried to make the title font smaller but doesn't work 
             # font = QtGui.QFont()
             # font.setPixelSize(8)

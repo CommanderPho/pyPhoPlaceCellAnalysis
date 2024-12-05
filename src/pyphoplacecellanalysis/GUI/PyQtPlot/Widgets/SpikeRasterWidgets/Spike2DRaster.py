@@ -1,8 +1,10 @@
 from copy import deepcopy
 import time
+from typing import Tuple, List, Dict, Optional
 import sys
 from indexed import IndexedOrderedDict
-
+from matplotlib.axis import Axis
+from matplotlib.figure import Figure
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyphocorehelpers.function_helpers import function_attributes
@@ -240,6 +242,9 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         # by default we want the time axis to approximately span -20 to 20. So we set the temporal_zoom_factor to 
         # self.params.temporal_zoom_factor = 40.0 / float(self.render_window_duration)
         self.params.temporal_zoom_factor = 1.0        
+
+        # Time Interval (epochs) legends:
+        self.params.enable_time_interval_legend_in_right_margin = True
         
         self.enable_debug_print = False
         self.enable_debug_widgets = True
@@ -356,6 +361,26 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             
         """
         self.logger.debug(f'Spike2DRaster._buildGraphics()')
+        
+        # create a splitter
+        
+        self.ui.main_content_splitter = pg.QtWidgets.QSplitter(0)
+        self.ui.main_content_splitter.setObjectName('main_content_splitter')
+        self.ui.main_content_splitter.setHandleWidth(10)
+        self.ui.main_content_splitter.setOrientation(0) # pg.Qt.Vertical
+        # Qt.Horizontal
+        self.ui.main_content_splitter.setStyleSheet("""
+                QSplitter::handle {
+                    background: rgb(255, 0, 4);
+                }
+                QSplitter::handle:horizontal {
+                    width: 15px;
+                }
+                QSplitter::handle:vertical {
+                    height: 15px;
+                }
+            """)
+
         ##### Main Raster Plot Content Top ##########
         
         self.ui.main_graphics_layout_widget = pg.GraphicsLayoutWidget()
@@ -363,8 +388,11 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         self.ui.main_graphics_layout_widget.useOpenGL(True)
         self.ui.main_graphics_layout_widget.resize(1000,600)
         # Add the main widget to the layout in the (0, 0) location:
-        self.ui.layout.addWidget(self.ui.main_graphics_layout_widget, 0, 0) # add the GLViewWidget to the layout at 0, 0
+        # self.ui.layout.addWidget(self.ui.main_graphics_layout_widget, 0, 0) # add the GLViewWidget to the layout at 0, 0
         
+        # add the GLViewWidget to the splitter
+        self.ui.main_content_splitter.addWidget(self.ui.main_graphics_layout_widget)
+
         # self.ui.main_gl_widget.clicked.connect(self.play_pause)
         # self.ui.main_gl_widget.doubleClicked.connect(self.toggle_full_screen)
         # self.ui.main_gl_widget.wheel.connect(self.wheel_handler)
@@ -444,18 +472,39 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         
         # self.Render2DScrollWindowPlot_on_window_update # register with the animation time window for updates for the scroller.
         # Connect the signals for the zoom region and the LinearRegionItem        
-        self.rate_limited_signal_scrolled_proxy = pg.SignalProxy(self.window_scrolled, rateLimit=60, slot=self.update_zoomed_plot_rate_limited) # Limit updates to 60 Signals/Second
+        self.rate_limited_signal_scrolled_proxy = pg.SignalProxy(self.window_scrolled, rateLimit=30, slot=self.update_zoomed_plot_rate_limited) # Limit updates to 30 Signals/Second
     
-
         # For this 2D Implementation of TimeCurvesViewMixin/PyQtGraphSpecificTimeCurvesMixin
         self.ui.main_time_curves_view_widget = None
         self.ui.main_time_curves_view_legend = None
         
+        # Create a QWidget to act as a wrapper
+        self.ui.wrapper_widget = pg.QtWidgets.QWidget()
+        self.ui.wrapper_widget.setObjectName("wrapper_widget")
+        self.ui.wrapper_widget.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred)
+
+        # Create a layout for the wrapper (you may want a different layout depending on your needs)
+        self.ui.wrapper_layout = pg.QtWidgets.QVBoxLayout(self.ui.wrapper_widget)
+        self.ui.wrapper_layout.setSpacing(0)
+        self.ui.wrapper_layout.setContentsMargins(0, 0, 0, 0)
+        
+        
         ## Add the container to hold dynamic matplotlib plot widgets:
         self.ui.dynamic_docked_widget_container = NestedDockAreaWidget()
         self.ui.dynamic_docked_widget_container.setObjectName("dynamic_docked_widget_container")
-        self.ui.layout.addWidget(self.ui.dynamic_docked_widget_container, 1, 0) # Add the dynamic container as the second row
+        # self.ui.layout.addWidget(self.ui.dynamic_docked_widget_container, 1, 0) # Add the dynamic container as the second row
+        # add the GLViewWidget to the splitter
+        # self.ui.main_content_splitter.addWidget(self.ui.dynamic_docked_widget_container)
 
+        # Add the container to the wrapper layout
+        self.ui.wrapper_layout.addWidget(self.ui.dynamic_docked_widget_container)
+
+        # Add the wrapper_widget to the splitter
+        self.ui.main_content_splitter.addWidget(self.ui.wrapper_widget)
+        
+
+        # add the splitter into your layout
+        self.ui.layout.addWidget(self.ui.main_content_splitter, 0, 0)  # add the splitter to the main layout at 0, 0
 
         # Required for dynamic matplotlib figures (2022-12-23 added, not sure how it relates to above):
         self._setupUI_matplotlib_render_plots()
@@ -534,6 +583,8 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
 
     def _update_plots(self):
         """
+        Seems to be called every time the timeline is scrolled at least.
+
         
         """
         self.logger.debug(f'Spike2DRaster._update_plots()')
@@ -652,6 +703,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     # ==================================================================================================================== #
     # State Save/Restore                                                                                                   #
     # ==================================================================================================================== #
+    @function_attributes(short_name=None, tags=['TODO', 'UNFINISHED', 'save_state', 'renderables', 'restore'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-03 05:23', related_items=[])
     def save_state_active_renderables(self, debug_print=True):
         """ Called to capture the currently added renderables, their customized visual appearance and layout, etc so that they can be restored later by calling `self.perform_restore_renderables(...)` with the output state of this function.
         TODO: not yet complete    
@@ -761,6 +813,118 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         self.remove_rendered_intervals('PBEs', debug_print=False)
         
 
+    # ==================================================================================================================== #
+    # Legends                                                                                                              #
+    # ==================================================================================================================== #
+    @function_attributes(short_name=None, tags=['legend'], input_requires=[], output_provides=[], uses=[], used_by=['build_or_update_all_epoch_interval_rect_legends'], creation_date='2024-07-01 18:29', related_items=[])
+    def _build_or_update_epoch_interval_rect_legend(self, parent_item):
+        """ Build a legend for a single plot each of the epoch rects 
+    
+        parent_item = self.ui.main_plot_widget.graphicsItem()
+
+        """
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import CustomLegendItemSample
+        
+        # Add legend inside the plot boundaries
+        legend_size = None # auto-sizing legend to contents
+        legend = pg.LegendItem(legend_size, offset=(-30, -30))  # Negative offset (x, y) from bottom-right corner
+        legend.setParentItem(parent_item)
+        legend.anchor((1, 1), (1, 1))  # Anchors the legend to the bottom-right corner
+        legend.setSampleType(CustomLegendItemSample)
+        return legend
+    
+
+    @function_attributes(short_name=None, tags=['legend'], input_requires=[], output_provides=[], uses=['_build_or_update_epoch_interval_rect_legend'], used_by=[], creation_date='2024-07-01 18:29', related_items=[])
+    def build_or_update_all_epoch_interval_rect_legends(self):
+        """ Build a legend for each of the subplots. 
+
+        active_2d_plot.build_or_update_all_epoch_interval_rect_legends()
+
+        """
+        from pyphocorehelpers.DataStructure.general_parameter_containers import RenderPlots
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.EpochRenderingMixin import RenderedEpochsItemsContainer
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem, CustomLegendItemSample
+
+        ## Try to get existing legends:
+        legends_dict = self.plots.get('legends', None)
+        if legends_dict is None:
+            ## create new container
+            self.plots['legends'] = RenderPlots(name='legends')
+            legends_dict = self.plots['legends']
+
+        assert legends_dict is not None
+        ## OUTPUTS: legends_dict
+
+        previously_encountered_plot_items = []
+        interval_info = self.get_all_rendered_intervals_dict()
+        if self.enable_debug_print:
+            print(f'=== BEGIN')
+        for a_name, an_intervals_dict in interval_info.items():
+            # is_first_iteration_on_plot = (i
+            if self.enable_debug_print:
+                print(f'a_name: {a_name}:')
+            for a_plot_name, a_plotted_intervals in an_intervals_dict.items():
+                if self.enable_debug_print:
+                    print(f'\ta_plot_name: {a_plot_name}, a_plotted_intervals: {a_plotted_intervals}, type(a_plotted_intervals): {type(a_plotted_intervals)}')
+                a_target_plot = self.plots[a_plot_name]
+                # if a_plot_name == target_plot_name:
+                ## Here's the object, add it to the legend
+                a_legend = legends_dict.get(a_target_plot, None) ## get the legend for this plot
+                if a_legend is None:
+                    ## create a legend:
+                    legends_dict[a_target_plot] = self._build_or_update_epoch_interval_rect_legend(a_target_plot.graphicsItem())
+                    a_legend = legends_dict[a_target_plot]
+                else:
+                    # reuse the legend
+                    # legends_dict[a_target_plot].clear() ## clear any existing items
+                    pass
+                assert a_legend is not None
+                # end if a_legend  
+                if (a_plot_name not in previously_encountered_plot_items):
+                    # first time for this plot
+                    a_legend.clear() ## clear
+
+                    needs_legend_margin: bool = (len(interval_info) > 0)
+
+                    ## Increase the right margin:
+                    if (self.params.enable_time_interval_legend_in_right_margin and needs_legend_margin):
+                        ## Increase the right margin:
+                        a_target_plot.layout.setContentsMargins(0, 0, 300, 0)  # left, top, right, bottom
+                    else:
+                        a_legend_plot.layout.setContentsMargins(0, 0, 0, 0)  # left, top, right, bottom
+                            
+
+                a_legend.addItem(a_plotted_intervals, a_name) ## add the item to the legend
+                previously_encountered_plot_items.append(a_plot_name)
+
+        return legends_dict
+    
+    @function_attributes(short_name=None, tags=['legend', 'remove_all', 'remove'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-01 18:29', related_items=[])
+    def remove_all_epoch_interval_rect_legends(self):
+        """ removes any created legends """
+        ## Remove the legends
+        legends = self.plots.get('legends', None)
+        if legends is not None:
+            for a_legend_plot, a_legend in legends.data_items():
+                if self.enable_debug_print:
+                    print(f'a_legend_plot: {a_legend_plot}, a_legend: {a_legend}')
+                if a_legend is not None:
+                    a_legend.clear() ## clear the legend items
+                    try:
+                        a_legend.setParentItem(None)
+                    except BaseException as err:
+                        if self.enable_debug_print:
+                            print(f'err: {err}')
+                        pass
+                    
+                    # a_legend_plot.removeItem(a_legend)
+                a_legend_plot.layout.setContentsMargins(0, 0, 0, 0)  # left, top, right, bottom
+
+            legends.clear()
+            del self.plots['legends']
+            
+
+
     ######################################################
     # TimeCurvesViewMixin/PyQtGraphSpecificTimeCurvesMixin specific overrides for 2D:
     """ 
@@ -849,7 +1013,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     def _build_or_update_time_curves_legend(self, parent_item):
         """ Build a legend for each of the curves 
     
-        parent_item=self.ui.main_time_curves_view_widget.graphicsItem()
+        parent_item = self.ui.main_time_curves_view_widget.graphicsItem()
 
         """
         # legend_size = (80,60) # fixed size legend
@@ -977,16 +1141,15 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         self.ui.matplotlib_view_widgets = {} # empty dictionary
 
     @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 13:26', related_items=[])
-    def add_new_matplotlib_render_plot_widget(self, row=1, col=0, name='matplotlib_view_widget'):
+    def add_new_matplotlib_render_plot_widget(self, row=1, col=0, name='matplotlib_view_widget', dockSize=(500,50), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None) -> Tuple[MatplotlibTimeSynchronizedWidget, Figure, List[Axis]]:
         """ creates a new dynamic MatplotlibTimeSynchronizedWidget, a container widget that holds a matplotlib figure, and adds it as a row to the main layout
         
         """
         dDisplayItem = self.ui.dynamic_docked_widget_container.find_display_dock(identifier=name) # Dock
         if dDisplayItem is None:
             # No extant matplotlib_view_widget and display_dock currently, create a new one:
-                
             ## TODO: hardcoded single-widget: used to be named `self.ui.matplotlib_view_widget`
-            self.ui.matplotlib_view_widgets[name] = MatplotlibTimeSynchronizedWidget() # Matplotlib widget directly
+            self.ui.matplotlib_view_widgets[name] = MatplotlibTimeSynchronizedWidget(name=name) # Matplotlib widget directly
             self.ui.matplotlib_view_widgets[name].setObjectName(name)
             self.ui.matplotlib_view_widgets[name].plots.fig.subplots_adjust(top=1.0, bottom=0.0, left=0.0, right=1.0, hspace=0.0, wspace=0.0)
             
@@ -994,14 +1157,18 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             # self.ui.layout.addWidget(self.ui.matplotlib_view_widget, row, col)
             
             ## Add to dynamic_docked_widget_container:
-            min_width = 500
-            min_height = 50
+            # min_width = 500
+            # min_height = 50
             # if _last_dock_outer_nested_item is not None:
             #     #NOTE: to stack two dock widgets on top of each other, do area.moveDock(d6, 'above', d4)   ## move d6 to stack on top of d4
             #     dockAddLocationOpts = ['above', _last_dock_outer_nested_item] # position relative to the _last_dock_outer_nested_item for this figure
             # else:
-            dockAddLocationOpts = ['bottom'] #no previous dock for this filter, so use absolute positioning
-            _, dDisplayItem = self.ui.dynamic_docked_widget_container.add_display_dock(name, dockSize=(min_width, min_height), display_config=FigureWidgetDockDisplayConfig(showCloseButton=True),
+            # dockAddLocationOpts = ['bottom'] #no previous dock for this filter, so use absolute positioning
+            
+            if display_config is None:
+                display_config = FigureWidgetDockDisplayConfig(showCloseButton=True)
+            
+            _, dDisplayItem = self.ui.dynamic_docked_widget_container.add_display_dock(name, dockSize=dockSize, display_config=display_config,
                                                                                     widget=self.ui.matplotlib_view_widgets[name], dockAddLocationOpts=dockAddLocationOpts, autoOrientation=False)
             dDisplayItem.setOrientation('horizontal', force=True)
             dDisplayItem.updateStyle()
@@ -1286,10 +1453,13 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         debug_print_temporal_info(self, prefix_string='', indent_string=indent_string)
         
         ## Time Curves: main_time_curves_view_widget:
-        print(f'Time Curves:')
-        main_tc_view_rect = self.ui.main_time_curves_view_widget.viewRect() # PyQt5.QtCore.QRectF(57.847549828567, -0.007193522045074202, 15.76451934295443, 1.0150365839255244)
-        debug_print_QRect(main_tc_view_rect, prefix_string='main_time_curves_view_widget.viewRect(): ', indent_string=indent_string)
-        
+        if self.ui.main_time_curves_view_widget is not None:
+            print(f'Time Curves:')
+            main_tc_view_rect = self.ui.main_time_curves_view_widget.viewRect() # PyQt5.QtCore.QRectF(57.847549828567, -0.007193522045074202, 15.76451934295443, 1.0150365839255244)
+            debug_print_QRect(main_tc_view_rect, prefix_string='main_time_curves_view_widget.viewRect(): ', indent_string=indent_string)
+        else:
+            print(f'No Time Curves added.')
+
         ## UI Properties:
         print(f'UI/Graphics Properties:')
         self.debug_print_spike_raster_2D_specific_plots_info(indent_string = '\t')

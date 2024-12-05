@@ -10,37 +10,14 @@ from matplotlib.colors import ListedColormap # used in PlottingConfig
 from neuropy.core.session.Formats.SessionSpecifications import SessionConfig
 from neuropy.core.epoch import NamedTimerange
 from neuropy.utils.dynamic_container import DynamicContainer
+from neuropy.core.parameters import BaseConfig
 
+from pyphocorehelpers.mixins.gettable_mixin import GetAccessibleMixin
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 
 # Old class Names: VideoOutputModeConfig, PlottingConfig, InteractivePlaceCellConfig
 
-@define(slots=False)
-class BaseConfig:
-    """ 2023-10-24 - Base class to enable successful unpickling from old pre-attrs-based classes (based on `DynamicParameters`) to attrs-based classes.`
-
-    """
-
-    ## For serialization/pickling:
-    def __getstate__(self):
-        # Copy the object's state from self.__dict__ which contains
-        # all our instance attributes (_mapping and _keys_at_init). Always use the dict.copy()
-        # method to avoid modifying the original state.
-        state = self.__dict__.copy()
-        # Remove the unpicklable entries.
-        # del state['file']
-        return state
-
-    def __setstate__(self, state):
-        # Restore instance attributes (i.e., _mapping and _keys_at_init).
-        # Restore instance attributes (i.e., _mapping and _keys_at_init).
-        if ('_mapping' in state) and ('_keys_at_init' in state):
-            # unpickling from the old DynamicParameters-based ComputationResult
-            print(f'unpickling from old DynamicParameters-based computationResult')
-            self.__dict__.update(state['_mapping'])
-        else:
-             # typical update
-            self.__dict__.update(state)
+    
 
 
 
@@ -154,6 +131,24 @@ class PlottingConfig(BaseConfig):
         _obj.subplots_shape = output_subplots_shape
         _obj.use_age_proportional_spike_scale = use_age_proportional_spike_scale
         _obj.plotter_type = plotter_type
+
+        if isinstance(_obj.subplots_shape, str):
+            subplots_shape_str: str = _obj.subplots_shape # '1|5'
+            subplots_shape_arr_strs = subplots_shape_str.split('|')
+            subplots_shape = [int(k) for k in subplots_shape_arr_strs]
+        else:
+            subplots_shape = [int(k) for k in _obj.subplots_shape]
+
+        try:
+            total_n_plots: int = np.prod(subplots_shape)
+            # subplots_shape_tuple = tuple(subplots_shape)
+            if total_n_plots > 1:
+                print(f'total_n_plots: {total_n_plots} > 1: overriding .plotter_type <= "MultiPlotter"')
+                _obj.plotter_type = 'MultiPlotter'
+                #'BackgroundPlotter'
+        except BaseException as e:
+            raise e
+
         return _obj
 
 

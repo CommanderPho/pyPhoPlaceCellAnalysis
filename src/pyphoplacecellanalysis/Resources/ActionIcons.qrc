@@ -18,6 +18,10 @@
     <file>Icons/actions/eye-half.png</file>
   </qresource>
   <qresource prefix="Graphics">
+    <file>Icons/graphics/long_short_laps.png</file>
+    <file>Icons/graphics/TrialByTrialReliabilityImageArray.png</file>
+    <file>Icons/graphics/yellow_blue_plot_icon.png</file>
+    <file>Icons/graphics/directional_track_template_pf1Ds.png</file>
     <file>Icons/graphics/Pho Symbol.svg</file>
     <file>Icons/graphics/Crosshairs.svg</file>
     <file>Icons/graphics/Decoder.svg</file>

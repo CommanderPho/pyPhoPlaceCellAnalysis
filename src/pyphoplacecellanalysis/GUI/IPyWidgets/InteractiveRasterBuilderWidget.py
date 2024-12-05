@@ -53,7 +53,7 @@ def calculate_spearman_correlation(spikes_df, shared_aclus_only_neuron_IDs, acti
 
     output_dict = {}
 
-    epoch_ranked_aclus_dict, epoch_ranked_fragile_linear_neuron_IDX_dict, epoch_selected_spikes_fragile_linear_neuron_IDX_dict, selected_spikes_only_df = RankOrderAnalyses.select_and_rank_spikes(spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict, rank_alignment, time_variable_name_override='t')
+    epoch_ranked_aclus_dict, epoch_ranked_fragile_linear_neuron_IDX_dict, epoch_selected_spikes_fragile_linear_neuron_IDX_dict, selected_spikes_only_df, final_good_Probe_Epoch_ids = RankOrderAnalyses.select_and_rank_spikes(spikes_df, active_aclu_to_fragile_linear_neuron_IDX_dict, rank_alignment, time_variable_name_override='t')
 
     ## TODO: might need to get the specific aclus that are active in the epoch and limit to the intersection of those and the current decoder:
     epoch_spikes_active_aclus = np.array(list(epoch_ranked_aclus_dict[epoch_id].keys())) # get the actual aclus instead of the indicies here.
@@ -125,6 +125,8 @@ class InteractiveRasterBuilderWidget:
     """ displays an interactive raster plot widget that allows you to click to add "spikes" and assess the effects on spearman rank-order
     
     💚 2023-12-08 - Add interactivity to raster plot so I can click and drop a spike.
+    
+    To be used with `2023-12-08 - InteractiveRasterPlotter.ipynb`
     
     """
     def __init__(self, num_neurons=10, time_window=100):

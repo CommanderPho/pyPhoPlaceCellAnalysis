@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <author>Pho Hale</author>
+ <class>RootWidget</class>
+ <widget class="QWidget" name="RootWidget">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>381</width>
+    <height>21</height>
+   </rect>
+  </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+    <horstretch>1</horstretch>
+    <verstretch>1</verstretch>
+   </sizepolicy>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>180</width>
+    <height>21</height>
+   </size>
+  </property>
+  <property name="baseSize">
+   <size>
+    <width>180</width>
+    <height>21</height>
+   </size>
+  </property>
+  <property name="windowTitle">
+   <string>thinButtonBarWidget</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">/*
+background-color: rgb(71, 58, 46);
+border-color: rgb(207, 207, 207);
+background-color: rgba(71, 65, 60, 180);
+color: rgb(244, 244, 244);
+border-color: rgb(0, 0, 0);
+*/
+QWidget {
+    background-color: rgb(71, 58, 46);
+    color: rgb(244, 244, 244);
+}
+QToolTip {
+    background-color: rgb(71, 58, 46);
+    color: rgb(244, 244, 244);
+    border: 1px solid rgb(207, 207, 207);
+}
+QStatusBar {
+    background-color: rgb(71, 58, 46);
+    color: rgb(244, 244, 244);
+}
+</string>
+  </property>
+  <layout class="QGridLayout" name="gridLayout" rowstretch="0" columnstretch="0">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <property name="spacing">
+    <number>0</number>
+   </property>
+   <item row="0" column="0">
+    <widget class="QFrame" name="thinButtonBarWidget">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+       <horstretch>1</horstretch>
+       <verstretch>1</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="minimumSize">
+      <size>
+       <width>120</width>
+       <height>21</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>16777215</width>
+       <height>21</height>
+      </size>
+     </property>
+     <property name="baseSize">
+      <size>
+       <width>120</width>
+       <height>21</height>
+      </size>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,1,0">
+      <property name="spacing">
+       <number>4</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>5</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <item>
+       <widget class="QToolButton" name="btnUnusedButton">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="text">
+         <string>...</string>
+        </property>
+        <property name="popupMode">
+         <enum>QToolButton::MenuButtonPopup</enum>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLineEdit" name="txtLineEdit">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+          <horstretch>1</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="text">
+         <string notr="true">BASIC TEST TEXT!</string>
+        </property>
+        <property name="frame">
+         <bool>false</bool>
+        </property>
+        <property name="readOnly">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::MinimumExpanding</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
+  <action name="actionCopyEpochSelections">
+   <property name="text">
+    <string>CopyEpochSelections</string>
+   </property>
+   <property name="toolTip">
+    <string>Copy Epoch Selections</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+C</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::TextHeuristicRole</enum>
+   </property>
+  </action>
+ </widget>
+ <resources>
+  <include location="../../../../Resources/GuiResources.qrc"/>
+  <include location="../../../../../../../silx/src/silx/resources/silx_resources.qrc"/>
+  <include location="../../../../Resources/ActionIcons.qrc"/>
+ </resources>
+ <connections/>
+</ui>

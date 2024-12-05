@@ -30,13 +30,14 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.hashing_helpers import get_hash_tuple, freeze
 from pyphocorehelpers.mixins.diffable import DiffableObject
 from pyphocorehelpers.print_helpers import print_filesystem_file_size, print_object_memory_usage
+from pyphocorehelpers.print_helpers import build_run_log_task_identifier, build_logger
 from pyphocorehelpers.Filesystem.path_helpers import build_unique_filename, backup_extant_file
 
 from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder # hopefully this works without all the other imports
 from neuropy.core.session.KnownDataSessionTypeProperties import KnownDataSessionTypeProperties
 from neuropy.utils.result_context import IdentifyingContext
 
-from pyphocorehelpers.print_helpers import CapturedException
+from pyphocorehelpers.exception_helpers import CapturedException
 from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import PipelineWithComputedPipelineStageMixin, ComputedPipelineStage
 from pyphoplacecellanalysis.General.Pipeline.Stages.Display import PipelineWithDisplayPipelineStageMixin, PipelineWithDisplaySavingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.Filtering import FilteredPipelineMixin
@@ -48,18 +49,15 @@ from pyphoplacecellanalysis.General.Mixins.ExportHelpers import OutputsSpecifier
 from neuropy.utils.mixins.AttrsClassHelpers import custom_define, AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
 
-
-
 from qtpy import QtCore, QtWidgets, QtGui
 
 # Pipeline Logging:
 import logging
-from pyphocorehelpers.print_helpers import build_module_logger
-pipeline_module_logger = build_module_logger('Spike3D.pipeline')
 
-from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum # for PipelineSavingScheme
+# from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum # for PipelineSavingScheme
+from enum import Enum
 
-class PipelineSavingScheme(ExtendedEnum):
+class PipelineSavingScheme(Enum):
     """Describes how the pickled pipeline is saved and how it impacts existing files.
     Used by `save_pipeline(...)`
 
@@ -84,6 +82,56 @@ class PipelineSavingScheme(ExtendedEnum):
         return dict(zip(cls.all_member_values(), values_list)) # doing it this way (comparing the string value) requires self.value in the shouldSave property!
         # return cls.build_member_value_dict([False, True, True])
 
+    # Implementing methods from ExtendedEnum directly
+    @classmethod
+    def all_members(cls) -> list:
+        return list(cls)
+
+    @classmethod
+    def all_member_names(cls) -> list:
+        return [member.name for member in cls]
+
+    @classmethod
+    def all_member_values(cls) -> list:
+        return [member.value for member in cls]
+
+    @classmethod
+    def build_member_value_dict(cls, values_list) -> dict:
+        assert len(values_list) == len(cls.all_members()), (
+            f"values_list must have one value for each member of the enum, "
+            f"but got {len(values_list)} values for {len(cls.all_members())} members."
+        )
+        return dict(zip(cls.all_members(), values_list))
+
+    @classmethod
+    def _init_from_upper_name_dict(cls) -> dict:
+        return dict(zip([name.upper() for name in cls.all_member_names()], cls.all_members()))
+
+    @classmethod
+    def _init_from_value_dict(cls) -> dict:
+        return dict(zip(cls.all_member_values(), cls.all_members()))
+
+    @classmethod
+    def init(cls, name=None, value=None, fallback_value=None):
+        """Allows enum values to be initialized from either a name or value (but not both).
+        Also allows passthrough of parameters already of the correct Enum type.
+        """
+        assert (name is not None) or (value is not None), (
+            "You must specify either name or value."
+        )
+        assert not (name is not None and value is not None), (
+            "Specify either name or value, not both."
+        )
+        if name is not None:
+            if isinstance(name, str):
+                return cls._init_from_upper_name_dict().get(name.upper(), fallback_value)
+            elif isinstance(name, cls):
+                return name
+        elif value is not None:
+            if isinstance(value, cls):
+                return value
+            return cls._init_from_value_dict().get(value, fallback_value)
+        raise NotImplementedError("Invalid parameters provided.")
 
 
 
@@ -101,9 +149,105 @@ class LoadedObjectPersistanceState:
         return len(curr_diff) > 0
 
 
+# Pipeline Pickling Helpers __________________________________________________________________________________________ #
+@function_attributes(short_name=None, tags=['pure', 'pkl'], input_requires=[], output_provides=[], uses=[], used_by=['save_custom_parameters_pipeline'], creation_date='2024-06-28 13:23', related_items=[])
+def helper_perform_pickle_pipeline(a_curr_active_pipeline, custom_save_filenames, custom_save_filepaths, enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=False, enable_save_h5: bool=False, saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE):
+    """ Pickles the pipelines as needed
+
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import helper_perform_pickle_pipeline
+    custom_save_filepaths = helper_perform_pickle_pipeline(a_curr_active_pipeline=_temp_curr_active_pipeline, custom_save_filenames=custom_save_filenames, custom_save_filepaths=custom_save_filepaths, enable_save_pipeline_pkl=True, enable_save_global_computations_pkl=False, enable_save_h5=False)
+
+    """	
+    try:
+        if enable_save_pipeline_pkl:
+            custom_save_filepaths['pipeline_pkl'] = a_curr_active_pipeline.save_pipeline(saving_mode=saving_mode, active_pickle_filename=custom_save_filenames['pipeline_pkl'])
+
+        if enable_save_global_computations_pkl:
+            custom_save_filepaths['global_computation_pkl'] = a_curr_active_pipeline.save_global_computation_results(override_global_pickle_filename=custom_save_filenames['global_computation_pkl'])
+
+        if enable_save_h5:
+            custom_save_filepaths['pipeline_h5'] = a_curr_active_pipeline.export_pipeline_to_h5(override_filename=custom_save_filenames['pipeline_h5'])
+        
+        print(f'custom_save_filepaths: {custom_save_filepaths}')
+
+    except BaseException as e:
+        print(f'failed pickling in `helper_perform_pickle_pipeline(...)` with error: {e}')
+        pass
+    
+    return custom_save_filepaths
+
+
+@function_attributes(short_name=None, tags=['NEEDS_REFACTOR', 'dataframe', 'filename', 'metadata'], input_requires=[], output_provides=[], uses=[], used_by=['_get_custom_filenames_from_computation_metadata'], creation_date='2024-10-28 12:40', related_items=[])
+def _get_custom_suffix_for_filename_from_computation_metadata(*extras_strings, included_qclu_values=None, minimum_inclusion_fr_Hz=None, parts_separator:str='-') -> str:
+    """ Uses passed parameters to determine an appropriate filename suffix
+    
+    
+    from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _get_custom_suffix_for_filename_from_computation_metadata
+    custom_suffix = _get_custom_suffix_for_filename_from_computation_metadata(new_replay_epochs=new_replay_epochs)
+
+    print(f'custom_suffix: "{custom_suffix}"')
+
+    """
+    custom_suffix_string_parts = []
+    custom_suffix: str = ''
+    if included_qclu_values is not None:
+        custom_suffix_string_parts.append(f"qclu_{included_qclu_values}")
+    if minimum_inclusion_fr_Hz is not None:
+        custom_suffix_string_parts.append(f"frateThresh_{minimum_inclusion_fr_Hz:.1f}")
+    custom_suffix = parts_separator.join([custom_suffix, *custom_suffix_string_parts, *extras_strings])
+    return custom_suffix
+
+
+@function_attributes(short_name=None, tags=['NEEDS_REFACTOR', 'dataframe', 'filename', 'metadata'], input_requires=[], output_provides=[], uses=[], used_by=['save_custom_parameters_pipeline', 'get_custom_pipeline_filenames_from_parameters'], creation_date='2024-10-28 12:40', related_items=[])
+def _get_custom_filenames_from_computation_metadata(epochs_source: str='normal_computed', included_qclu_values=None, minimum_inclusion_fr_Hz=None, parts_separator:str='-') -> Dict[str, str]:
+    """ Uses parameters stored in the pipeline to determine an appropriate filename
+    
+    
+    from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _get_custom_filenames_from_computation_metadata
+
+    custom_save_filepaths, custom_save_filenames, custom_suffix = _get_custom_filenames_from_computation_metadata(replay_suffix=replay_suffix, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
+    print(f'custom_save_filenames: {custom_save_filenames}')
+    print(f'custom_suffix: "{custom_suffix}"')
+
+    """
+    valid_epochs_source_values = ['compute_diba_quiescent_style_replay_events', 'diba_evt_file', 'initial_loaded', 'normal_computed']
+    assert epochs_source in valid_epochs_source_values, f"epochs_source: '{epochs_source}' is not in valid_epochs_source_values: {valid_epochs_source_values}"
+    to_filename_conversion_dict = {'compute_diba_quiescent_style_replay_events':'_withNewComputedReplays', 'diba_evt_file':'_withNewKamranExportedReplays', 'initial_loaded': '_withOldestImportedReplays', 'normal_computed': '_withNormalComputedReplays'}
+    custom_suffix: str = to_filename_conversion_dict[epochs_source]
+    custom_suffix += _get_custom_suffix_for_filename_from_computation_metadata(included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, parts_separator=parts_separator) # '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0'
+    ## INPUTS: custom_suffix
+    custom_save_filenames = {
+        'pipeline_pkl':f'loadedSessPickle{custom_suffix}.pkl',
+        'global_computation_pkl':f"global_computation_results{custom_suffix}.pkl",
+        'pipeline_h5':f'pipeline{custom_suffix}.h5',
+    }
+    # print(f'custom_save_filenames: {custom_save_filenames}')
+    custom_save_filepaths = {k:v for k, v in custom_save_filenames.items()}
+    return custom_save_filepaths, custom_save_filenames, custom_suffix
+
+
+@function_attributes(short_name=None, tags=['NEEDS_REFACTOR', 'save', 'save_custom'], input_requires=[], output_provides=[], uses=['_get_custom_suffix_for_filename_from_computation_metadata', 'helper_perform_pickle_pipeline'], used_by=[], creation_date='2024-10-28 14:08', related_items=[])
+def save_custom_parameters_pipeline(a_curr_active_pipeline, epochs_source: str='normal_computed', minimum_inclusion_fr_Hz=None, included_qclu_values=None, enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=False, enable_save_h5: bool = False, saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, parts_separator:str='-'):
+    """ Saves a pipeline with custom parameters
+
+    Usage:   
+        custom_save_filepaths = curr_active_pipeline.custom_save_pipeline_as(enable_save_pipeline_pkl=False, enable_save_global_computations_pkl=True, enable_save_h5=False)
+        custom_save_filepaths
+
+    """	
+    custom_save_filepaths, custom_save_filenames, custom_suffix = _get_custom_filenames_from_computation_metadata(epochs_source=epochs_source, included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, parts_separator=parts_separator)
+    print(f'custom_save_filenames: {custom_save_filenames}')
+    ## Pickle again after recomputing:
+    custom_save_filepaths = helper_perform_pickle_pipeline(a_curr_active_pipeline=a_curr_active_pipeline, custom_save_filenames=custom_save_filenames, custom_save_filepaths=custom_save_filepaths,
+                                                            enable_save_pipeline_pkl=enable_save_pipeline_pkl, enable_save_global_computations_pkl=enable_save_global_computations_pkl, enable_save_h5=enable_save_h5, saving_mode=saving_mode)
+
+    return custom_save_filepaths, custom_suffix
+
+
+
     
 
-class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, FilteredPipelineMixin, PipelineWithComputedPipelineStageMixin, PipelineWithDisplayPipelineStageMixin, PipelineWithDisplaySavingMixin, HDF_SerializationMixin, QtCore.QObject):
+class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, FilteredPipelineMixin, PipelineWithComputedPipelineStageMixin, PipelineWithDisplayPipelineStageMixin, PipelineWithDisplaySavingMixin, HDF_SerializationMixin, object):
     """ 
     
     Exposes the active sessions via its .sess member.
@@ -129,19 +273,25 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
     """
     
-    sigStageChanged = QtCore.Signal(object) # Emitted when the pipeline stage changes
+    # sigStageChanged = QtCore.Signal(object) # Emitted when the pipeline stage changes
     
     
-    def __init__(self, name="pipeline", session_data_type='kdiba', basedir=None, outputs_specifier: Optional[OutputsSpecifier]=None, load_function: Callable = None, post_load_functions: List[Callable] = [], parent=None, **kwargs):
+    def __init__(self, name="pipeline", session_data_type='kdiba', basedir=None, outputs_specifier: Optional[OutputsSpecifier]=None, load_function: Callable = None, post_load_functions: List[Callable] = []): # , parent=None, **kwargs
         """ 
         Captures:
             pipeline_module_logger (from module)
         """
-        super(NeuropyPipeline, self).__init__(parent, **kwargs)
+        # super(NeuropyPipeline, self).__init__(parent, **kwargs)
         self.pipeline_name = name
         self.session_data_type = None
         self._stage = None
-        self._logger = pipeline_module_logger
+
+        session_identifier: str = f"{name}.{session_data_type}"
+        # task_id: str = build_run_log_task_identifier(session_identifier, logging_root_FQDN='pipeline') # '2024-05-01_14-05-26.Apogee.Spike3D.test'
+
+        # task_id: str = build_run_log_task_identifier(run_context=self.get_session_context(), logging_root_FQDN='pipeline', include_curr_time_str=True, include_hostname=True)
+        task_id: str = build_run_log_task_identifier(run_context=session_identifier, logging_root_FQDN=None, include_curr_time_str=True, include_hostname=True)
+        self._logger = build_logger(full_logger_string=task_id, file_logging_dir=None, debug_print=False)
         self._logger.info(f'NeuropyPipeline.__init__(name="{name}", session_data_type="{session_data_type}", basedir="{basedir}")')
         
         self._persistance_state = None # indicate that this pipeline doesn't have a corresponding pickle file that it was loaded from
@@ -149,7 +299,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         self._plot_object = None
         self._registered_output_files = None # for RegisteredOutputsMixin
         
-        _stage_changed_connection = self.sigStageChanged.connect(self.on_stage_changed)
+        # _stage_changed_connection = self.sigStageChanged.connect(self.on_stage_changed)
         self.set_input(name=name, session_data_type=session_data_type, basedir=basedir, load_function=load_function, post_load_functions=post_load_functions)
 
         if outputs_specifier is None:
@@ -163,7 +313,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         self.logger.info(f'NeuropyPipeline.on_stage_changed(new_stage="{new_stage.identity}")')
 
     @classmethod
-    def init_from_known_data_session_type(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties, override_basepath=None, outputs_specifier: Optional[OutputsSpecifier]=None, override_post_load_functions=None):
+    def init_from_known_data_session_type(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties, override_basepath=None, outputs_specifier: Optional[OutputsSpecifier]=None, override_post_load_functions=None, override_parameters_flat_keypaths_dict=None):
         """ Initializes a new pipeline from a known data session type (e.g. 'bapun' or 'kdiba', which loads some defaults) """
         if override_basepath is not None:
             basepath = override_basepath
@@ -174,12 +324,16 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         else:
             post_load_functions = known_type_properties.post_load_functions
             
-        return cls(name=f'{type_name}_pipeline', session_data_type=type_name, basedir=basepath, outputs_specifier=outputs_specifier,
+        # Overload `override_parameters_flat_keypaths_dict`
+        _obj = cls(name=f'{type_name}_pipeline', session_data_type=type_name, basedir=basepath, outputs_specifier=outputs_specifier,
             load_function=known_type_properties.load_function, post_load_functions=post_load_functions)
-
+        # _obj.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict) ## seems too early as it is before the compute stage where global_computation_results is created (unless the pipeline was loaded.
+        return _obj
+    
     # Load/Save Persistance and Comparison _______________________________________________________________________________ #
     @classmethod
-    def try_init_from_saved_pickle_or_reload_if_needed(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties, override_basepath=None, outputs_specifier: Optional[OutputsSpecifier]=None, override_post_load_functions=None, force_reload=False, active_pickle_filename='loadedSessPickle.pkl', skip_save_on_initial_load=True, progress_print=True, debug_print=False):
+    def try_init_from_saved_pickle_or_reload_if_needed(cls, type_name: str, known_type_properties: KnownDataSessionTypeProperties, override_basepath=None, outputs_specifier: Optional[OutputsSpecifier]=None, override_post_load_functions=None, override_parameters_flat_keypaths_dict=None, force_reload=False,
+                                                     active_pickle_filename='loadedSessPickle.pkl', skip_save_on_initial_load=True, progress_print=True, debug_print=False):
         """ After a session has completed the loading stage prior to filtering (after all objects are built and such), it can be pickled to a file to drastically speed up future loading requests (as would have to be done when the notebook is restarted, etc) 
         Tries to find an extant pickled pipeline, and if it exists it loads and returns that. Otherwise, it loads/rebuilds the pipeline from scratch (from the initial raw data files) and then saves a pickled copy out to disk to speed up future loading attempts.
         
@@ -262,7 +416,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
                 finalized_loaded_sess_pickle_path.unlink() # .unlink() deletes a file
                 print(f"\t {finalized_loaded_sess_pickle_path} deleted.")
                 loaded_pipeline = None
-            except Exception as e:
+            except BaseException as e:
                 raise e
 
             
@@ -284,6 +438,9 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
                 # Otherwise we assume it's a complete computed pipeline pickeled result, in which case the pipeline is located in the 'curr_active_pipeline' key of the loaded dictionary.
                 curr_active_pipeline = loaded_pipeline['curr_active_pipeline']
                 
+
+            curr_active_pipeline.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
+            
             ## Do patching/repair on the unpickled timeline and its sessions to ensure all correct properties are set:
             active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
             active_data_mode_registered_class = active_data_session_types_registered_classes_dict[type_name]
@@ -319,7 +476,8 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             # Otherwise load failed, perform the fallback computation
             if debug_print:
                 print(f'Must reload/rebuild.')
-            curr_active_pipeline = cls.init_from_known_data_session_type(type_name, known_type_properties, override_basepath=Path(basepath), outputs_specifier=outputs_specifier, override_post_load_functions=post_load_functions)
+            curr_active_pipeline = cls.init_from_known_data_session_type(type_name, known_type_properties, override_basepath=Path(basepath), outputs_specifier=outputs_specifier, override_post_load_functions=post_load_functions, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
+            curr_active_pipeline.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
             # Save reloaded pipeline out to pickle for future loading
             if not skip_save_on_initial_load:
                 saveData(finalized_loaded_sess_pickle_path, db=curr_active_pipeline) # 589 MB
@@ -498,7 +656,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
     @stage.setter
     def stage(self, value):
         self._stage = value
-        self.sigStageChanged.emit(self._stage) # pass the new stage
+        # self.sigStageChanged.emit(self._stage) # pass the new stage
     
     @property
     def last_completed_stage(self) -> PipelineStage:
@@ -595,7 +753,8 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         super(NeuropyPipeline, self).__init__() # from 
         
         # Restore unpickable properties:
-        self._logger = pipeline_module_logger
+        task_id: str = build_run_log_task_identifier(self.get_session_context(), logging_root_FQDN=None) # '2024-05-01_14-05-26.Apogee.Spike3D.test', used to have `, logging_root_FQDN='pipeline'`
+        self._logger = build_logger(full_logger_string=task_id, file_logging_dir=None, debug_print=False)
         self._logger.info(f'NeuropyPipeline.__setstate__(state="{state}")') # AttributeError: 'DisplayPipelineStage' object has no attribute 'identity'
 
         self._persistance_state = None # the pickle_path has to be set manually after loading
@@ -603,7 +762,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         self._registered_output_files = None # for RegisteredOutputsMixin
         self._outputs_specifier = None
         
-        _stage_changed_connection = self.sigStageChanged.connect(self.on_stage_changed)
+        # _stage_changed_connection = self.sigStageChanged.connect(self.on_stage_changed)
          
         # Reload both the computation and display functions to get the updated values:
         self.reload_default_computation_functions()
@@ -612,7 +771,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         self.clear_registered_output_files() # outputs are reset each load, should they be?
 
 
-
+    @function_attributes(short_name=None, tags=['save', 'persistance'], input_requires=[], output_provides=[], uses=['saveData'], used_by=[], creation_date='2024-06-25 18:29', related_items=['save_global_computation_results'])
     def save_pipeline(self, saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, active_pickle_filename='loadedSessPickle.pkl', override_pickle_path: Optional[Path]=None):
         """ pickles (saves) the entire pipeline to a file that can be loaded later without recomputing.
 
@@ -683,10 +842,11 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
                     print(f'WARNING: saving_mode is OVERWRITE_IN_PLACE so {finalized_loaded_sess_pickle_path} will be overwritten even though exists.')
                     self.logger.warning(f'WARNING: saving_mode is OVERWRITE_IN_PLACE so {finalized_loaded_sess_pickle_path} will be overwritten even though exists.')
                 
+            # SAVING IS ACTUALLY DONE HERE _______________________________________________________________________________________ #
             # Save reloaded pipeline out to pickle for future loading
             try:
                 saveData(finalized_loaded_sess_pickle_path, db=self) # Save the pipeline out to pickle.
-            except Exception as e:
+            except BaseException as e:
                 raise e
             
             # If we saved to a temporary name, now see if we should overwrite or backup and then replace:
@@ -723,6 +883,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
     # HDF_SerializationMixin
 
     # HDFMixin Conformances ______________________________________________________________________________________________ #
+    @function_attributes(short_name=None, tags=['HDF', 'HDF5', 'export', 'output', 'serialization'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-24 17:00', related_items=[])
     def _export_global_computations_to_hdf(self, file_path, key: str, **kwargs):
         """ exports the self.global_computation_results to HDF file specified by file_path, key. """
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults # for build_neuron_identity_table_to_hdf
@@ -769,8 +930,15 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             inst_spike_rate_groups_result: InstantaneousSpikeRateGroupsComputation = self.global_computation_results.computed_data.long_short_inst_spike_rate_groups # = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.01) # 10ms
             # inst_spike_rate_groups_result.compute(curr_active_pipeline=self, active_context=self.sess.get_context())
             inst_spike_rate_groups_result.to_hdf(file_path, f'{a_global_computations_group_key}/inst_fr_comps') # held up by SpikeRateTrends.inst_fr_df_list  # to HDF, don't need to split it
-        except KeyError:
-            print(f'long_short_inst_spike_rate_groups is missing and will be skipped')
+            # NotImplementedError: a_field_attr: Attribute(name='LxC_aclus', default=None, validator=None, repr=True, eq=True, eq_key=None, order=True, order_key=None, hash=None, init=False, metadata=mappingproxy({'tags': ['dataset'], 'serialization': {'hdf': True}, 'custom_serialization_fn': None, 'hdf_metadata': {'track_eXclusive_cells': 'LxC'}}), type=<class 'numpy.ndarray'>, converter=None, kw_only=False, inherited=False, on_setattr=None, alias='LxC_aclus') could not be serialized and _ALLOW_GLOBAL_NESTED_EXPANSION is not allowed.
+
+        except (KeyError, AttributeError) as e:
+            print(f'long_short_inst_spike_rate_groups is missing and will be skipped. Error: {e}')
+        except NotImplementedError as e:
+            print(f'long_short_inst_spike_rate_groups failed to save to HDF5 due to NotImplementedError issues and will be skipped. Error {e}')
+        except TypeError as e:
+            # TypeError: Object dtype dtype('O') has no native HDF5 equivalent
+            print(f'long_short_inst_spike_rate_groups failed to save to HDF5 due to type issues and will be skipped. This is usually caused by Python None values. Error {e}')
         except BaseException:
             raise
 
@@ -793,7 +961,6 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         
         """
         
-        long_epoch_name, short_epoch_name, global_epoch_name = self.find_LongShortGlobal_epoch_names()
 
         # f.create_dataset(f'{key}/neuron_ids', data=a_sess.neuron_ids)
         # f.create_dataset(f'{key}/shank_ids', data=self.shank_ids)            
@@ -808,8 +975,8 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         self._export_global_computations_to_hdf(file_path, key=key)
 
         # Filtered Session Results:
-        for an_epoch_name in (long_epoch_name, short_epoch_name, global_epoch_name):
-            filter_context_key:str = "/" + self.filtered_contexts[an_epoch_name].get_description(separator="/", include_property_names=False) # '/kdiba/gor01/one/2006-6-08_14-26-15/maze1'
+        for an_epoch_name, an_epoch_context in self.filtered_contexts.items():
+            filter_context_key:str = "/" + an_epoch_context.get_description(separator="/", include_property_names=False) # '/kdiba/gor01/one/2006-6-08_14-26-15/maze1'
             # print(f'\tfilter_context_key: {filter_context_key}')
             with tb.open_file(file_path, mode='a') as f:
                 a_filter_group = f.create_group(session_group_key, an_epoch_name, title='the result of a filter function applied to the session.', createparents=True)
@@ -881,12 +1048,9 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             e = CapturedException(e, exception_info)
             print(f"ERROR: encountered exception {e} while trying to build the session HDF output.")
             if fail_on_exception:
-                raise e.exc
+                raise
             hdf5_output_path = None # set to None because it failed.
             return (hdf5_output_path, e)
-
-    
-
 
     @classmethod
     def read_hdf(cls, file_path, key: str, **kwargs) -> "NeuropyPipeline":
@@ -894,6 +1058,38 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         
         """
         raise NotImplementedError
+    
 
+
+    # # CSV Serialization Methods __________________________________________________________________________________________ #
+    # @function_attributes(short_name=None, tags=['csv', 'export', 'output', 'filesystem'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-01 07:26', related_items=[])
+    # def export_pipeline_to_CSVs(self, override_path: Optional[Path]=None, override_filename: Optional[str]=None, fail_on_exception:bool=True):
+    # 	""" Export the pipeline's components to a folder full of CSVs, not yet implemented.
+
+    # 	"""
+    # 	raise NotImplementedError('Not yet implemented')
+        
+
+
+
+    @function_attributes(short_name=None, tags=['save', 'custom_save', 'export'], input_requires=[], output_provides=[], uses=['save_custom_parameters_pipeline', 'self.get_all_parameters'], used_by=[], creation_date='2024-10-28 14:04', related_items=[])
+    def custom_save_pipeline_as(self, saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE,
+                                 enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=False, enable_save_h5: bool = False):
+        """ uses the pipeline's parameters to determine proper save names 
+        """
+        all_params_dict = self.get_all_parameters()
+
+        # preprocessing_parameters = all_params_dict['preprocessing']
+        rank_order_shuffle_analysis_parameters = all_params_dict['rank_order_shuffle_analysis']
+        minimum_inclusion_fr_Hz = deepcopy(rank_order_shuffle_analysis_parameters['minimum_inclusion_fr_Hz']) # 5.0
+        included_qclu_values = deepcopy(rank_order_shuffle_analysis_parameters['included_qclu_values']) # [1, 2, 4, 6, 7, 9]
+        
+        ## TODO: Ideally would use the value passed in self.get_all_parameters():
+        active_replay_epoch_parameters = deepcopy(self.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays)
+        epochs_source: str = active_replay_epoch_parameters.get('epochs_source', 'normal_computed')
+
+        custom_save_filepaths = save_custom_parameters_pipeline(self, epochs_source=epochs_source, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values, 
+                                                                saving_mode=saving_mode, enable_save_pipeline_pkl=enable_save_pipeline_pkl, enable_save_global_computations_pkl=enable_save_global_computations_pkl, enable_save_h5=enable_save_h5)
+        return custom_save_filepaths
 
 

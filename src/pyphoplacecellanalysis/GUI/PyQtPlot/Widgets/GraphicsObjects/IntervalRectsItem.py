@@ -7,7 +7,7 @@ import numpy as np
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore, QtGui, QtWidgets
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.helpers import RectangleRenderTupleHelpers
-
+from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.LegendItem import ItemSample, LegendItem # for custom legend
 
 ## Create a subclass of GraphicsObject.
 ## The only required methods are paint() and boundingRect() 
@@ -242,7 +242,62 @@ class IntervalRectsItem(pg.GraphicsObject):
     def setAlpha(self, a):
         self.setOpacity(a/255.)
         
-        
+
+
+class CustomLegendItemSample(ItemSample):
+    """ A ItemSample that can render a legend item for `IntervalRectsItem`
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import CustomLegendItemSample
+    
+    legend = pg.LegendItem(offset=(-10, -10))
+    legend.setParentItem(plt.graphicsItem())
+    legend.setSampleType(CustomLegendItemSample)  
+
+    """
+    def __init__(self, item):
+        super().__init__(item)
+        self.item = item
+
+    def paint(self, p, *args):
+        # print(f'CustomItemSample.paint(self, p, *args)')
+        if not isinstance(self.item, IntervalRectsItem):
+            ## Call superclass paint
+            # print(f'\t calling superclass, as type(self.item): {type(self.item)}')
+            super().paint(p, *args)
+        else:
+            # Custom Implementation
+            # print(f'\t calling custom implementation!')
+            if not self.item.isVisible():
+                p.setPen(pg.mkPen('w'))
+                p.drawLine(0, 11, 20, 11) # draw flat white line
+                return
+
+            # Define the size of the rectangle
+            rect_width = 20
+            rect_height = 8
+
+            # Calculate the top-left corner coordinates to center the rectangle
+            top_left_x = (self.boundingRect().width() - rect_width) / 2
+            top_left_y = (self.boundingRect().height() - rect_height) / 2
+
+            ## start_t, series_vertical_offset, duration_t, series_height, pen, brush = rect_data
+            # print(f'len(self.item.data): {len(self.item.data)}')
+
+            # The first item is representitive of all items, don't draw the item over-and-over
+            use_only_first_items: bool = True
+
+            for rect_data in self.item.data:
+                pen, brush = rect_data[4], rect_data[5]
+                if (pen is not None) or (brush is not None):                   
+                    p.setPen(pen)
+                    p.setBrush(brush)
+                    # p.drawRect(QtCore.QRectF(2, 2, 16, 16))
+                    p.drawRect(QtCore.QRectF(top_left_x, top_left_y, rect_width, rect_height))
+                    if use_only_first_items:
+                        return # break, only needed to draw one item
+
+        # print(f'done.')
+
+
 
 # ==================================================================================================================== #
 # MAIN TESTING                                                                                                         #
@@ -266,8 +321,7 @@ def main():
     #     (5., 15, 9, 8, 22, 'w'),
     #     (6., 9, 15, 8, 16, 'w'),
     # ]
-    
-    
+        
     series_start_offsets = [1, 5, 7]
     
     # Have series_offsets which are centers and series_start_offsets which are bottom edges:
@@ -299,10 +353,75 @@ def main():
     plt = pg.plot()
     plt.addItem(item)
     plt.setWindowTitle('pyqtgraph example: IntervalRectsItem')
+    # # Adjust the left margin
+    # plt.getPlotItem().layout.setContentsMargins(100, 10, 10, 10)  # left, top, right, bottom
+
+
+    # Add custom legend
+    legend = pg.LegendItem(offset=(-10, -10))
+    legend.setParentItem(plt.graphicsItem())
+    legend.setSampleType(CustomLegendItemSample)    
+    legend.addItem(item, 'Custom Rects')
+
     
+
+    # series_start_offsets = [1, 5, 7]
+    # curr_border_color = pg.mkColor('r')
+    # curr_border_color.setAlphaF(0.8)
+    # curr_fill_color = pg.mkColor('w')
+    # curr_fill_color.setAlphaF(0.2)
+    # curr_series_pen = pg.mkPen(curr_border_color)
+    # curr_series_brush = pg.mkBrush(curr_fill_color)
+    # data = []
+    # step_x_offset = 0.5
+    # for i in np.arange(len(series_start_offsets)):
+    #     curr_x_pos = (40.0 + (step_x_offset * float(i)))
+    #     data.append((curr_x_pos, series_start_offsets[i], 0.5, 1.0, curr_series_pen, curr_series_brush))
+
+    # item = IntervalRectsItem(data)
+    # item.setFlag(QtGui.QGraphicsItem.ItemIsMovable)
+    # plt = pg.plot()
+    # plt.addItem(item)
+    # plt.setWindowTitle('pyqtgraph example: IntervalRectsItem')
+
+    # # Add custom legend
+    # legend = CustomLegendItem(offset=(-10, -10))
+    # legend.setParentItem(plt.graphicsItem())
+    # legend.addItem(item, 'Custom Rects')
+
+def main2():
+    series_start_offsets = [1, 5, 7]
+    curr_border_color = pg.mkColor('r')
+    curr_border_color.setAlphaF(0.8)
+    curr_fill_color = pg.mkColor('w')
+    curr_fill_color.setAlphaF(0.2)
+    curr_series_pen = pg.mkPen(curr_border_color)
+    curr_series_brush = pg.mkBrush(curr_fill_color)
+    data = []
+    step_x_offset = 0.5
+    for i in np.arange(len(series_start_offsets)):
+        curr_x_pos = (40.0 + (step_x_offset * float(i)))
+        data.append((curr_x_pos, series_start_offsets[i], 0.5, 1.0, curr_series_pen, curr_series_brush))
+
+    item = IntervalRectsItem(data)
+    item.setFlag(QtGui.QGraphicsItem.ItemIsMovable)
+    plt = pg.plot()
+    plt.addItem(item)
+    plt.setWindowTitle('pyqtgraph example: IntervalRectsItem')
+    # Adjust the left margin
+    # plt.getPlotItem().layout.setContentsMargins(100, 10, 10, 10)  # left, top, right, bottom
+    plt.getPlotItem().layout.setContentsMargins(10, 10, 100, 10)  # left, top, right, bottom
+
+    # Add custom legend in the right margin
+    legend = LegendItem(offset=(100, -10))  # Adjust the x-offset as needed
+    legend.setParentItem(plt.graphicsItem())
+    legend.addItem(CustomLegendItemSample(item), 'Custom Rects')
+
+
 if __name__ == '__main__':
     
     # (start_t, duration_t, start_alt_axis, alt_axis_size, pen_color, brush_color)
-    main()
+    # main()
+    main2()
     pg.exec()
     

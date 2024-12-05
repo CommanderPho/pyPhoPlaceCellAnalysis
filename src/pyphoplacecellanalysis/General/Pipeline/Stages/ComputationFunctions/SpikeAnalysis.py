@@ -1,8 +1,10 @@
 from attrs import define, field, asdict
+from neuropy.analyses.decoders import BinningInfo
+from nptyping import NDArray
 import numpy as np
 import pandas as pd
 from indexed import IndexedOrderedDict
-from typing import Optional, Dict, List
+from typing import Any, Optional, Dict, List, Tuple
 import itertools
 
 # from neurodsp.burst import detect_bursts_dual_threshold, compute_burst_stats
@@ -44,6 +46,9 @@ import multiprocessing
 class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
     """ Computes instantaneous firing rates for each cell
     
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.SpikeAnalysis import SpikeRateTrends
+
+    
     """
     epoch_agg_inst_fr_list: np.ndarray = serialized_field(is_computable=True, init=False) # .shape (n_epochs, n_cells)
     cell_agg_inst_fr_list: np.ndarray = serialized_field(is_computable=True, init=False) # .shape (n_cells,)
@@ -68,10 +73,18 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
     
     instantaneous_time_bin_size_seconds: float = serialized_attribute_field(default=0.01, is_computable=False)
     kernel_width_ms: float = serialized_attribute_field(default=10.0, is_computable=False)
-    
+
     
     @classmethod
-    def init_from_spikes_and_epochs(cls, spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, instantaneous_time_bin_size_seconds=0.01, kernel=GaussianKernel(10*ms)) -> "SpikeRateTrends":
+    def init_from_spikes_and_epochs(cls, spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, instantaneous_time_bin_size_seconds=0.01, kernel=GaussianKernel(10*ms),
+                                    use_instantaneous_firing_rate=False, epoch_handling_mode:str='DropShorterMode') -> "SpikeRateTrends":
+        """ the main called function
+        
+        epoch_handling_mode='DropShorterMode' - the default mode prior to 2024-09-12, drops any epochs shorter than the time_bin_size so binning works appropriately.
+        epoch_handling_mode='UseAllEpochsMode' - if you pass a time_bin_size larger than the duration of an epoch, that epoch will have only one bin (with the bin duration the length of the Epoch, meaning each epoch can have variable bin sizes. Introduced 2024-09-12.
+                `instantaneous_time_bin_size_seconds` then effectively becomes a MAXIMUM time_bin_size duration as a smaller bin size (the length of one epoch) can be used if needed
+        
+        """
         if included_neuron_ids is None:
             included_neuron_ids = spikes_df.spikes.neuron_ids
         if len(included_neuron_ids)>0:
@@ -80,7 +93,37 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
             else:
                 filter_epochs_df = filter_epochs.to_dataframe()
                 
-            epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_agg_firing_rates_list = cls.compute_epochs_unit_avg_inst_firing_rates(spikes_df=spikes_df, filter_epochs=filter_epochs_df, included_neuron_ids=included_neuron_ids, instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel=kernel)
+                
+            assert epoch_handling_mode in ['DropShorterMode', 'UseAllEpochsMode']
+                
+            if epoch_handling_mode == 'DropShorterMode':
+                minimum_event_duration: float = instantaneous_time_bin_size_seconds # allow direct use            
+                ## Drop those less than the time bin duration
+                print(f'DropShorterMode:')
+                pre_drop_n_epochs = len(filter_epochs_df)
+                if minimum_event_duration is not None:                
+                    filter_epochs_df = filter_epochs_df[filter_epochs_df['duration'] > minimum_event_duration]
+                    post_drop_n_epochs = len(filter_epochs_df)
+                    n_dropped_epochs = post_drop_n_epochs - pre_drop_n_epochs
+                    print(f'\tminimum_event_duration present (minimum_event_duration={minimum_event_duration}).\n\tdropping {n_dropped_epochs} that are shorter than our minimum_event_duration of {minimum_event_duration}.', end='\t')
+                else:
+                    filter_epochs_df = filter_epochs_df[filter_epochs_df['duration'] > instantaneous_time_bin_size_seconds]
+                    post_drop_n_epochs = len(filter_epochs_df)
+                    n_dropped_epochs = post_drop_n_epochs - pre_drop_n_epochs
+                    print(f'\tdropping {n_dropped_epochs} that are shorter than our instantaneous_time_bin_size_seconds of {instantaneous_time_bin_size_seconds}', end='\t') 
+
+                print(f'{post_drop_n_epochs} remain.')
+            elif epoch_handling_mode == 'UseAllEpochsMode':
+                # Don't drop any epochs
+                print(f'UseAllEpochsMode')
+                pass
+            else:
+                raise NotImplementedError(f'epoch_handling_mode: {epoch_handling_mode} is unsupported.')
+            
+            
+            
+            epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_agg_firing_rates_list = cls.compute_epochs_unit_avg_inst_firing_rates(spikes_df=spikes_df, filter_epochs=filter_epochs_df, included_neuron_ids=included_neuron_ids, instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel=kernel,
+                                                                                                                                          use_instantaneous_firing_rate=use_instantaneous_firing_rate)
             _out = cls(inst_fr_df_list=epoch_inst_fr_df_list, inst_fr_signals_list=epoch_inst_fr_signal_list, included_neuron_ids=included_neuron_ids, filter_epochs_df=filter_epochs_df,
                         instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel_width_ms=kernel.sigma.magnitude)
             _out.recompute_on_update()
@@ -96,7 +139,15 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
         n_epochs = len(self.inst_fr_df_list)
         assert n_epochs > 0        
         n_cells = self.inst_fr_df_list[0].shape[1]
-        epoch_agg_firing_rates_list = np.vstack([a_signal.max(axis=0).magnitude for a_signal in self.inst_fr_signals_list]) # find the peak within each epoch (for all cells) using `.max(...)`
+        
+        
+        is_non_instantaneous = np.all([a_signal is None for a_signal in self.inst_fr_signals_list])
+        if is_non_instantaneous:
+            epoch_agg_firing_rates_list = np.vstack([np.nanmean(a_df.to_numpy(), axis=0) for a_df in self.inst_fr_df_list])
+        else:
+            # use instantaneous version
+            epoch_agg_firing_rates_list = np.vstack([a_signal.max(axis=0).magnitude for a_signal in self.inst_fr_signals_list]) # find the peak within each epoch (for all cells) using `.max(...)`
+            
         assert epoch_agg_firing_rates_list.shape == (n_epochs, n_cells)
         self.epoch_agg_inst_fr_list = epoch_agg_firing_rates_list # .shape (n_epochs, n_cells)
         cell_agg_firing_rates_list = epoch_agg_firing_rates_list.mean(axis=0) # find the peak over all epochs (for all cells) using `.max(...)` --- OOPS, what about the zero epochs? Should those actually effect the rate? Should they be excluded?
@@ -106,7 +157,7 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
 
 
     @classmethod
-    def compute_simple_time_binned_firing_rates_df(cls, active_spikes_df, time_bin_size_seconds=0.5, debug_print=False):
+    def compute_simple_time_binned_firing_rates_df(cls, active_spikes_df, time_bin_size_seconds=0.5, debug_print=False) -> Tuple[pd.DataFrame, pd.DataFrame, NDArray, BinningInfo]:
         """ This simple function computes the firing rates for each time bin. 
         Captures: debug_print
         """
@@ -116,7 +167,7 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
         return unit_specific_binned_spike_rate_df, unit_specific_binned_spike_counts_df, time_window_edges, time_window_edges_binning_info
 
     @classmethod
-    def compute_instantaneous_time_firing_rates(cls, active_spikes_df, time_bin_size_seconds=0.5, kernel=GaussianKernel(200*ms), t_start=0.0, t_stop=1000.0, included_neuron_ids=None):
+    def compute_instantaneous_time_firing_rates(cls, active_spikes_df, time_bin_size_seconds=0.5, kernel=GaussianKernel(200*ms), t_start=0.0, t_stop=1000.0, included_neuron_ids=None) -> Tuple[pd.DataFrame, Any, List[SpikeTrain]]:
         """ I think the error is actually occuring when: `time_bin_size_seconds > (t_stop - t_start)` """
         is_smaller_than_single_bin = (time_bin_size_seconds > (t_stop - t_start))
         assert not is_smaller_than_single_bin, f"ERROR: time_bin_size_seconds ({time_bin_size_seconds}) > (t_stop - t_start) ({t_stop - t_start}). Reduce the bin size or exclude this epoch."
@@ -149,10 +200,10 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
         return instantaneous_unit_specific_spike_rate_values, inst_rate, unit_split_spiketrains
 
     @classmethod
-    def compute_epochs_unit_avg_inst_firing_rates(cls, spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, instantaneous_time_bin_size_seconds=0.02, kernel=GaussianKernel(20*ms), debug_print=False):
+    def compute_epochs_unit_avg_inst_firing_rates(cls, spikes_df: pd.DataFrame, filter_epochs, included_neuron_ids=None, instantaneous_time_bin_size_seconds=0.02, kernel=GaussianKernel(20*ms), use_instantaneous_firing_rate: bool=False, debug_print=False):
         """Computes the average firing rate for each neuron (unit) in each epoch. 
             Usage:
-            epoch_inst_fr_df_list, epoch_avg_firing_rates_list = SpikeRateTrends.compute_epochs_unit_avg_inst_firing_rates(spikes_df=filter_epoch_spikes_df_L, filter_epochs=epochs_df_L, included_neuron_ids=EITHER_subset.track_exclusive_aclus, debug_print=True)
+            epoch_inst_fr_df_list, epoch_inst_fr_signal_list, epoch_avg_firing_rates_list = SpikeRateTrends.compute_epochs_unit_avg_inst_firing_rates(spikes_df=filter_epoch_spikes_df_L, filter_epochs=epochs_df_L, included_neuron_ids=EITHER_subset.track_exclusive_aclus, debug_print=True)
         """
         epoch_inst_fr_df_list = []
         epoch_inst_fr_signal_list = []
@@ -169,21 +220,36 @@ class SpikeRateTrends(HDFMixin, AttrsBasedClassHelperMixin):
         if debug_print:
             print(f'filter_epochs: {filter_epochs.epochs.n_epochs}')
         
-        for epoch_id in np.arange(np.shape(filter_epochs_df)[0]):
+        n_epochs: int = np.shape(filter_epochs_df)[0]
+        for epoch_id in np.arange(n_epochs):
             epoch_start = filter_epochs_df.start.values[epoch_id]
             epoch_end = filter_epochs_df.stop.values[epoch_id]
             epoch_spikes_df = spikes_df.spikes.time_sliced(t_start=epoch_start, t_stop=epoch_end)
 
-            unit_specific_inst_spike_rate_values_df, unit_specific_inst_spike_rate_signal, _unit_split_spiketrains = SpikeRateTrends.compute_instantaneous_time_firing_rates(epoch_spikes_df, time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel=kernel,
-                                                                                                                                                                            t_start=epoch_start, t_stop=epoch_end, included_neuron_ids=included_neuron_ids)
-            
-            # times accessible via `unit_specific_inst_spike_rate_signal.times`
-            epoch_inst_fr_df_list.append(unit_specific_inst_spike_rate_values_df)
-            epoch_inst_fr_signal_list.append(unit_specific_inst_spike_rate_signal)
+            if use_instantaneous_firing_rate:
+                unit_specific_inst_spike_rate_values_df, unit_specific_inst_spike_rate_signal, _unit_split_spiketrains = SpikeRateTrends.compute_instantaneous_time_firing_rates(epoch_spikes_df, time_bin_size_seconds=instantaneous_time_bin_size_seconds, kernel=kernel, t_start=epoch_start, t_stop=epoch_end, included_neuron_ids=included_neuron_ids)
+                # times accessible via `unit_specific_inst_spike_rate_signal.times`
+                epoch_inst_fr_df_list.append(unit_specific_inst_spike_rate_values_df)
+                epoch_inst_fr_signal_list.append(unit_specific_inst_spike_rate_signal)
 
-            # Compute average firing rate for each neuron
-            unit_avg_firing_rates = np.nanmean(unit_specific_inst_spike_rate_signal.magnitude, axis=0)
-            epoch_avg_firing_rates_list.append(unit_avg_firing_rates)
+                # Compute average firing rate for each neuron
+                unit_avg_firing_rates = np.nanmean(unit_specific_inst_spike_rate_signal.magnitude, axis=0)
+                epoch_avg_firing_rates_list.append(unit_avg_firing_rates)
+            else:
+                unit_specific_binned_spike_rate_df, unit_specific_binned_spike_counts_df, time_window_edges, time_window_edges_binning_info = SpikeRateTrends.compute_simple_time_binned_firing_rates_df(epoch_spikes_df, time_bin_size_seconds=instantaneous_time_bin_size_seconds, debug_print=debug_print) # returns dfs containing only the relevant entries
+                n_epoch_time_bins: int = np.shape(unit_specific_binned_spike_rate_df)[0]
+                ## Convert the returned df to a "full" representation: containing a column for each aclu in `included_neuron_ids` (which will be all zeros for aclus not active in this epoch)
+                unit_specific_binned_spike_rate_dict = unit_specific_binned_spike_rate_df.to_dict('list')
+                unit_specific_binned_spike_rate_dict = {aclu:unit_specific_binned_spike_rate_dict.get(aclu, np.zeros((n_epoch_time_bins, ))) for aclu in included_neuron_ids} # add entries for missing aclus
+                unit_specific_binned_spike_rate_df = pd.DataFrame(unit_specific_binned_spike_rate_dict)
+                
+                epoch_inst_fr_df_list.append(unit_specific_binned_spike_rate_df)
+                epoch_inst_fr_signal_list.append(None)
+
+                # Compute average firing rate for each neuron
+                unit_avg_firing_rates = np.nanmean(unit_specific_binned_spike_rate_df.to_numpy(), axis=0) # (n_neurons, )
+                epoch_avg_firing_rates_list.append(unit_avg_firing_rates)
+
             
         epoch_avg_firing_rates_list = np.vstack(epoch_avg_firing_rates_list)
 

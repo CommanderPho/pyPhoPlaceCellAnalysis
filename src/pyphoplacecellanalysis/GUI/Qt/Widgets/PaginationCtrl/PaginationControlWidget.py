@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import QApplication, QFileSystemModel, QTreeView, QWidget, 
 from PyQt5.QtGui import QPainter, QBrush, QPen, QColor, QFont, QIcon
 from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlot, QSize, QDir
 
+from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 from pyphocorehelpers.programming_helpers import documentation_tags, metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 
@@ -124,7 +125,7 @@ class PaginationControlWidget(QWidget):
         self.jump_to_page.connect(lambda page_idx: self._update_series_action_buttons())
 
 
-    @QtCore.pyqtSlot()
+    @pyqtExceptionPrintingSlot()
     def _on_update_pagination(self):
         """ called when the number of pages is updated. """
         # self.ui.spinBoxPage
@@ -135,7 +136,7 @@ class PaginationControlWidget(QWidget):
         self.ui.spinBoxPage.setSuffix(f"/{self.get_total_pages()}")
 
 
-    @QtCore.pyqtSlot()
+    @pyqtExceptionPrintingSlot()
     def _update_series_action_buttons(self):
         """ conditionally update whether the buttons are enabled based on whether we have a valid series selection. """        
         self.ui.btnJumpToPrevious.setEnabled(self.state.can_move_left)
@@ -145,7 +146,7 @@ class PaginationControlWidget(QWidget):
         # self.ui.btnCurrentIntervals_Extra.setEnabled(has_valid_series_selection)
 
 
-    @QtCore.pyqtSlot()
+    @pyqtExceptionPrintingSlot()
     def on_jump_next_page(self):
         """ 
         """
@@ -158,7 +159,7 @@ class PaginationControlWidget(QWidget):
         self.jump_to_page.emit(updated_page_idx)
         self.ui.spinBoxPage.blockSignals(False)
         
-    @QtCore.pyqtSlot()
+    @pyqtExceptionPrintingSlot()
     def on_jump_prev_page(self):
         """ 
         """
@@ -172,13 +173,34 @@ class PaginationControlWidget(QWidget):
         self.jump_to_page.emit(updated_page_idx)
         self.ui.spinBoxPage.blockSignals(False)
 
-    @QtCore.pyqtSlot(int)
+    @pyqtExceptionPrintingSlot(int)
     def go_to_page(self, page_number):
         """ one-based page_number """
         if page_number > 0 and page_number <= self.get_total_pages():
             updated_page_idx = page_number - 1 # convert the page number to a page index
             self.state.current_page_idx = updated_page_idx ## update the state
             self.jump_to_page.emit(updated_page_idx)
+            
+
+    @pyqtExceptionPrintingSlot(int)
+    def update_page_idx(self, updated_page_idx: int):
+        """ this value is safe to bind to. """
+        return self.programmatically_update_page_idx(updated_page_idx=updated_page_idx, block_signals=False)
+
+
+    def programmatically_update_page_idx(self, updated_page_idx: int, block_signals:bool=False):
+        """ Programmatically updates the spinBoxPage with the zero-based page_number 
+        page number (1-based) is always one greater than the page_index (0-based)
+        """
+        updated_page_number = updated_page_idx + 1 # page number (1-based) is always one greater than the page_index (0-based)
+        assert ((updated_page_number > 0) and (updated_page_number <= self.get_total_pages())), f"programmatically_update_page_idx(updated_page_idx: {updated_page_idx}) is invalid! updated_page_number: {updated_page_number}, total_pages: {self.get_total_pages()}"
+        self.state.current_page_idx = updated_page_idx ## update the state
+        self.ui.spinBoxPage.blockSignals(True)
+        self.ui.spinBoxPage.setValue(updated_page_number) # +1 because it's supposed to reflect the page_number instead of the page_index
+        if not block_signals:
+            self.jump_to_page.emit(updated_page_idx)
+        self.ui.spinBoxPage.blockSignals(False)
+
             
 
 

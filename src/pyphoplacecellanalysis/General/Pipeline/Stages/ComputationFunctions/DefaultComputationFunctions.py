@@ -1,5 +1,7 @@
 from copy import deepcopy
 import sys
+from typing import List
+from nptyping import NDArray
 import numpy as np
 import pandas as pd
 
@@ -12,9 +14,9 @@ from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder, Zhang_Two_Step
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult, Zhang_Two_Step
 
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder, computation_precidence_specifying_function, global_function
 
 from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import LeaveOneOutDecodingResult, LeaveOneOutDecodingAnalysisResult, _analyze_leave_one_out_decoding_results ## !!DO_NOT_REMOVE_DILL!! 2023-05-26 - Required to unpickle pipelines, imported just for dill compatibility
 
@@ -31,6 +33,17 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
     _computationPrecidence = 1 # must be done after PlacefieldComputations
     _is_global = False
 
+    @computation_precidence_specifying_function(overriden_computation_precidence=-0.1)
+    @function_attributes(short_name='lap_direction_determination', tags=['laps'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-24 13:04', related_items=[],
+        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].sess.laps.to_dataframe(), curr_active_pipeline.computation_results[computation_filter_name].sess.laps.to_dataframe()['is_LR_dir']), is_global=False)
+    def _perform_lap_direction_determination(computation_result: ComputationResult, **kwargs):
+        """ Adds the 'is_LR_dir' column to the laps dataframe and updates 'lap_dir' if needed.        
+        """
+        computation_result.sess.laps.update_lap_dir_from_smoothed_velocity(pos_input=computation_result.sess.position) # confirmed in-place
+        # computation_result.sess.laps.update_lap_dir_from_smoothed_velocity(pos_input=computation_result.sess.position)
+        # curr_sess.laps.update_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end) # this doesn't make sense for the filtered sessions unfortunately.
+        return computation_result # no changes except to the internal sessions
+    
 
     @function_attributes(short_name='position_decoding', tags=['decoding', 'position'], input_requires=["computed_data['pf1D']", "computed_data['pf2D']"], output_provides=[], uses=['BayesianPlacemapPositionDecoder'], used_by=[], creation_date='2023-09-12 17:30', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf1D_Decoder'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf2D_Decoder']), is_global=False)
@@ -206,7 +219,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
 
         return computation_result
 
-    @function_attributes(short_name=None, tags=['decoding', 'recursive', 'latent'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-12 17:34', related_items=[],
+    @function_attributes(short_name='recursive_latent_pf_decoding', tags=['decoding', 'recursive', 'latent'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-12 17:34', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf1D_RecursiveLatent'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf2D_RecursiveLatent']), is_global=False)
     def _perform_recursive_latent_placefield_decoding(computation_result: ComputationResult, **kwargs):
         """ note that currently the pf1D_Decoders are not built or used. 
@@ -354,17 +367,17 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         computation_result.computed_data['specific_epochs_decoding'] = curr_result
         return computation_result
 
-    @function_attributes(short_name='', tags=['radon_transform','epoch','replay','decoding','UNFINISHED'], input_requires=[], output_provides=[], uses=['compute_radon_transforms'], used_by=[], creation_date='2023-05-31 12:25')
-    def _perform_decoded_replay_fit_best_line_computation(computation_result: ComputationResult, **kwargs):
-        """ Radon Transform
-        """
-        # TODO: does this need to be a global function since there aren't decodings specifically for the epochs in a given session?
-        epochs_linear_fit_df = compute_radon_transforms(long_results_obj.original_1D_decoder, long_results_obj.all_included_filter_epochs_decoder_result)
-        epochs_linear_fit_df
+    # @function_attributes(short_name='', tags=['radon_transform','epoch','replay','decoding','UNFINISHED'], input_requires=[], output_provides=[], uses=['compute_radon_transforms'], used_by=[], creation_date='2023-05-31 12:25')
+    # def _perform_decoded_replay_fit_best_line_computation(computation_result: ComputationResult, **kwargs):
+    #     """ Radon Transform
+    #     """
+    #     # TODO: does this need to be a global function since there aren't decodings specifically for the epochs in a given session?
+    #     epochs_linear_fit_df, *extra_outputs = compute_radon_transforms(long_results_obj.original_1D_decoder, long_results_obj.all_included_filter_epochs_decoder_result)
+    #     epochs_linear_fit_df
         
-        ## TODO UNFINISHED 2023-05-31: need to add the result to the computation result:
+    #     ## TODO UNFINISHED 2023-05-31: need to add the result to the computation result:
         
-        return computation_result
+    #     return computation_result
 
 
 # ==================================================================================================================== #
@@ -592,29 +605,50 @@ def _subfn_compute_decoded_epochs(computation_result, active_config, filter_epoc
     filter_epochs_decoder_result.epoch_description_list = epoch_description_list
     return filter_epochs_decoder_result, active_filter_epochs, default_figure_name
 
+
+def compute_radon_transforms(decoder: "BasePositionDecoder", decoder_result: "DecodedFilterEpochsResult", nlines:int=8192, margin=16, jump_stat=None, n_jobs:int=1) -> pd.DataFrame:
+    """ 
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import perform_compute_radon_transforms
+
+    """
+    active_posterior = decoder_result.p_x_given_n_list # one for each epoch
+    
+    xbin_centers = deepcopy(decoder.xbin_centers) # the same for all xbins
+    t_bin_centers: List[NDArray] = deepcopy(decoder_result.time_window_centers) # list of the time_bin_centers for each decoded time bin in each decoded epoch (list of length n_epochs)
+    t0s_list: List[float] = [float(a_t_bin_centers[0]) for a_t_bin_centers in t_bin_centers] # the first time for each decoded posterior.
+
+
+    # the size of the x_bin in [cm]
+    if decoder.pf.bin_info is not None:
+        pos_bin_size = float(decoder.pf.bin_info['xstep'])
+    else:
+        ## if the bin_info is for some reason not accessible, just average the distance between the bin centers.
+        pos_bin_size = np.diff(decoder.pf.xbin_centers).mean()
+
+    return perform_compute_radon_transforms(active_posterior=active_posterior, x0=float(xbin_centers[0]), t0=t0s_list, decoding_time_bin_duration=decoder_result.decoding_time_bin_size, pos_bin_size=pos_bin_size, nlines=nlines, margin=margin, jump_stat=jump_stat, n_jobs=n_jobs)
+
+
+
 @function_attributes(short_name=None, tags=['radon-transform','decoder','line','fit','velocity','speed'], input_requires=[], output_provides=[], uses=['get_radon_transform'], used_by=['_perform_decoded_replay_fit_best_line_computation'], creation_date='2023-05-31 19:55', related_items=[])
-def compute_radon_transforms(decoder, decoder_result, nlines=5000, margin=16, jump_stat=None, n_jobs=1):
+def perform_compute_radon_transforms(active_posterior, x0, t0, decoding_time_bin_duration: float, pos_bin_size:float, nlines=8192, margin=16, jump_stat=None, n_jobs=4, enable_return_neighbors_arr=False) -> pd.DataFrame:
     """ 2023-05-25 - Computes the line of best fit (which gives the velocity) for the 1D Posteriors for each replay epoch using the Radon Transform approch.
     
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import compute_radon_transforms
         epochs_linear_fit_df = compute_radon_transforms(long_results_obj.original_1D_decoder, long_results_obj.all_included_filter_epochs_decoder_result)
         
+        a_directional_laps_filter_epochs_decoder_result = a_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df), filter_epochs=global_any_laps_epochs_obj, decoding_time_bin_size=laps_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
+        laps_radon_transform_df = compute_radon_transforms(a_directional_pf1D_Decoder, a_directional_laps_filter_epochs_decoder_result)
+
         Columns:         ['score', 'velocity', 'intercept', 'speed']
     """
+    assert isinstance(decoding_time_bin_duration, (float, int)), f"second argument should be the decoding_time_bin_duration (as a float, in seconds). Did you mean to call the `compute_radon_transforms(decoder, decoder_result, ...)` version?"
     from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import get_radon_transform
-    # active_time_bins = active_epoch_decoder_result.time_bin_edges[0]
-    # active_posterior_container = active_epoch_decoder_result.marginal_x_list[0]
-    active_posterior = decoder_result.p_x_given_n_list # one for each epoch
-
-    # the size of the x_bin in [cm]
-    pos_bin_size = float(decoder.pf.bin_info['xstep'])
-
     ## compute the Radon transform to get the lines of best fit
-    score, velocity, intercept = get_radon_transform(active_posterior, decoding_time_bin_duration=decoder_result.decoding_time_bin_size, pos_bin_size=pos_bin_size, posteriors=None, nlines=nlines, margin=margin, jump_stat=jump_stat, n_jobs=1)
-
+    extra_outputs = []
+    score, velocity, intercept, *extra_outputs = get_radon_transform(active_posterior, decoding_time_bin_duration=decoding_time_bin_duration, pos_bin_size=pos_bin_size, posteriors=None, nlines=nlines, margin=margin, jump_stat=jump_stat, n_jobs=n_jobs, enable_return_neighbors_arr=enable_return_neighbors_arr, x0=x0, t0=t0)
     epochs_linear_fit_df = pd.DataFrame({'score': score, 'velocity': velocity, 'intercept': intercept, 'speed': np.abs(velocity)})
-    return epochs_linear_fit_df
+    return epochs_linear_fit_df, *extra_outputs
 
 
 

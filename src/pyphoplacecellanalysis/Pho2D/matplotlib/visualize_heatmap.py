@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from pyphocorehelpers.function_helpers import function_attributes
 
 @function_attributes(short_name='visualize_heatmap', tags=['display','matplotlib','heatmap'], input_requires=[], output_provides=[], uses=[], used_by=['build_callout_subgraphic'], creation_date='2023-03-22 15:11')
-def visualize_heatmap(data, ax=None, show_value_labels=False, title="Simple Heatmap", show_xticks=False, show_yticks=False, show_colorbar=False, defer_show:bool = False):
+def visualize_heatmap(data, ax=None, show_value_labels=False, title="Simple Heatmap", show_xticks=False, show_yticks=False, show_colorbar=False, defer_show:bool = False, layout=None, **imshow_kwargs):
     """
     A MATPLOTLIB-based simple heatmap plot of the given 2D numpy array data.
 
@@ -29,8 +29,11 @@ def visualize_heatmap(data, ax=None, show_value_labels=False, title="Simple Heat
         fig = ax.get_figure()
         # fig.set_size_inches([23, 9.7])
 
+
     # Perform the plot:
-    im = ax.imshow(data)
+    im = ax.imshow(data, **imshow_kwargs)
+    # ax.set_xlim((xmin, xmax))
+    # ax.set_ylim((ymin, ymax))
 
     if show_colorbar:
         # Add colorbar
@@ -64,7 +67,9 @@ def visualize_heatmap(data, ax=None, show_value_labels=False, title="Simple Heat
                 text = ax.text(j, i, data[i, j], ha="center", va="center", color="w")
 
     ax.set_title(title)
-    fig.tight_layout()
+    if (layout is not None) and (layout == 'tight'):
+        fig.tight_layout()
+    
     if not defer_show:
         plt.show()
     
@@ -75,9 +80,10 @@ from typing import Tuple
 import numpy as np
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
+from pyphoplacecellanalysis.External.pyqtgraph_extensions.PlotWidget.CustomPlotWidget import CustomPlotWidget
 
 @function_attributes(short_name='heatmap_pyqtgraph', tags=['pyqtgraph', 'heatmap', 'app', 'window'], input_requires=[], output_provides=[], uses=[], used_by=['plot_kourosh_activity_style_figure'], creation_date='2023-06-21 15:27', related_items=[])
-def visualize_heatmap_pyqtgraph(data, win=None, show_value_labels=False, title="Simple Heatmap", show_xticks=False, show_yticks=False, show_colorbar=False, defer_show:bool = False) -> Tuple[pg.PlotWidget, pg.ImageItem]:
+def visualize_heatmap_pyqtgraph(data, win=None, show_value_labels=False, title="Simple Heatmap", show_xticks=False, show_yticks=False, show_colorbar=False, defer_show:bool = False) -> Tuple[CustomPlotWidget, pg.ImageItem]:
     """
     Creates a simple heatmap visualization of the given 2D numpy array data.
 
@@ -106,7 +112,8 @@ def visualize_heatmap_pyqtgraph(data, win=None, show_value_labels=False, title="
     # Create a new PlotWidget if win is not provided
     if win is None:
         app = pg.mkQApp()
-        win = pg.PlotWidget()
+        # win = pg.PlotWidget()
+        win = CustomPlotWidget()
         win.setWindowTitle(title)
         win.show()
         did_create_win = True

@@ -1,8 +1,12 @@
 import os
 import sys
 from pathlib import Path
-from typing import Optional, List, Dict
-from contextlib import redirect_stdout
+import builtins
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing_extensions import TypeAlias
+from nptyping import NDArray
+import neuropy.utils.type_aliases as types
+from contextlib import redirect_stdout, redirect_stderr
 
 import numpy as np
 import pandas as pd
@@ -13,26 +17,93 @@ from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionForma
 from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDibaOldDataSessionFormatRegisteredClass
 from neuropy.utils.result_context import IdentifyingContext
 
+from pyphocorehelpers.function_helpers import function_attributes
+
 from pyphoplacecellanalysis.General.Batch.runBatch import build_batch_task_logger
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData, loadData
 from pyphoplacecellanalysis.General.Batch.runBatch import run_specific_batch, BatchRun, BatchResultDataframeAccessor, run_diba_batch
-from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.BatchCompletionHandler import \
-    BatchSessionCompletionHandler, SavingOptions, BatchComputationProcessOptions
+from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.BatchCompletionHandler import BatchSessionCompletionHandler, SavingOptions, BatchComputationProcessOptions
 
+# ~ # NBSplit
 ## Begin Script Body
 
 script_file_path = os.path.abspath(__file__)
 script_file_parent_path = Path(os.path.dirname(script_file_path)).resolve()
-log_file_path = script_file_parent_path.joinpath('log_file.log')
-
 
 curr_session_context = {{ curr_session_context }}
 curr_session_basedir = Path(r'{{ curr_session_basedir }}').resolve()
+script_type: str = Path(script_file_path).resolve().stem.split('_')[0] # 'run_kdiba_gor01_one_2006-6-07_11-26-53', either ['run', 'figures']
 
-curr_task_logger = build_batch_task_logger(session_context=curr_session_context, file_logging_dir=script_file_parent_path) # create logger , file_logging_dir=
+session_ctxt_key:str = curr_session_context.get_description(separator='|', subset_includelist=['animal','exper_name','session_name'])
+
+
+{% if should_use_neptune_logging %}
+
+# ==================================================================================================================== #
+# NEPTUNE                                                                                                              #
+# ==================================================================================================================== #
+
+import neptune # for logging progress and results
+from neptune.types import File
+from neptune.utils import stringify_unsupported
+from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import Neptuner, AutoValueConvertingNeptuneRun
+
+neptune_kwargs = dict(
+        project="commander.pho/PhoDibaBatchProcessing",
+        api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxOGIxODU2My1lZTNhLTQ2ZWMtOTkzNS02ZTRmNzM5YmNjNjIifQ==",
+)
+        
+neptuner = Neptuner(project_name=neptune_kwargs['project'], api_token=neptune_kwargs['api_token'])
+
+if neptuner.run is None:
+    # Add the session_context properties to the run: {'format_name': 'kdiba', 'animal': 'vvp01', 'exper_name': 'two', 'session_name': '2006-4-09_16-40-54'}
+    neptuner.run = AutoValueConvertingNeptuneRun(project=neptuner.project_name, api_token=neptuner.api_token, dependencies="infer", source_files=[script_file_path])
+
+    params = {"script_file_path": script_file_path, "script_file_parent_path": script_file_parent_path.as_posix(), "curr_session_context": str(curr_session_context.get_description()), "curr_session_basedir": curr_session_basedir.resolve().as_posix(), "script_type": script_type}
+    neptuner.run["parameters"] = params
+
+    # Add the session_context properties to the run: {'format_name': 'kdiba', 'animal': 'vvp01', 'exper_name': 'two', 'session_name': '2006-4-09_16-40-54'}
+    for k, v in curr_session_context.to_dict().items():
+        neptuner.run[k] = v # add the properties to the run
+
+    neptuner.run["sys/tags"].add(list(curr_session_context.as_tuple()) + [script_type]) # adds the session tags ('kdiba', 'gor01', 'one', '2006-6-09_1-22-43')
+    neptuner.run["sys/group_tags"].add([session_ctxt_key, script_type])
+
+    # session_descriptor_string: a string describing the context of the session like 'sess_kdiba_2006-6-07_11-26-53'
+    neptuner.run['session_descriptor_string'] = curr_session_context.get_description() # 'kdiba_vvp01_two_2006-4-09_16-40-54_sess'
+    neptuner.outputs = neptuner.run['outputs']
+    neptuner.figures = neptuner.outputs['figures']
+
+neptuner_run: AutoValueConvertingNeptuneRun = neptuner.run
+neptuner_run.sync()
+{% endif %}
+
+curr_task_logger = build_batch_task_logger(session_context=curr_session_context, file_logging_dir=script_file_parent_path, logging_root_FQDN=None, include_curr_time_str=True)
+final_log_file_path: Path = None
+for a_handler in curr_task_logger.handlers:
+    if hasattr(a_handler, 'baseFilename'):
+        final_log_file_path = Path(a_handler.baseFilename).resolve()
+        print(f'final_log_file_path: {final_log_file_path}')
+        
+assert final_log_file_path is not None, f"final_log_file_path was not found after creating logger!!"
+
+{% if should_use_neptune_logging %}
+for k, v in {'final_log_file_path': final_log_file_path.as_posix()}.items():
+    try:
+        neptuner_run[f'parameters/{k}'] = v
+    except BaseException as err:
+        print(f'neptune error: {err} for key "{k}". Skipping and continuing')
+neptuner_run.sync()
+{% endif %}
+
+
 _line_sweep = '=========================='
 ## REPLACES THE `print` function within this scope
+if (print != builtins.print):
+    print(f'already replaced print function! Avoiding doing again to prevent infinite recurrsion!')
+    print = builtins.print ## restore the default print function before continuing
+
 _original_print = print
 def new_print(*args, **kwargs):
     # Call both regular print and logger.info
@@ -61,6 +132,11 @@ _restore_previous_matplotlib_settings_callback = matplotlib_configuration_update
 should_perform_figure_generation_to_file=False
 {% endif %}
 
+
+# ==================================================================================================================
+# Parameters and Override Dicts                                                                                     
+# ==================================================================================================================
+
 multiprocessing_kwargs = dict(use_multiprocessing=False, num_processes=1)
 batch_session_completion_handler_kwargs = dict(
     {% for key, value in batch_session_completion_handler_kwargs | dictsort %}
@@ -68,20 +144,34 @@ batch_session_completion_handler_kwargs = dict(
     {% endfor %}
 )
 
-# Override input/output files:
-local_computations_override_file = script_file_parent_path.joinpath('loadedSessPickle.pkl').resolve()
-global_computation_results_override_file = script_file_parent_path.joinpath('global_computation_results.pkl').resolve()
+{# # Disable all overrides for input/output files:
+local_computations_override_file = None
+global_computation_results_override_file = None
+local_computations_override_output_file = None
+global_computation_results_override_output_file = None #}
 
-# Overrides for the output files:
-local_computations_override_output_file = script_file_parent_path.joinpath('loadedSessPickle.pkl').resolve()
-global_computation_results_override_output_file = script_file_parent_path.joinpath('global_computation_results.pkl').resolve()
+## Override input/output files:
+parameter_specifier_str: str = "{{override_custom_pickle_suffix|default('')}}"
+{# override_output_folder: Path = script_file_parent_path #}
+override_output_folder: Path = Path(str(curr_session_basedir))
+assert override_output_folder.exists(), f"override_output_folder: '{override_output_folder}' does not exist!"
 
+local_computations_override_file = override_output_folder.joinpath(f'loadedSessPickle{parameter_specifier_str}.pkl') # do not call `.resolve()`, as this will mess up the session context parsing from the path when there are symlinks
+global_computation_results_override_file = override_output_folder.joinpath('output', f'global_computation_results{parameter_specifier_str}.pkl') # do not call `.resolve()`, as this will mess up the session context parsing from the path when there are symlinks
 
+## Overrides for the output files:
+local_computations_override_output_file = override_output_folder.joinpath(f'loadedSessPickle{parameter_specifier_str}.pkl') # do not call `.resolve()`, as this will mess up the session context parsing from the path when there are symlinks
+global_computation_results_override_output_file = override_output_folder.joinpath('output', f'global_computation_results{parameter_specifier_str}.pkl') # do not call `.resolve()`, as this will mess up the session context parsing from the path when there are symlinks
+
+override_parameters_flat_keypaths_dict = {{override_parameters_flat_keypaths_dict|default('dict()')}} # e.g. {'rank_order_shuffle_analysis.included_qclu_values': [1, 2], 'rank_order_shuffle_analysis.minimum_inclusion_fr_Hz': 5.0,}
+run_specific_batch_kwargs = {{run_specific_batch_kwargs|default('dict()')}}
+
+extended_computations_include_includelist = {{extended_computations_include_includelist|default('None')}}
 force_recompute_override_computations_includelist = {{force_recompute_override_computations_includelist|default('[]')}}
+force_recompute_override_computation_kwargs_dict = {{force_recompute_override_computation_kwargs_dict|default('dict()')}}
 should_force_reload_all = {{should_force_reload_all|default('False')}}
 should_freeze_pipeline_updates = {{should_freeze_pipeline_updates|default('False')}}
 should_symlink_output_pickles = {{should_symlink_output_pickles|default('False')}}
-
 
 {% if should_freeze_pipeline_updates %}
 ## No recomputing at all:
@@ -97,7 +187,8 @@ result_handler = BatchSessionCompletionHandler(force_reload_all=False,
 result_handler = BatchSessionCompletionHandler(force_reload_all=True,
                                                 session_computations_options=BatchComputationProcessOptions(should_load=False, should_compute=True, should_save=SavingOptions.ALWAYS, override_file=local_computations_override_file, override_output_file=local_computations_override_output_file),
                                                 global_computations_options=BatchComputationProcessOptions(should_load=False, should_compute=True, should_save=SavingOptions.ALWAYS, override_file=global_computation_results_override_file, override_output_file=global_computation_results_override_output_file),
-                                                force_recompute_override_computations_includelist=force_recompute_override_computations_includelist,                                                
+                                                extended_computations_include_includelist=extended_computations_include_includelist,
+                                                force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, force_recompute_override_computation_kwargs_dict=force_recompute_override_computation_kwargs_dict,
                                                 should_perform_figure_generation_to_file=should_perform_figure_generation_to_file, saving_mode=PipelineSavingScheme.OVERWRITE_IN_PLACE, force_global_recompute=True,
                                                 **batch_session_completion_handler_kwargs, **multiprocessing_kwargs)
 {% else %}
@@ -106,51 +197,141 @@ result_handler = BatchSessionCompletionHandler(force_reload_all=False,
                                                 session_computations_options=BatchComputationProcessOptions(should_load=True, should_compute=True, should_save=SavingOptions.IF_CHANGED, override_file=local_computations_override_file, override_output_file=local_computations_override_output_file),
                                                 global_computations_options=BatchComputationProcessOptions(should_load=True, should_compute=True, should_save=SavingOptions.IF_CHANGED, override_file=global_computation_results_override_file, override_output_file=global_computation_results_override_output_file),
                                                 should_perform_figure_generation_to_file=should_perform_figure_generation_to_file, should_generate_all_plots=True, saving_mode=PipelineSavingScheme.SKIP_SAVING, force_global_recompute=False,
-                                                force_recompute_override_computations_includelist=force_recompute_override_computations_includelist,
+                                                extended_computations_include_includelist=extended_computations_include_includelist,
+                                                force_recompute_override_computations_includelist=force_recompute_override_computations_includelist,  force_recompute_override_computation_kwargs_dict=force_recompute_override_computation_kwargs_dict,
                                                 **batch_session_completion_handler_kwargs, **multiprocessing_kwargs)
 {% endif %}
 {% endif %}
 
 
-with open(log_file_path, 'a') as f:
-    with redirect_stdout(f):
-        run_status, run_errors, run_outputs = run_specific_batch(global_data_root_parent_path=Path(r'{{ global_data_root_parent_path }}').resolve(),
-                                                        curr_session_context=curr_session_context,
-                                                        curr_session_basedir=curr_session_basedir,
-                                                        force_reload = result_handler.force_reload_all,
-                                                        post_run_callback_fn=result_handler.on_complete_success_execution_session,
-                                                        fail_on_exception=True,
-                                                        saving_mode=result_handler.saving_mode)
+# Add custom_user_completion_functions:
+# custom_user_completion_functions = {{custom_user_completion_functions|default('[]')}}
+{{custom_user_completion_function_template_code|default('custom_user_completion_functions = []')}}
+# ~ # NBSplit
+
+## Set the user_completion_function properties
+result_handler.BATCH_DATE_TO_USE = BATCH_DATE_TO_USE
+result_handler.collected_outputs_path = collected_outputs_path
+
+for a_custom_custom_user_completion_function in custom_user_completion_functions:
+    result_handler.completion_functions.append(a_custom_custom_user_completion_function)
+
+## Add any overriden kwargs:
+result_handler.override_user_completion_function_kwargs_dict = {{custom_user_completion_function_override_kwargs_dict|default('{}')}}
+
+{% if should_use_neptune_logging %}
+for k, v in {'BATCH_DATE_TO_USE': str(BATCH_DATE_TO_USE), 'collected_outputs_path': collected_outputs_path.as_posix(), 'custom_user_completion_functions': stringify_unsupported(custom_user_completion_functions)}.items():
+    try:
+        neptuner_run[f'parameters/{k}'] = v
+    except BaseException as err:
+        print(f'neptune error: {err} for key "{k}". Skipping and continuing')
 
 
-        new_print(f'finished run: {run_status}\nerrors: {run_errors}\n') # 'outputs: {run_outputs}'
+for k, v in dict(local_computations_override_file=local_computations_override_file, global_computation_results_override_file=global_computation_results_override_file, local_computations_override_output_file=local_computations_override_output_file, global_computation_results_override_output_file=global_computation_results_override_output_file,
+        should_freeze_pipeline_updates=should_freeze_pipeline_updates, should_perform_figure_generation_to_file=should_perform_figure_generation_to_file, should_symlink_output_pickles=should_symlink_output_pickles,
+        extended_computations_include_includelist=stringify_unsupported(extended_computations_include_includelist), force_recompute_override_computations_includelist=stringify_unsupported(force_recompute_override_computations_includelist), batch_session_completion_handler_kwargs=stringify_unsupported(batch_session_completion_handler_kwargs),
+        ).items():
+    try:
+        neptuner_run[f'parameters/{k}'] = v
+    except BaseException as err:
+        print(f'neptune error: {err} for key "{k}". Skipping and continuing')
 
-        new_print(f'\n/* ================================================================================================================== */ \n')
-        new_print(f'/* Finished {curr_session_context} __________________________________________________________________________________ */')
-
-        new_print(f'/* script_file_parent_path: {script_file_parent_path} __________________________________________________________________________________ */')
-        new_print(f'/* script_file_path: {script_file_path} __________________________________________________________________________________ */')
-        new_print(f'/* log_file_path: {log_file_path} __________________________________________________________________________________ */')
-        new_print(f'/* session_basedir: {curr_session_basedir} __________________________________________________________________________________ */')
-        new_print(f'/* local_computations_override_file: {local_computations_override_file} __________________________________________________________________________________ */')
-        new_print(f'/* global_computation_results_override_file: {global_computation_results_override_file} __________________________________________________________________________________ */')
-        new_print(f'/* local_computations_override_output_file: {local_computations_override_output_file} __________________________________________________________________________________ */')
-        new_print(f'/* global_computation_results_override_output_file: {global_computation_results_override_output_file} __________________________________________________________________________________ */')
-        new_print(f'/* should_freeze_pipeline_updates: {should_freeze_pipeline_updates} __________________________________________________________________________________ */')
-        new_print(f'/* should_force_reload_all: {should_force_reload_all} __________________________________________________________________________________ */')
-        new_print(f'/* should_perform_figure_generation_to_file: {should_perform_figure_generation_to_file} __________________________________________________________________________________ */')
-        new_print(f'/* should_symlink_output_pickles: {should_symlink_output_pickles} __________________________________________________________________________________ */')
-        new_print(f'/* force_recompute_override_computations_includelist: {force_recompute_override_computations_includelist} __________________________________________________________________________________ */')
-        new_print(f'/* batch_session_completion_handler_kwargs: {batch_session_completion_handler_kwargs} __________________________________________________________________________________ */')
-        new_print(f'/* run_outputs: {run_outputs} __________________________________________________________________________________ */')
-        {# new_print(f'/* batch_session_completion_handler_kwargs: {batch_session_completion_handler_kwargs} __________________________________________________________________________________ */') #}
+neptuner_run.sync()
+{% endif %}
 
 
+{% if should_use_neptune_logging %}
+for k, v in {'final_log_file_path': final_log_file_path.as_posix()}.items():
+    try:
+        neptuner_run[f'parameters/{k}'] = v
+    except BaseException as err:
+        print(f'neptune error: {err} for key "{k}". Skipping and continuing')
+neptuner_run.sync()
+{% endif %}
+
+# ~ # NBSplit
+
+{# Define a block named 'my_block' #}
+{% macro generate_block() %}
+run_status, run_errors, run_outputs = run_specific_batch(global_data_root_parent_path=Path(r'{{ global_data_root_parent_path }}').resolve(),
+                                                curr_session_context=curr_session_context,
+                                                curr_session_basedir=curr_session_basedir,
+                                                active_pickle_filename=result_handler.session_computations_options.override_file,
+                                                existing_task_logger=curr_task_logger,
+                                                force_reload = result_handler.force_reload_all,
+                                                post_run_callback_fn=result_handler.on_complete_success_execution_session,
+                                                fail_on_exception=False,
+                                                saving_mode=result_handler.saving_mode, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict, **run_specific_batch_kwargs)
+
+new_print(f'finished run: {run_status}\nerrors: {run_errors}\n') # 'outputs: {run_outputs}'
+
+{% if should_use_neptune_logging %}
+for k, v in {'run_status': run_status, 'run_errors': run_errors, 'run_outputs': run_outputs}.items():
+    try:
+        neptuner_run[f'outputs/{k}'] = stringify_unsupported(v)
+    except BaseException as err:
+        print(f'neptune error: {err} for key "{k}" (post `run_specific_batch`). Skipping and continuing')
+neptuner_run.sync()
+{% endif %}
+
+
+new_print(f'\n/* ================================================================================================================== */ \n')
+new_print(f'/* Finished {curr_session_context} __________________________________________________________________________________ */')
+
+new_print(f'/* script_file_parent_path: {script_file_parent_path} __________________________________________________________________________________ */')
+new_print(f'/* script_file_path: {script_file_path} __________________________________________________________________________________ */')
+{% if should_use_file_redirected_output_logging %}
+new_print(f'/* log_file_path: {final_log_file_path} __________________________________________________________________________________ */')
+{% endif %}
+new_print(f'/* session_basedir: {curr_session_basedir} __________________________________________________________________________________ */')
+new_print(f'/* local_computations_override_file: {local_computations_override_file} __________________________________________________________________________________ */')
+new_print(f'/* global_computation_results_override_file: {global_computation_results_override_file} __________________________________________________________________________________ */')
+new_print(f'/* local_computations_override_output_file: {local_computations_override_output_file} __________________________________________________________________________________ */')
+new_print(f'/* global_computation_results_override_output_file: {global_computation_results_override_output_file} __________________________________________________________________________________ */')
+new_print(f'/* should_freeze_pipeline_updates: {should_freeze_pipeline_updates} __________________________________________________________________________________ */')
+new_print(f'/* should_force_reload_all: {should_force_reload_all} __________________________________________________________________________________ */')
+new_print(f'/* should_perform_figure_generation_to_file: {should_perform_figure_generation_to_file} __________________________________________________________________________________ */')
+new_print(f'/* should_symlink_output_pickles: {should_symlink_output_pickles} __________________________________________________________________________________ */')
+new_print(f'/* extended_computations_include_includelist: {extended_computations_include_includelist} __________________________________________________________________________________ */')
+new_print(f'/* force_recompute_override_computations_includelist: {force_recompute_override_computations_includelist} __________________________________________________________________________________ */')
+new_print(f'/* batch_session_completion_handler_kwargs: {batch_session_completion_handler_kwargs} __________________________________________________________________________________ */')
+{# new_print(f'/* run_outputs: {run_outputs} __________________________________________________________________________________ */') #}
+{# new_print(f'/* batch_session_completion_handler_kwargs: {batch_session_completion_handler_kwargs} __________________________________________________________________________________ */') #}
+
+new_print(f'\n ALL DONE! \n')
+new_print(f'/* ================================================================================================================== */\n')
+{% endmacro %}
 
 
 
-        new_print(f'\n ALL DONE! \n')
-        new_print(f'/* ================================================================================================================== */\n')
+{% if should_use_file_redirected_output_logging %}
+with open(final_log_file_path, 'w') as f:
+    with redirect_stdout(f), redirect_stderr(f):
+{# Insert the block with each line indented by 4 spaces #}
+{# {{ self.my_block() | indent(8) }} #}
+{{ generate_block() | indent(8) }}
+
+{% else %}
+{# Insert the block with each line indented by 4 spaces #}
+{# {{ self.my_block() | indent(0) }} #}
+{{ generate_block() | indent(0) }}
+{% endif %}
 
 
-        {# should_symlink_output_pickles #}
+{% if should_use_neptune_logging %}
+neptuner_run.sync()
+try:
+    ## Upload the log file:
+    neptuner_run[f"outputs/log"].upload(Path(final_log_file_path).resolve().as_posix())
+    neptuner_run.sync()
+except BaseException as err:
+    print(f'neptune error: {err} while trying to upload log file at path "{final_log_file_path}". Skipping and continuing')
+
+
+try:
+    ## Finally, stop neptuner:
+    neptuner.stop()
+except BaseException as err:
+    print(f'neptune error: {err} while stopping!')
+
+{% endif %}

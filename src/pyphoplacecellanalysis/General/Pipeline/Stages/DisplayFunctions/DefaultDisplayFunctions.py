@@ -1,4 +1,4 @@
-from neuropy.utils.dynamic_container import overriding_dict_with # required for _display_2d_placefield_result_plot_raw
+from neuropy.utils.mixins.dict_representable import overriding_dict_with # required for _display_2d_placefield_result_plot_raw
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
 

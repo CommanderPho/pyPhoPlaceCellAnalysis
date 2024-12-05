@@ -154,7 +154,7 @@ class DataSeriesColorHelpers:
 
     @function_attributes(short_name=None, tags=['colors', 'neuron_identity'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-18 11:33', related_items=[])
     @classmethod
-    def build_cell_colors(cls, n_neurons:int, colormap_name='hsv', colormap_source='matplotlib'):
+    def build_cell_colors(cls, n_neurons:int, colormap_name='hsv', colormap_source='matplotlib', return_255_array: bool=True):
         """Cell Colors from just n_neurons using pyqtgraph colormaps.
         
         Usage:
@@ -171,9 +171,9 @@ class DataSeriesColorHelpers:
 
         # unit_colors_list = None # default rainbow of colors for the raster plots
         neuron_qcolors_list = cm.mapToQColor(np.arange(n_neurons)/float(n_neurons-1)) # returns a list of QColors
-        neuron_colors_ndarray = DataSeriesColorHelpers.qColorsList_to_NDarray(neuron_qcolors_list, is_255_array=True)
+        # neuron_colors_ndarray = DataSeriesColorHelpers.qColorsList_to_NDarray(neuron_qcolors_list, is_255_array=True)
         # neuron_colors_ndarray = DataSeriesColorHelpers.qColorsList_to_NDarray(neuron_qcolors_list, is_255_array=False)
-
+        neuron_colors_ndarray = DataSeriesColorHelpers.qColorsList_to_NDarray(neuron_qcolors_list, is_255_array=return_255_array)
         return neuron_qcolors_list, neuron_colors_ndarray
 
 

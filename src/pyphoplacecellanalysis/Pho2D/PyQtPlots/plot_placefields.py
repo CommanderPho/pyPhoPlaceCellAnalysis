@@ -1,14 +1,7 @@
-# required to enable non-blocking interaction:
-# from PyQt5.Qt import QApplication
-# # start qt event loop
-# _instance = QApplication.instance()
-# if not _instance:
-#     _instance = QApplication([])
-# app = _instance
 import numpy as np
 
 from neuropy.utils.misc import safe_item
-from neuropy.utils.dynamic_container import overriding_dict_with # used in display_all_pf_2D_pyqtgraph_binned_image_rendering to only get the valid kwargs to pass from the display config
+from neuropy.utils.mixins.dict_representable import overriding_dict_with # used in display_all_pf_2D_pyqtgraph_binned_image_rendering to only get the valid kwargs to pass from the display config
 from neuropy.utils.matplotlib_helpers import _build_variable_max_value_label, enumTuningMap2DPlotMode, enumTuningMap2DPlotVariables, _determine_best_placefield_2D_layout, _scale_current_placefield_to_acceptable_range, _build_neuron_identity_label # for display_all_pf_2D_pyqtgraph_binned_image_rendering
 from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow # for display_all_pf_2D_pyqtgraph_binned_image_rendering
 from neuropy.core.neuron_identities import PlotStringBrevityModeEnum # for display_all_pf_2D_pyqtgraph_binned_image_rendering
@@ -21,7 +14,7 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 # from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 from pyphoplacecellanalysis.GUI.PyQtPlot.pyqtplot_common import pyqtplot_common_setup
 
-from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import pyqtplot_build_image_bounds_extent
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import LayoutScrollability, pyqtplot_build_image_bounds_extent
 
 
 @function_attributes(short_name='pyqtplot_plot_image_array', tags=['display','pyqtgraph','plot','image','binned','2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-09-29 00:00')
@@ -172,7 +165,7 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
 
         img_item_array.append(img_item)
         plot_array.append(curr_plot)
-        other_components_array.append({'color_bar':bar})
+        other_components_array.append({'color_bar':bar}) # note this is a list of Dicts, one for every image
         
     # Post images loop:
     enable_show = False
@@ -187,7 +180,7 @@ def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num
     return app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array
 
 
-@function_attributes(short_name='all_pf_2D_pyqtgraph_binned_image_rendering', tags=['display','pyqtgraph','plot','image','binned','2D'], input_requires=[], output_provides=[], uses=['BasicBinnedImageRenderingWindow'], used_by=[], creation_date='2022-08-16 00:00')
+@function_attributes(short_name='all_pf_2D_pyqtgraph_binned_image_rendering', tags=['display','pyqtgraph','plot','image','binned','2D'], input_requires=[], output_provides=[], uses=['BasicBinnedImageRenderingWindow'], used_by=['_display_placemaps_pyqtplot_2D'], creation_date='2022-08-16 00:00')
 def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_format_config, debug_print=True): # , **kwargs
     """ 2022-08-16 - A fresh implementation of a pf_2D placefield renderer that uses the BasicBinnedImageRenderingWindow subclass. 
     
@@ -196,7 +189,19 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
     Analagous to:
         NeuroPy.neuropy.plotting.ratemaps.plot_ratemap_2D: the matplotlib-based version
 
+    Uses:
+        active_pf_2D.xbin, ybin=active_pf_2D.ybin
+        active_pf_2D.occupancy
+    
+        active_pf_2D.ratemap.neuron_ids, active_pf_2D.ratemap.neuron_extended_ids
+        
+        active_pf_2D.ratemap.tuning_curves || active_pf_2D.ratemap.spikes_maps
+
+        LayoutScrollability.NON_SCROLLABLE
+        
     Usage:
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.plot_placefields import display_all_pf_2D_pyqtgraph_binned_image_rendering
+
         out_all_pf_2D_pyqtgraph_binned_image_fig = display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_format_config)
         
     """
@@ -206,7 +211,7 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
     # cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
     # cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
     # color_map = figure_format_config.get('color_map', 'viridis')
-    color_map = figure_format_config.get('color_map', pg.colormap.get('jet','matplotlib'))
+    color_map = figure_format_config.get('color_map', pg.colormap.get('viridis','matplotlib'))
     # color_map = figure_format_config.get('color_map', 'viridis')
     # color_bar_mode = figure_format_config.get('color_bar_mode', 'each')
     color_bar_mode = figure_format_config.get('color_bar_mode', None) # no colorbars rendered  
@@ -216,7 +221,8 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
     drop_below_threshold = figure_format_config.get('drop_below_threshold', 0.0000001) # try to get the 'drop_below_threshold' argument
     included_unit_indicies = figure_format_config.get('included_unit_indicies', None)
     included_unit_neuron_IDs = figure_format_config.get('included_unit_neuron_IDs', None)
-
+    scrollability_mode = figure_format_config.get('scrollability_mode', LayoutScrollability.SCROLLABLE) 
+    
     missing_aclu_string_formatter = figure_format_config.get('missing_aclu_string_formatter', None)
     # missing_aclu_string_formatter: a lambda function that takes the current aclu string and returns a modified string that reflects that this aclu value is missing from the current result (e.g. missing_aclu_string_formatter('3') -> '3 <shared>')
     if missing_aclu_string_formatter is None:
@@ -277,7 +283,7 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
         **overriding_dict_with(lhs_dict={'subplots': (40, 3), 'fig_column_width': 8.0, 'fig_row_height': 1.0, 'resolution_multiplier': 1.0, 'max_screen_figure_size': (None, None), 'last_figure_subplots_same_layout': True, 'debug_print': True}, **figure_format_config))
 
     active_xbins = active_pf_2D.xbin
-    active_ybins = active_pf_2D.ybin    
+    active_ybins = active_pf_2D.ybin
     out = None
     # New page-based version:
     for page_idx in np.arange(num_pages):
@@ -318,9 +324,9 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
 
             if out is None:
                 # first iteration only
-                out = BasicBinnedImageRenderingWindow(pfmap, active_xbins, active_ybins, name=f'pf[{final_title_str}]', title=final_title_str, variable_label=curr_extended_id_string, wants_crosshairs=wants_crosshairs, color_map=color_map, color_bar_mode=color_bar_mode)
+                out = BasicBinnedImageRenderingWindow(pfmap, active_xbins, active_ybins, name=f'pf[{final_title_str}]', title=final_title_str, variable_label=curr_extended_id_string, wants_crosshairs=wants_crosshairs, color_map=color_map, color_bar_mode=color_bar_mode, scrollability_mode=scrollability_mode)
             else:
-                out.add_data(row=curr_page_relative_row, col=curr_page_relative_col, matrix=pfmap, xbins=active_xbins, ybins=active_ybins, name=f'pf[{final_title_str}]', title=final_title_str, variable_label=curr_extended_id_string)
+                out.add_data(row=(out.params.plot_row_offset + curr_page_relative_row), col=curr_page_relative_col, matrix=pfmap, xbins=active_xbins, ybins=active_ybins, name=f'pf[{final_title_str}]', title=final_title_str, variable_label=curr_extended_id_string)
         
     # ## Debugging only:
     # out.plots_data.included_unit_neuron_IDs = included_unit_neuron_IDs
@@ -330,6 +336,4 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
     # out.plots_data.active_maps = active_maps
 
     return out
-    
-    
     

@@ -11,9 +11,11 @@ from attr import define, field, Factory
 
 from neuropy.core import Epoch
 from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata
-from pyphocorehelpers.print_helpers import CapturedException
+from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsResults
-from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations
+from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_evaluate_required_computations, batch_extended_computations
 from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import main_complete_figure_generations
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import LongShortPipelineTests, JonathanFiringRateAnalysisResult, InstantaneousSpikeRateGroupsComputation
@@ -32,7 +34,7 @@ class SavingOptions(Enum):
 
 
 @custom_define(slots=False)
-class BatchComputationProcessOptions(HDF_SerializationMixin):
+class BatchComputationProcessOptions(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     """ specifies how computations should be ran. Should they be loaded from previously saved data? Computed? Saved? """
     should_load: bool = serialized_attribute_field() # should try to load from existing results from disk at all
         # never
@@ -61,7 +63,7 @@ class BatchComputationProcessOptions(HDF_SerializationMixin):
 
 @custom_define(slots=False)
 class PipelineCompletionResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
-    """ Class representing the specific results extratracted from the loaded pipeline and returned as return values from the post-execution callback function. """
+    """ Class representing the specific results extracted from the loaded pipeline and returned as return values from the post-execution callback function. """
     long_epoch_name: str = serialized_attribute_field()
     long_laps: Epoch = serialized_field()
     long_replays: Epoch = serialized_field()
@@ -127,7 +129,16 @@ class BatchSessionCompletionHandler:
     """ handles completion of a single session's batch processing.
 
     Allows accumulating results across sessions and runs.
+    
+    
+    Holds powerful options that are used during its `on_complete_success_execution_session` function, which is always passed as the callback for `run_specific_batch`
+    
+    Passed to `batch_extended_computations(...)` for global computation function calculations:
+        self.extended_computations_include_includelist
+        self.force_recompute_override_computations_includelist
+        self.force_recompute_override_computation_kwargs_dict # #TODO 2024-10-30 08:35: - [ ] is `force_recompute_override_computation_kwargs_dict` actually only used when forcing a recompute, or does passing it when it's the same as the already computed values force it to recompute?
 
+        
 
     Usage:
         from pyphoplacecellanalysis.General.Batch.runBatch import BatchSessionCompletionHandler
@@ -148,20 +159,23 @@ class BatchSessionCompletionHandler:
     num_processes: Optional[int] = field(default=None)
 
     # Computations
-    enable_full_pipeline_in_ram: bool = field(default=False) 
+    # enable_full_pipeline_in_ram: bool = field(default=False)
     ## Error with enable_full_pipeline_in_ram=True:
      # 	delta_since_last_compute=datetime.timedelta(seconds=43, microseconds=466370), outputs_local={'pkl': PosixPath('/nfs/turbo/umms-kdiba/Data/KDIBA/gor01/one/2006-6-08_14-26-15/loadedSessPickle.pkl')}, outputs_global={'pkl': PosixPath('/nfs/turbo/umms-kdiba/Data/KDIBA/gor01/one/2006-6-08_14-26-15/output/global_computation_results.pkl'), 'hdf5': None}, across_session_results={'inst_fr_comps': None, 'curr_active_pipeline': <pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline.NeuropyPipeline object at 0x148e83474700>}))'. Reason: 'AttributeError("Can't pickle local object 'DataSessionFormatBaseRegisteredClass.build_default_filter_functions.<locals>.<dictcomp>.<lambda>'")'
 
     # a list of functions to be called upon completion, will be called sequentially. 
     completion_functions: List[Callable] = field(default=Factory(list))
-    # override_session_computation_results_pickle_filename: Optional[str] = field(default=None) # 'output/loadedSessPickle.pkl'
+    override_user_completion_function_kwargs_dict: Dict[Union[Callable, str], Dict] = field(default=Factory(dict))
 
+    # override_session_computation_results_pickle_filename: Optional[str] = field(default=None) # 'output/loadedSessPickle.pkl'
+    BATCH_DATE_TO_USE: str = field(default='0000-00-00_Fake') # BATCH_DATE_TO_USE = '2024-03-27_Apogee'
+    collected_outputs_path: Path = field(default=None) # collected_outputs_path = Path(r'C:\Users\pho\repos\Spike3DWorkEnv\Spike3D\output\collected_outputs').resolve()
 
     ## Computation Options:
     session_computations_options: BatchComputationProcessOptions = field(default=BatchComputationProcessOptions(should_load=True, should_compute=True, should_save=SavingOptions.IF_CHANGED))
 
     global_computations_options: BatchComputationProcessOptions = field(default=BatchComputationProcessOptions(should_load=True, should_compute=True, should_save=SavingOptions.IF_CHANGED))
-    extended_computations_include_includelist: list = field(default=['pf_computation', 'pfdt_computation', 'firing_rate_trends',
+    extended_computations_include_includelist: list = field(default=['lap_direction_determination', 'pf_computation', 'pfdt_computation', 'firing_rate_trends',
                                                                     # 'pf_dt_sequential_surprise',
                                                                     'extended_stats',
                                         'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', # 'long_short_rate_remapping',
@@ -170,13 +184,17 @@ class BatchSessionCompletionHandler:
                                         'long_short_endcap_analysis',
                                         # 'spike_burst_detection',
                                         'split_to_directional_laps',
+                                        'merged_directional_placefields',
                                         'rank_order_shuffle_analysis',
+                                        'directional_train_test_split',
+                                        'directional_decoders_evaluate_epochs',
+                                        # 'directional_decoders_epoch_heuristic_scoring',
                                     ]) # do only specified
 
     force_global_recompute: bool = field(default=False)
     
     force_recompute_override_computations_includelist: list = field(default=Factory(list)) # empty list by default. For example self.force_recompute_override_computations_includelist = ['rank_order_shuffle_analysis'] would force recomputation of that global computation function
-
+    force_recompute_override_computation_kwargs_dict: list = field(default=Factory(dict))
 
     # @property
     # def override_session_computation_results_pickle_filename(self) -> Optional[str]:
@@ -234,6 +252,10 @@ class BatchSessionCompletionHandler:
             was_updated = _update_pipeline_missing_preprocessing_parameters(curr_active_pipeline)
             was_updated
         """
+        from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder
+        from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDibaOldDataSessionFormatRegisteredClass
+        from neuropy.core.session.Formats.SessionSpecifications import SessionConfig
+
         def _subfn_update_session_missing_preprocessing_parameters(sess):
             """ 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to a single session. Called only by `_update_pipeline_missing_preprocessing_parameters` """
             preprocessing_parameters = getattr(sess.config, 'preprocessing_parameters', None)
@@ -254,10 +276,36 @@ class BatchSessionCompletionHandler:
                     print(f'preprocessing parameters exist.')
                 # TODO: update them as needed?
                 return False
+            
+
+        def _subfn_update_session_missing_loaded_track_limits(curr_active_pipeline, always_reload_from_file:bool):
+            """ 2024-04-09 - Adds the previously missing `sess.config.loaded_track_limits` to a single session. Called only by `_update_pipeline_missing_preprocessing_parameters` """
+            loaded_track_limits = getattr(curr_active_pipeline.sess.config, 'loaded_track_limits', None)
+            if (loaded_track_limits is None) or always_reload_from_file:
+                print(f'No existing loaded_track_limits parameters! Assigning them!')
+                active_data_mode_name: str = curr_active_pipeline.session_data_type
+                active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
+                active_data_mode_registered_class = active_data_session_types_registered_classes_dict[active_data_mode_name]
+                a_session = deepcopy(curr_active_pipeline.sess)
+                sess_config: SessionConfig = SessionConfig(**deepcopy(a_session.config.__getstate__()))
+                a_session.config = sess_config
+                # a_session = active_data_mode_registered_class._default_kdiba_exported_load_position_info_mat(basepath=curr_active_pipeline.sess.basepath, session_name=curr_active_pipeline.session_name, session=deepcopy(curr_active_pipeline.sess))
+                a_session = active_data_mode_registered_class._default_kdiba_exported_load_position_info_mat(basepath=curr_active_pipeline.sess.basepath, session_name=curr_active_pipeline.session_name, session=a_session)
+                # a_session
+                curr_active_pipeline.stage.sess = a_session ## apply the session
+                # curr_active_pipeline.sess.config = a_session.config # apply the config only...
+                return True
+            else:
+                if debug_print:
+                    print(f'loaded_track_limits parameters exist.')
+                # TODO: update them as needed?
+                return False
+            
 
         # BEGIN MAIN FUNCTION BODY
         was_updated = False
         was_updated = was_updated | _subfn_update_session_missing_preprocessing_parameters(curr_active_pipeline.sess)
+        was_updated = was_updated | _subfn_update_session_missing_loaded_track_limits(curr_active_pipeline, always_reload_from_file=False)
 
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]:
@@ -272,7 +320,13 @@ class BatchSessionCompletionHandler:
 
     @classmethod
     def post_compute_validate(cls, curr_active_pipeline) -> bool:
-        """ 2023-05-16 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks. """
+        """ 2023-05-16 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks. 
+        
+        NOTE: returns `was_updated`, not `is_valid` or something similar.
+        
+        """
+        from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters
+        
         if not LongShortPipelineTests(curr_active_pipeline=curr_active_pipeline).validate():
             print(f'ERROR!! Pipeline is invalid according to LongShortPipelineTests!!')
             return False
@@ -282,7 +336,7 @@ class BatchSessionCompletionHandler:
         print(f'were pipeline preprocessing parameters missing and updated?: {was_updated}')
 
         ## BUG 2023-05-25 - Found ERROR for a loaded pipeline where for some reason the filtered_contexts[long_epoch_name]'s actual context was the same as the short maze ('...maze2'). Unsure how this happened.
-        was_updated = was_updated or cls._post_fix_filtered_contexts(curr_active_pipeline)
+        was_updated = was_updated or cls._post_fix_filtered_contexts(curr_active_pipeline) #TODO 2024-11-01 19:39: - [ ] This is where things go amiss it seems
 
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
@@ -293,6 +347,13 @@ class BatchSessionCompletionHandler:
         #     # long_epoch_context.filter_name = long_epoch_name
         #     # was_updated = True
         #     raise NotImplementedError("2023-11-29 - This shouldn't happen since we previously called `cls._post_fix_filtered_contexts(curr_active_pipeline)`!!")
+        
+        ## Add `curr_active_pipeline.global_computation_results.computation_config` as needed:
+        if curr_active_pipeline.global_computation_results.computation_config is None:
+            print('global_computation_results.computation_config is None! Making new one!')
+            curr_active_pipeline.global_computation_results.computation_config = ComputationKWargParameters.init_from_pipeline(curr_active_pipeline=curr_active_pipeline)
+            print(f'\tdone. Pipeline needs resave!')
+            was_updated = was_updated | True
 
         return was_updated
 
@@ -392,6 +453,8 @@ class BatchSessionCompletionHandler:
         If `.global_computations_options.should_compute` then computations will be tried and saved out as needed. If an error occurs, those will not be saved.
 
         """
+        from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters
+        
         # self.session_computations_options.override_output_file
         # self.global_computations_options.override_file
 
@@ -408,47 +471,60 @@ class BatchSessionCompletionHandler:
                         raise e.exc
 
         # 2023-10-03 - Temporarily override the existing
+        ## Add 2024-10-07 - `curr_active_pipeline.global_computation_results.computation_config` as needed:
+        needs_build_global_computation_config: bool = True
+
         if curr_active_pipeline.global_computation_results.computation_config is None:
             # Create a DynamicContainer-backed computation_config
-            print(f'_perform_long_short_instantaneous_spike_rate_groups_analysis is lacking a required computation config parameter! creating a new curr_active_pipeline.global_computation_results.computation_config')
-            curr_active_pipeline.global_computation_results.computation_config = DynamicContainer(instantaneous_time_bin_size_seconds=0.01)
+            # print(f'_perform_long_short_instantaneous_spike_rate_groups_analysis is lacking a required computation config parameter! creating a new curr_active_pipeline.global_computation_results.computation_config')
+            # curr_active_pipeline.global_computation_results.computation_config = DynamicContainer(instantaneous_time_bin_size_seconds=0.01)
+            needs_build_global_computation_config = True
         else:
             print(f'have an existing `global_computation_results.computation_config`: {curr_active_pipeline.global_computation_results.computation_config}')
-            if curr_active_pipeline.global_computation_results.computation_config.instantaneous_time_bin_size_seconds is None:
-                print(f'\t curr_active_pipeline.global_computation_results.computation_config.instantaneous_time_bin_size_seconds is None, overriding with 0.01')
-                curr_active_pipeline.global_computation_results.computation_config.instantaneous_time_bin_size_seconds = 0.01
+            if isinstance(curr_active_pipeline.global_computation_results.computation_config, ComputationKWargParameters):
+               needs_build_global_computation_config = False ## it is okay
+            else:
+                 needs_build_global_computation_config = True
 
+            # if curr_active_pipeline.global_computation_results.computation_config.instantaneous_time_bin_size_seconds is None:
+            #     print(f'\t curr_active_pipeline.global_computation_results.computation_config.instantaneous_time_bin_size_seconds is None, overriding with 0.01')
+            #     curr_active_pipeline.global_computation_results.computation_config.instantaneous_time_bin_size_seconds = 0.01
 
+        if needs_build_global_computation_config:
+            print('global_computation_results.computation_config is None! Making new one!')
+            curr_active_pipeline.global_computation_results.computation_config = ComputationKWargParameters.init_from_pipeline(curr_active_pipeline=curr_active_pipeline)
+            print(f'\tdone. Pipeline needs resave!')
+        
         if self.global_computations_options.should_save == SavingOptions.ALWAYS:
             assert self.global_computations_options.should_compute, f"currently  SavingOptions.ALWAYS requires that self.global_computations_options.should_compute == True also but this is not the case!"
 
 
-        
-        
         # Computation ________________________________________________________________________________________________________ #
         if self.global_computations_options.should_compute:
             # build computation functions to compute list:
             active_extended_computations_include_includelist = deepcopy(self.extended_computations_include_includelist)
             force_recompute_override_computations_includelist = self.force_recompute_override_computations_includelist or []
-            if (len(force_recompute_override_computations_includelist) > 0) and (not self.force_global_recompute):
-                # split out the forced computations:
-                active_extended_computations_include_includelist = [k for k in active_extended_computations_include_includelist if k not in force_recompute_override_computations_includelist] # exclude the forced recomputations from the main `active_extended_computations_include_includelist`
-
+            force_recompute_override_computation_kwargs_dict = self.force_recompute_override_computation_kwargs_dict or {} # #TODO 2024-10-30 08:35: - [ ] is `force_recompute_override_computation_kwargs_dict` actually only used when forcing a recompute, or does passing it when it's the same as the already computed values force it to recompute? It seems to force it to recompute
+            # ## #TODO 2024-11-06 14:21: - [ ] I think we should use `batch_evaluate_required_computations` instead of `batch_extended_computations` to avoid forcing recomputations.
+            # needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=active_extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+            #                                         force_recompute=self.force_global_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+            
             try:
                 # # 2023-01-* - Call extended computations to build `_display_short_long_firing_rate_index_comparison` figures:
-                curr_active_pipeline.reload_default_computation_functions()
-    
-                newly_computed_values += batch_extended_computations(curr_active_pipeline, include_includelist=active_extended_computations_include_includelist, include_global_functions=True, fail_on_exception=True, progress_print=True, 
-                                                                     force_recompute=self.force_global_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
-                
-                #TODO 2023-07-11 19:20: - [ ] We want to save the global results if they are computed, but we don't want them to be needlessly written to disk even when they aren't changed.
-                return newly_computed_values # return the list of newly computed values
+                with ExceptionPrintingContext(suppress=(not self.fail_on_exception)):
+                    curr_active_pipeline.reload_default_computation_functions()
+                    #TODO 2024-11-06 13:44: - [ ] `force_recompute_override_computations_includelist` is actually comming in with the specified override (when I was just trying to override the parameters)`
+                    newly_computed_values += batch_extended_computations(curr_active_pipeline, include_includelist=active_extended_computations_include_includelist, include_global_functions=True, fail_on_exception=True, progress_print=True, # #TODO 2024-11-01 19:33: - [ ] self.force_recompute is True for some reason!?!
+                                                                        force_recompute=self.force_global_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist,
+                                                                        computation_kwargs_dict=force_recompute_override_computation_kwargs_dict, debug_print=False)
+                    #TODO 2023-07-11 19:20: - [ ] We want to save the global results if they are computed, but we don't want them to be needlessly written to disk even when they aren't changed.
+                    return newly_computed_values # return the list of newly computed values
 
             except Exception as e:
                 ## TODO: catch/log saving error and indicate that it isn't saved.
                 exception_info = sys.exc_info()
                 e = CapturedException(e, exception_info)
-                print(f'ERROR perform `batch_extended_computations` or saving GLOBAL COMPUTATION RESULTS for pipeline of curr_session_context: {curr_session_context}. error: {e}')
+                print(f'ERROR perform `batch_extended_computations` or saving GLOBAL COMPUTATION RESULTS for pipeline of curr_session_context: "{curr_session_context}". error: {e}')
                 if self.fail_on_exception:
                     raise e.exc
 
@@ -487,7 +563,6 @@ class BatchSessionCompletionHandler:
             return (hdf5_output_path, None)
 
 
-
     def try_require_pipeline_has_refined_pfs(self, curr_active_pipeline):
         """ Refine the LxC/SxC designators using the firing rate index metric:
         """
@@ -502,7 +577,7 @@ class BatchSessionCompletionHandler:
             else:
                 return [] # no computations needed
 
-        except Exception as e:
+        except BaseException as e:
             exception_info = sys.exc_info()
             e = CapturedException(e, exception_info)
             print(f"ERROR: encountered exception {e} while trying run `_require_pipeline_has_refined_pfs(...)")
@@ -511,21 +586,22 @@ class BatchSessionCompletionHandler:
             return []
 
 
-    def completion_decorator(self, func):
-        """ NOT USED. Don't think it works yet. 
-        func (self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline) to be called """
-        self.completion_functions.append(func)
+    # def completion_decorator(self, func):
+    #     """ NOT USED. Don't think it works yet. 
+    #     func (self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline) to be called """
+    #     self.completion_functions.append(func)
         
-        def wrapper(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict):
-            print("Something is happening before the function is called.")
-            across_session_results_extended_dict = func(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict)
-            print("Something is happening after the function is called.")
-            return across_session_results_extended_dict
+    #     def wrapper(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict):
+    #         print("Something is happening before the function is called.")
+    #         across_session_results_extended_dict = func(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict)
+    #         print("Something is happening after the function is called.")
+    #         return across_session_results_extended_dict
         
-        return wrapper
+    #     return wrapper
 
 
     ## Main function that's called with the complete pipeline:
+    @function_attributes(short_name=None, tags=['IMPORTANT', 'callback', 'replay'], input_requires=['filtered_sessions[*].replay'], output_provides=[], uses=['self.completion_functions'], used_by=['run_specific_batch'], creation_date='2024-07-02 11:44', related_items=[])  
     def on_complete_success_execution_session(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline) -> PipelineCompletionResult:
         """ called when the execute_session completes like:
             `post_run_callback_fn_output = post_run_callback_fn(curr_session_context, curr_session_basedir, curr_active_pipeline)`
@@ -545,8 +621,6 @@ class BatchSessionCompletionHandler:
         print(f'on_complete_success_execution_session(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
         # print(f'curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}')
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-        # long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        # long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name]['computed_data'] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
         # Get existing laps from session:
         long_laps, short_laps, global_laps = [curr_active_pipeline.filtered_sessions[an_epoch_name].laps.as_epoch_obj() for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
         long_replays, short_replays, global_replays = [Epoch(curr_active_pipeline.filtered_sessions[an_epoch_name].replay.epochs.get_valid_df()) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
@@ -649,19 +723,31 @@ class BatchSessionCompletionHandler:
             #     raise e.exc
             _out_inst_fr_comps = None
             _out_recomputed_inst_fr_comps = None
-
+            pass
 
         
             
         # On large ram systems, we can return the whole pipeline? No, because the whole pipeline can't be pickled.
         across_session_results_extended_dict = {}
 
+        ## get override kwargs
+        override_user_completion_function_kwargs_dict = deepcopy(self.override_user_completion_function_kwargs_dict) ## previously used a blank override config, making it useless. {}
+        
         ## run external completion functions:
         for a_fn in self.completion_functions:
             print(f'\t>> calling external computation function: {a_fn.__name__}')
-            across_session_results_extended_dict = a_fn(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict)
-            
+            with ExceptionPrintingContext():
+                a_found_override_kwargs = {} ## start empty
+                if a_fn.__name__ in override_user_completion_function_kwargs_dict:
+                    ## found kwargs
+                    a_found_override_kwargs = override_user_completion_function_kwargs_dict.pop(a_fn.__name__, {})
+                elif a_fn in override_user_completion_function_kwargs_dict:
+                    a_found_override_kwargs = override_user_completion_function_kwargs_dict.pop(a_fn, {})
+                else:
+                    a_found_override_kwargs = {} # no override
 
+                across_session_results_extended_dict = a_fn(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict, **a_found_override_kwargs)
+            
 
         return PipelineCompletionResult(long_epoch_name=long_epoch_name, long_laps=long_laps, long_replays=long_replays,
                                            short_epoch_name=short_epoch_name, short_laps=short_laps, short_replays=short_replays,

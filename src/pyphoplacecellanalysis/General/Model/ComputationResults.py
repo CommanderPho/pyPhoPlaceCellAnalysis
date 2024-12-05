@@ -3,7 +3,8 @@
 from dataclasses import dataclass
 import sys
 import typing
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple, Union
+from datetime import datetime # for VersionedResultMixin
 
 from attrs import define, field, Factory, asdict # used for `ComputedResult`
 
@@ -13,7 +14,8 @@ from neuropy.core.session.dataSession import DataSession
 from neuropy.analyses.placefields import PlacefieldComputationParameters
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
-from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field, keys_only_repr
+from pyphocorehelpers.mixins.gettable_mixin import GetAccessibleMixin
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field, keys_only_repr, SimpleFieldSizesReprMixin
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
 
 ## Import with: from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
@@ -97,11 +99,19 @@ global_computation_results: pyphocorehelpers.DataStructure.dynamic_parameters.Dy
 """
 
 
+
+
 @custom_define(slots=False)
-class ComputationResult(HDF_SerializationMixin):
+class ComputationResult(SimpleFieldSizesReprMixin, HDF_SerializationMixin, AttrsBasedClassHelperMixin, GetAccessibleMixin):
     """
         The result of a single computation, on a filtered session with a specified config 
         The primary output data is stored in self.computed_data's dict
+
+        Known to be used for `curr_active_pipeline.global_computation_results`
+
+
+        NOTE THAT DUE TO `AttrsBasedClassHelperMixin`, ALL `ComputationResult` subclasses MUST BE ATTRS BASED!
+
     """
     sess: DataSession = serialized_field(repr=True)
     computation_config: Optional[DynamicParameters] = serialized_field(default=None, is_computable=False, repr=True)
@@ -132,9 +142,122 @@ class ComputationResult(HDF_SerializationMixin):
         return getattr(self, key)
 
 
+class VersionedResultMixin:
+    """ Implementors keep track of the version of the class by which they are instantiated.
+
+    Allows comparing the .result_version of a deseralized object to the current result version, and take actions (like adding/removing/changing fields or values as needed).
+
+    `result_verion` is stored as a string like "2024.01.11_0" in the format "{YYYY_MM_DD_DATE_STR}_{VERSION_NUM}"
+        the VERSION_NUM part is only used when the dates are equal (indicating multiple versions from the same day)
+        
+        
+    Implementors typically have:
+    
+        result_version: str = serialized_attribute_field(default='2024.01.11_0', is_computable=False, repr=False) # this field specfies the version of the result. 
+
+        
+        def __setstate__(self, state):
+            # Restore instance attributes (i.e., _mapping and _keys_at_init).
+
+            result_version: str = state.get('result_version', None)
+            if result_version is None:
+                result_version = "2024.01.10_0"
+                state['result_version'] = result_version # set result version
+
+    """
+    
+    _VersionedResultMixin_version: str = "2024.01.01_0" # to be updated in your IMPLEMENTOR to indicate its version
+    
+
+    @classmethod
+    def _VersionedResultMixin_parse_result_version_string(cls, v0_str: str) -> Tuple[datetime, int]:
+        date_str, version_num = v0_str.split('_')
+        date = datetime.strptime(date_str, '%Y.%m.%d')
+        return date, int(version_num)
+
+
+    @classmethod
+    def _VersionedResultMixin_compare_result_version_strings(cls, v0_str: str, v1_str: str) -> bool:
+        """
+        returns True if v0_str preceeds v1_str
+        """
+        v0_date, v0_num = cls._VersionedResultMixin_parse_result_version_string(v0_str)
+        v1_date, v1_num = cls._VersionedResultMixin_parse_result_version_string(v1_str)
+        if (v0_date == v1_date):
+            # the _num part is only used when the dates are equal (indicating multiple versions from the same day)
+            return (v0_num < v1_num)
+        else:
+            return (v0_date < v1_date)
+
+
+    def get_parsed_result_version(self) -> Tuple[datetime, int]:
+        """ parses the result version from the string format to something comparable. """
+        return VersionedResultMixin._VersionedResultMixin_parse_result_version_string(self.result_version)
+    
+
+    def is_result_version_earlier_than(self, v1: Union[str, Tuple[datetime, int], datetime]) -> bool:
+        """
+            returns True if self.result_version is earlier than a minimum `v1_str`
+        """
+        if isinstance(v1, str):
+            return self._VersionedResultMixin_compare_result_version_strings(self.result_version, v1)
+        elif isinstance(v1, Tuple):
+            v0_date, v0_num = self.get_parsed_result_version()
+            v1_date, v1_num = v1
+            return (v0_date < v1_date) or (v0_date == v1_date and v0_num < v1_num)
+        elif isinstance(v1, datetime):
+            v0_date, v0_num = self.get_parsed_result_version()
+            return v0_date < v1
+
+    def is_result_version_newer_than(self, v1: Union[str, Tuple[datetime, int], datetime]) -> bool:
+        """
+            returns True if self.result_version is newer than the given `v1_str`
+        """
+        if isinstance(v1, str):
+            return not self._VersionedResultMixin_compare_result_version_strings(self.result_version, v1) and self.result_version != v1
+        elif isinstance(v1, Tuple):
+            v0_date, v0_num = self.get_parsed_result_version()
+            v1_date, v1_num = v1
+            return (v0_date > v1_date) or (v0_date == v1_date and v0_num > v1_num)
+        elif isinstance(v1, datetime):
+            v0_date, v0_num = self.get_parsed_result_version()
+            return v0_date > v1
+
+    def is_result_version_equal_to(self, v1: Union[str, Tuple[datetime, int], datetime]) -> bool:
+        """
+            returns True if self.result_version is equal to the given `v1_str`
+        """
+        if isinstance(v1, str):
+            return (self.result_version == v1)
+        elif isinstance(v1, Tuple):
+            v0_date, v0_num = self.get_parsed_result_version()
+            v1_date, v1_num = v1
+            return (v0_date == v1_date and v0_num == v1_num)
+        elif isinstance(v1, datetime):
+            v0_date, v0_num = self.get_parsed_result_version()
+            return v0_date == v1
+
+    def _VersionedResultMixin__setstate__(self, state):
+        """ 
+        Updates: self.__dict__['result_version']
+        """
+        # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        result_version: str = state.get('result_version', None)
+        if result_version is None:
+            result_version = "2024.01.01_0"
+            state['result_version'] = result_version # set result version
+            
+        self.__dict__['result_version'] = result_version
+        
+        # don't call because the implementor should control this
+
+        # self.__dict__.update(state) 
+        # # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
+        # super(VersionedResultMixin, self).__init__()
+        
 
 @define(slots=False, repr=False)
-class ComputedResult(HDFMixin):
+class ComputedResult(SimpleFieldSizesReprMixin, VersionedResultMixin, HDFMixin, AttrsBasedClassHelperMixin, GetAccessibleMixin):
     """ 2023-05-10 - an object to replace DynamicContainers and static dicts for holding specific computed results
     
     Usage:
@@ -159,8 +282,11 @@ class ComputedResult(HDFMixin):
 
             
     """
-    is_global: bool = non_serialized_field(default=False, repr=False, is_computable=True)
-     
+    _VersionedResultMixin_version: str = "2024.01.01_0" # to be updated in your IMPLEMENTOR to indicate its version
+    
+    is_global: bool = non_serialized_field(default=False, repr=False, is_computable=True, kw_only=True) # init=False
+    result_version: str = serialized_attribute_field(default='2024.01.01_0', repr=False, is_computable=False, kw_only=True) # this field specfies the version of the result. 
+    
     # field(default=False, metadata={'is_hdf_handled_custom': True, 'serialization': {'hdf': False, 'csv': False, 'pkl': True}})
 
     ## For serialization/pickling:
@@ -170,10 +296,19 @@ class ComputedResult(HDFMixin):
         return state
 
     def __setstate__(self, state):
+        """ note that the __setstate__ is NOT inherited by children! They have to implement their own __setstate__ or their self.__dict__ will be used instead.
+        
+        """
         # Restore instance attributes (i.e., _mapping and _keys_at_init).
+
+        # For `VersionedResultMixin`
+        self._VersionedResultMixin__setstate__(state)
+
         self.__dict__.update(state)
+
+        ## Disabled 2024-05-28 22:11 
         # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
-        super(ComputedResult, self).__init__()
+        # super(ComputedResult, self).__init__()
 
 
 

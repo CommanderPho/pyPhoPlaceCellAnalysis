@@ -11,6 +11,7 @@ from matplotlib.colors import ListedColormap, BoundaryNorm
 import pyvista as pv
 import pyvistaqt as pvqt
 
+from neuropy.utils.mixins.dict_representable import override_dict
 from neuropy.utils.matplotlib_helpers import plot_position_curves_figure # for plot_laps_2d
 
 from pyphocorehelpers.function_helpers import function_attributes
@@ -105,7 +106,7 @@ def _plot_helper_add_arrow(line, position=None, position_mode='rel', direction='
     elif (end_ind >= num_points):
         end_ind = num_points - 1
         start_ind = num_points - 2
-    line.axes.annotate('',
+    return line.axes.annotate('',
         xytext=(xdata[start_ind], ydata[start_ind]),
         xy=(xdata[end_ind], ydata[end_ind]),
         arrowprops=dict(arrowstyle="->", color=color),
@@ -208,6 +209,8 @@ def plot_laps_2d(sess, legacy_plotting_mode=True, **kwargs):
     Called by:
         estimation_session_laps
     """
+
+
     # Passed 'even_lap_kwargs', 'odd_lap_kwargs' are to `_plot_helper_render_laps` when rendering the laps
     default_even_lap_kwargs = dict(color=DisplayColorsEnum.Laps.RL, include_highlight=True) # a yellowish-green
     default_odd_lap_kwargs = dict(color=DisplayColorsEnum.Laps.LR, include_highlight=True) # a purplish-royal-blue
@@ -219,8 +222,7 @@ def plot_laps_2d(sess, legacy_plotting_mode=True, **kwargs):
     pos_df = position_obj.to_dataframe()
     
     curr_laps_df = sess.laps.to_dataframe()
-    
-    fig, out_axes_list = plot_position_curves_figure(position_obj, **(dict(include_velocity=True, include_accel=False, figsize=(24, 10)) | kwargs)) #include_velocity=True, include_accel=True, figsize=(24, 10))
+    fig, out_axes_list = plot_position_curves_figure(position_obj, **(override_dict(dict(include_velocity=True, include_accel=False, figsize=(24, 10)), kwargs))) #include_velocity=True, include_accel=True, figsize=(24, 10))
 
     ## Draw on top of the existing position curves with the lap colors:
     if legacy_plotting_mode:
@@ -429,11 +431,20 @@ def plot_lap_trajectories_3d(sess, curr_num_subplots=1, active_page_index=0, inc
 
     # add the laps
     _add_specific_lap_trajectory(p, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, lap_specific_position_traces, lap_specific_time_ranges, single_combined_plot=single_combined_plot, lap_start_z=lap_start_z, lap_id_dependent_z_offset=lap_id_dependent_z_offset)
+    
+    ## Set title:
+    
+    
     return p, laps_pages
 
 @function_attributes(short_name=None, tags=['lap','trajectories','2D','matplotlib','plotting','paginated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-09 05:13', related_items=[])
 def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0):
-    """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots """
+    """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots
+     
+    Great plotting for laps.
+    Plots in a paginated manner.
+
+    """
     def _subfn_chunks(iterable, size=10):
         iterator = iter(iterable)
         for first in iterator:    # stops when iterator is depleted

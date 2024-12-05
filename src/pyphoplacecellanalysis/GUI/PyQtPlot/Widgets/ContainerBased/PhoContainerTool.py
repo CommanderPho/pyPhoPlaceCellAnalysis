@@ -19,6 +19,7 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 
+from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
 
 __all__ = ['PhoBaseContainerTool']
 
@@ -39,18 +40,19 @@ class PhoBaseContainerTool:
 
 
 @metadata_attributes(short_name=None, tags=['unused', 'container', 'pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-17 20:06', related_items=[])
-@define(slots=False)
+@define(slots=False, eq=False)
 class GenericPyQtGraphContainer:
     """ GenericPyQtGraphContainer holds related plots, their data, and methods that manipulate them in a straightforward way
 
-    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import GenericPyQtGraphContainer
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericPyQtGraphContainer
 
     """
     name: str = field(default='plot')
-    params: VisualizationParameters = field(default=Factory(VisualizationParameters, 'plotter'))
-    ui: PhoUIContainer = field(default=Factory(PhoUIContainer, 'plotter'))
     plots: PyqtgraphRenderPlots = field(default=Factory(PyqtgraphRenderPlots, 'plotter'))
     plot_data: RenderPlotsData = field(default=Factory(RenderPlotsData, 'plotter'))
+    ui: PhoUIContainer = field(default=Factory(PhoUIContainer, 'plotter'))
+    params: VisualizationParameters = field(default=Factory(VisualizationParameters, 'plotter'), repr=keys_only_repr)
+
 
 
 

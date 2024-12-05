@@ -1,10 +1,21 @@
+from __future__ import annotations # prevents having to specify types for typehinting as strings
+from typing import TYPE_CHECKING
+from warnings import warn
+from copy import deepcopy
+from typing import Optional, Union
+import numpy as np
+import pandas as pd
+from pandas.core.frame import DataFrame
+from neuropy.core.epoch import Epoch, ensure_dataframe
+
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Dict, Union
+from typing import Dict, List, Optional, Tuple, Union
 from attrs import define, field, Factory
 import attrs # used for several things
 import matplotlib.pyplot as plt
-from matplotlib import cm # used for plot_kourosh_activity_style_figure version too to get a good colormap 
+from matplotlib import cm
+from nptyping import NDArray # used for plot_kourosh_activity_style_figure version too to get a good colormap 
 import numpy as np
 import numpy.ma as ma # for masked array
 import pandas as pd
@@ -28,7 +39,7 @@ from neuropy.utils.dynamic_container import DynamicContainer
 from neuropy.utils.misc import shuffle_ids # used in _SHELL_analyze_leave_one_out_decoding_results
 from neuropy.utils.misc import split_array
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field, custom_define
-from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin, HDF_Converter
+from neuropy.utils.mixins.HDF5_representable import HDFMixin
 
 from pyphocorehelpers.indexing_helpers import find_neighbours
 from pyphocorehelpers.function_helpers import function_attributes
@@ -270,7 +281,7 @@ def _convert_optional_ndarray_to_hdf_attrs_fn(f, key: str, value):
 
 
 @custom_define(slots=False, repr=False)
-class LeaveOneOutDecodingResult(HDFMixin):
+class LeaveOneOutDecodingResult(HDFMixin, AttrsBasedClassHelperMixin):
     """Newer things to merge into LeaveOneOutDecodingAnalysisResult
     
     Usage:
@@ -299,7 +310,7 @@ class LeaveOneOutDecodingResult(HDFMixin):
 
     
 @custom_define(slots=False, repr=False)
-class TimebinnedNeuronActivity(HDFMixin):
+class TimebinnedNeuronActivity(HDFMixin, AttrsBasedClassHelperMixin):
     """ 2023-04-18 - keeps track of which neurons are active and inactive in each decoded timebin
     
     TODO TimebinnedNeuronActivity is not HDF serializable, and it doesn't make sense to make it such. It should be a non_serialized_field
@@ -341,7 +352,7 @@ class TimebinnedNeuronActivity(HDFMixin):
 
 
 @custom_define(slots=False, repr=False)
-class LeaveOneOutDecodingAnalysisResult(HDFMixin):
+class LeaveOneOutDecodingAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
     """ 2023-03-27 - Holds the results from a surprise analysis
 
     Built with:
@@ -1006,7 +1017,9 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decod
 import numpy as np
 from neuropy.analyses.decoders import radon_transform, old_radon_transform
 
+# _allow_parallel_run_general:bool = True
 _allow_parallel_run_general:bool = False
+
 
 def old_score_posterior(posterior, n_jobs:int=8):
     """Old version scoring of epochs that uses `old_radon_transform`
@@ -1036,8 +1049,14 @@ def old_score_posterior(posterior, n_jobs:int=8):
     slope = [res[1] for res in results]
     return np.asarray(score), np.asarray(slope)
 
-def get_radon_transform(posterior, decoding_time_bin_duration:float, pos_bin_size:float, nlines=5000, margin=16, jump_stat=None, posteriors=None, n_jobs:int=8):
+
+
+def get_radon_transform(posterior: Union[List, NDArray], decoding_time_bin_duration:float, pos_bin_size:float, nlines:int=5000, margin:Optional[float]=16.0, n_neighbours: Optional[int]=None, jump_stat=None, posteriors=None, n_jobs:int=8, enable_return_neighbors_arr: bool=False, debug_print=True,
+                         t0: Optional[Union[float, List, Tuple, NDArray]]=None, x0: Optional[float]=None):
         """ 2023-05-25 - Radon Transform to fit line to decoded replay epoch posteriors. Gives score, velocity, and intercept. 
+
+         t0: Optional[Union[float, List, Tuple, NDArray]] - usually a list of start times of the same length as posterior, with one for each decoded posterior
+
 
         Usage:
             from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import get_radon_transform
@@ -1052,25 +1071,85 @@ def get_radon_transform(posterior, decoding_time_bin_duration:float, pos_bin_siz
             pd.DataFrame({'score': score, 'velocity': velocity, 'intercept': intercept})
             
         """
+
         if posteriors is None:
             assert posterior is not None, "No posteriors found"
-            posteriors = posterior
+            if isinstance(posterior, (list, tuple)):
+                posteriors = posterior # multiple posteriors, okay
+            else:
+                # a single posterior, wrap in a list:
+                posteriors = [posterior,]
 
-        x_binsize = pos_bin_size
-        neighbours = int(margin / x_binsize)
+        if t0 is not None:
+            if isinstance(t0, (list, tuple, NDArray)):
+                t0s = t0 # multiple posteriors, okay
+                assert len(t0s) == len(posteriors), f"len(t0s): {len(t0s)} == len(posteriors): {len(posteriors)}"
+            else:
+                # a single time bin, wrap in a list:
+                t0s = [t0,]
+        else:
+            t0s = [None] * len(posteriors) # a list of all Nones
+
+        if n_neighbours is None:
+            # Set neighbors from margin, pos_bin_size
+            assert margin is not None, f"both neighbours and margin are None!"
+            n_neighbours = max(int(round(float(margin) / float(pos_bin_size))), 1) # neighbors must be at least one
+            if debug_print:
+                print(f'neighbours will be calculated from margin and pos_bin_size. n_neighbours: {n_neighbours} = int(margin: {margin} / pos_bin_size: {pos_bin_size})')
+        else:
+            # use existing neighbors
+            n_neighbours = int(n_neighbours)
+            if margin is not None:
+                print(f'WARN: margin is not None but its value will not be used because n_neighbours is provided directly (n_neighbours: {n_neighbours}, margin: {margin})')
 
         run_parallel = _allow_parallel_run_general and (n_jobs > 1)
+        if (n_jobs > 1) and (not _allow_parallel_run_general):
+            print(f'WARNING: n_jobs > 1 (n_jobs: {n_jobs}) but _allow_parallel_run_general == False, so parallel computation will not be performed.')
         if run_parallel:
             from joblib import Parallel, delayed
-            results = Parallel(n_jobs=n_jobs)( delayed(radon_transform)(epoch, nlines=nlines, dt=decoding_time_bin_duration, dx=pos_bin_size, neighbours=neighbours) for epoch in posteriors)
+            if enable_return_neighbors_arr:
+                print(f'WARN: using enable_return_neighbors_arr=True in parallel mode seems to cause deadlocks. Setting `enable_return_neighbors_arr=False` and continuing.')
+                enable_return_neighbors_arr = False
+            results = Parallel(n_jobs=n_jobs)( delayed(radon_transform)(epoch, nlines=nlines, dt=decoding_time_bin_duration, dx=pos_bin_size, n_neighbours=n_neighbours, enable_return_neighbors_arr=enable_return_neighbors_arr, t0=a_t0, x0=x0) for epoch, a_t0 in zip(posteriors, t0s))
+
         else:
-            results = [radon_transform(epoch, nlines=nlines, dt=decoding_time_bin_duration, dx=pos_bin_size, neighbours=neighbours) for epoch in posteriors]
-        score, velocity, intercept = np.asarray(results).T
+            results = [radon_transform(epoch, nlines=nlines, dt=decoding_time_bin_duration, dx=pos_bin_size, n_neighbours=n_neighbours, enable_return_neighbors_arr=enable_return_neighbors_arr, t0=a_t0, x0=x0) for epoch, a_t0 in zip(posteriors, t0s)]
+
+        if enable_return_neighbors_arr:
+            # score_velocity_intercept_tuple, (num_neighbours, neighbors_arr) = results # unpack
+            score = []
+            velocity = []
+            intercept = []
+            num_neighbours = []
+            neighbors_arr = []
+            debug_info = []
+
+            for a_result_tuple in results:
+                a_score, a_velocity, a_intercept, (a_num_neighbours, a_neighbors_arr, a_debug_info) = a_result_tuple
+                score.append(a_score)
+                velocity.append(a_velocity)
+                intercept.append(a_intercept)
+                num_neighbours.append(a_num_neighbours)
+                neighbors_arr.append(a_neighbors_arr)
+                debug_info.append(a_debug_info)
+               
+            score = np.array(score)
+            velocity = np.array(velocity)
+            intercept = np.array(intercept)
+            num_neighbours = np.array(num_neighbours)
+            # neighbors_arr = np.array(neighbors_arr)
+            # score, velocity, intercept = np.asarray(score_velocity_intercept_tuple).T
+        else:
+            score, velocity, intercept = np.asarray(results).T
 
         # if jump_stat is not None:
         #     return score, velocity, intercept, self._get_jd(posteriors, jump_stat)
         # else:
-        return score, velocity, intercept
+
+        if enable_return_neighbors_arr:
+            return score, velocity, intercept, (num_neighbours, neighbors_arr, debug_info)
+        else:
+            return score, velocity, intercept
 
 
 
@@ -1086,7 +1165,9 @@ def get_radon_transform(posterior, decoding_time_bin_duration:float, pos_bin_siz
 # Plotting                                                                                                             #
 # ==================================================================================================================== #
 from pyphocorehelpers.indexing_helpers import build_pairwise_indicies # used in plot_kourosh_activity_style_figure
-import pyphoplacecellanalysis.External.pyqtgraph as pg # required for `DiagnosticDistanceMetricFigure`
+if TYPE_CHECKING:
+    ## typehinting only imports here
+    import pyphoplacecellanalysis.External.pyqtgraph as pg # required for `DiagnosticDistanceMetricFigure`
 
 
 @define(slots=False, repr=False)
@@ -1099,7 +1180,7 @@ class DiagnosticDistanceMetricFigure:
 
     Usage: (for use in Jupyter Notebook)
         ```python
-        from PendingNotebookCode import DiagnosticDistanceMetricFigure
+        from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import DiagnosticDistanceMetricFigure
         import ipywidgets as widgets
         from IPython.display import display
 
@@ -1147,6 +1228,8 @@ class DiagnosticDistanceMetricFigure:
 
     def __attrs_post_init__(self):
         """ called after initializer built by `attrs` library. """
+        import pyphoplacecellanalysis.External.pyqtgraph as pg # required for `DiagnosticDistanceMetricFigure`
+        
         # Perform the primary setup to build the placefield
         self.win = pg.GraphicsLayoutWidget(show=True, title='diagnostic_plot')
         
@@ -1229,6 +1312,8 @@ class DiagnosticDistanceMetricFigure:
         """ Define an update function that will be called with the current slider index 
         Captures plot_dict, and all data variables
         """
+        import pyphoplacecellanalysis.External.pyqtgraph as pg # required for `DiagnosticDistanceMetricFigure`
+        
         # print(f'Slider index: {index}')
         hardcoded_sub_epoch_item_idx = 0
         updated_plot_data, is_valid, (normal_surprise, random_surprise) = self._get_updated_plot_data(index)

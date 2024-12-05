@@ -1,4 +1,6 @@
 import numpy as np
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from nptyping import NDArray
 
 class KeysListAccessingMixin:
     """ Provides a helper function to get the keys from a variety of different data-types. Used for combo-boxes."""
@@ -50,4 +52,40 @@ class ComboBoxCtrlOwningMixin:
         return found_desired_index
     
     
+from PyQt5 import QtWidgets
+
+## Ideal Interface:
+def build_combo_box(label: str, options: List[str], currentIndexChangedCallback=None) -> QtWidgets.QComboBox:
+    """ Instantiates a working PyQt5 QComboBox inline with a list of options, a label that's rendered to the left of the comobo box to indicate what the options mean.
     
+        from pyphoplacecellanalysis.GUI.Qt.Mixins.ComboBoxMixins import build_combo_box
+    
+        new_combo_box = build_combo_box(label='Format', options=['Numpy','Png', 'Svg'])
+        global_thin_button_bar_widget.horizontalLayout.addWidget(new_combo_box) # add the pagination control widget
+        # new_combo_box.currentIndexChanged.connect(self.on_selected_context_index_changed)
+        
+    """
+    layout = QtWidgets.QHBoxLayout()
+    layout.setContentsMargins(0, -1, -1, -1)
+    layout.setSpacing(2)
+    
+    label_widget = QtWidgets.QLabel(label)
+    combo_box = QtWidgets.QComboBox()
+    combo_box.addItems(options)
+    
+    if currentIndexChangedCallback:
+        combo_box.currentIndexChanged.connect(currentIndexChangedCallback)
+        
+    layout.addWidget(label_widget)
+    layout.addWidget(combo_box)
+    
+    container_widget = QtWidgets.QWidget()
+    container_widget.setContentsMargins(0, 0, 0, 0)
+    container_widget.setLayout(layout)
+    
+    combo_box.setObjectName(f'cmb{label}')
+    
+    return container_widget
+
+
+

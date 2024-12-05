@@ -4,19 +4,16 @@ from IPython.display import display
 import matplotlib
 
 from pathlib import Path
-from silx.gui import qt
-from silx.gui.dialog.ImageFileDialog import ImageFileDialog
-from silx.gui.dialog.DataFileDialog import DataFileDialog
-import silx.io
 
-
+# from silx.gui.dialog.ImageFileDialog import ImageFileDialog
+# import silx.io
 
 from pyphocorehelpers.gui.Jupyter.JupyterButtonRowWidget import build_fn_bound_buttons, JupyterButtonRowWidget, JupyterButtonColumnWidget
 from pyphocorehelpers.Filesystem.open_in_system_file_manager import reveal_in_system_file_manager
 from pyphocorehelpers.Filesystem.path_helpers import open_file_with_system_default
 
 
-from pyphocorehelpers.print_helpers import CapturedException
+from pyphocorehelpers.exception_helpers import CapturedException
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 import pyphoplacecellanalysis.External.pyqtgraph as pg
@@ -55,6 +52,12 @@ def saveFile(on_save_file_callback, caption:str="Save as..", startDir=None, sugg
 
 
 def openDialogAtHome():
+    """
+    
+    """
+    from silx.gui import qt
+    from silx.gui.dialog.DataFileDialog import DataFileDialog
+    
     # Clear the dialog
     path = qt.QDir.homePath()
     # dialog = self.createDialog()
@@ -115,6 +118,38 @@ class PipelineJupyterHelpers:
             # saving_mode = _bak_saving_mode
             print(f'done!')
             
+
+
+    @classmethod
+    def pipeline_computation_mode_widget(cls, curr_active_pipeline):
+        """ not fully implemented. Works when it's in a notebook but needs to be refactored. """
+        import ipywidgets as widgets
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
+
+        saving_mode = PipelineSavingScheme.SKIP_SAVING
+        force_reload = False
+
+        saving_mode_dropdown = widgets.Dropdown(
+            options=[('Read if possible', PipelineSavingScheme.SKIP_SAVING), ('Temp then write', PipelineSavingScheme.TEMP_THEN_OVERWRITE), ('Overwrite in place', PipelineSavingScheme.OVERWRITE_IN_PLACE)],
+            description='Mode:'
+        )
+
+        force_reload_checkbox = widgets.Checkbox(
+            value=False,
+            description='Force reload'
+        )
+
+        def update_variables(change):
+            global saving_mode, force_reload
+            saving_mode = saving_mode_dropdown.value
+            force_reload = force_reload_checkbox.value
+
+        saving_mode_dropdown.observe(update_variables, 'value')
+        force_reload_checkbox.observe(update_variables, 'value')
+
+        return widgets.VBox([saving_mode_dropdown, force_reload_checkbox])
+                
+
 
 def interactive_pipeline_files(curr_active_pipeline, defer_display:bool=False) -> JupyterButtonRowWidget:
     """	Displays a row of four buttons relating to the curr_active_pipeline that reveal the Output Folder, global pickle, pipeline pickle, and .h5 export path in the system file explorer.

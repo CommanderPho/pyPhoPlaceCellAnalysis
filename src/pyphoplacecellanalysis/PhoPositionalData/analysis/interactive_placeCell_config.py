@@ -12,6 +12,8 @@ from pyphoplacecellanalysis.General.Model.Configs.DynamicConfigs import VideoOut
 
 
 ## For building the configs used to filter the session by epoch: 
+
+# General.Pipeline.Stages.Filtering.FilterablePipelineStage.select_filters
 def build_configs(session_config, active_epoch, active_subplots_shape = (1,1)):
     ## Get the config corresponding to this epoch/session settings:
     active_config = InteractivePlaceCellConfig(active_session_config=session_config, active_epochs=active_epoch, video_output_config=None, plotting_config=None) # '3|1    

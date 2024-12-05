@@ -1,3 +1,4 @@
+from copy import deepcopy
 from pathlib import Path
 import pyvista as pv
 import pyvistaqt as pvqt
@@ -90,6 +91,22 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
         """ 
         Inputs: {'extant_plotter': None} 
         Outputs: {'ipspikesDataExplorer', 'plotter'}
+
+        Usage:
+            t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+            active_config_modifiying_kwargs = {
+                'plotting_config': {'should_use_linear_track_geometry': True, 
+                                    't_start': t_start, 't_delta': t_delta, 't_end': t_end,
+                                    }
+            }
+            _out_global = curr_active_pipeline.display(display_function='_display_3d_interactive_spike_and_behavior_browser', active_session_configuration_context=global_epoch_context,
+                                                        active_config_modifiying_kwargs=active_config_modifiying_kwargs,
+                                                        params_kwargs=dict(enable_historical_spikes=False, enable_recent_spikes=False, should_use_linear_track_geometry=True, **{'t_start': t_start, 't_delta': t_delta, 't_end': t_end}),
+                                                    )
+            ipspikesDataExplorer = _out_global['ipspikesDataExplorer']
+            p = _out_global['plotter']
+
+
         """
         active_config.plotting_config.show_legend = True        
         active_session = computation_result.sess # this is unfiltered, shouldn't be used... actually, it should be filtered. Don't know what's wrong here.
@@ -115,14 +132,32 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
         Inputs: {'extant_plotter': None} 
         Outputs: {'iplapsDataExplorer', 'plotter'}
         """
+        kwargs['params_kwargs'] = kwargs.get('params_kwargs', {})
+        
+        extant_params_kwargs_grid_bin_bounds = kwargs['params_kwargs'].get('grid_bin_bounds', None)
+        if extant_params_kwargs_grid_bin_bounds is None:
+            # set grid_bin_bounds if not set in params
+            grid_bin_bounds = deepcopy(active_config.computation_config.pf_params.grid_bin_bounds)
+            assert grid_bin_bounds is not None
+            kwargs['params_kwargs']['grid_bin_bounds'] = grid_bin_bounds
+
+
         active_laps_config = InteractivePlaceCellConfig(active_session_config=computation_result.sess.config, active_epochs=None, video_output_config=None, plotting_config=None) # '3|1    
-        active_laps_config.plotting_config = PlottingConfig(output_subplots_shape='1|5', output_parent_dir=Path('output', computation_result.sess.config.session_name, 'custom_laps'))
+        # active_laps_config.plotting_config = PlottingConfig.init_from_params(output_subplots_shape='1|5', output_parent_dir=Path('output', computation_result.sess.config.session_name, 'custom_laps'))
+        active_laps_config.plotting_config = PlottingConfig.init_from_params(output_subplots_shape=None, output_parent_dir=Path('output', computation_result.sess.config.session_name, 'custom_laps'))
+
+
+        ## Need: `active_laps_config.computation_config.pf_params.grid_bin_bounds`
+        
+        # active_laps_config.computation_config.pf_params = deepcopy(active_config.pf_params)
+
+
         # try: pActiveInteractiveLapsPlotter
         # except NameError: pActiveInteractiveLapsPlotter = None # Checks variable p's existance, and sets its value to None if it doesn't exist so it can be checked in the next step
         pActiveInteractiveLapsPlotter = kwargs.get('extant_plotter', None)
         # iplapsDataExplorer = InteractiveCustomDataExplorer(active_laps_config, computation_result.sess, **({'extant_plotter':None} | kwargs))
         # iplapsDataExplorer = InteractiveCustomDataExplorer(active_laps_config, computation_result.sess, **overriding_dict_with({'extant_plotter':None}, **kwargs))
-        iplapsDataExplorer = InteractiveCustomDataExplorer(active_laps_config, computation_result.sess, extant_plotter=kwargs.get('extant_plotter', None))
+        iplapsDataExplorer = InteractiveCustomDataExplorer(active_laps_config, computation_result.sess, extant_plotter=kwargs.get('extant_plotter', None), **kwargs)
 
         
         pActiveInteractiveLapsPlotter = iplapsDataExplorer.plot(pActivePlotter=pActiveInteractiveLapsPlotter)
@@ -130,8 +165,8 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
 
 
     @function_attributes(short_name='3d_image_plotter', tags=['display', 'image', '3D', 'pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-01-01 00:00', is_global=False)
-    def _display_3d_image_plotter(computation_result, active_config, **kwargs):
-        """ 
+    def _display_3d_image_plotter(computation_result, active_config, image_file=None, **kwargs):
+        """ Plots an existing image in a 3D environment
         Inputs: {'extant_plotter': None} 
         Outputs: {'plotter'}
         """
@@ -141,6 +176,9 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
             return ImagePlaneRendering.plot_3d_image(pActiveImageTestPlotter, active_epoch_placefields2D.ratemap.xbin, active_epoch_placefields2D.ratemap.ybin, active_epoch_placefields2D.ratemap.occupancy, loaded_image_tex=loaded_image_tex)
             
         # Texture from file:
-        image_file = r'output\2006-6-07_11-26-53\maze\speedThresh_0.00-gridBin_5.00_3.00-smooth_0.00_0.00-frateThresh_0.10\pf2D-Occupancy-maze-odd_laps-speedThresh_0.00-gridBin_5.00_3.00-smooth_0.00_0.00-frateThresh_0.png'
+        image_file = kwargs.get('image_file', r'output\2006-6-07_11-26-53\maze\speedThresh_0.00-gridBin_5.00_3.00-smooth_0.00_0.00-frateThresh_0.10\pf2D-Occupancy-maze-odd_laps-speedThresh_0.00-gridBin_5.00_3.00-smooth_0.00_0.00-frateThresh_0.png')
+        if not isinstance(image_file, Path):
+            image_file = Path(image_file).resolve()
+            assert image_file.exists(), f"image_file: '{image_file}' does not exist!"
         pActiveImageTestPlotter = plot_3d_image_plotter(computation_result.computed_data['pf2D'], image_file=image_file)
         return {'plotter': pActiveImageTestPlotter}

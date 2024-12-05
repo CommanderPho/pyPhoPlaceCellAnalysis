@@ -7,6 +7,12 @@ from pyphoplacecellanalysis.Pho2D.matplotlib.CustomMatplotlibWidget import Custo
 class MatplotlibTimeSynchronizedWidget(CustomMatplotlibWidget):
     """ Extends CustomMatplotlibWidget with time-synchronization properties 
     
+    #TODO 2024-01-06 06:13: - [ ] What does the "time-synchronization" refer to?  It seems to be used in stacks of pre-computed epoch posteriors only.
+        Oh right, it's  also used somewhere in SpikeRaster2D to add interactive matplotlib-based plots below I think    
+
+    ?? There's also `TimeSynchronizedPlotterBase`, which this class does not inherit from but the majority of the actually time-synchronized plotting subclasses do.
+    
+    
     Example::
 
         from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget

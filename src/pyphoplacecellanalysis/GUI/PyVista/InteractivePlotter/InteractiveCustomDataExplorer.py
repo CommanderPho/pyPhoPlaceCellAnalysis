@@ -20,15 +20,23 @@ class InteractiveCustomDataExplorer(InteractiveDataExplorerBase):
     This can be used as a very simple class to be extended with custom data.
     
     """
-    def __init__(self, active_config, active_session, extant_plotter=None):
-        super(InteractiveCustomDataExplorer, self).__init__(active_config, active_session, extant_plotter, data_explorer_name='CustomDataExplorer')
+    def __init__(self, active_config, active_session, extant_plotter=None, **kwargs):
+        super(InteractiveCustomDataExplorer, self).__init__(active_config, active_session, extant_plotter=extant_plotter, data_explorer_name='CustomDataExplorer', **kwargs)
         self._setup()
     
     def _setup_variables(self):
         pass
 
     def _setup_visualization(self):
-        pass
+        # Background Track/Maze rendering options:
+        self.params.setdefault('should_use_linear_track_geometry', False) # should only be True on the linear track with known geometry, otherwise it will be obviously incorrect.
+        if hasattr(self.active_config.plotting_config, 'should_use_linear_track_geometry') and (self.active_config.plotting_config.should_use_linear_track_geometry is not None):
+            self.params.should_use_linear_track_geometry = self.active_config.plotting_config.should_use_linear_track_geometry
+
+        ## MIXINS:
+        # self.setup_occupancy_plotting_mixin()
+        self.setup_MazeRenderingMixin()
+
 
 
     ######################
@@ -50,8 +58,10 @@ class InteractiveCustomDataExplorer(InteractiveDataExplorerBase):
                     
             else:
                 p = self.p
+        
                 
-        self.plots['maze_bg'] = perform_plot_flat_arena(p, self.x, self.y, bShowSequenceTraversalGradient=False, smoothing=self.active_config.plotting_config.get('use_smoothed_maze_rendering', True))
+        self.perform_plot_maze() # Implemented by conformance to `InteractivePyvistaPlotter_MazeRenderingMixin`
+
 
         p.hide_axes()
         # self.p.camera_position = 'xy' # Overhead (top) view

@@ -1,6 +1,11 @@
 from copy import deepcopy
 from pathlib import Path
+from typing import Any, Dict, List, Tuple, Union, Optional
 from attrs import define, field, Factory
+from datetime import datetime
+from neuropy.analyses import Epoch
+from neuropy.core import Ratemap # for BasePositionDecoder
+from neuropy.core.epoch import ensure_dataframe
 from nptyping import NDArray # for DecodedFilterEpochsResult
 # import pathlib
 
@@ -20,7 +25,8 @@ from neuropy.analyses.placefields import PfND # for BasePositionDecoder
 
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.general_helpers import OrderedMeta
-from pyphocorehelpers.indexing_helpers import BinningInfo, compute_spanning_bins, build_spanning_grid_matrix, np_ffill_1D # for compute_corrected_positions(...)
+from pyphocorehelpers.indexing_helpers import np_ffill_1D # for compute_corrected_positions(...)
+from neuropy.utils.mixins.binning_helpers import compute_spanning_bins, build_spanning_grid_matrix # for compute_corrected_positions(...)
 from pyphocorehelpers.print_helpers import WrappingMessagePrinter, SimplePrintable, safe_get_variable_shape
 from pyphocorehelpers.mixins.serialized import SerializedAttributesAllowBlockSpecifyingClass
 
@@ -258,7 +264,6 @@ class ZhangReconstructionImplementation:
             use_flat_computation_mode: bool - if True, a more memory efficient accumulating computation is performed that avoids `MemoryError: Unable to allocate 65.4 GiB for an array with shape (3969, 21896, 101) and data type float64` caused by allocating the full `cell_prob` matrix
             debug_intermediates_mode: bool - if True, the intermediate computations are stored and returned for debugging purposes. MUCH slower.
 
-
         NOTES: Flat vs. Full computation modes:
         Originally 
             cell_prob = np.zeros((nFlatPositionBins, nTimeBins, nCells)) 
@@ -269,8 +274,8 @@ class ZhangReconstructionImplementation:
 
         Note: This means that the "Flat" implementation may be more susceptible to numerical underflow, as the intermediate products can become very small, whereas the "Full" implementation does not have this issue. However, the "Flat" implementation can be more efficient in terms of memory usage and computation time, as it avoids creating a large number of intermediate arrays.
 
-
-        2023-04-19 - I'm confused by the lack of use of P_x in the calculation. According to my written formula P_x was used as the occupancy and multiplied in the output equation. After talking to Kourosh and the lab, it seems that the typical modern approach is to use a uniform `P_x` as to not bias the decoded position.
+        2023-04-19 - I'm confused by the lack of use of P_x in the calculation. According to my written formula P_x was used as the occupancy and multiplied in the output equation. 
+            After talking to Kourosh and the lab, it seems that the typical modern approach is to use a uniform `P_x` as to not bias the decoded position.
             But when I went to change my code to try a uniform P_x, it seems that P_x isn't used in the computation at all, and instead only its size is used?
             TODO 2023-04-19 - Check agreement with written equations.
         """
@@ -278,7 +283,7 @@ class ZhangReconstructionImplementation:
         if debug_print:
             print(f'np.shape(P_x): {np.shape(P_x)}, np.shape(F): {np.shape(F)}, np.shape(n): {np.shape(n)}')
         # np.shape(P_x): (1066, 1), np.shape(F): (1066, 66), np.shape(n): (66, 3530)
-        
+
         nCells = n.shape[0]
         nTimeBins = n.shape[1] # many time_bins
         nFlatPositionBins = np.shape(P_x)[0]
@@ -310,9 +315,20 @@ class ZhangReconstructionImplementation:
             cell_ratemap = F[cell, :][:, np.newaxis] # .shape: (nFlatPositionBins, 1)
             coeff = 1.0 / (factorial(cell_spkcnt)) # 1/factorial(n_{i}) term # .shape: (1, nTimeBins)
 
+            if np.sum(cell_ratemap) == 0:
+                ## zero ratemap for this cell encountered, replace with uniform
+                cell_ratemap[:, 0] = 1.0/float(nFlatPositionBins) # replace with uniform ratemap
+                print(f'WARN: f"np.sum(cell_ratemap): {cell_ratemap} for cell: {cell}", replacing with uniform!')
+                # raise ValueError(f"np.sum(cell_ratemap): {cell_ratemap} for cell: {cell}")
+
             if use_flat_computation_mode:
                 # Single-cell flat Version:
+
+                # _temp = (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (np.exp(-tau * cell_ratemap)) 
+                # cell_prob = cell_prob * _temp
+
                 cell_prob *= (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (np.exp(-tau * cell_ratemap)) # product equal using *=
+
                 # cell_prob.shape (nFlatPositionBins, nTimeBins)
             else:
                 # Full Version:
@@ -382,9 +398,232 @@ class Zhang_Two_Step:
         return k * one_step_p_x_given_n * cls.compute_conditional_probability_x_prev_given_x_t(x_prev, all_x, sigma_t, C)
     
 
+@custom_define(slots=False, repr=False)
+class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
+    """ Values for a single epoch. Class to hold debugging information for a transformation process
+     
+      from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
+       
+    """
+    p_x_given_n: NDArray = non_serialized_field()
+    epoch_info_tuple: Tuple = non_serialized_field() # EpochTuple
+
+    most_likely_positions: NDArray = non_serialized_field()
+    most_likely_position_indicies: NDArray = non_serialized_field()
+
+    nbins: int = non_serialized_field()
+    time_bin_container: Any = non_serialized_field()
+    time_bin_edges: NDArray = non_serialized_field()
+
+    marginal_x: NDArray = non_serialized_field()
+    marginal_y: Optional[NDArray] = non_serialized_field()
+
+    epoch_data_index: Optional[int] = non_serialized_field()
+
+    # active_num_neighbors: int = serialized_attribute_field()
+    # active_neighbors_arr: List = field()
+
+    # start_point: Tuple[float, float] = field()
+    # end_point: Tuple[float, float] = field()
+    # band_width: float = field()
+
+    @property
+    def n_xbins(self):
+        """The n_xbins property."""
+        return np.shape(self.p_x_given_n)[0]
+    
+
+    def __repr__(self):
+        """ 2024-01-11 - Renders only the fields and their sizes  """
+        from pyphocorehelpers.print_helpers import strip_type_str_to_classname
+        # content = ",\n\t".join([f"{a.name}: {strip_type_str_to_classname(type(getattr(self, a.name)))}" for a in self.__attrs_attrs__])
+        # return f"{type(self).__name__}({content}\n)"
+        attr_reprs = []
+        for a in self.__attrs_attrs__:
+            attr_type = strip_type_str_to_classname(type(getattr(self, a.name)))
+            if 'shape' in a.metadata:
+                shape = ', '.join(a.metadata['shape'])  # this joins tuple elements with a comma, creating a string without quotes
+                attr_reprs.append(f"{a.name}: {attr_type} | shape ({shape})")  # enclose the shape string with parentheses
+            else:
+                attr_reprs.append(f"{a.name}: {attr_type}")
+        content = ",\n\t".join(attr_reprs)
+        return f"{type(self).__name__}({content}\n)"
+    
+    @function_attributes(short_name=None, tags=['image', 'posterior'], input_requires=[], output_provides=[], uses=['get_array_as_image'], used_by=[], creation_date='2024-05-09 05:49', related_items=[])
+    def get_posterior_as_image(self, epoch_id_identifier_str: str = 'p_x_given_n', desired_height=None, desired_width=None, skip_img_normalization=True, export_grayscale:bool=False, **kwargs):
+        """ gets the posterior as a colormapped image 
+        
+        Usage:
+
+            posterior_image = active_captured_single_epoch_result.get_posterior_as_image(desired_height=400)
+            posterior_image
+
+
+        """
+        from pyphocorehelpers.plotting.media_output_helpers import get_array_as_image
+
+        if self.epoch_data_index is not None:
+            epoch_id_str = f"{epoch_id_identifier_str}[{self.epoch_data_index}]"
+        else:
+            epoch_id_str = f"{epoch_id_identifier_str}"
+
+        img_data = self.p_x_given_n.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
+        return get_array_as_image(img_data, desired_height=desired_height, desired_width=desired_width, skip_img_normalization=skip_img_normalization, export_grayscale=export_grayscale, **kwargs)
+
+
+    @function_attributes(short_name=None, tags=['export', 'image', 'posterior'], input_requires=[], output_provides=[], uses=['pyphocorehelpers.plotting.media_output_helpers.save_array_as_image'], used_by=['PosteriorExporting.export_decoded_posteriors_as_images'], creation_date='2024-05-09 05:49', related_items=[])
+    def save_posterior_as_image(self, parent_array_as_image_output_folder: Union[Path, str]='', epoch_id_identifier_str: str = 'p_x_given_n', desired_height=None, desired_width=None, colormap:str='viridis', skip_img_normalization=True, export_grayscale:bool=False, allow_override_aspect_ratio:bool=False, **kwargs):
+        """ saves the posterior to disk
+        
+        Usage:
+
+            posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder='output', desired_height=400)
+            posterior_image
+
+
+        """
+        from pyphocorehelpers.plotting.media_output_helpers import save_array_as_image
+
+        if isinstance(parent_array_as_image_output_folder, str):
+            parent_array_as_image_output_folder = Path(parent_array_as_image_output_folder).resolve()
+            
+            
+        if parent_array_as_image_output_folder.is_dir():
+            assert parent_array_as_image_output_folder.exists(), f"path '{parent_array_as_image_output_folder}' does not exist!"
+            
+            if self.epoch_data_index is not None:
+                epoch_id_str = f"{epoch_id_identifier_str}[{self.epoch_data_index}]"
+            else:
+                epoch_id_str = f"{epoch_id_identifier_str}"
+            _img_path = parent_array_as_image_output_folder.joinpath(f'{epoch_id_str}.png').resolve()
+        else:
+            _img_path = parent_array_as_image_output_folder.resolve() # already a direct path
+            
+
+        if (desired_height is None) and (desired_width is None):
+            # only if the user hasn't provided a desired width OR height should we suggest a height of 100
+            desired_height = 100
+            
+        img_data = self.p_x_given_n.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
+        raw_tuple = save_array_as_image(img_data, desired_height=desired_height, desired_width=desired_width, colormap=colormap, skip_img_normalization=skip_img_normalization, out_path=_img_path, export_grayscale=export_grayscale, allow_override_aspect_ratio=allow_override_aspect_ratio, **kwargs)
+        image_raw, path_raw = raw_tuple
+        return image_raw, path_raw
+
+
+                
+    # HDFMixin Conformances ______________________________________________________________________________________________ #
+    # def to_hdf(self, file_path):
+    #     with h5py.File(file_path, 'w') as f:
+    #         for attribute, value in self.__dict__.items():
+    #             if isinstance(value, pd.DataFrame):
+    #                 value.to_hdf(file_path, key=attribute)
+    #             elif isinstance(value, np.ndarray):
+    #                 f.create_dataset(attribute, data=value)
+    #             # ... handle other attribute types as needed ...    
+
+    def to_hdf(self, file_path, key: str, debug_print=False, enable_hdf_testing_mode:bool=False, required_zero_padding=None, leafs_include_epoch_idx:bool=False, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path
+        enable_hdf_testing_mode: bool - default False - if True, errors are not thrown for the first field that cannot be serialized, and instead all are attempted to see which ones work.
+
+
+        Usage:
+            hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('test_data.h5')
+            _pfnd_obj: PfND = long_one_step_decoder_1D.pf
+            _pfnd_obj.to_hdf(hdf5_output_path, key='test_pfnd')
+        """
+        import h5py
+        from pyphocorehelpers.plotting.media_output_helpers import img_data_to_greyscale, get_array_as_image
+        
+        assert not isinstance(file_path, (str, Path)), f"pass an already open HDF5 file handle. You passed type(file_path): {type(file_path)}, file_path: {file_path}"
+        f = file_path
+        if debug_print and enable_hdf_testing_mode:
+            print(f'type(f): {type(f)}, f: {f}') # type(f): <class 'h5py._hl.files.File'>, f: <HDF5 file "decoded_epoch_posteriors.h5" (mode r+)>
+        # super().to_hdf(file_path, key=key, debug_print=debug_print, enable_hdf_testing_mode=enable_hdf_testing_mode, **kwargs)
+        # handle custom properties here
+
+        if self.epoch_data_index is not None:
+            if required_zero_padding is not None:
+                epoch_data_idx_str: str = f"{self.epoch_data_index:0{required_zero_padding}d}"    
+            else:
+                epoch_data_idx_str: str = f"{self.epoch_data_index:0{len(str(self.epoch_data_index))}d}"
+        else:
+            epoch_data_idx_str = None
+        # OUTPUTS: epoch_data_idx_str
+        def _subfn_get_key_str(variable_name):
+            """ captures: key, epoch_data_idx_str, leafs_include_epoch_idx 
+            """
+            _temp_epoch_id_identifier_str: str = f'{key}/{variable_name}'
+            if (epoch_data_idx_str is not None) and leafs_include_epoch_idx:
+                return f"{_temp_epoch_id_identifier_str}[{epoch_data_idx_str}]"
+            else:
+                return f"{_temp_epoch_id_identifier_str}"
+        
+
+        attribute_type_fields = ['nbins', 'epoch_data_index', 'n_xbins']
+        dataset_type_fields = ['most_likely_positions', 'most_likely_position_indicies', 'time_bin_edges'] # 'p_x_given_n', 
+        container_type_fields = ['time_bin_container', 'marginal_x', 'marginal_y']
+        
+        # Get current date and time
+        current_time = datetime.now().isoformat()
+
+        # 'p_x_given_n':
+        # epoch_id_identifier_str: str = f'{key}/p_x_given_n'
+        # epoch_id_str = _subfn_get_key_str('p_x_given_n')
+        
+        # img_data = self.p_x_given_n.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
+        p_x_given_n = deepcopy(self.marginal_x.p_x_given_n)
+
+        f.create_dataset(_subfn_get_key_str('p_x_given_n'), data=p_x_given_n.astype(float))
+
+        # p_x_given_n_image = active_captured_single_epoch_result.get_posterior_as_image(skip_img_normalization=False, export_grayscale=True)
+        p_x_given_n_image = img_data_to_greyscale(p_x_given_n)
+        f.create_dataset(_subfn_get_key_str('p_x_given_n_grey'), data=p_x_given_n_image.astype(float))
+        
+        # f.attrs['creation_date'] = current_time
+        
+        ## Dataset type fields:
+        for a_field_name in dataset_type_fields:
+            a_val = getattr(self, a_field_name)
+            if a_val is not None:
+                ## valid value
+                # img_data = self.p_x_given_n.astype(float)  # .shape: (4, n_curr_epoch_time_bins) - (63, 4, 120)
+                f.create_dataset(_subfn_get_key_str(a_field_name), data=a_val) # TypeError: No conversion path for dtype: dtype('<U24')
+                # f.attrs['creation_date'] = current_time
+
+        ## Custom derived:
+        # 't_bin_centers':
+        t_bin_centers = deepcopy(self.time_bin_container.centers)
+        f.create_dataset(_subfn_get_key_str('t_bin_centers'), data=t_bin_centers)
+        # f.attrs['creation_date'] = current_time
+        
+        ## Attributes:
+        group = f[key]
+        group.attrs['creation_date'] = current_time
+        group.attrs['nbins'] = self.nbins
+        group.attrs['n_xbins'] = self.n_xbins
+        # group.attrs['ndim'] = self.ndim
+
+        epoch_info_tuple = deepcopy(self.epoch_info_tuple) # EpochTuple(Index=28, start=971.8437469999772, stop=983.9541530000279, label='28', duration=12.110406000050716, lap_id=29, lap_dir=1, score=0.36769430044232587, velocity=1.6140523749028528, intercept=1805.019565924132, speed=1.6140523749028528, wcorr=-0.9152062701244238, P_decoder=0.6562437078530542, pearsonr=-0.7228173157676305, travel=0.0324318935144031, coverage=0.19298245614035087, jump=0.0005841121495327102, sequential_correlation=16228.563177472019, monotonicity_score=16228.563177472019, laplacian_smoothness=16228.563177472019, longest_sequence_length=22, longest_sequence_length_ratio=0.4583333333333333, direction_change_bin_ratio=0.19148936170212766, congruent_dir_bins_ratio=0.574468085106383, total_congruent_direction_change=257.92556950947574, total_variation=326.1999849678664, integral_second_derivative=7423.7044320722935, stddev_of_diff=8.368982188902695)
+        epoch_info_tuple_included_fields = [k for k in dir(epoch_info_tuple) if ((not k.startswith('_')) and (k not in ['index', 'count']))] # ['Index', 'P_decoder', 'congruent_dir_bins_ratio', 'count', 'coverage', 'direction_change_bin_ratio', 'duration', 'index', 'integral_second_derivative', 'intercept', 'jump', 'label', 'lap_dir', 'lap_id', 'laplacian_smoothness', 'longest_sequence_length', 'longest_sequence_length_ratio', 'monotonicity_score', 'pearsonr', 'score', 'sequential_correlation', 'speed', 'start', 'stddev_of_diff', 'stop', 'total_congruent_direction_change', 'total_variation', 'travel', 'velocity', 'wcorr']
+        
+        issue_fields = ['is_user_annotated_epoch', 'is_valid_epoch']
+        for a_field_name in epoch_info_tuple_included_fields:
+            a_val = getattr(epoch_info_tuple, a_field_name)
+            if (a_val is not None):
+                ## valid value
+                group.attrs[a_field_name] = a_val
+
+
+
+
+    @classmethod
+    def read_hdf(cls, file_path, key: str, **kwargs) -> "PfND":
+        """ Reads the data from the key in the hdf5 file at file_path """
+        raise NotImplementedError("read_hdf not implemented")
+
 
 @custom_define(slots=False, repr=False)
-class DecodedFilterEpochsResult(AttrsBasedClassHelperMixin):
+class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     """ Container for the results of decoding a set of epochs (filter_epochs) using a decoder (active_decoder) 
     
     This class stores results from decoding from multiple non-contiguous time epochs, each containing many time bins (a variable number according to their length)
@@ -401,19 +640,130 @@ class DecodedFilterEpochsResult(AttrsBasedClassHelperMixin):
         [1, 1, 0.277354, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.277354, 0.277354, 0.277354, 0.277354, 1, 1, 0.277354, 0.277354, 0.277354, 1, 1, 1, 1, 0.277354, 1, 1, 1, 1]]), 'most_likely_positions_1D': array([1.5, 1.5, 0.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 0.5, 0.5, 0.5, 0.5, 1.5, 1.5, 0.5, 0.5, 0.5, 1.5, 1.5, 1.5, 1.5, 0.5, 1.5, 1.5, 1.5, 1.5])})
        
     """
-    decoding_time_bin_size: float # the time bin_size in seconds
-    num_filter_epochs: int # depends on the number of epochs (`n_epochs`)
-    most_likely_positions_list: list = field(metadata={'shape': ('n_epochs',)})
-    p_x_given_n_list: list = field(metadata={'shape': ('n_epochs',)})
-    marginal_x_list: list = field(metadata={'shape': ('n_epochs',)})
-    marginal_y_list: list = field(metadata={'shape': ('n_epochs',)})
-    most_likely_position_indicies_list: list = field(metadata={'shape': ('n_epochs',)})
-    spkcount: list = field(metadata={'shape': ('n_epochs',)})
-    nbins: np.ndarray = field(metadata={'shape': ('n_epochs',)}) # an array of the number of time bins in each epoch
-    time_bin_containers: list = field(metadata={'shape': ('n_epochs',)})
-    time_bin_edges: list = field(metadata={'shape': ('n_epochs',)}) # depends on the number of epochs, one per epoch
-    epoch_description_list: list[str] = field(default=Factory(list), metadata={'shape': ('n_epochs',)}) # depends on the number of epochs, one for each
+    decoding_time_bin_size: float = serialized_attribute_field() # the time bin_size in seconds
+    filter_epochs: pd.DataFrame = serialized_field() # the filter epochs themselves
+    num_filter_epochs: int = serialized_attribute_field() # depends on the number of epochs (`n_epochs`)
+    most_likely_positions_list: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
+    p_x_given_n_list: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
+    marginal_x_list: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
+    marginal_y_list: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
+    most_likely_position_indicies_list: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
+    spkcount: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
+    nbins: np.ndarray = serialized_field(metadata={'shape': ('n_epochs',)}) # an array of the number of time bins in each epoch
+    time_bin_containers: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
+    time_bin_edges: list = non_serialized_field(metadata={'shape': ('n_epochs',)}) # depends on the number of epochs, one per epoch
+    epoch_description_list: list[str] = non_serialized_field(default=Factory(list), metadata={'shape': ('n_epochs',)}) # depends on the number of epochs, one for each
     
+
+    @property
+    def active_filter_epochs(self):
+        """ for compatibility """
+        return deepcopy(self.filter_epochs)
+
+
+    @property
+    def time_window_centers(self) -> List[NDArray]:
+        """ for compatibility """
+        return deepcopy([self.time_bin_containers[an_epoch_idx].centers for an_epoch_idx in np.arange(self.num_filter_epochs)])
+
+
+    @function_attributes(short_name=None, tags=['single-epoch', 'indexing', 'start-time'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=['self.get_result_for_epoch_at_time'])
+    def get_result_for_epoch(self, active_epoch_idx: int) -> SingleEpochDecodedResult:
+        """ returns a container with the result from a single epoch. 
+        NOTE: active_epoch_idx is the "dumb-index" not a smarter epoch id or label or anything like that. See self.get_result_for_epoch_at_time(...) for smarter access.
+        
+        """
+        single_epoch_field_names = ['most_likely_positions_list', 'p_x_given_n_list', 'marginal_x_list', 'marginal_y_list', 'most_likely_position_indicies_list', 'nbins', 'time_bin_containers', 'time_bin_edges'] # a_decoder_decoded_epochs_result._test_find_fields_by_shape_metadata()
+        fields_to_single_epoch_fields_dict = dict(zip(['most_likely_positions_list', 'p_x_given_n_list', 'marginal_x_list', 'marginal_y_list', 'most_likely_position_indicies_list', 'nbins', 'time_bin_containers', 'time_bin_edges'],
+            ['most_likely_positions', 'p_x_given_n', 'marginal_x', 'marginal_y', 'most_likely_position_indicies', 'nbins', 'time_bin_container', 'time_bin_edges'])) # maps list names to single-epoch specific field names
+        
+        values_dict = {fields_to_single_epoch_fields_dict[field_name]:getattr(self, field_name)[active_epoch_idx] for field_name in single_epoch_field_names}
+        # a_posterior = self.p_x_given_n_list[active_epoch_idx].copy()
+        active_epoch_info_tuple = tuple(ensure_dataframe(self.active_filter_epochs).itertuples(name='EpochTuple'))[active_epoch_idx] # just dumb-indexes into the epochs array
+        single_epoch_result: SingleEpochDecodedResult = SingleEpochDecodedResult(**values_dict, epoch_info_tuple=active_epoch_info_tuple, epoch_data_index=active_epoch_idx)
+        return single_epoch_result
+    
+    @function_attributes(short_name=None, tags=['single-epoch', 'indexing', 'start-time'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-18 07:36', related_items=['self.get_result_for_epoch'])
+    def get_result_for_epoch_at_time(self, epoch_start_time: float) -> SingleEpochDecodedResult:
+        """ returns a container with the result from a single epoch, based on a start time
+        
+        
+        .get_result_for_epoch_at_time(epoch_start_time=clicked_epoch[0])
+        
+        """
+        filtered_v = self.filtered_by_epoch_times(included_epoch_start_times=np.atleast_1d(epoch_start_time)) # should only have 1 epoch remaining
+        assert len(filtered_v.filter_epochs) == 1, f"len(filtered_v.filter_epochs): {len(filtered_v.filter_epochs)}"
+        return filtered_v.get_result_for_epoch(active_epoch_idx=0) # 0 to indicate the first (and only) remaining epoch
+        
+    
+    
+    
+
+    @function_attributes(short_name=None, tags=['radon-transform','decoder','line','fit','velocity','speed'], input_requires=[], output_provides=[], uses=['get_radon_transform'], used_by=[], creation_date='2024-02-13 17:25', related_items=[])
+    def compute_radon_transforms(self, pos_bin_size:float, xbin_centers: NDArray, nlines:int=8192, margin:float=8, jump_stat=None, n_jobs:int=4, enable_return_neighbors_arr=False) -> pd.DataFrame:
+        """ 2023-05-25 - Computes the line of best fit (which gives the velocity) for the 1D Posteriors for each replay epoch using the Radon Transform approch.
+        
+        # pos_bin_size: the size of the x_bin in [cm]
+        if decoder.pf.bin_info is not None:
+            pos_bin_size = float(decoder.pf.bin_info['xstep'])
+        else:
+            ## if the bin_info is for some reason not accessible, just average the distance between the bin centers.
+            pos_bin_size = np.diff(decoder.pf.xbin_centers).mean()
+
+
+        Usage:
+        
+            epochs_linear_fit_df = compute_radon_transforms(pos_bin_size=pos_bin_size, nlines=8192, margin=16, n_jobs=1)
+            
+            a_directional_laps_filter_epochs_decoder_result = a_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df), filter_epochs=global_any_laps_epochs_obj, decoding_time_bin_size=laps_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
+            laps_radon_transform_df = compute_radon_transforms(a_directional_pf1D_Decoder, a_directional_laps_filter_epochs_decoder_result)
+
+            Columns:         ['score', 'velocity', 'intercept', 'speed']
+        """
+        from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import get_radon_transform
+        # active_time_bins = active_epoch_decoder_result.time_bin_edges[0]
+        # active_posterior_container = active_epoch_decoder_result.marginal_x_list[0]
+        active_posterior = self.p_x_given_n_list # one for each epoch
+        active_time_window_centers_list = [t[0] for t in self.time_window_centers] # first index
+        ## compute the Radon transform to get the lines of best fit
+        extra_outputs = []
+        score, velocity, intercept, *extra_outputs = get_radon_transform(active_posterior, decoding_time_bin_duration=self.decoding_time_bin_size, pos_bin_size=pos_bin_size, posteriors=None, nlines=nlines, margin=margin, jump_stat=jump_stat, n_jobs=n_jobs, enable_return_neighbors_arr=enable_return_neighbors_arr, debug_print=True,
+                                                                          x0=xbin_centers[0], t0=active_time_window_centers_list)
+        epochs_linear_fit_df = pd.DataFrame({'score': score, 'velocity': velocity, 'intercept': intercept, 'speed': np.abs(velocity)})
+        return epochs_linear_fit_df, extra_outputs
+
+
+    def __repr__(self):
+        """ 2024-01-11 - Renders only the fields and their sizes
+            DecodedFilterEpochsResult(decoding_time_bin_size: float,
+                filter_epochs: neuropy.core.epoch.Epoch,
+                num_filter_epochs: int,
+                most_likely_positions_list: list | shape (n_epochs),
+                p_x_given_n_list: list | shape (n_epochs),
+                marginal_x_list: list | shape (n_epochs),
+                marginal_y_list: list | shape (n_epochs),
+                most_likely_position_indicies_list: list | shape (n_epochs),
+                spkcount: list | shape (n_epochs),
+                nbins: numpy.ndarray | shape (n_epochs),
+                time_bin_containers: list | shape (n_epochs),
+                time_bin_edges: list | shape (n_epochs),
+                epoch_description_list: list | shape (n_epochs)
+            )
+        """
+        from pyphocorehelpers.print_helpers import strip_type_str_to_classname
+        # content = ",\n\t".join([f"{a.name}: {strip_type_str_to_classname(type(getattr(self, a.name)))}" for a in self.__attrs_attrs__])
+        # return f"{type(self).__name__}({content}\n)"
+        attr_reprs = []
+        for a in self.__attrs_attrs__:
+            attr_type = strip_type_str_to_classname(type(getattr(self, a.name)))
+            if 'shape' in a.metadata:
+                shape = ', '.join(a.metadata['shape'])  # this joins tuple elements with a comma, creating a string without quotes
+                attr_reprs.append(f"{a.name}: {attr_type} | shape ({shape})")  # enclose the shape string with parentheses
+            else:
+                attr_reprs.append(f"{a.name}: {attr_type}")
+        content = ",\n\t".join(attr_reprs)
+        return f"{type(self).__name__}({content}\n)"
+
 
     def flatten(self):
         """ flattens the result over all epochs to produce one per time bin """
@@ -428,7 +778,7 @@ class DecodedFilterEpochsResult(AttrsBasedClassHelperMixin):
 
     def flatten_to_masked_values(self):
         """ appends np.nan values to the beginning and end of each posterior (adding a start and end timebin as well) to allow flat plotting via matplotlib.
-
+        Looks  like it was depricated by `plot_slices_1D_most_likely_position_comparsions` to plot epoch slices (corresponding to certain periods in time) along the continuous session duration.
 
         """
         # returns a flattened version of self over all epochs
@@ -474,28 +824,278 @@ class DecodedFilterEpochsResult(AttrsBasedClassHelperMixin):
         return desired_total_n_timebins, updated_is_masked_bin, updated_time_bin_containers, updated_timebins_p_x_given_n
 
 
+    def find_data_indicies_from_epoch_times(self, epoch_times: NDArray) -> NDArray:
+        subset = deepcopy(self)
+        if not isinstance(subset.filter_epochs, pd.DataFrame):
+            subset.filter_epochs = subset.filter_epochs.to_dataframe()
+        return subset.filter_epochs.epochs.find_data_indicies_from_epoch_times(epoch_times=epoch_times)
 
-    def filtered_by_epochs(self, included_epoch_indicies):
-        """Returns a copy of itself with the fields with the n_epochs related metadata sliced by the included_epoch_indicies."""
+    def find_epoch_times_to_data_indicies_map(self, epoch_times: NDArray, atol:float=1e-3, t_column_names=None) -> Dict[Union[float, Tuple[float, float]], Union[int, NDArray]]:
+        """ returns the a Dict[Union[float, Tuple[float, float]], Union[int, NDArray]] matching data indicies corresponding to the epoch [start, stop] times 
+        epoch_times: S x 2 array of epoch start/end times
+        Returns: (S, ) array of data indicies corresponding to the times.
+
+        Uses:
+            self.find_epoch_times_to_data_indicies_map
+        
+        """
+        subset = deepcopy(self)
+        if not isinstance(subset.filter_epochs, pd.DataFrame):
+            subset.filter_epochs = subset.filter_epochs.to_dataframe()
+        return subset.filter_epochs.epochs.find_epoch_times_to_data_indicies_map(epoch_times=epoch_times, atol=atol, t_column_names=t_column_names)
+            
+
+    def filtered_by_epoch_times(self, included_epoch_start_times) -> "DecodedFilterEpochsResult":
+        """ Returns a copy of itself with the fields with the n_epochs related metadata sliced by the included_epoch_indicies found from the rows that match `included_epoch_start_times`.       
+        """
         subset = deepcopy(self)
         original_num_filter_epochs = subset.num_filter_epochs
-        subset.most_likely_positions_list = [subset.most_likely_positions_list[i] for i in included_epoch_indicies]
-        subset.p_x_given_n_list = [subset.p_x_given_n_list[i] for i in included_epoch_indicies]
-        subset.marginal_x_list = [subset.marginal_x_list[i] for i in included_epoch_indicies]
-        subset.marginal_y_list = [subset.marginal_y_list[i] for i in included_epoch_indicies]
-        subset.most_likely_position_indicies_list = [subset.most_likely_position_indicies_list[i] for i in included_epoch_indicies]
-        subset.spkcount = [subset.spkcount[i] for i in included_epoch_indicies]
-        subset.nbins = subset.nbins[included_epoch_indicies] # can be subset because it's an ndarray
-        subset.time_bin_containers = [subset.time_bin_containers[i] for i in included_epoch_indicies]
+        if not isinstance(subset.filter_epochs, pd.DataFrame):
+            subset.filter_epochs = subset.filter_epochs.to_dataframe()
+        found_data_indicies = subset.filter_epochs.epochs.find_data_indicies_from_epoch_times(epoch_times=included_epoch_start_times)
+        return subset.filtered_by_epochs(found_data_indicies)
+
+
+    def filtered_by_epochs(self, included_epoch_indicies, debug_print=False) -> "DecodedFilterEpochsResult":
+        """Returns a copy of itself with the fields with the n_epochs related metadata sliced by the included_epoch_indicies.
+        
+        MOSTLY TESTED 2024-03-11 - WORKING
+
+        """
+        subset = deepcopy(self)
+        original_num_filter_epochs = subset.num_filter_epochs
+        if not isinstance(subset.filter_epochs, pd.DataFrame):
+            subset.filter_epochs = subset.filter_epochs.to_dataframe()
+
+        ## Convert to the real-deal: pure indicies
+        old_fashioned_indicies = np.array([subset.filter_epochs.index.get_loc(a_loc_idx) for a_loc_idx in included_epoch_indicies])
+        if debug_print:
+            print(f'old_fashioned_indicies: {old_fashioned_indicies}')
+
+        ## Need to have the indicies before applying the filter:
+        subset.filter_epochs = subset.filter_epochs.loc[included_epoch_indicies] # the evil `.iloc[...]` creeps in again with `IndexError: positional indexers are out-of-bounds`
+        subset.most_likely_positions_list = [subset.most_likely_positions_list[i] for i in old_fashioned_indicies] # that's obviously not going to work because .loc[...] values are used. I need that magic trick that the new AI taught me -- `.index.get_loc(start_index)`
+        subset.p_x_given_n_list = [subset.p_x_given_n_list[i] for i in old_fashioned_indicies]
+        subset.marginal_x_list = [subset.marginal_x_list[i] for i in old_fashioned_indicies]
+        subset.marginal_y_list = [subset.marginal_y_list[i] for i in old_fashioned_indicies]
+        subset.most_likely_position_indicies_list = [subset.most_likely_position_indicies_list[i] for i in old_fashioned_indicies]
+        subset.spkcount = [subset.spkcount[i] for i in old_fashioned_indicies]
+        subset.nbins = subset.nbins[old_fashioned_indicies] # can be subset because it's an ndarray. `IndexError: arrays used as indices must be of integer (or boolean) type`: occurs because when it is empty it seems to default to float64 dtype
+        subset.time_bin_containers = [subset.time_bin_containers[i] for i in old_fashioned_indicies]
         subset.num_filter_epochs = len(included_epoch_indicies)
-        subset.time_bin_edges = [subset.time_bin_edges[i] for i in included_epoch_indicies]
+        subset.time_bin_edges = [subset.time_bin_edges[i] for i in old_fashioned_indicies]
         if len(subset.epoch_description_list) == original_num_filter_epochs:
             # sometimes epoch_description_list is empty and so it doesn't need to be subsetted.
-            subset.epoch_description_list = [subset.epoch_description_list[i] for i in included_epoch_indicies]
+            subset.epoch_description_list = [subset.epoch_description_list[i] for i in old_fashioned_indicies]
             
         # Only `decoding_time_bin_size` is unchanged
         return subset
     
+
+    @function_attributes(short_name=None, tags=['validate', 'time_bins'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-07 16:35', related_items=[])
+    def validate_time_bins(self):
+        """validates a `DecodedFilterEpochsResult` object -- ensuring that all lists are of consistent sizes and that within the lists all the time bins have the correct properties
+        """
+        def _subfn_check_all_epoch_lists_same_length(a_train_decoded_results):
+            single_epoch_field_names = ['most_likely_positions_list', 'p_x_given_n_list', 'marginal_x_list', 'marginal_y_list', 'most_likely_position_indicies_list', 'nbins', 'time_bin_containers', 'time_bin_edges'] # DecodedFilterEpochsResult._test_find_fields_by_shape_metadata(desired_keys_subset=desired_keys_subset)
+            list_field_length_dict: Dict[str, int] = {field_name:len(getattr(a_train_decoded_results, field_name)) for field_name in single_epoch_field_names}
+            assert np.allclose(np.array(list(list_field_length_dict.values())), a_train_decoded_results.num_filter_epochs), f"np.array(list(list_field_length_dict.values())): {np.array(list(list_field_length_dict.values()))} differs from a_train_decoded_results.num_filter_epochs: {a_train_decoded_results.num_filter_epochs}"
+
+        # checks all list fields are the same length as a_train_decoded_results.num_filter_epochs
+        _subfn_check_all_epoch_lists_same_length(a_train_decoded_results=self)
+
+        for an_epoch_idx in np.arange(self.num_filter_epochs):
+            epoch_lbl_str: str = f"Epoch[{an_epoch_idx}]: "
+            a_most_likely_positions_list = self.most_likely_positions_list[an_epoch_idx]
+            a_p_x_given_n = self.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
+            a_n_bins_n_time_bins: int = self.nbins[an_epoch_idx]
+            # a_most_likely_positions_list_n_time_bins, a_most_likely_positions_list_n_pos_bins = np.shape(a_most_likely_positions_list)
+            a_most_likely_positions_list_n_time_bins: int = np.shape(a_most_likely_positions_list)[0]
+            
+
+            ## Everything is valid only for 1D, don't check 2D at all:
+            # assert np.ndim(a_p_x_given_n) == 2, epoch_lbl_str + f"np.ndim(a_p_x_given_n): {np.ndim(a_p_x_given_n)}"
+            
+            if np.ndim(a_p_x_given_n) == 2:            
+                ## 1D position:
+                n_pos_bins_posterior, n_time_bins_posterior = np.shape(a_p_x_given_n) # np.shape(a_p_x_given_n): (62, 9)
+            elif np.ndim(a_p_x_given_n) == 3:
+                # 2D position
+                n_pos_x_bins_posterior, n_pos_y_bins_posterior, n_time_bins_posterior = np.shape(a_p_x_given_n) # np.shape(a_p_x_given_n): (62, 9)
+                # np.shape(self.p_x_given_n_list[an_epoch_idx-1])
+                # (57, 4, 3)
+                # np.shape(self.p_x_given_n_list[an_epoch_idx-2])
+                # (57, 4, 5)
+                # np.shape(self.p_x_given_n_list[an_epoch_idx-0])
+                # (57, 1, 16)
+                # np.shape(self.p_x_given_n_list[an_epoch_idx-2])
+                # (57, 4, 5)
+                # np.shape(self.p_x_given_n_list[an_epoch_idx-9])
+                # (57, 4, 2)
+
+
+            else:
+                raise NotImplementedError(f'Unexpected number of dimensions in posteriors! {epoch_lbl_str} np.ndim(a_p_x_given_n): {np.ndim(a_p_x_given_n)}"')
+            
+            assert a_n_bins_n_time_bins == n_time_bins_posterior, epoch_lbl_str + f"a_n_bins_n_time_bins: {a_n_bins_n_time_bins} != n_time_bins_posterior: {n_time_bins_posterior}\n\ta_train_decoded_results.nbins: {self.nbins}"
+            
+            ## Check position bin agreement:
+            assert a_most_likely_positions_list_n_time_bins == n_time_bins_posterior, epoch_lbl_str + f"a_most_likely_positions_list_n_time_bins: {a_most_likely_positions_list_n_time_bins} != n_time_bins_posterior: {n_time_bins_posterior}"
+            # assert a_most_likely_positions_list_n_pos_bins == n_pos_bins, f"a_most_likely_positions_list_n_pos_bins: {a_most_likely_positions_list_n_pos_bins} != n_pos_bins: {n_pos_bins}"
+
+            # time_window_centers = a_train_decoded_results.time_bin_containers[an_epoch_idx].centers
+            time_window_centers = self.time_window_centers[an_epoch_idx]
+            a_time_window_centers_n_time_bins = len(time_window_centers)
+            assert a_time_window_centers_n_time_bins == n_time_bins_posterior, epoch_lbl_str + f"a_time_window_centers_n_time_bins: {a_time_window_centers_n_time_bins} != n_time_bins_posterior: {n_time_bins_posterior}"
+            
+            a_time_bin_container = self.time_bin_containers[an_epoch_idx]
+            a_time_bin_container_n_time_bins = a_time_bin_container.num_bins
+            assert a_time_bin_container_n_time_bins == n_time_bins_posterior, epoch_lbl_str + f"a_time_bin_container_n_time_bins: {a_time_bin_container_n_time_bins} != n_time_bins_posterior: {n_time_bins_posterior}"
+            
+            # ## `time_bin_edges` are where the problems come from:
+            # # AssertionError: a_time_bin_edges_n_time_bins: 282 != n_time_bins_posterior: 1
+            # # [678.314 678.315 678.316 678.317 678.318 678.319 678.32 678.321 678.322 678.323 678.324 678.325 678.326 678.327 678.328 678.329 678.33 678.331 678.332 678.333 678.334 678.335 678.336 678.337 678.338 678.339 678.34 678.341 678.342 678.343 678.344 678.345 678.346 678.347 678.348 678.349 678.35 678.351 678.352 678.353 678.354 678.355 678.356 678.357 678.358 678.359 678.36 678.361 678.362 678.363 678.364 678.365 678.366 678.367 678.368 678.369 678.37 678.371 678.372 678.373 678.374 678.375 678.376 678.377 678.378 678.379 678.38 678.381 678.382 678.383 678.384 678.385 678.386 678.387 678.388 678.389 678.39 678.391 678.392 678.393 678.394 678.395 678.396 678.397 678.398 678.399 678.4 678.401 678.402 678.403 678.404 678.405 678.406 678.407 678.408 678.409 678.41 678.411 678.412 678.413 678.414 678.415 678.416 678.417 678.418 678.419 678.42 678.421 678.422 678.423 678.424 678.425 678.426 678.427 678.428 678.429 678.43 678.431 678.432 678.433 678.434 678.435 678.436 678.437 678.438 678.439 678.44 678.441 678.442 678.443 678.444 678.445 678.446 678.447 678.448 678.449 678.45 678.451 678.452 678.453 678.454 678.455 678.456 678.457 678.458 678.459 678.46 678.461 678.462 678.463 678.464 678.465 678.466 678.467 678.468 678.469 678.47 678.471 678.472 678.473 678.474 678.475 678.476 678.477 678.478 678.479 678.48 678.481 678.482 678.483 678.484 678.485 678.486 678.487 678.488 678.489 678.49 678.491 678.492 678.493 678.494 678.495 678.496 678.497 678.498 678.499 678.5 678.501 678.502 678.503 678.504 678.505 678.506 678.507 678.508 678.509 678.51 678.511 678.512 678.513 678.514 678.515 678.516 678.517 678.518 678.519 678.52 678.521 678.522 678.523 678.524 678.525 678.526 678.527 678.528 678.529 678.53 678.531 678.532 678.533 678.534 678.535 678.536 678.537 678.538 678.539 678.54 678.541 678.542 678.543 678.544 678.545 678.546 678.547 678.548 678.549 678.55 678.551 678.552 678.553 678.554 678.555 678.556 678.557 678.558 678.559 678.56 678.561 678.562 678.563 678.564 678.565 678.566 678.567 678.568 678.569 678.57 678.571 678.572 678.573 678.574 678.575 678.576 678.577 678.578 678.579 678.58 678.581 678.582 678.583 678.584 678.585 678.586 678.587 678.588 678.589 678.59 678.591 678.592 678.593 678.594 678.595 678.596]
+            # a_time_bin_edges = self.time_bin_edges[an_epoch_idx]
+            # a_time_bin_edges_n_time_bins = len(a_time_bin_edges)-1
+            # assert a_time_bin_edges_n_time_bins == n_time_bins_posterior, epoch_lbl_str + f"a_time_bin_edges_n_time_bins: {a_time_bin_edges_n_time_bins} != n_time_bins_posterior: {n_time_bins_posterior}\n\t {a_time_bin_edges}"
+            
+            # a_time_bin_container-based time_window_centers
+            a_time_bin_container_time_window_centers = a_time_bin_container.centers
+            a_time_bin_container_time_window_centers_n_time_bins = len(a_time_bin_container_time_window_centers)
+            assert a_time_bin_container_time_window_centers_n_time_bins == n_time_bins_posterior, epoch_lbl_str + f"a_time_bin_container_time_window_centers_n_time_bins: {a_time_bin_container_time_window_centers_n_time_bins} != n_time_bins_posterior: {n_time_bins_posterior}"
+
+            # time_window_centers = a_train_decoded_results.time_window_centers
+            # a_time_window_centers_n_time_bins = len(time_window_centers)
+            # assert a_time_window_centers_n_time_bins == n_time_bins, f"a_time_window_centers_n_time_bins: {a_time_window_centers_n_time_bins} != n_time_bins_posterior: {n_time_bins}"
+
+
+    @function_attributes(short_name=None, tags=['marginal', 'direction', 'track_id'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-08 00:40', related_items=[]) 
+    def compute_marginals(self, epoch_idx_col_name: str = 'lap_idx', epoch_start_t_col_name: str = 'lap_start_t', additional_transfer_column_names: Optional[List[str]]=None, auto_transfer_all_columns:bool=True): # -> tuple[tuple["DecodedMarginalResultTuple", "DecodedMarginalResultTuple", Tuple[List[DynamicContainer], Any, Any, pd.DataFrame]], pd.DataFrame]:
+        """Computes and initializes the marginal properties
+        
+        (epochs_directional_marginals_tuple, epochs_track_identity_marginals_tuple, epochs_non_marginalized_decoder_marginals_tuple), epochs_marginals_df = a_result.compute_marginals(additional_transfer_column_names=['start','stop','label','duration','lap_id','lap_dir'])
+        """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
+        
+        epochs_epochs_df: pd.DataFrame = ensure_dataframe(deepcopy(self.filter_epochs))
+        
+        epochs_directional_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_directional_likelihoods(self)
+        epochs_directional_marginals, epochs_directional_all_epoch_bins_marginal, epochs_most_likely_direction_from_decoder, epochs_is_most_likely_direction_LR_dir  = epochs_directional_marginals_tuple
+        epochs_track_identity_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(self)
+        epochs_track_identity_marginals, epochs_track_identity_all_epoch_bins_marginal, epochs_most_likely_track_identity_from_decoder, epochs_is_most_likely_track_identity_Long = epochs_track_identity_marginals_tuple
+        epochs_non_marginalized_decoder_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_non_marginalized_decoder_likelihoods(self, debug_print=False)
+        non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df = epochs_non_marginalized_decoder_marginals_tuple
+                
+        ## Build combined marginals df:
+        # epochs_marginals_df = pd.DataFrame(np.hstack((epochs_directional_all_epoch_bins_marginal, epochs_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
+        epochs_marginals_df = pd.DataFrame(np.hstack((non_marginalized_decoder_all_epoch_bins_marginal, epochs_directional_all_epoch_bins_marginal, epochs_track_identity_all_epoch_bins_marginal)), columns=['long_LR', 'long_RL', 'short_LR', 'short_RL', 'P_LR', 'P_RL', 'P_Long', 'P_Short'])
+        epochs_marginals_df[epoch_idx_col_name] = epochs_marginals_df.index.to_numpy()
+        epochs_marginals_df[epoch_start_t_col_name] = epochs_epochs_df['start'].to_numpy()
+        # epochs_marginals_df['stop'] = epochs_epochs_df['stop'].to_numpy()
+        # epochs_marginals_df['label'] = epochs_epochs_df['label'].to_numpy()
+        if auto_transfer_all_columns and (additional_transfer_column_names is None):
+            ## if no columns are explcitly specified, transfer all columns
+            additional_transfer_column_names = list(epochs_epochs_df.columns)
+            
+        if additional_transfer_column_names is not None:
+            for a_col_name in additional_transfer_column_names:
+                if ((a_col_name in epochs_epochs_df) and (a_col_name not in epochs_marginals_df)):
+                    epochs_marginals_df[a_col_name] = epochs_epochs_df[a_col_name].to_numpy()
+                else:
+                    print(f'WARN: extra column: "{a_col_name}" was specified but not present in epochs_epochs_df. Skipping.')
+        
+        
+        return (epochs_directional_marginals_tuple, epochs_track_identity_marginals_tuple, epochs_non_marginalized_decoder_marginals_tuple), epochs_marginals_df
+        
+
+    @function_attributes(short_name=None, tags=['per_time_bin', 'marginals', 'IMPORTANT'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-09 07:06', related_items=[])
+    def build_per_time_bin_marginals_df(self, active_marginals_tuple: Tuple, columns_tuple: Tuple, transfer_column_names_list: Optional[List[str]]=None) -> pd.DataFrame:
+        """ Used to build the `per_time_bin` outputs (as opposed to the `per_epoch` outputs)
+        
+        active_marginals=ripple_track_identity_marginals, columns=['P_LR', 'P_RL']
+        active_marginals=ripple_track_identity_marginals, columns=['P_Long', 'P_Short']
+        
+        _build_multiple_per_time_bin_marginals(a_decoder_result=a_decoder_result, active_marginals_tuple=(laps_directional_all_epoch_bins_marginal, laps_track_identity_all_epoch_bins_marginal), columns_tuple=(['P_LR', 'P_RL'], ['P_Long', 'P_Short']))
+        
+        transfer_column_names_list: List[str] = ['maze_id', 'lap_dir', 'lap_id']
+                
+        Creates Columns: ['center_t', ]
+        Creates new df with columns: ['epoch_idx', 't_bin_center', 'epoch_idx']
+        
+        History: Extracted from `pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalPseudo2DDecodersResult._build_multiple_per_time_bin_marginals` on 2024-10-09 
+        
+        """
+        parent_epoch_label_col_name: str = 'label' # column in `filter_epochs_df` that can be used to index into the epochs
+        filter_epochs_df = deepcopy(self.filter_epochs)
+        if not isinstance(filter_epochs_df, pd.DataFrame):
+            filter_epochs_df = filter_epochs_df.to_dataframe()
+            
+        filter_epochs_df['center_t'] = (filter_epochs_df['start'] + (filter_epochs_df['duration']/2.0))
+        
+        # self.num_filter_epochs: 664
+        flat_time_bin_centers_column = np.concatenate([curr_epoch_time_bin_container.centers for curr_epoch_time_bin_container in self.time_bin_containers]) # 4343
+        half_time_bin_size: float = self.time_bin_containers[0].edge_info.step / 2.0
+        flat_time_bin_start_edge_column = flat_time_bin_centers_column - half_time_bin_size
+        flat_time_bin_stop_edge_column = flat_time_bin_centers_column + half_time_bin_size
+
+        all_columns = []
+        all_epoch_extracted_posteriors = []
+        assert len(active_marginals_tuple) == len(columns_tuple)
+        
+        for active_marginals, active_columns in zip(active_marginals_tuple, columns_tuple):
+            epoch_extracted_posteriors = [a_result['p_x_given_n'] for a_result in active_marginals]
+            n_epoch_time_bins = [np.shape(a_posterior)[-1] for a_posterior in epoch_extracted_posteriors]
+            result_t_bin_idx_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=i) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
+            epoch_df_idx_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=filter_epochs_df.index[i]) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
+            epoch_label_column = np.concatenate([np.full((an_epoch_time_bins, ), fill_value=filter_epochs_df[parent_epoch_label_col_name].values[i]) for i, an_epoch_time_bins in enumerate(n_epoch_time_bins)])
+            all_columns.extend(active_columns)
+            # all_epoch_extracted_posteriors = np.hstack((all_epoch_extracted_posteriors, epoch_extracted_posteriors))
+            all_epoch_extracted_posteriors.append(np.hstack((epoch_extracted_posteriors)))
+            # all_epoch_extracted_posteriors.extend(epoch_extracted_posteriors)
+
+        all_epoch_extracted_posteriors = np.vstack(all_epoch_extracted_posteriors) # (4, n_time_bins) - (4, 5495)
+        epoch_time_bin_marginals_df = pd.DataFrame(all_epoch_extracted_posteriors.T, columns=all_columns)
+        epoch_time_bin_marginals_df['result_t_bin_idx'] = result_t_bin_idx_column # a.k.a result label
+        epoch_time_bin_marginals_df['epoch_df_idx'] = epoch_df_idx_column
+        epoch_time_bin_marginals_df['parent_epoch_label'] = epoch_label_column
+        
+        if (len(flat_time_bin_centers_column) < len(epoch_time_bin_marginals_df)):
+            # 2024-01-25 - This fix DOES NOT HELP. The constructed size is the same as the existing `flat_time_bin_centers_column`.
+            
+            # bin errors are occuring:
+            print(f'encountering bin issue! flat_time_bin_centers_column: {np.shape(flat_time_bin_centers_column)}. len(epoch_time_bin_marginals_df): {len(epoch_time_bin_marginals_df)}. Attempting to fix.')
+            # find where the indicies are less than two bins
+            # miscentered_bin_indicies = np.where(n_epoch_time_bins < 2)
+            # replace those centers with just the center of the epoch
+            t_bin_centers_list = []
+            for epoch_idx, curr_epoch_time_bin_container in enumerate(self.time_bin_containers):
+                curr_epoch_n_time_bins = n_epoch_time_bins[epoch_idx]
+                if (curr_epoch_n_time_bins < 2):
+                    an_epoch_center = filter_epochs_df['center_t'].to_numpy()[epoch_idx]
+                    t_bin_centers_list.append([an_epoch_center]) # list containing only the single epoch center
+                else:
+                    t_bin_centers_list.append(curr_epoch_time_bin_container.centers) 
+
+            flat_time_bin_centers_column = np.concatenate(t_bin_centers_list)
+            print(f'\t fixed flat_time_bin_centers_column: {np.shape(flat_time_bin_centers_column)}')
+
+        epoch_time_bin_marginals_df['label'] = epoch_time_bin_marginals_df.index.values.astype(int)
+        epoch_time_bin_marginals_df['start'] = deepcopy(flat_time_bin_start_edge_column) 
+        epoch_time_bin_marginals_df['t_bin_center'] = deepcopy(flat_time_bin_centers_column) 
+        epoch_time_bin_marginals_df['stop'] = deepcopy(flat_time_bin_stop_edge_column)
+
+        # except ValueError:
+            # epoch_time_bin_marginals_df['t_bin_center'] = deepcopy(a_decoder_result.filter_epochs['center_t'].to_numpy()[miscentered_bin_indicies])
+        
+        ## add columns from parent df:
+        if transfer_column_names_list is not None:
+            for a_test_transfer_column_name in transfer_column_names_list:
+                # a_test_transfer_column_name: str = 'maze_id'
+                epoch_time_bin_marginals_df[a_test_transfer_column_name] = epoch_time_bin_marginals_df['epoch_df_idx'].map(lambda idx: filter_epochs_df.loc[idx, a_test_transfer_column_name])
+            
+        return epoch_time_bin_marginals_df
+    
+
 # ==================================================================================================================== #
 # Placemap Position Decoders                                                                                           #
 # ==================================================================================================================== #
@@ -531,32 +1131,57 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
 
     # placefield properties:
     @property
-    def ratemap(self):
+    def ratemap(self) -> Ratemap:
         return self.pf.ratemap
 
     @property
-    def ndim(self):
+    def ndim(self) -> int:
         return int(self.pf.ndim)
 
     @property
-    def num_neurons(self):
+    def num_neurons(self) -> int:
         """The num_neurons property."""
         return self.ratemap.n_neurons # np.shape(self.neuron_IDs) # or self.ratemap.n_neurons
 
     # ratemap properties (xbin & ybin)  
     @property
-    def xbin(self):
+    def xbin(self) -> NDArray:
         return self.ratemap.xbin
     @property
-    def ybin(self):
+    def ybin(self) -> NDArray:
         return self.ratemap.ybin
     @property
-    def xbin_centers(self):
+    def xbin_centers(self) -> NDArray:
         return self.ratemap.xbin_centers
     @property
-    def ybin_centers(self):
+    def ybin_centers(self) -> NDArray:
         return self.ratemap.ybin_centers
-
+    @property
+    def n_xbin_edges(self) -> int:
+        return len(self.xbin) 
+    @property
+    def n_ybin_edges(self) -> Optional[int]:
+        """ the number of ybin edges. """
+        if self.ybin is None:
+            return None
+        else:
+             return len(self.ybin)
+    @property
+    def n_xbin_centers(self) -> int:
+        return (len(self.xbin) - 1) # the -1 is to get the counts for the centers only
+    @property
+    def n_ybin_centers(self) -> Optional[int]:
+        if self.ybin is None:
+            return None
+        else:
+             return (len(self.ybin) - 1) # the -1 is to get the counts for the centers only
+    @property
+    def pos_bin_size(self) -> Union[float, Tuple[float, float]]:
+        """ extracts pos_bin_size: the size of the x_bin in [cm], from the decoder. 
+        returns a tuple if 2D or a single float if 1D
+        """
+        return self.pf.pos_bin_size
+    
     @property
     def original_position_data_shape(self):
         """The original_position_data_shape property."""
@@ -629,10 +1254,22 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
             TODO 2023-04-06 - REMOVE this argument. it is unused. It exists just for backwards compatibility with the stateful decoder.
         """
         # call .get_by_id(ids) on the placefield (pf):
-        neuron_sliced_pf = self.pf.get_by_id(ids)
+        neuron_sliced_pf: PfND = self.pf.get_by_id(ids)
         ## apply the neuron_sliced_pf to the decoder:
         neuron_sliced_decoder = BasePositionDecoder(neuron_sliced_pf, setup_on_init=self.setup_on_init, post_load_on_init=self.post_load_on_init, debug_print=self.debug_print)
         return neuron_sliced_decoder
+    
+    @function_attributes(short_name=None, tags=['epoch', 'slice', 'restrict'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-29 19:08', related_items=[])
+    def replacing_computation_epochs(self, epochs: Union[Epoch, pd.DataFrame]):
+        """Implementors return a copy of themselves with their computation epochs (contained in their placefields at `self.pf`) replaced by the provided ones. The existing epochs are unrelated and do not need to be related to the new ones.
+        """
+        new_epochs_obj: Epoch = Epoch(ensure_dataframe(deepcopy(epochs)).epochs.get_valid_df()).get_non_overlapping()
+        ## Restrict the PfNDs:
+        epoch_replaced_pf1D: PfND = self.pf.replacing_computation_epochs(deepcopy(new_epochs_obj))
+        ## apply the neuron_sliced_pf to the decoder:
+        updated_decoder = BasePositionDecoder(epoch_replaced_pf1D, setup_on_init=self.setup_on_init, post_load_on_init=self.post_load_on_init, debug_print=self.debug_print)
+        return updated_decoder
+
 
     def conform_to_position_bins(self, target_one_step_decoder, force_recompute=True):
         """ After the underlying placefield (self.pf)'s position bins are changed by calling pf.conform_to_position_bins(...) externally, the computations for the decoder will be messed up (and out of sync).
@@ -695,14 +1332,37 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
     # ==================================================================================================================== #
     # Main computation functions:                                                                                          #
     # ==================================================================================================================== #
-    @function_attributes(short_name='decode_specific_epochs', tags=['decode'], input_requires=[], output_provides=[], creation_date='2023-03-23 19:10',
-        uses=['BayesianPlacemapPositionDecoder.perform_decode_specific_epochs'], used_by=[])
-    def decode_specific_epochs(self, spikes_df, filter_epochs, decoding_time_bin_size = 0.05, debug_print=False):
-        """ 
+    @function_attributes(short_name='decode_specific_epochs', tags=['decode', 'epochs', 'specific'], input_requires=[], output_provides=[], creation_date='2023-03-23 19:10',
+        uses=['BayesianPlacemapPositionDecoder.perform_decode_specific_epochs', 'pre_build_epochs_decoding_result', 'perform_pre_built_specific_epochs_decoding'], used_by=['decode_using_new_decoders'], related_items=['get_proper_global_spikes_df'])
+    def decode_specific_epochs(self, spikes_df: pd.DataFrame, filter_epochs, decoding_time_bin_size:float=0.05, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DecodedFilterEpochsResult:
+        """
+        History:
+            Split `perform_decode_specific_epochs` into two subfunctions: `_build_decode_specific_epochs_result_shell` and `_perform_decoding_specific_epochs`
+
         Uses:
             BayesianPlacemapPositionDecoder.perform_decode_specific_epochs(...)
         """
-        return self.perform_decode_specific_epochs(self, spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=debug_print)
+        ## Equivalent:
+        # return self.perform_decode_specific_epochs(self, spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
+        pre_built_epochs_decoding_result = self.pre_build_epochs_decoding_result(spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
+        return self.perform_pre_built_specific_epochs_decoding(filter_epochs_decoder_result=pre_built_epochs_decoding_result, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
+    
+    @function_attributes(short_name=None, tags=['pre-build', 'efficiency'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-29 00:00', related_items=['decode_specific_epochs', 'perform_pre_built_specific_epochs_decoding'])
+    def pre_build_epochs_decoding_result(self, spikes_df: pd.DataFrame, filter_epochs, decoding_time_bin_size:float=0.05, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DynamicContainer:
+        """ Builds the results used to call `.perform_pre_built_specific_epochs_decoding(...)`
+        History:
+            Split from `self.decode_specific_epochs` to allow reuse of the epochs for efficiency
+        """
+        return self._build_decode_specific_epochs_result_shell(neuron_IDs=self.neuron_IDs, spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
+    
+    @function_attributes(short_name=None, tags=['decode', 'efficiency'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-29 00:00', related_items=['decode_specific_epochs', 'pre_build_epochs_decoding_result'])
+    def perform_pre_built_specific_epochs_decoding(self, filter_epochs_decoder_result: DynamicContainer, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DecodedFilterEpochsResult:
+        """ Called with the results from `.pre_build_epochs_decoding_result(...)`
+        History:
+            Split from `self.decode_specific_epochs` to allow reuse of the epochs for efficiency
+        """
+        return self._perform_decoding_specific_epochs(active_decoder=self, filter_epochs_decoder_result=filter_epochs_decoder_result, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
+    
 
 	# ==================================================================================================================== #
     # Non-Modifying Methods:                                                                                               #
@@ -710,7 +1370,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
     @function_attributes(short_name='decode', tags=['decode', 'pure'], input_requires=[], output_provides=[], creation_date='2023-03-23 19:10',
         uses=['BayesianPlacemapPositionDecoder.perform_compute_most_likely_positions', 'ZhangReconstructionImplementation.neuropy_bayesian_prob'],
         used_by=['BayesianPlacemapPositionDecoder.perform_decode_specific_epochs'])
-    def decode(self, unit_specific_time_binned_spike_counts, time_bin_size, output_flat_versions=False, debug_print=True):
+    def decode(self, unit_specific_time_binned_spike_counts, time_bin_size:float, output_flat_versions=False, debug_print=True):
         """ decodes the neural activity from its internal placefields, returning its posterior and the predicted position 
         Does not alter the internal state of the decoder (doesn't change internal most_likely_positions or posterior, etc)
         
@@ -869,10 +1529,10 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         short_shared_aclus_only_decoder = short_decoder.get_by_id(shared_aclus) # short currently has a subset of long's alcus so this isn't needed, but just for symmetry do it anyway
         return shared_aclus, (long_shared_aclus_only_decoder, short_shared_aclus_only_decoder), long_short_pf_neurons_diff
 
-    @function_attributes(short_name='perform_decode_specific_epochs', tags=['decode','specific_epochs','epoch', 'classmethod'], input_requires=[], output_provides=[], uses=['active_decoder.decode', 'add_epochs_id_identity', 'epochs_spkcount', 'cls.perform_build_marginals'], used_by=[''], creation_date='2022-12-04 00:00')
+
     @classmethod
-    def perform_decode_specific_epochs(cls, active_decoder, spikes_df, filter_epochs, decoding_time_bin_size=0.05, debug_print=False) -> DecodedFilterEpochsResult:
-        """Uses the decoder to decode the nerual activity (provided in spikes_df) for each epoch in filter_epochs
+    def _build_decode_specific_epochs_result_shell(cls, neuron_IDs: NDArray, spikes_df: pd.DataFrame, filter_epochs: Union[Epoch, pd.DataFrame], decoding_time_bin_size:float=0.05, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DynamicContainer:
+        """Precomputes the time_binned spikes for the filter epochs since this is the slowest part of `perform_decode_specific_epochs`
 
         NOTE: Uses active_decoder.decode(...) to actually do the decoding
         
@@ -885,8 +1545,11 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
 
         Returns:
             DecodedFilterEpochsResult: _description_
+
+        Usage:
+            filter_epochs_decoder_result = cls._build_decode_specific_epochs_result_shell(neuron_IDs=active_decoder.neuron_IDs, spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
+
         """
-        # build output result object:
         filter_epochs_decoder_result = DynamicContainer(most_likely_positions_list=[], p_x_given_n_list=[], marginal_x_list=[], marginal_y_list=[], most_likely_position_indicies_list=[])
         
         if isinstance(filter_epochs, pd.DataFrame):
@@ -907,14 +1570,28 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
             print(f'np.shape(filter_epoch_spikes_df): {np.shape(filter_epoch_spikes_df)}')
 
         ## final step is to time_bin (relative to the start of each epoch) the time values of remaining spikes
-        spkcount, nbins, time_bin_containers_list = epochs_spkcount(filter_epoch_spikes_df, filter_epochs, decoding_time_bin_size, slideby=decoding_time_bin_size, export_time_bins=True, included_neuron_ids=active_decoder.neuron_IDs, debug_print=debug_print) ## time_bins returned are not correct, they're subsampled at a rate of 1000
+        spkcount, nbins, time_bin_containers_list = epochs_spkcount(filter_epoch_spikes_df, filter_epochs, decoding_time_bin_size, slideby=decoding_time_bin_size, export_time_bins=True, included_neuron_ids=neuron_IDs, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print) ## time_bins returned are not correct, they're subsampled at a rate of 1000
         num_filter_epochs = len(nbins) # one for each epoch in filter_epochs
+
+        # apply np.atleast_1d to all
+        for i, a_n_bins in enumerate(nbins):
+            time_bin_containers_list[i].centers = np.atleast_1d(time_bin_containers_list[i].centers)
+            time_bin_containers_list[i].edges = np.atleast_1d(time_bin_containers_list[i].edges)
+            # time_bin_containers_list[i].nbins = np.atleast_1d(time_bin_containers_list[i].edges)
+
+            # [(a_n_bins == len(time_bin_containers_list[i].centers)) ]
+        assert np.all([(a_n_bins == len(time_bin_containers_list[i].centers)) for i, a_n_bins in enumerate(nbins)])
+        # assert np.all([(a_n_bins == (len(time_bin_containers_list[i].edges)-1)) for i, a_n_bins in enumerate(nbins)]) # don't know why this wouldn't be true, but it's okay if it isn't I guess
+        assert np.all([(a_n_bins == time_bin_containers_list[i].num_bins) for i, a_n_bins in enumerate(nbins)])
 
         filter_epochs_decoder_result.spkcount = spkcount
         filter_epochs_decoder_result.nbins = nbins
         filter_epochs_decoder_result.time_bin_containers = time_bin_containers_list
         filter_epochs_decoder_result.decoding_time_bin_size = decoding_time_bin_size
+        filter_epochs_decoder_result.filter_epochs = filter_epochs
         filter_epochs_decoder_result.num_filter_epochs = num_filter_epochs
+
+        
         if debug_print:
             print(f'num_filter_epochs: {num_filter_epochs}, nbins: {nbins}') # the number of time bins that compose each decoding epoch e.g. nbins: [7 2 7 1 5 2 7 6 8 5 8 4 1 3 5 6 6 6 3 3 4 3 6 7 2 6 4 1 7 7 5 6 4 8 8 5 2 5 5 8]
 
@@ -929,21 +1606,142 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         filter_epochs_decoder_result.marginal_x_list = []
         filter_epochs_decoder_result.marginal_y_list = []
 
+        return filter_epochs_decoder_result
+
+    @classmethod
+    def _perform_decoding_specific_epochs(cls, active_decoder, filter_epochs_decoder_result: DynamicContainer, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DecodedFilterEpochsResult:
+        """ Actually performs the computation
+        
+        NOTE: Uses active_decoder.decode(...) to actually do the decoding
+        
+        """
         # Looks like we're iterating over each epoch in filter_epochs:
-        for i, curr_filter_epoch_spkcount, curr_epoch_num_time_bins, curr_filter_epoch_time_bin_container in zip(np.arange(num_filter_epochs), spkcount, nbins, time_bin_containers_list):
+        ## Validate the list lengths for the zip:
+        _arr_lengths = [len(v) for v in (np.arange(filter_epochs_decoder_result.num_filter_epochs), filter_epochs_decoder_result.spkcount, filter_epochs_decoder_result.nbins, filter_epochs_decoder_result.time_bin_containers)]
+        assert np.allclose(_arr_lengths, filter_epochs_decoder_result.num_filter_epochs), f"all arrays should be equal or the zip will be limited to the fewest items, but _arr_lengths: {_arr_lengths}"
+        
+        for i, curr_filter_epoch_spkcount, curr_epoch_num_time_bins, curr_filter_epoch_time_bin_container in zip(np.arange(filter_epochs_decoder_result.num_filter_epochs), filter_epochs_decoder_result.spkcount, filter_epochs_decoder_result.nbins, filter_epochs_decoder_result.time_bin_containers):
             ## New 2022-09-26 method with working time_bin_centers_list returned from epochs_spkcount
-            filter_epochs_decoder_result.time_bin_edges.append(curr_filter_epoch_time_bin_container.edges)            
-            most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = active_decoder.decode(curr_filter_epoch_spkcount, time_bin_size=decoding_time_bin_size, output_flat_versions=False, debug_print=debug_print)
-            filter_epochs_decoder_result.most_likely_positions_list.append(most_likely_positions)
-            filter_epochs_decoder_result.p_x_given_n_list.append(p_x_given_n)
-            filter_epochs_decoder_result.most_likely_position_indicies_list.append(most_likely_position_indicies)
+            a_time_bin_edges = np.atleast_1d(curr_filter_epoch_time_bin_container.edges)
+            filter_epochs_decoder_result.time_bin_edges.append(a_time_bin_edges)
+            if use_single_time_bin_per_epoch:
+                assert curr_filter_epoch_time_bin_container.num_bins == 1
+                curr_filter_epoch_time_bin_size: float = curr_filter_epoch_time_bin_container.edge_info.step # get the variable time_bin_size from the epoch object
+            else:
+                curr_filter_epoch_time_bin_size: float = filter_epochs_decoder_result.decoding_time_bin_size
+                
+            # # validation:
+            # n_neurons, n_time_bins = np.shape(curr_filter_epoch_spkcount)
+            # assert curr_epoch_num_time_bins == n_time_bins, f"curr_epoch_num_time_bins: {curr_epoch_num_time_bins} != n_time_bins (from curr_filter_epoch_spkcount): {n_time_bins}"
+            # a_time_bin_edges_n_time_bins = np.shape(a_time_bin_edges)[0] - 1
+            # assert a_time_bin_edges_n_time_bins == n_time_bins, f"a_time_bin_edges_n_time_bins: {a_time_bin_edges_n_time_bins} != n_time_bins (from curr_filter_epoch_spkcount): {n_time_bins}\n\t {a_time_bin_edges}"
+            
+            most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = active_decoder.decode(curr_filter_epoch_spkcount, time_bin_size=curr_filter_epoch_time_bin_size, output_flat_versions=False, debug_print=debug_print)
+            most_likely_positions = np.atleast_1d(most_likely_positions)
+            p_x_given_n = np.atleast_1d(p_x_given_n)
+
+            filter_epochs_decoder_result.most_likely_positions_list.append(np.atleast_1d(most_likely_positions))
+            filter_epochs_decoder_result.p_x_given_n_list.append(np.atleast_1d(p_x_given_n))
+            filter_epochs_decoder_result.most_likely_position_indicies_list.append(np.atleast_1d(most_likely_position_indicies))
 
             # Add the marginal container to the list
             curr_unit_marginal_x, curr_unit_marginal_y = cls.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
             filter_epochs_decoder_result.marginal_x_list.append(curr_unit_marginal_x)
             filter_epochs_decoder_result.marginal_y_list.append(curr_unit_marginal_y)
+        ## end for
         
-        return DecodedFilterEpochsResult(**filter_epochs_decoder_result.to_dict()) # dump the dynamic dict as kwargs into the class
+        ## 2024-08-07: POST-HOC VALIDATE
+        invalid_indicies_list = np.where([len(tc.centers) != len(xs) for tc, xs in zip(filter_epochs_decoder_result.time_bin_containers, filter_epochs_decoder_result.most_likely_positions_list)])[0]
+        if len(invalid_indicies_list) > 0:
+            for invalid_idx in invalid_indicies_list:
+                ## find non matching indicies
+                
+                # ==================================================================================================================== #
+                # SOLUTION 2024-08-07 20:08: - [ ] Recompute the Invalid Quantities with the known correct number of time bins:        #
+                # ==================================================================================================================== #
+                ## TODO 2024-08-07 20:27: - [ ] FUTURE: the core issue is being introduced in `epochs_spkcount` or whatever as a result of the strange slide. It may occur both n=1 and n=2 bins, maybe only n=2 now.
+                
+
+                #TODO 2024-08-16 01:10: - [ ] is `self.nbins` being updated?
+
+
+                # Steps:
+                ## 1. replace the edges/centers and their info in `filter_epochs_decoder_result.time_bin_containers`
+                ## 2. with correct number of bins, the computed values need to be fixed: most_likely_positions, most_likely_position_indicies, p_x_given_n, spkcount, and marginals
+        
+                filter_epochs_decoder_result.time_bin_containers[invalid_idx] = BinningContainer.init_from_edges(edges=filter_epochs_decoder_result.time_bin_containers[invalid_idx].edges, edge_info=None)
+                ## Now time bin properties are valid - time_bin_containers, n_bins, time_bin_edges
+                
+                ## testing:
+                # invalid_p_x_given_n = deepcopy(filter_epochs_decoder_result.p_x_given_n_list[invalid_idx]).T 
+                # invalid_pos = deepcopy(filter_epochs_decoder_result.most_likely_position_indicies_list[invalid_idx]).T # all most_likely_positions_1D, most_likely_positions_1D, most_likely_positions_1D
+                
+                ## Fix known invalid quantities (with extra entries relative to time bins) -
+                good_indicies = deepcopy(filter_epochs_decoder_result.time_bin_containers[invalid_idx].center_info.bin_indicies)
+                
+                # time_bin_edges, epoch_description_list
+                if filter_epochs_decoder_result.time_bin_edges[invalid_idx] is not None:
+                    filter_epochs_decoder_result.time_bin_edges[invalid_idx] = deepcopy(filter_epochs_decoder_result.time_bin_containers[invalid_idx].edges) # filter_epochs_decoder_result.time_bin_edges[invalid_idx][good_indicies]
+                    
+                # if filter_epochs_decoder_result.epoch_description_list[invalid_idx] is not None:
+                #     filter_epochs_decoder_result.epoch_description_list[invalid_idx] = filter_epochs_decoder_result.epoch_description_list[invalid_idx][good_indicies]
+                
+                # marginals:
+                if filter_epochs_decoder_result.marginal_x_list[invalid_idx] is not None:
+                    filter_epochs_decoder_result.marginal_x_list[invalid_idx].most_likely_positions_1D = filter_epochs_decoder_result.marginal_x_list[invalid_idx].most_likely_positions_1D[good_indicies]
+                    filter_epochs_decoder_result.marginal_x_list[invalid_idx].p_x_given_n = filter_epochs_decoder_result.marginal_x_list[invalid_idx].p_x_given_n[:, good_indicies]
+
+                ## marginal_y_list
+                if filter_epochs_decoder_result.marginal_y_list[invalid_idx] is not None:
+                    filter_epochs_decoder_result.marginal_y_list[invalid_idx].most_likely_positions_1D = filter_epochs_decoder_result.marginal_y_list[invalid_idx].most_likely_positions_1D[good_indicies]
+                    filter_epochs_decoder_result.marginal_y_list[invalid_idx].p_x_given_n = filter_epochs_decoder_result.marginal_y_list[invalid_idx].p_x_given_n[:, good_indicies]
+                
+
+                ndim = np.ndim(filter_epochs_decoder_result.p_x_given_n_list[invalid_idx]) # np.shape(filter_epochs_decoder_result.p_x_given_n_list[invalid_idx]) (57, 4, 16)
+
+                if ndim == 3:
+                    ## 2D Position Case (less tested)
+                    assert np.shape(filter_epochs_decoder_result.most_likely_position_indicies_list[invalid_idx])[0] == 2, f"filter_epochs_decoder_result.most_likely_position_indicies_list[invalid_idx] expected to be of shape (2, n_t_bins), but shape {np.shape(filter_epochs_decoder_result.most_likely_position_indicies_list[invalid_idx])}"
+                    filter_epochs_decoder_result.most_likely_position_indicies_list[invalid_idx] = filter_epochs_decoder_result.most_likely_position_indicies_list[invalid_idx][:, good_indicies] ## (2, n_t_bins) - (2, 16)  -> (2, 1) DONE
+                    
+                    assert np.shape(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx])[1] == 2, f"filter_epochs_decoder_result.most_likely_positions_list[invalid_idx] expected to be of shape (n_t_bins, 2), but shape {np.shape(filter_epochs_decoder_result.most_likely_position_indicies_list[invalid_idx])}"
+                    filter_epochs_decoder_result.most_likely_positions_list[invalid_idx] = filter_epochs_decoder_result.most_likely_positions_list[invalid_idx][good_indicies, :] ## (2, n_t_bins): (16, 2) -> (2, 1)
+
+                    filter_epochs_decoder_result.p_x_given_n_list[invalid_idx] = filter_epochs_decoder_result.p_x_given_n_list[invalid_idx][:, :, good_indicies]
+                    filter_epochs_decoder_result.spkcount[invalid_idx] = filter_epochs_decoder_result.spkcount[invalid_idx][:, good_indicies] ## okay for 2D? (80, 16) -> (80, 1)
+                    ## do post-hoc checking:
+                    assert (len(filter_epochs_decoder_result.time_bin_containers[invalid_idx].centers) == len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx])), f"even after fixing invalid_idx: {invalid_idx}: len(time_bin_containers[invalid_idx].centers): {len(filter_epochs_decoder_result.time_bin_containers[invalid_idx].centers)} != len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx]): {len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx])} "
+                    
+                else:
+                    ## 1D Position Case (what this validation and fix was designed for)
+                    filter_epochs_decoder_result.most_likely_position_indicies_list[invalid_idx] = filter_epochs_decoder_result.most_likely_position_indicies_list[invalid_idx][good_indicies] ## (n_epoch_time_bins, ) one position for each time bin in the replay
+                    filter_epochs_decoder_result.most_likely_positions_list[invalid_idx] = filter_epochs_decoder_result.most_likely_positions_list[invalid_idx][good_indicies] ## okay for 2D?
+                    filter_epochs_decoder_result.p_x_given_n_list[invalid_idx] = filter_epochs_decoder_result.p_x_given_n_list[invalid_idx][:, good_indicies]
+                    filter_epochs_decoder_result.spkcount[invalid_idx] = filter_epochs_decoder_result.spkcount[invalid_idx][good_indicies] ## okay for 2D?
+                    ## do post-hoc checking:
+                    assert (len(filter_epochs_decoder_result.time_bin_containers[invalid_idx].centers) == len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx])), f"even after fixing invalid_idx: {invalid_idx}: len(time_bin_containers[invalid_idx].centers): {len(filter_epochs_decoder_result.time_bin_containers[invalid_idx].centers)} != len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx]): {len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx])} "
+
+        assert np.all([(len(filter_epochs_decoder_result.most_likely_positions_list[i]) == len(filter_epochs_decoder_result.time_bin_containers[i].centers)) for i, a_n_bins in enumerate(filter_epochs_decoder_result.nbins)])
+
+        out_result: DecodedFilterEpochsResult = DecodedFilterEpochsResult(**filter_epochs_decoder_result.to_dict()) # dump the dynamic dict as kwargs into the class
+        out_result.validate_time_bins() ## one last full check! raises assertions if any time bins are still off
+        
+        
+        return out_result
+    
+
+    @function_attributes(short_name='perform_decode_specific_epochs', tags=['decode','specific_epochs','epoch', 'classmethod'], input_requires=[], output_provides=[], uses=['active_decoder.decode', 'add_epochs_id_identity', 'epochs_spkcount', 'cls.perform_build_marginals'], used_by=[''], creation_date='2022-12-04 00:00')
+    @classmethod
+    def perform_decode_specific_epochs(cls, active_decoder, spikes_df: pd.DataFrame, filter_epochs: Union[Epoch, pd.DataFrame], decoding_time_bin_size:float=0.05, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DecodedFilterEpochsResult:
+        """Uses the decoder to decode the nerual activity (provided in spikes_df) for each epoch in filter_epochs
+
+        History:
+            Split `perform_decode_specific_epochs` into two subfunctions: `_build_decode_specific_epochs_result_shell` and `_perform_decoding_specific_epochs`
+        """
+        # build output result object:
+        filter_epochs_decoder_result = cls._build_decode_specific_epochs_result_shell(neuron_IDs=active_decoder.neuron_IDs, spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
+        return cls._perform_decoding_specific_epochs(active_decoder=active_decoder, filter_epochs_decoder_result=filter_epochs_decoder_result, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
+    
     
     @classmethod
     def perform_build_marginals(cls, p_x_given_n, most_likely_positions, debug_print=False):

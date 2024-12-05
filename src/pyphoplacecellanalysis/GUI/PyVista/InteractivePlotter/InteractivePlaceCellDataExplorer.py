@@ -5,6 +5,7 @@
 
 
 """
+from typing import Optional, Tuple
 import numpy as np
 import pyvista as pv
 
@@ -25,7 +26,9 @@ from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter
 from pyphoplacecellanalysis.Pho3D.PyVista.gui import customize_default_pyvista_theme, print_controls_helper_text
 from pyphoplacecellanalysis.Pho3D.PyVista.spikeAndPositions import build_active_spikes_plot_data, perform_plot_flat_arena, spike_geom_box, spike_geom_cone
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractiveDataExplorerBase import InteractiveDataExplorerBase
+from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.InteractiveSliderWrapper import InteractiveSliderWrapper 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.visualization_window import VisualizationWindow # Used to build "Windows" into the data points such as the window defining the fixed time period preceeding the current time where spikes had recently fired, etc.
+
 
 class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, InteractiveDataExplorerBase):
     """ This 3D PyVista GUI displays a map of the animal's environment alongside animatable behavioral data (animal position on the maze, etc) and neural data (spikes, sleep state, ripple status, etc)
@@ -42,10 +45,9 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
     sigOnUpdateMeshes = QtCore.Signal(float, float) # Emitted after meshes are updated to allow connected slots to be called to perform their own updates. args: t_start, t_stop
     
     
-    @safely_accepts_kwargs
-    def __init__(self, active_config, active_session, extant_plotter=None):
+    def __init__(self, active_config, active_session, extant_plotter=None, **kwargs):
         # super().__init__(active_config, active_session, extant_plotter)
-        super(InteractivePlaceCellDataExplorer, self).__init__(active_config, active_session, extant_plotter, data_explorer_name='CellSpikePositionDataExplorer')
+        super(InteractivePlaceCellDataExplorer, self).__init__(active_config, active_session, extant_plotter, data_explorer_name='CellSpikePositionDataExplorer', **kwargs)
         self._setup()
         
         app = pg.mkQApp() # <PyQt5.QtWidgets.QApplication at 0x1d44a4891f0>
@@ -121,6 +123,10 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         self.params.setdefault('should_use_linear_track_geometry', False) # should only be True on the linear track with known geometry, otherwise it will be obviously incorrect.
         if hasattr(self.active_config.plotting_config, 'should_use_linear_track_geometry') and (self.active_config.plotting_config.should_use_linear_track_geometry is not None):
             self.params.should_use_linear_track_geometry = self.active_config.plotting_config.should_use_linear_track_geometry
+
+        ## MIXINS:
+        # self.setup_occupancy_plotting_mixin()
+        self.setup_MazeRenderingMixin()
 
 
 
@@ -234,7 +240,7 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
     # recent_spikes_window
     # z_fixed,
     # active_trail_opacity_values, active_trail_size_values
-    def on_active_window_update_mesh(self, t_start, t_stop, enable_position_mesh_updates=False, render=True, debug_print=False):
+    def on_active_window_update_mesh(self, t_start, t_stop, enable_historical_spikes=True, enable_recent_spikes=True, enable_position_mesh_updates=False, render=True, debug_print=False):
         """ The main update function - called to update the meshs with t_start, t_stop times representing the start and end of the new active window:
         This function is called from both slider-based updating (with an integer window index) and pyqt signal-style (update_window_start_end(new_start, new_end)) updating
         """
@@ -245,47 +251,48 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         self.p.add_text(curr_text_rendering_string, name='lblCurrent_spike_range', position='lower_right', color='white', shadow=True, font_size=10)
         
         ## Historical Spikes:
-        # active_included_all_historical_indicies = (flattened_spikes.flattened_spike_times < t_stop) # Accumulate Spikes mode. All spikes occuring prior to the end of the frame (meaning the current time) are plotted
-        historical_t_start = (t_stop - self.params.longer_spikes_window.duration_seconds) # Get the earliest time that will be included in the search
+        if enable_historical_spikes:
+            # active_included_all_historical_indicies = (flattened_spikes.flattened_spike_times < t_stop) # Accumulate Spikes mode. All spikes occuring prior to the end of the frame (meaning the current time) are plotted
+            historical_t_start = (t_stop - self.params.longer_spikes_window.duration_seconds) # Get the earliest time that will be included in the search
 
-        # TODO: replace with properties that I implemented
-        flattened_spike_times = self.active_session.flattened_spiketrains.flattened_spike_times
-        # flattened_spike_active_unitIdentities = self.active_session.flattened_spiketrains.spikes_df['fragile_linear_neuron_IDX'].values()
-        flattened_spike_active_unitIdentities = self.active_session.flattened_spiketrains.flattened_spike_identities
-        # flattened_spike_positions_list = self.active_session.flattened_spiketrains.spikes_df[["x", "y"]].to_numpy().T
-        flattened_spike_positions_list = self.params.flattened_spike_positions_list
+            # TODO: replace with properties that I implemented
+            flattened_spike_times = self.active_session.flattened_spiketrains.flattened_spike_times
+            # flattened_spike_active_unitIdentities = self.active_session.flattened_spiketrains.spikes_df['fragile_linear_neuron_IDX'].values()
+            flattened_spike_active_unitIdentities = self.active_session.flattened_spiketrains.flattened_spike_identities
+            # flattened_spike_positions_list = self.active_session.flattened_spiketrains.spikes_df[["x", "y"]].to_numpy().T
+            flattened_spike_positions_list = self.params.flattened_spike_positions_list
 
-        # evaluated as column names
-        active_included_all_historical_indicies = ((flattened_spike_times > historical_t_start) & (flattened_spike_times < t_stop)) # Two Sided Range Mode
-        historical_spikes_pdata, historical_spikes_pc = build_active_spikes_plot_data(flattened_spike_active_unitIdentities[active_included_all_historical_indicies],
-                                                                                        flattened_spike_positions_list[:, active_included_all_historical_indicies],
-                                                                                        spike_geom=spike_geom_box.copy())
+            # evaluated as column names
+            active_included_all_historical_indicies = ((flattened_spike_times > historical_t_start) & (flattened_spike_times < t_stop)) # Two Sided Range Mode
+            historical_spikes_pdata, historical_spikes_pc = build_active_spikes_plot_data(flattened_spike_active_unitIdentities[active_included_all_historical_indicies],
+                                                                                            flattened_spike_positions_list[:, active_included_all_historical_indicies],
+                                                                                            spike_geom=spike_geom_box.copy())
 
-        if historical_spikes_pc.n_points >= 1:
-            self.plots['spikes_main_historical'] = self.p.add_mesh(historical_spikes_pc, name='historical_spikes_main', scalars='cellID', cmap=self.active_config.plotting_config.pf_listed_colormap, show_scalar_bar=False, lighting=True, render=False)
-
+            if historical_spikes_pc.n_points >= 1:
+                self.plots['spikes_main_historical'] = self.p.add_mesh(historical_spikes_pc, name='historical_spikes_main', scalars='cellID', cmap=self.active_config.plotting_config.pf_listed_colormap, show_scalar_bar=False, lighting=True, render=False, reset_camera=False)
 
         ## Recent Spikes:
-        recent_spikes_t_start = (t_stop - self.params.recent_spikes_window.duration_seconds) # Get the earliest time that will be included in the recent spikes
-        # print('recent_spikes_t_start: {}; t_start: {}'.format(recent_spikes_t_start, t_start))
+        if enable_recent_spikes:
+            recent_spikes_t_start = (t_stop - self.params.recent_spikes_window.duration_seconds) # Get the earliest time that will be included in the recent spikes
+            # print('recent_spikes_t_start: {}; t_start: {}'.format(recent_spikes_t_start, t_start))
 
-        active_included_recent_only_indicies = ((flattened_spike_times > recent_spikes_t_start) & (flattened_spike_times < t_stop)) # Two Sided Range Mode
-        
-        active_recent_only_times = flattened_spike_times[active_included_recent_only_indicies] # the times of the recent spikes
-        
-        active_recent_only_times_offsets = ((active_recent_only_times - t_stop)/self.params.recent_spikes_window.duration_seconds) # Output is the time that's elapsed since the current time (which is the end of the current window). Number will be somewhere between 
-        # by dividing by self.params.recent_spikes_window.duration_seconds it means the output will be between -1.0 (for the oldest spikes about to exit the recent window) and 0.0 (for the newest spikes that just entered the window. 
-        active_recent_only_times_offsets += 1.0 # add one to make them scale factors instead of offsets.
-        
-        
-        # active_included_recent_only_indicies = ((flattened_spikes.flattened_spike_times > t_start) & (flattened_spikes.flattened_spike_times < t_stop)) # Two Sided Range Mode
-        recent_only_spikes_pdata, recent_only_spikes_pc = build_active_spikes_plot_data(flattened_spike_active_unitIdentities[active_included_recent_only_indicies],
-                                                                                        flattened_spike_positions_list[:, active_included_recent_only_indicies],
-                                                                                        scale_factors_list=active_recent_only_times_offsets,
-                                                                                        spike_geom=spike_geom_cone.copy())
+            active_included_recent_only_indicies = ((flattened_spike_times > recent_spikes_t_start) & (flattened_spike_times < t_stop)) # Two Sided Range Mode
+            
+            active_recent_only_times = flattened_spike_times[active_included_recent_only_indicies] # the times of the recent spikes
+            
+            active_recent_only_times_offsets = ((active_recent_only_times - t_stop)/self.params.recent_spikes_window.duration_seconds) # Output is the time that's elapsed since the current time (which is the end of the current window). Number will be somewhere between 
+            # by dividing by self.params.recent_spikes_window.duration_seconds it means the output will be between -1.0 (for the oldest spikes about to exit the recent window) and 0.0 (for the newest spikes that just entered the window. 
+            active_recent_only_times_offsets += 1.0 # add one to make them scale factors instead of offsets.
+            
+            
+            # active_included_recent_only_indicies = ((flattened_spikes.flattened_spike_times > t_start) & (flattened_spikes.flattened_spike_times < t_stop)) # Two Sided Range Mode
+            recent_only_spikes_pdata, recent_only_spikes_pc = build_active_spikes_plot_data(flattened_spike_active_unitIdentities[active_included_recent_only_indicies],
+                                                                                            flattened_spike_positions_list[:, active_included_recent_only_indicies],
+                                                                                            scale_factors_list=active_recent_only_times_offsets,
+                                                                                            spike_geom=spike_geom_cone.copy())
 
-        if recent_only_spikes_pc.n_points >= 1:
-            self.plots['spikes_main_recent_only'] = self.p.add_mesh(recent_only_spikes_pc, name='recent_only_spikes_main', scalars='cellID', cmap=self.active_config.plotting_config.pf_listed_colormap, show_scalar_bar=False, lighting=False, render=False) # color='white'
+            if recent_only_spikes_pc.n_points >= 1:
+                self.plots['spikes_main_recent_only'] = self.p.add_mesh(recent_only_spikes_pc, name='recent_only_spikes_main', scalars='cellID', cmap=self.active_config.plotting_config.pf_listed_colormap, show_scalar_bar=False, lighting=False, render=False, reset_camera=False) # color='white'
 
         ## Position Updates:
         if enable_position_mesh_updates:
@@ -327,10 +334,16 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
             curr_animal_point = [self.x[active_included_all_window_position_indicies[-1]], self.y[active_included_all_window_position_indicies[-1]], self.z_fixed[-1]]
             self.perform_plot_location_point('animal_current_location_point', curr_animal_point, render=False)
 
+
+        ## Maze Plotting Updates:
+        self.on_update_current_window_MazeRenderingMixin(new_window_t_start=t_start, new_window_t_stop=t_stop)
+
+
         self.sigOnUpdateMeshes.emit(t_start, t_stop) # TODO: efficiency - defer rendering optionally , False
         
         if render:
             self.p.render() # renders to ensure it's updated after changing the ScalarVisibility above
+
 
     def on_slider_update_mesh(self, value):
         """ called to update the current active time window from an integer index (such as that produced by the slider's update function or the class responsible for making videos) """
@@ -347,9 +360,11 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         # print('Constraining to curr_time_fixedSegments with times (start: {}, end: {})'.format(t_start, t_stop))
         # print('curr_time_fixedSegments: {}'.format(curr_time_fixedSegments))
         
-        enable_time_only_position_mesh_updates=True
-        
-        self.on_active_window_update_mesh(t_start=t_start, t_stop=t_stop, enable_position_mesh_updates=enable_time_only_position_mesh_updates, render=False)
+        enable_time_only_position_mesh_updates = True
+        enable_historical_spikes = self.params.get('enable_historical_spikes', True)
+        enable_recent_spikes = self.params.get('enable_recent_spikes', True)
+
+        self.on_active_window_update_mesh(t_start=t_start, t_stop=t_stop, enable_historical_spikes=enable_historical_spikes, enable_recent_spikes=enable_recent_spikes, enable_position_mesh_updates=enable_time_only_position_mesh_updates, render=False)
         
         if not enable_time_only_position_mesh_updates:
             ## Animal Position and Location Trail Plotting:
@@ -367,8 +382,36 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         # self.p.app.processEvents() # not needed probably
         return
 
+
+    ## Slider Properties:
+    @property
+    def active_timestamp_slider_wrapper(self) -> Optional[InteractiveSliderWrapper]:
+        """The active_timestap_slider_wrapper property."""
+        return self.ui.interactive_plotter.interface_properties.active_timestamp_slider_wrapper
+
+    @property
+    def active_timestamp_slider_curr_index(self) -> int:
+        """The integer index of the current timestamp slider property."""
+        return int(self.active_timestamp_slider_wrapper.curr_index)
+
+    @property
+    def active_timestamp_slider_curr_start_stop_times(self) -> Tuple[float, float]:
+        """Get the times that fall within the current plot window based on the slider."""
+        active_window_sample_indicies = np.squeeze(self.params.pre_computed_window_sample_indicies[self.active_timestamp_slider_curr_index,:]) # Get the current precomputed indicies for this curr_i
+        curr_time_fixedSegments = self.t[active_window_sample_indicies] # New Way
+        t_start = curr_time_fixedSegments[0]
+        t_stop = curr_time_fixedSegments[-1]
+        return (t_start, t_stop)
+
+
+
+
     # pf_colors, active_config
     def plot(self, pActivePlotter=None):
+        """ 
+        - Adds the slider GUI widget for the time
+
+        """
         ################################################
         ### Build Appropriate Plotter and set it up:
         #####################
@@ -394,7 +437,8 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
             interactive_timestamp_slider_actor = self.p.add_slider_widget(self.on_slider_update_mesh, [0, (self.params.num_time_points-1)], title='Trajectory Timestep', event_type='always', style='modern', pointa=(0.025, 0.08), pointb=(0.98, 0.08), fmt='%0.2f') # fmt="%0.2f"
             # interactive_timestamp_slider_wrapper = InteractiveSliderWrapper(interactive_timestamp_slider_actor)
             # interactive_plotter = pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter.PhoInteractivePlotter(pyvista_plotter=p, interactive_timestamp_slider_actor=interactive_timestamp_slider_actor)
-            interactive_plotter = PhoInteractivePlotter(pyvista_plotter=self.p, interactive_timestamp_slider_actor=interactive_timestamp_slider_actor)
+            self.ui.interactive_plotter = PhoInteractivePlotter.init_from_plotter_and_slider(pyvista_plotter=self.p, interactive_timestamp_slider_actor=interactive_timestamp_slider_actor, step_size=15)
+
             # interactive_checkbox_actor = p.add_checkbox_button_widget(toggle_animation, value=False, color_on='green')
             helper_controls_text = print_controls_helper_text()
             self.p.add_text(helper_controls_text, position='upper_left', name='lblControlsHelperText', color='grey', font_size=8.0)
@@ -405,9 +449,9 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
             # debug_console_widget.add_line_to_buffer('test log 2')
 
         # Plot the flat arena
-        self.plots['maze_bg'], self.plots_data['maze_bg'] = self.perform_plot_maze() # Implemented by conformance to `InteractivePyvistaPlotter_MazeRenderingMixin`
-        
-    
+        self.perform_plot_maze() # Implemented by conformance to `InteractivePyvistaPlotter_MazeRenderingMixin`
+
+
         # Legend:
         
         # the legend is supposed to be for the placefields, of which there are fewer than the neuron_ids (because some cells don't have a good placefield).

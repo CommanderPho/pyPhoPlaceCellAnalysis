@@ -13,10 +13,15 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.help
 from pyphoplacecellanalysis.GUI.Qt.Menus.BaseMenuProviderMixin import BaseMenuCommand # for commands
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import AddNewDecodedPosition_MatplotlibPlotCommand, AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand # for add matplotlib plot action
 
+
     
 
 class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
     """ The most up-to-date (as of 2022-09-29) method of building custom menu items. 
+    
+    Conceptually, DockedWidgets are widgets that initially are docked within the main SpikeRaster2D window (usually as dockItems) and are synchronized with the scrolling of the time window.
+     
+    
     
     .ui.menus.global_window_menus.debug_menu_provider.top_level_menu
     
@@ -84,6 +89,8 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
         self.ui.actionCombineTimeSynchronizedPlotterWindow
         
         """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand, AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand, AddNewDecodedEpochMarginal_MatplotlibPlotCommand
+        
         spike_raster_window = kwargs.get('spike_raster_window', None)
         # active_pf_2D_dt = kwargs.get('active_pf_2D_dt', None)
         curr_active_pipeline = kwargs.get('owning_pipeline_reference', None)
@@ -104,9 +111,14 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
         addSubmenuActionKeys.append(curr_action_key)
         curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Long Short Decoded Epochs in Matplotlib Views", name="actionLongShortDecodedEpochsDockedMatplotlibView", tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_actions_dict)
         addSubmenuActionKeys.append(curr_action_key)
+        curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Directional Decoded Epochs in Matplotlib Views", name="actionDirectionalDecodedEpochsDockedMatplotlibView", tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_actions_dict)
+        addSubmenuActionKeys.append(curr_action_key)
+        curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Pseudo2D Continuous Decoded Epochs in Matplotlib Views", name="actionPseudo2DDecodedEpochsDockedMatplotlibView", tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_actions_dict)
+        addSubmenuActionKeys.append(curr_action_key)
+        curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Pseudo2D Continuous Decoded Marginals in Matplotlib Views", name="actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView", tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_actions_dict)
+        addSubmenuActionKeys.append(curr_action_key)
         curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Custom...", name="actionNewDockedCustom", tooltip="", actions_dict=curr_actions_dict)
         addSubmenuActionKeys.append(curr_action_key)
-        
         
         # ==================================================================================================================== #
         # Connect the relevent actions to each action:
@@ -114,10 +126,10 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
         curr_actions_dict['actionNewDockedMatplotlibView'].triggered.connect(AddNewDecodedPosition_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output))
         curr_actions_dict['actionNewDockedContextNested'].triggered.connect(CreateNewContextNestedDocksCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output))
         curr_actions_dict['actionLongShortDecodedEpochsDockedMatplotlibView'].triggered.connect(AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output))
-
-
-
-
+        curr_actions_dict['actionDirectionalDecodedEpochsDockedMatplotlibView'].triggered.connect(AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output))
+        curr_actions_dict['actionPseudo2DDecodedEpochsDockedMatplotlibView'].triggered.connect(AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output))
+        curr_actions_dict['actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'].triggered.connect(AddNewDecodedEpochMarginal_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output))
+        
         # curr_actions_dict['actionNewDockedCustom'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='decoder', active_context=active_context, display_output=display_output))
                 
 
@@ -176,6 +188,7 @@ class CreateNewContextNestedDocksCommand(BaseMenuCommand):
         
     def execute(self, *args, **kwargs) -> None:
         """ Implicitly captures spike_raster_window """
+        print(f'menu execute(): {self}')
         pass # TODO:
         # _out_synchronized_plotter = build_combined_time_synchronized_plotters_window(active_pf_2D_dt=self._active_pf_2D_dt, controlling_widget=self._spike_raster_window.spike_raster_plt_2d, context=self._context, create_new_controlling_widget=False)
         # self._display_output['comboSynchronizedPlotter'] = _out_synchronized_plotter

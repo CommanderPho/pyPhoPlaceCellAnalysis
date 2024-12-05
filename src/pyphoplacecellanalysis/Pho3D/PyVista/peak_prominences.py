@@ -13,7 +13,7 @@ from pyphoplacecellanalysis.Pho3D.PyVista.graphs import plot_point_labels, _perf
 from pyphocorehelpers.gui.PyVista.CascadingDynamicPlotsList import CascadingDynamicPlotsList # used to wrap _render_peak_prominence_2d_results_on_pyvista_plotter's outputs
 from pyphocorehelpers.function_helpers import function_attributes
 
-
+@function_attributes(short_name=None, tags=['peak_prominence'], input_requires=[], output_provides=[], uses=[], used_by=['_render_peak_prominence_2d_results_on_pyvista_plotter'], creation_date='2024-05-09 05:29', related_items=[])
 def _build_pyvista_single_neuron_prominence_result_data(neuron_id, a_result, promenence_plot_threshold = 1.0, included_level_indicies=[1], debug_print=False):
     """
     
@@ -47,7 +47,16 @@ def _build_pyvista_single_neuron_prominence_result_data(neuron_id, a_result, pro
             curr_slices = a_peak['level_slices']
             levels_list = list(curr_slices.keys())
             if included_level_indicies is not None:
-                filtered_levels_list = [levels_list[i] for i in included_level_indicies]  
+                try:
+                    filtered_levels_list = [levels_list[i] for i in included_level_indicies]  
+                except IndexError as e:
+                     # list index out of range
+                    print(f'WARN: levels_list: {levels_list} does not contain all included_level_indicies: {included_level_indicies}. Skipping.')
+                    filtered_levels_list = levels_list
+                    
+                except Exception as e:
+                    # unhandled exception
+                    raise e
             else:
                 filtered_levels_list = levels_list
 
@@ -63,7 +72,11 @@ def _build_pyvista_single_neuron_prominence_result_data(neuron_id, a_result, pro
             peak_label = f'{peak_id}|{peak_height}|{prominence}'
             peak_labels.append(peak_label)
             
-            peak_levels[i,:] = filtered_levels_list
+            if len(filtered_levels_list) > 0:
+                peak_levels[i,:] = filtered_levels_list
+            else:
+                print(f'2024-01-31 - WARN - cannot set peak levels because filtered_levels_list is empty. Skipping.')
+                
             for level_idx, level_value in enumerate(filtered_levels_list):
                 curr_slice = curr_slices[level_value]
                 curr_contour = curr_slice['contour']
@@ -82,8 +95,9 @@ def _build_pyvista_single_neuron_prominence_result_data(neuron_id, a_result, pro
     # return peak_locations, colors, prominence_array, is_included_array
     
 
-def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, active_peak_prominence_2d_results, valid_neuron_id=2, render=True, debug_print=True, **kwargs):
-    """
+@function_attributes(short_name=None, tags=['peak_prominence', 'pyvista'], input_requires=[], output_provides=[], uses=['_perform_plot_point_labels', '_build_pyvista_single_neuron_prominence_result_data'], used_by=['render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter'], creation_date='2024-05-09 05:28', related_items=[])
+def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, active_peak_prominence_2d_results, valid_neuron_id:int=2, render=True, debug_print=True, **kwargs):
+    """ Draws the 2D slice of the placefield peak around its curve FOR A SINGLE NEURON
     
     Built Data:
         peak_locations, prominence_array, peak_labels, peak_levels, flat_peak_levels, peak_level_bboxes
@@ -107,7 +121,13 @@ def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, activ
         print(f'prominence_array: {prominence_array}')
         print(f'peak_levels: {peak_levels}')
         print(f'peak_level_bboxes: {peak_level_bboxes}')
-                                                          
+
+
+    # active_curve_color = 'white' # always white
+    ## try to use the neuron colors:
+    active_curve_color = ipcDataExplorer.params.cell_spike_colors_dict.get(valid_neuron_id, (1, 1, 1))  # Default to white if color not found
+    #plotter.add_mesh(peak, color=neuron_color)  # Apply the color here
+
     ## Outputs:
     
     # Contours/Isos
@@ -153,10 +173,18 @@ def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, activ
     curr_pdata = curr_neuron_plot_data['pdata_currActiveNeuronTuningCurve']
     curr_contours_mesh_name = f'pf[{valid_neuron_id}]_contours'
     curr_contours = curr_pdata.contour(isosurfaces=ipcDataExplorer.params.zScalingFactor*flat_peak_levels) # I really don't know why we need to multiply by zScalingFactor (~2000.0) again.
-    contours_mesh_actor = ipcDataExplorer.p.add_mesh(curr_contours, color="white", line_width=3, name=curr_contours_mesh_name, render=render) # should add it to the ipcDataExplorer's extant plotter (overlaying it on the current mesh
-    out_pf_contours_data[curr_contours_mesh_name] = curr_contours
-    out_pf_contours_actors[curr_contours_mesh_name] = contours_mesh_actor
-    
+    try:
+        contours_mesh_actor = ipcDataExplorer.p.add_mesh(curr_contours, color=active_curve_color, line_width=3, name=curr_contours_mesh_name, render=render) # should add it to the ipcDataExplorer's extant plotter (overlaying it on the current mesh
+        out_pf_contours_data[curr_contours_mesh_name] = curr_contours
+        out_pf_contours_actors[curr_contours_mesh_name] = contours_mesh_actor
+    except ValueError as e:
+        #  Empty meshes cannot be plotted. Input mesh has zero points.
+        out_pf_contours_data[curr_contours_mesh_name] = curr_contours
+        # out_pf_contours_actors[curr_contours_mesh_name] = None # do NOT include this entry
+        
+    except BaseException as e:
+        raise e # unhandled exception
+        
     ### Add simple bounding boxes to the plot:
     if debug_print:
         print(f'np.shape(peak_level_bboxes): {np.shape(peak_level_bboxes)}') # (2, 1, 4)
@@ -169,7 +197,7 @@ def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, activ
             a_peak_level = peak_levels[peak_idx][level_idx]
             ## Can use a rectangle instead of a box:
             out_pf_box_data[curr_box_mesh_name] = pv.Rectangle([((x0+width), y0, a_peak_level), ((x0+width), (y0+height), a_peak_level), (x0, (y0+height), a_peak_level), (x0, y0, a_peak_level)])
-            out_pf_box_actors[curr_box_mesh_name] = ipcDataExplorer.p.add_mesh(out_pf_box_data[curr_box_mesh_name], color="white",  name=curr_box_mesh_name, show_edges=True, edge_color="white", line_width=1.5, opacity=0.75, label=curr_box_mesh_name, style='wireframe', render=render)
+            out_pf_box_actors[curr_box_mesh_name] = ipcDataExplorer.p.add_mesh(out_pf_box_data[curr_box_mesh_name], color=active_curve_color,  name=curr_box_mesh_name, show_edges=True, edge_color=active_curve_color, line_width=1.5, opacity=0.75, label=curr_box_mesh_name, style='wireframe', render=render)
             
             ## Box Mode:
             ## build the corner points of the box:
@@ -188,6 +216,7 @@ def _render_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, activ
             x_center = (x0 + (x0+width))/2.0
             y_center = (y0 + (y0+height))/2.0
             
+            ## TODO: set the text color appropriately
             x_text_mesh = pv.Text3D(f'{width:.2f}')
             y_text_mesh = pv.Text3D(f'{height:.2f}')
             
@@ -253,7 +282,7 @@ out_pf_contours_data, out_pf_contours_actors, out_pf_box_data, out_pf_box_actors
 """
 
 
-@function_attributes(short_name=None, tags=['display', '3D', 'pf', 'peaks', 'promienence', 'ratemap'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-18 14:32', related_items=[])
+@function_attributes(short_name=None, tags=['display', '3D', 'pf', 'peaks', 'promienence', 'ratemap'], input_requires=[], output_provides=[], uses=['_render_peak_prominence_2d_results_on_pyvista_plotter'], used_by=[], creation_date='2023-09-18 14:32', related_items=[])
 def render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, active_peak_prominence_2d_results, debug_print=False, **kwargs):
     """
     Computes the appropriate contour/peaks/rectangle/etc components for each neuron_id using the active_peak_prominence_2d_results and uses them to create new:
@@ -271,6 +300,9 @@ def render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplo
     
         from pyphoplacecellanalysis.Pho3D.PyVista.peak_prominences import render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter
 
+        display_output = {}
+        active_config_name = long_LR_name
+        print(f'active_config_name: {active_config_name}')
         active_peak_prominence_2d_results = curr_active_pipeline.computation_results[active_config_name].computed_data.get('RatemapPeaksAnalysis', {}).get('PeakProminence2D', None)
         pActiveTuningCurvesPlotter = None
         display_output = display_output | curr_active_pipeline.display('_display_3d_interactive_tuning_curves_plotter', active_config_name, extant_plotter=display_output.get('pActiveTuningCurvesPlotter', None), panel_controls_mode='Qt', should_nan_non_visited_elements=False, zScalingFactor=2000.0) # Works now!
@@ -278,7 +310,7 @@ def render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplo
         display_output['pActiveTuningCurvesPlotter'] = display_output.pop('plotter') # rename the key from the generic "plotter" to "pActiveSpikesBehaviorPlotter" to avoid collisions with others
         pActiveTuningCurvesPlotter = display_output['pActiveTuningCurvesPlotter']
         root_dockAreaWindow, placefieldControlsContainerWidget, pf_widgets = display_output['pane'] # for Qt mode
-        
+
         active_peak_prominence_2d_results = curr_active_pipeline.computation_results[active_config_name].computed_data.get('RatemapPeaksAnalysis', {}).get('PeakProminence2D', None)
         render_all_neuron_peak_prominence_2d_results_on_pyvista_plotter(ipcDataExplorer, active_peak_prominence_2d_results)
         

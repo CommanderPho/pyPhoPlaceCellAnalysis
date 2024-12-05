@@ -4,6 +4,9 @@
 from functools import partial
 from benedict import benedict
 
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing_extensions import TypeAlias
+from nptyping import NDArray
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp, uic
 
@@ -64,16 +67,22 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         widget = LocalMenus_AddRenderable() # get the UI widget containing the menu items:
         widget.programmatic_actions_dict = benedict() # PhoUIContainer.init_from_dict({})
         renderable_menu = widget.ui.menuAdd_Renderable
-        
-        ## Time Intervals/Epochs:
-        submenu_addTimeIntervals = [widget.ui.actionAddTimeIntervals_Laps,
+
+        # Each section updates:      
+        ## Updates: `widget.programmatic_actions_dict`, 
+
+        # Time Intervals/Epochs: _____________________________________________________________________________________________ #
+        ## Creates: `submenu_addTimeIntervals_Connections`
+        ## Updates: `widget.programmatic_actions_dict`, 
+
+        submenu_addTimeIntervals: List[QtWidgets.QAction] = [widget.ui.actionAddTimeIntervals_Laps,
                                     widget.ui.actionAddTimeIntervals_PBEs,
                                     widget.ui.actionAddTimeIntervals_SessionEpochs,
                                     widget.ui.actionAddTimeIntervals_Ripples,
                                     widget.ui.actionAddTimeIntervals_Replays,
                                     widget.ui.actionAddTimeIntervals_Bursts,
                                     widget.ui.actionAddTimeIntervals_Custom]
-        submenu_addTimeIntervalCallbacks = [lambda evt=None: Laps2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.laps, destination_plot=destination_plot),
+        submenu_addTimeIntervalCallbacks: List[Callable] = [lambda evt=None: Laps2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.laps, destination_plot=destination_plot),
                                             lambda evt=None: PBE_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.pbe, destination_plot=destination_plot),
                                             lambda evt=None: SessionEpochs2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.epochs, destination_plot=destination_plot),
                                             lambda evt=None: Ripples_2DRenderTimeEpochs.add_render_time_epochs(curr_sess=sess.ripple, destination_plot=destination_plot),
@@ -85,7 +94,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         for an_action, a_callback in zip(submenu_addTimeIntervals, submenu_addTimeIntervalCallbacks):
             _curr_conn = an_action.triggered.connect(a_callback)
             submenu_addTimeIntervals_Connections.append(_curr_conn)
-            extracted_menu_path = PhoMenuHelper.parse_QAction_for_menu_path(an_action)
+            extracted_menu_path: List[str] = PhoMenuHelper.parse_QAction_for_menu_path(an_action) # extracted_menu_path: ['AddTimeIntervals', 'Laps']
             widget.programmatic_actions_dict['.'.join(extracted_menu_path)] = an_action # have to use a string keypath because `out_command_dict[*extracted_menu_path]` is not allowed
 
         # Set enabled state
@@ -93,8 +102,6 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         # widget.ui.actionAddTimeIntervals_Laps.setEnabled(sess.laps is not None)
         # widget.ui.actionAddTimeIntervals_Ripples.setEnabled(sess.ripple is not None)
         # widget.ui.actionAddTimeIntervals_Replays.setEnabled(sess.has_replays)
-
-        
         widget.ui.actionAddTimeIntervals_Laps.setEnabled(Laps2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.laps))
         widget.ui.actionAddTimeIntervals_Ripples.setEnabled(Ripples_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.ripple))
         widget.ui.actionAddTimeIntervals_PBEs.setEnabled(PBE_2DRenderTimeEpochs.is_render_time_epochs_enabled(sess.pbe))
@@ -102,7 +109,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         widget.ui.actionAddTimeIntervals_Bursts.setEnabled(SpikeBurstIntervals_2DRenderTimeEpochs.is_render_time_epochs_enabled(curr_sess=curr_active_pipeline, active_config_name=active_config_name)) # disable by default
 
 
-        ## Time Curves:
+        # Time Curves: _______________________________________________________________________________________________________ #
         submenu_addTimeCurves = [widget.ui.actionAddTimeCurves_Position, widget.ui.actionAddTimeCurves_Velocity, widget.ui.actionAddTimeCurves_Random, widget.ui.actionAddTimeCurves_RelativeEntropySurprise, widget.ui.actionAddTimeCurves_Custom]
         submenu_addTimeCurvesCallbacks = [lambda evt=None: PositionRenderTimeCurves.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot),
                                             lambda evt=None: VelocityRenderTimeCurves.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot),
@@ -119,7 +126,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
             extracted_menu_path = PhoMenuHelper.parse_QAction_for_menu_path(an_action)
             widget.programmatic_actions_dict['.'.join(extracted_menu_path)] = an_action # have to use a string keypath because `out_command_dict[*extracted_menu_path]` is not allowed
         
-        ## Matplotlib Plots:
+        # Matplotlib Plots: __________________________________________________________________________________________________ #
         # self.ui.menuAddRenderable_Matplotlib_Plot        
         submenu_addMatplotlibPlot = [widget.ui.actionAddMatplotlibPlot_DecodedPosition, widget.ui.actionAddMatplotlibPlot_Custom]
         submenu_addMatplotlibPlotCallbacks = [lambda evt=None: AddNewDecodedPosition_MatplotlibPlotCommand(destination_plot, curr_active_pipeline, active_config_name), # DecodedPositionMatplotlibSubplotRenderer.add_render_time_curves(curr_sess=sess, destination_plot=destination_plot), 
@@ -152,7 +159,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
 
 
     @classmethod
-    def add_renderable_context_menu(cls, active_2d_plot, curr_active_pipeline, active_config_name):
+    def add_renderable_context_menu(cls, active_2d_plot, curr_active_pipeline, active_config_name) -> QtWidgets.QMenu:
         """ 
         Usage:
             active_2d_plot = spike_raster_window.spike_raster_plt_2d 
@@ -189,7 +196,10 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         active_2d_plot_renderable_menus = cls._build_renderable_menu(active_2d_plot, curr_active_pipeline, active_config_name)
         widget_2d_menu = active_2d_plot_renderable_menus[0]
         menuAdd_Renderable = widget_2d_menu.ui.menuAdd_Renderable
-        programmatic_actions_dict = widget_2d_menu.programmatic_actions_dict
+        # programmatic_actions_dict = widget_2d_menu.programmatic_actions_dict
+
+        print(f'menuAdd_Renderable: {menuAdd_Renderable}, type(menuAdd_Renderable): {type(menuAdd_Renderable)}')
+        # print(f'menuAdd_Renderable: {menuAdd_Renderable}, type(menuAdd_Renderable): {type(menuAdd_Renderable)}')
 
         ## Specific to SpikeRaster2D:        
         ## Add the custom menu to the context menus of the plots in SpikeRaster2D:        
