@@ -142,6 +142,7 @@ class SubsequencesPartitioningResult:
 
     """
     flat_positions: NDArray = field(metadata={'desc': "the list of most-likely positions (in [cm]) for each time bin in a decoded posterior"})
+
     first_order_diff_lst: List = field() # the original list
 
     n_pos_bins: int = field(metadata={'desc': "the total number of unique position bins along the track, unrelated to the number of *positions* in `flat_positions` "})
@@ -160,10 +161,16 @@ class SubsequencesPartitioningResult:
     bridged_intrusion_bin_indicies: NDArray = field(default=None, repr=False, metadata={'desc': "indicies where an intrusion previously existed that was bridged. "}) # specified in diff indicies
     
 
-    
+    # main subsequence splits ____________________________________________________________________________________________ #
     split_positions_arrays: List[NDArray] = field(default=None, repr=False, metadata={'desc': "the positions in `flat_positions` but partitioned into subsequences determined by changes in direction exceeding `self.same_thresh`"})
+    split_position_flatindicies_arrays: List[NDArray] = field(default=None, repr=False, metadata={'desc': "the positions in `flat_positions` but partitioned into subsequences determined by changes in direction exceeding `self.same_thresh`"})
+
+
     merged_split_positions_arrays: List[NDArray] = field(default=None, metadata={'desc': "the subsequences from `split_positions_arrays` but merged into larger subsequences by briding-over (ignoring) sequences of intrusive tbins (with the max ignored length specified by `self.max_ignore_bins`"})
+    merged_split_position_flatindicies_arrays: List[NDArray] = field(default=None, metadata={'desc': "the subsequences from `split_positions_arrays` but merged into larger subsequences by briding-over (ignoring) sequences of intrusive tbins (with the max ignored length specified by `self.max_ignore_bins`"})
     
+
+
     sequence_info_df: pd.DataFrame = field(default=None, repr=False)
     
 
