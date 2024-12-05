@@ -5725,7 +5725,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 		requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=[],
 		validate_computation_test=_workaround_validate_has_directional_decoded_epochs_heuristic_scoring, 
 						is_global=True, computation_precidence=1002.2)
-	def _decoded_epochs_heuristic_scoring(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
+	def _decoded_epochs_heuristic_scoring(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, same_thresh_fraction_of_track: float=0.05, max_ignore_bins:float=2, use_bin_units_instead_of_realworld:bool=False):
 		""" Using the four 1D decoders, performs 1D Bayesian decoding for each of the known epochs (Laps, Ripple) from the neural activity during these peirods.
 		
 		Requires:
@@ -5762,6 +5762,20 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 		# print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
 		# print(f'included_qclu_values: {included_qclu_values}')
 
+		decoder_track_length_dict = track_templates.get_track_length_dict() # {'long_LR': 214.0, 'long_RL': 214.0, 'short_LR': 144.0, 'short_RL': 144.0}
+
+		# same_thresh_fraction_of_track: float = 0.025 ## up to 2.5% of the track -- notably worse
+		# same_thresh_fraction_of_track: float = 0.05 ## up to 5.0% of the track
+		
+		# same_thresh_fraction_of_track: float = 0.15 ## up to 15% of the track
+		same_thresh_cm_dict: Dict[types.DecoderName, float] = {k:(v * same_thresh_fraction_of_track) for k, v in decoder_track_length_dict.items()}
+		# same_thresh_n_bin_units: float = {k:(v * same_thresh_fraction_of_track) for k, v in decoder_track_length_dict.items()}
+
+		a_same_thresh_cm: float = same_thresh_cm_dict['long_LR'] # ALWAYS USE THE SAME FOR ALL TRACKS/DECODERS
+		# a_same_thresh_cm: float = 0.0
+		print(f'same_thresh_cm: {a_same_thresh_cm}')
+
+
 		# DirectionalMergedDecoders: Get the result after computation:
 		directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = global_computation_results.computed_data['DirectionalMergedDecoders']
 		ripple_decoding_time_bin_size: float = directional_merged_decoders_result.ripple_decoding_time_bin_size
@@ -5790,16 +5804,16 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 			# filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(filtered_epochs_df[['start', 'stop']].to_numpy()) for a_name, a_result in decoder_ripple_filter_epochs_decoder_result_dict.items()} # working filtered
 
 			# 🟪 2024-02-29 - `compute_pho_heuristic_replay_scores` ______________________________________________________________ #
-			a_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=a_filter_epochs_decoder_result_dict)
+			a_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=a_filter_epochs_decoder_result_dict,
+														   				same_thresh_cm=a_same_thresh_cm, max_ignore_bins=max_ignore_bins, use_bin_units_instead_of_realworld=use_bin_units_instead_of_realworld)
 			## make sure it updates the results
 			# global_computation_results.computed_data['TrainTestSplit'] = a_train_test_result
-
 		
 		return global_computation_results
 
 
 	@function_attributes(short_name='directional_train_test_split', tags=['train-test-split', 'global_computation'],
-					    input_requires=['global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values', 'global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz'], output_provides=[], uses=[], used_by=[], creation_date='2024-04-09 06:09', related_items=[],
+						input_requires=['global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values', 'global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz'], output_provides=[], uses=[], used_by=[], creation_date='2024-04-09 06:09', related_items=[],
 						requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders'], provides_global_keys=['TrainTestSplit'],
 						validate_computation_test=_workaround_validate_has_directional_train_test_split_result, 
 						is_global=True, computation_precidence=(1002.3))

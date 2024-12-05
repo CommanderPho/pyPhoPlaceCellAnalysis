@@ -142,6 +142,7 @@ class SubsequencesPartitioningResult:
 
     """
     flat_positions: NDArray = field(metadata={'desc': "the list of most-likely positions (in [cm]) for each time bin in a decoded posterior"})
+
     first_order_diff_lst: List = field() # the original list
 
     n_pos_bins: int = field(metadata={'desc': "the total number of unique position bins along the track, unrelated to the number of *positions* in `flat_positions` "})
@@ -160,10 +161,16 @@ class SubsequencesPartitioningResult:
     bridged_intrusion_bin_indicies: NDArray = field(default=None, repr=False, metadata={'desc': "indicies where an intrusion previously existed that was bridged. "}) # specified in diff indicies
     
 
-    
+    # main subsequence splits ____________________________________________________________________________________________ #
     split_positions_arrays: List[NDArray] = field(default=None, repr=False, metadata={'desc': "the positions in `flat_positions` but partitioned into subsequences determined by changes in direction exceeding `self.same_thresh`"})
+    split_position_flatindicies_arrays: List[NDArray] = field(default=None, repr=False, metadata={'WARN': 'UNIMPLEMENTED', 'desc': "the positions in `flat_positions` but partitioned into subsequences determined by changes in direction exceeding `self.same_thresh`"})
+
+
     merged_split_positions_arrays: List[NDArray] = field(default=None, metadata={'desc': "the subsequences from `split_positions_arrays` but merged into larger subsequences by briding-over (ignoring) sequences of intrusive tbins (with the max ignored length specified by `self.max_ignore_bins`"})
+    merged_split_position_flatindicies_arrays: List[NDArray] = field(default=None, metadata={'WARN': 'UNIMPLEMENTED', 'desc': "the subsequences from `split_positions_arrays` but merged into larger subsequences by briding-over (ignoring) sequences of intrusive tbins (with the max ignored length specified by `self.max_ignore_bins`"})
     
+
+
     sequence_info_df: pd.DataFrame = field(default=None, repr=False)
     
 
@@ -180,6 +187,14 @@ class SubsequencesPartitioningResult:
     def n_diff_bins(self) -> int:
         return len(self.first_order_diff_lst)
     
+    @property
+    def flat_position_indicies(self) -> NDArray:
+        """ the list of corresponding indicies for `self.flat_positions`."""
+        if self.flat_positions is None:
+            return None
+        return np.arange(len(self.flat_positions))
+
+
     @property
     def subsequence_index_lists_omitting_repeats(self):
         """The subsequence_index_lists_omitting_repeats property. BROKEN """
@@ -272,8 +287,6 @@ class SubsequencesPartitioningResult:
         return self.merged_split_positions_arrays[self.longest_sequence_no_repeats_start_idx]
 
 
-
-    
     def get_longest_sequence_length_ratio(self, should_use_no_repeat_values: bool = False) -> float:
         """  Compensate for repeating bins, not counting them towards the score but also not against. """
         ## Compensate for repeating bins, not counting them towards the score but also not against.
@@ -300,13 +313,34 @@ class SubsequencesPartitioningResult:
         """ main initializer """
         ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
         partition_result: "SubsequencesPartitioningResult" = cls.partition_subsequences_ignoring_repeated_similar_positions(a_most_likely_positions_list, n_pos_bins=n_pos_bins, flat_time_window_centers=flat_time_window_centers, same_thresh=same_thresh, max_ignore_bins=max_ignore_bins, flat_time_window_edges=flat_time_window_edges, debug_print=debug_print)  # Add 1 because np.diff reduces the index by 1
-        partition_result.partition_subsequences() ## 2024-12-04 09:15 New
-        partition_result.merge_intrusions() ## 2024-12-04 09:15 New
+
+        # # ChatGPT Method 2024-11-04 - 2pm ____________________________________________________________________________________ #
+        # partition_result.partition_subsequences() ## 2024-12-04 09:15 New
+        # partition_result.merge_intrusions() ## 2024-12-04 09:15 New
+
+
+        # Pho Method 2024-11-04 - Pre 2pm ____________________________________________________________________________________ #
+        # # Set `partition_result.split_positions_arrays` ______________________________________________________________________ #
+        # active_split_indicies = deepcopy(partition_result.split_indicies) ## this is what it should be, but all the splits are +1 later than they should be
+        # active_split_indicies = deepcopy(partition_result.diff_split_indicies) - 1 ## this is what it should be, but all the splits are +1 later than they should be
+        active_split_indicies = deepcopy(partition_result.split_indicies) ## this is what it should be, but all the splits are +1 later than they should be
+        split_most_likely_positions_arrays = np.split(a_most_likely_positions_list, active_split_indicies)
+        partition_result.split_positions_arrays = split_most_likely_positions_arrays
+        
+
+
+        # Set `merged_split_positions_arrays` ________________________________________________________________________________ #
+        _tmp_merge_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_values_list) = partition_result.merge_over_ignored_intrusions(max_ignore_bins=max_ignore_bins, debug_print=debug_print)
+        # flat_positions_list = deepcopy(partition_result.flat_positions.tolist())
+        partition_result.bridged_intrusion_bin_indicies = deepcopy(final_intrusion_values_list) # np.array([flat_positions_list.index(v) for v in final_intrusion_idxs])
+        
+        
+        ## Common Post-hoc
         partition_result.rebuild_sequence_info_df()
         return partition_result
     
 
-    @function_attributes(short_name=None, tags=['NOT_COMPLETE', 'NOT_NEEDED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-03 04:17', related_items=[])
+    @function_attributes(short_name=None, tags=['NOT_COMPLETE', 'NOT_NEEDED', 'PhoOriginal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-03 04:17', related_items=[])
     @classmethod
     def detect_repeated_similar_positions(cls, a_most_likely_positions_list: Union[List, NDArray], same_thresh: float = 4.0, debug_print=False, **kwargs) -> "SubsequencesPartitioningResult":
         """ function partitions the list according to an iterative rule and the direction changes, ignoring changes less than or equal to `same_thresh`.
@@ -424,7 +458,7 @@ class SubsequencesPartitioningResult:
         return (sub_change_equivalency_groups, sub_change_equivalency_group_values), (list_parts, list_split_indicies, sub_change_threshold_change_indicies)
 
 
-    @function_attributes(short_name=None, tags=['near_equal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-03 11:15', related_items=[])
+    @function_attributes(short_name=None, tags=['near_equal', 'PhoOriginal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-03 11:15', related_items=[])
     @classmethod
     def find_value_equiv_groups(cls, longest_sequence_subsequence: Union[List, NDArray], same_thresh_cm: float) -> Tuple[List, List]:
         """ returns the positions grouped by whether they are considered the same based on `same_thresh_cm`
@@ -467,7 +501,7 @@ class SubsequencesPartitioningResult:
         return value_equiv_group_list, value_equiv_group_idxs_list
 
 
-    @function_attributes(short_name=None, tags=['partition'], input_requires=[], output_provides=[], uses=['SubsequencesPartitioningResult', 'rebuild_sequence_info_df'], used_by=['init_from_positions_list'], creation_date='2024-05-09 02:47', related_items=[])
+    @function_attributes(short_name=None, tags=['partition', 'PhoOriginal'], input_requires=[], output_provides=[], uses=['SubsequencesPartitioningResult', 'rebuild_sequence_info_df'], used_by=['init_from_positions_list'], creation_date='2024-05-09 02:47', related_items=[])
     @classmethod
     def partition_subsequences_ignoring_repeated_similar_positions(cls, a_most_likely_positions_list: Union[List, NDArray], n_pos_bins: int, same_thresh: float = 4.0, debug_print=False, **kwargs) -> "SubsequencesPartitioningResult":
         """ function partitions the list according to an iterative rule and the direction changes, ignoring changes less than or equal to `same_thresh`.
@@ -509,7 +543,7 @@ class SubsequencesPartitioningResult:
 
         for i, v in enumerate(first_order_diff_lst):
             curr_dir = np.sign(v) # either [-1, 0, +1]
-            did_accum_dir_change: bool = (prev_accum_dir != curr_dir)# and (prev_accum_dir is not None) and (prev_accum_dir != 0)
+            did_accum_dir_change: bool = (prev_accum_dir != curr_dir) and (curr_dir != 0) # curr_dir == 0 means that we DEFER the split
             if debug_print:
                 print(f'i: {i}, v: {v}, curr_dir: {curr_dir}, prev_accum_dir: {prev_accum_dir}')
 
@@ -537,6 +571,7 @@ class SubsequencesPartitioningResult:
                 else:
                     # direction changed but it didn't exceed the threshold, a so-called "low-magnitude" change
                     sub_change_threshold_change_indicies.append(i)
+                    prev_accum_dir = None ## HACK fixes index after low-magnitude change
                 # END if (np.abs(v) > same_thresh)
                 
                 ## accumulate the new entry, and potentially the change direction
@@ -558,7 +593,7 @@ class SubsequencesPartitioningResult:
 
 
         diff_split_indicies = np.array(first_order_diff_list_split_indicies)
-        split_indicies = np.array(deepcopy(first_order_diff_list_split_indicies)) - 1
+        split_indicies = np.array(deepcopy(first_order_diff_list_split_indicies))# - 1
         # first_order_diff_list_split_indicies = diff_split_indicies + 1 # the +1 is because we pass a diff list/array which has one less index than the original array.
         # first_order_diff_list_split_indicies = deepcopy(diff_split_indicies) - 1 # try -1 
         sub_change_threshold_change_indicies = np.array(sub_change_threshold_change_indicies)
@@ -570,7 +605,7 @@ class SubsequencesPartitioningResult:
         return _result
 
 
-    @function_attributes(short_name=None, tags=['merge', '_compute_sequences_spanning_ignored_intrusions'], input_requires=['self.split_positions_arrays'], output_provides=['self.merged_split_positions_arrays'], uses=['_compute_sequences_spanning_ignored_intrusions'], used_by=[], creation_date='2024-11-27 08:17', related_items=['_compute_sequences_spanning_ignored_intrusions'])
+    @function_attributes(short_name=None, tags=['merge', '_compute_sequences_spanning_ignored_intrusions', 'PhoOriginal'], input_requires=['self.split_positions_arrays'], output_provides=['self.merged_split_positions_arrays'], uses=['_compute_sequences_spanning_ignored_intrusions'], used_by=[], creation_date='2024-11-27 08:17', related_items=['_compute_sequences_spanning_ignored_intrusions'])
     def merge_over_ignored_intrusions(self, max_ignore_bins: int = 2, should_skip_epoch_with_only_short_subsequences: bool = False, debug_print=False):
         """ an "intrusion" refers to one or more time bins that interrupt a longer sequence that would be monotonic if the intrusions were removed.
 
@@ -799,6 +834,15 @@ class SubsequencesPartitioningResult:
             print(f'original_split_positions_arrays: {original_split_positions_arrays}')
         
 
+        ## Begin by finding only the longest sequence
+        n_tbins_list = np.array([len(v) for v in original_split_positions_arrays])
+        longest_subsequence_idx: int = np.argmax(n_tbins_list)
+        
+        n_total_tbins: int = np.sum(n_tbins_list)
+        is_subsequence_potential_intrusion = (n_tbins_list <= max_ignore_bins) ## any subsequence shorter than the max ignore distance
+        ignored_subsequence_idxs = np.where(is_subsequence_potential_intrusion)[0]
+        
+
         # call `_subfn_perform_merge_iteration` ______________________________________________________________________________ #
         original_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_idxs) = _subfn_perform_merge_iteration(original_split_positions_arrays,
                                                                                                                                                                             max_ignore_bins=max_ignore_bins, should_skip_epoch_with_only_short_subsequences=should_skip_epoch_with_only_short_subsequences, debug_print=debug_print)
@@ -891,6 +935,42 @@ class SubsequencesPartitioningResult:
         return (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index)
 
 
+    @classmethod
+    def determine_directionality(cls, subseq: NDArray, return_normalized: bool=True) -> float:
+        """ determines the directionality of a subsequence between -1 and +1
+        
+        """
+        if isinstance(subseq, list):
+            subseq = np.array(subseq)
+
+        first_order_diff_lst = np.diff(subseq, n=1) # , prepend=[subseq[0]]
+
+        n_diff_bins: int = len(first_order_diff_lst)
+        n_original_bins: int = n_diff_bins + 1
+        
+        n_nonzero_diff_bins: int = np.sum(np.nonzero(first_order_diff_lst)) # len(first_order_diff_lst)
+    
+        sign_diff = np.sign(first_order_diff_lst) # -1, 0, +1 for each change    
+        sign_total = np.sum(sign_diff)
+        n_nonzero_sign_bins: int = np.sum(np.nonzero(sign_diff)) # len(first_order_diff_lst)
+    
+        if not return_normalized:
+            return sign_total
+        else:
+            norm_sign_total = sign_total / float(n_nonzero_sign_bins) # float(len(sign_diff))
+            return norm_sign_total
+        
+        # np.sum(first_order_diff_lst) / float(n_diff_bins))
+
+        # diffs = [subseq[i+1] - subseq[i] for i in range(len(subseq)-1)]
+        # if all(diff > 0 for diff in diffs):
+        #     return 'increasing'
+        # elif all(diff < 0 for diff in diffs):
+        #     return 'decreasing'
+        # else:
+        #     return 'none'
+        
+
 
     # 2024-12-04 09:16 New ChatGPT Simplified Functions __________________________________________________________________ #
     
@@ -917,6 +997,8 @@ class SubsequencesPartitioningResult:
             self.sequence_info_df['subsequence_idx'] = flatten(
                 [[i] * len(v) for i, v in enumerate(self.merged_split_positions_arrays)])
 
+
+        self.sequence_info_df['flat_idx'] = self.sequence_info_df.index.astype(int, copy=True)
         return self.sequence_info_df
 
     # Existing properties and methods remain unchanged or are adjusted as necessary
@@ -1034,6 +1116,33 @@ class SubsequencesPartitioningResult:
             from neuropy.utils.matplotlib_helpers import modify_colormap_alpha
             import matplotlib.transforms as mtransforms
 
+
+            # Plot Customization _________________________________________________________________________________________________ #
+            split_vlines_kwargs = dict(color='black', linestyle='-', linewidth=1) | kwargs.pop('split_vlines_kwargs', {})
+            time_bin_edges_vlines_kwargs = dict(color='grey', linestyle='--', linewidth=0.5) | kwargs.pop('time_bin_edges_vlines_kwargs', {})
+            direction_change_lines_kwargs = dict(color='yellow', linestyle=':', linewidth=2, zorder=1) | kwargs.pop('direction_change_lines_kwargs', {})
+
+            intrusion_time_bin_shading_kwargs = dict(facecolor='red', alpha=0.15, zorder=0) | kwargs.pop('intrusion_time_bin_shading_kwargs', {})
+            sequence_position_hlines_kwargs = dict(linewidth=4, zorder=-1) | kwargs.pop('sequence_position_hlines_kwargs', {})
+
+            # Example override dict ______________________________________________________________________________________________ #
+            # dict(
+            #     split_vlines_kwargs = dict(color='black', linestyle='-', linewidth=1, should_skip=False),
+            #     time_bin_edges_vlines_kwargs = dict(color='grey', linestyle='--', linewidth=0.5, should_skip=False) 
+            #     direction_change_lines_kwargs = dict(color='yellow', linestyle=':', linewidth=2, zorder=1, should_skip=False),
+            #     intrusion_time_bin_shading_kwargs = dict(facecolor='red', alpha=0.15, zorder=0, should_skip=False),
+            #     sequence_position_hlines_kwargs = dict(linewidth=4, zorder=-1, should_skip=False),
+            # )
+            
+
+            should_skip_split_vlines: bool = split_vlines_kwargs.pop('should_skip', False)
+            should_skip_time_bin_edges_vlines: bool = time_bin_edges_vlines_kwargs.pop('should_skip', False)
+            should_skip_direction_change_lines: bool = direction_change_lines_kwargs.pop('should_skip', False)
+            should_skip_intrusion_time_bin_shading: bool = intrusion_time_bin_shading_kwargs.pop('should_skip', False)
+            should_skip_sequence_position_hlines: bool = sequence_position_hlines_kwargs.pop('should_skip', False)
+            
+
+            # Begin Function Body ________________________________________________________________________________________________ #
             out_dict = {'time_bin_edges_vlines': None, 'split_vlines': None, 'subsequence_positions_hlines_dict': None,
                         'subsequence_arrows_dict': None, 'subsequence_arrow_labels_dict': None, 'main_sequence_tbins_axhlines': None,
                         'intrusion_shading': None, 'direction_change_lines': None,
@@ -1088,10 +1197,13 @@ class SubsequencesPartitioningResult:
 
             # Plot vertical lines at regular time bins excluding group splits
             regular_x_bins = np.setdiff1d(x_bins, group_end_indices)
-            out_dict['time_bin_edges_vlines'] = ax.vlines(regular_x_bins, ymin, ymax, color='grey', linestyle='--', linewidth=0.5)
+            if not should_skip_time_bin_edges_vlines:
+                out_dict['time_bin_edges_vlines'] = ax.vlines(regular_x_bins, ymin, ymax, **time_bin_edges_vlines_kwargs)
 
-            # Highlight separator lines where splits occur
-            out_dict['split_vlines'] = ax.vlines(group_end_indices, ymin, ymax, color='black', linestyle='-', linewidth=1)
+            if not should_skip_split_vlines:
+                # Highlight separator lines where splits occur
+                out_dict['split_vlines'] = ax.vlines(group_end_indices, ymin, ymax, **split_vlines_kwargs)
+
 
             # Define a colormap
             cmap = plt.get_cmap('tab10')
@@ -1102,20 +1214,23 @@ class SubsequencesPartitioningResult:
             out_dict['intrusion_shading'] = []
 
             # Shade intrusion time bins
-            if is_intrusion is not None:
-                for i in range(N):
-                    if is_intrusion[i]:
-                        ax.axvspan(x_starts[i], x_ends[i], facecolor='red', alpha=0.3, zorder=0)
-                        out_dict['intrusion_shading'].append((x_starts[i], x_ends[i]))
+            if not should_skip_intrusion_time_bin_shading:
+                if is_intrusion is not None:
+                    for i in range(N):
+                        if is_intrusion[i]:
+                            ax.axvspan(x_starts[i], x_ends[i], **intrusion_time_bin_shading_kwargs)
+                            out_dict['intrusion_shading'].append((x_starts[i], x_ends[i]))
 
-            # Draw direction change lines
-            out_dict['direction_change_lines'] = []
-            if direction_changes is not None:
-                for i in range(N):
-                    if direction_changes[i]:
-                        x_line = x_starts[i]
-                        line = ax.axvline(x_line, color='yellow', linestyle=':', linewidth=2, zorder=1)
-                        out_dict['direction_change_lines'].append(line)
+            
+            if not should_skip_direction_change_lines:
+                # Draw direction change lines
+                out_dict['direction_change_lines'] = []
+                if direction_changes is not None:
+                    for i in range(N):
+                        if direction_changes[i]:
+                            x_line = x_starts[i]
+                            line = ax.axvline(x_line, **direction_change_lines_kwargs)
+                            out_dict['direction_change_lines'].append(line)
 
             # Plot horizontal lines with customizable color
             out_dict['subsequence_positions_hlines_dict'] = {}
@@ -1142,9 +1257,10 @@ class SubsequencesPartitioningResult:
 
                 # Plot horizontal lines for position values within each time bin
                 # Adjust colors for intrusion time bins
-                colors = [color if is_intrusion is None or not is_intrusion[position_index + i] else 'red' for i in range(num_positions)]
-                out_dict['subsequence_positions_hlines_dict'][subsequence_idx] = ax.hlines(
-                    subsequence_positions, xmin=x_starts_subseq, xmax=x_ends_subseq, colors=colors, linewidth=2)
+                # colors = [color if is_intrusion is None or not is_intrusion[position_index + i] else 'red' for i in range(num_positions)]
+                colors = [color for i in range(num_positions)]
+                if not should_skip_sequence_position_hlines:
+                    out_dict['subsequence_positions_hlines_dict'][subsequence_idx] = ax.hlines(subsequence_positions, xmin=x_starts_subseq, xmax=x_ends_subseq, colors=colors, **sequence_position_hlines_kwargs)
 
                 if enable_position_difference_indicators:
                     ## Draw "change" arrows between each adjacent bin showing the amount of y-pos change
@@ -1283,13 +1399,26 @@ class SubsequencesPartitioningResult:
         split_positions_arrays = deepcopy(self.split_positions_arrays)
         out2: MatplotlibRenderPlots = self.plot_time_bins_multiple(num='debug_plot_merged_time_binned_positions', ax=ax_dict["ax_grouped_seq"], enable_position_difference_indicators=True,
             flat_time_window_edges=flat_time_window_edges, override_positions_list=split_positions_arrays, **common_plot_time_bins_multiple_kwargs,
+            sequence_position_hlines_kwargs=dict(linewidth=3, linestyle='--', zorder=11, alpha=0.9),
         )
         merged_plots_out_dict["ax_grouped_seq"] = out2.plots
         
+        #(offset, (on_off_seq)). For example, (0, (3, 10, 1, 15)) means (3pt line, 10pt space, 1pt line, 15pt space) with no offset, while (5, (10, 3)), means (10pt line, 3pt space), but skip the first 5pt line.
+        # linestyle = (0, (5, 1))
+        linestyle = (0, (1, 1)) # dots with 1pt dot, 0.5pt space
+        # Plot only the positions themselves, as dotted overlaying lines
+        pre_merged_debug_sequences_kwargs = dict(sequence_position_hlines_kwargs=dict(linewidth=2, linestyle=linestyle, zorder=10, alpha=1.0), # high-zorder to place it on-top, linestyle is "densely-dashed"
+            split_vlines_kwargs = dict(should_skip=True),
+            time_bin_edges_vlines_kwargs = dict(should_skip=True),
+            direction_change_lines_kwargs = dict(should_skip=True),
+            intrusion_time_bin_shading_kwargs = dict(should_skip=True),
+        )
+                    
+
         ## Add re-sequenced (merged) result:
         merged_split_positions_arrays = deepcopy(self.merged_split_positions_arrays)
         out3: MatplotlibRenderPlots = self.plot_time_bins_multiple(num='debug_plot_merged_time_binned_positions', ax=ax_dict["ax_merged_grouped_seq"], enable_position_difference_indicators=True,
-            flat_time_window_edges=flat_time_window_edges, override_positions_list=merged_split_positions_arrays, **common_plot_time_bins_multiple_kwargs, 
+            flat_time_window_edges=flat_time_window_edges, override_positions_list=merged_split_positions_arrays, **common_plot_time_bins_multiple_kwargs, **pre_merged_debug_sequences_kwargs,
         )        
         merged_plots_out_dict["ax_merged_grouped_seq"] = out3.plots
         
@@ -1306,7 +1435,210 @@ class SubsequencesPartitioningResult:
         return merged_out
 
 
+# ==================================================================================================================== #
+# CHATGPT GARBAGE?                                                                                                     #
+# ==================================================================================================================== #
+class LongestSupersequenceFinder:
+    """
+    A class to find the longest possible supersequence by merging subsequences while adhering to specified constraints.
+    
+    from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import LongestSupersequenceFinder
+    
+    # Sample subsequences
+    subsequences = [
+        [38.9801, 225.446, 225.446],
+        [145.532, 137.921, 38.9801],
+        [225.446, 217.835, 175.975, 107.478],
+        [134.116, 145.532],
+        [38.9801, 38.9801],
+        [172.17],
+        [149.337],
+        [248.278],
+        [225.446, 153.143, 145.532, 111.283, 69.4234]
+    ]
 
+    max_ignore_bins = 2  # Define your maximum ignore bins
+
+    # Create an instance of the finder
+    finder = LongestSupersequenceFinder(subsequences, max_ignore_bins)
+
+    # Find the longest supersequence
+    longest_supersequence = finder.find_longest_supersequence()
+
+    print("Longest Supersequence:")
+    print(longest_supersequence)
+    print("\nLength of the longest supersequence:", len(longest_supersequence))
+
+    """
+
+    def __init__(self, subsequences, max_ignore_bins):
+        """
+        Initializes the LongestSupersequenceFinder with the provided subsequences and constraints.
+
+        Parameters:
+        - subsequences (List[List[float]]): List of subsequences, each containing position values.
+        - max_ignore_bins (int): Maximum allowable length of an intruding subsequence.
+        """
+        self.subsequences = subsequences
+        self.max_ignore_bins = max_ignore_bins
+        self.processed_subsequences = []
+        # Process subsequences to determine directionality
+        self._process_subsequences()
+
+    def _process_subsequences(self):
+        """
+        Processes each subsequence to determine its directionality and stores the result.
+        """
+        for idx, subseq in enumerate(self.subsequences):
+            direction = self._determine_directionality(subseq)
+            self.processed_subsequences.append({
+                'index': idx,
+                'subseq': subseq,
+                'length': len(subseq),
+                'direction': direction
+            })
+
+    def _determine_directionality(self, subseq):
+        """
+        Determines the directionality of a subsequence.
+
+        Parameters:
+        - subseq (List[float]): A subsequence of position values.
+
+        Returns:
+        - str: 'increasing', 'decreasing', or 'none' based on the directionality.
+        """
+        # Calculate differences between consecutive positions
+        diffs = [subseq[i + 1] - subseq[i] for i in range(len(subseq) - 1)]
+        if not diffs:
+            return 'none'  # Cannot determine directionality for single-element subsequences
+        if all(diff > 0 for diff in diffs):
+            return 'increasing'
+        elif all(diff < 0 for diff in diffs):
+            return 'decreasing'
+        else:
+            return 'none'  # Mixed differences indicate no clear directionality
+
+    def find_longest_supersequence(self):
+        """
+        Finds the longest possible supersequence by merging subsequences while adhering to the specified constraints.
+
+        Returns:
+        - List[float]: The longest merged supersequence.
+        """
+        longest_supersequence = []
+        # Try both increasing and decreasing directions to find the longest supersequence
+        for direction in ['increasing', 'decreasing']:
+            # Find the longest subsequence with the current directionality
+            starting_subseq = self._find_longest_subseq_with_direction(direction)
+            if starting_subseq:
+                # Attempt to extend the supersequence from the starting subsequence
+                superseq = self._extend_supersequence(
+                    starting_subseq['index'],
+                    direction
+                )
+                # Update the longest supersequence if a longer one is found
+                if len(superseq) > len(longest_supersequence):
+                    longest_supersequence = superseq
+        return longest_supersequence
+
+    def _find_longest_subseq_with_direction(self, direction):
+        """
+        Finds the longest subsequence with a specific directionality.
+
+        Parameters:
+        - direction (str): The desired directionality ('increasing' or 'decreasing').
+
+        Returns:
+        - dict or None: The longest subsequence with the specified directionality, or None if not found.
+        """
+        same_dir_subseqs = [s for s in self.processed_subsequences if s['direction'] == direction]
+        if not same_dir_subseqs:
+            return None
+        # Return the subsequence with the maximum length
+        return max(same_dir_subseqs, key=lambda s: s['length'])
+
+    def _extend_supersequence(self, start_idx, direction):
+        """
+        Extends a supersequence from the starting subsequence by merging adjacent subsequences.
+
+        Parameters:
+        - start_idx (int): Index of the starting subsequence.
+        - direction (str): The directionality of the supersequence ('increasing' or 'decreasing').
+
+        Returns:
+        - List[float]: The extended supersequence.
+        """
+        # Initialize the supersequence with the starting subsequence
+        supersequence = self.processed_subsequences[start_idx]['subseq'].copy()
+        total_sequence_bins = len(supersequence)
+        total_intruding_bins = 0
+
+        # Helper function to check constraints
+        def constraints_satisfied(intruding_bins, sequence_bins):
+            """
+            Checks whether the constraints are satisfied.
+
+            Constraints:
+            1. No intruding subsequence exceeds max_ignore_bins bins.
+            2. Total intruding bins do not exceed half of the candidate supersequence length.
+
+            Parameters:
+            - intruding_bins (int): Total number of intruding bins.
+            - sequence_bins (int): Total number of bins in the supersequence.
+
+            Returns:
+            - bool: True if constraints are satisfied, False otherwise.
+            """
+            return intruding_bins <= sequence_bins / 2.0
+
+        # Extend forward
+        idx = start_idx
+        while idx + 1 < len(self.processed_subsequences):
+            idx += 1
+            subseq_info = self.processed_subsequences[idx]
+            if subseq_info['direction'] == direction:
+                # Same directionality; merge subsequence
+                supersequence.extend(subseq_info['subseq'])
+                total_sequence_bins += subseq_info['length']
+            else:
+                # Intruding subsequence
+                if subseq_info['length'] > self.max_ignore_bins:
+                    # Constraint 1 violated; cannot include this intruding subsequence
+                    break
+                # Tentatively include intruding subsequence
+                total_intruding_bins += subseq_info['length']
+                if not constraints_satisfied(total_intruding_bins, total_sequence_bins + subseq_info['length']):
+                    # Constraint 2 violated; cannot include more intruding bins
+                    break
+                # Include intruding subsequence
+                supersequence.extend(subseq_info['subseq'])
+                total_sequence_bins += subseq_info['length']
+
+        # Extend backward
+        idx = start_idx
+        while idx - 1 >= 0:
+            idx -= 1
+            subseq_info = self.processed_subsequences[idx]
+            if subseq_info['direction'] == direction:
+                # Same directionality; merge subsequence at the beginning
+                supersequence = subseq_info['subseq'] + supersequence
+                total_sequence_bins += subseq_info['length']
+            else:
+                # Intruding subsequence
+                if subseq_info['length'] > self.max_ignore_bins:
+                    # Constraint 1 violated; cannot include this intruding subsequence
+                    break
+                # Tentatively include intruding subsequence
+                total_intruding_bins += subseq_info['length']
+                if not constraints_satisfied(total_intruding_bins, total_sequence_bins + subseq_info['length']):
+                    # Constraint 2 violated; cannot include more intruding bins
+                    break
+                # Include intruding subsequence
+                supersequence = subseq_info['subseq'] + supersequence
+                total_sequence_bins += subseq_info['length']
+
+        return supersequence
 
 
 
@@ -1759,7 +2091,7 @@ class HeuristicReplayScoring:
     @classmethod
     @function_attributes(short_name='main_contiguous_subsequence_len', tags=['bin-wise', 'bin-size', 'score', 'replay', 'sequence_length'], input_requires=[], output_provides=[],
                           uses=['SubsequencesPartitioningResult', '_compute_sequences_spanning_ignored_intrusions'], used_by=[], creation_date='2024-03-12 01:05', related_items=['SubsequencesPartitioningResult'])
-    def bin_wise_contiguous_subsequence_num_bins_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, same_thresh_fraction_of_track: float = 0.025, max_ignore_bins:int=2) -> int:
+    def bin_wise_contiguous_subsequence_num_bins_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, same_thresh_fraction_of_track: float = 0.050, max_ignore_bins:int=2) -> int:
         """ The amount of the track that is represented by the decoding. More is better (indicating a longer replay).
 
         - Finds the longest continuous sequence (perhaps with some intrusions allowed?)
@@ -1779,7 +2111,8 @@ class HeuristicReplayScoring:
         ## Begin computations:
 
         ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
-        partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, flat_time_window_centers=deepcopy(time_window_centers))
+        partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm,
+                                                                                                                    flat_time_window_centers=deepcopy(time_window_centers))
         # longest_sequence_subsequence = deepcopy(partition_result.longest_sequence_subsequence)
         # longest_sequence_subsequence_partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(longest_sequence_subsequence, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm)
         # longest_sequence_subsequence_partition_result.merged_split_positions_arrays ## makes things worse
@@ -1993,7 +2326,7 @@ class HeuristicReplayScoring:
     @function_attributes(short_name=None, tags=['heuristic', 'replay', 'score', 'OLDER'], input_requires=[], output_provides=[],
                          uses=['_compute_pos_derivs', 'partition_subsequences_ignoring_repeated_similar_positions', '_compute_total_variation', '_compute_integral_second_derivative', '_compute_stddev_of_diff', 'HeuristicScoresTuple'],
                          used_by=['compute_all_heuristic_scores'], creation_date='2024-02-29 00:00', related_items=[])
-    def compute_pho_heuristic_replay_scores(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, debug_print=False, use_bin_units_instead_of_realworld:bool=False, max_ignore_bins:float=2, same_thresh: float=4.0, **kwargs) -> HeuristicScoresTuple:
+    def compute_pho_heuristic_replay_scores(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, debug_print=False, use_bin_units_instead_of_realworld:bool=False, max_ignore_bins:float=2, same_thresh_cm: float=6.0, **kwargs) -> HeuristicScoresTuple:
         """ 2024-02-29 - New smart replay heuristic scoring
 
         
@@ -2111,7 +2444,7 @@ class HeuristicReplayScoring:
             # sign_change_indices = np.where(np.diff(a_first_order_diff_sign) != 0)[0] + 1  # Add 1 because np.diff reduces the index by 1
 
             ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
-            partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list=a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh) # (a_first_order_diff, same_thresh=same_thresh)
+            partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list=a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm) # (a_first_order_diff, same_thresh=same_thresh)
             num_direction_changes: int = len(partition_result.split_indicies)
             direction_change_bin_ratio: float = float(num_direction_changes) / (float(n_time_bins)-1) ## OUT: direction_change_bin_ratio
 
@@ -2255,7 +2588,7 @@ class HeuristicReplayScoring:
 
     @classmethod
     @function_attributes(short_name=None, tags=['heuristic', 'main', 'computation'], input_requires=[], output_provides=[], uses=['_run_all_score_computations', 'cls.compute_pho_heuristic_replay_scores', 'cls.build_all_score_computations_fn_dict'], used_by=[], creation_date='2024-03-12 00:59', related_items=[])
-    def compute_all_heuristic_scores(cls, track_templates: TrackTemplates, a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult]) -> Tuple[Dict[str, DecodedFilterEpochsResult], Dict[str, pd.DataFrame]]:
+    def compute_all_heuristic_scores(cls, track_templates: TrackTemplates, a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], use_bin_units_instead_of_realworld:bool=False, max_ignore_bins:float=2, same_thresh_cm: float=6.0, **kwargs) -> Tuple[Dict[str, DecodedFilterEpochsResult], Dict[str, pd.DataFrame]]:
         """ Computes all heuristic scoring metrics (for each epoch) and adds them to the DecodedFilterEpochsResult's .filter_epochs as columns
         
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_all_heuristic_scores
@@ -2272,7 +2605,7 @@ class HeuristicReplayScoring:
         _out_new_scores: Dict[str, pd.DataFrame] = {}
 
         for a_name, a_result in a_decoded_filter_epochs_decoder_result_dict.items():
-            _out_new_scores[a_name] =  pd.DataFrame([asdict(cls.compute_pho_heuristic_replay_scores(a_result=a_result, an_epoch_idx=an_epoch_idx), filter=lambda a, v: a.name not in ['position_derivatives_df']) for an_epoch_idx in np.arange(a_result.num_filter_epochs)])
+            _out_new_scores[a_name] =  pd.DataFrame([asdict(cls.compute_pho_heuristic_replay_scores(a_result=a_result, an_epoch_idx=an_epoch_idx, use_bin_units_instead_of_realworld=use_bin_units_instead_of_realworld, max_ignore_bins=max_ignore_bins, same_thresh_cm=same_thresh_cm), filter=lambda a, v: a.name not in ['position_derivatives_df']) for an_epoch_idx in np.arange(a_result.num_filter_epochs)])
             assert np.shape(_out_new_scores[a_name])[0] == np.shape(a_result.filter_epochs)[0], f"np.shape(_out_new_scores[a_name])[0]: {np.shape(_out_new_scores[a_name])[0]} != np.shape(a_result.filter_epochs)[0]: {np.shape(a_result.filter_epochs)[0]}"
             a_result.filter_epochs = PandasHelpers.adding_additional_df_columns(original_df=a_result.filter_epochs, additional_cols_df=_out_new_scores[a_name]) # update the filter_epochs with the new columns
 
