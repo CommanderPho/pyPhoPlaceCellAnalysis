@@ -2535,14 +2535,15 @@ class HeuristicReplayScoring:
             # continuous_sequence_lengths = [len(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_first_order_diff_arrays]
             # if debug_print:
             #     print(f'continuous_sequence_lengths: {continuous_sequence_lengths}')
-            longest_sequence_length: int = partition_result.longest_sequence_length_no_repeats
+            # longest_sequence_length: int = partition_result.longest_sequence_length_no_repeats
+            longest_sequence_length: int = partition_result.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=True, should_use_no_repeat_values=False)
             if debug_print:
                 print("Longest sequence of time bins without a direction change:", longest_sequence_length)
             # longest_sequence_start_idx: int = np.nanargmax(continuous_sequence_lengths)
             # longest_sequence = split_first_order_diff_arrays[longest_sequence_start_idx]
             
-            longest_sequence_length_ratio: float = partition_result.longest_sequence_length_ratio # float(longest_sequence_length) /  float(n_time_bins) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
-
+            # longest_sequence_length_ratio: float = partition_result.longest_sequence_length_ratio # float(longest_sequence_length) /  float(n_time_bins) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
+            longest_sequence_length_ratio: float = partition_result.get_longest_sequence_length(return_ratio=True, should_ignore_intrusion_bins=True, should_use_no_repeat_values=False)
 
             # 2024-05-09 Sequence Determination with ignored repeats (not yet working) ___________________________________________ #
             # split_diff_index_subsequence_index_arrays = np.split(np.arange(partition_result.n_diff_bins), partition_result.diff_split_indicies) # subtract 1 again to get the diff_split_indicies instead
@@ -2653,7 +2654,7 @@ class HeuristicReplayScoring:
                 single_decoder_column_name = f"{score_name}"
                 unique_full_decoder_score_column_name: str = f"{score_name}_{a_name}"
 
-                
+                # 'main_contiguous_subsequence_len_short_LR'
                 all_epochs_scores_dict[unique_full_decoder_score_column_name] = [computation_fn(a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length, **computation_fn_kwargs_dict.get(score_computation_name, {})) for an_epoch_idx in np.arange(a_result.num_filter_epochs)]
                 _a_separate_decoder_new_scores_dict[single_decoder_column_name] = deepcopy(all_epochs_scores_dict[unique_full_decoder_score_column_name]) # a single column, all epochs
             # END for all_score_computations_fn_dict
