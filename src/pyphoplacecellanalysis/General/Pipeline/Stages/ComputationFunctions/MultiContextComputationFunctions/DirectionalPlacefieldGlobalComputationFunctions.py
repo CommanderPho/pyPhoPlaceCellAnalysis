@@ -5260,8 +5260,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 		from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
 		from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
 		from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
-		
-		minimum_inclusion_fr_Hz: float = global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+		# global_computation_results is not None, but `global_computation_results.computation_config` is. Why?
+		minimum_inclusion_fr_Hz: float = global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz # #TODO 2024-12-10 13:21: - [ ] Failing here --- no clue why, global_computation_results is None
 		included_qclu_values: List[int] = global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
 		# included_aclus = owning_pipeline_reference.determine_good_aclus_by_qclu(included_qclu_values=included_qclu_values, debug_print=True)
 		
