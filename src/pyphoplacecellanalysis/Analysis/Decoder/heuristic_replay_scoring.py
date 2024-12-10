@@ -1290,11 +1290,17 @@ class SubsequencesPartitioningResult:
             x_start = x_starts[0]
             position_index = 0  # Global position index across all subsequences
 
+            ## sort the subsequences by length so that the colors are always assigned in a consistent order (longest == color0, 2nd-longests == color1, ....)
+            subsequence_lengths = np.array([len(x) for x in positions_list])
+            subsequence_len_sort_indicies = np.argsort(subsequence_lengths)[::-1]
+            
+
             for subsequence_idx, subsequence_positions in enumerate(positions_list):
                 num_positions: int = len(subsequence_positions)
                 curr_subsequence_end_position: float = float(num_positions) * bin_width
-                color = cmap(subsequence_idx % num_colors)
-
+                # color = cmap(subsequence_idx % num_colors)
+                color = cmap(subsequence_len_sort_indicies[subsequence_idx] % num_colors)
+                
                 x_rel_indices = np.arange(num_positions)
                 x_indices = x_start + (x_rel_indices * bin_width)
                 x_starts_subseq = x_indices
