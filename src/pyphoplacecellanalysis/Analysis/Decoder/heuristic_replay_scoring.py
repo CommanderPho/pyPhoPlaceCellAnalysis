@@ -190,6 +190,10 @@ class SubsequencesPartitioningResult:
         return len(self.first_order_diff_lst)
     
     @property
+    def n_flat_position_bins(self) -> int:
+        return len(self.flat_positions)
+    
+    @property
     def flat_position_indicies(self) -> NDArray:
         """ the list of corresponding indicies for `self.flat_positions`."""
         if self.flat_positions is None:
@@ -353,6 +357,43 @@ class SubsequencesPartitioningResult:
             else:
                 return 0.0 # zero it out if they are all repeats
             
+    @function_attributes(short_name=None, tags=['time_bin'], input_requires=[], output_provides=[], uses=['.flat_time_window_edges', '.flat_time_window_centers'], used_by=[], creation_date='2024-12-12 09:39', related_items=[])
+    def get_flat_time_bins_info(self):
+        """ 
+        bin_width, (x_starts, x_centers, x_ends), x_bins = a_partition_result.get_flat_time_bins_info()
+        """
+        flat_time_window_edges = self.flat_time_window_edges
+        flat_time_window_centers = self.flat_time_window_centers
+        # Flatten the positions_list to get all positions for setting y-limits
+        # all_positions = np.concatenate(positions_list)
+        num_flat_positions: int = self.n_flat_position_bins #len(all_positions)
+        print(f'num_flat_positions: {num_flat_positions}')
+        # Prepare x-values for time bins
+        if flat_time_window_edges is not None:
+            ## Prefer edges over centers
+            assert (len(flat_time_window_edges)-1) == num_flat_positions, f"(len(flat_time_window_edges)-1): {(len(flat_time_window_edges)-1)} and num_flat_positions: {num_flat_positions}"
+            x_bins = deepcopy(flat_time_window_edges[:-1])  ## Left edges of bins
+            bin_width: float = np.median(np.diff(x_bins))
+            x_starts = x_bins
+            x_centers = x_bins + (bin_width / 2.0)
+            x_ends = x_bins + bin_width
+        elif flat_time_window_centers is not None:
+            assert len(flat_time_window_centers) == num_flat_positions, f"flat_time_window_centers must have the same length as positions, but len(flat_time_window_centers): {len(flat_time_window_centers)} and num_flat_positions: {num_flat_positions}"
+            x_bins = deepcopy(flat_time_window_centers)
+            bin_width: float = np.median(np.diff(x_bins))
+            x_starts = x_bins - bin_width / 2
+            x_centers = deepcopy(x_bins) # + (bin_width / 2.0)
+            x_ends = x_bins + bin_width / 2
+        else:
+            ## Use indices as the x_bins
+            x_bins = np.arange(num_flat_positions + 1)  # Time bin left edges, 0-indexed though
+            bin_width: float = 1.0
+            x_starts = x_bins[:-1]
+            x_centers = deepcopy(x_starts) + (bin_width / 2.0)
+            x_ends = x_bins[1:]
+                    
+        return bin_width, (x_starts, x_centers, x_ends), x_bins
+    
 
     # ==================================================================================================================== #
     # Update/Recompute Functions                                                                                           #
@@ -1164,15 +1205,25 @@ class SubsequencesPartitioningResult:
 
 
         self.position_bins_info_df['flat_idx'] = self.position_bins_info_df.index.astype(int, copy=True)
-        
+        ## add time bins
+        bin_width, (t_bin_starts, t_bin_centers, t_bin_ends), x_bins = self.get_flat_time_bins_info()
+        Assert.len_equals(t_bin_starts, required_length=self.n_flat_position_bins)
+        Assert.len_equals(t_bin_centers, required_length=self.n_flat_position_bins)
+        Assert.len_equals(t_bin_ends, required_length=self.n_flat_position_bins)
+        self.position_bins_info_df['t_bin_start'] = t_bin_starts.astype(float)
+        self.position_bins_info_df['t_bin_center'] = t_bin_centers.astype(float)
+        self.position_bins_info_df['t_bin_end'] = t_bin_ends.astype(float)
+
         ## build first_order_diff_df
         if self.first_order_diff_lst is not None:
             Assert.len_equals(self.first_order_diff_lst, len(self.flat_positions))
             prev_bin_flat_idxs = self.position_bins_info_df['flat_idx'].to_numpy()[:-1]
             next_bin_flat_idxs = self.position_bins_info_df['flat_idx'].to_numpy()[1:]
+            split_line_flat_t = self.position_bins_info_df['t_bin_end'].to_numpy()[:-1].astype(float) # all but the last end, as this isn't a valid one
+            
 
             self.position_changes_info_df = pd.DataFrame({'pos_diff': np.diff(self.position_bins_info_df['pos']),
-                                                    'prev_bin_flat_idx': prev_bin_flat_idxs, 'next_bin_flat_idxs': next_bin_flat_idxs,
+                                                    'prev_bin_flat_idx': prev_bin_flat_idxs, 'next_bin_flat_idxs': next_bin_flat_idxs, 't': split_line_flat_t, # np.diff(self.position_bins_info_df['t_bin_center']),
             })
             # position_changes_info_df['split_reason'] = '' # str column descripting why the split occured
             self.position_changes_info_df['direction'] = np.sign(self.position_changes_info_df['pos_diff']).astype(int)
@@ -1284,7 +1335,7 @@ class SubsequencesPartitioningResult:
     @classmethod
     def _debug_plot_time_bins_multiple(cls, positions_list, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True, defer_show: bool = False, flat_time_window_centers=None, flat_time_window_edges=None,
                                         enable_axes_formatting: bool = False,  arrow_alpha: float = 0.4, subsequence_line_color_alpha: float = 0.55,
-                                        is_intrusion: Optional[NDArray] = None, direction_changes: Optional[NDArray] = None, debug_print=False, **kwargs):
+                                        is_intrusion: Optional[NDArray] = None, direction_changes: Optional[NDArray] = None, position_info_df: Optional[pd.DataFrame]=None, position_changes_info_df: Optional[pd.DataFrame]=None, debug_print=False, **kwargs):
             """
             Plots positions over fixed-width time bins with vertical lines separating each bin.
             Each sublist in positions_list is plotted in a different color.
@@ -1308,7 +1359,7 @@ class SubsequencesPartitioningResult:
             # Plot Customization _________________________________________________________________________________________________ #
             split_vlines_kwargs = dict(color='black', linestyle='-', linewidth=1) | kwargs.pop('split_vlines_kwargs', {})
             time_bin_edges_vlines_kwargs = dict(color='grey', linestyle='--', linewidth=0.5) | kwargs.pop('time_bin_edges_vlines_kwargs', {})
-            direction_change_lines_kwargs = dict(color='yellow', linestyle=':', linewidth=2, zorder=1) | kwargs.pop('direction_change_lines_kwargs', {})
+            direction_change_lines_kwargs = dict(color='yellow', linestyle=':', linewidth=4, zorder=22) | kwargs.pop('direction_change_lines_kwargs', {})
 
             intrusion_time_bin_shading_kwargs = dict(facecolor='red', alpha=0.15, zorder=0) | kwargs.pop('intrusion_time_bin_shading_kwargs', {})
             sequence_position_hlines_kwargs = dict(linewidth=4, zorder=-1) | kwargs.pop('sequence_position_hlines_kwargs', {})            
@@ -1463,12 +1514,22 @@ class SubsequencesPartitioningResult:
             if not should_skip_direction_change_lines:
                 # Draw direction change lines
                 out_dict['direction_change_lines'] = []
+                
                 if direction_changes is not None:
                     for i in range(N):
                         if direction_changes[i]:
                             x_line = x_starts[i]
                             line = ax.axvline(x_line, **direction_change_lines_kwargs)
                             out_dict['direction_change_lines'].append(line)
+                            
+                if position_changes_info_df is not None:
+                    exceeding_jump_dist_diff_df = position_changes_info_df[position_changes_info_df['exceeds_jump_distance']] 
+                    for change_t in exceeding_jump_dist_diff_df['t'].to_numpy():
+                        line = ax.axvline(change_t, **direction_change_lines_kwargs)
+                        out_dict['direction_change_lines'].append(line)
+                    
+
+
 
             # Plot horizontal lines with customizable color
             out_dict['subsequence_positions_hlines_dict'] = {}
@@ -1572,6 +1633,7 @@ class SubsequencesPartitioningResult:
             subsequence_line_color_alpha=subsequence_line_color_alpha,
             is_intrusion=is_intrusion,  # Pass the intrusion information
             direction_changes=direction_changes,  # Pass the direction change information
+            position_info_df=self.position_bins_info_df, position_changes_info_df=self.position_changes_info_df,
             **kwargs
         )
 
@@ -1646,7 +1708,7 @@ class SubsequencesPartitioningResult:
             # sequence_position_hlines_kwargs=dict(linewidth=3, linestyle=linestyle, zorder=11, alpha=1.0),
             split_vlines_kwargs = dict(should_skip=False),
             time_bin_edges_vlines_kwargs = dict(should_skip=False),
-            direction_change_lines_kwargs = dict(should_skip=True),
+            direction_change_lines_kwargs = dict(should_skip=False),
             intrusion_time_bin_shading_kwargs = dict(should_skip=False),
             main_sequence_position_dots_kwargs = dict(should_skip=False, linewidths=2, marker ="^", edgecolor ="red", s = 100, zorder=1),
         )
