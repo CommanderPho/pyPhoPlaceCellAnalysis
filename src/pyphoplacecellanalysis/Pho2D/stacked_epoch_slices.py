@@ -995,13 +995,18 @@ class ClickActionCallbacks:
                     print(f'\tactive_captured_single_epoch_result.epoch_info_tuple: {active_captured_single_epoch_result.epoch_info_tuple}')
                     print(f'\tdone.')
                     
-                most_likely_position_indicies = deepcopy(active_captured_single_epoch_result.most_likely_position_indicies)
-                most_likely_position_indicies = np.squeeze(most_likely_position_indicies)
+                # most_likely_position_indicies = deepcopy(active_captured_single_epoch_result.most_likely_position_indicies)
+                # most_likely_position_indicies = np.squeeze(most_likely_position_indicies)
+
+                most_likely_positions = deepcopy(active_captured_single_epoch_result.most_likely_positions)
+                most_likely_positions = np.squeeze(most_likely_positions)
+
+                
                 # t_bin_centers = deepcopy(active_captured_single_epoch_result.time_bin_container.centers)
                 # t_bin_indicies = np.arange(len(np.squeeze(most_likely_position_indicies)))
                 # p_x_given_n = deepcopy(active_captured_single_epoch_result.marginal_x.p_x_given_n)
                 try:
-                    copy_to_clipboard(code_str=f"{most_likely_position_indicies}", message_print=True)
+                    copy_to_clipboard(code_str=f"{np.array2string(most_likely_positions, separator=', ')}", message_print=True)
                 except Exception as e:
                     print(f"ERR: copy_selected_most_likely_positions_to_clipboard_callback(...): err: {e}. Continuing.")
                     raise
