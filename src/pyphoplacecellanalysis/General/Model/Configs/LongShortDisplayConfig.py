@@ -414,17 +414,18 @@ class FixedCustomColormaps:
 
 
     @classmethod
-    def get_custom_black_with_low_values_dropped_cmap(cls):
+    def get_custom_black_with_low_values_dropped_cmap(cls, low_value_cutoff:float=0.1):
         """ Oranges with low values omitted
         """
-        from matplotlib.colors import LinearSegmentedColormap
-        return LinearSegmentedColormap.from_list(f"dropping_low_values_black_colormap", [
-            [0.0,0.0,0.0, 0.0],
-            [0.0,0.0,0.0, 1.0],
-            [0.0,0.0,0.0, 1.0],
-            [0.0,0.0,0.0, 1.0],
-            [0.0,0.0,0.0, 1.0],
-            [0.0,0.0,0.0, 1.0]])
+        from matplotlib.colors import LinearSegmentedColormap, Colormap
+        assert low_value_cutoff < 1.0, f"low_value_cutoff: {low_value_cutoff}"
+        # Each point is (normalized value, color)
+        colors = [
+            (0.0, [0.0,0.0,0.0, 0.0]),    # Start: 0.0 mapped to blue
+            (low_value_cutoff, [0.0,0.0,0.0, 0.0]),   # Middle: 0.5 mapped to white
+            (1.0, [0.0,0.0,0.0, 1.0])      # End: 1.0 mapped to red
+        ]
+        return LinearSegmentedColormap.from_list(f"dropping_low_values_black_colormap", colors)
 
 
 
