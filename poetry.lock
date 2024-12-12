@@ -4102,8 +4102,8 @@ tests = ["pytest", "pytest-qt"]
 [package.source]
 type = "git"
 url = "https://github.com/CommanderPho/mpl-multitab.git"
-reference = "v0.1.0"
-resolved_reference = "bf9cba798cc89f62e83418ab509feb4074622314"
+reference = "pho_compat"
+resolved_reference = "0b02d2a616e39e5bac10797228fedb71bd8b8fc8"
 
 [[package]]
 name = "mplcursors"
@@ -9542,4 +9542,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.12"
-content-hash = "daf3bc58a4d8282eea8825f7a81f78c282c849d6a6e2bcd9b6e637f925c31c12"
+content-hash = "85d2e84555b432e103bf5ad190d1b91bb350cbe7bdbb95389181ba19aafdfcb3"
