@@ -897,7 +897,7 @@ class SubsequencesPartitioningResult:
                 print(f'final_intrusion_idxs: {final_intrusion_idxs}')
         
         ## update dataframe
-        self.rebuild_sequence_info_df()
+        # self.rebuild_sequence_info_df()
         
         # return (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index)
         return original_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_idxs)
@@ -1138,7 +1138,7 @@ class SubsequencesPartitioningResult:
 
 
     @function_attributes(short_name=None, tags=['df', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=['compute'], creation_date='2024-12-12 03:47', related_items=[])
-    def rebuild_sequence_info_df(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def rebuild_sequence_info_df(self, additional_split_on_exceeding_jump_distance:bool=False) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """Rebuilds the sequence_info_df using the new subsequences.
         Updates: self.position_bins_info_df, self.position_changes_info_df
         """
@@ -1181,7 +1181,8 @@ class SubsequencesPartitioningResult:
             self.position_changes_info_df['should_split'] = np.logical_and(self.position_changes_info_df['did_accum_dir_change'], self.position_changes_info_df['exceeds_same_thresh'])
             if (self.max_jump_distance_cm is not None):
                 self.position_changes_info_df['exceeds_jump_distance'] = (np.abs(self.position_changes_info_df['pos_diff']) > self.max_jump_distance_cm)
-                self.position_changes_info_df['should_split'] = np.logical_or(self.position_changes_info_df['should_split'], self.position_changes_info_df['exceeds_jump_distance'])
+                if additional_split_on_exceeding_jump_distance:
+                    self.position_changes_info_df['should_split'] = np.logical_or(self.position_changes_info_df['should_split'], self.position_changes_info_df['exceeds_jump_distance'])
 
 
         return self.position_bins_info_df, self.position_changes_info_df
@@ -1662,17 +1663,9 @@ class SubsequencesPartitioningResult:
         # linestyle = (0, (1, 1)) # dots with 1pt dot, 0.5pt space
         # linestyle = '-'
         # Plot only the positions themselves, as dotted overlaying lines
-        post_merged_debug_sequences_kwargs = deepcopy(pre_merged_debug_sequences_kwargs) | dict(
-            # sequence_position_hlines_kwargs=dict(linewidth=2, linestyle=linestyle, zorder=10, alpha=1.0), # high-zorder to place it on-top, linestyle is "densely-dashed"
-            # split_vlines_kwargs = dict(should_skip=False),
-            # time_bin_edges_vlines_kwargs = dict(should_skip=False),
-            # direction_change_lines_kwargs = dict(should_skip=True),
-            # intrusion_time_bin_shading_kwargs = dict(should_skip=False),
-            # main_sequence_position_dots_kwargs = dict(should_skip=False, linewidths=2, marker ="^", edgecolor ="red", s = 100, zorder=1),
-        )
-                    
 
         ## Add re-sequenced (merged) result:
+        post_merged_debug_sequences_kwargs = deepcopy(pre_merged_debug_sequences_kwargs) | dict()
         merged_split_positions_arrays = deepcopy(self.merged_split_positions_arrays)
         out3: MatplotlibRenderPlots = self.plot_time_bins_multiple(num='debug_plot_merged_time_binned_positions', ax=ax_dict["ax_merged_grouped_seq"], enable_position_difference_indicators=True,
             flat_time_window_edges=flat_time_window_edges, override_positions_list=merged_split_positions_arrays, **common_plot_time_bins_multiple_kwargs, **post_merged_debug_sequences_kwargs,
