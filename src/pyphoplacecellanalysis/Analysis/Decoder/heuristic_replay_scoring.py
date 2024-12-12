@@ -903,8 +903,7 @@ class SubsequencesPartitioningResult:
         # return (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index)
         return original_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_idxs)
 
-
-    @function_attributes(short_name=None, tags=['merge', '_compute_sequences_spanning_ignored_intrusions', 'PhoOriginal'], input_requires=['self.split_positions_arrays'], output_provides=['self.merged_split_positions_arrays'], uses=['_compute_sequences_spanning_ignored_intrusions'], used_by=[], creation_date='2024-11-27 08:17', related_items=['_compute_sequences_spanning_ignored_intrusions'])
+    @function_attributes(short_name=None, tags=['partition'], input_requires=['self.merged_split_positions_arrays'], output_provides=['self.merged_split_positions_arrays'], uses=[], used_by=[], creation_date='2024-12-11 23:42', related_items=[])
     def enforce_max_jump_distance(self, max_jump_distance_cm: float = 30.0, debug_print=False):
         """ an "intrusion" refers to one or more time bins that interrupt a longer sequence that would be monotonic if the intrusions were removed.
 
@@ -939,6 +938,7 @@ class SubsequencesPartitioningResult:
 
         ## Begin by finding only the longest sequence
         n_tbins_list = np.array([len(v) for v in original_split_positions_arrays])
+        first_order_diff_value_exceeeding_jump_distance_indicies = []
         
         # new_merged_split_positions_arrays = deepcopy(original_merged_split_positions_arrays)
         new_merged_split_positions_arrays = []
@@ -949,9 +949,12 @@ class SubsequencesPartitioningResult:
             num_jumps_exceeding_max: int = np.count_nonzero(does_jump_exceed_max)
             jump_exceeds_max_idxs = np.where(does_jump_exceed_max)[0]
             if num_jumps_exceeding_max > 0:
-                print(f'does_jump_exceed_max: {does_jump_exceed_max}')
+                if debug_print:
+                    print(f'does_jump_exceed_max: {does_jump_exceed_max}')
                 a_split_subsequence = np.split(a_subsequence, jump_exceeds_max_idxs) ## splits into sub bins
                 ## TODO: keep track of splits?
+                first_order_diff_value_exceeeding_jump_distance_indicies.extend(jump_exceeds_max_idxs)
+                
                 # new_merged_split_positions_arrays[a_subsequence_idx] = a_split_subsequence
                 for a_sub_sub_sequence in a_split_subsequence:
                     new_merged_split_positions_arrays.append(a_sub_sub_sequence) ## append the split subsequence
@@ -977,10 +980,11 @@ class SubsequencesPartitioningResult:
         # self.rebuild_sequence_info_df()
         
         self.merged_split_positions_arrays = new_merged_split_positions_arrays
-        
+        first_order_diff_value_exceeeding_jump_distance_indicies = np.array(first_order_diff_value_exceeeding_jump_distance_indicies)
         # return (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index)
         # return original_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_idxs)
-        return new_merged_split_positions_arrays
+        return new_merged_split_positions_arrays, first_order_diff_value_exceeeding_jump_distance_indicies
+    
     
 
 
@@ -1088,7 +1092,7 @@ class SubsequencesPartitioningResult:
         #     return 'none'
         
 
-
+    @function_attributes(short_name=None, tags=['compute', 'MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-11 23:43', related_items=[])
     def compute(self, debug_print=False):
         """ recomputes all """
         
