@@ -148,7 +148,8 @@ class SubsequencesPartitioningResult:
     n_pos_bins: int = field(metadata={'desc': "the total number of unique position bins along the track, unrelated to the number of *positions* in `flat_positions` "})
     max_ignore_bins: int = field(default=2, metadata={'desc': "the maximum number of sequential time bins that can be merged over to form a larger subsequence."})
     same_thresh: float = field(default=4, metadata={'desc': "if the difference (in [cm]) between the positions of two sequential time bins is less than this value, it will be treated as a non-changing direction and effectively treated as a single bin."})
-
+    max_jump_distance_cm: Optional[float] = field(default=None, metadata={'desc': 'The maximum allowed distance between adjacent bins'})
+    
     flat_time_window_centers: Optional[NDArray] = field(default=None)
     flat_time_window_edges: Optional[NDArray] = field(default=None)
     
@@ -358,34 +359,21 @@ class SubsequencesPartitioningResult:
 
     @function_attributes(short_name=None, tags=['sequence'], input_requires=[], output_provides=[], uses=['partition_subsequences_ignoring_repeated_similar_positions', 'partition_subsequences', 'merge_intrusions', 'rebuild_sequence_info_df'], used_by=['bin_wise_continuous_sequence_sort_score_fn'], creation_date='2024-11-27 11:12', related_items=[])
     @classmethod
-    def init_from_positions_list(cls, a_most_likely_positions_list: NDArray, n_pos_bins: int, max_ignore_bins: int = 2, same_thresh: float = 4, flat_time_window_centers=None, flat_time_window_edges=None, debug_print:bool=False) -> "SubsequencesPartitioningResult":
+    def init_from_positions_list(cls, a_most_likely_positions_list: NDArray, n_pos_bins: int, max_ignore_bins: int = 2, same_thresh: float = 4, max_jump_distance_cm: Optional[float]=None, flat_time_window_centers=None, flat_time_window_edges=None, debug_print:bool=False) -> "SubsequencesPartitioningResult":
         """ main initializer """
+        
+        if isinstance(a_most_likely_positions_list, list):
+            a_most_likely_positions_list = np.array(a_most_likely_positions_list)
+        
+        first_order_diff_lst = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
+        assert len(first_order_diff_lst) == len(a_most_likely_positions_list), f"the prepend above should ensure that the sequence and its first-order diff are the same length."
+        partition_result = cls(flat_positions=deepcopy(a_most_likely_positions_list), n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh, max_jump_distance_cm=max_jump_distance_cm, flat_time_window_centers=flat_time_window_centers, flat_time_window_edges=flat_time_window_edges,
+                               first_order_diff_lst=None, list_parts=None, diff_split_indicies=None, split_indicies=None, low_magnitude_change_indicies=None,          
+                            )
+        
         ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
-        partition_result: "SubsequencesPartitioningResult" = cls.partition_subsequences_ignoring_repeated_similar_positions(a_most_likely_positions_list, n_pos_bins=n_pos_bins, flat_time_window_centers=flat_time_window_centers, same_thresh=same_thresh, max_ignore_bins=max_ignore_bins, flat_time_window_edges=flat_time_window_edges, debug_print=debug_print)  # Add 1 because np.diff reduces the index by 1
+        partition_result.compute(debug_print=debug_print)
 
-        # # ChatGPT Method 2024-11-04 - 2pm ____________________________________________________________________________________ #
-        # partition_result.partition_subsequences() ## 2024-12-04 09:15 New
-        # partition_result.merge_intrusions() ## 2024-12-04 09:15 New
-
-
-        # Pho Method 2024-11-04 - Pre 2pm ____________________________________________________________________________________ #
-        # # Set `partition_result.split_positions_arrays` ______________________________________________________________________ #
-        # active_split_indicies = deepcopy(partition_result.split_indicies) ## this is what it should be, but all the splits are +1 later than they should be
-        # active_split_indicies = deepcopy(partition_result.diff_split_indicies) - 1 ## this is what it should be, but all the splits are +1 later than they should be
-        active_split_indicies = deepcopy(partition_result.split_indicies) ## this is what it should be, but all the splits are +1 later than they should be
-        split_most_likely_positions_arrays = np.split(a_most_likely_positions_list, active_split_indicies)
-        partition_result.split_positions_arrays = split_most_likely_positions_arrays
-        
-
-
-        # Set `merged_split_positions_arrays` ________________________________________________________________________________ #
-        _tmp_merge_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_values_list) = partition_result.merge_over_ignored_intrusions(max_ignore_bins=max_ignore_bins, debug_print=debug_print)
-        # flat_positions_list = deepcopy(partition_result.flat_positions.tolist())
-        partition_result.bridged_intrusion_bin_indicies = deepcopy(final_intrusion_values_list) # np.array([flat_positions_list.index(v) for v in final_intrusion_idxs])
-        
-        
-        ## Common Post-hoc
-        partition_result.rebuild_sequence_info_df()
         return partition_result
     
 
@@ -552,7 +540,7 @@ class SubsequencesPartitioningResult:
 
     @function_attributes(short_name=None, tags=['partition', 'PhoOriginal'], input_requires=[], output_provides=[], uses=['SubsequencesPartitioningResult', 'rebuild_sequence_info_df'], used_by=['init_from_positions_list'], creation_date='2024-05-09 02:47', related_items=[])
     @classmethod
-    def partition_subsequences_ignoring_repeated_similar_positions(cls, a_most_likely_positions_list: Union[List, NDArray], n_pos_bins: int, same_thresh: float = 4.0, debug_print=False, **kwargs) -> "SubsequencesPartitioningResult":
+    def partition_subsequences_ignoring_repeated_similar_positions(cls, a_most_likely_positions_list: Union[List, NDArray], n_pos_bins: int, same_thresh: float = 4.0, debug_print=False, **kwargs) -> dict:
         """ function partitions the list according to an iterative rule and the direction changes, ignoring changes less than or equal to `same_thresh`.
         
         NOTE: This helps "ignore" false-positive direction changes for bins with spatially-nearby (stationary) positions that happen to be offset in the wrong direction.
@@ -576,7 +564,6 @@ class SubsequencesPartitioningResult:
         if isinstance(a_most_likely_positions_list, list):
             a_most_likely_positions_list = np.array(a_most_likely_positions_list)
         
-    
         first_order_diff_lst = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
         assert len(first_order_diff_lst) == len(a_most_likely_positions_list), f"the prepend above should ensure that the sequence and its first-order diff are the same length."
 
@@ -646,13 +633,14 @@ class SubsequencesPartitioningResult:
         # first_order_diff_list_split_indicies = diff_split_indicies + 1 # the +1 is because we pass a diff list/array which has one less index than the original array.
         # first_order_diff_list_split_indicies = deepcopy(diff_split_indicies) - 1 # try -1 
         sub_change_threshold_change_indicies = np.array(sub_change_threshold_change_indicies)
-
+        
         list_parts = [np.array(l) for l in list_parts]
-
-        _result = SubsequencesPartitioningResult(flat_positions=deepcopy(a_most_likely_positions_list), first_order_diff_lst=first_order_diff_lst, list_parts=list_parts, diff_split_indicies=diff_split_indicies, split_indicies=split_indicies, low_magnitude_change_indicies=sub_change_threshold_change_indicies,
-                                                  n_pos_bins=n_pos_bins, same_thresh=same_thresh, **kwargs)
-        return _result
-
+        
+        # _result = SubsequencesPartitioningResult(flat_positions=deepcopy(a_most_likely_positions_list), first_order_diff_lst=first_order_diff_lst, list_parts=list_parts, diff_split_indicies=diff_split_indicies, split_indicies=split_indicies, low_magnitude_change_indicies=sub_change_threshold_change_indicies,
+        #                                           n_pos_bins=n_pos_bins, same_thresh=same_thresh, **kwargs)
+        # return _result
+        return dict(flat_positions=deepcopy(a_most_likely_positions_list), first_order_diff_lst=first_order_diff_lst, list_parts=list_parts, diff_split_indicies=diff_split_indicies, split_indicies=split_indicies, low_magnitude_change_indicies=sub_change_threshold_change_indicies, n_pos_bins=n_pos_bins, same_thresh=same_thresh, **kwargs)
+     
 
     @function_attributes(short_name=None, tags=['merge', '_compute_sequences_spanning_ignored_intrusions', 'PhoOriginal'], input_requires=['self.split_positions_arrays'], output_provides=['self.merged_split_positions_arrays'], uses=['_compute_sequences_spanning_ignored_intrusions'], used_by=[], creation_date='2024-11-27 08:17', related_items=['_compute_sequences_spanning_ignored_intrusions'])
     def merge_over_ignored_intrusions(self, max_ignore_bins: int = 2, should_skip_epoch_with_only_short_subsequences: bool = False, debug_print=False):
@@ -916,6 +904,86 @@ class SubsequencesPartitioningResult:
         return original_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_idxs)
 
 
+    @function_attributes(short_name=None, tags=['merge', '_compute_sequences_spanning_ignored_intrusions', 'PhoOriginal'], input_requires=['self.split_positions_arrays'], output_provides=['self.merged_split_positions_arrays'], uses=['_compute_sequences_spanning_ignored_intrusions'], used_by=[], creation_date='2024-11-27 08:17', related_items=['_compute_sequences_spanning_ignored_intrusions'])
+    def enforce_max_jump_distance(self, max_jump_distance_cm: float = 30.0, debug_print=False):
+        """ an "intrusion" refers to one or more time bins that interrupt a longer sequence that would be monotonic if the intrusions were removed.
+
+        The quintessential example would be a straight ramp that is interrupted by a single point discontinuity intrusion.  
+
+        iNPUTS:
+            split_first_order_diff_arrays: a list of split arrays of 1st order differences.
+            continuous_sequence_lengths: a list of integer sequence lengths
+            longest_sequence_start_idx: int - the sequence start index to start the scan in each direction
+            max_ignore_bins: int = 2 - this means to disolve sequences shorter than 2 time bins if the sequences on each side are in the same direction
+
+            
+        REQUIRES: self.merged_split_positions_arrays, self.split_positions_arrays
+        UPDATES: self.merged_split_positions_arrays
+            
+        Usage:
+
+        HISTORY: 2024-11-27 08:18 based off of `_compute_sequences_spanning_ignored_intrusions`
+        
+        """
+        # ==================================================================================================================== #
+        # BEGIN FUNCTION BODY                                                                                                  #
+        # ==================================================================================================================== #
+
+        ## INPUTS: split_first_order_diff_arrays, continuous_sequence_lengths, max_ignore_bins
+        assert self.split_positions_arrays is not None
+        original_split_positions_arrays = deepcopy(self.split_positions_arrays)
+        original_merged_split_positions_arrays = deepcopy(self.merged_split_positions_arrays)
+        if debug_print:
+            print(f'original_split_positions_arrays: {original_split_positions_arrays}, original_merged_split_positions_arrays: {original_merged_split_positions_arrays}')
+        
+
+        ## Begin by finding only the longest sequence
+        n_tbins_list = np.array([len(v) for v in original_split_positions_arrays])
+        
+        # new_merged_split_positions_arrays = deepcopy(original_merged_split_positions_arrays)
+        new_merged_split_positions_arrays = []
+        for a_subsequence_idx, a_subsequence in enumerate(original_merged_split_positions_arrays):
+            ## iterate through subsequences
+            a_subsequence_first_order_diff = np.diff(a_subsequence, n=1)
+            does_jump_exceed_max = (a_subsequence_first_order_diff > max_jump_distance_cm)
+            num_jumps_exceeding_max: int = np.count_nonzero(does_jump_exceed_max)
+            jump_exceeds_max_idxs = np.where(does_jump_exceed_max)[0]
+            if num_jumps_exceeding_max > 0:
+                print(f'does_jump_exceed_max: {does_jump_exceed_max}')
+                a_split_subsequence = np.split(a_subsequence, jump_exceeds_max_idxs) ## splits into sub bins
+                ## TODO: keep track of splits?
+                # new_merged_split_positions_arrays[a_subsequence_idx] = a_split_subsequence
+                for a_sub_sub_sequence in a_split_subsequence:
+                    new_merged_split_positions_arrays.append(a_sub_sub_sequence) ## append the split subsequence
+                    
+            else:
+                ## no split needed
+                new_merged_split_positions_arrays.append(a_subsequence)
+
+        ## OUTPUTS: final_out_subsequences
+        
+
+        # Update Self ________________________________________________________________________________________________________ #
+        ## update self properties
+        # self.merged_split_positions_arrays = deepcopy(final_out_subsequences)
+        
+        # self.bridged_intrusion_bin_indicies = final_intrusion_idxs
+        
+        # if len(final_intrusion_idxs) > 0:
+        #     if debug_print:
+        #         print(f'final_intrusion_idxs: {final_intrusion_idxs}')
+        
+        ## update dataframe
+        # self.rebuild_sequence_info_df()
+        
+        self.merged_split_positions_arrays = new_merged_split_positions_arrays
+        
+        # return (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index)
+        # return original_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_idxs)
+        return new_merged_split_positions_arrays
+    
+
+
     @function_attributes(short_name=None, tags=['merge', 'intrusion', 'subsequences', 'ISSUE'], input_requires=[], output_provides=[], uses=[], used_by=['self.merge_over_ignored_intrusions'], creation_date='2024-12-04 04:43', related_items=[])
     @classmethod
     def _compute_sequences_spanning_ignored_intrusions(cls, subsequence_list, continuous_sequence_lengths, target_subsequence_idx: int, max_ignore_bins: int = 2):
@@ -1021,8 +1089,41 @@ class SubsequencesPartitioningResult:
         
 
 
+    def compute(self, debug_print=False):
+        """ recomputes all """
+        
+        partition_result_dict = self.partition_subsequences_ignoring_repeated_similar_positions(a_most_likely_positions_list=self.flat_positions, n_pos_bins=self.n_pos_bins, flat_time_window_centers=self.flat_time_window_centers, flat_time_window_edges=self.flat_time_window_edges, 
+                                                                                                same_thresh=self.same_thresh, max_ignore_bins=self.max_ignore_bins, debug_print=debug_print)  # Add 1 because np.diff reduces the index by 1
+
+        self.__dict__.update(partition_result_dict) ## update self from the result - first_order_diff_lst, list_parts, diff_split_indicies, split_indicies, low_magnitude_change_indicies
+        
+        # # ChatGPT Method 2024-11-04 - 2pm ____________________________________________________________________________________ #
+        # partition_result.partition_subsequences() ## 2024-12-04 09:15 New
+        # partition_result.merge_intrusions() ## 2024-12-04 09:15 New
+
+
+        # Pho Method 2024-11-04 - Pre 2pm ____________________________________________________________________________________ #
+        # # Set `partition_result.split_positions_arrays` ______________________________________________________________________ #
+        # active_split_indicies = deepcopy(partition_result.split_indicies) ## this is what it should be, but all the splits are +1 later than they should be
+        # active_split_indicies = deepcopy(partition_result.diff_split_indicies) - 1 ## this is what it should be, but all the splits are +1 later than they should be
+        active_split_indicies = deepcopy(self.split_indicies) ## this is what it should be, but all the splits are +1 later than they should be
+        split_most_likely_positions_arrays = np.split(self.flat_positions, active_split_indicies)
+        self.split_positions_arrays = split_most_likely_positions_arrays
+        
+        # Set `merged_split_positions_arrays` ________________________________________________________________________________ #
+        _tmp_merge_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_values_list) = self.merge_over_ignored_intrusions(max_ignore_bins=self.max_ignore_bins, debug_print=debug_print)
+        # flat_positions_list = deepcopy(partition_result.flat_positions.tolist())
+        self.bridged_intrusion_bin_indicies = deepcopy(final_intrusion_values_list) # np.array([flat_positions_list.index(v) for v in final_intrusion_idxs])
+        
+        if self.max_jump_distance_cm is not None:
+            self.enforce_max_jump_distance(max_jump_distance_cm=self.max_jump_distance_cm, debug_print=debug_print)
+
+        ## Common Post-hoc
+        self.rebuild_sequence_info_df()
+
     # 2024-12-04 09:16 New ChatGPT Simplified Functions __________________________________________________________________ #
-    
+
+
     def rebuild_sequence_info_df(self) -> pd.DataFrame:
         """Rebuilds the sequence_info_df using the new subsequences."""
         # Initialize the dataframe
@@ -1053,93 +1154,93 @@ class SubsequencesPartitioningResult:
     # Existing properties and methods remain unchanged or are adjusted as necessary
     # Update properties that depend on split_positions_arrays and merged_split_positions_arrays
 
-    @function_attributes(short_name=None, tags=['private', 'ChatGPT', '2024-12-04_09:16_Simplified'], input_requires=[], output_provides=[], uses=[], used_by=['init_from_positions_list'], creation_date='2024-12-04 10:07', related_items=[])
-    def partition_subsequences(self):
-        """
-        Partitions the positions into subsequences based on significant direction changes.
-        Small changes below the threshold (jitter around a stationary position) are ignored.
-        Requires: self.flat_positions, self.same_thresh
-        Updates `self.split_positions_arrays`.
-        """
-        positions = self.flat_positions
-        same_thresh = self.same_thresh
+    # @function_attributes(short_name=None, tags=['private', 'ChatGPT', '2024-12-04_09:16_Simplified'], input_requires=[], output_provides=[], uses=[], used_by=['init_from_positions_list'], creation_date='2024-12-04 10:07', related_items=[])
+    # def partition_subsequences(self):
+    #     """
+    #     Partitions the positions into subsequences based on significant direction changes.
+    #     Small changes below the threshold (jitter around a stationary position) are ignored.
+    #     Requires: self.flat_positions, self.same_thresh
+    #     Updates `self.split_positions_arrays`.
+    #     """
+    #     positions = self.flat_positions
+    #     same_thresh = self.same_thresh
 
-        # Compute first-order differences and directions
-        diffs = np.diff(positions, prepend=positions[0])
-        directions = np.sign(diffs)
+    #     # Compute first-order differences and directions
+    #     diffs = np.diff(positions, prepend=positions[0])
+    #     directions = np.sign(diffs)
 
-        subsequences = []
-        current_subseq = [positions[0]]
-        prev_dir = directions[0]
+    #     subsequences = []
+    #     current_subseq = [positions[0]]
+    #     prev_dir = directions[0]
 
-        for i in range(1, len(positions)):
-            curr_dir = directions[i]
-            diff = diffs[i]
+    #     for i in range(1, len(positions)):
+    #         curr_dir = directions[i]
+    #         diff = diffs[i]
 
-            # Determine if the direction has changed significantly
-            if curr_dir != prev_dir and np.abs(diff) > same_thresh:
-                subsequences.append(np.array(current_subseq))
-                current_subseq = [positions[i]]
-                prev_dir = curr_dir
-            else:
-                current_subseq.append(positions[i])
-                # Update the direction if the change is significant
-                if np.abs(diff) > same_thresh:
-                    prev_dir = curr_dir
+    #         # Determine if the direction has changed significantly
+    #         if curr_dir != prev_dir and np.abs(diff) > same_thresh:
+    #             subsequences.append(np.array(current_subseq))
+    #             current_subseq = [positions[i]]
+    #             prev_dir = curr_dir
+    #         else:
+    #             current_subseq.append(positions[i])
+    #             # Update the direction if the change is significant
+    #             if np.abs(diff) > same_thresh:
+    #                 prev_dir = curr_dir
 
-        if current_subseq:
-            subsequences.append(np.array(current_subseq))
+    #     if current_subseq:
+    #         subsequences.append(np.array(current_subseq))
 
-        self.split_positions_arrays = subsequences
+    #     self.split_positions_arrays = subsequences
 
-    @function_attributes(short_name=None, tags=['private', 'ChatGPT', '2024-12-04_09:16_Simplified'], input_requires=[], output_provides=[], uses=[], used_by=['init_from_positions_list'], creation_date='2024-12-04 10:07', related_items=[])
-    def merge_intrusions(self):
-        """
-        Merges short subsequences (intrusions) into adjacent longer sequences.
-        Requires: self.split_positions_arrays, self.max_ignore_bins
-        Updates: self.merged_split_positions_arrays
-        """
-        subsequences = self.split_positions_arrays
-        max_ignore_bins = self.max_ignore_bins
+    # @function_attributes(short_name=None, tags=['private', 'ChatGPT', '2024-12-04_09:16_Simplified'], input_requires=[], output_provides=[], uses=[], used_by=['init_from_positions_list'], creation_date='2024-12-04 10:07', related_items=[])
+    # def merge_intrusions(self):
+    #     """
+    #     Merges short subsequences (intrusions) into adjacent longer sequences.
+    #     Requires: self.split_positions_arrays, self.max_ignore_bins
+    #     Updates: self.merged_split_positions_arrays
+    #     """
+    #     subsequences = self.split_positions_arrays
+    #     max_ignore_bins = self.max_ignore_bins
 
-        merged_subsequences = []
-        i = 0
-        while i < len(subsequences):
-            current_seq = subsequences[i]
-            current_seq_len = len(current_seq)
-            if current_seq_len <= max_ignore_bins:
-                # Potential intrusion
-                left_seq = merged_subsequences[-1] if merged_subsequences else None
-                right_seq = subsequences[i + 1] if i + 1 < len(subsequences) else None
+    #     merged_subsequences = []
+    #     i = 0
+    #     while i < len(subsequences):
+    #         current_seq = subsequences[i]
+    #         current_seq_len = len(current_seq)
+    #         if current_seq_len <= max_ignore_bins:
+    #             # Potential intrusion
+    #             left_seq = merged_subsequences[-1] if merged_subsequences else None
+    #             right_seq = subsequences[i + 1] if i + 1 < len(subsequences) else None
 
-                # Decide which side to merge with
-                merged = False
-                if left_seq is not None:
-                    left_seq_len = len(left_seq)
-                    if left_seq_len >= (current_seq_len * 2):
-                        # Merge with left sequence
-                        merged_seq = np.concatenate([left_seq, current_seq])
-                        merged_subsequences[-1] = merged_seq
-                        merged = True
+    #             # Decide which side to merge with
+    #             merged = False
+    #             if left_seq is not None:
+    #                 left_seq_len = len(left_seq)
+    #                 if left_seq_len >= (current_seq_len * 2):
+    #                     # Merge with left sequence
+    #                     merged_seq = np.concatenate([left_seq, current_seq])
+    #                     merged_subsequences[-1] = merged_seq
+    #                     merged = True
 
-                if not merged and right_seq is not None:
-                    right_seq_len = len(right_seq)
-                    if right_seq_len >= (current_seq_len * 2):
-                        # Merge with right sequence
-                        merged_seq = np.concatenate([current_seq, right_seq])
-                        i += 1  # Skip the next sequence as it's merged
-                        merged_subsequences.append(merged_seq)
-                        merged = True
+    #             if not merged and right_seq is not None:
+    #                 right_seq_len = len(right_seq)
+    #                 if right_seq_len >= (current_seq_len * 2):
+    #                     # Merge with right sequence
+    #                     merged_seq = np.concatenate([current_seq, right_seq])
+    #                     i += 1  # Skip the next sequence as it's merged
+    #                     merged_subsequences.append(merged_seq)
+    #                     merged = True
 
-                if not merged:
-                    # Cannot merge, keep as is
-                    merged_subsequences.append(current_seq)
-            else:
-                # Not an intrusion
-                merged_subsequences.append(current_seq)
-            i += 1
+    #             if not merged:
+    #                 # Cannot merge, keep as is
+    #                 merged_subsequences.append(current_seq)
+    #         else:
+    #             # Not an intrusion
+    #             merged_subsequences.append(current_seq)
+    #         i += 1
 
-        self.merged_split_positions_arrays = merged_subsequences
+    #     self.merged_split_positions_arrays = merged_subsequences
         
 
     # Visualization/Graphical Debugging __________________________________________________________________________________ #
@@ -2218,7 +2319,7 @@ class HeuristicReplayScoring:
     @function_attributes(short_name=None, tags=['heuristic', 'replay', 'score', 'OLDER'], input_requires=[], output_provides=[],
                          uses=['_compute_pos_derivs', 'partition_subsequences_ignoring_repeated_similar_positions', '_compute_total_variation', '_compute_integral_second_derivative', '_compute_stddev_of_diff', 'HeuristicScoresTuple'],
                          used_by=['compute_all_heuristic_scores'], creation_date='2024-02-29 00:00', related_items=[])
-    def compute_pho_heuristic_replay_scores(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, debug_print=False, use_bin_units_instead_of_realworld:bool=False, max_ignore_bins:float=2, same_thresh_cm: float=6.0, **kwargs) -> HeuristicScoresTuple:
+    def compute_pho_heuristic_replay_scores(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, debug_print=False, use_bin_units_instead_of_realworld:bool=False, max_ignore_bins:float=2, same_thresh_cm: float=6.0, max_jump_distance_cm: float = 30.0, **kwargs) -> HeuristicScoresTuple:
         """ 2024-02-29 - New smart replay heuristic scoring
 
         
@@ -2336,7 +2437,7 @@ class HeuristicReplayScoring:
             # sign_change_indices = np.where(np.diff(a_first_order_diff_sign) != 0)[0] + 1  # Add 1 because np.diff reduces the index by 1
 
             ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
-            partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list=a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm) # (a_first_order_diff, same_thresh=same_thresh)
+            partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list=a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm) # (a_first_order_diff, same_thresh=same_thresh)
             num_direction_changes: int = len(partition_result.split_indicies)
             direction_change_bin_ratio: float = float(num_direction_changes) / (float(n_time_bins)-1) ## OUT: direction_change_bin_ratio
 
@@ -2490,7 +2591,7 @@ class HeuristicReplayScoring:
 
     @classmethod
     @function_attributes(short_name=None, tags=['heuristic', 'main', 'computation'], input_requires=[], output_provides=[], uses=['_run_all_score_computations', 'cls.compute_pho_heuristic_replay_scores', 'cls.build_all_score_computations_fn_dict'], used_by=['_decoded_epochs_heuristic_scoring'], creation_date='2024-03-12 00:59', related_items=[])
-    def compute_all_heuristic_scores(cls, track_templates: TrackTemplates, a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], use_bin_units_instead_of_realworld:bool=False, max_ignore_bins:float=2, same_thresh_cm: float=6.0, **kwargs) -> Tuple[Dict[str, DecodedFilterEpochsResult], Dict[str, pd.DataFrame]]:
+    def compute_all_heuristic_scores(cls, track_templates: TrackTemplates, a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], use_bin_units_instead_of_realworld:bool=False, max_ignore_bins:float=2, same_thresh_cm: float=6.0, max_jump_distance_cm: float = 30.0, **kwargs) -> Tuple[Dict[str, DecodedFilterEpochsResult], Dict[str, pd.DataFrame]]:
         """ Computes all heuristic scoring metrics (for each epoch) and adds them to the DecodedFilterEpochsResult's .filter_epochs as columns
         
         Directly called by the global computation function `_decoded_epochs_heuristic_scoring`
@@ -2516,7 +2617,7 @@ class HeuristicReplayScoring:
         _out_new_scores: Dict[str, pd.DataFrame] = {}
 
         for a_name, a_result in a_decoded_filter_epochs_decoder_result_dict.items():
-            _out_new_scores[a_name] =  pd.DataFrame([asdict(cls.compute_pho_heuristic_replay_scores(a_result=a_result, an_epoch_idx=an_epoch_idx, use_bin_units_instead_of_realworld=use_bin_units_instead_of_realworld, max_ignore_bins=max_ignore_bins, same_thresh_cm=same_thresh_cm), filter=lambda a, v: a.name not in ['position_derivatives_df']) for an_epoch_idx in np.arange(a_result.num_filter_epochs)])
+            _out_new_scores[a_name] =  pd.DataFrame([asdict(cls.compute_pho_heuristic_replay_scores(a_result=a_result, an_epoch_idx=an_epoch_idx, use_bin_units_instead_of_realworld=use_bin_units_instead_of_realworld, max_ignore_bins=max_ignore_bins, same_thresh_cm=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm), filter=lambda a, v: a.name not in ['position_derivatives_df']) for an_epoch_idx in np.arange(a_result.num_filter_epochs)])
             assert np.shape(_out_new_scores[a_name])[0] == np.shape(a_result.filter_epochs)[0], f"np.shape(_out_new_scores[a_name])[0]: {np.shape(_out_new_scores[a_name])[0]} != np.shape(a_result.filter_epochs)[0]: {np.shape(a_result.filter_epochs)[0]}"
             a_result.filter_epochs = PandasHelpers.adding_additional_df_columns(original_df=a_result.filter_epochs, additional_cols_df=_out_new_scores[a_name]) # update the filter_epochs with the new columns
 

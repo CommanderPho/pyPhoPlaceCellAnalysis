@@ -5727,7 +5727,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 		requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=[],
 		validate_computation_test=_workaround_validate_has_directional_decoded_epochs_heuristic_scoring, 
 						is_global=True, computation_precidence=1002.2)
-	def _decoded_epochs_heuristic_scoring(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, same_thresh_fraction_of_track: float=0.05, max_ignore_bins:float=2, use_bin_units_instead_of_realworld:bool=False):
+	def _decoded_epochs_heuristic_scoring(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, same_thresh_fraction_of_track: float=0.05, max_ignore_bins:float=2, max_jump_distance_cm: float=30.0, use_bin_units_instead_of_realworld:bool=False):
 		""" Using the four 1D decoders, performs 1D Bayesian decoding for each of the known epochs (Laps, Ripple) from the neural activity during these peirods.
 		
 		Requires:
@@ -5741,9 +5741,6 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 		Should call:
 		
 		_perform_compute_custom_epoch_decoding
-
-
-		
 
 		"""
 		from neuropy.core.epoch import TimeColumnAliasesProtocol
@@ -5807,7 +5804,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
 			# 🟪 2024-02-29 - `compute_pho_heuristic_replay_scores` ______________________________________________________________ #
 			a_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=a_filter_epochs_decoder_result_dict,
-														   				same_thresh_cm=a_same_thresh_cm, max_ignore_bins=max_ignore_bins, use_bin_units_instead_of_realworld=use_bin_units_instead_of_realworld)
+														   				same_thresh_cm=a_same_thresh_cm, max_ignore_bins=max_ignore_bins, max_jump_distance_cm=max_jump_distance_cm, use_bin_units_instead_of_realworld=use_bin_units_instead_of_realworld)
 			## make sure it updates the results
 			# global_computation_results.computed_data['TrainTestSplit'] = a_train_test_result
 		
