@@ -1576,7 +1576,7 @@ class SubsequencesPartitioningResult:
 
 
 
-    def _plot_step_by_step_subsequence_partition_process(self, extant_ax_dict=None):
+    def _plot_step_by_step_subsequence_partition_process(self, extant_fig=None, extant_ax_dict=None):
         """ diagnostic for debugging the step-by-step sequence partitioning heuristics 
         
         out: MatplotlibRenderPlots = partition_result._plot_step_by_step_subsequence_partition_process()
@@ -1591,23 +1591,30 @@ class SubsequencesPartitioningResult:
         linestyle = '-'
 
         merged_plots_out_dict = {}
-        
         if extant_ax_dict is None:
-            fig = plt.figure(layout="constrained", clear=True)
-            ax_dict = fig.subplot_mosaic(
-                [
-                    ["ax_ungrouped_seq"],
-                    ["ax_grouped_seq"], # "ax_SHORT_activity_v_time", "ax_SHORT_pf_tuning_curve"],
-                    ["ax_merged_grouped_seq"],
-                ],
-                # set the height ratios between the rows
-                # height_ratios=[8, 1],
-                # height_ratios=[1, 1],
-                # set the width ratios between the columns
-                # width_ratios=[1, 8, 8, 1],
-                sharex=True, sharey=True,
-                gridspec_kw=dict(wspace=0, hspace=0.15) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
-            )
+            if extant_fig is None:
+                ## needs create new fig
+                fig = plt.figure(layout="constrained", clear=True)
+                ax_dict = None
+            else:
+                ## already exists
+                fig = extant_fig
+                Assert.len_equals(fig.axes, required_length=3)
+                ax_dict = dict(zip(["ax_ungrouped_seq", "ax_grouped_seq", "ax_merged_grouped_seq"], fig.axes))
+                # for ax in fig.axes:
+                #     ax.remove()
+
+            if ax_dict is None:
+                ## create new axes                            
+                ax_dict = fig.subplot_mosaic(
+                    [
+                        ["ax_ungrouped_seq"],
+                        ["ax_grouped_seq"], # "ax_SHORT_activity_v_time", "ax_SHORT_pf_tuning_curve"],
+                        ["ax_merged_grouped_seq"],
+                    ],
+                    sharex=True, sharey=True,
+                    gridspec_kw=dict(wspace=0, hspace=0.15) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+                )
         else:
             ## already exists
             Assert.len_equals(extant_ax_dict, 3)
