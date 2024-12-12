@@ -2463,6 +2463,17 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
 
     from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import RadonTransformPlotDataProvider
 
+    
+    Can extract from owner like:
+    
+        from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import SubsequencesPartitioningResult
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DecodedSequenceAndHeuristicsPlotData
+
+        decoded_sequence_and_heuristics_curves_data_dict: Dict[types.DecoderName, Dict[float, DecodedSequenceAndHeuristicsPlotData]] = paginated_multi_decoder_decoded_epochs_window.get_children_props(prop_path='plots_data.decoded_sequence_and_heuristics_curves_data')
+        decoded_sequence_and_heuristics_partition_results_dict: Dict[types.DecoderName, Dict[float, SubsequencesPartitioningResult]] = {a_name:{k:v.partition_result for k, v in a_data_dict.items()} for a_name, a_data_dict in decoded_sequence_and_heuristics_curves_data_dict.items()}
+        # decoded_sequence_and_heuristics_curves_data_dict
+        decoded_sequence_and_heuristics_partition_results_dict
+
 
     """
     plots_group_identifier_key: str = 'decoded_sequence_and_heuristics_curves' # _out_pagination_controller.plots['weighted_corr']
