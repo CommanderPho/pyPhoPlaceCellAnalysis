@@ -943,18 +943,20 @@ class SubsequencesPartitioningResult:
         
         # new_merged_split_positions_arrays = deepcopy(original_merged_split_positions_arrays)
         new_merged_split_positions_arrays = []
+        relative_to_abs_idx: int = 0
         for a_subsequence_idx, a_subsequence in enumerate(original_merged_split_positions_arrays):
             ## iterate through subsequences
             a_subsequence_first_order_diff = np.diff(a_subsequence, n=1)
             does_jump_exceed_max = (np.abs(a_subsequence_first_order_diff) > max_jump_distance_cm)
             num_jumps_exceeding_max: int = np.count_nonzero(does_jump_exceed_max)
-            jump_exceeds_max_idxs = np.where(does_jump_exceed_max)[0]
+            _subseq_rel_jump_exceeds_max_idxs = np.where(does_jump_exceed_max)[0] ## subsequence relative
             if num_jumps_exceeding_max > 0:
                 if debug_print:
                     print(f'does_jump_exceed_max: {does_jump_exceed_max}')
-                a_split_subsequence = np.split(a_subsequence, jump_exceeds_max_idxs) ## splits into sub bins
+                a_split_subsequence = np.split(a_subsequence, _subseq_rel_jump_exceeds_max_idxs) ## splits into sub bins
                 ## TODO: keep track of splits?
-                first_order_diff_value_exceeeding_jump_distance_indicies.extend(jump_exceeds_max_idxs)
+                abs_jump_exceeds_max_idxs = _subseq_rel_jump_exceeds_max_idxs + relative_to_abs_idx # transform to abs indicies
+                first_order_diff_value_exceeeding_jump_distance_indicies.extend(abs_jump_exceeds_max_idxs)
                 
                 # new_merged_split_positions_arrays[a_subsequence_idx] = a_split_subsequence
                 for a_sub_sub_sequence in a_split_subsequence:
@@ -963,6 +965,9 @@ class SubsequencesPartitioningResult:
             else:
                 ## no split needed
                 new_merged_split_positions_arrays.append(a_subsequence)
+
+            relative_to_abs_idx += len(a_subsequence) ## add the indicies in the entire subsequence
+            
 
         ## OUTPUTS: final_out_subsequences
         
