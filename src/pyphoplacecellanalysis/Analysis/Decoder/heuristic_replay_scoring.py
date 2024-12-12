@@ -1168,7 +1168,21 @@ class SubsequencesPartitioningResult:
         ## build first_order_diff_df
         if self.first_order_diff_lst is not None:
             Assert.len_equals(self.first_order_diff_lst, len(self.flat_positions))
-            self.position_changes_info_df = pd.DataFrame({'pos_diff': self.first_order_diff_lst})
+            prev_bin_flat_idxs = self.position_bins_info_df['flat_idx'].to_numpy()[:-1]
+            next_bin_flat_idxs = self.position_bins_info_df['flat_idx'].to_numpy()[1:]
+
+            self.position_changes_info_df = pd.DataFrame({'pos_diff': np.diff(self.position_bins_info_df['pos']),
+                                                    'prev_bin_flat_idx': prev_bin_flat_idxs, 'next_bin_flat_idxs': next_bin_flat_idxs,
+            })
+            # position_changes_info_df['split_reason'] = '' # str column descripting why the split occured
+            self.position_changes_info_df['direction'] = np.sign(self.position_changes_info_df['pos_diff']).astype(int)
+            self.position_changes_info_df['exceeds_same_thresh'] = (np.abs(self.position_changes_info_df['pos_diff']) > self.same_thresh)
+            self.position_changes_info_df['did_accum_dir_change'] = (self.position_changes_info_df['direction'] != self.position_changes_info_df['direction'].shift()) & (self.position_changes_info_df['direction'] != 0)
+            self.position_changes_info_df['should_split'] = np.logical_and(self.position_changes_info_df['did_accum_dir_change'], self.position_changes_info_df['exceeds_same_thresh'])
+            if (self.max_jump_distance_cm is not None):
+                self.position_changes_info_df['exceeds_jump_distance'] = (np.abs(self.position_changes_info_df['pos_diff']) > self.max_jump_distance_cm)
+                self.position_changes_info_df['should_split'] = np.logical_or(self.position_changes_info_df['should_split'], self.position_changes_info_df['exceeds_jump_distance'])
+
 
         return self.position_bins_info_df, self.position_changes_info_df
 
@@ -1318,6 +1332,53 @@ class SubsequencesPartitioningResult:
             should_skip_main_sequence_position_dots: bool = main_sequence_position_dots_kwargs.pop('should_skip', False)
             
 
+
+            def _subfn_draw_change_arrows(out_dict, subsequence_idx, subsequence_positions, x_starts_subseq, bin_width, num_positions):
+                """ captures: arrow_alpha, arrow_alpha, arrow_alpha, arrow_alpha
+                
+                out_dict = _subfn_draw_change_arrows(out_dict, subsequence_idx=subsequence_idx, subsequence_positions=subsequence_positions, x_starts_subseq=x_starts_subseq, bin_width=bin_width, num_positions=num_positions)
+                """
+                ## Draw "change" arrows between each adjacent bin showing the amount of y-pos change
+                arrow_color = (0, 0, 0, arrow_alpha,)
+                arrow_text_outline_color = (1.0, 1.0, 1.0, arrow_alpha)
+
+                out_dict['subsequence_arrows_dict'][subsequence_idx] = []
+                out_dict['subsequence_arrow_labels_dict'][subsequence_idx] = []
+
+                # Now, for each pair of adjacent positions within the group, draw arrows and labels
+                for i in range(num_positions - 1):
+                    delta_pos = subsequence_positions[i+1] - subsequence_positions[i]
+                    x0 = x_starts_subseq[i] + (bin_width / 2.0)
+                    x1 = x_starts_subseq[i+1] + (bin_width / 2.0)
+                    y0 = subsequence_positions[i]
+                    y1 = subsequence_positions[i+1]
+
+                    # Draw an arrow from (x0, y0) to (x1, y1)
+                    arrow = ax.annotate(
+                        '',
+                        xy=(x1, y1),
+                        xytext=(x0, y0),
+                        arrowprops=dict(arrowstyle='->', color=arrow_color, shrinkA=0, shrinkB=0, linewidth=1),
+                    )
+                    out_dict['subsequence_arrows_dict'][subsequence_idx].append(arrow)
+
+                    # Place the label near the midpoint of the arrow
+                    xm = (x0 + x1) / 2
+                    ym = (y0 + y1) / 2
+                    txt = ax.text(
+                        xm, ym,
+                        f'{delta_pos:+.2f}',  # Format with sign and two decimal places
+                        fontsize=6,
+                        ha='center',
+                        va='bottom',
+                        color=arrow_color,
+                        bbox=dict(facecolor=arrow_text_outline_color, edgecolor='none', alpha=arrow_alpha, pad=0.5)  # Add background for readability
+                    )
+                    out_dict['subsequence_arrow_labels_dict'][subsequence_idx].append(txt)
+                    
+                # end for i in ...
+                return out_dict
+
             # Begin Function Body ________________________________________________________________________________________________ #
             out_dict = {'time_bin_edges_vlines': None, 'split_vlines': None, 'subsequence_positions_hlines_dict': None,
                         'subsequence_arrows_dict': None, 'subsequence_arrow_labels_dict': None, 'main_sequence_tbins_axhlines': None,
@@ -1454,48 +1515,17 @@ class SubsequencesPartitioningResult:
                 if not should_skip_sequence_position_hlines:
                     out_dict['subsequence_positions_hlines_dict'][subsequence_idx] = ax.hlines(subsequence_positions, xmin=x_starts_subseq, xmax=x_ends_subseq, colors=colors, **sequence_position_hlines_kwargs)
 
-                if enable_position_difference_indicators:
-                    ## Draw "change" arrows between each adjacent bin showing the amount of y-pos change
-                    arrow_color = (0, 0, 0, arrow_alpha,)
-                    arrow_text_outline_color = (1.0, 1.0, 1.0, arrow_alpha)
-
-                    out_dict['subsequence_arrows_dict'][subsequence_idx] = []
-                    out_dict['subsequence_arrow_labels_dict'][subsequence_idx] = []
-
-                    # Now, for each pair of adjacent positions within the group, draw arrows and labels
-                    for i in range(num_positions - 1):
-                        delta_pos = subsequence_positions[i+1] - subsequence_positions[i]
-                        x0 = x_starts_subseq[i] + (bin_width / 2.0)
-                        x1 = x_starts_subseq[i+1] + (bin_width / 2.0)
-                        y0 = subsequence_positions[i]
-                        y1 = subsequence_positions[i+1]
-
-                        # Draw an arrow from (x0, y0) to (x1, y1)
-                        arrow = ax.annotate(
-                            '',
-                            xy=(x1, y1),
-                            xytext=(x0, y0),
-                            arrowprops=dict(arrowstyle='->', color=arrow_color, shrinkA=0, shrinkB=0, linewidth=1),
-                        )
-                        out_dict['subsequence_arrows_dict'][subsequence_idx].append(arrow)
-
-                        # Place the label near the midpoint of the arrow
-                        xm = (x0 + x1) / 2
-                        ym = (y0 + y1) / 2
-                        txt = ax.text(
-                            xm, ym,
-                            f'{delta_pos:+.2f}',  # Format with sign and two decimal places
-                            fontsize=6,
-                            ha='center',
-                            va='bottom',
-                            color=arrow_color,
-                            bbox=dict(facecolor=arrow_text_outline_color, edgecolor='none', alpha=arrow_alpha, pad=0.5)  # Add background for readability
-                        )
-                        out_dict['subsequence_arrow_labels_dict'][subsequence_idx].append(txt)
 
                 # Update x_start for next group
                 x_start += curr_subsequence_end_position
                 position_index += num_positions
+            ## end for subsequence_idx, subsequence_positions in...
+            
+            if enable_position_difference_indicators:
+                ## Draw "change" arrows between each adjacent bin showing the amount of y-pos change
+                # x_starts_subseq = (x_starts[0] + (np.arange(len(all_positions)) * bin_width))
+                out_dict = _subfn_draw_change_arrows(out_dict, subsequence_idx=0, subsequence_positions=all_positions, x_starts_subseq=x_starts, bin_width=bin_width, num_positions=len(all_positions))
+                
 
             if enable_axes_formatting:
                 # Set axis labels and limits
@@ -1603,10 +1633,20 @@ class SubsequencesPartitioningResult:
         )
         merged_plots_out_dict["ax_ungrouped_seq"] = out.plots
         ## Add initially-sequenced result:
+        pre_merged_debug_sequences_kwargs = dict(
+            sequence_position_hlines_kwargs=dict(linewidth=2, linestyle=linestyle, zorder=10, alpha=1.0), # high-zorder to place it on-top, linestyle is "densely-dashed"
+            # sequence_position_hlines_kwargs=dict(linewidth=3, linestyle=linestyle, zorder=11, alpha=1.0),
+            split_vlines_kwargs = dict(should_skip=False),
+            time_bin_edges_vlines_kwargs = dict(should_skip=False),
+            direction_change_lines_kwargs = dict(should_skip=True),
+            intrusion_time_bin_shading_kwargs = dict(should_skip=False),
+            main_sequence_position_dots_kwargs = dict(should_skip=False, linewidths=2, marker ="^", edgecolor ="red", s = 100, zorder=1),
+        )
+        
         split_positions_arrays = deepcopy(self.split_positions_arrays)
         out2: MatplotlibRenderPlots = self.plot_time_bins_multiple(num='debug_plot_merged_time_binned_positions', ax=ax_dict["ax_grouped_seq"], enable_position_difference_indicators=True,
-            flat_time_window_edges=flat_time_window_edges, override_positions_list=split_positions_arrays, **common_plot_time_bins_multiple_kwargs,
-            sequence_position_hlines_kwargs=dict(linewidth=3, linestyle='-', zorder=11, alpha=1.0),
+            flat_time_window_edges=flat_time_window_edges, override_positions_list=split_positions_arrays, **common_plot_time_bins_multiple_kwargs, **pre_merged_debug_sequences_kwargs,
+            # sequence_position_hlines_kwargs=dict(linewidth=3, linestyle='-', zorder=11, alpha=1.0),
         )
         merged_plots_out_dict["ax_grouped_seq"] = out2.plots
         
@@ -1615,19 +1655,20 @@ class SubsequencesPartitioningResult:
         # linestyle = (0, (1, 1)) # dots with 1pt dot, 0.5pt space
         # linestyle = '-'
         # Plot only the positions themselves, as dotted overlaying lines
-        pre_merged_debug_sequences_kwargs = dict(sequence_position_hlines_kwargs=dict(linewidth=2, linestyle=linestyle, zorder=10, alpha=1.0), # high-zorder to place it on-top, linestyle is "densely-dashed"
-            split_vlines_kwargs = dict(should_skip=False),
-            time_bin_edges_vlines_kwargs = dict(should_skip=False),
-            direction_change_lines_kwargs = dict(should_skip=True),
-            intrusion_time_bin_shading_kwargs = dict(should_skip=False),
-            main_sequence_position_dots_kwargs = dict(should_skip=False, linewidths=2, marker ="^", edgecolor ="red", s = 100, zorder=1),
+        post_merged_debug_sequences_kwargs = deepcopy(pre_merged_debug_sequences_kwargs) | dict(
+            # sequence_position_hlines_kwargs=dict(linewidth=2, linestyle=linestyle, zorder=10, alpha=1.0), # high-zorder to place it on-top, linestyle is "densely-dashed"
+            # split_vlines_kwargs = dict(should_skip=False),
+            # time_bin_edges_vlines_kwargs = dict(should_skip=False),
+            # direction_change_lines_kwargs = dict(should_skip=True),
+            # intrusion_time_bin_shading_kwargs = dict(should_skip=False),
+            # main_sequence_position_dots_kwargs = dict(should_skip=False, linewidths=2, marker ="^", edgecolor ="red", s = 100, zorder=1),
         )
                     
 
         ## Add re-sequenced (merged) result:
         merged_split_positions_arrays = deepcopy(self.merged_split_positions_arrays)
         out3: MatplotlibRenderPlots = self.plot_time_bins_multiple(num='debug_plot_merged_time_binned_positions', ax=ax_dict["ax_merged_grouped_seq"], enable_position_difference_indicators=True,
-            flat_time_window_edges=flat_time_window_edges, override_positions_list=merged_split_positions_arrays, **common_plot_time_bins_multiple_kwargs, **pre_merged_debug_sequences_kwargs,
+            flat_time_window_edges=flat_time_window_edges, override_positions_list=merged_split_positions_arrays, **common_plot_time_bins_multiple_kwargs, **post_merged_debug_sequences_kwargs,
         )        
         merged_plots_out_dict["ax_merged_grouped_seq"] = out3.plots
         
