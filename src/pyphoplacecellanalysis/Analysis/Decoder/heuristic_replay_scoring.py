@@ -1145,7 +1145,9 @@ class SubsequencesPartitioningResult:
     # Visualization/Graphical Debugging __________________________________________________________________________________ #
     @function_attributes(short_name=None, tags=['plot', 'matplotlib', 'figure', 'debug'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-27 06:36', related_items=['SubsequencesPartitioningResult'])
     @classmethod
-    def _debug_plot_time_bins_multiple(cls, positions_list, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True, defer_show: bool = False, flat_time_window_centers=None, flat_time_window_edges=None, enable_axes_formatting: bool = False,  arrow_alpha: float = 0.4, subsequence_line_color_alpha: float = 0.55, is_intrusion: Optional[NDArray] = None, direction_changes: Optional[NDArray] = None, **kwargs):
+    def _debug_plot_time_bins_multiple(cls, positions_list, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True, defer_show: bool = False, flat_time_window_centers=None, flat_time_window_edges=None,
+                                        enable_axes_formatting: bool = False,  arrow_alpha: float = 0.4, subsequence_line_color_alpha: float = 0.55,
+                                        is_intrusion: Optional[NDArray] = None, direction_changes: Optional[NDArray] = None, **kwargs):
             """
             Plots positions over fixed-width time bins with vertical lines separating each bin.
             Each sublist in positions_list is plotted in a different color.
@@ -1174,6 +1176,10 @@ class SubsequencesPartitioningResult:
             intrusion_time_bin_shading_kwargs = dict(facecolor='red', alpha=0.15, zorder=0) | kwargs.pop('intrusion_time_bin_shading_kwargs', {})
             sequence_position_hlines_kwargs = dict(linewidth=4, zorder=-1) | kwargs.pop('sequence_position_hlines_kwargs', {})
 
+
+            
+            main_sequence_position_dots_kwargs = dict(linewidths=2, marker ="^", edgecolor="#141414F9", s = 200, zorder=1) | kwargs.pop('main_sequence_position_dots_kwargs', {}) # "#141414F9" -- near black
+            
             # Example override dict ______________________________________________________________________________________________ #
             # dict(
             #     split_vlines_kwargs = dict(color='black', linestyle='-', linewidth=1, should_skip=False),
@@ -1181,6 +1187,7 @@ class SubsequencesPartitioningResult:
             #     direction_change_lines_kwargs = dict(color='yellow', linestyle=':', linewidth=2, zorder=1, should_skip=False),
             #     intrusion_time_bin_shading_kwargs = dict(facecolor='red', alpha=0.15, zorder=0, should_skip=False),
             #     sequence_position_hlines_kwargs = dict(linewidth=4, zorder=-1, should_skip=False),
+            #     main_sequence_position_dots_kwargs = dict(linewidths=2, marker ="^", edgecolor ="red", s = 200, zorder=1),
             # )
             
 
@@ -1189,12 +1196,13 @@ class SubsequencesPartitioningResult:
             should_skip_direction_change_lines: bool = direction_change_lines_kwargs.pop('should_skip', False)
             should_skip_intrusion_time_bin_shading: bool = intrusion_time_bin_shading_kwargs.pop('should_skip', False)
             should_skip_sequence_position_hlines: bool = sequence_position_hlines_kwargs.pop('should_skip', False)
+            should_skip_main_sequence_position_dots: bool = main_sequence_position_dots_kwargs.pop('should_skip', False)
             
 
             # Begin Function Body ________________________________________________________________________________________________ #
             out_dict = {'time_bin_edges_vlines': None, 'split_vlines': None, 'subsequence_positions_hlines_dict': None,
                         'subsequence_arrows_dict': None, 'subsequence_arrow_labels_dict': None, 'main_sequence_tbins_axhlines': None,
-                        'intrusion_shading': None, 'direction_change_lines': None,
+                        'intrusion_shading': None, 'direction_change_lines': None, 'main_sequence_position_dots': None,
                         }
 
             if ax is None:
@@ -1285,30 +1293,39 @@ class SubsequencesPartitioningResult:
             out_dict['subsequence_positions_hlines_dict'] = {}
             out_dict['subsequence_arrows_dict'] = {}
             out_dict['subsequence_arrow_labels_dict'] = {}
-
+            out_dict['main_sequence_position_dots'] = {}
+            
             # Keep track of the current x position
             x_start = x_starts[0]
             position_index = 0  # Global position index across all subsequences
 
             ## sort the subsequences by length so that the colors are always assigned in a consistent order (longest == color0, 2nd-longests == color1, ....)
             subsequence_lengths = np.array([len(x) for x in positions_list])
-            subsequence_len_sort_indicies = np.argsort(subsequence_lengths)[::-1]
+            main_subsequence_length: int = np.max(subsequence_lengths)
+            subsequence_len_sort_indicies = np.argsort(subsequence_lengths)[::-1] ## reverse sorted for length
             
-
             for subsequence_idx, subsequence_positions in enumerate(positions_list):
                 num_positions: int = len(subsequence_positions)
                 curr_subsequence_end_position: float = float(num_positions) * bin_width
                 # color = cmap(subsequence_idx % num_colors)
-                color = cmap(subsequence_len_sort_indicies[subsequence_idx] % num_colors)
+                curr_subsequence_size_sorted_idx: int = subsequence_len_sort_indicies[subsequence_idx]
+                color = cmap(curr_subsequence_size_sorted_idx % num_colors) ## curr color set here
                 
+                is_main_sequence: bool = (num_positions == main_subsequence_length) # (curr_subsequence_size_sorted_idx == 0) # longest subsequence
                 x_rel_indices = np.arange(num_positions)
                 x_indices = x_start + (x_rel_indices * bin_width)
                 x_starts_subseq = x_indices
+                x_centers_subseq = x_indices + (float(bin_width) / 2.0)
                 x_ends_subseq = x_indices + bin_width
 
                 if (subsequence_idx == longest_subsequence_idx):
                     longest_subsequence_start_x = x_starts_subseq[0]
                     longest_subsequence_end_x = x_ends_subseq[-1]
+
+                if is_main_sequence and (not should_skip_main_sequence_position_dots):
+                    ## plot the dots indidicating that this is the main sequence
+                    print(f'main_sequence_position_dots -- color: {color}\n\tsubsequence_idx: {subsequence_idx}, subsequence_positions: {subsequence_positions}')
+                    out_dict['main_sequence_position_dots'][subsequence_idx] = ax.scatter(x_centers_subseq, subsequence_positions, color=color, **main_sequence_position_dots_kwargs)
 
                 # Plot horizontal lines for position values within each time bin
                 # Adjust colors for intrusion time bins
@@ -2195,7 +2212,8 @@ class HeuristicReplayScoring:
         # return longest_no_repeats_sequence_length_ratio
         # return int(partition_result.longest_subsequence_length)
         # return int(partition_result.longest_subsequence_non_intrusion_nbins) ## excluding intrusions
-        longest_sequence_length: int = int(partition_result.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=True, should_use_no_repeat_values=False))
+        # longest_sequence_length: int = int(partition_result.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=True, should_use_no_repeat_values=False))
+        longest_sequence_length: int = int(partition_result.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=False, should_use_no_repeat_values=False))
         
         if np.isclose(a_most_likely_positions_list[0],  92.2559):
             print('HIT IT!')
