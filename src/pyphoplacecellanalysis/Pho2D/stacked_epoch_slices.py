@@ -1801,7 +1801,6 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             DecodedSequenceAndHeuristicsPlotDataProvider.add_data_to_pagination_controller(self, decoded_sequence_and_heuristics_curves_data, update_controller_on_apply=False)
 
 
-
         if not defer_refresh:
             self.refresh_current_page()
 
@@ -3195,7 +3194,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
     @classmethod
     def plot_full_paginated_decoded_epochs_window(cls, curr_active_pipeline, track_templates, active_spikes_df,
                                                 active_decoder_decoded_epochs_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], directional_decoders_epochs_decode_result: "DecoderDecodedEpochsResult", 
-                                                active_filter_epochs_df: pd.DataFrame, known_epochs_type='ripple', title='Long-like post-Delta Ripples Only'):
+                                                active_filter_epochs_df: pd.DataFrame, known_epochs_type='ripple', title='Long-like post-Delta Ripples Only', **kwargs):
         """ 
         Plots 3 connected windows: the main decoded position posteriors, the track identity posteriors, and the rasters
 
@@ -3234,13 +3233,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                 # 'build_fn': 'insets_view',
                 'should_draw_time_bin_boundaries': True, 'time_bin_edges_display_kwargs': dict(color='grey', alpha=0.5, linewidth=1.5),   
         }
-
-        # Build main Decoded Posterior Window ________________________________________________________________________________ #
-        ## uses `active_decoder_decoded_epochs_result_dict`
-        app, paginated_multi_decoder_decoded_epochs_window, pagination_controller_dict = PhoPaginatedMultiDecoderDecodedEpochsWindow.init_from_track_templates(curr_active_pipeline, track_templates,
-            decoder_decoded_epochs_result_dict=active_decoder_decoded_epochs_result_dict, epochs_name=known_epochs_type, title=title,
-            included_epoch_indicies=None, debug_print=False,
-            params_kwargs={'enable_per_epoch_action_buttons': False,
+        
+        params_kwargs = {'enable_per_epoch_action_buttons': False,
                 'skip_plotting_most_likely_positions': True, 'skip_plotting_measured_positions': True, 
                 'enable_decoded_most_likely_position_curve': False, 'enable_decoded_sequence_and_heuristics_curve': False, 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False,
                 # 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False,
@@ -3249,8 +3243,17 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                 'enable_update_window_title_on_page_change': False, 'build_internal_callbacks': True,
                 'posterior_heatmap_imshow_kwargs': dict(cmap=get_heatmap_cmap(cmap='Oranges', bad_color='black', under_color='white', over_color='red')),
                 # 'debug_print': True,
-                **_shared_plotting_kwargs,            
-        })
+                **_shared_plotting_kwargs,
+        } | kwargs.pop('params_kwargs', {})
+        
+        # Build main Decoded Posterior Window ________________________________________________________________________________ #
+        ## uses `active_decoder_decoded_epochs_result_dict`
+        app, paginated_multi_decoder_decoded_epochs_window, pagination_controller_dict = PhoPaginatedMultiDecoderDecodedEpochsWindow.init_from_track_templates(curr_active_pipeline, track_templates,
+            decoder_decoded_epochs_result_dict=active_decoder_decoded_epochs_result_dict, epochs_name=known_epochs_type, title=title,
+            included_epoch_indicies=None, debug_print=False,
+            params_kwargs = params_kwargs,
+            **kwargs,
+        )
         
         # Build Raster Widget ________________________________________________________________________________________________ #
         ripple_rasters_plot_tuple = paginated_multi_decoder_decoded_epochs_window.build_attached_raster_viewer_widget(track_templates=track_templates, active_spikes_df=active_spikes_df, filtered_epochs_df=active_filter_epochs_df) 

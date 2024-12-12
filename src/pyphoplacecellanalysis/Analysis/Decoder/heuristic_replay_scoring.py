@@ -985,6 +985,10 @@ class SubsequencesPartitioningResult:
         for a_subsequence_idx, a_subsequence in enumerate(original_merged_split_positions_arrays):
             ## iterate through subsequences
             a_subsequence_first_order_diff = np.diff(a_subsequence, n=1)
+            # a_subsequence_first_order_diff = np.diff(a_subsequence, n=1, prepend=[0.0,]) ## prepend 0.0 so hopefully the bins line up
+            # first_order_diff_lst = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
+            # assert len(first_order_diff_lst) == len(a_most_likely_positions_list), f"the prepend above should ensure that the sequence and its first-order diff are the same length."
+        
             does_jump_exceed_max = (np.abs(a_subsequence_first_order_diff) > max_jump_distance_cm)
             num_jumps_exceeding_max: int = np.count_nonzero(does_jump_exceed_max)
             _subseq_rel_jump_exceeds_max_idxs = np.where(does_jump_exceed_max)[0] ## subsequence relative
@@ -1026,9 +1030,10 @@ class SubsequencesPartitioningResult:
 
         first_order_diff_value_exceeeding_jump_distance_indicies = np.array(first_order_diff_value_exceeeding_jump_distance_indicies)
         if len(first_order_diff_value_exceeeding_jump_distance_indicies) > 0:
-            print(f'first_order_diff_value_exceeeding_jump_distance_indicies: {first_order_diff_value_exceeeding_jump_distance_indicies}')
-            print(f'\toriginal_merged_split_positions_arrays: {original_merged_split_positions_arrays}')
-            print(f'\tnew_merged_split_positions_arrays: {new_merged_split_positions_arrays}')
+            if debug_print:
+                print(f'first_order_diff_value_exceeeding_jump_distance_indicies: {first_order_diff_value_exceeeding_jump_distance_indicies}')
+                print(f'\toriginal_merged_split_positions_arrays: {original_merged_split_positions_arrays}')
+                print(f'\tnew_merged_split_positions_arrays: {new_merged_split_positions_arrays}')
             self.merged_split_positions_arrays = deepcopy(new_merged_split_positions_arrays)
         
         # return (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index)
@@ -1393,6 +1398,8 @@ class SubsequencesPartitioningResult:
             intrusion_time_bin_shading_kwargs = dict(facecolor='red', alpha=0.15, zorder=0) | kwargs.pop('intrusion_time_bin_shading_kwargs', {})
             sequence_position_hlines_kwargs = dict(linewidth=4, zorder=-1) | kwargs.pop('sequence_position_hlines_kwargs', {})            
             main_sequence_position_dots_kwargs = dict(linewidths=2, marker ="^", edgecolor="#141414F9", s = 200, zorder=1) | kwargs.pop('main_sequence_position_dots_kwargs', {}) # "#141414F9" -- near black
+            non_main_sequence_alpha_multiplier: float = 0.2
+            should_show_non_main_sequence_hlines: bool = False
             
             # Example override dict ______________________________________________________________________________________________ #
             # dict(
@@ -1607,13 +1614,22 @@ class SubsequencesPartitioningResult:
                     if debug_print:
                         print(f'main_sequence_position_dots -- color: {color}\n\tsubsequence_idx: {subsequence_idx}, subsequence_positions: {subsequence_positions}')
                     out_dict['main_sequence_position_dots'][subsequence_idx] = ax.scatter(x_centers_subseq, subsequence_positions, color=color, **main_sequence_position_dots_kwargs)
+                else:
+                    if debug_print:
+                        print(f'color: {color}')
+                    Assert.len_equals(color, 4)
+                    color = list(color) # convert to list so it can be modified
+                    color[-1] = (color[-1] * non_main_sequence_alpha_multiplier)
+                    color = tuple(color)
+                    
 
-                # Plot horizontal lines for position values within each time bin
-                # Adjust colors for intrusion time bins
-                # colors = [color if is_intrusion is None or not is_intrusion[position_index + i] else 'red' for i in range(num_positions)]
-                colors = [color for i in range(num_positions)]
-                if not should_skip_sequence_position_hlines:
-                    out_dict['subsequence_positions_hlines_dict'][subsequence_idx] = ax.hlines(subsequence_positions, xmin=x_starts_subseq, xmax=x_ends_subseq, colors=colors, **sequence_position_hlines_kwargs)
+                if (not should_skip_sequence_position_hlines):
+                    if (is_main_sequence or should_show_non_main_sequence_hlines):
+                        # Plot horizontal lines for position values within each time bin
+                        # Adjust colors for intrusion time bins
+                        # colors = [color if is_intrusion is None or not is_intrusion[position_index + i] else 'red' for i in range(num_positions)]
+                        colors = [color for i in range(num_positions)]
+                        out_dict['subsequence_positions_hlines_dict'][subsequence_idx] = ax.hlines(subsequence_positions, xmin=x_starts_subseq, xmax=x_ends_subseq, colors=colors, **sequence_position_hlines_kwargs)
 
 
                 # Update x_start for next group
