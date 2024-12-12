@@ -710,7 +710,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
 										       ripple_decoding_time_bin_size_override: Optional[float]=None, laps_decoding_time_bin_size_override: Optional[float]=None,
 												needs_recompute_heuristics: bool = False, force_recompute_all_decoding: bool = False,
-											    save_hdf:bool=True, allow_append_to_session_h5_file:bool=True) -> dict:
+											    save_hdf:bool=True, allow_append_to_session_h5_file:bool=True, max_ignore_bins: float = 2, same_thresh_cm: float = 6, max_jump_distance_cm: float = 30) -> dict:
 	"""
 	Aims to export the results of the global 'directional_decoders_evaluate_epochs' calculation
 
@@ -768,7 +768,7 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 		'laps_decoding_time_bin_size_override': laps_decoding_time_bin_size_override,
 		'needs_recompute_heuristics': needs_recompute_heuristics, 'save_hdf': save_hdf, 'allow_append_to_session_h5_file': allow_append_to_session_h5_file,
 		'output_csv_paths': None, 'output_hdf_paths': None, # 'allow_append_to_session_h5_file': allow_append_to_session_h5_file,
-		
+		'max_ignore_bins':max_ignore_bins, 'same_thresh_cm':same_thresh_cm, 'max_jump_distance_cm':max_jump_distance_cm,		
 	}
 	
 	# across_session_results_extended_dict['compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function'].update({'output_csv_paths': []})
@@ -927,7 +927,7 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 	if (needs_recompute_heuristics or (not _workaround_validate_has_directional_decoded_epochs_heuristic_scoring(curr_active_pipeline))):
 		print(f'\tmissing heuristic columns. Recomputing:')
 		directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates,
-																				     a_decoded_filter_epochs_decoder_result_dict=directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict)
+																				     a_decoded_filter_epochs_decoder_result_dict=directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict, max_ignore_bins=max_ignore_bins, same_thresh_cm=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm)
 		print(f'\tdone recomputing heuristics.')
 
 
