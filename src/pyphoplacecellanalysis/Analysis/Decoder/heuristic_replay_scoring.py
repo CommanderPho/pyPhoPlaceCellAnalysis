@@ -946,7 +946,7 @@ class SubsequencesPartitioningResult:
         for a_subsequence_idx, a_subsequence in enumerate(original_merged_split_positions_arrays):
             ## iterate through subsequences
             a_subsequence_first_order_diff = np.diff(a_subsequence, n=1)
-            does_jump_exceed_max = (a_subsequence_first_order_diff > max_jump_distance_cm)
+            does_jump_exceed_max = (np.abs(a_subsequence_first_order_diff) > max_jump_distance_cm)
             num_jumps_exceeding_max: int = np.count_nonzero(does_jump_exceed_max)
             jump_exceeds_max_idxs = np.where(does_jump_exceed_max)[0]
             if num_jumps_exceeding_max > 0:
