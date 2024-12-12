@@ -2481,7 +2481,7 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
 
     
     @classmethod
-    def decoder_build_single_decoded_sequence_and_heuristics_curves_data(cls, curr_results_obj, decoder_track_length: float, same_thresh_fraction_of_track: float = 0.075, included_columns=None):
+    def decoder_build_single_decoded_sequence_and_heuristics_curves_data(cls, curr_results_obj, decoder_track_length: float, same_thresh_fraction_of_track: float = 0.075, max_jump_distance_cm: float=60.0, included_columns=None):
         """ builds for a single decoder. 
         same_thresh_fraction_of_track: float = 0.1 ## up to 10% of the track
         same_thresh_fraction_of_track: float = 0.075 ## up to 7.5% of the track
@@ -2507,7 +2507,8 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
             a_p_x_given_n = curr_results_obj.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
             n_time_bins: int = curr_results_obj.nbins[an_epoch_idx]
             n_pos_bins: int = np.shape(a_p_x_given_n)[0]
-            partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, flat_time_window_centers=time_window_centers, n_pos_bins=n_pos_bins, max_ignore_bins=2, same_thresh=same_thresh_cm, flat_time_window_edges=time_window_edges)
+            partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, flat_time_window_centers=time_window_centers, n_pos_bins=n_pos_bins,
+                                                                                                                        max_ignore_bins=2, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm, flat_time_window_edges=time_window_edges)
 
             ## Build the result
             # out_position_curves_data[an_epoch_idx] = DecodedSequenceAndHeuristicsPlotData(partition_result=partition_result, time_bin_centers=time_window_centers, line_y_most_likely=a_most_likely_positions_list, line_y_actual=None)

@@ -19,8 +19,7 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.assertion_helpers import Assert
 
 from neuropy.utils.mixins.indexing_helpers import UnpackableMixin, get_dict_subset
-from neuropy.utils.indexing_helpers import ListHelpers
-from neuropy.utils.indexing_helpers import flatten
+from neuropy.utils.indexing_helpers import PandasHelpers, flatten, ListHelpers
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult # used in compute_pho_heuristic_replay_scores
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult, TrackTemplates
@@ -367,7 +366,7 @@ class SubsequencesPartitioningResult:
         # Flatten the positions_list to get all positions for setting y-limits
         # all_positions = np.concatenate(positions_list)
         num_flat_positions: int = self.n_flat_position_bins #len(all_positions)
-        print(f'num_flat_positions: {num_flat_positions}')
+        # print(f'num_flat_positions: {num_flat_positions}')
         # Prepare x-values for time bins
         if flat_time_window_edges is not None:
             ## Prefer edges over centers
@@ -944,7 +943,7 @@ class SubsequencesPartitioningResult:
         return original_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_idxs)
 
     @function_attributes(short_name=None, tags=['partition'], input_requires=['self.merged_split_positions_arrays'], output_provides=['self.merged_split_positions_arrays'], uses=[], used_by=['compute'], creation_date='2024-12-11 23:42', related_items=[])
-    def enforce_max_jump_distance(self, max_jump_distance_cm: float = 30.0, debug_print=False):
+    def enforce_max_jump_distance(self, max_jump_distance_cm: float = 60.0, debug_print=False):
         """ an "intrusion" refers to one or more time bins that interrupt a longer sequence that would be monotonic if the intrusions were removed.
 
         The quintessential example would be a straight ramp that is interrupted by a single point discontinuity intrusion.  
@@ -992,6 +991,7 @@ class SubsequencesPartitioningResult:
             if num_jumps_exceeding_max > 0:
                 if debug_print:
                     print(f'does_jump_exceed_max: {does_jump_exceed_max}')
+                # _subseq_rel_jump_exceeds_max_idxs = _subseq_rel_jump_exceeds_max_idxs + 1 # add one because we want to split AFTER the large change
                 a_split_subsequence = np.split(a_subsequence, _subseq_rel_jump_exceeds_max_idxs) ## splits into sub bins
                 ## TODO: keep track of splits?
                 abs_jump_exceeds_max_idxs = _subseq_rel_jump_exceeds_max_idxs + relative_to_abs_idx # transform to abs indicies
@@ -1023,9 +1023,14 @@ class SubsequencesPartitioningResult:
         
         ## update dataframe
         # self.rebuild_sequence_info_df()
-        
-        self.merged_split_positions_arrays = new_merged_split_positions_arrays
+
         first_order_diff_value_exceeeding_jump_distance_indicies = np.array(first_order_diff_value_exceeeding_jump_distance_indicies)
+        if len(first_order_diff_value_exceeeding_jump_distance_indicies) > 0:
+            print(f'first_order_diff_value_exceeeding_jump_distance_indicies: {first_order_diff_value_exceeeding_jump_distance_indicies}')
+            print(f'\toriginal_merged_split_positions_arrays: {original_merged_split_positions_arrays}')
+            print(f'\tnew_merged_split_positions_arrays: {new_merged_split_positions_arrays}')
+            self.merged_split_positions_arrays = deepcopy(new_merged_split_positions_arrays)
+        
         # return (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index)
         # return original_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_idxs)
         return new_merged_split_positions_arrays, first_order_diff_value_exceeeding_jump_distance_indicies
@@ -1236,6 +1241,30 @@ class SubsequencesPartitioningResult:
                     self.position_changes_info_df['should_split'] = np.logical_or(self.position_changes_info_df['should_split'], self.position_changes_info_df['exceeds_jump_distance'])
 
 
+        ## Get prev/next positions: ['prev_pos', 'next_pos']
+        if (self.position_changes_info_df is not None) and (self.position_bins_info_df is not None):
+            lookup_column_map_dict = {'prev_bin_flat_idx':'flat_idx', 'next_bin_flat_idxs':'flat_idx'} # {df.column_name: lookup_properties_map_df.column_name}
+            _temp_position_bins_info_df = deepcopy(self.position_bins_info_df)
+            for df_col_name, lookup_properties_map_df_col_name in lookup_column_map_dict.items():
+                assert lookup_properties_map_df_col_name in _temp_position_bins_info_df.columns
+                _temp_position_bins_info_df[df_col_name] = _temp_position_bins_info_df[lookup_properties_map_df_col_name]
+                
+            # position_bins_info_df['prev_bin_flat_idx'] = position_bins_info_df['flat_idx']
+            # print(list(position_bins_info_df.columns)) # ['pos', 'orig_subsequence_idx', 'is_intrusion', 'subsequence_idx', 'flat_idx', 't_bin_start', 't_bin_center', 't_bin_end', 'prev_bin_flat_idx']
+
+            # 'prev_bin_flat_idx' ________________________________________________________________________________________________ #
+            desired_post_add_renamed_dict = {'pos':'prev_pos'}
+            # included_lookup_column_names = list(lookup_column_map_dict.keys()) + ['pos',]  #['pos', 'prev_bin_flat_idx']
+            included_lookup_column_names = ['pos', 'prev_bin_flat_idx']
+            self.position_changes_info_df = PandasHelpers.add_explicit_dataframe_columns_from_lookup_df(self.position_changes_info_df, lookup_properties_map_df=_temp_position_bins_info_df[included_lookup_column_names], join_column_name='prev_bin_flat_idx')
+            self.position_changes_info_df = self.position_changes_info_df.rename(columns=desired_post_add_renamed_dict, inplace=False)
+
+            # 'next_bin_flat_idxs' _______________________________________________________________________________________________ #
+            desired_post_add_renamed_dict = {'pos':'next_pos'}
+            included_lookup_column_names = ['pos', 'next_bin_flat_idxs']
+            self.position_changes_info_df = PandasHelpers.add_explicit_dataframe_columns_from_lookup_df(self.position_changes_info_df, lookup_properties_map_df=_temp_position_bins_info_df[included_lookup_column_names], join_column_name='next_bin_flat_idxs')
+            self.position_changes_info_df = self.position_changes_info_df.rename(columns=desired_post_add_renamed_dict, inplace=False)
+
         return self.position_bins_info_df, self.position_changes_info_df
 
     # Existing properties and methods remain unchanged or are adjusted as necessary
@@ -1359,7 +1388,7 @@ class SubsequencesPartitioningResult:
             # Plot Customization _________________________________________________________________________________________________ #
             split_vlines_kwargs = dict(color='black', linestyle='-', linewidth=1) | kwargs.pop('split_vlines_kwargs', {})
             time_bin_edges_vlines_kwargs = dict(color='grey', linestyle='--', linewidth=0.5) | kwargs.pop('time_bin_edges_vlines_kwargs', {})
-            direction_change_lines_kwargs = dict(color='yellow', linestyle=':', linewidth=4, zorder=22) | kwargs.pop('direction_change_lines_kwargs', {})
+            direction_change_lines_kwargs = dict(color='yellow', linestyle=':', linewidth=2, zorder=22) | kwargs.pop('direction_change_lines_kwargs', {})
 
             intrusion_time_bin_shading_kwargs = dict(facecolor='red', alpha=0.15, zorder=0) | kwargs.pop('intrusion_time_bin_shading_kwargs', {})
             sequence_position_hlines_kwargs = dict(linewidth=4, zorder=-1) | kwargs.pop('sequence_position_hlines_kwargs', {})            
@@ -1524,9 +1553,18 @@ class SubsequencesPartitioningResult:
                             
                 if position_changes_info_df is not None:
                     exceeding_jump_dist_diff_df = position_changes_info_df[position_changes_info_df['exceeds_jump_distance']] 
-                    for change_t in exceeding_jump_dist_diff_df['t'].to_numpy():
-                        line = ax.axvline(change_t, **direction_change_lines_kwargs)
-                        out_dict['direction_change_lines'].append(line)
+                    change_times = exceeding_jump_dist_diff_df['t'].to_numpy()
+                    prev_pos = exceeding_jump_dist_diff_df['prev_pos'].to_numpy()
+                    next_pos = exceeding_jump_dist_diff_df['next_pos'].to_numpy()
+                    
+                    out_dict['direction_change_lines'] = ax.vlines(change_times, prev_pos, next_pos, **direction_change_lines_kwargs)
+                    
+                    # for change_t in exceeding_jump_dist_diff_df['t'].to_numpy():
+                    #     # line = ax.axvline(change_t, **direction_change_lines_kwargs)
+                        
+                    #     line = ax.axvline(change_t, **direction_change_lines_kwargs)
+                        
+                    #     out_dict['direction_change_lines'].append(line)
                     
 
 
@@ -1544,7 +1582,7 @@ class SubsequencesPartitioningResult:
             ## sort the subsequences by length so that the colors are always assigned in a consistent order (longest == color0, 2nd-longests == color1, ....)
             subsequence_lengths = np.array([len(x) for x in positions_list])
             main_subsequence_length: int = np.max(subsequence_lengths)
-            subsequence_len_sort_indicies = np.argsort(subsequence_lengths)[::-1] ## reverse sorted for length
+            subsequence_len_sort_indicies = np.argsort(subsequence_lengths, kind='stable')[::-1] ## reverse sorted for length
             
             for subsequence_idx, subsequence_positions in enumerate(positions_list):
                 num_positions: int = len(subsequence_positions)
@@ -1553,7 +1591,7 @@ class SubsequencesPartitioningResult:
                 curr_subsequence_size_sorted_idx: int = subsequence_len_sort_indicies[subsequence_idx]
                 color = cmap(curr_subsequence_size_sorted_idx % num_colors) ## curr color set here
                 
-                is_main_sequence: bool = (num_positions == main_subsequence_length) # (curr_subsequence_size_sorted_idx == 0) # longest subsequence
+                is_main_sequence: bool = (num_positions == main_subsequence_length) and (curr_subsequence_size_sorted_idx == 0) # (curr_subsequence_size_sorted_idx == 0) # longest subsequence
                 x_rel_indices = np.arange(num_positions)
                 x_indices = x_start + (x_rel_indices * bin_width)
                 x_starts_subseq = x_indices
@@ -2729,7 +2767,7 @@ class HeuristicReplayScoring:
 
     @classmethod
     @function_attributes(short_name=None, tags=['heuristic', 'main', 'computation'], input_requires=[], output_provides=[], uses=['_run_all_score_computations', 'cls.compute_pho_heuristic_replay_scores', 'cls.build_all_score_computations_fn_dict'], used_by=['_decoded_epochs_heuristic_scoring'], creation_date='2024-03-12 00:59', related_items=[])
-    def compute_all_heuristic_scores(cls, track_templates: TrackTemplates, a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], use_bin_units_instead_of_realworld:bool=False, max_ignore_bins:float=2, same_thresh_cm: float=6.0, max_jump_distance_cm: float = 30.0, **kwargs) -> Tuple[Dict[str, DecodedFilterEpochsResult], Dict[str, pd.DataFrame]]:
+    def compute_all_heuristic_scores(cls, track_templates: TrackTemplates, a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], use_bin_units_instead_of_realworld:bool=False, max_ignore_bins:float=2, same_thresh_cm: float=6.0, max_jump_distance_cm: float = 60.0, **kwargs) -> Tuple[Dict[str, DecodedFilterEpochsResult], Dict[str, pd.DataFrame]]:
         """ Computes all heuristic scoring metrics (for each epoch) and adds them to the DecodedFilterEpochsResult's .filter_epochs as columns
         
         Directly called by the global computation function `_decoded_epochs_heuristic_scoring`

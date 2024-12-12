@@ -5727,7 +5727,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 		requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=[],
 		validate_computation_test=_workaround_validate_has_directional_decoded_epochs_heuristic_scoring, 
 						is_global=True, computation_precidence=1002.2)
-	def _decoded_epochs_heuristic_scoring(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, same_thresh_fraction_of_track: float=0.05, max_ignore_bins:float=2, max_jump_distance_cm: float=30.0, use_bin_units_instead_of_realworld:bool=False):
+	def _decoded_epochs_heuristic_scoring(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, same_thresh_fraction_of_track: float=0.05, max_ignore_bins:float=2, max_jump_distance_cm: float=60.0, use_bin_units_instead_of_realworld:bool=False):
 		""" Using the four 1D decoders, performs 1D Bayesian decoding for each of the known epochs (Laps, Ripple) from the neural activity during these peirods.
 		
 		Requires:
