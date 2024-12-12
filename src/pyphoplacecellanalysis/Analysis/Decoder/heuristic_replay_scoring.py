@@ -366,8 +366,6 @@ class SubsequencesPartitioningResult:
         if isinstance(a_most_likely_positions_list, list):
             a_most_likely_positions_list = np.array(a_most_likely_positions_list)
         
-        first_order_diff_lst = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
-        assert len(first_order_diff_lst) == len(a_most_likely_positions_list), f"the prepend above should ensure that the sequence and its first-order diff are the same length."
         partition_result = cls(flat_positions=deepcopy(a_most_likely_positions_list), n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh, max_jump_distance_cm=max_jump_distance_cm, flat_time_window_centers=flat_time_window_centers, flat_time_window_edges=flat_time_window_edges,
                                first_order_diff_lst=None, list_parts=None, diff_split_indicies=None, split_indicies=None, low_magnitude_change_indicies=None,          
                             )
@@ -496,7 +494,7 @@ class SubsequencesPartitioningResult:
         return (sub_change_equivalency_groups, sub_change_equivalency_group_values), (list_parts, list_split_indicies, sub_change_threshold_change_indicies)
 
 
-    @function_attributes(short_name=None, tags=['near_equal', 'PhoOriginal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-03 11:15', related_items=[])
+    @function_attributes(short_name=None, tags=['near_equal', 'PhoOriginal', 'EXTRA'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-03 11:15', related_items=[])
     @classmethod
     def find_value_equiv_groups(cls, longest_sequence_subsequence: Union[List, NDArray], same_thresh_cm: float) -> Tuple[List, List]:
         """ returns the positions grouped by whether they are considered the same based on `same_thresh_cm`
@@ -539,7 +537,7 @@ class SubsequencesPartitioningResult:
         return value_equiv_group_list, value_equiv_group_idxs_list
 
 
-    @function_attributes(short_name=None, tags=['partition', 'PhoOriginal'], input_requires=[], output_provides=[], uses=['SubsequencesPartitioningResult', 'rebuild_sequence_info_df'], used_by=['init_from_positions_list'], creation_date='2024-05-09 02:47', related_items=[])
+    @function_attributes(short_name=None, tags=['partition', 'PhoOriginal'], input_requires=[], output_provides=[], uses=['SubsequencesPartitioningResult', 'rebuild_sequence_info_df'], used_by=['compute'], creation_date='2024-05-09 02:47', related_items=[])
     @classmethod
     def partition_subsequences_ignoring_repeated_similar_positions(cls, a_most_likely_positions_list: Union[List, NDArray], n_pos_bins: int, same_thresh: float = 4.0, debug_print=False, **kwargs) -> dict:
         """ function partitions the list according to an iterative rule and the direction changes, ignoring changes less than or equal to `same_thresh`.
@@ -643,7 +641,7 @@ class SubsequencesPartitioningResult:
         return dict(flat_positions=deepcopy(a_most_likely_positions_list), first_order_diff_lst=first_order_diff_lst, list_parts=list_parts, diff_split_indicies=diff_split_indicies, split_indicies=split_indicies, low_magnitude_change_indicies=sub_change_threshold_change_indicies, n_pos_bins=n_pos_bins, same_thresh=same_thresh, **kwargs)
      
 
-    @function_attributes(short_name=None, tags=['merge', '_compute_sequences_spanning_ignored_intrusions', 'PhoOriginal'], input_requires=['self.split_positions_arrays'], output_provides=['self.merged_split_positions_arrays'], uses=['_compute_sequences_spanning_ignored_intrusions'], used_by=[], creation_date='2024-11-27 08:17', related_items=['_compute_sequences_spanning_ignored_intrusions'])
+    @function_attributes(short_name=None, tags=['merge', '_compute_sequences_spanning_ignored_intrusions', 'PhoOriginal'], input_requires=['self.split_positions_arrays'], output_provides=['self.merged_split_positions_arrays'], uses=['_compute_sequences_spanning_ignored_intrusions'], used_by=['compute'], creation_date='2024-11-27 08:17', related_items=['_compute_sequences_spanning_ignored_intrusions'])
     def merge_over_ignored_intrusions(self, max_ignore_bins: int = 2, should_skip_epoch_with_only_short_subsequences: bool = False, debug_print=False):
         """ an "intrusion" refers to one or more time bins that interrupt a longer sequence that would be monotonic if the intrusions were removed.
 
@@ -904,7 +902,7 @@ class SubsequencesPartitioningResult:
         # return (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index)
         return original_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_idxs)
 
-    @function_attributes(short_name=None, tags=['partition'], input_requires=['self.merged_split_positions_arrays'], output_provides=['self.merged_split_positions_arrays'], uses=[], used_by=[], creation_date='2024-12-11 23:42', related_items=[])
+    @function_attributes(short_name=None, tags=['partition'], input_requires=['self.merged_split_positions_arrays'], output_provides=['self.merged_split_positions_arrays'], uses=[], used_by=['compute'], creation_date='2024-12-11 23:42', related_items=[])
     def enforce_max_jump_distance(self, max_jump_distance_cm: float = 30.0, debug_print=False):
         """ an "intrusion" refers to one or more time bins that interrupt a longer sequence that would be monotonic if the intrusions were removed.
 
@@ -1098,7 +1096,7 @@ class SubsequencesPartitioningResult:
         #     return 'none'
         
 
-    @function_attributes(short_name=None, tags=['compute', 'MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-11 23:43', related_items=[])
+    @function_attributes(short_name=None, tags=['compute', 'MAIN'], input_requires=[], output_provides=[], uses=['partition_subsequences_ignoring_repeated_similar_positions', 'merge_over_ignored_intrusions', 'enforce_max_jump_distance', 'rebuild_sequence_info_df'], used_by=['init_from_positions_list'], creation_date='2024-12-11 23:43', related_items=[])
     def compute(self, debug_print=False):
         """ recomputes all """
         
@@ -1138,9 +1136,8 @@ class SubsequencesPartitioningResult:
             self.position_changes_info_df.loc[first_order_diff_value_exceeeding_jump_distance_indicies, 'exceeds_jump_distance'] = True
             # first_order_diff_value_exceeeding_jump_distance_indicies
 
-    # 2024-12-04 09:16 New ChatGPT Simplified Functions __________________________________________________________________ #
 
-
+    @function_attributes(short_name=None, tags=['df', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=['compute'], creation_date='2024-12-12 03:47', related_items=[])
     def rebuild_sequence_info_df(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """Rebuilds the sequence_info_df using the new subsequences.
         Updates: self.position_bins_info_df, self.position_changes_info_df
@@ -1272,7 +1269,7 @@ class SubsequencesPartitioningResult:
     @classmethod
     def _debug_plot_time_bins_multiple(cls, positions_list, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True, defer_show: bool = False, flat_time_window_centers=None, flat_time_window_edges=None,
                                         enable_axes_formatting: bool = False,  arrow_alpha: float = 0.4, subsequence_line_color_alpha: float = 0.55,
-                                        is_intrusion: Optional[NDArray] = None, direction_changes: Optional[NDArray] = None, **kwargs):
+                                        is_intrusion: Optional[NDArray] = None, direction_changes: Optional[NDArray] = None, debug_print=False, **kwargs):
             """
             Plots positions over fixed-width time bins with vertical lines separating each bin.
             Each sublist in positions_list is plotted in a different color.
@@ -1299,10 +1296,7 @@ class SubsequencesPartitioningResult:
             direction_change_lines_kwargs = dict(color='yellow', linestyle=':', linewidth=2, zorder=1) | kwargs.pop('direction_change_lines_kwargs', {})
 
             intrusion_time_bin_shading_kwargs = dict(facecolor='red', alpha=0.15, zorder=0) | kwargs.pop('intrusion_time_bin_shading_kwargs', {})
-            sequence_position_hlines_kwargs = dict(linewidth=4, zorder=-1) | kwargs.pop('sequence_position_hlines_kwargs', {})
-
-
-            
+            sequence_position_hlines_kwargs = dict(linewidth=4, zorder=-1) | kwargs.pop('sequence_position_hlines_kwargs', {})            
             main_sequence_position_dots_kwargs = dict(linewidths=2, marker ="^", edgecolor="#141414F9", s = 200, zorder=1) | kwargs.pop('main_sequence_position_dots_kwargs', {}) # "#141414F9" -- near black
             
             # Example override dict ______________________________________________________________________________________________ #
@@ -1449,7 +1443,8 @@ class SubsequencesPartitioningResult:
 
                 if is_main_sequence and (not should_skip_main_sequence_position_dots):
                     ## plot the dots indidicating that this is the main sequence
-                    print(f'main_sequence_position_dots -- color: {color}\n\tsubsequence_idx: {subsequence_idx}, subsequence_positions: {subsequence_positions}')
+                    if debug_print:
+                        print(f'main_sequence_position_dots -- color: {color}\n\tsubsequence_idx: {subsequence_idx}, subsequence_positions: {subsequence_positions}')
                     out_dict['main_sequence_position_dots'][subsequence_idx] = ax.scatter(x_centers_subseq, subsequence_positions, color=color, **main_sequence_position_dots_kwargs)
 
                 # Plot horizontal lines for position values within each time bin
