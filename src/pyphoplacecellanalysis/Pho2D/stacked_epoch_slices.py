@@ -2079,7 +2079,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
         ## Convert to controlled by global paginator:
         new_connections_dict = cls._build_globally_controlled_pagination(paginated_multi_decoder_decoded_epochs_window=root_dockAreaWindow, pagination_controller_dict=pagination_controller_dict)
-        root_dockAreaWindow.init_additional_mouse_click_action_controls_ui()
+        root_dockAreaWindow._init_UI_additional_mouse_click_action_selection_combos()
 
         # Add functions ______________________________________________________________________________________________________ #
 
@@ -2091,16 +2091,14 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         return app, root_dockAreaWindow
 
 
-    def init_additional_mouse_click_action_controls_ui(self):
-        """ adds GUI controls for selecting the desired mouse button actions 
+    @function_attributes(short_name=None, tags=['settings', 'ui', 'private'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-11 20:20', related_items=[])
+    def _init_UI_additional_mouse_click_action_selection_combos(self, debug_print: bool=False):
+        """ adds 3 GUI controls for selecting the desired mouse button actions - 3 separate controls to be added to a thin horizontal toolbar: 1. allows choosing the LMB action from a list `methods_list` of 4 items, 2. allows choosing the MMB action from the same list, 3. allows choosing the RMB action from the same list. All 3 controls should be independent.
+        
         """
         # from qtpy import QtCore, QtWidgets
-        from pyphoplacecellanalysis.External.pyqtgraph.Qt import QT_LIB, QtCore, QtGui, QtWidgets
-        
-
-        # def update_callbacks(combo_box, action_key):
-        #     selected_text = combo_box.currentText()
-        
+        from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui, QtWidgets
+                
         def update_callbacks(selected_combo_box_text: str, action_key: str):
             """ captures self
             """
@@ -2112,7 +2110,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             on_click_item_callbacks_dict = self.get_children_props(prop_path=action_key) # 'params.on_middle_click_item_callbacks'
             
             for a_name, a_callback_dict in on_click_item_callbacks_dict.items():
-                print(f'a_name: {a_name}')
+                if debug_print:
+                    print(f'a_name: {a_name}')
                 ## remove old method names
                 for old_method_name in methods_list:
                     a_callback_dict.pop(old_method_name, None)
@@ -2120,8 +2119,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                 a_callback_dict[selected_combo_box_text] = selected_callback_fn
                 # a_callback_dict.update(selected_combo_box_text=selected_callback_fn)
                 
-
-            print(f'action_key: {action_key} - new action: {selected_combo_box_text}')
+            if debug_print:
+                print(f'action_key: {action_key} - new action: {selected_combo_box_text}')
             
             # if not hasattr(self.params, 'on_left_click_item_callbacks'):
             #     self.params.params['on_left_click_item_callbacks'] = {}
@@ -2139,33 +2138,34 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         methods_list = list(self.ui._contents.possible_mouse_actions_dict.keys())
         global_thin_button_bar_widget = self.global_thin_button_bar_widget
         
-        # Create and add the left mouse button (LMB) combo box
-        self.ui._contents.lmb_action_combo = QtWidgets.QComboBox()
-        self.ui._contents.lmb_action_combo.addItems(methods_list)
-        lmb_action = QtGui.QAction("LMB Action", self)
-        global_thin_button_bar_widget.addAction(lmb_action)
-        parent_bar_add_widget_fn(self.ui._contents.lmb_action_combo)
-        
+        # # Create and add the left mouse button (LMB) combo box
+        # self.ui._contents.lmb_action_combo = QtWidgets.QComboBox()
+        # self.ui._contents.lmb_action_combo.addItems(methods_list)
+        # lmb_action = QtGui.QAction("LMB Action", self)
+        # global_thin_button_bar_widget.addAction(lmb_action)
+        # global_thin_button_bar_widget.horizontalLayout.insertWidget(2, self.ui._contents.lmb_action_combo)
         # self.ui._contents.lmb_action_combo.currentIndexChanged.connect(lambda selected_index: update_callbacks(self.ui._contents.lmb_action_combo.itemText(selected_index), 'params.on_left_click_item_callbacks'))
-        self.ui._contents.lmb_action_combo.currentIndexChanged.connect(lambda selected_index: update_callbacks(self.ui._contents.lmb_action_combo.itemText(selected_index), 'params.on_left_click_item_callbacks'))
-
+        # self.ui._contents.lmb_action_combo.setCurrentIndex(methods_list.index('copy_click_time_to_clipboard_callback'))
+        
         # Create and add the middle mouse button (MMB) combo box
         self.ui._contents.mmb_action_combo = QtWidgets.QComboBox()
         self.ui._contents.mmb_action_combo.addItems(methods_list)
         mmb_action = QtGui.QAction("MMB Action", self)
         global_thin_button_bar_widget.addAction(mmb_action)
-        parent_bar_add_widget_fn(self.ui._contents.mmb_action_combo)
-        # self.ui._contents.mmb_action_combo.currentIndexChanged.connect(lambda selected_index: update_callbacks(self.ui._contents.mmb_action_combo.itemText(selected_index), 'params.on_middle_click_item_callbacks'))
+        global_thin_button_bar_widget.horizontalLayout.insertWidget(2, self.ui._contents.mmb_action_combo)
         self.ui._contents.mmb_action_combo.currentIndexChanged.connect(lambda selected_index: update_callbacks(self.ui._contents.mmb_action_combo.itemText(selected_index), 'params.on_middle_click_item_callbacks'))
+        self.ui._contents.mmb_action_combo.setCurrentIndex(methods_list.index('copy_axis_image_to_clipboard_callback')) # copy_click_time_to_clipboard_callback # Set default index for MMB combo box
+
 
         # Create and add the right mouse button (RMB) combo box
         self.ui._contents.rmb_action_combo = QtWidgets.QComboBox()
         self.ui._contents.rmb_action_combo.addItems(methods_list)
         rmb_action = QtGui.QAction("RMB Action", self)
         global_thin_button_bar_widget.addAction(rmb_action)
-        parent_bar_add_widget_fn(self.ui._contents.rmb_action_combo)
-        # self.ui._contents.rmb_action_combo.currentIndexChanged.connect(lambda selected_index: update_callbacks(self.ui._contents.rmb_action_combo.itemText(selected_index), 'params.on_secondary_click_item_callbacks'))
+        global_thin_button_bar_widget.horizontalLayout.insertWidget(3, self.ui._contents.rmb_action_combo)
         self.ui._contents.rmb_action_combo.currentIndexChanged.connect(lambda selected_index: update_callbacks(self.ui._contents.rmb_action_combo.itemText(selected_index), 'params.on_secondary_click_item_callbacks'))
+        self.ui._contents.rmb_action_combo.setCurrentIndex(methods_list.index('log_clicked_epoch_times_to_message_box_callback')) # Set default index for RMB combo box
+
 
 
     @classmethod
