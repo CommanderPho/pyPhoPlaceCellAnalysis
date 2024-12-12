@@ -170,18 +170,19 @@ class SubsequencesPartitioningResult:
     merged_split_positions_arrays: List[NDArray] = field(default=None, metadata={'desc': "the subsequences from `split_positions_arrays` but merged into larger subsequences by briding-over (ignoring) sequences of intrusive tbins (with the max ignored length specified by `self.max_ignore_bins`"})
     merged_split_position_flatindicies_arrays: List[NDArray] = field(default=None, metadata={'WARN': 'UNIMPLEMENTED', 'desc': "the subsequences from `split_positions_arrays` but merged into larger subsequences by briding-over (ignoring) sequences of intrusive tbins (with the max ignored length specified by `self.max_ignore_bins`"})
     
-
-
-    sequence_info_df: pd.DataFrame = field(default=None, repr=False)
+    ## Info Dataframes:
+    position_bins_info_df: pd.DataFrame = field(default=None, repr=False, metadata={'desc': "one entry for each entry in `flat_positions`"})
+    position_changes_info_df: pd.DataFrame = field(default=None, repr=False, metadata={'desc': "one change for each entry in `first_order_diff_lst`"})
     
 
     def __attrs_post_init__(self):
         if isinstance(self.flat_positions, list):
             self.flat_positions = np.array(self.flat_positions)        
 
-        if self.sequence_info_df is None:
+        if (self.position_bins_info_df is None) or (self.position_changes_info_df is None):
             ## initialize new
-            self.sequence_info_df = self.rebuild_sequence_info_df()
+            self.position_bins_info_df, self.position_changes_info_df = self.rebuild_sequence_info_df()
+
 
     # Computed Properties ________________________________________________________________________________________________ #
     @property
@@ -293,18 +294,18 @@ class SubsequencesPartitioningResult:
         """Returns the flatindicies for the elements in the longest merged subsequence."""
         if self.merged_split_positions_arrays is None:
             return np.array([])
-        if self.sequence_info_df is None:
+        if self.position_bins_info_df is None:
             self.rebuild_sequence_info_df()
-        is_longest_sequence_bin = (self.sequence_info_df['subsequence_idx'] == self.longest_sequence_subsequence_idx) #['flat_idx'].to_numpy()
-        return self.sequence_info_df[is_longest_sequence_bin]['flat_idx'].to_numpy()
+        is_longest_sequence_bin = (self.position_bins_info_df['subsequence_idx'] == self.longest_sequence_subsequence_idx) #['flat_idx'].to_numpy()
+        return self.position_bins_info_df[is_longest_sequence_bin]['flat_idx'].to_numpy()
 
 
     @property
     def longest_sequence_subsequence_excluding_intrusions(self) -> NDArray:
         """ the longest merged subsequence excluding intrusions."""
-        if self.sequence_info_df is None:
+        if self.position_bins_info_df is None:
             self.rebuild_sequence_info_df()
-        intrusion_flat_indicies = self.sequence_info_df[self.sequence_info_df['is_intrusion']]['flat_idx'].to_numpy()
+        intrusion_flat_indicies = self.position_bins_info_df[self.position_bins_info_df['is_intrusion']]['flat_idx'].to_numpy()
         longest_sequence_non_intrusion_flatindicies = np.setdiff1d(self.longest_sequence_flatindicies, intrusion_flat_indicies)
         return self.flat_positions[longest_sequence_non_intrusion_flatindicies]
     
@@ -325,7 +326,7 @@ class SubsequencesPartitioningResult:
             longest_subsequence = self.longest_sequence_subsequence
         else:
             ## Ignoring intrusion bins
-            non_intrusion_flat_indicies = self.sequence_info_df[np.logical_not(self.sequence_info_df['is_intrusion'])]['flat_idx'].to_numpy()
+            non_intrusion_flat_indicies = self.position_bins_info_df[np.logical_not(self.position_bins_info_df['is_intrusion'])]['flat_idx'].to_numpy()
             flat_positions = self.flat_positions[non_intrusion_flat_indicies]
             longest_subsequence = self.longest_sequence_subsequence_excluding_intrusions
             
@@ -1120,40 +1121,54 @@ class SubsequencesPartitioningResult:
         self.bridged_intrusion_bin_indicies = deepcopy(final_intrusion_values_list) # np.array([flat_positions_list.index(v) for v in final_intrusion_idxs])
         
         if self.max_jump_distance_cm is not None:
-            self.enforce_max_jump_distance(max_jump_distance_cm=self.max_jump_distance_cm, debug_print=debug_print)
-
+            new_merged_split_positions_arrays, first_order_diff_value_exceeeding_jump_distance_indicies = self.enforce_max_jump_distance(max_jump_distance_cm=self.max_jump_distance_cm, debug_print=debug_print)
+        else:
+            first_order_diff_value_exceeeding_jump_distance_indicies = None
+        
         ## Common Post-hoc
-        self.rebuild_sequence_info_df()
+        # self.rebuild_sequence_info_df()
+        self.position_bins_info_df, self.position_changes_info_df = self.rebuild_sequence_info_df()
+        if first_order_diff_value_exceeeding_jump_distance_indicies is not None:
+            self.position_changes_info_df['exceeds_jump_distance'] = False
+            self.position_changes_info_df.loc[first_order_diff_value_exceeeding_jump_distance_indicies, 'exceeds_jump_distance'] = True
+            # first_order_diff_value_exceeeding_jump_distance_indicies
 
     # 2024-12-04 09:16 New ChatGPT Simplified Functions __________________________________________________________________ #
 
 
-    def rebuild_sequence_info_df(self) -> pd.DataFrame:
-        """Rebuilds the sequence_info_df using the new subsequences."""
+    def rebuild_sequence_info_df(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Rebuilds the sequence_info_df using the new subsequences.
+        Updates: self.position_bins_info_df, self.position_changes_info_df
+        """
         # Initialize the dataframe
-        self.sequence_info_df = pd.DataFrame({'pos': self.flat_positions})
-
+        self.position_bins_info_df = pd.DataFrame({'pos': self.flat_positions})
+        
+        
         if self.flat_time_window_centers is not None:
             assert len(self.flat_time_window_centers) == len(self.flat_positions)
-            self.sequence_info_df['t_center'] = self.flat_time_window_centers
+            self.position_bins_info_df['t_center'] = self.flat_time_window_centers
 
         # Assign original subsequence indices
         if self.split_positions_arrays is not None:
-            self.sequence_info_df['orig_subsequence_idx'] = flatten(
-                [[i] * len(v) for i, v in enumerate(self.split_positions_arrays)])
+            self.position_bins_info_df['orig_subsequence_idx'] = flatten([[i] * len(v) for i, v in enumerate(self.split_positions_arrays)])
             # Mark intrusions based on max_ignore_bins
             is_intrusion: List[bool] = [len(v) <= self.max_ignore_bins for v in self.split_positions_arrays]
             intrusion_dict = {idx: val for idx, val in enumerate(is_intrusion)}
-            self.sequence_info_df['is_intrusion'] = self.sequence_info_df['orig_subsequence_idx'].map(intrusion_dict)
+            self.position_bins_info_df['is_intrusion'] = self.position_bins_info_df['orig_subsequence_idx'].map(intrusion_dict)
 
         # Assign merged subsequence indices
         if self.merged_split_positions_arrays is not None:
-            self.sequence_info_df['subsequence_idx'] = flatten(
-                [[i] * len(v) for i, v in enumerate(self.merged_split_positions_arrays)])
+            self.position_bins_info_df['subsequence_idx'] = flatten([[i] * len(v) for i, v in enumerate(self.merged_split_positions_arrays)])
 
 
-        self.sequence_info_df['flat_idx'] = self.sequence_info_df.index.astype(int, copy=True)
-        return self.sequence_info_df
+        self.position_bins_info_df['flat_idx'] = self.position_bins_info_df.index.astype(int, copy=True)
+        
+        ## build first_order_diff_df
+        if self.first_order_diff_lst is not None:
+            Assert.len_equals(self.first_order_diff_lst, len(self.flat_positions))
+            self.position_changes_info_df = pd.DataFrame({'pos_diff': self.first_order_diff_lst})
+
+        return self.position_bins_info_df, self.position_changes_info_df
 
     # Existing properties and methods remain unchanged or are adjusted as necessary
     # Update properties that depend on split_positions_arrays and merged_split_positions_arrays
@@ -1508,11 +1523,11 @@ class SubsequencesPartitioningResult:
         # Extract 'is_intrusion' array from sequence_info_df
         is_intrusion = None
         direction_changes = None
-        if self.sequence_info_df is not None:
-            if 'is_intrusion' in self.sequence_info_df.columns:
-                is_intrusion = self.sequence_info_df['is_intrusion'].values
-            if 'direction_change' in self.sequence_info_df.columns:
-                direction_changes = self.sequence_info_df['direction_change'].values
+        if self.position_bins_info_df is not None:
+            if 'is_intrusion' in self.position_bins_info_df.columns:
+                is_intrusion = self.position_bins_info_df['is_intrusion'].values
+            if 'direction_change' in self.position_bins_info_df.columns:
+                direction_changes = self.position_bins_info_df['direction_change'].values
 
         return self._debug_plot_time_bins_multiple(
             positions_list=override_positions_list,
