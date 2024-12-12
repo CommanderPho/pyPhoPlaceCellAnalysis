@@ -1546,7 +1546,7 @@ class SubsequencesPartitioningResult:
 
 
 
-    def _plot_step_by_step_subsequence_partition_process(self):
+    def _plot_step_by_step_subsequence_partition_process(self, extant_ax_dict=None):
         """ diagnostic for debugging the step-by-step sequence partitioning heuristics 
         
         out: MatplotlibRenderPlots = partition_result._plot_step_by_step_subsequence_partition_process()
@@ -1558,33 +1558,48 @@ class SubsequencesPartitioningResult:
         
 
         common_plot_time_bins_multiple_kwargs = dict(subsequence_line_color_alpha=0.95, arrow_alpha=0.4, enable_axes_formatting=True, )
-        
+        linestyle = '-'
 
         merged_plots_out_dict = {}
         
-        fig = plt.figure(layout="constrained", clear=True)
-        ax_dict = fig.subplot_mosaic(
-            [
-                ["ax_ungrouped_seq"],
-                ["ax_grouped_seq"], # "ax_SHORT_activity_v_time", "ax_SHORT_pf_tuning_curve"],
-                ["ax_merged_grouped_seq"],
-            ],
-            # set the height ratios between the rows
-            # height_ratios=[8, 1],
-            # height_ratios=[1, 1],
-            # set the width ratios between the columns
-            # width_ratios=[1, 8, 8, 1],
-            sharex=True, sharey=True,
-            gridspec_kw=dict(wspace=0, hspace=0.15) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
-        )
+        if extant_ax_dict is None:
+            fig = plt.figure(layout="constrained", clear=True)
+            ax_dict = fig.subplot_mosaic(
+                [
+                    ["ax_ungrouped_seq"],
+                    ["ax_grouped_seq"], # "ax_SHORT_activity_v_time", "ax_SHORT_pf_tuning_curve"],
+                    ["ax_merged_grouped_seq"],
+                ],
+                # set the height ratios between the rows
+                # height_ratios=[8, 1],
+                # height_ratios=[1, 1],
+                # set the width ratios between the columns
+                # width_ratios=[1, 8, 8, 1],
+                sharex=True, sharey=True,
+                gridspec_kw=dict(wspace=0, hspace=0.15) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+            )
+        else:
+            ## already exists
+            Assert.len_equals(extant_ax_dict, 3)
+            ax_dict = extant_ax_dict
+            fig = extant_ax_dict['ax_ungrouped_seq'].get_figure()
+            
 
 
         flat_time_window_edges = np.arange(self.total_num_subsequence_bins+1)
         
         split_most_likely_positions_arrays = deepcopy(self.flat_positions) ## unsplit positions
+        pre_partitioned_debug_sequences_kwargs = dict(sequence_position_hlines_kwargs=dict(linewidth=2, linestyle=linestyle, zorder=10, alpha=1.0), # high-zorder to place it on-top, linestyle is "densely-dashed"
+            split_vlines_kwargs = dict(should_skip=False),
+            time_bin_edges_vlines_kwargs = dict(should_skip=False),
+            direction_change_lines_kwargs = dict(should_skip=True),
+            intrusion_time_bin_shading_kwargs = dict(should_skip=True),
+            main_sequence_position_dots_kwargs = dict(should_skip=True),
+        )
+        
         # out: MatplotlibRenderPlots = SubsequencesPartitioningResult._debug_plot_time_bins_multiple(positions_list=split_most_likely_positions_arrays, ax=ax_dict["ax_ungrouped_seq"])
         out: MatplotlibRenderPlots = self.plot_time_bins_multiple(num='debug_plot_merged_time_binned_positions', ax=ax_dict["ax_ungrouped_seq"], enable_position_difference_indicators=True,
-            flat_time_window_edges=flat_time_window_edges, override_positions_list=split_most_likely_positions_arrays, **common_plot_time_bins_multiple_kwargs,
+            flat_time_window_edges=flat_time_window_edges, override_positions_list=split_most_likely_positions_arrays, **common_plot_time_bins_multiple_kwargs, **pre_partitioned_debug_sequences_kwargs,
         )
         merged_plots_out_dict["ax_ungrouped_seq"] = out.plots
         ## Add initially-sequenced result:
@@ -1598,13 +1613,14 @@ class SubsequencesPartitioningResult:
         #(offset, (on_off_seq)). For example, (0, (3, 10, 1, 15)) means (3pt line, 10pt space, 1pt line, 15pt space) with no offset, while (5, (10, 3)), means (10pt line, 3pt space), but skip the first 5pt line.
         # linestyle = (0, (5, 1))
         # linestyle = (0, (1, 1)) # dots with 1pt dot, 0.5pt space
-        linestyle = '-'
+        # linestyle = '-'
         # Plot only the positions themselves, as dotted overlaying lines
         pre_merged_debug_sequences_kwargs = dict(sequence_position_hlines_kwargs=dict(linewidth=2, linestyle=linestyle, zorder=10, alpha=1.0), # high-zorder to place it on-top, linestyle is "densely-dashed"
             split_vlines_kwargs = dict(should_skip=False),
             time_bin_edges_vlines_kwargs = dict(should_skip=False),
             direction_change_lines_kwargs = dict(should_skip=True),
             intrusion_time_bin_shading_kwargs = dict(should_skip=False),
+            main_sequence_position_dots_kwargs = dict(should_skip=False, linewidths=2, marker ="^", edgecolor ="red", s = 100, zorder=1),
         )
                     
 
