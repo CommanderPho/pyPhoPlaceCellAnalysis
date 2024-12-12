@@ -968,13 +968,57 @@ class ClickActionCallbacks:
                     a_thin_button_bar_widget = self.thin_button_bar_widget
                     a_thin_button_bar_widget.label_message = f"<clicked> {code_string}"
                     
-                except BaseException as e:
+                except Exception as e:
                     print(f"log_clicked_epoch_times_to_message_box_callback(...): err: {e}. Continuing.") # expected in leftmost (index 0) plot
                     
                 # self.show_message(message=f"{code_string}", durationMs=1000)
                 # print(f'done.')
 
-                
+    def copy_selected_most_likely_positions_to_clipboard_callback(self, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time):
+        """ called when the user alt-clicks an epoch 
+        
+        captures: active_captured_single_epoch_result
+        """
+        from pyphocorehelpers.programming_helpers import copy_to_clipboard
+        
+        if self.params.debug_print:
+            print(f'copy_selected_most_likely_positions_to_clipboard_callback(clicked_data_index: {clicked_data_index}, clicked_epoch_is_selected: {clicked_epoch_is_selected}, clicked_epoch_start_stop_time: {clicked_epoch_start_stop_time})')
+        if clicked_epoch_start_stop_time is not None:
+            if len(clicked_epoch_start_stop_time) == 2:
+                start_t, end_t = clicked_epoch_start_stop_time
+                # print(f'start_t: {start_t}')
+                clicked_data_index: int = self.find_data_indicies_from_epoch_times(epoch_times=np.array([start_t, end_t]))[0]
+                if self.params.debug_print:
+                    print(f'\tclicked_data_index: {clicked_data_index}')            
+                active_captured_single_epoch_result = self.filter_epochs_decoder_result.get_result_for_epoch(active_epoch_idx=clicked_data_index)
+                if self.params.debug_print:
+                    print(f'\tactive_captured_single_epoch_result.epoch_info_tuple: {active_captured_single_epoch_result.epoch_info_tuple}')
+                    print(f'\tdone.')
+                    
+                most_likely_position_indicies = deepcopy(active_captured_single_epoch_result.most_likely_position_indicies)
+                most_likely_position_indicies = np.squeeze(most_likely_position_indicies)
+                # t_bin_centers = deepcopy(active_captured_single_epoch_result.time_bin_container.centers)
+                # t_bin_indicies = np.arange(len(np.squeeze(most_likely_position_indicies)))
+                # p_x_given_n = deepcopy(active_captured_single_epoch_result.marginal_x.p_x_given_n)
+                try:
+                    copy_to_clipboard(code_str=f"{most_likely_position_indicies}", message_print=True)
+                except Exception as e:
+                    print(f"ERR: copy_selected_most_likely_positions_to_clipboard_callback(...): err: {e}. Continuing.")
+                    raise
+
+                # out_df = pd.DataFrame({'t': t_bin_centers, 'pos': most_likely_position_indicies})
+                # code_string: str = f"[{start_t}, {end_t}, {out_df}]"
+                # try:
+                #     out_df.to_clipboard(excel=True, sep=', ')
+                    
+                #     # a_thin_button_bar_widget = self.ui.mw.ui.thin_button_bar_widget
+                #     a_thin_button_bar_widget = self.thin_button_bar_widget
+                #     a_thin_button_bar_widget.label_message = f"<clicked> {code_string}"
+                    
+                # except Exception as e:
+                #     print(f"ERR: copy_selected_most_likely_positions_to_clipboard_callback(...): err: {e}. Continuing.") # expected in leftmost (index 0) plot
+                    
+
 
 
 class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
