@@ -5721,7 +5721,9 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 		return global_computation_results
 
 
-	@function_attributes(short_name='directional_decoders_epoch_heuristic_scoring', tags=['heuristic', 'directional-decoders', 'epochs', 'filter', 'score', 'weighted-correlation', 'radon-transform', 'multiple-decoders', 'main-computation-function'], input_requires=['global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values', 'global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz'], output_provides=[], uses=[], used_by=[], creation_date='2024-03-12 17:23', related_items=[],
+	@function_attributes(short_name='directional_decoders_epoch_heuristic_scoring', tags=['heuristic', 'directional-decoders', 'epochs', 'filter', 'score', 'weighted-correlation', 'radon-transform', 'multiple-decoders', 'main-computation-function'],
+					   input_requires=['global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values', 'global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz'], output_provides=[],
+					   uses=['filter_and_update_epochs_and_spikes', 'HeuristicReplayScoring.compute_all_heuristic_scores'], used_by=[], creation_date='2024-03-12 17:23', related_items=[],
 		requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=[],
 		validate_computation_test=_workaround_validate_has_directional_decoded_epochs_heuristic_scoring, 
 						is_global=True, computation_precidence=1002.2)
@@ -7412,7 +7414,9 @@ class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
 
 		"""
 		from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
+		from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
 		
+
 		## ✅ Add a new row for each of the four 1D directional decoders:
 		identifier_name: str = f'{a_decoder_name}_ContinuousDecode'
 		print(f'identifier_name: {identifier_name}')
@@ -7436,16 +7440,23 @@ class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
 		
 		# most_likely_positions_mode: 'standard'|'corrected'
 		# fig, curr_ax = curr_active_pipeline.display('_display_plot_marginal_1D_most_likely_position_comparisons', _active_config_name, variable_name='x', most_likely_positions_mode='corrected', ax=an_ax) # ax=active_2d_plot.ui.matplotlib_view_widget.ax
+		posterior_heatmap_imshow_kwargs = dict(
+			# cmap=get_heatmap_cmap(cmap='Oranges', bad_color='black', under_color='white', over_color='red'),
+			cmap = get_heatmap_cmap(cmap='viridis', bad_color='black', under_color='white', over_color='red'),
+												)	
+
 		## Actual plotting portion:
 		fig, curr_ax = plot_1D_most_likely_position_comparsions(None, time_window_centers=time_window_centers, xbin=active_bins,
 																posterior=active_posterior,
 																active_most_likely_positions_1D=active_most_likely_positions,
-																ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False)
+																ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
+																posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
 
 		widget.draw() # alternative to accessing through full path?
 		active_2d_plot.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
 		return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes
 	
+
 	@classmethod
 	def add_pseudo2D_decoder_decoded_epochs(cls, curr_active_pipeline, active_2d_plot, debug_print=False):
 		""" adds the decoded epochs for the long/short decoder from the global_computation_results as new matplotlib plot rows. """
