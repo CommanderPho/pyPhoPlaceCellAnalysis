@@ -365,7 +365,8 @@ class SubsequencesPartitioningResult:
         #     ## Ignoring intrusion bins
         #     num_longest_subsequence_good_values = num_longest_subsequence_good_values - main_subsequence_df['n_intrusion_bins'].to_numpy()[0]
             
-
+        assert (not (should_ignore_intrusion_bins and should_use_no_repeat_values)), f"not currently correct with both should_use_no_repeat_values AND should_ignore_intrusion_bins"
+        #TODO 2024-12-13 14:30: - [ ] {'n_intrusion_bins': 10, 'len': 20, 'len_excluding_repeats': 11, 'len_excluding_intrusions': 10, 'len_excluding_both': 1}
 
         if should_ignore_intrusion_bins:
             if should_use_no_repeat_values:
@@ -384,7 +385,6 @@ class SubsequencesPartitioningResult:
         if not return_ratio:
             return int(num_longest_subsequence_good_values)
         else:
-            
             all_subsequence_values_count_dict = self.subsequences_df[['n_intrusion_bins', 'len', 'len_excluding_repeats', 'len_excluding_intrusions', 'len_excluding_both']].sum(axis='index').to_dict()
             # total_num_all_good_values = all_subsequence_values_count_dict['len']
             # total_num_all_good_values = all_subsequence_values_count_dict['len_excluding_repeats']
@@ -1248,7 +1248,7 @@ class SubsequencesPartitioningResult:
         ## merge into `all_subsequences_scores_df`:
         all_subsequences_scores_df = all_subsequences_scores_df.merge(computed_subseq_properties_df, how='left', on='subsequence_idx') ## requires that the output dataframe has all rows that were in `subsequences_df`, filling in NaNs when no corresponding values are found in the right df
         all_subsequences_scores_df['len_excluding_intrusions'] = all_subsequences_scores_df['len'] - all_subsequences_scores_df['n_intrusion_bins']
-        all_subsequences_scores_df['len_excluding_both'] = all_subsequences_scores_df['len_excluding_repeats'] - all_subsequences_scores_df['n_intrusion_bins']
+        all_subsequences_scores_df['len_excluding_both'] = all_subsequences_scores_df['len_excluding_repeats'] - all_subsequences_scores_df['n_intrusion_bins'] #TODO 2024-12-13 14:30: - [ ] Incorrect, 
         ## move all the length-related columns to the end
         all_subsequences_scores_df = PandasHelpers.reordering_columns_relative(all_subsequences_scores_df, column_names=list(filter(lambda column: ((column == 'len') or column.startswith('len_')), all_subsequences_scores_df.columns)), relative_mode='end')
 
@@ -1872,7 +1872,7 @@ class SubsequencesPartitioningResult:
         longest_seq_length_dict = {'all': self.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=False, should_use_no_repeat_values=False),
             'ignoring_intru': self.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=True, should_use_no_repeat_values=False),
             'no_repeat': self.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=False, should_use_no_repeat_values=True),
-            'ignoring_both': self.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=True, should_use_no_repeat_values=True),
+            # 'ignoring_both': self.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=True, should_use_no_repeat_values=True), # #TODO 2024-12-13 14:32: - [ ] Broken repeats and intrusions (double counting subtractions)
         }
 
         longest_seq_length_multiline_label_str: str = '\n'.join([': '.join([k, str(v)]) for k, v in longest_seq_length_dict.items()])
@@ -2591,7 +2591,8 @@ class HeuristicReplayScoring:
 
         ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
         partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, pos_bin_edges=pos_bin_edges, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm, flat_time_window_centers=deepcopy(time_window_centers))
-        longest_no_repeats_sequence_length_ratio: float = partition_result.get_longest_sequence_length(return_ratio=True, should_ignore_intrusion_bins=True, should_use_no_repeat_values=True) # partition_result.longest_no_repeats_sequence_length_ratio         
+        # longest_no_repeats_sequence_length_ratio: float = partition_result.get_longest_sequence_length(return_ratio=True, should_ignore_intrusion_bins=True, should_use_no_repeat_values=True) # #TODO 2024-12-13 14:32: - [ ] Broken repeats and intrusions (double counting subtractions)
+        longest_no_repeats_sequence_length_ratio: float = partition_result.get_longest_sequence_length(return_ratio=True, should_ignore_intrusion_bins=False, should_use_no_repeat_values=True)
         assert longest_no_repeats_sequence_length_ratio <= 1.0, f"longest_no_repeats_sequence_length_ratio should not be greater than 1.0, but it is {longest_no_repeats_sequence_length_ratio}!!"
         return longest_no_repeats_sequence_length_ratio
     
@@ -2712,7 +2713,8 @@ class HeuristicReplayScoring:
         ## Begin computations:
         partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, pos_bin_edges=pos_bin_edges, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm,
                                                                                                                     flat_time_window_centers=deepcopy(time_window_centers), flat_time_window_edges=deepcopy(time_bin_edges))
-        longest_sequence_length: int = int(partition_result.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=True, should_use_no_repeat_values=True))
+        # longest_sequence_length: int = int(partition_result.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=True, should_use_no_repeat_values=True)) # #TODO 2024-12-13 14:32: - [ ] Broken repeats and intrusions (double counting subtractions)
+        longest_sequence_length: int = int(partition_result.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=True, should_use_no_repeat_values=False)) # #TODO 2024-12-13 14:32: - [ ] Broken repeats and intrusions (double counting subtractions)
         return longest_sequence_length
     
 
@@ -2799,7 +2801,7 @@ class HeuristicReplayScoring:
          ## END OLD
          'main_seq_len': cls.bin_wise_main_subsequence_len_fn,
          'main_seq_len_ignoring_intrusions': cls.bin_wise_main_subsequence_len_ignoring_intrusions_fn, 
-         'main_seq_len_ignoring_intrusions_and_repeats': cls.bin_wise_main_subsequence_len_ignoring_intrusions_and_repeats_fn,
+        #  'main_seq_len_ignoring_intrusions_and_repeats': cls.bin_wise_main_subsequence_len_ignoring_intrusions_and_repeats_fn,
          'main_seq_track_coverage_score': cls.bin_wise_main_subsequence_track_coverage_score_fn, 
          'main_seq_total_distance_traveled': cls.bin_wise_main_subsequence_total_distance_traveled_fn,
          # ['main_seq_len', 'main_seq_len_ignoring_intrusions', 'main_seq_len_ignoring_intrusions_and_repeats', 'main_seq_track_coverage_score', 'main_seq_total_distance_traveled']
