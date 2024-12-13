@@ -181,6 +181,9 @@ class SubsequencesPartitioningResult:
     ## Info Dataframes:
     position_bins_info_df: pd.DataFrame = field(default=None, repr=False, metadata={'desc': "one entry for each entry in `flat_positions`"})
     position_changes_info_df: pd.DataFrame = field(default=None, repr=False, metadata={'desc': "one change for each entry in `first_order_diff_lst`"})
+
+    subsequences_df: pd.DataFrame = field(default=None, repr=False, metadata={'desc': "properties computed for the final subsequences. Produced by self.post_compute_subsequence_properties()"})
+    
     
 
     def __attrs_post_init__(self):
@@ -189,7 +192,7 @@ class SubsequencesPartitioningResult:
 
         if (self.position_bins_info_df is None) or (self.position_changes_info_df is None):
             ## initialize new
-            self.position_bins_info_df, self.position_changes_info_df = self.rebuild_sequence_info_df()
+            self.position_bins_info_df, self.position_changes_info_df, self.subsequences_df = self.rebuild_sequence_info_df()
 
 
     # Computed Properties ________________________________________________________________________________________________ #
@@ -588,6 +591,11 @@ class SubsequencesPartitioningResult:
                     initial_v = v
 
         ## end for i, v ...
+        # end any open groups:
+        if (len(curr_accum_value_equiv_group) > 0) or (len(curr_accum_value_equiv_group_idxs) > 0):
+            value_equiv_group_list.append(curr_accum_value_equiv_group) ## add this group to the groups list
+            value_equiv_group_idxs_list.append(curr_accum_value_equiv_group_idxs)
+
         ## OUTPUTS: value_equiv_group_list, value_equiv_group_idxs_list
         return value_equiv_group_list, value_equiv_group_idxs_list
 
@@ -1193,63 +1201,116 @@ class SubsequencesPartitioningResult:
         
         ## Common Post-hoc
         # self.rebuild_sequence_info_df()
-        self.position_bins_info_df, self.position_changes_info_df = self.rebuild_sequence_info_df()
+        self.position_bins_info_df, self.position_changes_info_df, self.subsequences_df = self.rebuild_sequence_info_df()
         if first_order_diff_value_exceeeding_jump_distance_indicies is not None:
             self.position_changes_info_df['exceeds_jump_distance'] = False
             self.position_changes_info_df.loc[first_order_diff_value_exceeeding_jump_distance_indicies, 'exceeds_jump_distance'] = True
             # first_order_diff_value_exceeeding_jump_distance_indicies
 
-    @function_attributes(short_name=None, tags=['post-compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-13 08:36', related_items=[])
-    def post_compute_subsequence_properties(self):
+
+    @function_attributes(short_name=None, tags=['post-compute'], input_requires=['self.merged_split_positions_arrays'], output_provides=[], uses=[], used_by=['.rebuild_sequence_info_df'], creation_date='2024-12-13 08:36', related_items=[])
+    def post_compute_subsequence_properties(self, debug_print:bool=False):
         """ computes the sequence properties for each subsequence independently, most importantly the main (longest) subsequence """        
         #TODO 2024-12-13 09:30: - [ ] Finish using heuristic/subsequence measures for longest subsequence
+
+        assert self.pos_bin_edges is not None
         
-        # # Define the scoring functions lists
-        # _positions_fns = [
-        #     # SequenceScoringComputations.directionality_ratio,
-        #     # SequenceScoringComputations.sweep_score,
-        #     SequenceScoringComputations.total_distance_traveled,
-        #     SequenceScoringComputations.track_coverage_score,
-        #     # SequenceScoringComputations.transition_entropy
-        # ]
+        # Define the scoring functions lists
+        _positions_fns = [
+            # SequenceScoringComputations.directionality_ratio,
+            # SequenceScoringComputations.sweep_score,
+            SequenceScoringComputations.total_distance_traveled,
+            SequenceScoringComputations.track_coverage_score,
+            # SequenceScoringComputations.transition_entropy
+        ]
 
-        # _positions_times_fns = [
-        #     SequenceScoringComputations.sequential_correlation,
-        #     SequenceScoringComputations.monotonicity_score,
-        #     SequenceScoringComputations.laplacian_smoothness,
-        # ]
+        if self.flat_time_window_edges is not None:
+            _positions_times_fns = [
+                SequenceScoringComputations.sequential_correlation,
+                SequenceScoringComputations.monotonicity_score,
+                SequenceScoringComputations.laplacian_smoothness,
+            ]
+        else:
+            ## no times
+            if debug_print:
+                print(f'WARNING: no times in the SubsequencesPartitioningResult -- time-based metrics will be skipped.')
+            _positions_times_fns = []
 
-        # ## Wrap them:
+        ## Wrap them:
         # positions_fns_dict = {fn.__name__:(lambda *args, **kwargs: SequenceScoringComputations._META_bin_wise_wrapper_score_fn(fn, *args, needs_times=False, **kwargs)) for fn in _positions_fns}
         # positions_times_fns_dict = {fn.__name__:(lambda *args, **kwargs: SequenceScoringComputations._META_bin_wise_wrapper_score_fn(fn, *args, needs_times=True, **kwargs)) for fn in _positions_times_fns}
-
-        # self.pos
-        # pos_bounds = [np.min([track_templates.long_LR_decoder.xbin, track_templates.short_LR_decoder.xbin]), np.max([track_templates.long_LR_decoder.xbin, track_templates.short_LR_decoder.xbin])] # [37.0773897438341, 253.98616538463315]
-        # num_pos_bins: int = track_templates.long_LR_decoder.n_xbin_centers
-        # xbin_edges: NDArray = deepcopy(track_templates.long_LR_decoder.xbin)
-        
-        # # computation_fn_kwargs_dict: passed to each score function to specify additional required parameters
-        # computation_fn_kwargs_dict = {
-        #     'main_contiguous_subsequence_len': dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm),
-        #     'continuous_seq_len_ratio_no_repeats': dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm),
-        #     'continuous_seq_sort': dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm),
-        #     'sweep_score':  dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, num_pos_bins=num_pos_bins),
-        #     'track_coverage_score':  dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(xbin_edges)),
-        # }
-        
+        positions_fns_dict = {fn.__name__:fn for fn in _positions_fns}
+        positions_times_fns_dict = {fn.__name__:fn for fn in _positions_times_fns}
 
 
+        xbin_edges: NDArray = deepcopy(self.pos_bin_edges)
+        num_pos_bins: int = self.n_pos_bins
+        same_thresh_cm = self.same_thresh
+        max_ignore_bins = self.max_ignore_bins
+        max_jump_distance_cm = self.max_jump_distance_cm
+                
+        # computation_fn_kwargs_dict: passed to each score function to specify additional required parameters
+        computation_fn_kwargs_dict = {
+            'main_contiguous_subsequence_len': dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(xbin_edges)),
+            'continuous_seq_len_ratio_no_repeats': dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(xbin_edges)),
+            'continuous_seq_sort': dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(xbin_edges)),
+            'sweep_score':  dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, num_pos_bins=num_pos_bins, pos_bin_edges=deepcopy(xbin_edges)),
+            'track_coverage_score':  dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(xbin_edges)),
+            'total_distance_traveled': dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(xbin_edges)),
+        }
 
+
+        # bin_width, (x_starts, x_centers, x_ends), x_bins = self.get_flat_time_bins_info()
+        if self.flat_time_window_edges is None:
+            ## create fake
+            times = np.arange(self.total_num_subsequence_bins+1)
+        else:
+            assert self.flat_time_window_centers is not None
+            times = deepcopy(self.flat_time_window_centers)
+
+        all_score_computations_fn_dict = (positions_fns_dict | positions_times_fns_dict)
+
+        all_subsequences_scores_dict = {}
         merged_split_positions_arrays = deepcopy(self.merged_split_positions_arrays)
         for a_subsequence_idx, a_subsequence in enumerate(merged_split_positions_arrays):
-            print(f'subsequence[{a_subsequence_idx}]: {a_subsequence}')
-            
+            if debug_print:
+                print(f'subsequence[{a_subsequence_idx}]: {a_subsequence}')
+            ## INPUTS: a_subsequence
+            total_num_values: int = len(a_subsequence)
+            _, value_equiv_group_idxs_list = SubsequencesPartitioningResult.find_value_equiv_groups(a_subsequence, same_thresh_cm=self.same_thresh)
+            total_num_values_excluding_repeats: int = len(value_equiv_group_idxs_list) ## the total number of non-repeated values
+            total_num_repeated_values: int = total_num_values - total_num_values_excluding_repeats
+            if debug_print:
+                print(f'total_num_values: {total_num_values}')
+                print(f'total_num_values_excluding_repeats: {total_num_values_excluding_repeats}')
+                print(f'total_num_repeated_values: {total_num_repeated_values}')
 
 
-    @function_attributes(short_name=None, tags=['df', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=['compute'], creation_date='2024-12-12 03:47', related_items=[])
-    def rebuild_sequence_info_df(self, additional_split_on_exceeding_jump_distance:bool=False) -> Tuple[pd.DataFrame, pd.DataFrame]:
+            all_subsequences_scores_dict[a_subsequence_idx] = {'subsequence_idx': a_subsequence_idx, 'len': total_num_values, 'len_excluding_repeats': total_num_values_excluding_repeats, # 'len': total_num_values,
+                                                                'positions': a_subsequence.tolist()} 
+            all_subsequences_scores_dict[a_subsequence_idx] = all_subsequences_scores_dict[a_subsequence_idx] | {score_computation_name:computation_fn(a_subsequence, times=times, **computation_fn_kwargs_dict.get(score_computation_name, {})) for score_computation_name, computation_fn in all_score_computations_fn_dict.items()}
+
+        ## END for a_subseq....
+
+        ## once done with all scores for this decoder, have `_a_separate_decoder_new_scores_dict`:
+        all_subsequences_scores_df = pd.DataFrame.from_dict(all_subsequences_scores_dict, orient='index')
+        ## add the ['main_rank', 'is_main'] columns
+        all_subsequences_scores_df: pd.DataFrame = all_subsequences_scores_df.sort_values(['len', 'subsequence_idx', 'total_distance_traveled', 'track_coverage_score'], ascending=False).reset_index(drop=True) #.astype({'Probe_Epoch_id': 'int'}) # Sort by columns: 'Probe_Epoch_id' (ascending), 't_rel_seconds' (ascending), 'aclu' (ascending)
+        all_subsequences_scores_df['main_rank'] = all_subsequences_scores_df.index.to_numpy() ## adds the 'subsequence_main_rank' column
+        all_subsequences_scores_df['is_main'] = (all_subsequences_scores_df['main_rank'] == 0)
+        all_subsequences_scores_df = all_subsequences_scores_df.sort_values(['subsequence_idx'], ascending=True, inplace=False).reset_index(drop=True) ## restore normal ascending subsequence_index order
+
+        ## #TODO 2024-12-13 11:26: - [ ] Add ['num_repeats', 'num_intrusions', and various lengths subtracting these values from 'len']
+
+        return all_subsequences_scores_df
+
+
+
+    @function_attributes(short_name=None, tags=['df', 'compute'], input_requires=[], output_provides=[], uses=['post_compute_subsequence_properties'], used_by=['compute'], creation_date='2024-12-12 03:47', related_items=[])
+    def rebuild_sequence_info_df(self, additional_split_on_exceeding_jump_distance:bool=False) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """Rebuilds the sequence_info_df using the new subsequences.
-        Updates: self.position_bins_info_df, self.position_changes_info_df
+        Updates: self.position_bins_info_df, self.position_changes_info_df, self.subsequences_df
+        
         """
         # Initialize the dataframe
         self.position_bins_info_df = pd.DataFrame({'pos': self.flat_positions})
@@ -1328,7 +1389,14 @@ class SubsequencesPartitioningResult:
             self.position_changes_info_df = PandasHelpers.add_explicit_dataframe_columns_from_lookup_df(self.position_changes_info_df, lookup_properties_map_df=_temp_position_bins_info_df[included_lookup_column_names], join_column_name='next_bin_flat_idxs')
             self.position_changes_info_df = self.position_changes_info_df.rename(columns=desired_post_add_renamed_dict, inplace=False)
 
-        return self.position_bins_info_df, self.position_changes_info_df
+
+        # Subsequences Dataframe _____________________________________________________________________________________________ #
+        if self.merged_split_positions_arrays is not None:
+            self.subsequences_df = self.post_compute_subsequence_properties()
+        else:
+            self.subsequences_df = None
+
+        return self.position_bins_info_df, self.position_changes_info_df, self.subsequences_df
 
     # Existing properties and methods remain unchanged or are adjusted as necessary
     # Update properties that depend on split_positions_arrays and merged_split_positions_arrays
@@ -2929,7 +2997,6 @@ class HeuristicReplayScoring:
         """
         
         from neuropy.utils.indexing_helpers import NumpyHelpers, PandasHelpers
-        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import get_track_length_dict
 
         # computation_fn_kwargs_dict: passed to each score function to specify additional required parameters
         if computation_fn_kwargs_dict is None:
