@@ -1559,7 +1559,15 @@ class SubsequencesPartitioningResult:
                             
                 if position_changes_info_df is not None:
                     exceeding_jump_dist_diff_df = position_changes_info_df[position_changes_info_df['exceeds_jump_distance']] 
-                    change_times = exceeding_jump_dist_diff_df['t'].to_numpy()
+                    is_x_axis_integer_bin_indexed: bool = (x_starts[0] < 1)
+
+                    
+                    if is_x_axis_integer_bin_indexed:
+                        change_times = exceeding_jump_dist_diff_df.index.to_numpy()
+                        # change_times = change_times - change_times[0] ## subtract the start time to get to relative indexing
+                    else:                        
+                        change_times = exceeding_jump_dist_diff_df['t'].to_numpy()
+                        
                     prev_pos = exceeding_jump_dist_diff_df['prev_pos'].to_numpy()
                     next_pos = exceeding_jump_dist_diff_df['next_pos'].to_numpy()
                     
@@ -1605,9 +1613,6 @@ class SubsequencesPartitioningResult:
                 curr_subsequence_end_position: float = float(num_positions) * bin_width
                 # color = cmap(subsequence_idx % num_colors)
                 # curr_subsequence_size_sorted_idx: int = subsequence_len_sort_indicies[subsequence_idx]
-                
-
-                # curr_subsequence_size_sorted_idx: int = sorted_subsequence_lengths.index(subsequence_idx)
                 curr_subsequence_size_sorted_idx: int = len_sorted_subsequence_idxs.index(subsequence_idx)
                 
                 color = cmap(curr_subsequence_size_sorted_idx % num_colors) ## curr color set here
@@ -1763,9 +1768,22 @@ class SubsequencesPartitioningResult:
             fig = extant_ax_dict['ax_ungrouped_seq'].get_figure()
             
 
+        # flat_time_window_edges = np.arange(self.total_num_subsequence_bins+1)
+        # bin_width, (t_bin_starts, t_bin_centers, t_bin_ends), x_bins = self.get_flat_time_bins_info()
+        # Assert.len_equals(t_bin_starts, required_length=self.n_flat_position_bins)
+        # Assert.len_equals(t_bin_centers, required_length=self.n_flat_position_bins)
+        # Assert.len_equals(t_bin_ends, required_length=self.n_flat_position_bins)
+        force_integer_x_axis_index: bool = True
 
-        flat_time_window_edges = np.arange(self.total_num_subsequence_bins+1)
+        if (not force_integer_x_axis_index) and (self.flat_time_window_edges is not None):
+            flat_time_window_edges = deepcopy(self.flat_time_window_edges)
+            Assert.len_equals(flat_time_window_edges, required_length=(self.total_num_subsequence_bins+1))
+
+        else:    
+            flat_time_window_edges = np.arange(self.total_num_subsequence_bins+1)
+            Assert.len_equals(flat_time_window_edges, required_length=(self.total_num_subsequence_bins+1))
         
+
         split_most_likely_positions_arrays = deepcopy(self.flat_positions) ## unsplit positions
         pre_partitioned_debug_sequences_kwargs = dict(sequence_position_hlines_kwargs=dict(linewidth=2, linestyle=linestyle, zorder=10, alpha=1.0), # high-zorder to place it on-top, linestyle is "densely-dashed"
             split_vlines_kwargs = dict(should_skip=False),

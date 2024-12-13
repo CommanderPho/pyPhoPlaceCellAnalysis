@@ -2614,7 +2614,9 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
                 basic_linestyle = '-' # default
                 merged_split_positions_arrays = deepcopy(a_partition_result.merged_split_positions_arrays)
                 out: "MatplotlibRenderPlots" = a_partition_result.plot_time_bins_multiple(ax=curr_ax, enable_position_difference_indicators=False, flat_time_window_centers=time_window_centers, flat_time_window_edges=time_window_edges, override_positions_list=merged_split_positions_arrays, 
-                                                                                           enable_axes_formatting=False, defer_show=True, sequence_position_hlines_kwargs=dict(linewidth=3, linestyle=basic_linestyle, zorder=9, alpha=1.0),
+                                                                                           enable_axes_formatting=False, defer_show=True,
+                                                                                                sequence_position_hlines_kwargs=dict(linewidth=3, linestyle=basic_linestyle, zorder=9, alpha=1.0),
+                                                                                                main_sequence_position_dots_kwargs = dict(linewidths=2, marker ="^", edgecolor="#141414F9", s=75, zorder=10, alpha=0.85),
                                                                                            )
                 
                 if show_pre_merged_debug_sequences:
@@ -2623,7 +2625,7 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
                     # Plot only the positions themselves, as dotted overlaying lines
                     linestyle = (0, (1, 1)) # dots with 1pt dot, 0.5pt space
 
-                    pre_merged_debug_sequences_kwargs = dict(sequence_position_hlines_kwargs=dict(linewidth=2, linestyle=linestyle, zorder=10, alpha=1.0), # high-zorder to place it on-top, linestyle is "densely-dashed"
+                    pre_merged_debug_sequences_kwargs = dict(sequence_position_hlines_kwargs=dict(linewidth=2, linestyle=linestyle, zorder=11, alpha=1.0), # high-zorder to place it on-top, linestyle is "densely-dashed"
                         split_vlines_kwargs = dict(should_skip=True),
                         time_bin_edges_vlines_kwargs = dict(should_skip=True),
                         direction_change_lines_kwargs = dict(should_skip=True),
