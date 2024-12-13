@@ -345,28 +345,41 @@ class SubsequencesPartitioningResult:
         main_subsequence_df = self.subsequences_df[self.subsequences_df['is_main']]
         # ['n_intrusion_bins', 'len', 'len_excluding_repeats', 'len_excluding_intrusions', 'len_excluding_both']
 
-
-
-        if should_use_no_repeat_values:
-            # _, all_value_equiv_group_idxs_list = SubsequencesPartitioningResult.find_value_equiv_groups(flat_positions, same_thresh_cm=self.same_thresh)
-            # total_num_all_good_values: int = len(all_value_equiv_group_idxs_list) # the number of equivalence value sets in the longest subsequence
-            # _, value_equiv_group_idxs_list = SubsequencesPartitioningResult.find_value_equiv_groups(longest_subsequence, same_thresh_cm=self.same_thresh)
-            # num_items_per_equiv_list: List[int] = [len(v) for v in value_equiv_group_idxs_list] ## number of items in each equiv-list
-            # num_longest_subsequence_good_values: int = len(value_equiv_group_idxs_list) # the number of equivalence value sets in the longest subsequence
-            num_longest_subsequence_good_values = main_subsequence_df['len_excluding_repeats'].to_numpy()[0]
+        # if should_use_no_repeat_values:
+        #     # _, all_value_equiv_group_idxs_list = SubsequencesPartitioningResult.find_value_equiv_groups(flat_positions, same_thresh_cm=self.same_thresh)
+        #     # total_num_all_good_values: int = len(all_value_equiv_group_idxs_list) # the number of equivalence value sets in the longest subsequence
+        #     # _, value_equiv_group_idxs_list = SubsequencesPartitioningResult.find_value_equiv_groups(longest_subsequence, same_thresh_cm=self.same_thresh)
+        #     # num_items_per_equiv_list: List[int] = [len(v) for v in value_equiv_group_idxs_list] ## number of items in each equiv-list
+        #     # num_longest_subsequence_good_values: int = len(value_equiv_group_idxs_list) # the number of equivalence value sets in the longest subsequence
+        #     num_longest_subsequence_good_values = main_subsequence_df['len_excluding_repeats'].to_numpy()[0]
 
             
-        else:
-            ## version that doesn't ignore repeats:
-            # total_num_all_good_values = self.total_num_subsequence_bins
-            # num_longest_subsequence_good_values = len(longest_subsequence)
-            num_longest_subsequence_good_values = main_subsequence_df['len'].to_numpy()[0]
+        # else:
+        #     ## version that doesn't ignore repeats:
+        #     # total_num_all_good_values = self.total_num_subsequence_bins
+        #     # num_longest_subsequence_good_values = len(longest_subsequence)
+        #     num_longest_subsequence_good_values = main_subsequence_df['len'].to_numpy()[0]
             
+
+        # if should_ignore_intrusion_bins:
+        #     ## Ignoring intrusion bins
+        #     num_longest_subsequence_good_values = num_longest_subsequence_good_values - main_subsequence_df['n_intrusion_bins'].to_numpy()[0]
+            
+
 
         if should_ignore_intrusion_bins:
-            ## Ignoring intrusion bins
-            num_longest_subsequence_good_values = num_longest_subsequence_good_values - main_subsequence_df['n_intrusion_bins'].to_numpy()[0]
-            
+            if should_use_no_repeat_values:
+                num_longest_subsequence_good_values = main_subsequence_df['len_excluding_both'].to_numpy()[0]
+            else:
+                num_longest_subsequence_good_values = main_subsequence_df['len_excluding_intrusions'].to_numpy()[0]
+
+        else:
+            if should_use_no_repeat_values:
+                num_longest_subsequence_good_values = main_subsequence_df['len_excluding_repeats'].to_numpy()[0]
+            else:
+                num_longest_subsequence_good_values = main_subsequence_df['len'].to_numpy()[0]
+
+
 
         if not return_ratio:
             return int(num_longest_subsequence_good_values)
@@ -393,6 +406,7 @@ class SubsequencesPartitioningResult:
                     total_num_all_good_values = all_subsequence_values_count_dict['len']
 
             if total_num_all_good_values > 0:
+                assert num_longest_subsequence_good_values <= total_num_all_good_values, f"num_longest_subsequence_good_values: {num_longest_subsequence_good_values}, total_num_all_good_values: {total_num_all_good_values}"
                 return (float(num_longest_subsequence_good_values) / float(total_num_all_good_values)) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
             else:
                 return 0.0 # zero it out if they are all repeats
