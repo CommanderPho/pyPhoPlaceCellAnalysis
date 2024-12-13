@@ -3001,6 +3001,7 @@ class HeuristicReplayScoring:
             'continuous_seq_sort': dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(xbin_edges)),
             'sweep_score':  dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, num_pos_bins=num_pos_bins, pos_bin_edges=deepcopy(xbin_edges)),
             'track_coverage_score':  dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(xbin_edges)),
+            'total_distance_traveled': dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(xbin_edges)),
         }
         
         all_score_computations_fn_dict = cls.build_all_score_computations_fn_dict()
