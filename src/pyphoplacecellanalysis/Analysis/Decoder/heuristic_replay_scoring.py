@@ -2645,8 +2645,20 @@ class HeuristicReplayScoring:
         a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
         n_time_bins: int = a_result.nbins[an_epoch_idx]
         n_pos_bins: int = np.shape(a_p_x_given_n)[0]
-        time_window_centers = a_result.time_window_centers[an_epoch_idx]
-        time_bin_edges = a_result.time_bin_edges[an_epoch_idx]
+        
+        time_window_centers = a_result.time_window_centers[an_epoch_idx] # (1, ) --- correct
+        time_bin_edges = a_result.time_bin_edges[an_epoch_idx] # (30, )
+        
+        if (n_time_bins == 1) and (len(time_window_centers) == 1):
+            ## fix time_bin_edges -- it has been noticed when there's only one bin, `time_bin_edges` has a drastically wrong number of elements (e.g. len (30, )) while `time_window_centers` is right.
+            if len(time_bin_edges) != 2:
+                ## fix em
+                time_bin_container = a_result.time_bin_containers[an_epoch_idx]
+                time_bin_edges = np.array(list(time_bin_container.center_info.variable_extents))
+                assert len(time_bin_edges) == 2, f"tried to fix but FAILED!"
+                # print(f'fixed time_bin_edges: {time_bin_edges}')
+
+
         if (same_thresh_cm is None):
             assert same_thresh_fraction_of_track is not None
             same_thresh_cm: float = float(same_thresh_fraction_of_track * a_decoder_track_length)
@@ -2662,9 +2674,6 @@ class HeuristicReplayScoring:
                                                                                                                     flat_time_window_centers=deepcopy(time_window_centers), flat_time_window_edges=deepcopy(time_bin_edges))
 
         longest_sequence_length: int = int(partition_result.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=False, should_use_no_repeat_values=False))
-        
-        if np.isclose(a_most_likely_positions_list[0],  92.2559):
-            print('HIT IT!')
              
         return longest_sequence_length
     
@@ -2685,7 +2694,18 @@ class HeuristicReplayScoring:
         n_time_bins: int = a_result.nbins[an_epoch_idx]
         n_pos_bins: int = np.shape(a_p_x_given_n)[0]
         time_window_centers = a_result.time_window_centers[an_epoch_idx]
-        time_bin_edges = a_result.time_bin_edges[an_epoch_idx]
+        time_bin_edges = a_result.time_bin_edges[an_epoch_idx] # (30, )
+        
+        if (n_time_bins == 1) and (len(time_window_centers) == 1):
+            ## fix time_bin_edges -- it has been noticed when there's only one bin, `time_bin_edges` has a drastically wrong number of elements (e.g. len (30, )) while `time_window_centers` is right.
+            if len(time_bin_edges) != 2:
+                ## fix em
+                time_bin_container = a_result.time_bin_containers[an_epoch_idx]
+                time_bin_edges = np.array(list(time_bin_container.center_info.variable_extents))
+                assert len(time_bin_edges) == 2, f"tried to fix but FAILED!"
+                # print(f'fixed time_bin_edges: {time_bin_edges}')
+
+
         if (same_thresh_cm is None):
             assert same_thresh_fraction_of_track is not None
             same_thresh_cm: float = float(same_thresh_fraction_of_track * a_decoder_track_length)
@@ -2709,7 +2729,17 @@ class HeuristicReplayScoring:
         n_time_bins: int = a_result.nbins[an_epoch_idx]
         n_pos_bins: int = np.shape(a_p_x_given_n)[0]
         time_window_centers = a_result.time_window_centers[an_epoch_idx]
-        time_bin_edges = a_result.time_bin_edges[an_epoch_idx]
+        time_bin_edges = a_result.time_bin_edges[an_epoch_idx] # (30, )
+        
+        if (n_time_bins == 1) and (len(time_window_centers) == 1):
+            ## fix time_bin_edges -- it has been noticed when there's only one bin, `time_bin_edges` has a drastically wrong number of elements (e.g. len (30, )) while `time_window_centers` is right.
+            if len(time_bin_edges) != 2:
+                ## fix em
+                time_bin_container = a_result.time_bin_containers[an_epoch_idx]
+                time_bin_edges = np.array(list(time_bin_container.center_info.variable_extents))
+                assert len(time_bin_edges) == 2, f"tried to fix but FAILED!"
+                # print(f'fixed time_bin_edges: {time_bin_edges}')
+
         if (same_thresh_cm is None):
             assert same_thresh_fraction_of_track is not None
             same_thresh_cm: float = float(same_thresh_fraction_of_track * a_decoder_track_length)
@@ -2733,7 +2763,17 @@ class HeuristicReplayScoring:
         n_time_bins: int = a_result.nbins[an_epoch_idx]
         n_pos_bins: int = np.shape(a_p_x_given_n)[0]
         time_window_centers = a_result.time_window_centers[an_epoch_idx]
-        time_bin_edges = a_result.time_bin_edges[an_epoch_idx]
+        time_bin_edges = a_result.time_bin_edges[an_epoch_idx] # (30, )
+        
+        if (n_time_bins == 1) and (len(time_window_centers) == 1):
+            ## fix time_bin_edges -- it has been noticed when there's only one bin, `time_bin_edges` has a drastically wrong number of elements (e.g. len (30, )) while `time_window_centers` is right.
+            if len(time_bin_edges) != 2:
+                ## fix em
+                time_bin_container = a_result.time_bin_containers[an_epoch_idx]
+                time_bin_edges = np.array(list(time_bin_container.center_info.variable_extents))
+                assert len(time_bin_edges) == 2, f"tried to fix but FAILED!"
+                # print(f'fixed time_bin_edges: {time_bin_edges}')
+
         if (same_thresh_cm is None):
             assert same_thresh_fraction_of_track is not None
             same_thresh_cm: float = float(same_thresh_fraction_of_track * a_decoder_track_length)
@@ -2758,7 +2798,17 @@ class HeuristicReplayScoring:
         n_time_bins: int = a_result.nbins[an_epoch_idx]
         n_pos_bins: int = np.shape(a_p_x_given_n)[0]
         time_window_centers = a_result.time_window_centers[an_epoch_idx]
-        time_bin_edges = a_result.time_bin_edges[an_epoch_idx]
+        time_bin_edges = a_result.time_bin_edges[an_epoch_idx] # (30, )
+        
+        if (n_time_bins == 1) and (len(time_window_centers) == 1):
+            ## fix time_bin_edges -- it has been noticed when there's only one bin, `time_bin_edges` has a drastically wrong number of elements (e.g. len (30, )) while `time_window_centers` is right.
+            if len(time_bin_edges) != 2:
+                ## fix em
+                time_bin_container = a_result.time_bin_containers[an_epoch_idx]
+                time_bin_edges = np.array(list(time_bin_container.center_info.variable_extents))
+                assert len(time_bin_edges) == 2, f"tried to fix but FAILED!"
+                # print(f'fixed time_bin_edges: {time_bin_edges}')
+
         if (same_thresh_cm is None):
             assert same_thresh_fraction_of_track is not None
             same_thresh_cm: float = float(same_thresh_fraction_of_track * a_decoder_track_length)
@@ -2784,7 +2834,17 @@ class HeuristicReplayScoring:
         n_time_bins: int = a_result.nbins[an_epoch_idx]
         n_pos_bins: int = np.shape(a_p_x_given_n)[0]
         time_window_centers = a_result.time_window_centers[an_epoch_idx]
-        time_bin_edges = a_result.time_bin_edges[an_epoch_idx]
+        time_bin_edges = a_result.time_bin_edges[an_epoch_idx] # (30, )
+        
+        if (n_time_bins == 1) and (len(time_window_centers) == 1):
+            ## fix time_bin_edges -- it has been noticed when there's only one bin, `time_bin_edges` has a drastically wrong number of elements (e.g. len (30, )) while `time_window_centers` is right.
+            if len(time_bin_edges) != 2:
+                ## fix em
+                time_bin_container = a_result.time_bin_containers[an_epoch_idx]
+                time_bin_edges = np.array(list(time_bin_container.center_info.variable_extents))
+                assert len(time_bin_edges) == 2, f"tried to fix but FAILED!"
+                # print(f'fixed time_bin_edges: {time_bin_edges}')
+
         if (same_thresh_cm is None):
             assert same_thresh_fraction_of_track is not None
             same_thresh_cm: float = float(same_thresh_fraction_of_track * a_decoder_track_length)
@@ -2831,7 +2891,7 @@ class HeuristicReplayScoring:
          ## END OLD
          'main_seq_len': cls.bin_wise_main_subsequence_len_fn,
          'main_seq_len_ignoring_intrusions': cls.bin_wise_main_subsequence_len_ignoring_intrusions_fn, 
-        #  'main_seq_len_ignoring_intrusions_and_repeats': cls.bin_wise_main_subsequence_len_ignoring_intrusions_and_repeats_fn,
+         'main_seq_len_ignoring_intrusions_and_repeats': cls.bin_wise_main_subsequence_len_ignoring_intrusions_and_repeats_fn,
          'main_seq_track_coverage_score': cls.bin_wise_main_subsequence_track_coverage_score_fn, 
          'main_seq_total_distance_traveled': cls.bin_wise_main_subsequence_total_distance_traveled_fn,
          # ['main_seq_len', 'main_seq_len_ignoring_intrusions', 'main_seq_len_ignoring_intrusions_and_repeats', 'main_seq_track_coverage_score', 'main_seq_total_distance_traveled']
