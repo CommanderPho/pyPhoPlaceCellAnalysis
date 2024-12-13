@@ -1796,7 +1796,8 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         decoder_track_length: float = self.params.get('track_length_cm', None)
         assert decoder_track_length is not None
         # Build Decoded Positions Data and add them:    
-        decoded_sequence_and_heuristics_curves_data = DecodedSequenceAndHeuristicsPlotDataProvider.decoder_build_single_decoded_sequence_and_heuristics_curves_data(deepcopy(decoder_decoded_epochs_result), decoder_track_length=decoder_track_length, included_columns=included_columns)
+        pos_bin_edges = deepcopy(self.params.xbin)
+        decoded_sequence_and_heuristics_curves_data = DecodedSequenceAndHeuristicsPlotDataProvider.decoder_build_single_decoded_sequence_and_heuristics_curves_data(deepcopy(decoder_decoded_epochs_result), pos_bin_edges=pos_bin_edges, decoder_track_length=decoder_track_length, included_columns=included_columns)
         if decoded_sequence_and_heuristics_curves_data is not None:
             DecodedSequenceAndHeuristicsPlotDataProvider.add_data_to_pagination_controller(self, decoded_sequence_and_heuristics_curves_data, update_controller_on_apply=False)
 
@@ -2302,7 +2303,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             raise NotImplementedError(f"epoch_type_name: {epoch_type_name}")
 
         ## Add the radon_transform_lines to each of the four figures:
-        for a_name, a_pagination_controller in self.pagination_controllers.items():            
+        for a_name, a_pagination_controller in self.pagination_controllers.items():          
+            # a_pagination_controller.params.xbin 
             a_pagination_controller.add_data_overlays(decoder_decoded_epochs_result=decoder_decoded_epochs_result_dict[a_name], included_columns=included_columns, defer_refresh=True)
 
         if not defer_refresh:
