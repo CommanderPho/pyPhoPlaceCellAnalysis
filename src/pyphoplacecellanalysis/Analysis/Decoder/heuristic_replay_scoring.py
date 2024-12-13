@@ -944,7 +944,7 @@ class SubsequencesPartitioningResult:
                                                                                                                                                                             max_ignore_bins=max_ignore_bins, should_skip_epoch_with_only_short_subsequences=should_skip_epoch_with_only_short_subsequences, debug_print=debug_print)
 
         ## OUTPUTS: final_out_subsequences
-        
+        final_out_subsequences = [v for v in final_out_subsequences if len(v) > 0] ## only non-empty subsequences
 
         # Update Self ________________________________________________________________________________________________________ #
         ## update self properties
@@ -961,6 +961,7 @@ class SubsequencesPartitioningResult:
         
         # return (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index)
         return original_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_idxs)
+
 
     @function_attributes(short_name=None, tags=['partition'], input_requires=['self.merged_split_positions_arrays'], output_provides=['self.merged_split_positions_arrays'], uses=[], used_by=['compute'], creation_date='2024-12-11 23:42', related_items=[])
     def enforce_max_jump_distance(self, max_jump_distance_cm: float = 60.0, debug_print=False):
@@ -1054,6 +1055,8 @@ class SubsequencesPartitioningResult:
                 print(f'first_order_diff_value_exceeeding_jump_distance_indicies: {first_order_diff_value_exceeeding_jump_distance_indicies}')
                 print(f'\toriginal_merged_split_positions_arrays: {original_merged_split_positions_arrays}')
                 print(f'\tnew_merged_split_positions_arrays: {new_merged_split_positions_arrays}')
+                
+            new_merged_split_positions_arrays = [v for v in new_merged_split_positions_arrays if len(v) > 0] ## exclude empty subsequences
             self.merged_split_positions_arrays = deepcopy(new_merged_split_positions_arrays)
         
         # return (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index)
@@ -1187,6 +1190,8 @@ class SubsequencesPartitioningResult:
         # active_split_indicies = deepcopy(partition_result.diff_split_indicies) - 1 ## this is what it should be, but all the splits are +1 later than they should be
         active_split_indicies = deepcopy(self.split_indicies) ## this is what it should be, but all the splits are +1 later than they should be
         split_most_likely_positions_arrays = np.split(self.flat_positions, active_split_indicies)
+        ## Drop empty subsequences
+        split_most_likely_positions_arrays = [x for x in split_most_likely_positions_arrays if len(x) > 0] ## only non-zero entries
         self.split_positions_arrays = split_most_likely_positions_arrays
         
         # Set `merged_split_positions_arrays` ________________________________________________________________________________ #
@@ -1199,13 +1204,22 @@ class SubsequencesPartitioningResult:
         else:
             first_order_diff_value_exceeeding_jump_distance_indicies = None
         
-        ## Common Post-hoc
+
+        ## Common Post-hoc:
+
+        ## Drop empty subsequences
+        self.merged_split_positions_arrays = [x for x in self.merged_split_positions_arrays if len(x) > 0] ## only non-zero entries
+
         # self.rebuild_sequence_info_df()
         self.position_bins_info_df, self.position_changes_info_df, self.subsequences_df = self.rebuild_sequence_info_df()
         if first_order_diff_value_exceeeding_jump_distance_indicies is not None:
             self.position_changes_info_df['exceeds_jump_distance'] = False
             self.position_changes_info_df.loc[first_order_diff_value_exceeeding_jump_distance_indicies, 'exceeds_jump_distance'] = True
             # first_order_diff_value_exceeeding_jump_distance_indicies
+
+
+
+        
 
 
     @function_attributes(short_name=None, tags=['post-compute'], input_requires=['self.merged_split_positions_arrays'], output_provides=[], uses=[], used_by=['.rebuild_sequence_info_df'], creation_date='2024-12-13 08:36', related_items=[])
@@ -1301,6 +1315,16 @@ class SubsequencesPartitioningResult:
         all_subsequences_scores_df = all_subsequences_scores_df.sort_values(['subsequence_idx'], ascending=True, inplace=False).reset_index(drop=True) ## restore normal ascending subsequence_index order
 
         ## #TODO 2024-12-13 11:26: - [ ] Add ['num_repeats', 'num_intrusions', and various lengths subtracting these values from 'len']
+        computed_subseq_properties_df = deepcopy(self.position_bins_info_df).groupby(['subsequence_idx']).agg(flat_idx_first=('flat_idx', 'first'), flat_idx_last=('flat_idx', 'last'),
+                                                                                                    start_t=('t_bin_start', 'first'), end_t=('t_bin_end', 'last'),
+                                                                                                    n_intrusion_bins=('is_intrusion', 'sum')).reset_index()
+
+        ## merge into `all_subsequences_scores_df`:
+        all_subsequences_scores_df = all_subsequences_scores_df.merge(computed_subseq_properties_df, how='left', on='subsequence_idx') ## requires that the output dataframe has all rows that were in `subsequences_df`, filling in NaNs when no corresponding values are found in the right df
+        all_subsequences_scores_df['len_excluding_intrusions'] = all_subsequences_scores_df['len'] - all_subsequences_scores_df['n_intrusion_bins']
+        all_subsequences_scores_df['len_excluding_both'] = all_subsequences_scores_df['len_excluding_repeats'] - all_subsequences_scores_df['n_intrusion_bins']
+        ## move all the length-related columns to the end
+        all_subsequences_scores_df = PandasHelpers.reordering_columns_relative(all_subsequences_scores_df, column_names=list(filter(lambda column: ((column == 'len') or column.startswith('len_')), all_subsequences_scores_df.columns)), relative_mode='end')
 
         return all_subsequences_scores_df
 
