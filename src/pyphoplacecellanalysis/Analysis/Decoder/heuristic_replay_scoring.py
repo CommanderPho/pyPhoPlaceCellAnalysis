@@ -1216,6 +1216,14 @@ class SubsequencesPartitioningResult:
                 print(f'subsequence[{a_subsequence_idx}]:{a_subsequence_times} || {a_subsequence}')
             ## INPUTS: a_subsequence
             total_num_values: int = len(a_subsequence)
+
+            ## 2024-12-13 - remove inclusons first
+            ###################### 44444444444444444444444444444444444444444444444444444444 #######################################
+            non_intrusion_pos_bins_df = position_bins_info_df[np.logical_not(position_bins_info_df['is_intrusion'])]
+            non_intrusion_idxs = non_intrusion_pos_bins_df['flat_idx'].to_numpy()
+            non_intrusion_times = non_intrusion_pos_bins_df['t_bin_center'].to_numpy()
+            non_intrusion_pos = non_intrusion_pos_bins_df['pos'].to_numpy()
+
             
             _, value_equiv_group_idxs_list = SubsequencesPartitioningResult.find_value_equiv_groups(a_subsequence, same_thresh_cm=self.same_thresh)
             total_num_values_excluding_repeats: int = len(value_equiv_group_idxs_list) ## the total number of non-repeated values
@@ -1244,6 +1252,11 @@ class SubsequencesPartitioningResult:
         computed_subseq_properties_df = deepcopy(self.position_bins_info_df).groupby(['subsequence_idx']).agg(flat_idx_first=('flat_idx', 'first'), flat_idx_last=('flat_idx', 'last'),
                                                                                                     start_t=('t_bin_start', 'first'), end_t=('t_bin_end', 'last'),
                                                                                                     n_intrusion_bins=('is_intrusion', 'sum')).reset_index()
+
+
+        ## Proper method is to remove the intrusions, and then look for repeats
+        # ['is_intrusion'] or  ## don't double-count the repeats for intrusions
+
 
         ## merge into `all_subsequences_scores_df`:
         all_subsequences_scores_df = all_subsequences_scores_df.merge(computed_subseq_properties_df, how='left', on='subsequence_idx') ## requires that the output dataframe has all rows that were in `subsequences_df`, filling in NaNs when no corresponding values are found in the right df
