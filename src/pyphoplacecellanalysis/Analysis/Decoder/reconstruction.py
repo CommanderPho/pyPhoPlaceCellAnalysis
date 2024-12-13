@@ -630,6 +630,26 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         The two representational formats are:
             1. 
     
+            
+            
+    WARNING/BUGS/LIMITATIONS: when there's only one bin in epoch, `time_bin_edges` has a drastically wrong number of elements (e.g. len (30, )) while `time_window_centers` is right
+        Workaround: can be fixed with the following code:
+    
+        n_time_bins: int = a_result.nbins[an_epoch_idx]
+        time_window_centers = a_result.time_window_centers[an_epoch_idx]
+        time_bin_edges = a_result.time_bin_edges[an_epoch_idx] # (30, )
+        
+        if (n_time_bins == 1) and (len(time_window_centers) == 1):
+            ## fix time_bin_edges -- it has been noticed when there's only one bin, `time_bin_edges` has a drastically wrong number of elements (e.g. len (30, )) while `time_window_centers` is right.
+            if len(time_bin_edges) != 2:
+                ## fix em
+                time_bin_container = a_result.time_bin_containers[an_epoch_idx]
+                time_bin_edges = np.array(list(time_bin_container.center_info.variable_extents))
+                assert len(time_bin_edges) == 2, f"tried to fix but FAILED!"
+                # print(f'fixed time_bin_edges: {time_bin_edges}')
+
+                
+            
     Usage:
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 
