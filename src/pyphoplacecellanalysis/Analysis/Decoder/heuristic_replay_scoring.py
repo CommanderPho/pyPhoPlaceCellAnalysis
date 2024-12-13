@@ -1187,7 +1187,8 @@ class SubsequencesPartitioningResult:
             'sweep_score':  dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, num_pos_bins=num_pos_bins, pos_bin_edges=deepcopy(xbin_edges)),
             'track_coverage_score':  dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(xbin_edges)),
             'total_distance_traveled': dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(xbin_edges)),
-        } | {k:deepcopy(dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(xbin_edges))) for k in ['main_seq_len', 'main_seq_len_ignoring_intrusions', 'main_seq_len_ignoring_intrusions_and_repeats', 'main_seq_len_ratio_ignoring_intrusions_and_repeats', 'main_seq_track_coverage_score', 'main_seq_total_distance_traveled']}
+        } | {k:deepcopy(dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(xbin_edges))) for k in ['main_seq_len', 'main_seq_len_ignoring_intrusions', 'main_seq_len_ignoring_intrusions_and_repeats', 'main_seq_len_ratio_ignoring_intrusions_and_repeats',
+                                                                                                                                                                                                                            'main_seq_track_coverage_score', 'main_seq_total_distance_traveled']}
 
 
         # bin_width, (x_starts, x_centers, x_ends), x_bins = self.get_flat_time_bins_info()
@@ -1204,11 +1205,10 @@ class SubsequencesPartitioningResult:
         merged_split_positions_arrays = deepcopy(self.merged_split_positions_arrays)
     
         is_non_intrusion_bin = np.logical_not(self.position_bins_info_df['is_intrusion'].to_numpy())
-        non_intrusion_pos_bins_df = self.position_bins_info_df[np.logical_not(self.position_bins_info_df['is_intrusion'])]
-        non_intrusion_idxs = non_intrusion_pos_bins_df['flat_idx'].to_numpy()
-        non_intrusion_times = non_intrusion_pos_bins_df['t_bin_center'].to_numpy()
-        non_intrusion_pos = non_intrusion_pos_bins_df['pos'].to_numpy()
-
+        # non_intrusion_pos_bins_df = self.position_bins_info_df[np.logical_not(self.position_bins_info_df['is_intrusion'])]
+        # non_intrusion_idxs = non_intrusion_pos_bins_df['flat_idx'].to_numpy()
+        # non_intrusion_times = non_intrusion_pos_bins_df['t_bin_center'].to_numpy()
+        # non_intrusion_pos = non_intrusion_pos_bins_df['pos'].to_numpy()
 
         Assert.same_length(times, self.flat_positions)
         
@@ -2801,8 +2801,7 @@ class HeuristicReplayScoring:
         ## Begin computations:
         partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, pos_bin_edges=pos_bin_edges, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm,
                                                                                                                     flat_time_window_centers=deepcopy(time_window_centers), flat_time_window_edges=deepcopy(time_bin_edges))
-        longest_sequence_length: int = int(partition_result.get_longest_sequence_length(return_ratio=True, should_ignore_intrusion_bins=True, should_use_no_repeat_values=True))
-        return longest_sequence_length
+        return partition_result.get_longest_sequence_length(return_ratio=True, should_ignore_intrusion_bins=True, should_use_no_repeat_values=True)
     
 
 
@@ -3258,7 +3257,8 @@ class HeuristicReplayScoring:
             'sweep_score':  dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, num_pos_bins=num_pos_bins, pos_bin_edges=deepcopy(xbin_edges)),
             'track_coverage_score':  dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(xbin_edges)),
             'total_distance_traveled': dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(xbin_edges)),
-        } | {k:deepcopy(dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(xbin_edges))) for k in ['main_seq_len', 'main_seq_len_ignoring_intrusions', 'main_seq_len_ignoring_intrusions_and_repeats', 'main_seq_len_ratio_ignoring_intrusions_and_repeats', 'main_seq_track_coverage_score', 'main_seq_total_distance_traveled']}
+        } | {k:deepcopy(dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(xbin_edges))) for k in ['main_seq_len', 'main_seq_len_ignoring_intrusions',
+                                                                                                                                                                                                                            'main_seq_len_ignoring_intrusions_and_repeats', 'main_seq_len_ratio_ignoring_intrusions_and_repeats', 'main_seq_track_coverage_score', 'main_seq_total_distance_traveled']}
         
         all_score_computations_fn_dict = cls.build_all_score_computations_fn_dict()
         a_decoded_filter_epochs_decoder_result_dict, all_epochs_scores_df = cls._run_all_score_computations(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=a_decoded_filter_epochs_decoder_result_dict, all_score_computations_fn_dict=all_score_computations_fn_dict, computation_fn_kwargs_dict=computation_fn_kwargs_dict)

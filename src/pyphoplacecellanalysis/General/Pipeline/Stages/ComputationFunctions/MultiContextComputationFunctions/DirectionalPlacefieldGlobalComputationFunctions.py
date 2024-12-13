@@ -2525,11 +2525,6 @@ class DecoderDecodedEpochsResult(ComputedResult):
 		weighted_corr_col_names = ['wcorr']
 		pearson_col_names = ['pearsonr']
 
-		# heuristic_score_col_names = ['travel', 'coverage', 'jump', 'longest_sequence_length_ratio', 'direction_change_bin_ratio', 'congruent_dir_bins_ratio', 'total_congruent_direction_change'] + ['total_variation', 'integral_second_derivative', 'stddev_of_diff'] # , 'sequential_correlation', 'monotonicity_score', 'laplacian_smoothness', 'longest_sequence_length'
-		# heuristic_score_col_names = ['travel', 'coverage'] + ['jump', 'max_jump_cm', 'max_jump_cm_per_sec', 'ratio_jump_valid_bins'] +  ['longest_sequence_length', 'longest_sequence_length_ratio', 'direction_change_bin_ratio', 'congruent_dir_bins_ratio', 'total_congruent_direction_change'] + ['total_variation', 'integral_second_derivative', 'stddev_of_diff'] # , 'sequential_correlation', 'monotonicity_score', 'laplacian_smoothness', 'longest_sequence_length'
-		# ['jump', 'max_jump_cm', 'max_jump_cm_per_sec', 'ratio_jump_valid_bins', 'travel', 'coverage', 'sequential_correlation', 'monotonicity_score', 'laplacian_smoothness']
-		# heuristic_score_col_names += ['continuous_seq_sort', 'continuous_seq_len_ratio_no_repeats']
-		
 		heuristic_score_col_names = HeuristicReplayScoring.get_all_score_computation_col_names()
 		print(f'heuristic_score_col_names: {heuristic_score_col_names}')
 
