@@ -1482,6 +1482,7 @@ class WeightedCorrelationPlotData:
         return ['wcorr', 'P_decoder', 'pearsonr',
                 'travel', 'coverage', 'avg_jump_cm', 'max_jump', 'max_jump_cm', 'max_jump_cm_per_sec', 'ratio_jump_valid_bins',
                 'total_congruent_direction_change', 'longest_sequence_length', 'continuous_seq_sort', 'continuous_seq_len_ratio_no_repeats', 'main_contiguous_subsequence_len',
+                'main_seq_len', 'main_seq_len_ignoring_intrusions', 'main_seq_len_ignoring_intrusions_and_repeats', 'main_seq_track_coverage_score', 'main_seq_total_distance_traveled',
         ]
 
     @classmethod
@@ -1549,6 +1550,12 @@ class WeightedCorrelationPlotData:
                 'continuous_seq_sort':default_smart_formatting_fn_factory(short_name='seq_srt'),
                 'continuous_seq_len_ratio_no_repeats':default_smart_formatting_fn_factory(short_name='seq_srt_no_rep'),
                 'main_contiguous_subsequence_len':default_smart_formatting_fn_factory(short_name='main_seq_len'),
+
+                'main_seq_len':default_smart_formatting_fn_factory(short_name='main_seq_len'),
+                'main_seq_len_ignoring_intrusions':default_smart_formatting_fn_factory(short_name='main_seq_len_ignoring_intrusions'),
+                'main_seq_len_ignoring_intrusions_and_repeats':default_smart_formatting_fn_factory(short_name='main_seq_len_ignoring_intrusions_and_repeats'),
+                'main_seq_track_coverage_score':default_smart_formatting_fn_factory(short_name='main_seq_track_coverage_score'),
+                'main_seq_total_distance_traveled':default_smart_formatting_fn_factory(short_name='main_seq_total_distance_traveled'),                            
             }
 
             # actually_present_column_formatting_fn_dict = {k:v for k, v in column_formatting_fn_dict.items() if k in actually_present_df_column_names} # this version requires all columns to be defined in the above  `column_formatting_fn_dict`, see below
