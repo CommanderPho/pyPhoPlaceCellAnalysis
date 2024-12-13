@@ -1202,7 +1202,14 @@ class SubsequencesPartitioningResult:
 
         all_subsequences_scores_dict = {}
         merged_split_positions_arrays = deepcopy(self.merged_split_positions_arrays)
-        
+    
+        is_non_intrusion_bin = np.logical_not(self.position_bins_info_df['is_intrusion'].to_numpy())
+        non_intrusion_pos_bins_df = self.position_bins_info_df[np.logical_not(self.position_bins_info_df['is_intrusion'])]
+        non_intrusion_idxs = non_intrusion_pos_bins_df['flat_idx'].to_numpy()
+        non_intrusion_times = non_intrusion_pos_bins_df['t_bin_center'].to_numpy()
+        non_intrusion_pos = non_intrusion_pos_bins_df['pos'].to_numpy()
+
+
         Assert.same_length(times, self.flat_positions)
         
         split_lengths = [len(v) for v in merged_split_positions_arrays]
@@ -1211,39 +1218,56 @@ class SubsequencesPartitioningResult:
         Assert.same_length(split_subsequence_times_list, merged_split_positions_arrays) # must have same number of position_subsequences and time_subsequences
         assert np.all(np.array([len(v) for v in split_subsequence_times_list]) == split_lengths) #, f"times and positions for each subsequence must match!"
         
-        for a_subsequence_idx, (a_subsequence_times, a_subsequence) in enumerate(zip(split_subsequence_times_list, merged_split_positions_arrays)):
+        split_subsequence_is_non_intrusion_bin_list = [v for v in np.split(is_non_intrusion_bin, split_indicies) if len(v) > 0] # exclude empty subsequences
+        Assert.same_length(split_subsequence_is_non_intrusion_bin_list, merged_split_positions_arrays) # must have same number of position_subsequences and time_subsequences
+        assert np.all(np.array([len(v) for v in split_subsequence_is_non_intrusion_bin_list]) == split_lengths)
+        
+
+        for a_subsequence_idx, (a_subsequence_times, a_subsequence, a_subsequence_is_non_intrusion_bin) in enumerate(zip(split_subsequence_times_list, merged_split_positions_arrays, split_subsequence_is_non_intrusion_bin_list)):
             if debug_print:
                 print(f'subsequence[{a_subsequence_idx}]:{a_subsequence_times} || {a_subsequence}')
             ## INPUTS: a_subsequence
             total_num_values: int = len(a_subsequence)
 
-            ## 2024-12-13 - remove inclusons first
-            ###################### 44444444444444444444444444444444444444444444444444444444 #######################################
-            non_intrusion_pos_bins_df = position_bins_info_df[np.logical_not(position_bins_info_df['is_intrusion'])]
-            non_intrusion_idxs = non_intrusion_pos_bins_df['flat_idx'].to_numpy()
-            non_intrusion_times = non_intrusion_pos_bins_df['t_bin_center'].to_numpy()
-            non_intrusion_pos = non_intrusion_pos_bins_df['pos'].to_numpy()
-
-            
+            # Excluding Repeats Only _____________________________________________________________________________________________ #
             _, value_equiv_group_idxs_list = SubsequencesPartitioningResult.find_value_equiv_groups(a_subsequence, same_thresh_cm=self.same_thresh)
             total_num_values_excluding_repeats: int = len(value_equiv_group_idxs_list) ## the total number of non-repeated values
             total_num_repeated_values: int = total_num_values - total_num_values_excluding_repeats
+            ## OUTPUT: total_num_values_excluding_repeats, total_num_repeated_values
+            
+
+            ## 2024-12-13 - remove inclusons first
+            ###################### 44444444444444444444444444444444444444444444444444444444 #######################################
+            a_subsequence_non_intrusion_pos = a_subsequence[a_subsequence_is_non_intrusion_bin]
+            a_subsequence_non_intrusion_times = a_subsequence[a_subsequence_is_non_intrusion_bin]
+            total_num_values_excluding_intrusions: int = len(a_subsequence_non_intrusion_pos) ## OUTPUT: total_num_values_excluding_intrusions
+            
+            _, non_intrusion_value_equiv_group_idxs_list = SubsequencesPartitioningResult.find_value_equiv_groups(a_subsequence_non_intrusion_pos, same_thresh_cm=self.same_thresh)
+            total_num_values_excluding_intrusions_and_repeats: int = len(non_intrusion_value_equiv_group_idxs_list) ## the total number of non-repeated values
+            ## OUTPUT: total_num_values_excluding_intrusions, total_num_values_excluding_intrusions_and_repeats
+
             if debug_print:
                 print(f'total_num_values: {total_num_values}')
-                print(f'total_num_values_excluding_repeats: {total_num_values_excluding_repeats}')
                 print(f'total_num_repeated_values: {total_num_repeated_values}')
+                print(f'total_num_values_excluding_repeats: {total_num_values_excluding_repeats}')
+                print(f'total_num_values_excluding_intrusions: {total_num_values_excluding_intrusions}')
+                print(f'total_num_values_excluding_intrusions_and_repeats: {total_num_values_excluding_intrusions_and_repeats}')
 
 
-            all_subsequences_scores_dict[a_subsequence_idx] = {'subsequence_idx': a_subsequence_idx, 'len': total_num_values, 'len_excluding_repeats': total_num_values_excluding_repeats, # 'len': total_num_values,
+            all_subsequences_scores_dict[a_subsequence_idx] = {'subsequence_idx': a_subsequence_idx, 'len': total_num_values, 'len_excluding_repeats': total_num_values_excluding_repeats, 'len_excluding_intrusions': total_num_values_excluding_intrusions, 'len_excluding_both': total_num_values_excluding_intrusions_and_repeats, 'n_repeated_values': total_num_repeated_values,
                                                                 'positions': a_subsequence.tolist()} 
             all_subsequences_scores_dict[a_subsequence_idx] = all_subsequences_scores_dict[a_subsequence_idx] | {score_computation_name:computation_fn(a_subsequence, times=deepcopy(a_subsequence_times), **computation_fn_kwargs_dict.get(score_computation_name, {})) for score_computation_name, computation_fn in all_score_computations_fn_dict.items()}
 
         ## END for a_subseq....
 
+
+        # main_subsequence_ranking_columns: List[str] = ['len', 'len_excluding_both', 'len_excluding_intrusions', 'len_excluding_repeats'] ## full length
+        main_subsequence_ranking_columns: List[str] = ['len_excluding_both', 'len_excluding_intrusions', 'len_excluding_repeats', 'len'] ## full length
+        
         ## once done with all scores for this decoder, have `_a_separate_decoder_new_scores_dict`:
         all_subsequences_scores_df = pd.DataFrame.from_dict(all_subsequences_scores_dict, orient='index')
         ## add the ['main_rank', 'is_main'] columns
-        all_subsequences_scores_df: pd.DataFrame = all_subsequences_scores_df.sort_values(['len', 'subsequence_idx', 'total_distance_traveled', 'track_coverage_score'], ascending=False).reset_index(drop=True) #.astype({'Probe_Epoch_id': 'int'}) # Sort by columns: 'Probe_Epoch_id' (ascending), 't_rel_seconds' (ascending), 'aclu' (ascending)
+        all_subsequences_scores_df: pd.DataFrame = all_subsequences_scores_df.sort_values([*main_subsequence_ranking_columns, 'subsequence_idx', 'total_distance_traveled', 'track_coverage_score'], ascending=False).reset_index(drop=True) #.astype({'Probe_Epoch_id': 'int'}) # Sort by columns: 'Probe_Epoch_id' (ascending), 't_rel_seconds' (ascending), 'aclu' (ascending)
         all_subsequences_scores_df['main_rank'] = all_subsequences_scores_df.index.to_numpy() ## adds the 'subsequence_main_rank' column
         all_subsequences_scores_df['is_main'] = (all_subsequences_scores_df['main_rank'] == 0)
         all_subsequences_scores_df = all_subsequences_scores_df.sort_values(['subsequence_idx'], ascending=True, inplace=False).reset_index(drop=True) ## restore normal ascending subsequence_index order
@@ -1260,8 +1284,8 @@ class SubsequencesPartitioningResult:
 
         ## merge into `all_subsequences_scores_df`:
         all_subsequences_scores_df = all_subsequences_scores_df.merge(computed_subseq_properties_df, how='left', on='subsequence_idx') ## requires that the output dataframe has all rows that were in `subsequences_df`, filling in NaNs when no corresponding values are found in the right df
-        all_subsequences_scores_df['len_excluding_intrusions'] = all_subsequences_scores_df['len'] - all_subsequences_scores_df['n_intrusion_bins']
-        all_subsequences_scores_df['len_excluding_both'] = all_subsequences_scores_df['len_excluding_repeats'] - all_subsequences_scores_df['n_intrusion_bins'] #TODO 2024-12-13 14:30: - [ ] Incorrect, 
+        # all_subsequences_scores_df['len_excluding_intrusions'] = all_subsequences_scores_df['len'] - all_subsequences_scores_df['n_intrusion_bins']
+        # all_subsequences_scores_df['len_excluding_both'] = all_subsequences_scores_df['len_excluding_repeats'] - all_subsequences_scores_df['n_intrusion_bins'] #TODO 2024-12-13 14:30: - [ ] Incorrect, 
         ## move all the length-related columns to the end
         all_subsequences_scores_df = PandasHelpers.reordering_columns_relative(all_subsequences_scores_df, column_names=list(filter(lambda column: ((column == 'len') or column.startswith('len_')), all_subsequences_scores_df.columns)), relative_mode='end')
 
