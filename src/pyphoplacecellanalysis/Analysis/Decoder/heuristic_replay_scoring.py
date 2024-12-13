@@ -345,21 +345,11 @@ class SubsequencesPartitioningResult:
         main_subsequence_df = self.subsequences_df[self.subsequences_df['is_main']]
         # ['n_intrusion_bins', 'len', 'len_excluding_repeats', 'len_excluding_intrusions', 'len_excluding_both']
 
-        
-        ## Compensate for repeating bins, not counting them towards the score but also not against.
-        if not should_ignore_intrusion_bins:
-            flat_positions = self.flat_positions
-            # longest_subsequence = self.longest_sequence_subsequence
-        else:
-            ## Ignoring intrusion bins
-            non_intrusion_flat_indicies = self.position_bins_info_df[np.logical_not(self.position_bins_info_df['is_intrusion'])]['flat_idx'].to_numpy()
-            flat_positions = self.flat_positions[non_intrusion_flat_indicies]
-            # longest_subsequence = self.longest_sequence_subsequence_excluding_intrusions
-            
+
 
         if should_use_no_repeat_values:
-            _, all_value_equiv_group_idxs_list = SubsequencesPartitioningResult.find_value_equiv_groups(flat_positions, same_thresh_cm=self.same_thresh)
-            total_num_all_good_values: int = len(all_value_equiv_group_idxs_list) # the number of equivalence value sets in the longest subsequence
+            # _, all_value_equiv_group_idxs_list = SubsequencesPartitioningResult.find_value_equiv_groups(flat_positions, same_thresh_cm=self.same_thresh)
+            # total_num_all_good_values: int = len(all_value_equiv_group_idxs_list) # the number of equivalence value sets in the longest subsequence
             # _, value_equiv_group_idxs_list = SubsequencesPartitioningResult.find_value_equiv_groups(longest_subsequence, same_thresh_cm=self.same_thresh)
             # num_items_per_equiv_list: List[int] = [len(v) for v in value_equiv_group_idxs_list] ## number of items in each equiv-list
             # num_longest_subsequence_good_values: int = len(value_equiv_group_idxs_list) # the number of equivalence value sets in the longest subsequence
@@ -368,7 +358,7 @@ class SubsequencesPartitioningResult:
             
         else:
             ## version that doesn't ignore repeats:
-            total_num_all_good_values = self.total_num_subsequence_bins
+            # total_num_all_good_values = self.total_num_subsequence_bins
             # num_longest_subsequence_good_values = len(longest_subsequence)
             num_longest_subsequence_good_values = main_subsequence_df['len'].to_numpy()[0]
             
@@ -381,11 +371,34 @@ class SubsequencesPartitioningResult:
         if not return_ratio:
             return int(num_longest_subsequence_good_values)
         else:
+            
+            all_subsequence_values_count_dict = self.subsequences_df[['n_intrusion_bins', 'len', 'len_excluding_repeats', 'len_excluding_intrusions', 'len_excluding_both']].sum(axis='index').to_dict()
+            # total_num_all_good_values = all_subsequence_values_count_dict['len']
+            # total_num_all_good_values = all_subsequence_values_count_dict['len_excluding_repeats']
+            # total_num_all_good_values = all_subsequence_values_count_dict['len_excluding_intrusions']
+            # total_num_all_good_values = all_subsequence_values_count_dict['len_excluding_both']
+            # n_intrusion_bins = all_subsequence_values_count_dict['n_intrusion_bins']
+
+            ## Compensate for repeating bins, not counting them towards the score but also not against.
+            if should_ignore_intrusion_bins:
+                if should_use_no_repeat_values:
+                    total_num_all_good_values = all_subsequence_values_count_dict['len_excluding_both']
+                else:
+                    total_num_all_good_values = all_subsequence_values_count_dict['len_excluding_intrusions']
+
+            else:
+                if should_use_no_repeat_values:
+                    total_num_all_good_values = all_subsequence_values_count_dict['len_excluding_repeats']
+                else:
+                    total_num_all_good_values = all_subsequence_values_count_dict['len']
+
             if total_num_all_good_values > 0:
                 return (float(num_longest_subsequence_good_values) / float(total_num_all_good_values)) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
             else:
                 return 0.0 # zero it out if they are all repeats
             
+
+
     @function_attributes(short_name=None, tags=['time_bin'], input_requires=[], output_provides=[], uses=['.flat_time_window_edges', '.flat_time_window_centers'], used_by=[], creation_date='2024-12-12 09:39', related_items=[])
     def get_flat_time_bins_info(self):
         """ 
@@ -1166,7 +1179,7 @@ class SubsequencesPartitioningResult:
         # bin_width, (x_starts, x_centers, x_ends), x_bins = self.get_flat_time_bins_info()
         if self.flat_time_window_edges is None:
             ## create fake
-            times = np.arange(self.total_num_subsequence_bins+1)
+            times = np.arange(self.total_num_subsequence_bins) # +1 ## it seems like we actually have left-edges only or centers, not true edges??
         else:
             assert self.flat_time_window_centers is not None
             times = deepcopy(self.flat_time_window_centers)
@@ -1176,11 +1189,12 @@ class SubsequencesPartitioningResult:
         all_subsequences_scores_dict = {}
         merged_split_positions_arrays = deepcopy(self.merged_split_positions_arrays)
         
-
+        Assert.same_length(times, self.flat_positions)
+        
         split_lengths = [len(v) for v in merged_split_positions_arrays]
         split_indicies = np.cumsum(split_lengths)
         split_subsequence_times_list = [v for v in np.split(times, split_indicies) if len(v) > 0] # exclude empty subsequences
-        Assert.same_length(split_subsequence_times_list, merged_split_positions_arrays)
+        Assert.same_length(split_subsequence_times_list, merged_split_positions_arrays) # must have same number of position_subsequences and time_subsequences
         assert np.all(np.array([len(v) for v in split_subsequence_times_list]) == split_lengths) #, f"times and positions for each subsequence must match!"
         
         for a_subsequence_idx, (a_subsequence_times, a_subsequence) in enumerate(zip(split_subsequence_times_list, merged_split_positions_arrays)):
