@@ -1880,6 +1880,9 @@ class HeuristicReplayScoring:
     
     from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring, HeuristicScoresTuple
 
+    'bin_by_bin' - return results that are a list of values -- one corresponding to each time bin
+    'bin_wise' - return a single result for all time bins in a sequence
+
     """
 
     @classmethod
