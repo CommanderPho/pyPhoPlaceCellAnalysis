@@ -1175,11 +1175,20 @@ class SubsequencesPartitioningResult:
 
         all_subsequences_scores_dict = {}
         merged_split_positions_arrays = deepcopy(self.merged_split_positions_arrays)
-        for a_subsequence_idx, a_subsequence in enumerate(merged_split_positions_arrays):
+        
+
+        split_lengths = [len(v) for v in merged_split_positions_arrays]
+        split_indicies = np.cumsum(split_lengths)
+        split_subsequence_times_list = [v for v in np.split(times, split_indicies) if len(v) > 0] # exclude empty subsequences
+        Assert.same_length(split_subsequence_times_list, merged_split_positions_arrays)
+        assert np.all(np.array([len(v) for v in split_subsequence_times_list]) == split_lengths) #, f"times and positions for each subsequence must match!"
+        
+        for a_subsequence_idx, (a_subsequence_times, a_subsequence) in enumerate(zip(split_subsequence_times_list, merged_split_positions_arrays)):
             if debug_print:
-                print(f'subsequence[{a_subsequence_idx}]: {a_subsequence}')
+                print(f'subsequence[{a_subsequence_idx}]:{a_subsequence_times} || {a_subsequence}')
             ## INPUTS: a_subsequence
             total_num_values: int = len(a_subsequence)
+            
             _, value_equiv_group_idxs_list = SubsequencesPartitioningResult.find_value_equiv_groups(a_subsequence, same_thresh_cm=self.same_thresh)
             total_num_values_excluding_repeats: int = len(value_equiv_group_idxs_list) ## the total number of non-repeated values
             total_num_repeated_values: int = total_num_values - total_num_values_excluding_repeats
@@ -1191,7 +1200,7 @@ class SubsequencesPartitioningResult:
 
             all_subsequences_scores_dict[a_subsequence_idx] = {'subsequence_idx': a_subsequence_idx, 'len': total_num_values, 'len_excluding_repeats': total_num_values_excluding_repeats, # 'len': total_num_values,
                                                                 'positions': a_subsequence.tolist()} 
-            all_subsequences_scores_dict[a_subsequence_idx] = all_subsequences_scores_dict[a_subsequence_idx] | {score_computation_name:computation_fn(a_subsequence, times=times, **computation_fn_kwargs_dict.get(score_computation_name, {})) for score_computation_name, computation_fn in all_score_computations_fn_dict.items()}
+            all_subsequences_scores_dict[a_subsequence_idx] = all_subsequences_scores_dict[a_subsequence_idx] | {score_computation_name:computation_fn(a_subsequence, times=deepcopy(a_subsequence_times), **computation_fn_kwargs_dict.get(score_computation_name, {})) for score_computation_name, computation_fn in all_score_computations_fn_dict.items()}
 
         ## END for a_subseq....
 
