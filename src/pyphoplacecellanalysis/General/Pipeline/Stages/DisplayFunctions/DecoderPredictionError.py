@@ -2572,7 +2572,7 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
         
         if debug_print:
             print(f'{params.name}: _callback_update_curr_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})\n\tdata_index_value: {data_index_value}')
-        
+    
         extant_plots = plots[cls.plots_group_identifier_key].get(data_index_value, {})
         extant_line = extant_plots.get('line', None)
         # plot the radon transform line on the epoch:    
@@ -2612,11 +2612,22 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
                 
                 # Most likely position plots:
                 basic_linestyle = '-' # default
+                common_plot_time_bins_multiple_kwargs = dict(subsequence_line_color_alpha=0.95, arrow_alpha=0.4, enable_axes_formatting=False, defer_show=True) | kwargs
+
+                merged_debug_sequences_kwargs = dict(
+                    sequence_position_hlines_kwargs=dict(linewidth=2, linestyle=basic_linestyle, zorder=10, alpha=1.0), # high-zorder to place it on-top, linestyle is "densely-dashed"
+                    # sequence_position_hlines_kwargs=dict(linewidth=3, linestyle=basic_linestyle, zorder=9, alpha=1.0),
+                    split_vlines_kwargs = dict(should_skip=False),
+                    time_bin_edges_vlines_kwargs = dict(should_skip=False),
+                    direction_change_lines_kwargs = dict(should_skip=False),
+                    intrusion_time_bin_shading_kwargs = dict(should_skip=False),
+                    # main_sequence_position_dots_kwargs = dict(should_skip=False, linewidths=2, marker ="^", edgecolor ="red", s = 100, zorder=1),
+                    main_sequence_position_dots_kwargs = dict(should_skip=False, linewidths=2, marker ="^", edgecolor="#141414F9", s=75, zorder=11, alpha=0.85),
+                )
+        
                 merged_split_positions_arrays = deepcopy(a_partition_result.merged_split_positions_arrays)
                 out: "MatplotlibRenderPlots" = a_partition_result.plot_time_bins_multiple(ax=curr_ax, enable_position_difference_indicators=False, flat_time_window_centers=time_window_centers, flat_time_window_edges=time_window_edges, override_positions_list=merged_split_positions_arrays, 
-                                                                                           enable_axes_formatting=False, defer_show=True,
-                                                                                                sequence_position_hlines_kwargs=dict(linewidth=3, linestyle=basic_linestyle, zorder=9, alpha=1.0),
-                                                                                                main_sequence_position_dots_kwargs = dict(linewidths=2, marker ="^", edgecolor="#141414F9", s=75, zorder=10, alpha=0.85),
+                                                                                          **common_plot_time_bins_multiple_kwargs, **merged_debug_sequences_kwargs,                                                                                        
                                                                                            )
                 
                 if show_pre_merged_debug_sequences:

@@ -129,15 +129,22 @@ def _compute_stddev_of_diff(arr) -> float:
 
 @define(slots=False)
 class SubsequencesPartitioningResult:
-    """ returned by `partition_subsequences_ignoring_repeated_similar_positions` 
+    """ Performs partitioning and re-grouping (merging) of a sequence of position values into multiple subsequences, performing heuristically-inspired operations like "bridging" over missing bins and recognizing the main sequence.
 
-    diff_index_subsequence_indicies = np.split(np.arange(n_diff_bins), list_split_indicies)
-    no_low_magnitude_diff_index_subsequence_indicies = [v[np.isin(v, low_magnitude_change_indicies, invert=True)] for v in diff_index_subsequence_indicies] # get the list of indicies for each subsequence without the low-magnitude ones
-    num_subsequence_bins: List[int] = [len(v) for v in diff_index_subsequence_indicies]
-    num_subsequence_bins_no_repeats: List[int] = [len(v) for v in no_low_magnitude_diff_index_subsequence_indicies]
+    returned by `partition_subsequences_ignoring_repeated_similar_positions` 
 
-    total_num_subsequence_bins = np.sum(num_subsequence_bins)
-    total_num_subsequence_bins_no_repeats = np.sum(num_subsequence_bins_no_repeats)
+    Terminology:
+        - "repeats" - repeats refer to sequential position bins that remain relatively constant, within a bounded `same_thresh`
+
+
+    Usage:
+        diff_index_subsequence_indicies = np.split(np.arange(n_diff_bins), list_split_indicies)
+        no_low_magnitude_diff_index_subsequence_indicies = [v[np.isin(v, low_magnitude_change_indicies, invert=True)] for v in diff_index_subsequence_indicies] # get the list of indicies for each subsequence without the low-magnitude ones
+        num_subsequence_bins: List[int] = [len(v) for v in diff_index_subsequence_indicies]
+        num_subsequence_bins_no_repeats: List[int] = [len(v) for v in no_low_magnitude_diff_index_subsequence_indicies]
+
+        total_num_subsequence_bins = np.sum(num_subsequence_bins)
+        total_num_subsequence_bins_no_repeats = np.sum(num_subsequence_bins_no_repeats)
 
     """
     flat_positions: NDArray = field(metadata={'desc': "the list of most-likely positions (in [cm]) for each time bin in a decoded posterior"})
@@ -1754,16 +1761,16 @@ class SubsequencesPartitioningResult:
                 ## create new axes                            
                 ax_dict = fig.subplot_mosaic(
                     [
-                        ["ax_ungrouped_seq"],
-                        ["ax_grouped_seq"], # "ax_SHORT_activity_v_time", "ax_SHORT_pf_tuning_curve"],
-                        ["ax_merged_grouped_seq"],
+                        ["ax_ungrouped_seq", "ax_label_ungrouped_seq"],
+                        ["ax_grouped_seq", "ax_label_grouped_seq"],
+                        ["ax_merged_grouped_seq", "ax_label_merged_grouped_seq"],
                     ],
                     sharex=True, sharey=True,
-                    gridspec_kw=dict(wspace=0, hspace=0.15) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+                    gridspec_kw=dict(width_ratios=[6,1], wspace=0, hspace=0.15) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
                 )
         else:
             ## already exists
-            Assert.len_equals(extant_ax_dict, 3)
+            Assert.len_equals(extant_ax_dict, 6)
             ax_dict = extant_ax_dict
             fig = extant_ax_dict['ax_ungrouped_seq'].get_figure()
             
@@ -1783,6 +1790,29 @@ class SubsequencesPartitioningResult:
             flat_time_window_edges = np.arange(self.total_num_subsequence_bins+1)
             Assert.len_equals(flat_time_window_edges, required_length=(self.total_num_subsequence_bins+1))
         
+
+
+        # ==================================================================================================================== #
+        # Set up text label axes to the right of the plotting axes:                                                            #
+        # ==================================================================================================================== #
+        ax_dict["ax_label_ungrouped_seq"].axis("off")
+        ax_dict["ax_label_grouped_seq"].axis("off")
+        ax_dict["ax_label_merged_grouped_seq"].axis("off")
+
+
+        longest_seq_length_dict = {'all': self.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=False, should_use_no_repeat_values=False),
+            'ignoring_intru': self.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=True, should_use_no_repeat_values=False),
+            'no_repeat': self.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=False, should_use_no_repeat_values=True),
+            'ignoring_both': self.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=True, should_use_no_repeat_values=True),
+        }
+
+        longest_seq_length_multiline_label_str: str = '\n'.join([': '.join([k, str(v)]) for k, v in longest_seq_length_dict.items()])
+
+
+        ax_dict["ax_label_ungrouped_seq"].text(0.5, 0.5, "Line1\nLine2", ha="center", va="center")
+        ax_dict["ax_label_grouped_seq"].text(0.5, 0.5, "Line1\nLine2", ha="center", va="center")
+        ax_dict["ax_label_merged_grouped_seq"].text(0.5, 0.5, longest_seq_length_multiline_label_str, ha="center", va="center")
+
 
         split_most_likely_positions_arrays = deepcopy(self.flat_positions) ## unsplit positions
         pre_partitioned_debug_sequences_kwargs = dict(sequence_position_hlines_kwargs=dict(linewidth=2, linestyle=linestyle, zorder=10, alpha=1.0), # high-zorder to place it on-top, linestyle is "densely-dashed"
@@ -2146,7 +2176,7 @@ class HeuristicReplayScoring:
     @classmethod
     @function_attributes(short_name='continuous_seq_sort', tags=['bin-wise', 'bin-size', 'score', 'replay', 'sequence_length'], input_requires=[], output_provides=[],
                           uses=['SubsequencesPartitioningResult', '_compute_sequences_spanning_ignored_intrusions'], used_by=[], creation_date='2024-03-12 01:05', related_items=['SubsequencesPartitioningResult'])
-    def bin_wise_continuous_sequence_sort_score_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, max_ignore_bins:int=2, same_thresh_cm: Optional[float]=6.0, same_thresh_fraction_of_track: Optional[float] = None) -> float:
+    def bin_wise_continuous_sequence_sort_score_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, max_ignore_bins:int=2, same_thresh_cm: Optional[float]=6.0, same_thresh_fraction_of_track: Optional[float] = None, max_jump_distance_cm: float = 60.0) -> float:
         """ The amount of the track that is represented by the decoding. More is better (indicating a longer replay).
 
         - Finds the longest continuous sequence (perhaps with some intrusions allowed?)
@@ -2211,7 +2241,7 @@ class HeuristicReplayScoring:
         # INPUTS: a_most_likely_positions_list, n_pos_bins
 
         ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
-        partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, flat_time_window_centers=deepcopy(time_window_centers))
+        partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm, flat_time_window_centers=deepcopy(time_window_centers))
         longest_sequence_length_ratio: float = partition_result.get_longest_sequence_length(return_ratio=True, should_ignore_intrusion_bins=True, should_use_no_repeat_values=False) # partition_result.longest_sequence_length_ratio 
         
         assert longest_sequence_length_ratio <= 1.0, f"longest_sequence_length_ratio should not be greater than 1.0, but it is {longest_sequence_length_ratio}!!"
@@ -2239,7 +2269,7 @@ class HeuristicReplayScoring:
     @classmethod
     @function_attributes(short_name='continuous_seq_len_ratio_no_repeats', tags=['bin-wise', 'bin-size', 'score', 'replay', 'sequence_length'], input_requires=[], output_provides=[],
                           uses=['SubsequencesPartitioningResult', '_compute_sequences_spanning_ignored_intrusions'], used_by=[], creation_date='2024-03-12 01:05', related_items=['SubsequencesPartitioningResult'])
-    def bin_wise_continuous_sequence_sort_excluding_near_repeats_score_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, max_ignore_bins:int=2, same_thresh_cm: Optional[float]=6.0, same_thresh_fraction_of_track: Optional[float] = None) -> float:
+    def bin_wise_continuous_sequence_sort_excluding_near_repeats_score_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, max_ignore_bins:int=2, same_thresh_cm: Optional[float]=6.0, same_thresh_fraction_of_track: Optional[float] = None, max_jump_distance_cm: float = 60.0) -> float:
         """ The amount of the track that is represented by the decoding. More is better (indicating a longer replay).
 
         - Finds the longest continuous sequence (perhaps with some intrusions allowed?)
@@ -2294,7 +2324,7 @@ class HeuristicReplayScoring:
         ## Begin computations:
 
         ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
-        partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, flat_time_window_centers=deepcopy(time_window_centers))
+        partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm, flat_time_window_centers=deepcopy(time_window_centers))
         longest_no_repeats_sequence_length_ratio: float = partition_result.get_longest_sequence_length(return_ratio=True, should_ignore_intrusion_bins=True, should_use_no_repeat_values=True) # partition_result.longest_no_repeats_sequence_length_ratio         
         assert longest_no_repeats_sequence_length_ratio <= 1.0, f"longest_no_repeats_sequence_length_ratio should not be greater than 1.0, but it is {longest_no_repeats_sequence_length_ratio}!!"
         return longest_no_repeats_sequence_length_ratio
@@ -2303,7 +2333,7 @@ class HeuristicReplayScoring:
     @classmethod
     @function_attributes(short_name='main_contiguous_subsequence_len', tags=['bin-wise', 'bin-size', 'score', 'replay', 'sequence_length'], input_requires=[], output_provides=[],
                           uses=['SubsequencesPartitioningResult', '_compute_sequences_spanning_ignored_intrusions'], used_by=[], creation_date='2024-03-12 01:05', related_items=['SubsequencesPartitioningResult'])
-    def bin_wise_contiguous_subsequence_num_bins_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, max_ignore_bins:int=2, same_thresh_cm: Optional[float]=6.0, same_thresh_fraction_of_track: Optional[float] = None) -> int:
+    def bin_wise_contiguous_subsequence_num_bins_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, max_ignore_bins:int=2, same_thresh_cm: Optional[float]=6.0, same_thresh_fraction_of_track: Optional[float] = None, max_jump_distance_cm: float = 60.0) -> int:
         """ The amount of the track that is represented by the decoding. More is better (indicating a longer replay).
 
         - Finds the longest continuous sequence (perhaps with some intrusions allowed?)
@@ -2329,7 +2359,7 @@ class HeuristicReplayScoring:
         # [92.2559,84.6451,84.6451,92.2559,134.116,126.505,126.505,141.726,149.337,38.9801]
         # same_thresh_cm: 7.2
         ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
-        partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm,
+        partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm,
                                                                                                                     flat_time_window_centers=deepcopy(time_window_centers))
         # longest_sequence_subsequence = deepcopy(partition_result.longest_sequence_subsequence)
         # longest_sequence_subsequence_partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(longest_sequence_subsequence, n_pos_bins=n_pos_bins, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm)
@@ -2553,7 +2583,7 @@ class HeuristicReplayScoring:
     @function_attributes(short_name=None, tags=['heuristic', 'replay', 'score', 'OLDER'], input_requires=[], output_provides=[],
                          uses=['_compute_pos_derivs', 'partition_subsequences_ignoring_repeated_similar_positions', '_compute_total_variation', '_compute_integral_second_derivative', '_compute_stddev_of_diff', 'HeuristicScoresTuple'],
                          used_by=['compute_all_heuristic_scores'], creation_date='2024-02-29 00:00', related_items=[])
-    def compute_pho_heuristic_replay_scores(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, debug_print=False, use_bin_units_instead_of_realworld:bool=False, max_ignore_bins:float=2, same_thresh_cm: float=6.0, max_jump_distance_cm: float = 30.0, **kwargs) -> HeuristicScoresTuple:
+    def compute_pho_heuristic_replay_scores(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, debug_print=False, use_bin_units_instead_of_realworld:bool=False, max_ignore_bins:float=2, same_thresh_cm: float=6.0, max_jump_distance_cm: float = 60.0, **kwargs) -> HeuristicScoresTuple:
         """ 2024-02-29 - New smart replay heuristic scoring
 
         
@@ -2840,9 +2870,9 @@ class HeuristicReplayScoring:
         
         # computation_fn_kwargs_dict: passed to each score function to specify additional required parameters
         computation_fn_kwargs_dict = {
-            'main_contiguous_subsequence_len': dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None),
-            'continuous_seq_len_ratio_no_repeats': dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None),
-            'continuous_seq_sort': dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None),
+            'main_contiguous_subsequence_len': dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm),
+            'continuous_seq_len_ratio_no_repeats': dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm),
+            'continuous_seq_sort': dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm),
         }
         
         all_score_computations_fn_dict = cls.build_all_score_computations_fn_dict()
