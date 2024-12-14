@@ -920,51 +920,94 @@ class SubsequencesPartitioningResult:
         # ==================================================================================================================== #
 
         ## INPUTS: split_first_order_diff_arrays, continuous_sequence_lengths, max_ignore_bins
-        assert self.split_positions_arrays is not None
-        original_split_positions_arrays = deepcopy(self.split_positions_arrays)
-        original_merged_split_positions_arrays = deepcopy(self.merged_split_positions_arrays)
-        if debug_print:
-            print(f'original_split_positions_arrays: {original_split_positions_arrays}, original_merged_split_positions_arrays: {original_merged_split_positions_arrays}')
+        # assert self.split_positions_arrays is not None
+        # original_split_positions_arrays = deepcopy(self.split_positions_arrays)
+        # original_active_split_positions_arrays = deepcopy(self.split_positions_arrays)
+        assert self.merged_split_positions_arrays is not None
+        original_active_split_positions_arrays = deepcopy(self.merged_split_positions_arrays) # used merged version
+        assert original_active_split_positions_arrays is not None
+        # if debug_print:
+            # print(f'original_split_positions_arrays: {original_split_positions_arrays}, original_merged_split_positions_arrays: {original_merged_split_positions_arrays}')
         
 
         ## Begin by finding only the longest sequence
-        n_tbins_list = np.array([len(v) for v in original_split_positions_arrays])
+        # n_tbins_list = np.array([len(v) for v in original_split_positions_arrays])
         first_order_diff_value_exceeeding_jump_distance_indicies = []
         
         # new_merged_split_positions_arrays = deepcopy(original_merged_split_positions_arrays)
-        new_merged_split_positions_arrays = []
-        relative_to_abs_idx: int = 0
-        for a_subsequence_idx, a_subsequence in enumerate(original_merged_split_positions_arrays):
-            ## iterate through subsequences
-            a_subsequence_first_order_diff = np.diff(a_subsequence, n=1)
-            # a_subsequence_first_order_diff = np.diff(a_subsequence, n=1, prepend=[0.0,]) ## prepend 0.0 so hopefully the bins line up
-            # first_order_diff_lst = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
-            # assert len(first_order_diff_lst) == len(a_most_likely_positions_list), f"the prepend above should ensure that the sequence and its first-order diff are the same length."
         
-            does_jump_exceed_max = (np.abs(a_subsequence_first_order_diff) > max_jump_distance_cm)
-            num_jumps_exceeding_max: int = np.count_nonzero(does_jump_exceed_max)
-            _subseq_rel_jump_exceeds_max_idxs = np.where(does_jump_exceed_max)[0] ## subsequence relative
+
+        split_lengths = [len(v) for v in original_active_split_positions_arrays]
+        original_split_indicies = np.cumsum(split_lengths)
+        split_subsequence_flatindicies_list = [v for v in NumpyHelpers.split(self.flat_position_indicies, original_split_indicies) if len(v) > 0] # exclude empty subsequences
+        Assert.same_length(split_subsequence_flatindicies_list, original_active_split_positions_arrays) # must have same number of position_subsequences and time_subsequences
+        assert np.all(np.array([len(v) for v in split_subsequence_flatindicies_list]) == split_lengths) #, f"times and positions for each subsequence must match!"
+        
+        if debug_print:
+            print(f'original_split_indicies: {original_split_indicies}')
+        updated_split_indicies = deepcopy(original_split_indicies.tolist()) ## NEW
+        OLD_METHOD_new_active_split_positions_arrays = [] ## OLD
+        
+
+        # relative_to_abs_idx: int = 0
+        # for a_subsequence_idx, a_subsequence in enumerate(original_active_split_positions_arrays):
+        for a_subsequence_idx, (a_subsequence_flatindicies, a_subsequence) in enumerate(zip(split_subsequence_flatindicies_list, original_active_split_positions_arrays)):
+            if debug_print:
+                print(f'subsequence[{a_subsequence_idx}]:{a_subsequence_flatindicies} || {a_subsequence}')
+            ## INPUTS: a_subsequence
+            total_num_values: int = len(a_subsequence)        
+
+            ## iterate through subsequences
+            a_subsequence_first_order_diff = np.diff(a_subsequence, n=1) ## these diffs are AFTER the bin they should split on. A split on the last bin should always be neglected (right?)
+            does_diff_jump_exceed_max = (np.abs(a_subsequence_first_order_diff) > max_jump_distance_cm)
+            num_jumps_exceeding_max: int = np.count_nonzero(does_diff_jump_exceed_max)
+            # _subseq_rel_jump_exceeds_max_idxs = np.where(does_jump_exceed_max)[0] ## subsequence relative
+            _subseq_rel_jump_exceeds_max_diff_edge_idxs = np.where(does_diff_jump_exceed_max)[0] ## subsequence relative
+            
+            # abs_flatindicies_jump_exceeds_max = a_subsequence_flatindicies[does_diff_jump_exceed_max] ## get the list of "before" bin_flatindicies where each split should occur
+            abs_flatindicies_jump_exceeds_max = a_subsequence_flatindicies[_subseq_rel_jump_exceeds_max_diff_edge_idxs]
+            print(f'abs_flatindicies_jump_exceeds_max: {abs_flatindicies_jump_exceeds_max}')
+            
+
             if num_jumps_exceeding_max > 0:
                 if debug_print:
-                    print(f'does_jump_exceed_max: {does_jump_exceed_max}')
+                    print(f'does_jump_exceed_max: {does_diff_jump_exceed_max}')
                 # _subseq_rel_jump_exceeds_max_idxs = _subseq_rel_jump_exceeds_max_idxs + 1 # add one because we want to split AFTER the large change
-                a_split_subsequence = np.split(a_subsequence, _subseq_rel_jump_exceeds_max_idxs) ## splits into sub bins
+                # a_split_subsequence = NumpyHelpers.split(a_subsequence, _subseq_rel_jump_exceeds_max_idxs) ## splits into sub bins
+                a_split_subsequence = NumpyHelpers.split(a_subsequence, _subseq_rel_jump_exceeds_max_diff_edge_idxs)
+                
+
                 ## TODO: keep track of splits?
-                abs_jump_exceeds_max_idxs = _subseq_rel_jump_exceeds_max_idxs + relative_to_abs_idx # transform to abs indicies
-                first_order_diff_value_exceeeding_jump_distance_indicies.extend(abs_jump_exceeds_max_idxs)
+                # abs_jump_exceeds_max_idxs = _subseq_rel_jump_exceeds_max_idxs + relative_to_abs_idx # transform to abs indicies
+                first_order_diff_value_exceeeding_jump_distance_indicies.extend(abs_flatindicies_jump_exceeds_max) ## OLD
+                
+
+                updated_split_indicies.extend(abs_flatindicies_jump_exceeds_max) ## update new split indicies 
                 
                 # new_merged_split_positions_arrays[a_subsequence_idx] = a_split_subsequence
                 for a_sub_sub_sequence in a_split_subsequence:
-                    new_merged_split_positions_arrays.append(a_sub_sub_sequence) ## append the split subsequence
+                    OLD_METHOD_new_active_split_positions_arrays.append(a_sub_sub_sequence) ## append the split subsequence
                     
             else:
                 ## no split needed
-                new_merged_split_positions_arrays.append(a_subsequence)
+                OLD_METHOD_new_active_split_positions_arrays.append(a_subsequence)
 
-            relative_to_abs_idx += len(a_subsequence) ## add the indicies in the entire subsequence
+            # relative_to_abs_idx += len(a_subsequence) ## add the indicies in the entire subsequence
             
 
-        ## OUTPUTS: final_out_subsequences
+        ## OUTPUTS: final_out_subsequences, updated_split_indicies
+        
+        updated_split_indicies = np.unique(updated_split_indicies) ## sorts them ascending AND removes duplicate values
+        new_active_split_flatindicies_arrays = NumpyHelpers.split(self.flat_position_indicies, updated_split_indicies)
+        new_active_split_positions_arrays = NumpyHelpers.split(self.flat_positions, updated_split_indicies)
+        if debug_print:
+            print(f'OLD_METHOD_new_active_split_positions_arrays: {OLD_METHOD_new_active_split_positions_arrays}')
+            print(f'first_order_diff_value_exceeeding_jump_distance_indicies: {first_order_diff_value_exceeeding_jump_distance_indicies}')            
+
+            print(f'updated_split_indicies: {updated_split_indicies}')
+            print(f'new_active_split_flatindicies_arrays: {new_active_split_flatindicies_arrays}')
+            print(f'new_active_split_positions_arrays: {new_active_split_positions_arrays}')
+            
         
 
         # Update Self ________________________________________________________________________________________________________ #
@@ -984,15 +1027,15 @@ class SubsequencesPartitioningResult:
         if len(first_order_diff_value_exceeeding_jump_distance_indicies) > 0:
             if debug_print:
                 print(f'first_order_diff_value_exceeeding_jump_distance_indicies: {first_order_diff_value_exceeeding_jump_distance_indicies}')
-                print(f'\toriginal_merged_split_positions_arrays: {original_merged_split_positions_arrays}')
-                print(f'\tnew_merged_split_positions_arrays: {new_merged_split_positions_arrays}')
+                print(f'\toriginal_merged_split_positions_arrays: {original_active_split_positions_arrays}')
+                print(f'\tnew_merged_split_positions_arrays: {new_active_split_positions_arrays}')
                 
-            new_merged_split_positions_arrays = [v for v in new_merged_split_positions_arrays if len(v) > 0] ## exclude empty subsequences
-            self.merged_split_positions_arrays = deepcopy(new_merged_split_positions_arrays)
+            new_active_split_positions_arrays = [v for v in new_active_split_positions_arrays if len(v) > 0] ## exclude empty subsequences
+            self.merged_split_positions_arrays = deepcopy(new_active_split_positions_arrays)
         
         # return (left_congruent_flanking_sequence, left_congruent_flanking_index), (right_congruent_flanking_sequence, right_congruent_flanking_index)
         # return original_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_idxs)
-        return new_merged_split_positions_arrays, first_order_diff_value_exceeeding_jump_distance_indicies
+        return new_active_split_positions_arrays, first_order_diff_value_exceeeding_jump_distance_indicies
     
     
 
