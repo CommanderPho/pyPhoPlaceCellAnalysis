@@ -19,7 +19,7 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.assertion_helpers import Assert
 
 from neuropy.utils.mixins.indexing_helpers import UnpackableMixin, get_dict_subset
-from neuropy.utils.indexing_helpers import PandasHelpers, flatten, ListHelpers
+from neuropy.utils.indexing_helpers import PandasHelpers, flatten, ListHelpers, NumpyHelpers
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult # used in compute_pho_heuristic_replay_scores
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult, TrackTemplates
@@ -138,7 +138,7 @@ class SubsequencesPartitioningResult:
 
 
     Usage:
-        diff_index_subsequence_indicies = np.split(np.arange(n_diff_bins), list_split_indicies)
+        diff_index_subsequence_indicies = NumpyHelpers.split(np.arange(n_diff_bins), list_split_indicies)
         no_low_magnitude_diff_index_subsequence_indicies = [v[np.isin(v, low_magnitude_change_indicies, invert=True)] for v in diff_index_subsequence_indicies] # get the list of indicies for each subsequence without the low-magnitude ones
         num_subsequence_bins: List[int] = [len(v) for v in diff_index_subsequence_indicies]
         num_subsequence_bins_no_repeats: List[int] = [len(v) for v in no_low_magnitude_diff_index_subsequence_indicies]
@@ -1121,7 +1121,7 @@ class SubsequencesPartitioningResult:
         # active_split_indicies = deepcopy(partition_result.split_indicies) ## this is what it should be, but all the splits are +1 later than they should be
         # active_split_indicies = deepcopy(partition_result.diff_split_indicies) - 1 ## this is what it should be, but all the splits are +1 later than they should be
         active_split_indicies = deepcopy(self.split_indicies) ## this is what it should be, but all the splits are +1 later than they should be
-        split_most_likely_positions_arrays = np.split(self.flat_positions, active_split_indicies)
+        split_most_likely_positions_arrays = NumpyHelpers.split(self.flat_positions, active_split_indicies)
         ## Drop empty subsequences
         split_most_likely_positions_arrays = [x for x in split_most_likely_positions_arrays if len(x) > 0] ## only non-empty subsequences
         self.split_positions_arrays = split_most_likely_positions_arrays
@@ -1229,11 +1229,11 @@ class SubsequencesPartitioningResult:
         
         split_lengths = [len(v) for v in merged_split_positions_arrays]
         split_indicies = np.cumsum(split_lengths)
-        split_subsequence_times_list = [v for v in np.split(times, split_indicies) if len(v) > 0] # exclude empty subsequences
+        split_subsequence_times_list = [v for v in NumpyHelpers.split(times, split_indicies) if len(v) > 0] # exclude empty subsequences
         Assert.same_length(split_subsequence_times_list, merged_split_positions_arrays) # must have same number of position_subsequences and time_subsequences
         assert np.all(np.array([len(v) for v in split_subsequence_times_list]) == split_lengths) #, f"times and positions for each subsequence must match!"
         
-        split_subsequence_is_non_intrusion_bin_list = [v for v in np.split(is_non_intrusion_bin, split_indicies) if len(v) > 0] # exclude empty subsequences
+        split_subsequence_is_non_intrusion_bin_list = [v for v in NumpyHelpers.split(is_non_intrusion_bin, split_indicies) if len(v) > 0] # exclude empty subsequences
         Assert.same_length(split_subsequence_is_non_intrusion_bin_list, merged_split_positions_arrays) # must have same number of position_subsequences and time_subsequences
         assert np.all(np.array([len(v) for v in split_subsequence_is_non_intrusion_bin_list]) == split_lengths)
         
@@ -3106,9 +3106,9 @@ class HeuristicReplayScoring:
                 print(f'direction_change_bin_ratio: {direction_change_bin_ratio}')
 
             # Split the array at each index where a sign change occurs
-            # split_most_likely_positions_arrays = np.split(a_most_likely_positions_list, partition_result.split_indicies)
-            # split_first_order_diff_arrays = np.split(a_first_order_diff, partition_result.split_indicies)
-            split_first_order_diff_arrays = np.split(a_first_order_diff, partition_result.diff_split_indicies)
+            # split_most_likely_positions_arrays = NumpyHelpers.split(a_most_likely_positions_list, partition_result.split_indicies)
+            # split_first_order_diff_arrays = NumpyHelpers.split(a_first_order_diff, partition_result.split_indicies)
+            split_first_order_diff_arrays = NumpyHelpers.split(a_first_order_diff, partition_result.diff_split_indicies)
 
             # Pre-2024-05-09 Sequence Determination ______________________________________________________________________________ #
             # continuous_sequence_lengths = [len(a_split_first_order_diff_array) for a_split_first_order_diff_array in split_first_order_diff_arrays]
@@ -3125,7 +3125,7 @@ class HeuristicReplayScoring:
             longest_sequence_length_ratio: float = partition_result.get_longest_sequence_length(return_ratio=True, should_ignore_intrusion_bins=True, should_use_no_repeat_values=False)
 
             # 2024-05-09 Sequence Determination with ignored repeats (not yet working) ___________________________________________ #
-            # split_diff_index_subsequence_index_arrays = np.split(np.arange(partition_result.n_diff_bins), partition_result.diff_split_indicies) # subtract 1 again to get the diff_split_indicies instead
+            # split_diff_index_subsequence_index_arrays = NumpyHelpers.split(np.arange(partition_result.n_diff_bins), partition_result.diff_split_indicies) # subtract 1 again to get the diff_split_indicies instead
             # no_low_magnitude_diff_index_subsequence_indicies = [v[np.isin(v, partition_result.low_magnitude_change_indicies, invert=True)] for v in split_diff_index_subsequence_index_arrays] # get the list of indicies for each subsequence without the low-magnitude ones
             # num_subsequence_bins = np.array([len(v) for v in split_diff_index_subsequence_index_arrays])
             # num_subsequence_bins_no_repeats = np.array([len(v) for v in no_low_magnitude_diff_index_subsequence_indicies])
