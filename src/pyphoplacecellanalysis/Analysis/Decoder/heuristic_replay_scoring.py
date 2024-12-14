@@ -152,7 +152,6 @@ class SubsequencesPartitioningResult:
     first_order_diff_lst: List = field() # the original list
 
     pos_bin_edges: NDArray = field(metadata={'desc': "the total number of unique position bins along the track, unrelated to the number of *positions* in `flat_positions` "})
-    # n_pos_bins: int = field(metadata={'desc': "the total number of unique position bins along the track, unrelated to the number of *positions* in `flat_positions` "})
     
     max_ignore_bins: int = field(default=2, metadata={'desc': "the maximum number of sequential time bins that can be merged over to form a larger subsequence."})
     same_thresh: float = field(default=4, metadata={'desc': "if the difference (in [cm]) between the positions of two sequential time bins is less than this value, it will be treated as a non-changing direction and effectively treated as a single bin."})
@@ -163,7 +162,7 @@ class SubsequencesPartitioningResult:
     
     # computed ___________________________________________________________________________________________________________ #
     
-    list_parts: List = field(default=None, repr=False) # factory=list
+    # list_parts: List = field(default=None, repr=False) # factory=list
     diff_split_indicies: NDArray = field(default=None, repr=False, metadata={'desc': "the indicies into the for the 1st-order diff array (`first_order_diff_lst`) where a split into subsequences should occur. "}) # for the 1st-order diff array
     split_indicies: NDArray = field(default=None, repr=False, metadata={'desc': "the indicies into `flat_positions` where a split into subsequences should occur. "}) # for the original array
     low_magnitude_change_indicies: NDArray = field(default=None, repr=False, metadata={'desc': "indicies where a change in direction occurs but it's below the threshold indicated by `same_thresh`"}) # specified in diff indicies
@@ -181,7 +180,6 @@ class SubsequencesPartitioningResult:
     ## Info Dataframes:
     position_bins_info_df: pd.DataFrame = field(default=None, repr=False, metadata={'desc': "one entry for each entry in `flat_positions`"})
     position_changes_info_df: pd.DataFrame = field(default=None, repr=False, metadata={'desc': "one change for each entry in `first_order_diff_lst`"})
-
     subsequences_df: pd.DataFrame = field(default=None, repr=False, metadata={'desc': "properties computed for the final subsequences. Produced by self.post_compute_subsequence_properties()"})
     
     
@@ -464,7 +462,7 @@ class SubsequencesPartitioningResult:
             a_most_likely_positions_list = np.array(a_most_likely_positions_list)
         
         partition_result = cls(flat_positions=deepcopy(a_most_likely_positions_list), pos_bin_edges=deepcopy(pos_bin_edges), max_ignore_bins=max_ignore_bins, same_thresh=same_thresh, max_jump_distance_cm=max_jump_distance_cm, flat_time_window_centers=flat_time_window_centers, flat_time_window_edges=flat_time_window_edges,
-                               first_order_diff_lst=None, list_parts=None, diff_split_indicies=None, split_indicies=None, low_magnitude_change_indicies=None,          
+                               first_order_diff_lst=None, diff_split_indicies=None, split_indicies=None, low_magnitude_change_indicies=None,          
                             )
         
         ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
@@ -618,13 +616,13 @@ class SubsequencesPartitioningResult:
         # first_order_diff_list_split_indicies = deepcopy(diff_split_indicies) - 1 # try -1 
         sub_change_threshold_change_indicies = np.array(sub_change_threshold_change_indicies)
         
-        list_parts = [np.array(l) for l in list_parts]
+        # list_parts = [np.array(l) for l in list_parts]
         
-        return dict(flat_positions=deepcopy(a_most_likely_positions_list), first_order_diff_lst=first_order_diff_lst, list_parts=list_parts, diff_split_indicies=diff_split_indicies, split_indicies=split_indicies, low_magnitude_change_indicies=sub_change_threshold_change_indicies, same_thresh=same_thresh, **kwargs)
+        return dict(flat_positions=deepcopy(a_most_likely_positions_list), first_order_diff_lst=first_order_diff_lst, diff_split_indicies=diff_split_indicies, split_indicies=split_indicies, low_magnitude_change_indicies=sub_change_threshold_change_indicies, same_thresh=same_thresh, **kwargs)
      
 
     @function_attributes(short_name=None, tags=['merge', '_compute_sequences_spanning_ignored_intrusions', 'PhoOriginal'], input_requires=['self.split_positions_arrays'], output_provides=['self.merged_split_positions_arrays'], uses=['_compute_sequences_spanning_ignored_intrusions'], used_by=['compute'], creation_date='2024-11-27 08:17', related_items=['_compute_sequences_spanning_ignored_intrusions'])
-    def merge_over_ignored_intrusions(self, max_ignore_bins: int = 2, should_skip_epoch_with_only_short_subsequences: bool = False, debug_print=False):
+    def merge_over_ignored_intrusions(self, max_ignore_bins: int = 2, max_jump_distance_cm: Optional[float]=None, should_skip_epoch_with_only_short_subsequences: bool = False, debug_print=False):
         """ an "intrusion" refers to one or more time bins that interrupt a longer sequence that would be monotonic if the intrusions were removed.
 
         The quintessential example would be a straight ramp that is interrupted by a single point discontinuity intrusion.  
@@ -687,7 +685,7 @@ class SubsequencesPartitioningResult:
             return deduplicated_replace_dict
         
 
-        def _subfn_perform_merge_iteration(original_split_positions_arrays, max_ignore_bins: int = 2, should_skip_epoch_with_only_short_subsequences: bool = False, debug_print=False):
+        def _subfn_perform_merge_iteration(original_split_positions_arrays, max_ignore_bins: int = 2, max_jump_distance_cm: Optional[float]=None, should_skip_epoch_with_only_short_subsequences: bool = False, debug_print=False):
             """ only uses `self` in the call `self._compute_sequences_spanning_ignored_intrusions(...)` which is actually a classmethod, so this whole func could be a classmethod
             
             Captures: self, _subfn_resolve_overlapping_replacement_indicies
@@ -720,7 +718,7 @@ class SubsequencesPartitioningResult:
             else:
                 # try to merge over intrusions
                 for a_subsequence_idx, a_subsequence, a_n_tbins, is_potentially_ignored_intrusion in zip(np.arange(len(n_tbins_list)), original_split_positions_arrays, n_tbins_list, is_subsequence_potential_intrusion):
-                    ## loop through ignored subsequences to find out how to merge them
+                    ## loop through ignored subsequences (the tiny fragments between the larger sequences) to find out if we can merge adjacent subsequences
                     #TODO 2024-11-27 08:36: - [ ] 
                     if (not is_potentially_ignored_intrusion):
                         # for an_ignored_subsequence_idx in ignored_subsequence_idxs:
@@ -754,33 +752,52 @@ class SubsequencesPartitioningResult:
                             if debug_print:
                                 print(f'\tWARN: merge NULL, both flanking sequences are empty or too short. Skipping')
                         else:
+                            is_merge_jump_distance_too_large: bool = False
                             # decide on subsequence to merge                    
                             if len_left_congruent_flanking_sequence > len_right_congruent_flanking_sequence:
                                 # merge LEFT sequence ________________________________________________________________________________________________ #
                                 if debug_print:
                                     print(f'\tmerge LEFT: left_congruent_flanking_sequence: {left_congruent_flanking_sequence}, left_congruent_flanking_index: {left_congruent_flanking_index}')
                                 new_subsequence = np.array([*left_congruent_flanking_sequence, *active_subsequence_pos])
-                                ## remove old
-                                for an_idx_to_remove in np.arange(left_congruent_flanking_index, (a_subsequence_idx+1)):                    
-                                    subsequences_to_remove.append(original_split_positions_arrays[an_idx_to_remove])
-                                # _tmp_merge_split_positions_arrays[left_congruent_flanking_index:(a_subsequence_idx+1)] = [] # new_subsequence ## or [] to clear it?
-                                subsequences_to_add.append(new_subsequence)
-                                # subsequence_replace_dict[tuple([original_split_positions_arrays[an_idx_to_remove] for an_idx_to_remove in np.arange(left_congruent_flanking_index, (a_subsequence_idx+1))])] = new_subsequence
-                                subsequence_replace_dict[tuple(np.arange(left_congruent_flanking_index, (a_subsequence_idx+1)).tolist())] = (a_subsequence_idx, new_subsequence)
-                                final_is_subsequence_intrusion = True
+                                
+                                ## test to see if the jump distance introduced by merging exceeeds the allowed value
+                                if max_jump_distance_cm is not None:
+                                    merge_edge_jump_distance: float = np.abs(left_congruent_flanking_sequence[-1] - active_subsequence_pos[0])
+                                    is_merge_jump_distance_too_large = (merge_edge_jump_distance > max_jump_distance_cm)
+
+                                if (not is_merge_jump_distance_too_large):
+                                    ## remove old
+                                    for an_idx_to_remove in np.arange(left_congruent_flanking_index, (a_subsequence_idx+1)):                    
+                                        subsequences_to_remove.append(original_split_positions_arrays[an_idx_to_remove])
+                                    # _tmp_merge_split_positions_arrays[left_congruent_flanking_index:(a_subsequence_idx+1)] = [] # new_subsequence ## or [] to clear it?
+                                    subsequences_to_add.append(new_subsequence)
+                                    # subsequence_replace_dict[tuple([original_split_positions_arrays[an_idx_to_remove] for an_idx_to_remove in np.arange(left_congruent_flanking_index, (a_subsequence_idx+1))])] = new_subsequence
+                                    subsequence_replace_dict[tuple(np.arange(left_congruent_flanking_index, (a_subsequence_idx+1)).tolist())] = (a_subsequence_idx, new_subsequence)
+                                    final_is_subsequence_intrusion = True
+                                    
+
                             else:
                                 # merge RIGHT, be biased towards merging right (due to lack of >= above) _____________________________________________ #
                                 if debug_print:
                                     print(f'\tmerge RIGHT: right_congruent_flanking_sequence: {right_congruent_flanking_sequence}, right_congruent_flanking_index: {right_congruent_flanking_index}')
                                 new_subsequence = np.array([*active_subsequence_pos, *right_congruent_flanking_sequence])
-                                ## remove old
-                                for an_idx_to_remove in np.arange(a_subsequence_idx, (right_congruent_flanking_index+1)):                    
-                                    subsequences_to_remove.append(original_split_positions_arrays[an_idx_to_remove])
-                                # _tmp_merge_split_positions_arrays[a_subsequence_idx:(right_congruent_flanking_index+1)] = [] # new_subsequence ## or [] to clear it?
-                                subsequences_to_add.append(new_subsequence)
-                                # subsequence_replace_dict[tuple([original_split_positions_arrays[an_idx_to_remove] for an_idx_to_remove in np.arange(a_subsequence_idx, (right_congruent_flanking_index+1))])] = new_subsequence
-                                subsequence_replace_dict[tuple(np.arange(a_subsequence_idx, (right_congruent_flanking_index+1)).tolist())] = (a_subsequence_idx, new_subsequence)
-                                final_is_subsequence_intrusion = True
+                                
+                                ## test to see if the jump distance introduced by merging exceeeds the allowed value
+                                if max_jump_distance_cm is not None:
+                                    merge_edge_jump_distance: float = np.abs(active_subsequence_pos[-1] - right_congruent_flanking_sequence[0])
+                                    is_merge_jump_distance_too_large = (merge_edge_jump_distance > max_jump_distance_cm)
+
+                                if (not is_merge_jump_distance_too_large):
+                                    ## remove old
+                                    for an_idx_to_remove in np.arange(a_subsequence_idx, (right_congruent_flanking_index+1)):                    
+                                        subsequences_to_remove.append(original_split_positions_arrays[an_idx_to_remove])
+                                    # _tmp_merge_split_positions_arrays[a_subsequence_idx:(right_congruent_flanking_index+1)] = [] # new_subsequence ## or [] to clear it?
+                                    subsequences_to_add.append(new_subsequence)
+                                    # subsequence_replace_dict[tuple([original_split_positions_arrays[an_idx_to_remove] for an_idx_to_remove in np.arange(a_subsequence_idx, (right_congruent_flanking_index+1))])] = new_subsequence
+                                    subsequence_replace_dict[tuple(np.arange(a_subsequence_idx, (right_congruent_flanking_index+1)).tolist())] = (a_subsequence_idx, new_subsequence)
+                                    final_is_subsequence_intrusion = True
+                                    
+
                             ## END if len_left_congruent_flanking_sequ...
                                 
                             #TODO 2024-12-04 04:55: - [ ] Why can't we merge both left AND then right?
@@ -859,7 +876,7 @@ class SubsequencesPartitioningResult:
         
         # call `_subfn_perform_merge_iteration` ______________________________________________________________________________ #
         original_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_idxs) = _subfn_perform_merge_iteration(original_split_positions_arrays,
-                                                                                                                                                                            max_ignore_bins=max_ignore_bins, should_skip_epoch_with_only_short_subsequences=should_skip_epoch_with_only_short_subsequences, debug_print=debug_print)
+                                                                                                                                                                            max_ignore_bins=max_ignore_bins, max_jump_distance_cm=max_jump_distance_cm, should_skip_epoch_with_only_short_subsequences=should_skip_epoch_with_only_short_subsequences, debug_print=debug_print)
 
         ## OUTPUTS: final_out_subsequences
         final_out_subsequences = [v for v in final_out_subsequences if len(v) > 0] ## only non-empty subsequences
@@ -1111,7 +1128,7 @@ class SubsequencesPartitioningResult:
         #TODO 2024-12-13 12:26: - [ ] Are `self.split_indicies` or the merged equiv wrong if we remove empty subsequences?
         
         # Set `merged_split_positions_arrays` ________________________________________________________________________________ #
-        _tmp_merge_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_values_list) = self.merge_over_ignored_intrusions(max_ignore_bins=self.max_ignore_bins, debug_print=debug_print)
+        _tmp_merge_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_values_list) = self.merge_over_ignored_intrusions(max_ignore_bins=self.max_ignore_bins, max_jump_distance_cm=self.max_jump_distance_cm, debug_print=debug_print)
         # flat_positions_list = deepcopy(partition_result.flat_positions.tolist())
         self.bridged_intrusion_bin_indicies = deepcopy(final_intrusion_values_list) # np.array([flat_positions_list.index(v) for v in final_intrusion_idxs])
         
@@ -1141,8 +1158,6 @@ class SubsequencesPartitioningResult:
     @function_attributes(short_name=None, tags=['post-compute'], input_requires=['self.merged_split_positions_arrays'], output_provides=[], uses=[], used_by=['.rebuild_sequence_info_df'], creation_date='2024-12-13 08:36', related_items=[])
     def post_compute_subsequence_properties(self, enable_temporal_functions:bool=False, debug_print:bool=False):
         """ computes the sequence properties for each subsequence independently, most importantly the main (longest) subsequence """        
-        #TODO 2024-12-13 09:30: - [ ] Finish using heuristic/subsequence measures for longest subsequence
-
         assert self.pos_bin_edges is not None
         
         # Define the scoring functions lists
