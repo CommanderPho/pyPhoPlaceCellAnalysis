@@ -779,8 +779,15 @@ class SubsequencesPartitioningResult:
                                 
                                 ## test to see if the jump distance introduced by merging exceeeds the allowed value
                                 if max_jump_distance_cm is not None:
-                                    merge_edge_jump_distance: float = np.abs(left_congruent_flanking_sequence[-1] - active_subsequence_pos[0])
-                                    is_merge_jump_distance_too_large = (merge_edge_jump_distance > max_jump_distance_cm)
+                                    if (len_right_congruent_flanking_sequence > 0):
+                                        ## have a flanking right sequence to "bridge over" -- make sure that the last bin of the left seq and the first bin of the right seq don't exceed the jump dist thresh
+                                        merge_bridge_edges_jump_distance: float = np.abs(right_congruent_flanking_sequence[0] - left_congruent_flanking_sequence[-1])
+                                        is_merge_jump_distance_too_large = (merge_bridge_edges_jump_distance > max_jump_distance_cm)
+                                    else:
+                                        ## no right sequence, just merging self (the intrusion bins) onto the left flanking sequence (from the right) 
+                                        # not relevant, the distance between the longest adj subsequence and the intrusion value:
+                                        merge_edge_jump_distance: float = np.abs(left_congruent_flanking_sequence[-1] - active_subsequence_pos[0])
+                                        is_merge_jump_distance_too_large = (merge_edge_jump_distance > max_jump_distance_cm)
 
                                 if (not is_merge_jump_distance_too_large):
                                     ## remove old
@@ -801,8 +808,17 @@ class SubsequencesPartitioningResult:
                                 
                                 ## test to see if the jump distance introduced by merging exceeeds the allowed value
                                 if max_jump_distance_cm is not None:
-                                    merge_edge_jump_distance: float = np.abs(active_subsequence_pos[-1] - right_congruent_flanking_sequence[0])
-                                    is_merge_jump_distance_too_large = (merge_edge_jump_distance > max_jump_distance_cm)
+                                    
+                                    if (len_left_congruent_flanking_sequence > 0):
+                                        ## have a flanking left sequence to "bridge over" -- make sure that the last bin of the left seq and the first bin of the right seq don't exceed the jump dist thresh
+                                        merge_bridge_edges_jump_distance: float = np.abs(right_congruent_flanking_sequence[0] - left_congruent_flanking_sequence[-1]) ## this seems the same in both left or right longer
+                                        is_merge_jump_distance_too_large = (merge_bridge_edges_jump_distance > max_jump_distance_cm)
+                                    else:
+                                        ## no left sequence, just merging self (the intrusion bins) onto the right flanking sequence                                    
+                                        ## not relevant, the distance between the longest adj subsequence and the intrusion value:
+                                        merge_edge_jump_distance: float = np.abs(active_subsequence_pos[-1] - right_congruent_flanking_sequence[0])
+                                        is_merge_jump_distance_too_large = (merge_edge_jump_distance > max_jump_distance_cm)
+                                        
 
                                 if (not is_merge_jump_distance_too_large):
                                     ## remove old
