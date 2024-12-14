@@ -2643,23 +2643,24 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
                 
                 if show_pre_merged_debug_sequences:
                     ## Add the intermediate debug values to the axes
-                    merged_plots_out_dict = {'main': out.plots}
-                    # Plot only the positions themselves, as dotted overlaying lines
-                    linestyle = (0, (1, 1)) # dots with 1pt dot, 0.5pt space
+                    raise NotImplementedError(f'Depricated to try and prevent bad drawing 2024-12-13 18:49')
+                    # merged_plots_out_dict = {'main': out.plots}
+                    # # Plot only the positions themselves, as dotted overlaying lines
+                    # linestyle = (0, (1, 1)) # dots with 1pt dot, 0.5pt space
 
-                    pre_merged_debug_sequences_kwargs = dict(sequence_position_hlines_kwargs=dict(linewidth=2, linestyle=linestyle, zorder=11, alpha=1.0), # high-zorder to place it on-top, linestyle is "densely-dashed"
-                        split_vlines_kwargs = dict(should_skip=True),
-                        time_bin_edges_vlines_kwargs = dict(should_skip=True),
-                        direction_change_lines_kwargs = dict(should_skip=True),
-                        intrusion_time_bin_shading_kwargs = dict(should_skip=True),
-                    )
+                    # pre_merged_debug_sequences_kwargs = dict(sequence_position_hlines_kwargs=dict(linewidth=2, linestyle=linestyle, zorder=11, alpha=1.0), # high-zorder to place it on-top, linestyle is "densely-dashed"
+                    #     split_vlines_kwargs = dict(should_skip=True),
+                    #     time_bin_edges_vlines_kwargs = dict(should_skip=True),
+                    #     direction_change_lines_kwargs = dict(should_skip=True),
+                    #     intrusion_time_bin_shading_kwargs = dict(should_skip=True),
+                    # )
                     
-                    pre_merged_split_positions_arrays = deepcopy(a_partition_result.split_positions_arrays)
-                    out3: MatplotlibRenderPlots = a_partition_result.plot_time_bins_multiple(ax=curr_ax, enable_position_difference_indicators=False, flat_time_window_centers=time_window_centers, flat_time_window_edges=time_window_edges,
-                        override_positions_list=pre_merged_split_positions_arrays, subsequence_line_color_alpha=0.95, arrow_alpha=0.9, enable_axes_formatting=False, defer_show=True, **pre_merged_debug_sequences_kwargs,
-                    )
-                    merged_plots_out_dict['debug'] = out3.plots
-                    out.plots = merged_plots_out_dict
+                    # pre_merged_split_positions_arrays = deepcopy(a_partition_result.split_positions_arrays)
+                    # out3: MatplotlibRenderPlots = a_partition_result.plot_time_bins_multiple(ax=curr_ax, enable_position_difference_indicators=False, flat_time_window_centers=time_window_centers, flat_time_window_edges=time_window_edges,
+                    #     override_positions_list=pre_merged_split_positions_arrays, subsequence_line_color_alpha=0.95, arrow_alpha=0.9, enable_axes_formatting=False, defer_show=True, **pre_merged_debug_sequences_kwargs,
+                    # )
+                    # merged_plots_out_dict['debug'] = out3.plots
+                    # out.plots = merged_plots_out_dict
                     
 
 
