@@ -1564,6 +1564,7 @@ class SubsequencesPartitioningResult:
             sequence_position_hlines_kwargs = dict(linewidth=4, zorder=-1, alpha=0.95) | kwargs.pop('sequence_position_hlines_kwargs', {})            
             main_sequence_position_dots_kwargs = dict(linewidths=2, marker ="^", edgecolor="#141414F9", s = 200, zorder=1) | kwargs.pop('main_sequence_position_dots_kwargs', {}) # "#141414F9" -- near black
             
+            subsequence_relative_bin_idx_labels_kwargs = dict(should_skip=False) | kwargs.pop('subsequence_relative_bin_idx_labels_kwargs', {})
             
             # Example override dict ______________________________________________________________________________________________ #
             # dict(
@@ -1582,7 +1583,7 @@ class SubsequencesPartitioningResult:
             should_skip_intrusion_time_bin_shading: bool = intrusion_time_bin_shading_kwargs.pop('should_skip', False)
             should_skip_sequence_position_hlines: bool = sequence_position_hlines_kwargs.pop('should_skip', False)
             should_skip_main_sequence_position_dots: bool = main_sequence_position_dots_kwargs.pop('should_skip', False)
-            
+            should_skip_subsequence_relative_bin_idx_labels: bool = subsequence_relative_bin_idx_labels_kwargs.pop('should_skip', False)
 
 
             def _subfn_draw_change_arrows(out_dict, subsequence_idx, subsequence_positions, x_starts_subseq, bin_width, num_positions):
@@ -1753,6 +1754,8 @@ class SubsequencesPartitioningResult:
             out_dict['subsequence_arrows_dict'] = {}
             out_dict['subsequence_arrow_labels_dict'] = {}
             out_dict['main_sequence_position_dots'] = {}
+            if not should_skip_subsequence_relative_bin_idx_labels:
+                out_dict['subsequence_bin_count_labels_dict'] = {}
             
             # Keep track of the current x position
             x_start = x_starts[0]
@@ -1766,7 +1769,10 @@ class SubsequencesPartitioningResult:
 
             sorted_subsequence_lengths = deepcopy(subsequence_lengths)[subsequence_len_sort_indicies].tolist()
             len_sorted_subsequence_idxs = np.arange(len(subsequence_lengths))[subsequence_len_sort_indicies].tolist()
+            #TODO 2024-12-16 12:35: - [ ] Fix subsequence length calculation so that it's synchronized with the method used to rank the subsequences in the `post_compute_subsequence_properties` fcn.
+                ## IMPORTANT! This is how the plots and the labels are getting off when called externally.
             
+
             # subsequence_len_rank_list = [for i, v in enumerate(sorted_subsequence_lengths)]
             
             if debug_print:
@@ -1798,12 +1804,6 @@ class SubsequencesPartitioningResult:
                     print(f'subsequence_idx: {subsequence_idx}, curr_subsequence_size_sorted_idx: {curr_subsequence_size_sorted_idx}, num_positions: {num_positions}, subsequence_positions: {subsequence_positions}, is_main_sequence: {is_main_sequence}')
 
                 if not is_main_sequence:
-                    # if debug_print:
-                    #     print(f'subsequence_idx: {subsequence_idx} is not mainsequence - color: {color}')
-                    # Assert.len_equals(color, 4)
-                    # color = list(color) # convert to list so it can be modified
-                    # color[-1] = (color[-1] * non_main_sequence_alpha_multiplier)
-                    # color = tuple(color)
                     sequence_position_hlines_kwargs.update(alpha=(0.95 * non_main_sequence_alpha_multiplier))
                 else:
                     # is main sequence
@@ -1815,6 +1815,35 @@ class SubsequencesPartitioningResult:
                     if debug_print:
                         print(f'main_sequence_position_dots -- color: {color}\n\tsubsequence_idx: {subsequence_idx}, subsequence_positions: {subsequence_positions}')
                     out_dict['main_sequence_position_dots'][subsequence_idx] = ax.scatter(x_centers_subseq, subsequence_positions, color=color, **main_sequence_position_dots_kwargs)
+
+                    if not should_skip_subsequence_relative_bin_idx_labels:
+                        # draw the little labels above each sequence bin indicating its count
+                        
+                        subseq_idx_text_alpha = 0.95
+                        subseq_idx_text_color = (color[0], color[1], color[2], subseq_idx_text_alpha,)
+                        subseq_idx_text_outline_color = (1.0, 1.0, 1.0, 0.5)
+                        subsequence_idx_offset = 2.0 ## positions slightly above the position
+
+                        out_dict['subsequence_bin_count_labels_dict'][subsequence_idx] = []
+
+                        ## text will contain: `x_rel_indices`
+                        
+                        ## each label will be positioned at x=x_centers_subseq, y=(subsequence_idx_offset+subsequence_positions)
+                        
+                        # Now, for each pair of adjacent positions within the group, draw arrows and labels
+                        for a_subsequence_rel_idx, an_x_center, a_subsequence_position in zip(x_rel_indices, x_centers_subseq, subsequence_positions): # range(num_positions - 1)
+                            txt = ax.text(
+                                an_x_center, (a_subsequence_position + subsequence_idx_offset),
+                                f'{int(a_subsequence_rel_idx)}',  # Format with sign and two decimal places
+                                fontsize=6,
+                                ha='center',
+                                va='bottom',
+                                color=subseq_idx_text_color,
+                                bbox=dict(facecolor=subseq_idx_text_outline_color, edgecolor='none', alpha=subseq_idx_text_alpha, pad=0.5)  # Add background for readability
+                            )
+                            out_dict['subsequence_bin_count_labels_dict'][subsequence_idx].append(txt)
+                        # end for a_subsequence_rel_idx, an_x_cente...
+            
 
                     
                 if (not should_skip_sequence_position_hlines):
