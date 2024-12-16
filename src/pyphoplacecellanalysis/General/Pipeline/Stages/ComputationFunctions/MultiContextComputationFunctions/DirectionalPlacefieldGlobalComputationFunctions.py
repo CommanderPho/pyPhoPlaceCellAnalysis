@@ -5793,15 +5793,16 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 		#                                               short_directional_decoder_dict=short_directional_decoder_dict, short_directional_pf1D_Decoder=short_directional_pf1D_Decoder)
 		
 
-		for a_filter_epochs_decoder_result_dict in (decoder_ripple_filter_epochs_decoder_result_dict, decoder_laps_filter_epochs_decoder_result_dict):
-	   
-			# filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(filtered_epochs_df[['start', 'stop']].to_numpy()) for a_name, a_result in decoder_ripple_filter_epochs_decoder_result_dict.items()} # working filtered
+		# 🟪 2024-02-29 - `compute_pho_heuristic_replay_scores` ______________________________________________________________ #
+		decoder_ripple_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict,
+																	same_thresh_cm=a_same_thresh_cm, max_ignore_bins=max_ignore_bins, max_jump_distance_cm=max_jump_distance_cm, use_bin_units_instead_of_realworld=use_bin_units_instead_of_realworld)
 
-			# 🟪 2024-02-29 - `compute_pho_heuristic_replay_scores` ______________________________________________________________ #
-			a_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=a_filter_epochs_decoder_result_dict,
-														   				same_thresh_cm=a_same_thresh_cm, max_ignore_bins=max_ignore_bins, max_jump_distance_cm=max_jump_distance_cm, use_bin_units_instead_of_realworld=use_bin_units_instead_of_realworld)
-			## make sure it updates the results
-			# global_computation_results.computed_data['TrainTestSplit'] = a_train_test_result
+		# 🟪 2024-02-29 - `compute_pho_heuristic_replay_scores` ______________________________________________________________ #
+		decoder_laps_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict,
+																	same_thresh_cm=a_same_thresh_cm, max_ignore_bins=max_ignore_bins, max_jump_distance_cm=max_jump_distance_cm, use_bin_units_instead_of_realworld=use_bin_units_instead_of_realworld)
+
+
+		# _decoded_epochs_heuristic_scoring
 		
 		return global_computation_results
 
