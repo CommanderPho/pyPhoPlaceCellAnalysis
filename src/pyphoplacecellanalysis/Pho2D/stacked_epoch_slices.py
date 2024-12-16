@@ -2232,7 +2232,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         # 'enable_update_window_title_on_page_change'
         pagination_controller_dict =  cls._subfn_prepare_plot_multi_decoders_stacked_epoch_slices(curr_active_pipeline, track_templates, decoder_decoded_epochs_result_dict=decoder_decoded_epochs_result_dict, epochs_name=epochs_name, included_epoch_indicies=included_epoch_indicies, defer_render=True, save_figure=False, **kwargs)
         app, paginated_multi_decoder_decoded_epochs_window = cls.init_from_pagination_controller_dict(pagination_controller_dict, name=name, title=title, defer_show=defer_show) # Combine to a single figure
-        build_extra_programmatic_buttons(paginated_multi_decoder_decoded_epochs_window, **button_kwargs)
+        build_extra_programmatic_buttons(paginated_multi_decoder_decoded_epochs_window)
     
         # paginated_multi_decoder_decoded_epochs_window.params['track_length_cm_dict'] = track_templates.get_track_length_dict()
         return app, paginated_multi_decoder_decoded_epochs_window, pagination_controller_dict
