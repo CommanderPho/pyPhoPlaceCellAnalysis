@@ -2928,6 +2928,10 @@ def _workaround_validate_has_directional_decoded_epochs_evaluations(curr_active_
 
 # from neuropy.utils.indexing_helpers import MissingColumnsError
 
+
+
+
+
 def _workaround_validate_has_directional_decoded_epochs_heuristic_scoring(curr_active_pipeline, computation_filter_name='maze') -> bool:
 	""" 
 	
@@ -2936,9 +2940,9 @@ def _workaround_validate_has_directional_decoded_epochs_heuristic_scoring(curr_a
 	
 	"""
 	from neuropy.core.epoch import ensure_dataframe
+	from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicsResult
 
 	print_missing_columns: bool = True
-
 	directional_decoders_decode_epochs_result = curr_active_pipeline.global_computation_results.computed_data.get('DirectionalDecodersEpochsEvaluations', None)
 	if directional_decoders_decode_epochs_result is None:
 		return False
@@ -2966,6 +2970,11 @@ def _workaround_validate_has_directional_decoded_epochs_heuristic_scoring(curr_a
 		required_columns=heuristic_score_col_names,  print_missing_columns=print_missing_columns)
 	if (laps_has_required_columns is None) or (not laps_has_required_columns):
 		# raise MissingColumnsError(heuristic_score_col_names)
+		return False
+
+
+	heuristics_result: HeuristicsResult = curr_active_pipeline.global_computation_results.computed_data.get('Heuristics', None)
+	if heuristics_result is None:
 		return False
 
 	return True
@@ -5718,8 +5727,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
 	@function_attributes(short_name='directional_decoders_epoch_heuristic_scoring', tags=['heuristic', 'directional-decoders', 'epochs', 'filter', 'score', 'weighted-correlation', 'radon-transform', 'multiple-decoders', 'main-computation-function'],
 					   input_requires=['global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values', 'global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz'], output_provides=[],
-					   uses=['filter_and_update_epochs_and_spikes', 'HeuristicReplayScoring.compute_all_heuristic_scores'], used_by=[], creation_date='2024-03-12 17:23', related_items=[],
-		requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=[],
+					   uses=['filter_and_update_epochs_and_spikes', 'HeuristicReplayScoring.compute_all_heuristic_scores', 'HeuristicsResult'], used_by=[], creation_date='2024-03-12 17:23', related_items=[],
+		requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=['Heuristics'],
 		validate_computation_test=_workaround_validate_has_directional_decoded_epochs_heuristic_scoring, 
 						is_global=True, computation_precidence=1002.2)
 	def _decoded_epochs_heuristic_scoring(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, same_thresh_fraction_of_track: float=0.05, max_ignore_bins:float=2, max_jump_distance_cm: float=60.0, use_bin_units_instead_of_realworld:bool=False):
@@ -5740,7 +5749,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 		"""
 		from neuropy.core.epoch import TimeColumnAliasesProtocol
 		from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
-		from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring
+		from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring, HeuristicsResult
 
 		if global_computation_results.computation_config is None:
 			raise NotImplementedError(f'global_computation_results.computation_config is None!')
@@ -5794,16 +5803,19 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 		
 
 		# 🟪 2024-02-29 - `compute_pho_heuristic_replay_scores` ______________________________________________________________ #
-		decoder_ripple_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict,
+		decoder_ripple_filter_epochs_decoder_result_dict, ripple_out_new_scores, ripple_partition_result_dict = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict,
 																	same_thresh_cm=a_same_thresh_cm, max_ignore_bins=max_ignore_bins, max_jump_distance_cm=max_jump_distance_cm, use_bin_units_instead_of_realworld=use_bin_units_instead_of_realworld)
 
 		# 🟪 2024-02-29 - `compute_pho_heuristic_replay_scores` ______________________________________________________________ #
-		decoder_laps_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict,
+		decoder_laps_filter_epochs_decoder_result_dict, _laps_out_new_scores, _laps_partition_result_dict = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict,
 																	same_thresh_cm=a_same_thresh_cm, max_ignore_bins=max_ignore_bins, max_jump_distance_cm=max_jump_distance_cm, use_bin_units_instead_of_realworld=use_bin_units_instead_of_realworld)
 
 
-		# _decoded_epochs_heuristic_scoring
+		a_heuristics_result = HeuristicsResult(is_global=True, heuristic_scores_df_dict=ripple_out_new_scores, partition_result_dict=ripple_partition_result_dict)
 		
+		# 'Heuristics'
+		global_computation_results.computed_data['Heuristics'] = a_heuristics_result
+
 		return global_computation_results
 
 
