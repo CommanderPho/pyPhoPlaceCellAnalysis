@@ -2019,7 +2019,34 @@ class SubsequencesPartitioningResult:
         # out2: MatplotlibRenderPlots = SubsequencesPartitioningResult._debug_plot_time_bins_multiple(positions_list=final_out_subsequences, num='debug_plot_merged_time_binned_positions')
         return merged_out
 
+@define(slots=False, repr=False)
+class HeuristicsResult(ComputedResult):
+	""" Represents a rigorous test of decoding performance by splitting the lap epochs into Train/Test periods
+	
+	Usage:
+	
+	from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicsResult
+	
+    heuristics_result: HeuristicsResult = curr_active_pipeline.global_computation_results.computed_data.get('Heuristics', None)
+	if heuristics_result is None:
+		return False
+        
+	"""
+	_VersionedResultMixin_version: str = "2024.12.16_0" # to be updated in your IMPLEMENTOR to indicate its version
 
+	heuristic_scores_df_dict: Dict[types.DecoderName, pd.DataFrame] = serialized_field(default=None)
+	partition_result_dict: Dict[types.DecoderName, List[SubsequencesPartitioningResult]] = serialized_field(default=None)
+
+
+	# def sliced_by_neuron_id(self, included_neuron_ids: NDArray) -> "TrainTestSplitResult":
+	# 	""" refactored out of `self.filtered_by_frate(...)` and `TrackTemplates.determine_decoder_aclus_filtered_by_frate(...)`
+	# 	Only `self.train_lap_specific_pf1D_Decoder_dict` is affected
+		
+	# 	"""
+	# 	_obj = deepcopy(self) # temporary copy of the object
+	# 	_obj.train_lap_specific_pf1D_Decoder_dict = {k:v.get_by_id(included_neuron_ids) for k, v in _obj.train_lap_specific_pf1D_Decoder_dict.items()}
+	# 	return _obj
+	
 
 
 class SequenceScoringComputations:
