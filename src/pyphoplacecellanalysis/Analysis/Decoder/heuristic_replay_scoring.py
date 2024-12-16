@@ -1564,7 +1564,7 @@ class SubsequencesPartitioningResult:
             sequence_position_hlines_kwargs = dict(linewidth=4, zorder=-1, alpha=0.95) | kwargs.pop('sequence_position_hlines_kwargs', {})            
             main_sequence_position_dots_kwargs = dict(linewidths=2, marker ="^", edgecolor="#141414F9", s = 200, zorder=1) | kwargs.pop('main_sequence_position_dots_kwargs', {}) # "#141414F9" -- near black
             
-            subsequence_relative_bin_idx_labels_kwargs = dict(should_skip=False) | kwargs.pop('subsequence_relative_bin_idx_labels_kwargs', {})
+            subsequence_relative_bin_idx_labels_kwargs = dict(should_skip=False, should_skip_if_non_main_sequence=should_show_non_main_sequence_hlines, subseq_idx_text_alpha = 0.95, subseq_idx_text_outline_color = ('color', 'color', 'color', 0.95), subsequence_idx_offset = 4.0) | kwargs.pop('subsequence_relative_bin_idx_labels_kwargs', {})
             
             # Example override dict ______________________________________________________________________________________________ #
             # dict(
@@ -1583,7 +1583,12 @@ class SubsequencesPartitioningResult:
             should_skip_intrusion_time_bin_shading: bool = intrusion_time_bin_shading_kwargs.pop('should_skip', False)
             should_skip_sequence_position_hlines: bool = sequence_position_hlines_kwargs.pop('should_skip', False)
             should_skip_main_sequence_position_dots: bool = main_sequence_position_dots_kwargs.pop('should_skip', False)
+        
             should_skip_subsequence_relative_bin_idx_labels: bool = subsequence_relative_bin_idx_labels_kwargs.pop('should_skip', False)
+            should_skip_if_non_main_sequence_subsequence_relative_bin_idx_labels: bool = subsequence_relative_bin_idx_labels_kwargs.pop('should_skip_if_non_main_sequence', should_show_non_main_sequence_hlines) # whether to skip for sequences other than the main sequence
+        
+
+        
 
 
             def _subfn_draw_change_arrows(out_dict, subsequence_idx, subsequence_positions, x_starts_subseq, bin_width, num_positions):
@@ -1631,6 +1636,51 @@ class SubsequencesPartitioningResult:
                     
                 # end for i in ...
                 return out_dict
+            
+
+            def _subfn_draw_subsequence_index_labels(out_dict, subsequence_idx, subsequence_positions, x_rel_indices, x_centers_subseq, subsequence_color, subseq_idx_text_alpha = 0.95, subseq_idx_text_outline_color = (1.0, 1.0, 1.0, 0.5), subsequence_idx_offset = 2.0):
+                """ draw the little labels above each sequence bin indicating its count
+                captures: None
+                
+                subseq_idx_text_outline_color = (1.0, 1.0, 1.0, 0.5)
+                subseq_idx_text_outline_color = ('color', 'color', 'color', 0.5)
+                
+                out_dict = _subfn_draw_subsequence_index_labels(out_dict, subsequence_idx=subsequence_idx, subsequence_positions=subsequence_positions, x_rel_indices=x_rel_indices, x_centers_subseq=x_centers_subseq, subsequence_color=color, **subsequence_relative_bin_idx_labels_kwargs)
+                """
+                # subseq_idx_text_color = (subsequence_color[0], subsequence_color[1], subsequence_color[2], subseq_idx_text_alpha,)
+                subseq_idx_text_color = (1.0, 1.0, 1.0, subseq_idx_text_alpha,)
+
+                out_dict['subsequence_bin_count_labels_dict'][subsequence_idx] = []
+
+                ## text will contain: `x_rel_indices`
+                ## each label will be positioned at x=x_centers_subseq, y=(subsequence_idx_offset+subsequence_positions)
+                # subseq_idx_text_outline_color = [v for v in subseq_idx_text_outline_color]
+                final_subseq_idx_text_outline_color = []
+                for color_comp_idx, v in enumerate(subseq_idx_text_outline_color):
+                    if isinstance(v, str):
+                        assert v == 'color', f"v must equal 'color' but is instead '{v}'"
+                        ## replace with that color component
+                        final_subseq_idx_text_outline_color.append(subsequence_color[color_comp_idx])
+                    else:
+                        final_subseq_idx_text_outline_color.append(v)
+                        
+                # Now, for each pair of adjacent positions within the group, draw arrows and labels
+                for a_subsequence_rel_idx, an_x_center, a_subsequence_position in zip(x_rel_indices, x_centers_subseq, subsequence_positions):
+                    txt = ax.text(
+                        an_x_center, (a_subsequence_position + subsequence_idx_offset),
+                        f'{int(a_subsequence_rel_idx)}', 
+                        fontsize=6,
+                        ha='center',
+                        va='bottom',
+                        color=subseq_idx_text_color,
+                        bbox=dict(facecolor=final_subseq_idx_text_outline_color, edgecolor='none', alpha=subseq_idx_text_alpha, pad=0.5)  # Add background for readability
+                    )
+                    out_dict['subsequence_bin_count_labels_dict'][subsequence_idx].append(txt)
+                # end for a_subsequence_rel_idx, an_x_cente...
+                
+                return out_dict
+            
+
 
             # Begin Function Body ________________________________________________________________________________________________ #
             out_dict = {'time_bin_edges_vlines': None, 'split_vlines': None, 'subsequence_positions_hlines_dict': None,
@@ -1816,35 +1866,6 @@ class SubsequencesPartitioningResult:
                         print(f'main_sequence_position_dots -- color: {color}\n\tsubsequence_idx: {subsequence_idx}, subsequence_positions: {subsequence_positions}')
                     out_dict['main_sequence_position_dots'][subsequence_idx] = ax.scatter(x_centers_subseq, subsequence_positions, color=color, **main_sequence_position_dots_kwargs)
 
-                    if not should_skip_subsequence_relative_bin_idx_labels:
-                        # draw the little labels above each sequence bin indicating its count
-                        
-                        subseq_idx_text_alpha = 0.95
-                        subseq_idx_text_color = (color[0], color[1], color[2], subseq_idx_text_alpha,)
-                        subseq_idx_text_outline_color = (1.0, 1.0, 1.0, 0.5)
-                        subsequence_idx_offset = 2.0 ## positions slightly above the position
-
-                        out_dict['subsequence_bin_count_labels_dict'][subsequence_idx] = []
-
-                        ## text will contain: `x_rel_indices`
-                        
-                        ## each label will be positioned at x=x_centers_subseq, y=(subsequence_idx_offset+subsequence_positions)
-                        
-                        # Now, for each pair of adjacent positions within the group, draw arrows and labels
-                        for a_subsequence_rel_idx, an_x_center, a_subsequence_position in zip(x_rel_indices, x_centers_subseq, subsequence_positions): # range(num_positions - 1)
-                            txt = ax.text(
-                                an_x_center, (a_subsequence_position + subsequence_idx_offset),
-                                f'{int(a_subsequence_rel_idx)}',  # Format with sign and two decimal places
-                                fontsize=6,
-                                ha='center',
-                                va='bottom',
-                                color=subseq_idx_text_color,
-                                bbox=dict(facecolor=subseq_idx_text_outline_color, edgecolor='none', alpha=subseq_idx_text_alpha, pad=0.5)  # Add background for readability
-                            )
-                            out_dict['subsequence_bin_count_labels_dict'][subsequence_idx].append(txt)
-                        # end for a_subsequence_rel_idx, an_x_cente...
-            
-
                     
                 if (not should_skip_sequence_position_hlines):
                     if (is_main_sequence or should_show_non_main_sequence_hlines):
@@ -1853,6 +1874,13 @@ class SubsequencesPartitioningResult:
                         # colors = [color if is_intrusion is None or not is_intrusion[position_index + i] else 'red' for i in range(num_positions)]
                         colors = [color for i in range(num_positions)]
                         out_dict['subsequence_positions_hlines_dict'][subsequence_idx] = ax.hlines(subsequence_positions, xmin=x_starts_subseq, xmax=x_ends_subseq, colors=colors, **sequence_position_hlines_kwargs)
+
+
+                if not should_skip_subsequence_relative_bin_idx_labels:
+                    if (is_main_sequence or should_skip_if_non_main_sequence_subsequence_relative_bin_idx_labels):
+                        out_dict = _subfn_draw_subsequence_index_labels(out_dict, subsequence_idx=subsequence_idx, subsequence_positions=subsequence_positions, x_rel_indices=x_rel_indices, x_centers_subseq=x_centers_subseq, subsequence_color=color, **subsequence_relative_bin_idx_labels_kwargs)
+
+            
 
 
                 # Update x_start for next group
