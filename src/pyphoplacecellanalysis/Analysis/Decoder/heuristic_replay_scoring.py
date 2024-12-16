@@ -1316,9 +1316,10 @@ class SubsequencesPartitioningResult:
 
         ## END for a_subseq....
 
-
+        ### main_subsequence_ranking_columns: List[str]: The columns used for sorting/ranking the subsequences 
         # main_subsequence_ranking_columns: List[str] = ['len', 'len_excluding_both', 'len_excluding_intrusions', 'len_excluding_repeats'] ## full length
-        main_subsequence_ranking_columns: List[str] = ['len_excluding_both', 'len_excluding_intrusions', 'len_excluding_repeats', 'len'] ## full length
+        main_subsequence_ranking_columns: List[str] = ['len_excluding_intrusions', 'len_excluding_repeats', 'len', 'len_excluding_both'] ## -- uses the length excluding intrusions but COUNTS repeats
+        # main_subsequence_ranking_columns: List[str] = ['len_excluding_both', 'len_excluding_intrusions', 'len_excluding_repeats', 'len'] ## -- uses the length excluding both intrusions and repeats
         
         ## once done with all scores for this decoder, have `_a_separate_decoder_new_scores_dict`:
         all_subsequences_scores_df = pd.DataFrame.from_dict(all_subsequences_scores_dict, orient='index')

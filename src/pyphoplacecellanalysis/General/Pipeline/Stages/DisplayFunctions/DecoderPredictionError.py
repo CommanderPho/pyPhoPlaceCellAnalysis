@@ -2576,8 +2576,10 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
 
         ## Extract the visibility:
         should_enable_plot: bool = params.enable_decoded_sequence_and_heuristics_curve
-        show_pre_merged_debug_sequences: bool = params.show_pre_merged_debug_sequences
+        # show_pre_merged_debug_sequences: bool = params.show_pre_merged_debug_sequences
+        show_pre_merged_debug_sequences: bool = params.setdefault('show_pre_merged_debug_sequences', False)
         
+
         # data_index_value = data_idx # OLD MODE
         data_index_value = epoch_start_t
         
@@ -2637,13 +2639,14 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
                 )
         
                 merged_split_positions_arrays = deepcopy(a_partition_result.merged_split_positions_arrays)
-                out: "MatplotlibRenderPlots" = a_partition_result.plot_time_bins_multiple(ax=curr_ax, enable_position_difference_indicators=False, flat_time_window_centers=time_window_centers, flat_time_window_edges=time_window_edges, override_positions_list=merged_split_positions_arrays, 
+                out: "MatplotlibRenderPlots" = a_partition_result.plot_time_bins_multiple(ax=curr_ax, enable_position_difference_indicators=False,
+                                                                                         flat_time_window_centers=time_window_centers, flat_time_window_edges=time_window_edges, override_positions_list=merged_split_positions_arrays, 
                                                                                           **common_plot_time_bins_multiple_kwargs, **merged_debug_sequences_kwargs,                                                                                        
                                                                                            )
                 
-                if show_pre_merged_debug_sequences:
-                    ## Add the intermediate debug values to the axes
-                    raise NotImplementedError(f'Depricated to try and prevent bad drawing 2024-12-13 18:49')
+                # if show_pre_merged_debug_sequences:
+                    # Add the intermediate debug values to the axes
+                    # raise NotImplementedError(f'Depricated to try and prevent bad drawing 2024-12-13 18:49')
                     # merged_plots_out_dict = {'main': out.plots}
                     # # Plot only the positions themselves, as dotted overlaying lines
                     # linestyle = (0, (1, 1)) # dots with 1pt dot, 0.5pt space
