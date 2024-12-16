@@ -124,11 +124,13 @@ def _compute_stddev_of_diff(arr) -> float:
     return np.std(np.diff(arr, n=1))
 
 
-
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field, keys_only_repr
+from neuropy.utils.mixins.HDF5_representable import HDFMixin
+from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
 
 
 @define(slots=False)
-class SubsequencesPartitioningResult:
+class SubsequencesPartitioningResult(ComputedResult):
     """ Performs partitioning and re-grouping (merging) of a sequence of position values into multiple subsequences, performing heuristically-inspired operations like "bridging" over missing bins and recognizing the main sequence.
 
     returned by `partition_subsequences_ignoring_repeated_similar_positions` 
@@ -147,42 +149,44 @@ class SubsequencesPartitioningResult:
         total_num_subsequence_bins_no_repeats = np.sum(num_subsequence_bins_no_repeats)
 
     """
-    flat_positions: NDArray = field(metadata={'desc': "the list of most-likely positions (in [cm]) for each time bin in a decoded posterior"})
+    _VersionedResultMixin_version: str = "2024.12.16_0" # to be updated in your IMPLEMENTOR to indicate its version
+    
+    flat_positions: NDArray = serialized_field(metadata={'desc': "the list of most-likely positions (in [cm]) for each time bin in a decoded posterior"})
 
-    first_order_diff_lst: List = field() # the original list
+    first_order_diff_lst: List = non_serialized_field() # the original list
 
-    pos_bin_edges: NDArray = field(metadata={'desc': "the total number of unique position bins along the track, unrelated to the number of *positions* in `flat_positions` "})
+    pos_bin_edges: NDArray = serialized_field(metadata={'desc': "the total number of unique position bins along the track, unrelated to the number of *positions* in `flat_positions` "})
     
-    max_ignore_bins: int = field(default=2, metadata={'desc': "the maximum number of sequential time bins that can be merged over to form a larger subsequence."})
-    same_thresh: float = field(default=4, metadata={'desc': "if the difference (in [cm]) between the positions of two sequential time bins is less than this value, it will be treated as a non-changing direction and effectively treated as a single bin."})
-    max_jump_distance_cm: Optional[float] = field(default=None, metadata={'desc': 'The maximum allowed distance between adjacent bins'})
+    max_ignore_bins: int = serialized_attribute_field(default=2, metadata={'desc': "the maximum number of sequential time bins that can be merged over to form a larger subsequence."})
+    same_thresh: float = serialized_attribute_field(default=4, metadata={'desc': "if the difference (in [cm]) between the positions of two sequential time bins is less than this value, it will be treated as a non-changing direction and effectively treated as a single bin."})
+    max_jump_distance_cm: Optional[float] = serialized_attribute_field(default=None, metadata={'desc': 'The maximum allowed distance between adjacent bins'})
     
-    flat_time_window_centers: Optional[NDArray] = field(default=None)
-    flat_time_window_edges: Optional[NDArray] = field(default=None)
+    flat_time_window_centers: Optional[NDArray] = serialized_field(default=None)
+    flat_time_window_edges: Optional[NDArray] = serialized_field(default=None)
     
-    main_subsequence_ranking_columns: List[str] = field(default=None, metadata={'desc': "the names of the columns used for sorting/ranking the subsequences by length"})
+    main_subsequence_ranking_columns: List[str] = serialized_field(default=None, metadata={'desc': "the names of the columns used for sorting/ranking the subsequences by length"})
 
     # computed ___________________________________________________________________________________________________________ #
     
     # list_parts: List = field(default=None, repr=False) # factory=list
-    diff_split_indicies: NDArray = field(default=None, repr=False, metadata={'desc': "the indicies into the for the 1st-order diff array (`first_order_diff_lst`) where a split into subsequences should occur. "}) # for the 1st-order diff array
-    split_indicies: NDArray = field(default=None, repr=False, metadata={'desc': "the indicies into `flat_positions` where a split into subsequences should occur. "}) # for the original array
-    low_magnitude_change_indicies: NDArray = field(default=None, repr=False, metadata={'desc': "indicies where a change in direction occurs but it's below the threshold indicated by `same_thresh`"}) # specified in diff indicies
-    bridged_intrusion_bin_indicies: NDArray = field(default=None, repr=False, metadata={'desc': "indicies where an intrusion previously existed that was bridged. "}) # specified in diff indicies
+    diff_split_indicies: NDArray = non_serialized_field(default=None, repr=False, metadata={'desc': "the indicies into the for the 1st-order diff array (`first_order_diff_lst`) where a split into subsequences should occur. "}) # for the 1st-order diff array
+    split_indicies: NDArray = non_serialized_field(default=None, repr=False, metadata={'desc': "the indicies into `flat_positions` where a split into subsequences should occur. "}) # for the original array
+    low_magnitude_change_indicies: NDArray = non_serialized_field(default=None, repr=False, metadata={'desc': "indicies where a change in direction occurs but it's below the threshold indicated by `same_thresh`"}) # specified in diff indicies
+    bridged_intrusion_bin_indicies: NDArray = non_serialized_field(default=None, repr=False, metadata={'desc': "indicies where an intrusion previously existed that was bridged. "}) # specified in diff indicies
     
 
     # main subsequence splits ____________________________________________________________________________________________ #
-    split_positions_arrays: List[NDArray] = field(default=None, repr=False, metadata={'desc': "the positions in `flat_positions` but partitioned into subsequences determined by changes in direction exceeding `self.same_thresh`"})
-    split_position_flatindicies_arrays: List[NDArray] = field(default=None, repr=False, metadata={'desc': "the positions in `flat_positions` but partitioned into subsequences determined by changes in direction exceeding `self.same_thresh`"})
+    split_positions_arrays: List[NDArray] = non_serialized_field(default=None, repr=False, metadata={'desc': "the positions in `flat_positions` but partitioned into subsequences determined by changes in direction exceeding `self.same_thresh`"})
+    split_position_flatindicies_arrays: List[NDArray] = non_serialized_field(default=None, repr=False, metadata={'desc': "the positions in `flat_positions` but partitioned into subsequences determined by changes in direction exceeding `self.same_thresh`"})
 
 
-    merged_split_positions_arrays: List[NDArray] = field(default=None, metadata={'desc': "the subsequences from `split_positions_arrays` but merged into larger subsequences by briding-over (ignoring) sequences of intrusive tbins (with the max ignored length specified by `self.max_ignore_bins`"})
-    merged_split_position_flatindicies_arrays: List[NDArray] = field(default=None, metadata={'desc': "the subsequences from `split_positions_arrays` but merged into larger subsequences by briding-over (ignoring) sequences of intrusive tbins (with the max ignored length specified by `self.max_ignore_bins`"})
+    merged_split_positions_arrays: List[NDArray] = non_serialized_field(default=None, metadata={'desc': "the subsequences from `split_positions_arrays` but merged into larger subsequences by briding-over (ignoring) sequences of intrusive tbins (with the max ignored length specified by `self.max_ignore_bins`"})
+    merged_split_position_flatindicies_arrays: List[NDArray] = non_serialized_field(default=None, metadata={'desc': "the subsequences from `split_positions_arrays` but merged into larger subsequences by briding-over (ignoring) sequences of intrusive tbins (with the max ignored length specified by `self.max_ignore_bins`"})
     
     ## Info Dataframes:
-    position_bins_info_df: pd.DataFrame = field(default=None, repr=False, metadata={'desc': "one entry for each entry in `flat_positions`"})
-    position_changes_info_df: pd.DataFrame = field(default=None, repr=False, metadata={'desc': "one change for each entry in `first_order_diff_lst`"})
-    subsequences_df: pd.DataFrame = field(default=None, repr=False, metadata={'desc': "properties computed for the final subsequences. Produced by self.post_compute_subsequence_properties()"})
+    position_bins_info_df: pd.DataFrame = non_serialized_field(default=None, repr=False, metadata={'desc': "one entry for each entry in `flat_positions`"})
+    position_changes_info_df: pd.DataFrame = non_serialized_field(default=None, repr=False, metadata={'desc': "one change for each entry in `first_order_diff_lst`"})
+    subsequences_df: pd.DataFrame = non_serialized_field(default=None, repr=False, metadata={'desc': "properties computed for the final subsequences. Produced by self.post_compute_subsequence_properties()"})
     
     
 
