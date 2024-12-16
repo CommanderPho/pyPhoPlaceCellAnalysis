@@ -3022,70 +3022,6 @@ class HeuristicReplayScoring:
         
 
     @classmethod
-    @function_attributes(short_name=None, tags=['private'], input_requires=[], output_provides=[], uses=[], used_by=['compute_all_heuristic_scores'], creation_date='2024-03-07 19:54', related_items=[])
-    def _run_all_score_computations(cls, track_templates: TrackTemplates, a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], all_score_computations_fn_dict: Dict, computation_fn_kwargs_dict: Optional[Dict]=None):
-        """ PARALLELIZATION: All epochs are entirely independent, so it seems that they all could be done in parallel
-        
-        Performs the score computations specified in `all_score_computations_fn_dict` 
-        Ideas is to have a general format for the functions that can be ran, and this function loops through all of them passing them what they need to run (all decoders, all epochs) and then collects their outputs to get simple DataFrames of scores for each epoch.
-
-        Currently only have one implemented.
-        #TODO 2024-03-07 20:05: - [ ] generalize the older `compute_pho_heuristic_replay_scores` to be called from here too!
-
-        Usage:
-            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import bin_wise_position_difference ## functions to run
-            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _run_all_score_computations
-
-            all_score_computations_fn_dict = {'bin_wise_position_difference': bin_wise_position_difference}
-            all_epochs_scores_df = _run_score_computations(track_templates, a_decoded_filter_epochs_decoder_result_dict, all_score_computations_fn_dict=all_score_computations_fn_dict)
-            all_epochs_scores_df
-
-        """
-        
-        
-
-        # computation_fn_kwargs_dict: passed to each score function to specify additional required parameters
-        if computation_fn_kwargs_dict is None:
-            raise NotImplementedError(f'YOU BETTER PASS ONE! 2024-12-05')
-
-
-        ## INPUTS: track_templates, a_decoded_filter_epochs_decoder_result_dict
-        # decoder_track_length_dict =  {a_name:idealized_track_length_dict[a_name.split('_', maxsplit=1)[0]] for a_name, a_result in a_decoded_filter_epochs_decoder_result_dict.items()}
-        decoder_track_length_dict = track_templates.get_track_length_dict()  # {'long_LR': 214.0, 'long_RL': 214.0, 'short_LR': 144.0, 'short_RL': 144.0}
-
-        ## INPUTS: a_decoded_filter_epochs_decoder_result_dict, decoder_track_length_dict
-        all_epochs_scores_dict = {} # holds a single flat dataframe with scores from across all decoders
-        separate_decoder_new_scores_df = {} # holds one df for each decoder name in a_decoded_filter_epochs_decoder_result_dict
-
-        for a_name, a_result in a_decoded_filter_epochs_decoder_result_dict.items():
-            ## all four decoders are guaranteed to be independent
-            a_decoder_track_length: float = decoder_track_length_dict[a_name]
-
-            _a_separate_decoder_new_scores_dict = {}
-
-            ## compute all scores for this decoder:
-            for score_computation_name, computation_fn in all_score_computations_fn_dict.items():
-                score_name: str = score_computation_name # bin_wise_position_difference.short_name or bin_wise_position_difference.__name__
-                single_decoder_column_name = f"{score_name}"
-                unique_full_decoder_score_column_name: str = f"{score_name}_{a_name}"
-
-                # 'main_contiguous_subsequence_len_short_LR'
-                all_epochs_scores_dict[unique_full_decoder_score_column_name] = [computation_fn(a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length, **computation_fn_kwargs_dict.get(score_computation_name, {})) for an_epoch_idx in np.arange(a_result.num_filter_epochs)]
-                _a_separate_decoder_new_scores_dict[single_decoder_column_name] = deepcopy(all_epochs_scores_dict[unique_full_decoder_score_column_name]) # a single column, all epochs
-            # END for all_score_computations_fn_dict
-
-            ## once done with all scores for this decoder, have `_a_separate_decoder_new_scores_dict`:
-            separate_decoder_new_scores_df[a_name] =  pd.DataFrame(_a_separate_decoder_new_scores_dict)
-            assert np.shape(separate_decoder_new_scores_df[a_name])[0] == np.shape(a_result.filter_epochs)[0], f"np.shape(separate_decoder_new_scores_df[a_name])[0]: {np.shape(separate_decoder_new_scores_df[a_name])[0]} != np.shape(a_result.filter_epochs)[0]: {np.shape(a_result.filter_epochs)[0]}"
-            a_result.filter_epochs = PandasHelpers.adding_additional_df_columns(original_df=a_result.filter_epochs, additional_cols_df=separate_decoder_new_scores_df[a_name]) # update the filter_epochs with the new columns
-
-        # END for `a_decoded_filter_epochs_decoder_result_dict`
-        ## OUTPUTS: all_epochs_scores_dict, all_epochs_scores_df
-        all_epochs_scores_df = pd.DataFrame(all_epochs_scores_dict)
-        return a_decoded_filter_epochs_decoder_result_dict, all_epochs_scores_df
-
-
-    @classmethod
     @function_attributes(short_name=None, tags=['heuristic', 'MAIN', 'computation'], input_requires=[], output_provides=[], uses=['_run_all_score_computations', 'cls.compute_pho_heuristic_replay_scores', 'cls.build_all_score_computations_fn_dict'], used_by=['_decoded_epochs_heuristic_scoring'], creation_date='2024-03-12 00:59', related_items=[])
     def compute_all_heuristic_scores(cls, track_templates: TrackTemplates, a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], use_bin_units_instead_of_realworld:bool=False, max_ignore_bins:float=2, same_thresh_cm: float=6.0, max_jump_distance_cm: float = 60.0, **kwargs) -> Tuple[Dict[str, DecodedFilterEpochsResult], Dict[str, pd.DataFrame]]:
         """ Computes all heuristic scoring metrics (for each epoch) and adds them to the DecodedFilterEpochsResult's .filter_epochs as columns
@@ -3124,15 +3060,27 @@ class HeuristicReplayScoring:
             raise NotImplementedError(f'YOU BETTER PASS ONE! 2024-12-05')
 
         ## INPUTS: track_templates, a_decoded_filter_epochs_decoder_result_dict
-        # decoder_track_length_dict =  {a_name:idealized_track_length_dict[a_name.split('_', maxsplit=1)[0]] for a_name, a_result in a_decoded_filter_epochs_decoder_result_dict.items()}
         decoder_track_length_dict = track_templates.get_track_length_dict()  # {'long_LR': 214.0, 'long_RL': 214.0, 'short_LR': 144.0, 'short_RL': 144.0}
 
         ## INPUTS: a_decoded_filter_epochs_decoder_result_dict, decoder_track_length_dict
-        all_epochs_scores_dict = {} # holds a single flat dataframe with scores from across all decoders
-        separate_decoder_new_scores_df = {} # holds one df for each decoder name in a_decoded_filter_epochs_decoder_result_dict
+        _all_epochs_scores_dict = {} # holds a single flat dataframe with scores from across all decoders
+        _separate_decoder_new_scores_df = {} # holds one df for each decoder name in a_decoded_filter_epochs_decoder_result_dict
+
+
+        # END for `a_decoded_filter_epochs_decoder_result_dict`
+        ## OUTPUTS: all_epochs_scores_dict, all_epochs_scores_df
+        # all_epochs_scores_df = pd.DataFrame(all_epochs_scores_dict)
+        
+
+        # END OLD cls._run_all_score_computations ____________________________________________________________________________ #
+
+        _out_new_scores: Dict[str, pd.DataFrame] = {}
 
         for a_name, a_result in a_decoded_filter_epochs_decoder_result_dict.items():
             ## all four decoders are guaranteed to be independent
+            # Performs the score computations specified in `all_score_computations_fn_dict` 
+            # Idea is to have a general format for the functions that can be ran, and this function loops through all of them passing them what they need to run (all decoders, all epochs) and then collects their outputs to get simple DataFrames of scores for each epoch.
+            
             a_decoder_track_length: float = decoder_track_length_dict[a_name]
 
             _a_separate_decoder_new_scores_dict = {}
@@ -3144,25 +3092,16 @@ class HeuristicReplayScoring:
                 unique_full_decoder_score_column_name: str = f"{score_name}_{a_name}"
 
                 # 'main_contiguous_subsequence_len_short_LR'
-                all_epochs_scores_dict[unique_full_decoder_score_column_name] = [computation_fn(a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length, **computation_fn_kwargs_dict.get(score_computation_name, {})) for an_epoch_idx in np.arange(a_result.num_filter_epochs)]
-                _a_separate_decoder_new_scores_dict[single_decoder_column_name] = deepcopy(all_epochs_scores_dict[unique_full_decoder_score_column_name]) # a single column, all epochs
+                _all_epochs_scores_dict[unique_full_decoder_score_column_name] = [computation_fn(a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length, **computation_fn_kwargs_dict.get(score_computation_name, {})) for an_epoch_idx in np.arange(a_result.num_filter_epochs)]
+                _a_separate_decoder_new_scores_dict[single_decoder_column_name] = deepcopy(_all_epochs_scores_dict[unique_full_decoder_score_column_name]) # a single column, all epochs
             # END for all_score_computations_fn_dict
 
             ## once done with all scores for this decoder, have `_a_separate_decoder_new_scores_dict`:
-            separate_decoder_new_scores_df[a_name] =  pd.DataFrame(_a_separate_decoder_new_scores_dict)
-            assert np.shape(separate_decoder_new_scores_df[a_name])[0] == np.shape(a_result.filter_epochs)[0], f"np.shape(separate_decoder_new_scores_df[a_name])[0]: {np.shape(separate_decoder_new_scores_df[a_name])[0]} != np.shape(a_result.filter_epochs)[0]: {np.shape(a_result.filter_epochs)[0]}"
-            a_result.filter_epochs = PandasHelpers.adding_additional_df_columns(original_df=a_result.filter_epochs, additional_cols_df=separate_decoder_new_scores_df[a_name]) # update the filter_epochs with the new columns
+            _separate_decoder_new_scores_df[a_name] =  pd.DataFrame(_a_separate_decoder_new_scores_dict)
+            assert np.shape(_separate_decoder_new_scores_df[a_name])[0] == np.shape(a_result.filter_epochs)[0], f"np.shape(separate_decoder_new_scores_df[a_name])[0]: {np.shape(_separate_decoder_new_scores_df[a_name])[0]} != np.shape(a_result.filter_epochs)[0]: {np.shape(a_result.filter_epochs)[0]}"
+            a_result.filter_epochs = PandasHelpers.adding_additional_df_columns(original_df=a_result.filter_epochs, additional_cols_df=_separate_decoder_new_scores_df[a_name]) # update the filter_epochs with the new columns
+            
 
-        # END for `a_decoded_filter_epochs_decoder_result_dict`
-        ## OUTPUTS: all_epochs_scores_dict, all_epochs_scores_df
-        all_epochs_scores_df = pd.DataFrame(all_epochs_scores_dict)
-        
-
-        # END OLD cls._run_all_score_computations ____________________________________________________________________________ #
-
-        _out_new_scores: Dict[str, pd.DataFrame] = {}
-
-        for a_name, a_result in a_decoded_filter_epochs_decoder_result_dict.items():
             _out_new_scores[a_name] =  pd.DataFrame([asdict(cls.compute_pho_heuristic_replay_scores(a_result=a_result, an_epoch_idx=an_epoch_idx, pos_bin_edges=deepcopy(xbin_edges), use_bin_units_instead_of_realworld=use_bin_units_instead_of_realworld, max_ignore_bins=max_ignore_bins, same_thresh_cm=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm), filter=lambda a, v: a.name not in ['position_derivatives_df']) for an_epoch_idx in np.arange(a_result.num_filter_epochs)])
             assert np.shape(_out_new_scores[a_name])[0] == np.shape(a_result.filter_epochs)[0], f"np.shape(_out_new_scores[a_name])[0]: {np.shape(_out_new_scores[a_name])[0]} != np.shape(a_result.filter_epochs)[0]: {np.shape(a_result.filter_epochs)[0]}"
             a_result.filter_epochs = PandasHelpers.adding_additional_df_columns(original_df=a_result.filter_epochs, additional_cols_df=_out_new_scores[a_name]) # update the filter_epochs with the new columns
