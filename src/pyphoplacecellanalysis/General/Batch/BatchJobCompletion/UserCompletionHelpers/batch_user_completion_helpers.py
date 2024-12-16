@@ -926,7 +926,7 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 	# 🟪 2024-02-29 - `compute_pho_heuristic_replay_scores` - updates `directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict`
 	if (needs_recompute_heuristics or (not _workaround_validate_has_directional_decoded_epochs_heuristic_scoring(curr_active_pipeline))):
 		print(f'\tmissing heuristic columns. Recomputing:')
-		directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates,
+		directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict, _out_new_scores, _out_new_partition_result_dict = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates,
 																				     a_decoded_filter_epochs_decoder_result_dict=directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict, max_ignore_bins=max_ignore_bins, same_thresh_cm=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm)
 		print(f'\tdone recomputing heuristics.')
 

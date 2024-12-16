@@ -3177,7 +3177,7 @@ def _perform_filter_replay_epochs(curr_active_pipeline, global_epoch_name, track
     # filtered_decoder_filter_epochs_decoder_result_dict
 
     # 🟪 2024-02-29 - `compute_pho_heuristic_replay_scores`
-    filtered_decoder_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=filtered_decoder_filter_epochs_decoder_result_dict)
+    filtered_decoder_filter_epochs_decoder_result_dict, _out_new_scores, partition_result_dict = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=filtered_decoder_filter_epochs_decoder_result_dict)
 
     if should_only_include_user_selected_epochs:
         filtered_epochs_df = filtered_epochs_df.epochs.matching_epoch_times_slice(any_good_selected_epoch_times)
