@@ -160,6 +160,8 @@ class SubsequencesPartitioningResult:
     flat_time_window_centers: Optional[NDArray] = field(default=None)
     flat_time_window_edges: Optional[NDArray] = field(default=None)
     
+    main_subsequence_ranking_columns: List[str] = field(default=None, metadata={'desc': "the names of the columns used for sorting/ranking the subsequences by length"})
+
     # computed ___________________________________________________________________________________________________________ #
     
     # list_parts: List = field(default=None, repr=False) # factory=list
@@ -185,6 +187,12 @@ class SubsequencesPartitioningResult:
     
 
     def __attrs_post_init__(self):
+        if self.main_subsequence_ranking_columns is None:
+            # self.main_subsequence_ranking_columns = ['len', 'len_excluding_both', 'len_excluding_intrusions', 'len_excluding_repeats'] ## full length
+            self.main_subsequence_ranking_columns = ['len_excluding_intrusions', 'len_excluding_repeats', 'len', 'len_excluding_both'] ## -- uses the length excluding intrusions but COUNTS repeats
+            # self.main_subsequence_ranking_columns = ['len_excluding_both', 'len_excluding_intrusions', 'len_excluding_repeats', 'len'] ## -- uses the length excluding both intrusions and repeats
+            
+
         if isinstance(self.flat_positions, list):
             self.flat_positions = np.array(self.flat_positions)        
 
@@ -1317,14 +1325,12 @@ class SubsequencesPartitioningResult:
         ## END for a_subseq....
 
         ### main_subsequence_ranking_columns: List[str]: The columns used for sorting/ranking the subsequences 
-        # main_subsequence_ranking_columns: List[str] = ['len', 'len_excluding_both', 'len_excluding_intrusions', 'len_excluding_repeats'] ## full length
-        main_subsequence_ranking_columns: List[str] = ['len_excluding_intrusions', 'len_excluding_repeats', 'len', 'len_excluding_both'] ## -- uses the length excluding intrusions but COUNTS repeats
-        # main_subsequence_ranking_columns: List[str] = ['len_excluding_both', 'len_excluding_intrusions', 'len_excluding_repeats', 'len'] ## -- uses the length excluding both intrusions and repeats
+        main_subsequence_ranking_columns: List[str] = self.main_subsequence_ranking_columns
         
         ## once done with all scores for this decoder, have `_a_separate_decoder_new_scores_dict`:
         all_subsequences_scores_df = pd.DataFrame.from_dict(all_subsequences_scores_dict, orient='index')
         ## add the ['main_rank', 'is_main'] columns
-        all_subsequences_scores_df: pd.DataFrame = all_subsequences_scores_df.sort_values([*main_subsequence_ranking_columns, 'subsequence_idx', 'total_distance_traveled', 'track_coverage_score'], ascending=False).reset_index(drop=True) #.astype({'Probe_Epoch_id': 'int'}) # Sort by columns: 'Probe_Epoch_id' (ascending), 't_rel_seconds' (ascending), 'aclu' (ascending)
+        all_subsequences_scores_df: pd.DataFrame = all_subsequences_scores_df.sort_values([*main_subsequence_ranking_columns, 'subsequence_idx', 'total_distance_traveled', 'track_coverage_score', 'subsequence_idx'], ascending=False).reset_index(drop=True)
         all_subsequences_scores_df['main_rank'] = all_subsequences_scores_df.index.to_numpy() ## adds the 'subsequence_main_rank' column
         all_subsequences_scores_df['is_main'] = (all_subsequences_scores_df['main_rank'] == 0)
         all_subsequences_scores_df = all_subsequences_scores_df.sort_values(['subsequence_idx'], ascending=True, inplace=False).reset_index(drop=True) ## restore normal ascending subsequence_index order
@@ -1437,96 +1443,7 @@ class SubsequencesPartitioningResult:
 
         return self.position_bins_info_df, self.position_changes_info_df, self.subsequences_df
 
-    # Existing properties and methods remain unchanged or are adjusted as necessary
-    # Update properties that depend on split_positions_arrays and merged_split_positions_arrays
-
-    # @function_attributes(short_name=None, tags=['private', 'ChatGPT', '2024-12-04_09:16_Simplified'], input_requires=[], output_provides=[], uses=[], used_by=['init_from_positions_list'], creation_date='2024-12-04 10:07', related_items=[])
-    # def partition_subsequences(self):
-    #     """
-    #     Partitions the positions into subsequences based on significant direction changes.
-    #     Small changes below the threshold (jitter around a stationary position) are ignored.
-    #     Requires: self.flat_positions, self.same_thresh
-    #     Updates `self.split_positions_arrays`.
-    #     """
-    #     positions = self.flat_positions
-    #     same_thresh = self.same_thresh
-
-    #     # Compute first-order differences and directions
-    #     diffs = np.diff(positions, prepend=positions[0])
-    #     directions = np.sign(diffs)
-
-    #     subsequences = []
-    #     current_subseq = [positions[0]]
-    #     prev_dir = directions[0]
-
-    #     for i in range(1, len(positions)):
-    #         curr_dir = directions[i]
-    #         diff = diffs[i]
-
-    #         # Determine if the direction has changed significantly
-    #         if curr_dir != prev_dir and np.abs(diff) > same_thresh:
-    #             subsequences.append(np.array(current_subseq))
-    #             current_subseq = [positions[i]]
-    #             prev_dir = curr_dir
-    #         else:
-    #             current_subseq.append(positions[i])
-    #             # Update the direction if the change is significant
-    #             if np.abs(diff) > same_thresh:
-    #                 prev_dir = curr_dir
-
-    #     if current_subseq:
-    #         subsequences.append(np.array(current_subseq))
-
-    #     self.split_positions_arrays = subsequences
-
-    # @function_attributes(short_name=None, tags=['private', 'ChatGPT', '2024-12-04_09:16_Simplified'], input_requires=[], output_provides=[], uses=[], used_by=['init_from_positions_list'], creation_date='2024-12-04 10:07', related_items=[])
-    # def merge_intrusions(self):
-    #     """
-    #     Merges short subsequences (intrusions) into adjacent longer sequences.
-    #     Requires: self.split_positions_arrays, self.max_ignore_bins
-    #     Updates: self.merged_split_positions_arrays
-    #     """
-    #     subsequences = self.split_positions_arrays
-    #     max_ignore_bins = self.max_ignore_bins
-
-    #     merged_subsequences = []
-    #     i = 0
-    #     while i < len(subsequences):
-    #         current_seq = subsequences[i]
-    #         current_seq_len = len(current_seq)
-    #         if current_seq_len <= max_ignore_bins:
-    #             # Potential intrusion
-    #             left_seq = merged_subsequences[-1] if merged_subsequences else None
-    #             right_seq = subsequences[i + 1] if i + 1 < len(subsequences) else None
-
-    #             # Decide which side to merge with
-    #             merged = False
-    #             if left_seq is not None:
-    #                 left_seq_len = len(left_seq)
-    #                 if left_seq_len >= (current_seq_len * 2):
-    #                     # Merge with left sequence
-    #                     merged_seq = np.concatenate([left_seq, current_seq])
-    #                     merged_subsequences[-1] = merged_seq
-    #                     merged = True
-
-    #             if not merged and right_seq is not None:
-    #                 right_seq_len = len(right_seq)
-    #                 if right_seq_len >= (current_seq_len * 2):
-    #                     # Merge with right sequence
-    #                     merged_seq = np.concatenate([current_seq, right_seq])
-    #                     i += 1  # Skip the next sequence as it's merged
-    #                     merged_subsequences.append(merged_seq)
-    #                     merged = True
-
-    #             if not merged:
-    #                 # Cannot merge, keep as is
-    #                 merged_subsequences.append(current_seq)
-    #         else:
-    #             # Not an intrusion
-    #             merged_subsequences.append(current_seq)
-    #         i += 1
-
-    #     self.merged_split_positions_arrays = merged_subsequences
+    
         
 
     # Visualization/Graphical Debugging __________________________________________________________________________________ #
@@ -1554,6 +1471,7 @@ class SubsequencesPartitioningResult:
             from neuropy.utils.matplotlib_helpers import modify_colormap_alpha
             import matplotlib.transforms as mtransforms
 
+            # main_subsequence_ranking_columns: List[str] = kwargs.pop('main_subsequence_ranking_columns', ['len_excluding_intrusions', 'len_excluding_repeats', 'len', 'len_excluding_both']) # self.main_subsequence_ranking_columns
 
             # Plot Customization _________________________________________________________________________________________________ #
             split_vlines_kwargs = dict(color='black', linestyle='-', linewidth=1) | kwargs.pop('split_vlines_kwargs', {})
@@ -1565,7 +1483,9 @@ class SubsequencesPartitioningResult:
             main_sequence_position_dots_kwargs = dict(linewidths=2, marker ="^", edgecolor="#141414F9", s = 200, zorder=1) | kwargs.pop('main_sequence_position_dots_kwargs', {}) # "#141414F9" -- near black
             
             subsequence_relative_bin_idx_labels_kwargs = dict(should_skip=False, should_skip_if_non_main_sequence=should_show_non_main_sequence_hlines, subseq_idx_text_alpha = 0.95, subseq_idx_text_outline_color = ('color', 'color', 'color', 0.95), subsequence_idx_offset = 4.0) | kwargs.pop('subsequence_relative_bin_idx_labels_kwargs', {})
+
             
+
             # Example override dict ______________________________________________________________________________________________ #
             # dict(
             #     split_vlines_kwargs = dict(color='black', linestyle='-', linewidth=1, should_skip=False),
@@ -1587,10 +1507,6 @@ class SubsequencesPartitioningResult:
             should_skip_subsequence_relative_bin_idx_labels: bool = subsequence_relative_bin_idx_labels_kwargs.pop('should_skip', False)
             should_skip_if_non_main_sequence_subsequence_relative_bin_idx_labels: bool = subsequence_relative_bin_idx_labels_kwargs.pop('should_skip_if_non_main_sequence', should_show_non_main_sequence_hlines) # whether to skip for sequences other than the main sequence
         
-
-        
-
-
             def _subfn_draw_change_arrows(out_dict, subsequence_idx, subsequence_positions, x_starts_subseq, bin_width, num_positions):
                 """ captures: arrow_alpha, arrow_alpha, arrow_alpha, arrow_alpha
                 
@@ -1699,25 +1615,25 @@ class SubsequencesPartitioningResult:
 
             # Flatten the positions_list to get all positions for setting y-limits
             all_positions = np.concatenate(positions_list)
-            N = len(all_positions)
+            n_all_positions: int = len(all_positions)
 
             # Prepare x-values for time bins
             if flat_time_window_edges is not None:
                 ## Prefer edges over centers
-                assert (len(flat_time_window_edges)-1) == N, f"(len(flat_time_window_edges)-1): {(len(flat_time_window_edges)-1)} and len(all_positions): {len(all_positions)}"
+                assert (len(flat_time_window_edges)-1) == n_all_positions, f"(len(flat_time_window_edges)-1): {(len(flat_time_window_edges)-1)} and len(all_positions): {len(all_positions)}"
                 x_bins = deepcopy(flat_time_window_edges[:-1])  ## Left edges of bins
                 bin_width: float = np.median(np.diff(x_bins))
                 x_starts = x_bins
                 x_ends = x_bins + bin_width
             elif flat_time_window_centers is not None:
-                assert len(flat_time_window_centers) == N, f"flat_time_window_centers must have the same length as positions, but len(flat_time_window_centers): {len(flat_time_window_centers)} and len(all_positions): {len(all_positions)}"
+                assert len(flat_time_window_centers) == n_all_positions, f"flat_time_window_centers must have the same length as positions, but len(flat_time_window_centers): {len(flat_time_window_centers)} and len(all_positions): {len(all_positions)}"
                 x_bins = deepcopy(flat_time_window_centers)
                 bin_width: float = np.median(np.diff(x_bins))
                 x_starts = x_bins - bin_width / 2
                 x_ends = x_bins + bin_width / 2
             else:
                 ## Use indices as the x_bins
-                x_bins = np.arange(N + 1)  # Time bin edges
+                x_bins = np.arange(n_all_positions + 1)  # Time bin edges
                 bin_width: float = 1.0
                 x_starts = x_bins[:-1]
                 x_ends = x_bins[1:]
@@ -1732,8 +1648,7 @@ class SubsequencesPartitioningResult:
 
             ## Find the longest subsequence
             longest_subsequence_idx: int = np.argmax(group_lengths)
-            longest_subsequence_start_x = None
-            longest_subsequence_end_x = None
+
 
             # Plot vertical lines at regular time bins excluding group splits
             regular_x_bins = np.setdiff1d(x_bins, group_end_indices)
@@ -1756,7 +1671,7 @@ class SubsequencesPartitioningResult:
             # Shade intrusion time bins
             if not should_skip_intrusion_time_bin_shading:
                 if is_intrusion is not None:
-                    for i in range(N):
+                    for i in range(n_all_positions):
                         if is_intrusion[i]:
                             ax.axvspan(x_starts[i], x_ends[i], **intrusion_time_bin_shading_kwargs)
                             out_dict['intrusion_shading'].append((x_starts[i], x_ends[i]))
@@ -1767,7 +1682,7 @@ class SubsequencesPartitioningResult:
                 out_dict['direction_change_lines'] = []
                 
                 if direction_changes is not None:
-                    for i in range(N):
+                    for i in range(n_all_positions):
                         if direction_changes[i]:
                             x_line = x_starts[i]
                             line = ax.axvline(x_line, **direction_change_lines_kwargs)
@@ -1795,9 +1710,6 @@ class SubsequencesPartitioningResult:
                     #     line = ax.axvline(change_t, **direction_change_lines_kwargs)
                         
                     #     out_dict['direction_change_lines'].append(line)
-                    
-
-
 
             # Plot horizontal lines with customizable color
             out_dict['subsequence_positions_hlines_dict'] = {}
@@ -1813,9 +1725,17 @@ class SubsequencesPartitioningResult:
 
             ## sort the subsequences by length so that the colors are always assigned in a consistent order (longest == color0, 2nd-longests == color1, ....)
             subsequence_lengths = np.array([len(x) for x in positions_list])
-            main_subsequence_length: int = np.max(subsequence_lengths)
+            # main_subsequence_length: int = np.max(subsequence_lengths)
             # subsequence_len_sort_indicies = np.argsort(subsequence_lengths, kind='stable')[::-1] ## reverse sorted for length
-            subsequence_len_sort_indicies = np.argsort((-subsequence_lengths), kind='stable') # [:n] # `(-subsequence_lengths)` negate the lengths so the largest value is actually the lowest
+            # subsequence_len_sort_indicies = np.argsort((-subsequence_lengths), kind='stable') # [:n] # `(-subsequence_lengths)` negate the lengths so the largest value is actually the lowest
+            subsequence_len_sort_indicies = kwargs.pop('subsequence_len_sort_indicies', None) # `(-subsequence_lengths)` negate the lengths so the largest value is actually the lowest
+            if subsequence_len_sort_indicies is None:
+                subsequence_len_sort_indicies = np.argsort((-subsequence_lengths), kind='stable') ## use default, sort by literal sequence length
+                main_subsequence_length: int = np.max(subsequence_lengths)
+            else:
+                main_subsequence_length: int = subsequence_lengths[subsequence_len_sort_indicies[0]]         
+
+            Assert.same_length(subsequence_len_sort_indicies, subsequence_lengths)
 
             sorted_subsequence_lengths = deepcopy(subsequence_lengths)[subsequence_len_sort_indicies].tolist()
             len_sorted_subsequence_idxs = np.arange(len(subsequence_lengths))[subsequence_len_sort_indicies].tolist()
@@ -1926,6 +1846,17 @@ class SubsequencesPartitioningResult:
             if 'direction_change' in self.position_bins_info_df.columns:
                 direction_changes = self.position_bins_info_df['direction_change'].values
 
+
+        # subsequence_lengths = np.array([len(x) for x in override_positions_list])
+        # subsequence_len_sort_indicies = np.argsort((-subsequence_lengths), kind='stable')
+        
+        # sorted_subsequences_df: pd.DataFrame = deepcopy(self.subsequences_df).sort_values(['main_rank'], ascending=False)
+        # if np.all(override_positions_list == self.merged_split_positions_arrays):
+        if np.all([np.all(a == b) for a, b in zip(override_positions_list, self.merged_split_positions_arrays)]):
+            sorted_subsequence_idxs = deepcopy(self.subsequences_df).sort_values(['main_rank'], ascending=True).index.to_numpy()
+        else:
+            sorted_subsequence_idxs = None # use the default sorts
+
         return self._debug_plot_time_bins_multiple(
             positions_list=override_positions_list,
             num=num,
@@ -1938,7 +1869,8 @@ class SubsequencesPartitioningResult:
             subsequence_line_color_alpha=subsequence_line_color_alpha,
             is_intrusion=is_intrusion,  # Pass the intrusion information
             direction_changes=direction_changes,  # Pass the direction change information
-            position_info_df=self.position_bins_info_df, position_changes_info_df=self.position_changes_info_df,
+            position_info_df=self.position_bins_info_df, position_changes_info_df=self.position_changes_info_df, subsequences_df=self.subsequences_df,
+            subsequence_len_sort_indicies=sorted_subsequence_idxs,
             **kwargs
         )
 
