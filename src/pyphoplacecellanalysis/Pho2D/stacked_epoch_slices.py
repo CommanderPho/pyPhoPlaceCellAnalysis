@@ -1970,7 +1970,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
     # Pass-through properties ____________________________________________________________________________________________ #
     @property
     def decoder_filter_epochs_decoder_result_dict(self) -> Dict[types.DecoderName, DecodedFilterEpochsResult]:
-        """The global_thin_button_bar_widget property."""
+        """ each child has a `.filter_epochs_decoder_result` property """
         return self.get_children_props(prop_path='plots_data.filter_epochs_decoder_result')
  
 
@@ -2232,14 +2232,6 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         # 'enable_update_window_title_on_page_change'
         pagination_controller_dict =  cls._subfn_prepare_plot_multi_decoders_stacked_epoch_slices(curr_active_pipeline, track_templates, decoder_decoded_epochs_result_dict=decoder_decoded_epochs_result_dict, epochs_name=epochs_name, included_epoch_indicies=included_epoch_indicies, defer_render=True, save_figure=False, **kwargs)
         app, paginated_multi_decoder_decoded_epochs_window = cls.init_from_pagination_controller_dict(pagination_controller_dict, name=name, title=title, defer_show=defer_show) # Combine to a single figure
-        
-        if epochs_name == 'ripple':
-            button_kwargs = dict(decoder_laps_filter_epochs_decoder_result_dict=None, filtered_decoder_filter_epochs_decoder_result_dict=decoder_decoded_epochs_result_dict)
-        elif epochs_name == 'laps':
-            button_kwargs = dict(decoder_laps_filter_epochs_decoder_result_dict=decoder_decoded_epochs_result_dict, filtered_decoder_filter_epochs_decoder_result_dict=None)
-        else:
-            raise NotImplementedError(f'unknown epochs_name: "{epochs_name}", expected "ripple" or "laps"')
-        
         build_extra_programmatic_buttons(paginated_multi_decoder_decoded_epochs_window, **button_kwargs)
     
         # paginated_multi_decoder_decoded_epochs_window.params['track_length_cm_dict'] = track_templates.get_track_length_dict()
@@ -2274,7 +2266,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         
         
     @function_attributes(short_name=None, tags=['data-overlays', 'add'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-12 00:00', related_items=['remove_data_overlays'])
-    def add_data_overlays(self, decoder_laps_filter_epochs_decoder_result_dict=None, decoder_ripple_filter_epochs_decoder_result_dict=None, included_columns=None, defer_refresh=False):
+    def add_data_overlays(self, included_columns=None, defer_refresh=False):
         """ builds the Radon Transforms and Weighted Correlation data and adds them to the plot.
         
         REFINEMENT: note that it only plots either 'laps' or 'ripple', not both, so it doesn't need all this data.
@@ -2283,32 +2275,20 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import WeightedCorrelationPaginatedPlotDataProvider
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DecodedPositionsPlotDataProvider, DecodedSequenceAndHeuristicsPlotDataProvider
         
-        if decoder_laps_filter_epochs_decoder_result_dict is not None:
-            assert isinstance(decoder_laps_filter_epochs_decoder_result_dict, dict), f"type(decoder_laps_filter_epochs_decoder_result_dict) is {type(decoder_laps_filter_epochs_decoder_result_dict)}, if it's TrackTemplates we forgot to update the function calls"
-
         ## Choose which columns from the filter_epochs dataframe to include on the plot.
         if included_columns is None:
             included_columns = []
 
-        epoch_type_names_list: List[str] = [a_pagination_controller.params.active_identifying_figure_ctx.epochs for a_pagination_controller in self.pagination_controllers.values()]
-        # All epoch_type_names should be the same, either 'laps' or 'ripple':
-        assert (len(set(epoch_type_names_list)) == 1), f"All epoch_type_names should be the same, either 'laps' or 'ripple', but they are not: epoch_type_names_list: {epoch_type_names_list}"
-        epoch_type_name: str = epoch_type_names_list[0]
-        assert epoch_type_name in ['laps', 'ripple']
-        if epoch_type_name == 'laps':
-            decoder_decoded_epochs_result_dict = decoder_laps_filter_epochs_decoder_result_dict
-        elif epoch_type_name == 'ripple':
-            decoder_decoded_epochs_result_dict = decoder_ripple_filter_epochs_decoder_result_dict
-        else:
-            raise NotImplementedError(f"epoch_type_name: {epoch_type_name}")
-
-        ## Add the radon_transform_lines to each of the four figures:
+        decoder_decoded_epochs_result_dict = deepcopy(self.decoder_filter_epochs_decoder_result_dict)
+        
+        ## Add the overlays to each of the four figures:
         for a_name, a_pagination_controller in self.pagination_controllers.items():          
             # a_pagination_controller.params.xbin 
             a_pagination_controller.add_data_overlays(decoder_decoded_epochs_result=decoder_decoded_epochs_result_dict[a_name], included_columns=included_columns, defer_refresh=True)
 
         if not defer_refresh:
             self.refresh_current_page()
+            
 
 
     @function_attributes(short_name=None, tags=['data-overlays', 'remove'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-12 00:00', related_items=['add_data_overlays'])
@@ -3236,7 +3216,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                 'should_draw_time_bin_boundaries': True, 'time_bin_edges_display_kwargs': dict(color='grey', alpha=0.5, linewidth=1.5),   
         }
         
-        params_kwargs = {'enable_per_epoch_action_buttons': False,
+        params_kwargs = {'known_epochs_type': known_epochs_type,
+                         'enable_per_epoch_action_buttons': False,
                 'skip_plotting_most_likely_positions': True, 'skip_plotting_measured_positions': True, 
                 'enable_decoded_most_likely_position_curve': False, 'enable_decoded_sequence_and_heuristics_curve': False, 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False,
                 # 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False,
@@ -3456,7 +3437,7 @@ def _build_attached_raster_viewer(paginated_multi_decoder_decoded_epochs_window:
 
 
 @function_attributes(short_name=None, tags=['ui', 'buttons'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-25 16:03', related_items=[])
-def build_extra_programmatic_buttons(paginated_multi_decoder_decoded_epochs_window: PhoPaginatedMultiDecoderDecodedEpochsWindow, decoder_laps_filter_epochs_decoder_result_dict=None, filtered_decoder_filter_epochs_decoder_result_dict=None):
+def build_extra_programmatic_buttons(paginated_multi_decoder_decoded_epochs_window: PhoPaginatedMultiDecoderDecodedEpochsWindow):
     """ Builds a row of buttons that populate the bottom-most toolbar in the window to provide page-specific functionality and perform various tasks.
     
  
@@ -3484,7 +3465,7 @@ def build_extra_programmatic_buttons(paginated_multi_decoder_decoded_epochs_wind
     dict(icon_path=':/png/gui/icons/view-refresh.png', name="Refresh", callback=(lambda self, *args, **kwargs: paginated_multi_decoder_decoded_epochs_window.refresh_current_page())), ## captures: paginated_multi_decoder_decoded_epochs_window
     # dict(icon_path=':/png/gui/icons/nxdata-create.png', name="AddDataOverlays", callback=(lambda self, *args, **kwargs: paginated_multi_decoder_decoded_epochs_window.add_data_overlays(decoder_laps_filter_epochs_decoder_result_dict, filtered_decoder_filter_epochs_decoder_result_dict))), ## captures: paginated_multi_decoder_decoded_epochs_window, decoder_laps_filter_epochs_decoder_result_dict, filtered_decoder_filter_epochs_decoder_result_dict
     # dict(icon_path=':/png/gui/icons/mask-clear-all.png', name="RemoveDataOverlays", callback=(lambda self, *args, **kwargs: paginated_multi_decoder_decoded_epochs_window.remove_data_overlays())), ## captures: paginated_multi_decoder_decoded_epochs_window
-    dict(icon_path=':/png/gui/icons/image-select-add.png', name="AddDataOverlays", callback=(lambda self, *args, **kwargs: paginated_multi_decoder_decoded_epochs_window.add_data_overlays(decoder_laps_filter_epochs_decoder_result_dict, filtered_decoder_filter_epochs_decoder_result_dict))), ## captures: paginated_multi_decoder_decoded_epochs_window, decoder_laps_filter_epochs_decoder_result_dict, filtered_decoder_filter_epochs_decoder_result_dict
+    dict(icon_path=':/png/gui/icons/image-select-add.png', name="AddDataOverlays", callback=(lambda self, *args, **kwargs: paginated_multi_decoder_decoded_epochs_window.add_data_overlays())), ## captures: paginated_multi_decoder_decoded_epochs_window, decoder_laps_filter_epochs_decoder_result_dict, filtered_decoder_filter_epochs_decoder_result_dict
     dict(icon_path=':/png/gui/icons/image-select-erase.png', name="RemoveDataOverlays", callback=(lambda self, *args, **kwargs: paginated_multi_decoder_decoded_epochs_window.remove_data_overlays())), ## captures: paginated_multi_decoder_decoded_epochs_window
     dict(icon_path=':/png/gui/icons/document-print.png', name="PrintUserAnnotations", callback=(lambda self, *args, **kwargs: paginated_multi_decoder_decoded_epochs_window.print_user_annotations())), ## captures: paginated_multi_decoder_decoded_epochs_window
     dict(icon_path=':/png/gui/icons/document-open.png', name="LoadUserAnnotations", callback=(lambda self, *args, **kwargs: paginated_multi_decoder_decoded_epochs_window.restore_selections_from_user_annotations())), ## captures: paginated_multi_decoder_decoded_epochs_window

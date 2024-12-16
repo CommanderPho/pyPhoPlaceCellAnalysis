@@ -2517,197 +2517,6 @@ class HeuristicReplayScoring:
         
 
 
-    # @classmethod
-    # @function_attributes(short_name='continuous_seq_sort', tags=['DEPRICATED', 'bin-wise', 'bin-size', 'score', 'replay', 'sequence_length'], input_requires=[], output_provides=[],
-    #                       uses=['SubsequencesPartitioningResult', '_compute_sequences_spanning_ignored_intrusions'], used_by=[], creation_date='2024-03-12 01:05', related_items=['SubsequencesPartitioningResult'])
-    # def bin_wise_continuous_sequence_sort_score_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, pos_bin_edges: NDArray, max_ignore_bins:int=2, same_thresh_cm: Optional[float]=6.0, same_thresh_fraction_of_track: Optional[float] = None, max_jump_distance_cm: float = 60.0) -> float:
-    #     """ The amount of the track that is represented by the decoding. More is better (indicating a longer replay).
-
-    #     - Finds the longest continuous sequence (perhaps with some intrusions allowed?)
-    #             Intrusions!
-    #     - Do something with the start/end periods
-    #     - 
-
-    #     TODO 2024-03-27 - Not yet working:  
-
-    #     # 2024-03-27 - Finish `bin_wise_continuous_sequence_sort_score_fn`
-    #         from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring, is_valid_sequence_index, _compute_sequences_spanning_ignored_intrusions
-
-    #         # track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict
-
-    #         a_result: DecodedFilterEpochsResult = deepcopy(directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict['short_RL'])
-    #         an_epoch_idx: int = 8
-    #         a_decoder_track_length = 144.0 # {'long_LR': 214.0, 'long_RL': 214.0, 'short_LR': 144.0, 'short_RL': 144.0}
-    #         HeuristicReplayScoring.bin_wise_continuous_sequence_sort_score_fn(a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length)
-    #         start_t: float = 105.4005
-
-    #         active_filter_epochs: pd.DataFrame = deepcopy(a_result.active_filter_epochs)
-    #         active_filter_epochs
-    #         active_filter_epochs.epochs.find_data_indicies_from_epoch_times(epoch_times=np.array([start_t])) # array([8], dtype=int64)
-    #         active_filter_epochs
-
-    #         an_epoch_idx: int = 8
-
-    #         a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
-    #         a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
-    #         n_time_bins: int = a_result.nbins[an_epoch_idx]
-    #         n_pos_bins: int = np.shape(a_p_x_given_n)[0]
-    #         time_window_centers = a_result.time_window_centers[an_epoch_idx]
-
-    #         a_most_likely_positions_list
-
-    #         # n_time_bins
-
-    #     """
-    #     ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
-    #     a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
-    #     a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
-    #     n_time_bins: int = a_result.nbins[an_epoch_idx]
-    #     n_pos_bins: int = np.shape(a_p_x_given_n)[0]
-    #     time_window_centers = a_result.time_window_centers[an_epoch_idx]
-    #     if (same_thresh_cm is None):
-    #         assert same_thresh_fraction_of_track is not None
-    #         same_thresh_cm: float = float(same_thresh_fraction_of_track * a_decoder_track_length)
-    #     else:
-    #         assert same_thresh_fraction_of_track is None, f"only same_thresh_fraction_of_track or a_decoder_track_length can be provided, NOT BOTH!" 
-    #         ## use it directly
-
-    #     ## Begin computations:
-
-    #     # Get confidence of each position
-    #     # each_t_bin_max_confidence = np.nanmax(a_p_x_given_n, axis=0)
-
-    #     # the confidence in the differences depends on the confidence in the two bins that the differences are taken from
-    #     # each_t_bin_max_confidence
-    #     # each_t_bin_max_confidence
-
-
-    #     # INPUTS: a_most_likely_positions_list, n_pos_bins
-
-    #     ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
-    #     partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, pos_bin_edges=pos_bin_edges, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm, flat_time_window_centers=deepcopy(time_window_centers))
-    #     longest_sequence_length_ratio: float = partition_result.get_longest_sequence_length(return_ratio=True, should_ignore_intrusion_bins=True, should_use_no_repeat_values=False) # partition_result.longest_sequence_length_ratio 
-        
-    #     assert longest_sequence_length_ratio <= 1.0, f"longest_sequence_length_ratio should not be greater than 1.0, but it is {longest_sequence_length_ratio}!!"
-        
-    #     return longest_sequence_length_ratio
-    
-
-    # @classmethod
-    # @function_attributes(short_name='continuous_seq_len_ratio_no_repeats', tags=['DEPRICATED', 'bin-wise', 'bin-size', 'score', 'replay', 'sequence_length'], input_requires=[], output_provides=[],
-    #                       uses=['SubsequencesPartitioningResult', '_compute_sequences_spanning_ignored_intrusions'], used_by=[], creation_date='2024-03-12 01:05', related_items=['SubsequencesPartitioningResult'])
-    # def bin_wise_continuous_sequence_sort_excluding_near_repeats_score_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, pos_bin_edges: NDArray, max_ignore_bins:int=2, same_thresh_cm: Optional[float]=6.0, same_thresh_fraction_of_track: Optional[float] = None, max_jump_distance_cm: float = 60.0) -> float:
-    #     """ The amount of the track that is represented by the decoding. More is better (indicating a longer replay).
-
-    #     - Finds the longest continuous sequence (perhaps with some intrusions allowed?)
-    #             Intrusions!
-    #     - Do something with the start/end periods
-    #     - 
-
-    #     TODO 2024-03-27 - Not yet working:  
-
-    #     # 2024-03-27 - Finish `bin_wise_continuous_sequence_sort_score_fn`
-    #         from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring, is_valid_sequence_index, _compute_sequences_spanning_ignored_intrusions
-
-    #         # track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict
-
-    #         a_result: DecodedFilterEpochsResult = deepcopy(directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict['short_RL'])
-    #         an_epoch_idx: int = 8
-    #         a_decoder_track_length = 144.0 # {'long_LR': 214.0, 'long_RL': 214.0, 'short_LR': 144.0, 'short_RL': 144.0}
-    #         HeuristicReplayScoring.bin_wise_continuous_sequence_sort_score_fn(a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length)
-    #         start_t: float = 105.4005
-
-    #         active_filter_epochs: pd.DataFrame = deepcopy(a_result.active_filter_epochs)
-    #         active_filter_epochs
-    #         active_filter_epochs.epochs.find_data_indicies_from_epoch_times(epoch_times=np.array([start_t])) # array([8], dtype=int64)
-    #         active_filter_epochs
-
-    #         an_epoch_idx: int = 8
-
-    #         a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
-    #         a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
-    #         n_time_bins: int = a_result.nbins[an_epoch_idx]
-    #         n_pos_bins: int = np.shape(a_p_x_given_n)[0]
-    #         time_window_centers = a_result.time_window_centers[an_epoch_idx]
-
-    #         a_most_likely_positions_list
-
-    #         # n_time_bins
-
-    #     """
-    #     ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
-    #     a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
-    #     a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
-    #     n_time_bins: int = a_result.nbins[an_epoch_idx]
-    #     n_pos_bins: int = np.shape(a_p_x_given_n)[0]
-    #     time_window_centers = a_result.time_window_centers[an_epoch_idx]
-    #     if (same_thresh_cm is None):
-    #         assert same_thresh_fraction_of_track is not None
-    #         same_thresh_cm: float = float(same_thresh_fraction_of_track * a_decoder_track_length)
-    #     else:
-    #         assert same_thresh_fraction_of_track is None, f"only same_thresh_fraction_of_track or a_decoder_track_length can be provided, NOT BOTH!" 
-    #         ## use it directly
-
-    #     ## Begin computations:
-
-    #     ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
-    #     partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, pos_bin_edges=pos_bin_edges, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm, flat_time_window_centers=deepcopy(time_window_centers))
-    #     longest_no_repeats_sequence_length_ratio: float = partition_result.get_longest_sequence_length(return_ratio=True, should_ignore_intrusion_bins=True, should_use_no_repeat_values=True)
-    #     assert longest_no_repeats_sequence_length_ratio <= 1.0, f"longest_no_repeats_sequence_length_ratio should not be greater than 1.0, but it is {longest_no_repeats_sequence_length_ratio}!!"
-    #     return longest_no_repeats_sequence_length_ratio
-    
-
-    # @classmethod
-    # @function_attributes(short_name='main_contiguous_subsequence_len', tags=['DEPRICATED', 'bin-wise', 'bin-size', 'score', 'replay', 'sequence_length'], input_requires=[], output_provides=[],
-    #                       uses=['SubsequencesPartitioningResult', '_compute_sequences_spanning_ignored_intrusions'], used_by=[], creation_date='2024-03-12 01:05', related_items=['SubsequencesPartitioningResult'])
-    # def bin_wise_contiguous_subsequence_num_bins_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, pos_bin_edges: NDArray, max_ignore_bins:int=2, same_thresh_cm: Optional[float]=6.0, same_thresh_fraction_of_track: Optional[float] = None, max_jump_distance_cm: float = 60.0) -> int:
-    #     """ The amount of the track that is represented by the decoding. More is better (indicating a longer replay).
-
-    #     - Finds the longest continuous sequence (perhaps with some intrusions allowed?)
-    #             Intrusions!
-    #     - Do something with the start/end periods
-    #     - 
-
-    #     """
-    #     ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
-    #     a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
-    #     a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
-    #     n_time_bins: int = a_result.nbins[an_epoch_idx]
-    #     n_pos_bins: int = np.shape(a_p_x_given_n)[0]
-        
-    #     time_window_centers = a_result.time_window_centers[an_epoch_idx] # (1, ) --- correct
-    #     time_bin_edges = a_result.time_bin_edges[an_epoch_idx] # (30, )
-        
-    #     if (n_time_bins == 1) and (len(time_window_centers) == 1):
-    #         ## fix time_bin_edges -- it has been noticed when there's only one bin, `time_bin_edges` has a drastically wrong number of elements (e.g. len (30, )) while `time_window_centers` is right.
-    #         if len(time_bin_edges) != 2:
-    #             ## fix em
-    #             time_bin_container = a_result.time_bin_containers[an_epoch_idx]
-    #             time_bin_edges = np.array(list(time_bin_container.center_info.variable_extents))
-    #             assert len(time_bin_edges) == 2, f"tried to fix but FAILED!"
-    #             # print(f'fixed time_bin_edges: {time_bin_edges}')
-
-
-    #     if (same_thresh_cm is None):
-    #         assert same_thresh_fraction_of_track is not None
-    #         same_thresh_cm: float = float(same_thresh_fraction_of_track * a_decoder_track_length)
-    #     else:
-    #         assert same_thresh_fraction_of_track is None, f"only same_thresh_fraction_of_track or a_decoder_track_length can be provided, NOT BOTH!" 
-    #         ## use it directly
-        
-    #     ## Begin computations:
-    #     # [92.2559,84.6451,84.6451,92.2559,134.116,126.505,126.505,141.726,149.337,38.9801]
-    #     # same_thresh_cm: 7.2
-    #     ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
-    #     partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, pos_bin_edges=pos_bin_edges, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm,
-    #                                                                                                                 flat_time_window_centers=deepcopy(time_window_centers), flat_time_window_edges=deepcopy(time_bin_edges))
-
-    #     longest_sequence_length: int = int(partition_result.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=False, should_use_no_repeat_values=False))
-             
-    #     return longest_sequence_length
-    
-
-
     # ==================================================================================================================== #
     # New Simplified Heuristic Types                                                                                       #
     # ==================================================================================================================== #
@@ -2849,7 +2658,6 @@ class HeuristicReplayScoring:
                                                                                                                     flat_time_window_centers=deepcopy(time_window_centers), flat_time_window_edges=deepcopy(time_bin_edges))
         return partition_result.get_longest_sequence_length(return_ratio=True, should_ignore_intrusion_bins=True, should_use_no_repeat_values=True)
     
-
 
     @classmethod
     @function_attributes(short_name='mseq_tcov', tags=['bin-wise', 'bin-size', 'New Simplified', 'score', 'replay', 'sequence_length'], input_requires=[], output_provides=[],
@@ -3216,7 +3024,8 @@ class HeuristicReplayScoring:
     @classmethod
     @function_attributes(short_name=None, tags=['private'], input_requires=[], output_provides=[], uses=[], used_by=['compute_all_heuristic_scores'], creation_date='2024-03-07 19:54', related_items=[])
     def _run_all_score_computations(cls, track_templates: TrackTemplates, a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], all_score_computations_fn_dict: Dict, computation_fn_kwargs_dict: Optional[Dict]=None):
-        """ 
+        """ PARALLELIZATION: All epochs are entirely independent, so it seems that they all could be done in parallel
+        
         Performs the score computations specified in `all_score_computations_fn_dict` 
         Ideas is to have a general format for the functions that can be ran, and this function loops through all of them passing them what they need to run (all decoders, all epochs) and then collects their outputs to get simple DataFrames of scores for each epoch.
 
@@ -3277,7 +3086,7 @@ class HeuristicReplayScoring:
 
 
     @classmethod
-    @function_attributes(short_name=None, tags=['heuristic', 'main', 'computation'], input_requires=[], output_provides=[], uses=['_run_all_score_computations', 'cls.compute_pho_heuristic_replay_scores', 'cls.build_all_score_computations_fn_dict'], used_by=['_decoded_epochs_heuristic_scoring'], creation_date='2024-03-12 00:59', related_items=[])
+    @function_attributes(short_name=None, tags=['heuristic', 'MAIN', 'computation'], input_requires=[], output_provides=[], uses=['_run_all_score_computations', 'cls.compute_pho_heuristic_replay_scores', 'cls.build_all_score_computations_fn_dict'], used_by=['_decoded_epochs_heuristic_scoring'], creation_date='2024-03-12 00:59', related_items=[])
     def compute_all_heuristic_scores(cls, track_templates: TrackTemplates, a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], use_bin_units_instead_of_realworld:bool=False, max_ignore_bins:float=2, same_thresh_cm: float=6.0, max_jump_distance_cm: float = 60.0, **kwargs) -> Tuple[Dict[str, DecodedFilterEpochsResult], Dict[str, pd.DataFrame]]:
         """ Computes all heuristic scoring metrics (for each epoch) and adds them to the DecodedFilterEpochsResult's .filter_epochs as columns
         
