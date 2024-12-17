@@ -33,12 +33,18 @@ class SubsequenceDetectionSamples:
      [236.86178836035953, 122.69927486520214, 248.27803970987526, 244.47262259337003, 252.08345682638054, 244.47262259337003, 252.08345682638054, 252.08345682638054, 160.75344603025462, 187.3913658457913, 96.06135504966542, 115.08844063219165,],
     ]
     
+    false_positive_list = [
+        [134.116, 38.9801, 210.224, 183.586, 38.9801, 38.9801, 38.9801, 38.9801, 38.9801, 38.9801, 38.9801, 38.9801, 206.418, 206.418, 195.002, 206.418, 38.9801, 38.9801, 206.418, 38.9801, 38.9801, 38.9801, 38.9801, 38.9801, 206.418, 198.808, 206.418],
+    ]
+    
     @classmethod
     def get_all_examples(cls):
         all_example_dict = {}
         all_example_dict.update({f"intrusion[{i}]":np.array(arr) for i, arr in enumerate(SubsequenceDetectionSamples.intrusion_example_positions_list)})
         all_example_dict.update({f"jump[{i}]":np.array(arr) for i, arr in enumerate(SubsequenceDetectionSamples.jump_bad_list)})
         all_example_dict.update({f"great[{i}]":np.array(arr) for i, arr in enumerate(SubsequenceDetectionSamples.good_long_sequences_list)})
+        all_example_dict.update({f"false_positive[{i}]":np.array(arr) for i, arr in enumerate(SubsequenceDetectionSamples.false_positive_list)})
+        
         return all_example_dict
 
         # plot_subplot_mosaic_dict = {f"intrusion_example[{i}]":dict(sharex=True, sharey=True, mosaic=[["ax_ungrouped_seq"],["ax_grouped_seq"],["ax_merged_grouped_seq"],], gridspec_kw=dict(wspace=0, hspace=0.15)) for i, idx in enumerate(np.arange(num_tabs))}
