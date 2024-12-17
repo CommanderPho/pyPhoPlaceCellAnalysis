@@ -1107,6 +1107,7 @@ class SubsequencesPartitioningResult(ComputedResult):
         # original_split_positions_arrays = deepcopy(self.split_positions_arrays)
         # original_active_split_positions_arrays = deepcopy(self.split_positions_arrays)
         assert self.merged_split_positions_arrays is not None
+        exceeding_jump_distance_split_indicies = []
         
         ## Begin by finding only the longest sequence
         # n_tbins_list = np.array([len(v) for v in original_split_positions_arrays])
@@ -1118,15 +1119,15 @@ class SubsequencesPartitioningResult(ComputedResult):
 
         non_intrusion_position_bins_info_df: pd.DataFrame = self.position_bins_info_df[np.logical_not(self.position_bins_info_df['is_intrusion'])]
 
-        partitioned_df_dict = partition_df_dict(non_intrusion_position_bins_info_df, partitionColumn='subsequence_idx') ## WARNING: some subsequences are ALL INTRUSIONS, meaning they get eliminated here
-        non_intrusion_main_subsequence_df = partitioned_df_dict[main_subsequence_idx]
-        non_intrusion_main_subsequence_changes_info_df = SubsequencesPartitioningResult._compute_position_changes_info_df(position_bins_info_df=non_intrusion_main_subsequence_df, same_thresh=self.same_thresh, max_jump_distance_cm=self.max_jump_distance_cm, additional_split_on_exceeding_jump_distance=False)
+        if len(non_intrusion_position_bins_info_df) > 0:
+            partitioned_df_dict = partition_df_dict(non_intrusion_position_bins_info_df, partitionColumn='subsequence_idx') ## WARNING: some subsequences are ALL INTRUSIONS, meaning they get eliminated here
+            non_intrusion_main_subsequence_df = partitioned_df_dict[main_subsequence_idx]
+            if len(non_intrusion_main_subsequence_df) > 0:
+                non_intrusion_main_subsequence_changes_info_df = SubsequencesPartitioningResult._compute_position_changes_info_df(position_bins_info_df=non_intrusion_main_subsequence_df, same_thresh=self.same_thresh, max_jump_distance_cm=self.max_jump_distance_cm, additional_split_on_exceeding_jump_distance=False)
+                ## find where additional splits are needed:
+                exceeding_jump_distance_df = non_intrusion_main_subsequence_changes_info_df[non_intrusion_main_subsequence_changes_info_df['exceeds_jump_distance']] ## want to insert the split after `next_bin_flat_idxs` --> at index 4
+                exceeding_jump_distance_split_indicies = exceeding_jump_distance_df['next_bin_flat_idxs'].to_numpy()
 
-
-
-        ## find where additional splits are needed:
-        exceeding_jump_distance_df = non_intrusion_main_subsequence_changes_info_df[non_intrusion_main_subsequence_changes_info_df['exceeds_jump_distance']] ## want to insert the split after `next_bin_flat_idxs` --> at index 4
-        exceeding_jump_distance_split_indicies = exceeding_jump_distance_df['next_bin_flat_idxs'].to_numpy()
 
         # partition_result.split_indicies
         if len(exceeding_jump_distance_split_indicies) > 0:
