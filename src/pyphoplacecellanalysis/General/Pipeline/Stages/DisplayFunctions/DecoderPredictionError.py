@@ -2540,20 +2540,30 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
             # build the discrete line over the centered time bins:
             a_most_likely_positions_list =  np.atleast_1d(deepcopy(curr_results_obj.most_likely_positions_list[an_epoch_idx]))
             time_window_centers = np.atleast_1d(deepcopy(curr_results_obj.time_window_centers[an_epoch_idx]))
-            time_window_edges = np.atleast_1d(deepcopy(curr_results_obj.time_bin_edges[an_epoch_idx]))
+            time_bin_edges = np.atleast_1d(deepcopy(curr_results_obj.time_bin_edges[an_epoch_idx]))
             assert len(a_most_likely_positions_list) == len(time_window_centers)
             a_p_x_given_n = curr_results_obj.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
             n_time_bins: int = curr_results_obj.nbins[an_epoch_idx]
             
+            if (n_time_bins == 1) and (len(time_window_centers) == 1):
+                ## fix time_bin_edges -- it has been noticed when there's only one bin, `time_bin_edges` has a drastically wrong number of elements (e.g. len (30, )) while `time_window_centers` is right.
+                if len(time_bin_edges) != 2:
+                    ## fix em
+                    time_bin_container = curr_results_obj.time_bin_containers[an_epoch_idx]
+                    time_bin_edges = np.array(list(time_bin_container.center_info.variable_extents))
+                    assert len(time_bin_edges) == 2, f"tried to fix but FAILED!"
+                    # print(f'fixed time_bin_edges: {time_bin_edges}')
+                    
+
             n_pos_bins: int = np.shape(a_p_x_given_n)[0]
             partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, flat_time_window_centers=time_window_centers, pos_bin_edges=pos_bin_edges,
-                                                                                                                        max_ignore_bins=2, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm, flat_time_window_edges=time_window_edges)
+                                                                                                                        max_ignore_bins=2, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm, flat_time_window_edges=time_bin_edges) # AssertionError: (len(flat_time_window_edges)-1): 49 and num_flat_positions: 1
 
             # 'is_included_by_heuristic_criteria'
             is_epoch_included_in_filter: bool = a_tuple.is_included_by_heuristic_criteria
             ## Build the result
             # out_position_curves_data[an_epoch_idx] = DecodedSequenceAndHeuristicsPlotData(partition_result=partition_result, time_bin_centers=time_window_centers, line_y_most_likely=a_most_likely_positions_list, line_y_actual=None)
-            out_position_curves_data[a_tuple.start] = DecodedSequenceAndHeuristicsPlotData(partition_result=partition_result, time_bin_centers=time_window_centers, time_bin_edges=time_window_edges, line_y_most_likely=a_most_likely_positions_list, is_epoch_included=is_epoch_included_in_filter)
+            out_position_curves_data[a_tuple.start] = DecodedSequenceAndHeuristicsPlotData(partition_result=partition_result, time_bin_centers=time_window_centers, time_bin_edges=time_bin_edges, line_y_most_likely=a_most_likely_positions_list, is_epoch_included=is_epoch_included_in_filter)
 
 
         return out_position_curves_data
