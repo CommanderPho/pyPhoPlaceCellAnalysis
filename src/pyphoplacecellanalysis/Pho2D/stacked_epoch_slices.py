@@ -2754,7 +2754,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
     #     return {a_name:getattr(a_pagination_controller, prop_name) for a_name, a_pagination_controller in self.pagination_controllers.items()}
 
     @function_attributes(short_name=None, tags=['USEFUL', 'children', 'simplification'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-04 05:18', related_items=[])
-    def get_children_props(self, prop_path):
+    def get_children_props(self, prop_path: str):
         """ 
         paginated_multi_decoder_decoded_epochs_window.get_children_props(prop_path='plots_data.epoch_slices')
         paginated_multi_decoder_decoded_epochs_window.get_children_props(prop_path='plots_data.filter_epochs_decoder_result')
@@ -2773,9 +2773,37 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
         return {a_name:get_nested_prop(a_pagination_controller, prop_path) for a_name, a_pagination_controller in self.pagination_controllers.items()}
 
-    # def set_child_props(self, prop_name, value):
-    #     for child in self.findChildren(QWidget):
-    #         setattr(child, prop_name, value)
+
+    def set_children_props(self, prop_path: str, value):
+        """ sets the property from a path for each child object 
+        """
+        # def get_nested_prop(obj, prop_path):
+        #     attrs = prop_path.split(".")
+        #     for attr in attrs:
+        #         obj = getattr(obj, attr, None)
+        #         if obj is None:
+        #             break
+        #     return obj
+                
+        prop_name_parts = prop_path.split('.')
+        if len(prop_name_parts) >= 2:
+            ## at least two parts
+            container_prop_name = '.'.join(prop_name_parts[:-1]) ## all but the last prop
+            final_property_name: str = prop_name_parts[-1]
+            
+            child_container_props_dict = self.get_children_props(prop_path=container_prop_name)
+            
+            for a_name, a_pagination_controller in self.pagination_controllers.items():
+                a_container = child_container_props_dict[a_name]                
+                setattr(a_container, final_property_name, value) ## hopefully updates in-place?                
+                # get_nested_prop(a_pagination_controller, container_prop_name)
+                
+        else:
+            raise NotImplementedError(f'')
+            
+        # for child in self.findChildren(QWidget):
+        #     setattr(child, prop_name, value)
+
 
 
     def show_message(self, message: str, durationMs:int=4000):
