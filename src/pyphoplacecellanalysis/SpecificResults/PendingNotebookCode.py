@@ -70,7 +70,7 @@ class SerializationHelperBaseClass:
 class SerializationHelper_CustomDecodingResults(SerializationHelperBaseClass):
     @function_attributes(short_name=None, tags=['save', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-25 12:58', related_items=[])
     @classmethod
-    def save(cls, a_directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult, long_pf2D, save_path):
+    def save(cls, a_directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult, long_pf2D, save_path, debug_print=False):
         """ Used for "2024-08-01 - Heuristic Analysis.ipynb"
         Usage:
             directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = deepcopy(curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']) ## GENERAL
@@ -90,13 +90,15 @@ class SerializationHelper_CustomDecodingResults(SerializationHelperBaseClass):
         ybin = deepcopy(long_pf2D.ybin)
         ybin_centers = deepcopy(long_pf2D.ybin_centers)
 
-        print(xbin_centers)
+        if debug_print:
+            print(xbin_centers)
         save_dict = {
         'directional_decoders_epochs_decode_result': a_directional_decoders_epochs_decode_result.__getstate__(),
         'xbin': xbin, 'xbin_centers': xbin_centers}
 
         saveData(save_path, save_dict)
-        print(f'save_path: {save_path}')
+        if debug_print:
+            print(f'save_path: {save_path}')
         return save_path
 
 
