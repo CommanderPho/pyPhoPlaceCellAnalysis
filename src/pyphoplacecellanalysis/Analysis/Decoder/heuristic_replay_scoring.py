@@ -2681,216 +2681,6 @@ class HeuristicReplayScoring:
     # ==================================================================================================================== #
 
 
-    # @classmethod
-    # @function_attributes(short_name='mseq_len', tags=['bin-wise', 'bin-size', 'New Simplified', 'score', 'replay', 'sequence_length'], input_requires=[], output_provides=[],
-    #                       uses=['SubsequencesPartitioningResult'], used_by=[], creation_date='2024-03-12 01:05', related_items=['SubsequencesPartitioningResult'])
-    # def bin_wise_main_subsequence_len_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, pos_bin_edges: NDArray, max_ignore_bins:int=2, same_thresh_cm: Optional[float]=6.0, same_thresh_fraction_of_track: Optional[float] = None, max_jump_distance_cm: float = 60.0) -> int:
-    #     ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
-    #     a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
-    #     a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
-    #     n_time_bins: int = a_result.nbins[an_epoch_idx]
-    #     n_pos_bins: int = np.shape(a_p_x_given_n)[0]
-    #     time_window_centers = a_result.time_window_centers[an_epoch_idx]
-    #     time_bin_edges = a_result.time_bin_edges[an_epoch_idx] # (30, )
-        
-    #     if (n_time_bins == 1) and (len(time_window_centers) == 1):
-    #         ## fix time_bin_edges -- it has been noticed when there's only one bin, `time_bin_edges` has a drastically wrong number of elements (e.g. len (30, )) while `time_window_centers` is right.
-    #         if len(time_bin_edges) != 2:
-    #             ## fix em
-    #             time_bin_container = a_result.time_bin_containers[an_epoch_idx]
-    #             time_bin_edges = np.array(list(time_bin_container.center_info.variable_extents))
-    #             assert len(time_bin_edges) == 2, f"tried to fix but FAILED!"
-    #             # print(f'fixed time_bin_edges: {time_bin_edges}')
-
-
-    #     if (same_thresh_cm is None):
-    #         assert same_thresh_fraction_of_track is not None
-    #         same_thresh_cm: float = float(same_thresh_fraction_of_track * a_decoder_track_length)
-    #     else:
-    #         assert same_thresh_fraction_of_track is None, f"only same_thresh_fraction_of_track or a_decoder_track_length can be provided, NOT BOTH!" 
-    #         ## use it directly
-        
-    #     ## Begin computations:
-    #     partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, pos_bin_edges=pos_bin_edges, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm,
-    #                                                                                                                 flat_time_window_centers=deepcopy(time_window_centers), flat_time_window_edges=deepcopy(time_bin_edges))
-    #     longest_sequence_length: int = int(partition_result.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=False, should_use_no_repeat_values=False))
-    #     return longest_sequence_length
-    
-    # @classmethod
-    # @function_attributes(short_name='mseq_len_ignoring_intrusions', tags=['bin-wise', 'bin-size', 'New Simplified', 'score', 'replay', 'sequence_length'], input_requires=[], output_provides=[],
-    #                       uses=['SubsequencesPartitioningResult'], used_by=[], creation_date='2024-03-12 01:05', related_items=['SubsequencesPartitioningResult'])
-    # def bin_wise_main_subsequence_len_ignoring_intrusions_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, pos_bin_edges: NDArray, max_ignore_bins:int=2, same_thresh_cm: Optional[float]=6.0, same_thresh_fraction_of_track: Optional[float] = None, max_jump_distance_cm: float = 60.0) -> int:
-    #     ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
-    #     a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
-    #     a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
-    #     n_time_bins: int = a_result.nbins[an_epoch_idx]
-    #     n_pos_bins: int = np.shape(a_p_x_given_n)[0]
-    #     time_window_centers = a_result.time_window_centers[an_epoch_idx]
-    #     time_bin_edges = a_result.time_bin_edges[an_epoch_idx] # (30, )
-        
-    #     if (n_time_bins == 1) and (len(time_window_centers) == 1):
-    #         ## fix time_bin_edges -- it has been noticed when there's only one bin, `time_bin_edges` has a drastically wrong number of elements (e.g. len (30, )) while `time_window_centers` is right.
-    #         if len(time_bin_edges) != 2:
-    #             ## fix em
-    #             time_bin_container = a_result.time_bin_containers[an_epoch_idx]
-    #             time_bin_edges = np.array(list(time_bin_container.center_info.variable_extents))
-    #             assert len(time_bin_edges) == 2, f"tried to fix but FAILED!"
-    #             # print(f'fixed time_bin_edges: {time_bin_edges}')
-
-    #     if (same_thresh_cm is None):
-    #         assert same_thresh_fraction_of_track is not None
-    #         same_thresh_cm: float = float(same_thresh_fraction_of_track * a_decoder_track_length)
-    #     else:
-    #         assert same_thresh_fraction_of_track is None, f"only same_thresh_fraction_of_track or a_decoder_track_length can be provided, NOT BOTH!" 
-    #         ## use it directly
-        
-    #     ## Begin computations:
-    #     partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, pos_bin_edges=pos_bin_edges, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm,
-    #                                                                                                                 flat_time_window_centers=deepcopy(time_window_centers), flat_time_window_edges=deepcopy(time_bin_edges))
-    #     longest_sequence_length: int = int(partition_result.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=True, should_use_no_repeat_values=False))
-    #     return longest_sequence_length
-    
-    # @classmethod
-    # @function_attributes(short_name='mseq_len_ignoring_intrusions_and_repeats', tags=['bin-wise', 'bin-size', 'New Simplified', 'score', 'replay', 'sequence_length'], input_requires=[], output_provides=[],
-    #                       uses=['SubsequencesPartitioningResult'], used_by=[], creation_date='2024-03-12 01:05', related_items=['SubsequencesPartitioningResult'])
-    # def bin_wise_main_subsequence_len_ignoring_intrusions_and_repeats_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, pos_bin_edges: NDArray, max_ignore_bins:int=2, same_thresh_cm: Optional[float]=6.0, same_thresh_fraction_of_track: Optional[float] = None, max_jump_distance_cm: float = 60.0) -> int:
-    #     ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
-    #     a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
-    #     a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
-    #     n_time_bins: int = a_result.nbins[an_epoch_idx]
-    #     n_pos_bins: int = np.shape(a_p_x_given_n)[0]
-    #     time_window_centers = a_result.time_window_centers[an_epoch_idx]
-    #     time_bin_edges = a_result.time_bin_edges[an_epoch_idx] # (30, )
-        
-    #     if (n_time_bins == 1) and (len(time_window_centers) == 1):
-    #         ## fix time_bin_edges -- it has been noticed when there's only one bin, `time_bin_edges` has a drastically wrong number of elements (e.g. len (30, )) while `time_window_centers` is right.
-    #         if len(time_bin_edges) != 2:
-    #             ## fix em
-    #             time_bin_container = a_result.time_bin_containers[an_epoch_idx]
-    #             time_bin_edges = np.array(list(time_bin_container.center_info.variable_extents))
-    #             assert len(time_bin_edges) == 2, f"tried to fix but FAILED!"
-    #             # print(f'fixed time_bin_edges: {time_bin_edges}')
-
-    #     if (same_thresh_cm is None):
-    #         assert same_thresh_fraction_of_track is not None
-    #         same_thresh_cm: float = float(same_thresh_fraction_of_track * a_decoder_track_length)
-    #     else:
-    #         assert same_thresh_fraction_of_track is None, f"only same_thresh_fraction_of_track or a_decoder_track_length can be provided, NOT BOTH!" 
-    #         ## use it directly
-        
-    #     ## Begin computations:
-    #     partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, pos_bin_edges=pos_bin_edges, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm,
-    #                                                                                                                 flat_time_window_centers=deepcopy(time_window_centers), flat_time_window_edges=deepcopy(time_bin_edges))
-    #     longest_sequence_length: int = int(partition_result.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=True, should_use_no_repeat_values=True))
-    #     return longest_sequence_length
-    
-    # @classmethod
-    # @function_attributes(short_name='mseq_len_ratio_ignoring_intrusions_and_repeats', tags=['bin-wise', 'RATIO', 'bin-size', 'New Simplified', 'score', 'replay', 'sequence_length'], input_requires=[], output_provides=[],
-    #                       uses=['SubsequencesPartitioningResult'], used_by=[], creation_date='2024-03-12 01:05', related_items=['SubsequencesPartitioningResult'])
-    # def bin_wise_main_subsequence_len_ratio_ignoring_intrusions_and_repeats_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, pos_bin_edges: NDArray, max_ignore_bins:int=2, same_thresh_cm: Optional[float]=6.0, same_thresh_fraction_of_track: Optional[float] = None, max_jump_distance_cm: float = 60.0) -> int:
-    #     ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
-    #     a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
-    #     a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
-    #     n_time_bins: int = a_result.nbins[an_epoch_idx]
-    #     n_pos_bins: int = np.shape(a_p_x_given_n)[0]
-    #     time_window_centers = a_result.time_window_centers[an_epoch_idx]
-    #     time_bin_edges = a_result.time_bin_edges[an_epoch_idx] # (30, )
-        
-    #     if (n_time_bins == 1) and (len(time_window_centers) == 1):
-    #         ## fix time_bin_edges -- it has been noticed when there's only one bin, `time_bin_edges` has a drastically wrong number of elements (e.g. len (30, )) while `time_window_centers` is right.
-    #         if len(time_bin_edges) != 2:
-    #             ## fix em
-    #             time_bin_container = a_result.time_bin_containers[an_epoch_idx]
-    #             time_bin_edges = np.array(list(time_bin_container.center_info.variable_extents))
-    #             assert len(time_bin_edges) == 2, f"tried to fix but FAILED!"
-    #             # print(f'fixed time_bin_edges: {time_bin_edges}')
-
-    #     if (same_thresh_cm is None):
-    #         assert same_thresh_fraction_of_track is not None
-    #         same_thresh_cm: float = float(same_thresh_fraction_of_track * a_decoder_track_length)
-    #     else:
-    #         assert same_thresh_fraction_of_track is None, f"only same_thresh_fraction_of_track or a_decoder_track_length can be provided, NOT BOTH!" 
-    #         ## use it directly
-        
-    #     ## Begin computations:
-    #     partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, pos_bin_edges=pos_bin_edges, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm,
-    #                                                                                                                 flat_time_window_centers=deepcopy(time_window_centers), flat_time_window_edges=deepcopy(time_bin_edges))
-    #     return partition_result.get_longest_sequence_length(return_ratio=True, should_ignore_intrusion_bins=True, should_use_no_repeat_values=True)
-    
-
-    # @classmethod
-    # @function_attributes(short_name='mseq_tcov', tags=['bin-wise', 'bin-size', 'New Simplified', 'score', 'replay', 'sequence_length'], input_requires=[], output_provides=[],
-    #                       uses=['SubsequencesPartitioningResult'], used_by=[], creation_date='2024-03-12 01:05', related_items=['SubsequencesPartitioningResult'])
-    # def bin_wise_main_subsequence_track_coverage_score_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, pos_bin_edges: NDArray, max_ignore_bins:int=2, same_thresh_cm: Optional[float]=6.0, same_thresh_fraction_of_track: Optional[float] = None, max_jump_distance_cm: float = 60.0) -> int:
-    #     ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
-    #     a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
-    #     a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
-    #     n_time_bins: int = a_result.nbins[an_epoch_idx]
-    #     n_pos_bins: int = np.shape(a_p_x_given_n)[0]
-    #     time_window_centers = a_result.time_window_centers[an_epoch_idx]
-    #     time_bin_edges = a_result.time_bin_edges[an_epoch_idx] # (30, )
-        
-    #     if (n_time_bins == 1) and (len(time_window_centers) == 1):
-    #         ## fix time_bin_edges -- it has been noticed when there's only one bin, `time_bin_edges` has a drastically wrong number of elements (e.g. len (30, )) while `time_window_centers` is right.
-    #         if len(time_bin_edges) != 2:
-    #             ## fix em
-    #             time_bin_container = a_result.time_bin_containers[an_epoch_idx]
-    #             time_bin_edges = np.array(list(time_bin_container.center_info.variable_extents))
-    #             assert len(time_bin_edges) == 2, f"tried to fix but FAILED!"
-    #             # print(f'fixed time_bin_edges: {time_bin_edges}')
-
-    #     if (same_thresh_cm is None):
-    #         assert same_thresh_fraction_of_track is not None
-    #         same_thresh_cm: float = float(same_thresh_fraction_of_track * a_decoder_track_length)
-    #     else:
-    #         assert same_thresh_fraction_of_track is None, f"only same_thresh_fraction_of_track or a_decoder_track_length can be provided, NOT BOTH!" 
-    #         ## use it directly
-        
-    #     ## Begin computations:
-    #     partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, pos_bin_edges=pos_bin_edges, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm,
-    #                                                                                                                 flat_time_window_centers=deepcopy(time_window_centers), flat_time_window_edges=deepcopy(time_bin_edges))
-    #     assert partition_result.subsequences_df is not None
-    #     main_subsequence_df = partition_result.subsequences_df[partition_result.subsequences_df['is_main']]
-    #     return main_subsequence_df['track_coverage_score'].to_numpy()[0]
-    
-
-    # @classmethod
-    # @function_attributes(short_name='mseq_dtrav', tags=['bin-wise', 'bin-size', 'New Simplified', 'score', 'replay', 'sequence_length'], input_requires=[], output_provides=[],
-    #                       uses=['SubsequencesPartitioningResult'], used_by=[], creation_date='2024-03-12 01:05', related_items=['SubsequencesPartitioningResult'])
-    # def bin_wise_main_subsequence_total_distance_traveled_fn(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, pos_bin_edges: NDArray, max_ignore_bins:int=2, same_thresh_cm: Optional[float]=6.0, same_thresh_fraction_of_track: Optional[float] = None, max_jump_distance_cm: float = 60.0) -> int:
-    #     ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
-    #     a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
-    #     a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
-    #     n_time_bins: int = a_result.nbins[an_epoch_idx]
-    #     n_pos_bins: int = np.shape(a_p_x_given_n)[0]
-    #     time_window_centers = a_result.time_window_centers[an_epoch_idx]
-    #     time_bin_edges = a_result.time_bin_edges[an_epoch_idx] # (30, )
-        
-    #     if (n_time_bins == 1) and (len(time_window_centers) == 1):
-    #         ## fix time_bin_edges -- it has been noticed when there's only one bin, `time_bin_edges` has a drastically wrong number of elements (e.g. len (30, )) while `time_window_centers` is right.
-    #         if len(time_bin_edges) != 2:
-    #             ## fix em
-    #             time_bin_container = a_result.time_bin_containers[an_epoch_idx]
-    #             time_bin_edges = np.array(list(time_bin_container.center_info.variable_extents))
-    #             assert len(time_bin_edges) == 2, f"tried to fix but FAILED!"
-    #             # print(f'fixed time_bin_edges: {time_bin_edges}')
-
-    #     if (same_thresh_cm is None):
-    #         assert same_thresh_fraction_of_track is not None
-    #         same_thresh_cm: float = float(same_thresh_fraction_of_track * a_decoder_track_length)
-    #     else:
-    #         assert same_thresh_fraction_of_track is None, f"only same_thresh_fraction_of_track or a_decoder_track_length can be provided, NOT BOTH!" 
-    #         ## use it directly
-        
-    #     ## Begin computations:
-    #     partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, pos_bin_edges=pos_bin_edges, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm,
-    #                                                                                                                 flat_time_window_centers=deepcopy(time_window_centers), flat_time_window_edges=deepcopy(time_bin_edges))
-    #     assert partition_result.subsequences_df is not None
-    #     main_subsequence_df = partition_result.subsequences_df[partition_result.subsequences_df['is_main']]
-    #     return main_subsequence_df['total_distance_traveled'].to_numpy()[0]
-
-
-
 
     # ==================================================================================================================== #
     # All Computation Fns of Type                                                                                          #
@@ -3462,10 +3252,41 @@ class HeuristicThresholdFiltering:
     """ 
     
     from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicThresholdFiltering
+    example_decoder_name = 'long_LR'
+    all_epoch_result: DecodedFilterEpochsResult = deepcopy(filtered_decoder_filter_epochs_decoder_result_dict[example_decoder_name])
+    included_filter_epoch_result: DecodedFilterEpochsResult = deepcopy(high_heuristic_only_filtered_decoder_filter_epochs_decoder_result_dict[example_decoder_name])
+    all_epoch_result, included_filter_epoch_result, (_, included_filter_epoch_times_to_all_epoch_index_arr) = HeuristicThresholdFiltering.get_filtered_result(all_epoch_result=all_epoch_result,
+                                                                                                            included_filter_epoch_result=included_filter_epoch_result, start_col_name='start'
+    )
     
+    
+    
+    Usage 2:
+    
+        # INPUTS: directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult
+        session_name: str = curr_active_pipeline.session_name
+        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        directional_decoders_epochs_decode_result.ripple_weighted_corr_merged_df = DecoderDecodedEpochsResult.add_session_df_columns(directional_decoders_epochs_decode_result.ripple_weighted_corr_merged_df, session_name=session_name, time_bin_size=None, t_start=t_start, curr_session_t_delta=t_delta, t_end=t_end, time_col='ripple_start_t')
+        directional_decoders_epochs_decode_result.ripple_simple_pf_pearson_merged_df = DecoderDecodedEpochsResult.add_session_df_columns(directional_decoders_epochs_decode_result.ripple_simple_pf_pearson_merged_df, session_name=session_name, time_bin_size=None, t_start=t_start, curr_session_t_delta=t_delta, t_end=t_end, time_col='ripple_start_t')
+            
+        directional_decoders_epochs_decode_result.ripple_weighted_corr_merged_df = PandasHelpers.dropping_duplicated_df_columns(df=directional_decoders_epochs_decode_result.ripple_weighted_corr_merged_df)
+        directional_decoders_epochs_decode_result.ripple_simple_pf_pearson_merged_df = PandasHelpers.dropping_duplicated_df_columns(df=directional_decoders_epochs_decode_result.ripple_simple_pf_pearson_merged_df)
+        # duplicated_columns, duplicated_columns_dict = PandasHelpers.find_duplicated_df_columns(df=ripple_weighted_corr_merged_df, print_duplicated_columns=True)
+        ripple_weighted_corr_merged_df = PandasHelpers.dropping_duplicated_df_columns(df=directional_decoders_epochs_decode_result.ripple_weighted_corr_merged_df)
+        ripple_simple_pf_pearson_merged_df = PandasHelpers.dropping_duplicated_df_columns(df=directional_decoders_epochs_decode_result.ripple_simple_pf_pearson_merged_df)
+
+        ripple_merged_complete_epoch_stats_df: pd.DataFrame = PandasHelpers.dropping_duplicated_df_columns(df=directional_decoders_epochs_decode_result.build_complete_all_scores_merged_df())
+
+        from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicThresholdFiltering
+        ripple_merged_complete_epoch_stats_df, (included_heuristic_ripple_start_times, excluded_heuristic_ripple_start_times) = HeuristicThresholdFiltering.add_columns(df=ripple_merged_complete_epoch_stats_df)
+        high_heuristic_only_filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(included_heuristic_ripple_start_times) for a_name, a_result in filtered_decoder_filter_epochs_decoder_result_dict.items()} # working filtered
+        low_heuristic_only_filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(excluded_heuristic_ripple_start_times) for a_name, a_result in filtered_decoder_filter_epochs_decoder_result_dict.items()} # working filtered
+
+
     
     """
-    filter_thresholds_dict = {'mseq_len_ignoring_intrusions_and_repeats': 4, 'mseq_tcov': 0.35 }
+    # filter_thresholds_dict = {'mseq_len_ignoring_intrusions_and_repeats': 4, 'mseq_tcov': 0.35 }
+    filter_thresholds_dict = {'mseq_len_ignoring_intrusions': 5, 'mseq_tcov': 0.35 } # 'mseq_len_ratio_ignoring_intrusions_and_repeats', 'mseq_dtrav'
     
     # df_is_included_criteria_dict = {a_col_name:(lambda df: (df[f'overall_best_{a_col_name}'] >= a_thresh)) for a_col_name, a_thresh in filter_thresholds_dict.items()}
     # df_is_included_criteria_dict = lambda df: {a_col_name:(df[f'overall_best_{a_col_name}'] >= a_thresh) for a_col_name, a_thresh in filter_thresholds_dict.items()}

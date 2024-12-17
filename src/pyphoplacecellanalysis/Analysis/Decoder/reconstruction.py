@@ -900,7 +900,11 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         subset.marginal_y_list = [subset.marginal_y_list[i] for i in old_fashioned_indicies]
         subset.most_likely_position_indicies_list = [subset.most_likely_position_indicies_list[i] for i in old_fashioned_indicies]
         subset.spkcount = [subset.spkcount[i] for i in old_fashioned_indicies]
-        subset.nbins = subset.nbins[old_fashioned_indicies] # can be subset because it's an ndarray. `IndexError: arrays used as indices must be of integer (or boolean) type`: occurs because when it is empty it seems to default to float64 dtype
+        if len(old_fashioned_indicies) > 0:
+            subset.nbins = subset.nbins[old_fashioned_indicies] # can be subset because it's an ndarray. `IndexError: arrays used as indices must be of integer (or boolean) type`: occurs because when it is empty it seems to default to float64 dtype
+        else:    
+            subset.nbins = [] # empty list
+        
         subset.time_bin_containers = [subset.time_bin_containers[i] for i in old_fashioned_indicies]
         subset.num_filter_epochs = len(included_epoch_indicies)
         subset.time_bin_edges = [subset.time_bin_edges[i] for i in old_fashioned_indicies]
