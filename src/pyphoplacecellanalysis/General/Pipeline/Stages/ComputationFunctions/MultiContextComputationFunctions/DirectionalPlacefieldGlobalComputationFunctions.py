@@ -2540,7 +2540,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
 		return (all_df_shared_column_names, all_df_score_column_names, all_df_column_names,
 					merged_conditional_prob_column_names, merged_wcorr_column_names, heuristic_score_col_names)
 
-	@function_attributes(short_name=None, tags=['merged', 'all_scores', 'df', 'epochs'], input_requires=[], output_provides=[], uses=['.decoder_ripple_filter_epochs_decoder_result_dict'], used_by=[], creation_date='2024-03-14 19:10', related_items=[])
+	@function_attributes(short_name=None, tags=['merged', 'all_scores', 'df', 'epochs'], input_requires=[], output_provides=[], uses=['.decoder_ripple_filter_epochs_decoder_result_dict', '_build_merged_score_metric_df'], used_by=[], creation_date='2024-03-14 19:10', related_items=[])
 	def build_complete_all_scores_merged_df(self, debug_print=False) -> pd.DataFrame:
 		""" Builds a single merged dataframe from the four separate .filter_epochs dataframes from the result for each decoder, merging them into a single dataframe with ['_long_LR','_long_RL','_short_LR','_short_RL'] suffixes for the combined columns.
 		2024-03-14 19:04 
@@ -2566,9 +2566,9 @@ class DecoderDecodedEpochsResult(ComputedResult):
 		all_df_shared_column_names, all_df_score_column_names, all_df_column_names, merged_conditional_prob_column_names, merged_wcorr_column_names, heuristic_score_col_names = self.get_all_scores_column_names()
 
 		## Extract the concrete dataframes from the results:
-		extracted_filter_epochs_dfs_dict = {k:ensure_dataframe(a_result.filter_epochs) for k, a_result in self.decoder_ripple_filter_epochs_decoder_result_dict.items()}
+		extracted_filter_epochs_dfs_dict = {k:ensure_dataframe(a_result.filter_epochs) for k, a_result in self.decoder_ripple_filter_epochs_decoder_result_dict.items()} # #TODO 2024-12-17 08:12: - [ ] Debugging: P_Decoder columns already have NaNs in the same place as they do in the next step here!
 		## Merge the dict of four dataframes, one for each decoder, with column names like ['wcorr', 'travel', 'speed'] to a single merged df with suffixed of the dict keys like ['wcorr_long_LR', 'wcorr_long_RL',  ...., 'travel_long_LR', 'travel_long_RL', 'travel_short_LR', 'travel_short_RL', ...]
-		extracted_merged_scores_df: pd.DataFrame = _build_merged_score_metric_df(extracted_filter_epochs_dfs_dict, columns=all_df_score_column_names, best_decoder_index_column_name=None)
+		extracted_merged_scores_df: pd.DataFrame = _build_merged_score_metric_df(extracted_filter_epochs_dfs_dict, columns=all_df_score_column_names, best_decoder_index_column_name=None) ## already has NaN values for the decoder probabilities here :[
 		# extracted_merged_scores_df
 
 		_ref_df = deepcopy(tuple(extracted_filter_epochs_dfs_dict.values())[0]) # first dataframe is the same as the others, determine which columns are available
@@ -2624,7 +2624,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
 		# # Weighted correlations:
 
 		# Build the final merged dataframe with the score columns for each of the four decoders but only one copy of the common columns.
-		extracted_merged_scores_df: pd.DataFrame = pd.concat(included_merge_dfs_list, axis='columns') # (common_shared_portion_df, conditional_prob_df, extracted_merged_scores_df)
+		extracted_merged_scores_df: pd.DataFrame = pd.concat(included_merge_dfs_list, axis='columns') # (common_shared_portion_df, conditional_prob_df, extracted_merged_scores_df) ### I THINK NaNs come in here
 		# extracted_merged_scores_df: pd.DataFrame = pd.concat((common_shared_portion_df, conditional_prob_df, extracted_merged_scores_df), axis='columns')
 		extracted_merged_scores_df['ripple_start_t'] = extracted_merged_scores_df['start']
 

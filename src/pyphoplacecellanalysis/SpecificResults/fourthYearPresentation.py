@@ -25,9 +25,6 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 from neuropy.utils.matplotlib_helpers import draw_epoch_regions
 
 from neuropy.utils.matplotlib_helpers import FormattedFigureText
-from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
-from pyphoplacecellanalysis.Pho2D.track_shape_drawing import add_vertical_track_bounds_lines, add_track_shapes
-
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import plot_long_short_surprise_difference_plot, plot_long_short, plot_long_short_any_values
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
 
