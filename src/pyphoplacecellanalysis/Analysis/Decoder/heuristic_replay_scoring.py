@@ -1073,6 +1073,80 @@ class SubsequencesPartitioningResult(ComputedResult):
         return new_active_split_positions_arrays, first_order_diff_value_exceeeding_jump_distance_indicies
     
     
+    @function_attributes(short_name=None, tags=['partition', 'max_jump_distance', 'split', 'subsequences'], input_requires=['self.merged_split_positions_arrays','self.position_bins_info_df'], output_provides=['self.merged_split_positions_arrays'], uses=[], used_by=['compute'], creation_date='2024-12-17 14:03', related_items=[])
+    def new_simple_split_main_subsequence_on_max_jump_distance(self, debug_print=False):
+        """
+        
+        Replaces: `enforce_max_jump_distance`
+
+        The quintessential example would be a straight ramp that is interrupted by a single point discontinuity intrusion.  
+
+        iNPUTS:
+            split_first_order_diff_arrays: a list of split arrays of 1st order differences.
+            continuous_sequence_lengths: a list of integer sequence lengths
+            longest_sequence_start_idx: int - the sequence start index to start the scan in each direction
+            max_ignore_bins: int = 2 - this means to disolve sequences shorter than 2 time bins if the sequences on each side are in the same direction
+
+            
+        REQUIRES: self.merged_split_positions_arrays, self.split_positions_arrays
+        UPDATES: self.merged_split_positions_arrays
+            
+        Usage:
+
+        HISTORY: 2024-11-27 08:18 based off of `_compute_sequences_spanning_ignored_intrusions`
+        
+        """        
+        from pyphocorehelpers.indexing_helpers import partition_df_dict
+
+        # ==================================================================================================================== #
+        # BEGIN FUNCTION BODY                                                                                                  #
+        # ==================================================================================================================== #
+
+        ## INPUTS: split_first_order_diff_arrays, continuous_sequence_lengths, max_ignore_bins
+        # assert self.split_positions_arrays is not None
+        # original_split_positions_arrays = deepcopy(self.split_positions_arrays)
+        # original_active_split_positions_arrays = deepcopy(self.split_positions_arrays)
+        assert self.merged_split_positions_arrays is not None
+        
+        ## Begin by finding only the longest sequence
+        # n_tbins_list = np.array([len(v) for v in original_split_positions_arrays])
+
+        ## INPUTS: partition_result
+        main_subsequence_only_df = self.subsequences_df[self.subsequences_df['is_main']]
+        main_subsequence_idx = main_subsequence_only_df['subsequence_idx'].to_numpy()[0]
+        # main_subsequence_only_df['flat_idx_first', 'flat_idx_last', 'flat_idx_first']
+
+        non_intrusion_position_bins_info_df: pd.DataFrame = self.position_bins_info_df[np.logical_not(self.position_bins_info_df['is_intrusion'])]
+
+        partitioned_df_dict = partition_df_dict(non_intrusion_position_bins_info_df, partitionColumn='subsequence_idx') ## WARNING: some subsequences are ALL INTRUSIONS, meaning they get eliminated here
+        non_intrusion_main_subsequence_df = partitioned_df_dict[main_subsequence_idx]
+        non_intrusion_main_subsequence_changes_info_df = SubsequencesPartitioningResult._compute_position_changes_info_df(position_bins_info_df=non_intrusion_main_subsequence_df, same_thresh=self.same_thresh, max_jump_distance_cm=self.max_jump_distance_cm, additional_split_on_exceeding_jump_distance=False)
+
+
+
+        ## find where additional splits are needed:
+        exceeding_jump_distance_df = non_intrusion_main_subsequence_changes_info_df[non_intrusion_main_subsequence_changes_info_df['exceeds_jump_distance']] ## want to insert the split after `next_bin_flat_idxs` --> at index 4
+        exceeding_jump_distance_split_indicies = exceeding_jump_distance_df['next_bin_flat_idxs'].to_numpy()
+
+        # partition_result.split_indicies
+        if len(exceeding_jump_distance_split_indicies) > 0:
+            new_merged_split_indicies = deepcopy(self.merged_split_indicies).tolist()
+            new_merged_split_indicies.extend(exceeding_jump_distance_split_indicies)
+            new_merged_split_indicies = np.unique(new_merged_split_indicies) ## sort them and get only the uniques
+
+            new_active_split_positions_arrays = np.split(deepcopy(self.flat_positions), new_merged_split_indicies)
+            new_active_split_positions_arrays = [v for v in new_active_split_positions_arrays if len(v) > 0] ## drop zero entries. 2024-12-17 14:15 Why are there zero-length entries?
+            
+
+            self.merged_split_positions_arrays = new_active_split_positions_arrays
+            self.merged_split_position_flatindicies_arrays = NumpyHelpers.split(deepcopy(self.flat_position_indicies), self.merged_split_indicies) 
+        else:
+            new_active_split_positions_arrays = deepcopy(self.merged_split_positions_arrays)
+            exceeding_jump_distance_split_indicies = [] ## no changes
+
+        return new_active_split_positions_arrays, exceeding_jump_distance_split_indicies
+    
+    
 
 
     @function_attributes(short_name=None, tags=['merge', 'intrusion', 'subsequences', 'ISSUE'], input_requires=[], output_provides=[], uses=[], used_by=['self.merge_over_ignored_intrusions'], creation_date='2024-12-04 04:43', related_items=[])
@@ -1227,6 +1301,10 @@ class SubsequencesPartitioningResult(ComputedResult):
             self.position_changes_info_df['exceeds_jump_distance'] = False
             self.position_changes_info_df.loc[first_order_diff_value_exceeeding_jump_distance_indicies, 'exceeds_jump_distance'] = True
 
+        if self.max_jump_distance_cm is not None:
+            ## updates self.merged_*
+            new_merged_split_positions_arrays, first_order_diff_value_exceeeding_jump_distance_indicies = self.new_simple_split_main_subsequence_on_max_jump_distance(debug_print=debug_print)
+            self.position_bins_info_df, self.position_changes_info_df, self.subsequences_df = self.rebuild_sequence_info_df() ## update the dataframes and everything again
 
 
         
@@ -2071,6 +2149,7 @@ class SubsequencesPartitioningResult(ComputedResult):
 
         # out2: MatplotlibRenderPlots = SubsequencesPartitioningResult._debug_plot_time_bins_multiple(positions_list=final_out_subsequences, num='debug_plot_merged_time_binned_positions')
         return merged_out
+
 
 @define(slots=False, repr=False)
 class HeuristicsResult(ComputedResult):
