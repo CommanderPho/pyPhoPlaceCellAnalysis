@@ -2436,8 +2436,10 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
 
 
-    def print_user_annotations(self, should_copy_to_clipboard=True):
+    def print_user_annotations(self, should_copy_to_clipboard=True, use_new_concise_nested_context_format = True):
         """ Builds user annotations and outputs them. 
+
+        use_new_concise_nested_context_format = True # 2024-03-04 - Concise 
 
         >>> Prints Output Like:
         Add the following code to `pyphoplacecellanalysis.General.Model.user_annotations.UserAnnotationsManager.get_user_annotations()` function body:
@@ -2528,8 +2530,6 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             user_annotations[a_context] = a_saved_selection.epoch_times
 
         # Updates the context. Needs to generate the code.
-
-        use_new_concise_nested_context_format = True # 2024-03-04 - Concise 
 
         # ## Generate code to insert int user_annotations:
         self.ui.print('Add the following code to `pyphoplacecellanalysis.General.Model.user_annotations.UserAnnotationsManager.get_user_annotations()` function body:')
