@@ -2680,9 +2680,39 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         # end for
 
         return out_fig_paths_dict
+    
 
-    @function_attributes(short_name=None, tags=['export'], input_requires=[], output_provides=[], uses=['export_decoder_pagination_controller_figure_page'], used_by=[], creation_date='2024-08-13 13:05', related_items=[])
-    def export_all_pages(self, curr_active_pipeline, enable_export_combined_img: bool=True, write_vector_format=True, write_png=True, **kwargs):
+    @function_attributes(short_name=None, tags=['export', 'combine', 'image'], input_requires=[], output_provides=[], uses=[], used_by=['export_all_pages'], creation_date='2024-12-17 10:32', related_items=[])
+    @classmethod
+    def build_combined_all_pages_image(cls, out_fig_paths_dict_list: Dict, combined_image_basename: str = 'combined'):
+        """ builds a concatenated image from the individually exported decoded epochs produced by `out_fig_paths_dict_list = export_all_pages(...)` """
+        from PIL import Image
+        from pyphocorehelpers.plotting.media_output_helpers import vertical_image_stack, horizontal_image_stack, image_grid
+
+        _flat_png_list = []
+        _flat_pdf_list = []
+        
+        for a_page_idx, a_page_out_dict in out_fig_paths_dict_list.items():
+            print(f'page[{a_page_idx}]: a_page_out_dict: {a_page_out_dict}')
+            for a_final_context, an_output_list in a_page_out_dict.items():
+                # final_context
+                _flat_pdf_list.append(an_output_list[0]) ## pdf
+                _flat_png_list.append(an_output_list[1]) ## png
+
+        ## handle PNGs                    
+        out_parent_path = _flat_png_list[0].parent.resolve()
+        _flat_raster_imgs = [Image.open(i) for i in _flat_png_list] ## open the images from disk
+        split_list = [_flat_raster_imgs[i:i + 4] for i in range(0, len(_flat_raster_imgs), 4)]
+        _out_combined_img = vertical_image_stack([horizontal_image_stack(a_row, padding=0) for a_row in split_list], padding=4)
+
+        combined_img_out_path = out_parent_path.joinpath(f'{combined_image_basename}.png')
+        _out_combined_img.save(combined_img_out_path)
+        
+        return (_flat_png_list, _out_combined_img, combined_img_out_path)
+    
+
+    @function_attributes(short_name=None, tags=['export'], input_requires=[], output_provides=[], uses=['export_decoder_pagination_controller_figure_page', 'build_combined_all_pages_image'], used_by=[], creation_date='2024-08-13 13:05', related_items=[])
+    def export_all_pages(self, curr_active_pipeline, write_vector_format=True, write_png=True, enable_export_combined_img: bool=False, **kwargs):
         """ exports each pages single-decoder figures separately
 
         Usage:
@@ -2714,28 +2744,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
 
         if enable_export_combined_img:
-            from PIL import Image
-            from pyphocorehelpers.plotting.media_output_helpers import vertical_image_stack, horizontal_image_stack, image_grid
-
-            _flat_png_list = []
-            _flat_pdf_list = []
-            
-            for a_page_idx, a_page_out_dict in out_fig_paths_dict_list.items():
-                print(f'page[{a_page_idx}]: a_page_out_dict: {a_page_out_dict}')
-                for a_final_context, an_output_list in a_page_out_dict.items():
-                    # final_context
-                    _flat_pdf_list.append(an_output_list[0]) ## pdf
-                    _flat_png_list.append(an_output_list[1]) ## png
-
-            ## handle PNGs                    
-            out_parent_path = _flat_png_list[0].parent.resolve()
-            _flat_raster_imgs = [Image.open(i) for i in _flat_png_list] ## open the images from disk
-            split_list = [_flat_raster_imgs[i:i + 4] for i in range(0, len(_flat_raster_imgs), 4)]
-            _out_combined_img = vertical_image_stack([horizontal_image_stack(a_row, padding=0) for a_row in split_list], padding=4)
-
-            combined_img_out_path = out_parent_path.joinpath('combined.png')
-            _out_combined_img.save(combined_img_out_path)
-
+            (_flat_png_list, _out_combined_img, combined_img_out_path) = self.build_combined_all_pages_image(out_fig_paths_dict_list=out_fig_paths_dict_list)
 
         print(f'\tdone.')
         return out_fig_paths_dict_list
