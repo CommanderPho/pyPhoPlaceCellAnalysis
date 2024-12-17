@@ -92,7 +92,32 @@ class PosteriorExporting:
     from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
     
     
-    
+    Usage:
+        ## Exports: "2024-11-26_Lab-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(decoded_posteriors).h5"
+		print(f'save_hdf == True, so exporting posteriors to HDF file...')
+		# parent_output_path = self.collected_outputs_path.resolve()
+		save_path: Path = _subfn_build_custom_export_to_h5_path(data_identifier_str='(decoded_posteriors)', a_tbin_size=directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size, parent_output_path=self.collected_outputs_path.resolve())
+		# save_path = Path(f'output/{BATCH_DATE_TO_USE}_newest_all_decoded_epoch_posteriors.h5').resolve()
+		complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
+		_, _, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
+		custom_params_hdf_key: str = custom_suffix.strip('_') # strip leading/trailing underscores
+		# _parent_save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_decoded_posteriors_to_HDF5', custom_suffix=custom_suffix)
+		_parent_save_context: DisplaySpecifyingIdentifyingContext = deepcopy(session_context).overwriting_context(custom_suffix=custom_params_hdf_key, display_fn_name='save_decoded_posteriors_to_HDF5')
+		# _parent_save_context: DisplaySpecifyingIdentifyingContext = complete_session_context.overwriting_context(display_fn_name='save_decoded_posteriors_to_HDF5')
+		_parent_save_context.display_dict = {
+			'custom_suffix': lambda k, v: f"{v}", # just include the name
+			'display_fn_name': lambda k, v: f"{v}", # just include the name
+		}
+		out_contexts, _flat_all_HDF5_out_paths = PosteriorExporting.perform_save_all_decoded_posteriors_to_HDF5(decoder_laps_filter_epochs_decoder_result_dict=None,
+																					decoder_ripple_filter_epochs_decoder_result_dict=deepcopy(directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict),
+																					_save_context=_parent_save_context.get_raw_identifying_context(), save_path=save_path, should_overwrite_extant_file=(not allow_append_to_session_h5_file))
+
+		_flat_all_HDF5_out_paths = list(dict.fromkeys([v.as_posix() for v in _flat_all_HDF5_out_paths]).keys())
+		# _output_HDF5_paths_info_str: str = '\n'.join([f'"{file_uri_from_path(a_path)}"' for a_path in _flat_all_HDF5_out_paths])
+		_output_HDF5_paths_info_str: str = '\n'.join([f'"{a_path}"' for a_path in _flat_all_HDF5_out_paths])
+		# print(f'\t\t\tHDF5 Paths: {_flat_all_HDF5_out_paths}\n')
+		print(f'\t\t\tHDF5 Paths: {_output_HDF5_paths_info_str}\n')
+        
     """
     @classmethod
     def save_posterior_to_video(cls, a_decoder_continuously_decoded_result: DecodedFilterEpochsResult, result_name: str='a_decoder_continuously_decoded_result'):
@@ -657,7 +682,7 @@ class PosteriorExporting:
     
 
     @classmethod
-    @function_attributes(short_name=None, tags=['save', 'export', 'HDF5', 'h5'], input_requires=[], output_provides=[], uses=['save_decoded_posteriors_to_HDF5'], used_by=[], creation_date='2024-08-28 08:36', related_items=[])
+    @function_attributes(short_name=None, tags=['MAIN', 'save', 'export', 'HDF5', 'h5'], input_requires=[], output_provides=[], uses=['save_decoded_posteriors_to_HDF5'], used_by=[], creation_date='2024-08-28 08:36', related_items=[])
     def perform_save_all_decoded_posteriors_to_HDF5(cls, decoder_laps_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], _save_context: IdentifyingContext, save_path: Path, should_overwrite_extant_file:bool=True):
         """
         
@@ -1078,11 +1103,35 @@ class PosteriorExporting:
 
 
 
-
+@metadata_attributes(short_name=None, tags=['export', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-16 22:28', related_items=[])
 @define(slots=False)
 class LoadedPosteriorContainer:
     """ 
-    from pyphoplacecellanalysis.Pho2D.data_exporting import LoadedPosteriorContainer
+
+    Usage:    
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import H5FileAggregator
+        from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
+        from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
+        from pyphoplacecellanalysis.Pho2D.data_exporting import LoadedPosteriorContainer
+        from neuropy.utils.indexing_helpers import flatten, flatten_dict
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor
+                        
+        ## INPUTS: parsed_h5_files_df
+        decoded_posteriors_parsed_h5_files_df = parsed_h5_files_df[parsed_h5_files_df['file_type'] == 'decoded_posteriors']
+
+        print(decoded_posteriors_parsed_h5_files_df['custom_replay_name'].unique())
+        # matching_custom_replay_name_str: str = "withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]"
+        # matching_custom_replay_name_str: str = "withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2, 4, 6, 7, 9]"
+        matching_custom_replay_name_str: str = 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0'
+        decoded_posteriors_parsed_h5_files_df = decoded_posteriors_parsed_h5_files_df[decoded_posteriors_parsed_h5_files_df['custom_replay_name'] == matching_custom_replay_name_str]
+        decoded_posteriors_parsed_h5_files_df
+        decoded_posteriors_h5_files = [Path(v.as_posix()).resolve() for v in decoded_posteriors_parsed_h5_files_df['path'].to_list()]
+        # decoded_posteriors_h5_files
+        ## OUTPUTS: decoded_posteriors_h5_files
+
+        all_sessions_exported_posteriors_dict, all_sessions_exported_posteriors_data_only_dict = LoadedPosteriorContainer.load_batch_hdf5_exports(exported_posterior_data_h5_files=decoded_posteriors_h5_files)
+        ## OUTPUTS: all_sessions_exported_posteriors_dict, all_sessions_exported_posteriors_data_only_dict
+
     """
     file_path: Optional[Path] = field(default=None)
     session_key_parts: List = field(default=Factory(list))
@@ -1157,7 +1206,7 @@ class LoadedPosteriorContainer:
         #     all_cells_first_spike_time_df_loaded, global_spikes_df_loaded, global_spikes_dict_loaded, first_spikes_dict_loaded, extra_dfs_dict_loaded = a_first_spike_time_tuple ## unpack
 
 
-
+@metadata_attributes(short_name=None, tags=['export', 'posterior', 'datasource', 'plotting'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-16 22:28', related_items=[])
 @define(slots=False, eq=False, repr=False)
 class PosteriorPlottingDatasource:
     """ a datasource that provides posteriors
