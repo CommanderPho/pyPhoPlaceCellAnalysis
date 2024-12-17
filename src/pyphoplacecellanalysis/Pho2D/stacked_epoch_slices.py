@@ -37,6 +37,7 @@ from pyphoplacecellanalysis.Resources.icon_helpers import try_get_icon
 
 from pyphocorehelpers.indexing_helpers import Paginator
 from pyphocorehelpers.exception_helpers import ExceptionPrintingContext
+from pyphocorehelpers.assertion_helpers import Assert
 
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import build_scrollable_graphics_layout_widget_ui, build_scrollable_graphics_layout_widget_with_nested_viewbox_ui
 from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget
@@ -2581,11 +2582,28 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         
         # Uses: paginated_multi_decoder_decoded_epochs_window, user_annotations
         # figure_ctx_dict = {a_name:v.params.active_identifying_figure_ctx for a_name, v in self.pagination_controllers.items()} 
-        figure_ctx_dict = self.figure_ctx_dict
-        loaded_selections_context_dict = {a_name:a_figure_ctx.adding_context_if_missing(user_annotation='selections', **additional_selections_context) for a_name, a_figure_ctx in figure_ctx_dict.items()}
-        loaded_selections_dict = {a_name:user_annotations.get(a_selections_ctx, None) for a_name, a_selections_ctx in loaded_selections_context_dict.items()}
+        # figure_ctx_dict = self.figure_ctx_dict
+        # loaded_selections_context_dict = {a_name:a_figure_ctx.adding_context_if_missing(user_annotation='selections', **additional_selections_context) for a_name, a_figure_ctx in figure_ctx_dict.items()}
+        # loaded_selections_dict = {a_name:user_annotations.get(a_selections_ctx, None) for a_name, a_selections_ctx in loaded_selections_context_dict.items()}
 
         new_selections_dict = {a_decoder_name:a_pagination_controller.restore_selections_from_user_annotations(user_annotations, defer_render=defer_render, **additional_selections_context) for a_decoder_name, a_pagination_controller in self.pagination_controllers.items()}
+        
+
+        enable_all_row_selection_sync: bool = True
+        if enable_all_row_selection_sync:
+            children_is_epoch_selected: NDArray = np.vstack([deepcopy(a_pagination_controller.is_selected) for a_name, a_pagination_controller in self.pagination_controllers.items()]) #.shape (4, 136)
+            any_child_epoch_is_selected: NDArray = np.any(children_is_epoch_selected, axis=0) # (136,)
+            ## assign to all 
+            for a_decoder_name, a_pagination_controller in self.pagination_controllers.items():
+                # a_pagination_controller.is_selected = deepcopy(any_child_epoch_is_selected) ## make it independent  # params.update(**updated_values)
+                # a_pagination_controller.params.is_selected
+
+                # Replace values in the dictionary with new_values
+                Assert.same_length(a_pagination_controller.params.is_selected, any_child_epoch_is_selected)
+                a_pagination_controller.params.is_selected = {k: v for k, v in zip(a_pagination_controller.params.is_selected.keys(), any_child_epoch_is_selected)}
+                a_pagination_controller.perform_update_selections(defer_render=False)
+                
+
         # self.draw()
         return new_selections_dict
     
