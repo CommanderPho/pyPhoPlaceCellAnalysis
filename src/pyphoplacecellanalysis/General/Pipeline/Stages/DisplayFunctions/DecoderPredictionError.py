@@ -2527,21 +2527,21 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
         num_filter_epochs:int = curr_results_obj.num_filter_epochs
         time_bin_containers: List[BinningContainer] = deepcopy(curr_results_obj.time_bin_containers)
         active_filter_epochs_df: pd.DataFrame = deepcopy(ensure_dataframe(curr_results_obj.active_filter_epochs))
-        active_filter_epochs_df, (included_heuristic_ripple_start_times, excluded_heuristic_ripple_start_times) = HeuristicThresholdFiltering.add_columns(df=active_filter_epochs_df)
+        # active_filter_epochs_df, (included_heuristic_ripple_start_times, excluded_heuristic_ripple_start_times) = HeuristicThresholdFiltering.add_columns(df=active_filter_epochs_df, start_col_name='start')
         
-        # if ('is_included_by_heuristic_criteria' not in active_filter_epochs_df.columns):
-        #     ## create it
-        #     # start_col_name: str = 'ripple_start_t'
-        #     start_col_name: str = 'start'
-        #     filter_thresholds_dict = {'mseq_len_ignoring_intrusions_and_repeats': 4, 'mseq_tcov': 0.35 }
-        #     # df_is_included_criteria_fn = lambda df: NumpyHelpers.logical_and(*[(df[f'overall_best_{a_col_name}'] >= a_thresh) for a_col_name, a_thresh in filter_thresholds_dict.items()])
-        #     df_is_included_criteria_fn = lambda df: NumpyHelpers.logical_and(*[(df[f'{a_col_name}'] >= a_thresh) for a_col_name, a_thresh in filter_thresholds_dict.items()])
-        #     df_is_excluded_criteria_fn = lambda df: np.logical_not(df_is_included_criteria_fn(df=df))
-        #     assert PandasHelpers.require_columns(active_filter_epochs_df, required_columns=list(filter_thresholds_dict.keys()), print_missing_columns=True)
-        #     included_heuristic_ripple_start_times = active_filter_epochs_df[df_is_included_criteria_fn(active_filter_epochs_df)][start_col_name].values
-        #     excluded_heuristic_ripple_start_times = active_filter_epochs_df[df_is_excluded_criteria_fn(active_filter_epochs_df)][start_col_name].values
-        #     active_filter_epochs_df['is_included_by_heuristic_criteria'] = False # default to False
-        #     active_filter_epochs_df.loc[active_filter_epochs_df.epochs.find_data_indicies_from_epoch_times(included_heuristic_ripple_start_times), 'is_included_by_heuristic_criteria'] = True ## adds the ['is_included_by_heuristic_criteria'] column
+        if ('is_included_by_heuristic_criteria' not in active_filter_epochs_df.columns):
+            ## create it
+            # start_col_name: str = 'ripple_start_t'
+            start_col_name: str = 'start'
+            filter_thresholds_dict = {'mseq_len_ignoring_intrusions_and_repeats': 4, 'mseq_tcov': 0.35 }
+            # df_is_included_criteria_fn = lambda df: NumpyHelpers.logical_and(*[(df[f'overall_best_{a_col_name}'] >= a_thresh) for a_col_name, a_thresh in filter_thresholds_dict.items()])
+            df_is_included_criteria_fn = lambda df: NumpyHelpers.logical_and(*[(df[f'{a_col_name}'] >= a_thresh) for a_col_name, a_thresh in filter_thresholds_dict.items()])
+            df_is_excluded_criteria_fn = lambda df: np.logical_not(df_is_included_criteria_fn(df=df))
+            assert PandasHelpers.require_columns(active_filter_epochs_df, required_columns=list(filter_thresholds_dict.keys()), print_missing_columns=True)
+            included_heuristic_ripple_start_times = active_filter_epochs_df[df_is_included_criteria_fn(active_filter_epochs_df)][start_col_name].values
+            excluded_heuristic_ripple_start_times = active_filter_epochs_df[df_is_excluded_criteria_fn(active_filter_epochs_df)][start_col_name].values
+            active_filter_epochs_df['is_included_by_heuristic_criteria'] = False # default to False
+            active_filter_epochs_df.loc[active_filter_epochs_df.epochs.find_data_indicies_from_epoch_times(included_heuristic_ripple_start_times), 'is_included_by_heuristic_criteria'] = True ## adds the ['is_included_by_heuristic_criteria'] column
 
 
 
