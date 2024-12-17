@@ -1094,7 +1094,6 @@ class SubsequencesPartitioningResult(ComputedResult):
             
         Usage:
         
-        TODO: convert to use `is_valid_sequence_index(...)`?
 
         """
         ## INPUTS: split_first_order_diff_arrays, continuous_sequence_lengths, max_ignore_bins
@@ -1500,6 +1499,7 @@ class SubsequencesPartitioningResult(ComputedResult):
             import matplotlib.pyplot as plt
             from neuropy.utils.matplotlib_helpers import modify_colormap_alpha
             import matplotlib.transforms as mtransforms
+            from neuropy.utils.matplotlib_helpers import add_text_with_stroke
 
             # main_subsequence_ranking_columns: List[str] = kwargs.pop('main_subsequence_ranking_columns', ['len_excluding_intrusions', 'len_excluding_repeats', 'len', 'len_excluding_both']) # self.main_subsequence_ranking_columns
 
@@ -1512,8 +1512,34 @@ class SubsequencesPartitioningResult(ComputedResult):
             sequence_position_hlines_kwargs = dict(linewidth=4, zorder=-1, alpha=0.95) | kwargs.pop('sequence_position_hlines_kwargs', {})            
             main_sequence_position_dots_kwargs = dict(linewidths=2, marker ="^", edgecolor="#141414F9", s = 200, zorder=1) | kwargs.pop('main_sequence_position_dots_kwargs', {}) # "#141414F9" -- near black
             
-            subsequence_relative_bin_idx_labels_kwargs = dict(should_skip=False, should_skip_if_non_main_sequence=should_show_non_main_sequence_hlines, subseq_idx_text_alpha = 0.95, subseq_idx_text_outline_color = ('color', 'color', 'color', 0.95), subsequence_idx_offset = 4.0) | kwargs.pop('subsequence_relative_bin_idx_labels_kwargs', {})
+            subsequence_relative_bin_idx_labels_kwargs = dict(should_skip=False, should_skip_if_non_main_sequence=should_show_non_main_sequence_hlines,
+                                                              subseq_idx_text_alpha = 0.95, subseq_idx_text_outline_color = ('color', 'color', 'color', 0.95), subsequence_idx_offset = 4.0) | kwargs.pop('subsequence_relative_bin_idx_labels_kwargs', {})
+    
 
+
+            # def _helper_build_text_kwargs_outside_right(a_curr_ax):
+            #     """ Text kwargs to render outside and to the right of the axes. 
+            #     captures: found_matplotlib_font_name
+            #     """
+            #     a_curr_fig = a_curr_ax.get_figure()
+                
+            #     text_kwargs = dict(stroke_alpha=0.8, strokewidth=4, stroke_foreground='w', text_foreground=f'{cls.text_color}', font_size=9.5, text_alpha=0.75)
+
+            #     font_prop = font_manager.FontProperties(family=found_matplotlib_font_name, weight='bold')
+            #     text_kwargs['fontproperties'] = font_prop
+
+            #     # Positioning outside to the right:
+            #     text_kwargs |= dict(
+            #         loc='upper right',
+            #         horizontalalignment='left',
+            #         # horizontalalignment='right', # breaks it
+            #         bbox_to_anchor=(1.35, 1.0), bbox_transform=a_curr_ax.transAxes, transform=a_fig.transFigure, # Outside right, kinda working
+            #         # bbox_to_anchor=(1.0, 0.5), bbox_transform=a_fig.transFigure, transform=a_fig.transFigure, # Outside right, figure coordinates, fully working -- except for rows because they're all centered vertically w.r.t figure
+            #         # bbox_to_anchor=(0.95, curr_ax_top_edge), bbox_transform=a_curr_fig.transFigure, transform=a_curr_fig.transFigure, # Outside right, figure coordinates, fully working -- fixed rows
+            #         # bbox_to_anchor=(0.9, curr_ax_top_edge), bbox_transform=a_curr_fig.transFigure, transform=a_curr_fig.transFigure, # Outside right, figure coordinates, fully working -- except for rows because they're all centered vertically w.r.t figure
+            #     )
+            #     return text_kwargs
+        
             
 
             # Example override dict ______________________________________________________________________________________________ #
@@ -1611,17 +1637,28 @@ class SubsequencesPartitioningResult(ComputedResult):
                     else:
                         final_subseq_idx_text_outline_color.append(v)
                         
+
+                enable_colored_outline_mode: bool = True
+                if enable_colored_outline_mode:
+                    # text_kwargs = dict(stroke_alpha=0.8, strokewidth=4, stroke_foreground='w', text_foreground=f'{cls.text_color}', font_size=9.5, text_alpha=0.75)
+                    text_kwargs = dict(stroke_alpha=0.8, strokewidth=1.5, stroke_foreground=final_subseq_idx_text_outline_color, text_foreground='black', text_alpha=subseq_idx_text_alpha)
+                else:
+                    text_kwargs = dict(bbox=dict(facecolor=final_subseq_idx_text_outline_color, edgecolor='none', alpha=subseq_idx_text_alpha, pad=0.5),  # Add background for readability
+                    )
+
                 # Now, for each pair of adjacent positions within the group, draw arrows and labels
                 for a_subsequence_rel_idx, an_x_center, a_subsequence_position in zip(x_rel_indices, x_centers_subseq, subsequence_positions):
-                    txt = ax.text(
-                        an_x_center, (a_subsequence_position + subsequence_idx_offset),
-                        f'{int(a_subsequence_rel_idx)}', 
-                        fontsize=6,
-                        ha='center',
-                        va='bottom',
-                        color=subseq_idx_text_color,
-                        bbox=dict(facecolor=final_subseq_idx_text_outline_color, edgecolor='none', alpha=subseq_idx_text_alpha, pad=0.5)  # Add background for readability
-                    )
+                    # txt = ax.text(
+                    #     an_x_center, (a_subsequence_position + subsequence_idx_offset),
+                    #     f'{int(a_subsequence_rel_idx)}', 
+                    #     fontsize=7.5,
+                    #     ha='center',
+                    #     va='bottom',
+                    #     color=subseq_idx_text_color,
+                    #     **text_kwargs,                        
+                    # )
+
+                    txt = add_text_with_stroke(ax, text=f'{int(a_subsequence_rel_idx)}', x_pos=an_x_center, y_pos=(a_subsequence_position + subsequence_idx_offset), font_size=7.5, ha='center', va='bottom', **text_kwargs)
                     out_dict['subsequence_bin_count_labels_dict'][subsequence_idx].append(txt)
                 # end for a_subsequence_rel_idx, an_x_cente...
                 
