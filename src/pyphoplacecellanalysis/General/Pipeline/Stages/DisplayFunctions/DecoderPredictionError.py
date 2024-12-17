@@ -1911,6 +1911,13 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         # text_kwargs = _helper_build_text_kwargs_flat_top(a_curr_ax=curr_ax)
         # text_kwargs = _helper_build_text_kwargs_adjacent_right(a_curr_ax=curr_ax)
 
+        ## On Lab computer, reduce the stroke_Width
+        # text_kwargs.update(stroke_alpha=0.95, strokewidth=1.5, stroke_foreground='w', text_foreground='black', font_size=11.0, text_alpha=0.95) # #TODO 2024-12-17 12:33: - [ ] Reduce the stroke width
+        text_kwargs.update(stroke_alpha=1.0, strokewidth=2.5, stroke_foreground='black', text_foreground='black', font_size=14.0, text_alpha=0.95)
+        # anchored_text_alpha_override_value: float = 0.4 ## default
+        anchored_text_alpha_override_value: float = 1.0 ## default
+        # custom_value_formatter = None ## OVERRIDE custom_value_formatter
+        
         
         # data_index_value = data_idx # OLD MODE
         data_index_value = epoch_start_t
@@ -1943,7 +1950,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
                     anchored_text = None
                     anchored_text = add_inner_title(curr_ax, final_text, use_AnchoredCustomText=use_AnchoredCustomText, custom_value_formatter=custom_value_formatter, **text_kwargs)
                     anchored_text.patch.set_ec("none")
-                    anchored_text.set_alpha(0.4)
+                    anchored_text.set_alpha(anchored_text_alpha_override_value)
                 else:
                     anchored_text.txt.set_text(final_text)
             else:
@@ -1959,10 +1966,13 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
                     print(f'creating new anchored text label for {curr_ax}, final_text: {final_text}')
                 anchored_text = add_inner_title(curr_ax, final_text, use_AnchoredCustomText=use_AnchoredCustomText, custom_value_formatter=custom_value_formatter, **text_kwargs) # '#ff001a' loc = 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'
                 anchored_text.patch.set_ec("none")
-                anchored_text.set_alpha(0.4)
+                anchored_text.set_alpha(anchored_text_alpha_override_value)
             else:
                 anchored_text = None
 
+
+        # anchored_text.set_alpha(0.95)
+        
         # Store the plot objects for future updates:
         plots[cls.plots_group_identifier_key][curr_ax] = {'wcorr_text': anchored_text}
         
