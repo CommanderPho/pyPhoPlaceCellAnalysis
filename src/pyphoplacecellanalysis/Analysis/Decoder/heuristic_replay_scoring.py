@@ -1377,6 +1377,55 @@ class SubsequencesPartitioningResult(ComputedResult):
 
         return all_subsequences_scores_df
 
+    @classmethod
+    def _compute_position_changes_info_df(cls, position_bins_info_df: pd.DataFrame, same_thresh: float, max_jump_distance_cm: Optional[float]=None, additional_split_on_exceeding_jump_distance:bool=False):
+        """ `position_bins_info_df` is not altered 
+        
+        """
+        prev_bin_flat_idxs = position_bins_info_df['flat_idx'].to_numpy()[:-1]
+        next_bin_flat_idxs = position_bins_info_df['flat_idx'].to_numpy()[1:]
+        split_line_flat_t = position_bins_info_df['t_bin_end'].to_numpy()[:-1].astype(float) # all but the last end, as this isn't a valid one
+        
+        position_changes_info_df = pd.DataFrame({'pos_diff': np.diff(position_bins_info_df['pos']),
+                                                'prev_bin_flat_idx': prev_bin_flat_idxs, 'next_bin_flat_idxs': next_bin_flat_idxs, 't': split_line_flat_t, # np.diff(position_bins_info_df['t_bin_center']),
+        })
+        # position_changes_info_df['split_reason'] = '' # str column descripting why the split occured
+        position_changes_info_df['direction'] = np.sign(position_changes_info_df['pos_diff']).astype(int)
+        position_changes_info_df['exceeds_same_thresh'] = (np.abs(position_changes_info_df['pos_diff']) > same_thresh)
+        position_changes_info_df['did_accum_dir_change'] = (position_changes_info_df['direction'] != position_changes_info_df['direction'].shift()) & (position_changes_info_df['direction'] != 0)
+        position_changes_info_df['should_split'] = np.logical_and(position_changes_info_df['did_accum_dir_change'], position_changes_info_df['exceeds_same_thresh'])
+        if (max_jump_distance_cm is not None):
+            position_changes_info_df['exceeds_jump_distance'] = (np.abs(position_changes_info_df['pos_diff']) > max_jump_distance_cm)
+            if additional_split_on_exceeding_jump_distance:
+                position_changes_info_df['should_split'] = np.logical_or(position_changes_info_df['should_split'], position_changes_info_df['exceeds_jump_distance'])
+
+
+        ## Get prev/next positions: ['prev_pos', 'next_pos']
+        if (position_changes_info_df is not None) and (position_bins_info_df is not None):
+            lookup_column_map_dict = {'prev_bin_flat_idx':'flat_idx', 'next_bin_flat_idxs':'flat_idx'} # {df.column_name: lookup_properties_map_df.column_name}
+            _temp_position_bins_info_df = deepcopy(position_bins_info_df)
+            for df_col_name, lookup_properties_map_df_col_name in lookup_column_map_dict.items():
+                assert lookup_properties_map_df_col_name in _temp_position_bins_info_df.columns
+                _temp_position_bins_info_df[df_col_name] = _temp_position_bins_info_df[lookup_properties_map_df_col_name]
+                
+            # position_bins_info_df['prev_bin_flat_idx'] = position_bins_info_df['flat_idx']
+            # print(list(position_bins_info_df.columns)) # ['pos', 'orig_subsequence_idx', 'is_intrusion', 'subsequence_idx', 'flat_idx', 't_bin_start', 't_bin_center', 't_bin_end', 'prev_bin_flat_idx']
+
+            # 'prev_bin_flat_idx' ________________________________________________________________________________________________ #
+            desired_post_add_renamed_dict = {'pos':'prev_pos'}
+            # included_lookup_column_names = list(lookup_column_map_dict.keys()) + ['pos',]  #['pos', 'prev_bin_flat_idx']
+            included_lookup_column_names = ['pos', 'prev_bin_flat_idx']
+            position_changes_info_df = PandasHelpers.add_explicit_dataframe_columns_from_lookup_df(position_changes_info_df, lookup_properties_map_df=_temp_position_bins_info_df[included_lookup_column_names], join_column_name='prev_bin_flat_idx')
+            position_changes_info_df = position_changes_info_df.rename(columns=desired_post_add_renamed_dict, inplace=False)
+
+            # 'next_bin_flat_idxs' _______________________________________________________________________________________________ #
+            desired_post_add_renamed_dict = {'pos':'next_pos'}
+            included_lookup_column_names = ['pos', 'next_bin_flat_idxs']
+            position_changes_info_df = PandasHelpers.add_explicit_dataframe_columns_from_lookup_df(position_changes_info_df, lookup_properties_map_df=_temp_position_bins_info_df[included_lookup_column_names], join_column_name='next_bin_flat_idxs')
+            position_changes_info_df = position_changes_info_df.rename(columns=desired_post_add_renamed_dict, inplace=False)
+
+
+        return position_changes_info_df
 
 
     @function_attributes(short_name=None, tags=['df', 'compute'], input_requires=[], output_provides=[], uses=['post_compute_subsequence_properties'], used_by=['compute'], creation_date='2024-12-12 03:47', related_items=[])
@@ -1418,50 +1467,8 @@ class SubsequencesPartitioningResult(ComputedResult):
 
         ## build first_order_diff_df
         if self.first_order_diff_lst is not None:
-            Assert.len_equals(self.first_order_diff_lst, len(self.flat_positions))
-            prev_bin_flat_idxs = self.position_bins_info_df['flat_idx'].to_numpy()[:-1]
-            next_bin_flat_idxs = self.position_bins_info_df['flat_idx'].to_numpy()[1:]
-            split_line_flat_t = self.position_bins_info_df['t_bin_end'].to_numpy()[:-1].astype(float) # all but the last end, as this isn't a valid one
-            
-
-            self.position_changes_info_df = pd.DataFrame({'pos_diff': np.diff(self.position_bins_info_df['pos']),
-                                                    'prev_bin_flat_idx': prev_bin_flat_idxs, 'next_bin_flat_idxs': next_bin_flat_idxs, 't': split_line_flat_t, # np.diff(self.position_bins_info_df['t_bin_center']),
-            })
-            # position_changes_info_df['split_reason'] = '' # str column descripting why the split occured
-            self.position_changes_info_df['direction'] = np.sign(self.position_changes_info_df['pos_diff']).astype(int)
-            self.position_changes_info_df['exceeds_same_thresh'] = (np.abs(self.position_changes_info_df['pos_diff']) > self.same_thresh)
-            self.position_changes_info_df['did_accum_dir_change'] = (self.position_changes_info_df['direction'] != self.position_changes_info_df['direction'].shift()) & (self.position_changes_info_df['direction'] != 0)
-            self.position_changes_info_df['should_split'] = np.logical_and(self.position_changes_info_df['did_accum_dir_change'], self.position_changes_info_df['exceeds_same_thresh'])
-            if (self.max_jump_distance_cm is not None):
-                self.position_changes_info_df['exceeds_jump_distance'] = (np.abs(self.position_changes_info_df['pos_diff']) > self.max_jump_distance_cm)
-                if additional_split_on_exceeding_jump_distance:
-                    self.position_changes_info_df['should_split'] = np.logical_or(self.position_changes_info_df['should_split'], self.position_changes_info_df['exceeds_jump_distance'])
-
-
-        ## Get prev/next positions: ['prev_pos', 'next_pos']
-        if (self.position_changes_info_df is not None) and (self.position_bins_info_df is not None):
-            lookup_column_map_dict = {'prev_bin_flat_idx':'flat_idx', 'next_bin_flat_idxs':'flat_idx'} # {df.column_name: lookup_properties_map_df.column_name}
-            _temp_position_bins_info_df = deepcopy(self.position_bins_info_df)
-            for df_col_name, lookup_properties_map_df_col_name in lookup_column_map_dict.items():
-                assert lookup_properties_map_df_col_name in _temp_position_bins_info_df.columns
-                _temp_position_bins_info_df[df_col_name] = _temp_position_bins_info_df[lookup_properties_map_df_col_name]
-                
-            # position_bins_info_df['prev_bin_flat_idx'] = position_bins_info_df['flat_idx']
-            # print(list(position_bins_info_df.columns)) # ['pos', 'orig_subsequence_idx', 'is_intrusion', 'subsequence_idx', 'flat_idx', 't_bin_start', 't_bin_center', 't_bin_end', 'prev_bin_flat_idx']
-
-            # 'prev_bin_flat_idx' ________________________________________________________________________________________________ #
-            desired_post_add_renamed_dict = {'pos':'prev_pos'}
-            # included_lookup_column_names = list(lookup_column_map_dict.keys()) + ['pos',]  #['pos', 'prev_bin_flat_idx']
-            included_lookup_column_names = ['pos', 'prev_bin_flat_idx']
-            self.position_changes_info_df = PandasHelpers.add_explicit_dataframe_columns_from_lookup_df(self.position_changes_info_df, lookup_properties_map_df=_temp_position_bins_info_df[included_lookup_column_names], join_column_name='prev_bin_flat_idx')
-            self.position_changes_info_df = self.position_changes_info_df.rename(columns=desired_post_add_renamed_dict, inplace=False)
-
-            # 'next_bin_flat_idxs' _______________________________________________________________________________________________ #
-            desired_post_add_renamed_dict = {'pos':'next_pos'}
-            included_lookup_column_names = ['pos', 'next_bin_flat_idxs']
-            self.position_changes_info_df = PandasHelpers.add_explicit_dataframe_columns_from_lookup_df(self.position_changes_info_df, lookup_properties_map_df=_temp_position_bins_info_df[included_lookup_column_names], join_column_name='next_bin_flat_idxs')
-            self.position_changes_info_df = self.position_changes_info_df.rename(columns=desired_post_add_renamed_dict, inplace=False)
-
+            Assert.len_equals(self.first_order_diff_lst, len(self.flat_positions))            
+            self.position_changes_info_df = self._compute_position_changes_info_df(position_bins_info_df=self.position_bins_info_df, same_thresh=self.same_thresh, max_jump_distance_cm=self.max_jump_distance_cm, additional_split_on_exceeding_jump_distance=additional_split_on_exceeding_jump_distance)
 
         # Subsequences Dataframe _____________________________________________________________________________________________ #
         if self.merged_split_positions_arrays is not None:
