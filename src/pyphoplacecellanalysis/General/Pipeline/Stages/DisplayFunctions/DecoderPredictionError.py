@@ -17,7 +17,7 @@ from neuropy.utils.mixins.dict_representable import overriding_dict_with, get_di
 from neuropy.utils.efficient_interval_search import get_non_overlapping_epochs # used in _display_plot_decoded_epoch_slices to get only the valid (non-overlapping) epochs
 from neuropy.utils.result_context import IdentifyingContext
 from neuropy.utils.mixins.binning_helpers import BinningContainer # for _build_radon_transform_plotting_data typehinting
-
+from neuropy.utils.indexing_helpers import flatten, NumpyHelpers, PandasHelpers
 
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.programming_helpers import metadata_attributes
@@ -2453,7 +2453,7 @@ class DecodedSequenceAndHeuristicsPlotData:
     time_bin_centers: NDArray = field()
     time_bin_edges: NDArray = field()
     line_y_most_likely: NDArray = field()
-    line_y_actual: NDArray = field()
+    is_epoch_included: bool = field()
 
 class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
     """ Adds the most-likely and actual position points/lines to the posterior heatmap.
@@ -2488,7 +2488,7 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
     """
     plots_group_identifier_key: str = 'decoded_sequence_and_heuristics_curves' # _out_pagination_controller.plots['weighted_corr']
     
-    provided_params: Dict[str, Any] = {'enable_decoded_sequence_and_heuristics_curve': True, 'show_pre_merged_debug_sequences': False} # , enable_actual_position_curve = False
+    provided_params: Dict[str, Any] = {'enable_decoded_sequence_and_heuristics_curve': True, 'show_pre_merged_debug_sequences': False, 'show_heuristic_criteria_filter_epoch_inclusion_status': True} # , enable_actual_position_curve = False
     provided_plots_data: Dict[str, Any] = {'decoded_sequence_and_heuristics_curves_data': None}
     provided_plots: Dict[str, Any] = {'decoded_sequence_and_heuristics_curves': {}}
     column_names: List[str] = [] ## #TODO 2024-11-25 13:57: - [ ] Need column names used by this data provider
@@ -2515,6 +2515,23 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
         time_bin_containers: List[BinningContainer] = deepcopy(curr_results_obj.time_bin_containers)
         active_filter_epochs_df: pd.DataFrame = deepcopy(ensure_dataframe(curr_results_obj.active_filter_epochs))
         
+
+        if ('is_included_by_heuristic_criteria' not in active_filter_epochs_df.columns):
+            ## create it
+            # start_col_name: str = 'ripple_start_t'
+            start_col_name: str = 'start'
+            filter_thresholds_dict = {'mseq_len_ignoring_intrusions_and_repeats': 4, 'mseq_tcov': 0.35 }
+            # df_is_included_criteria_fn = lambda df: NumpyHelpers.logical_and(*[(df[f'overall_best_{a_col_name}'] >= a_thresh) for a_col_name, a_thresh in filter_thresholds_dict.items()])
+            df_is_included_criteria_fn = lambda df: NumpyHelpers.logical_and(*[(df[f'{a_col_name}'] >= a_thresh) for a_col_name, a_thresh in filter_thresholds_dict.items()])
+            df_is_excluded_criteria_fn = lambda df: np.logical_not(df_is_included_criteria_fn(df=df))
+            assert PandasHelpers.require_columns(active_filter_epochs_df, required_columns=list(filter_thresholds_dict.keys()), print_missing_columns=True)
+            included_heuristic_ripple_start_times = active_filter_epochs_df[df_is_included_criteria_fn(active_filter_epochs_df)][start_col_name].values
+            excluded_heuristic_ripple_start_times = active_filter_epochs_df[df_is_excluded_criteria_fn(active_filter_epochs_df)][start_col_name].values
+            active_filter_epochs_df['is_included_by_heuristic_criteria'] = False # default to False
+            active_filter_epochs_df.loc[active_filter_epochs_df.epochs.find_data_indicies_from_epoch_times(included_heuristic_ripple_start_times), 'is_included_by_heuristic_criteria'] = True ## adds the ['is_included_by_heuristic_criteria'] column
+
+
+
         out_position_curves_data = {}
         for an_epoch_idx, a_tuple in enumerate(active_filter_epochs_df.itertuples(name='EpochDataTuple')):
             ## NOTE: uses a_tuple.start as the index in to the data dict:
@@ -2532,9 +2549,11 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
             partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, flat_time_window_centers=time_window_centers, pos_bin_edges=pos_bin_edges,
                                                                                                                         max_ignore_bins=2, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm, flat_time_window_edges=time_window_edges)
 
+            # 'is_included_by_heuristic_criteria'
+            is_epoch_included_in_filter: bool = a_tuple.is_included_by_heuristic_criteria
             ## Build the result
             # out_position_curves_data[an_epoch_idx] = DecodedSequenceAndHeuristicsPlotData(partition_result=partition_result, time_bin_centers=time_window_centers, line_y_most_likely=a_most_likely_positions_list, line_y_actual=None)
-            out_position_curves_data[a_tuple.start] = DecodedSequenceAndHeuristicsPlotData(partition_result=partition_result, time_bin_centers=time_window_centers, time_bin_edges=time_window_edges, line_y_most_likely=a_most_likely_positions_list, line_y_actual=None)
+            out_position_curves_data[a_tuple.start] = DecodedSequenceAndHeuristicsPlotData(partition_result=partition_result, time_bin_centers=time_window_centers, time_bin_edges=time_window_edges, line_y_most_likely=a_most_likely_positions_list, is_epoch_included=is_epoch_included_in_filter)
 
 
         return out_position_curves_data
@@ -2578,6 +2597,10 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
         should_enable_plot: bool = params.enable_decoded_sequence_and_heuristics_curve
         # show_pre_merged_debug_sequences: bool = params.show_pre_merged_debug_sequences
         show_pre_merged_debug_sequences: bool = params.setdefault('show_pre_merged_debug_sequences', False)
+
+
+        show_heuristic_criteria_filter_epoch_inclusion_status: bool = params.setdefault('show_heuristic_criteria_filter_epoch_inclusion_status', False)
+
         
 
         # data_index_value = data_idx # OLD MODE
@@ -2610,6 +2633,8 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
             
             a_partition_result = plots_data.decoded_sequence_and_heuristics_curves_data[data_index_value].partition_result ## get the partition result
             
+            an_is_epoch_included_in_filter: bool = plots_data.decoded_sequence_and_heuristics_curves_data[data_index_value].is_epoch_included
+            
             # if extant_line is not None:
             #     # extant_line.remove()
             #     if extant_line.axes is None:
@@ -2633,17 +2658,57 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
                     split_vlines_kwargs = dict(should_skip=False),
                     time_bin_edges_vlines_kwargs = dict(should_skip=False),
                     direction_change_lines_kwargs = dict(should_skip=False),
-                    intrusion_time_bin_shading_kwargs = dict(should_skip=False),
+                    intrusion_time_bin_shading_kwargs = dict(should_skip=False, facecolor='red', alpha=0.15),
                     # main_sequence_position_dots_kwargs = dict(should_skip=False, linewidths=2, marker ="^", edgecolor ="red", s = 100, zorder=1),
                     main_sequence_position_dots_kwargs = dict(should_skip=False, linewidths=2, marker ="^", edgecolor="#141414F9", s=75, zorder=11, alpha=0.85),
+                    subsequence_relative_bin_idx_labels_kwargs = dict(should_skip=False, should_skip_if_non_main_sequence=False, subseq_idx_text_alpha = 0.95, subseq_idx_text_outline_color = ('color', 'color', 'color', 0.95), subsequence_idx_offset = 4.0),
                 )
         
+                if show_heuristic_criteria_filter_epoch_inclusion_status:
+                    if an_is_epoch_included_in_filter:
+                        linewidth = 5.5
+                        color = 'red'
+                        override_alpha = 0.85
+                        override_subsequence_line_color_alpha = 0.95
+                        intrusion_time_bin_shading_override_alpha = 0.15
+                        override_subsequence_relative_bin_idx_labels_kwargs = dict(subseq_idx_text_alpha = 0.95, subseq_idx_text_outline_color = ('color', 'color', 'color', 0.95))
+
+                        
+                    else:
+                        ## Non-included Filter:    
+                        linewidth = 0.5
+                        color = 'black'
+                        override_alpha = 0.25
+                        override_subsequence_line_color_alpha = 0.25
+                        intrusion_time_bin_shading_override_alpha = 0.05
+                        override_subsequence_relative_bin_idx_labels_kwargs = dict(subseq_idx_text_alpha=0.25, subseq_idx_text_outline_color = ('color', 'color', 'color', 0.25))
+                                                
+
+                    merged_debug_sequences_kwargs['sequence_position_hlines_kwargs'].update(alpha=override_alpha) ## update the alpha of the main dots
+                    merged_debug_sequences_kwargs['main_sequence_position_dots_kwargs'].update(alpha=override_alpha) ## update the alpha of the main dots
+                    merged_debug_sequences_kwargs['intrusion_time_bin_shading_kwargs'].update(alpha=intrusion_time_bin_shading_override_alpha)
+                    merged_debug_sequences_kwargs['subsequence_relative_bin_idx_labels_kwargs'].update(**override_subsequence_relative_bin_idx_labels_kwargs)
+                    
+                    common_plot_time_bins_multiple_kwargs.update(subsequence_line_color_alpha=override_subsequence_line_color_alpha)
+                    
+                    for spine in curr_ax.spines.values():
+                        spine.set_linewidth(linewidth)
+                        spine.set_color(color)
+                        spine.set_edgecolor(color)                
+                    # curr_ax.tick_params(color=color, labelcolor=color)
+                # END if show_heuristic_criteria_filter_epoch_inclusion_status
+
+
                 merged_split_positions_arrays = deepcopy(a_partition_result.merged_split_positions_arrays)
                 out: "MatplotlibRenderPlots" = a_partition_result.plot_time_bins_multiple(ax=curr_ax, enable_position_difference_indicators=False,
                                                                                          flat_time_window_centers=time_window_centers, flat_time_window_edges=time_window_edges, override_positions_list=merged_split_positions_arrays, 
                                                                                           **common_plot_time_bins_multiple_kwargs, **merged_debug_sequences_kwargs,                                                                                        
                                                                                            )
                 
+
+
+
+
                 # if show_pre_merged_debug_sequences:
                     # Add the intermediate debug values to the axes
                     # raise NotImplementedError(f'Depricated to try and prevent bad drawing 2024-12-13 18:49')
