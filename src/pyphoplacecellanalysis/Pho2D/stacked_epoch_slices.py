@@ -2712,12 +2712,14 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
     
 
     @function_attributes(short_name=None, tags=['export'], input_requires=[], output_provides=[], uses=['export_decoder_pagination_controller_figure_page', 'build_combined_all_pages_image'], used_by=[], creation_date='2024-08-13 13:05', related_items=[])
-    def export_all_pages(self, curr_active_pipeline, write_vector_format=True, write_png=True, enable_export_combined_img: bool=False, **kwargs):
+    def export_all_pages(self, curr_active_pipeline, write_vector_format=True, write_png=True, enable_export_combined_img: bool=False, combined_image_basename: str = 'combined', **kwargs):
         """ exports each pages single-decoder figures separately
 
         Usage:
             export_decoder_pagination_controller_figure_page(pagination_controller_dict, curr_active_pipeline)
 
+            _out_paths, (_out_combined_img, combined_img_out_path) = paginated_multi_decoder_decoded_epochs_window.export_all_pages(curr_active_pipeline, enable_export_combined_img=True, combined_image_basename=f'{DAY_DATE_TO_USE}_combined_All_Epochs')
+            
         """
         output_figure_kwargs = dict(write_vector_format=write_vector_format, write_png=write_png) | kwargs
 
@@ -2742,12 +2744,13 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             self.draw()
             out_fig_paths_dict_list[a_page_idx] = self.export_decoder_pagination_controller_figure_page(curr_active_pipeline=curr_active_pipeline, **output_figure_kwargs)
 
+        print(f'\tdone.')
 
         if enable_export_combined_img:
-            (_flat_png_list, _out_combined_img, combined_img_out_path) = self.build_combined_all_pages_image(out_fig_paths_dict_list=out_fig_paths_dict_list)
-
-        print(f'\tdone.')
-        return out_fig_paths_dict_list
+            (_flat_png_list, _out_combined_img, combined_img_out_path) = self.build_combined_all_pages_image(out_fig_paths_dict_list=out_fig_paths_dict_list, combined_image_basename=combined_image_basename)
+            return out_fig_paths_dict_list, (_out_combined_img, combined_img_out_path)
+        else:
+            return out_fig_paths_dict_list
     
     
     #endregion Export/Output ______________________________________________________________________________________________________ #
