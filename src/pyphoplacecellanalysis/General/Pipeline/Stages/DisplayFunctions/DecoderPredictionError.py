@@ -1913,7 +1913,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
 
         ## On Lab computer, reduce the stroke_Width
         # text_kwargs.update(stroke_alpha=0.95, strokewidth=1.5, stroke_foreground='w', text_foreground='black', font_size=11.0, text_alpha=0.95) # #TODO 2024-12-17 12:33: - [ ] Reduce the stroke width
-        text_kwargs.update(stroke_alpha=1.0, strokewidth=2.5, stroke_foreground='black', text_foreground='black', font_size=14.0, text_alpha=0.95)
+        text_kwargs.update(stroke_alpha=0.75, strokewidth=1.5, stroke_foreground='grey', text_foreground='black', font_size=11.0, text_alpha=0.95)
         # anchored_text_alpha_override_value: float = 0.4 ## default
         anchored_text_alpha_override_value: float = 1.0 ## default
         # custom_value_formatter = None ## OVERRIDE custom_value_formatter
@@ -2518,27 +2518,30 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
         same_thresh_fraction_of_track: float = 0.075 ## up to 7.5% of the track
         
         """
+        from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicThresholdFiltering
+        
+
         same_thresh_cm: float = (decoder_track_length * same_thresh_fraction_of_track)
         # same_thresh_n_bin_units: float = {k:(v * same_thresh_fraction_of_track) for k, v in decoder_track_length_dict.items()}
         
         num_filter_epochs:int = curr_results_obj.num_filter_epochs
         time_bin_containers: List[BinningContainer] = deepcopy(curr_results_obj.time_bin_containers)
         active_filter_epochs_df: pd.DataFrame = deepcopy(ensure_dataframe(curr_results_obj.active_filter_epochs))
+        active_filter_epochs_df, (included_heuristic_ripple_start_times, excluded_heuristic_ripple_start_times) = HeuristicThresholdFiltering.add_columns(df=active_filter_epochs_df)
         
-
-        if ('is_included_by_heuristic_criteria' not in active_filter_epochs_df.columns):
-            ## create it
-            # start_col_name: str = 'ripple_start_t'
-            start_col_name: str = 'start'
-            filter_thresholds_dict = {'mseq_len_ignoring_intrusions_and_repeats': 4, 'mseq_tcov': 0.35 }
-            # df_is_included_criteria_fn = lambda df: NumpyHelpers.logical_and(*[(df[f'overall_best_{a_col_name}'] >= a_thresh) for a_col_name, a_thresh in filter_thresholds_dict.items()])
-            df_is_included_criteria_fn = lambda df: NumpyHelpers.logical_and(*[(df[f'{a_col_name}'] >= a_thresh) for a_col_name, a_thresh in filter_thresholds_dict.items()])
-            df_is_excluded_criteria_fn = lambda df: np.logical_not(df_is_included_criteria_fn(df=df))
-            assert PandasHelpers.require_columns(active_filter_epochs_df, required_columns=list(filter_thresholds_dict.keys()), print_missing_columns=True)
-            included_heuristic_ripple_start_times = active_filter_epochs_df[df_is_included_criteria_fn(active_filter_epochs_df)][start_col_name].values
-            excluded_heuristic_ripple_start_times = active_filter_epochs_df[df_is_excluded_criteria_fn(active_filter_epochs_df)][start_col_name].values
-            active_filter_epochs_df['is_included_by_heuristic_criteria'] = False # default to False
-            active_filter_epochs_df.loc[active_filter_epochs_df.epochs.find_data_indicies_from_epoch_times(included_heuristic_ripple_start_times), 'is_included_by_heuristic_criteria'] = True ## adds the ['is_included_by_heuristic_criteria'] column
+        # if ('is_included_by_heuristic_criteria' not in active_filter_epochs_df.columns):
+        #     ## create it
+        #     # start_col_name: str = 'ripple_start_t'
+        #     start_col_name: str = 'start'
+        #     filter_thresholds_dict = {'mseq_len_ignoring_intrusions_and_repeats': 4, 'mseq_tcov': 0.35 }
+        #     # df_is_included_criteria_fn = lambda df: NumpyHelpers.logical_and(*[(df[f'overall_best_{a_col_name}'] >= a_thresh) for a_col_name, a_thresh in filter_thresholds_dict.items()])
+        #     df_is_included_criteria_fn = lambda df: NumpyHelpers.logical_and(*[(df[f'{a_col_name}'] >= a_thresh) for a_col_name, a_thresh in filter_thresholds_dict.items()])
+        #     df_is_excluded_criteria_fn = lambda df: np.logical_not(df_is_included_criteria_fn(df=df))
+        #     assert PandasHelpers.require_columns(active_filter_epochs_df, required_columns=list(filter_thresholds_dict.keys()), print_missing_columns=True)
+        #     included_heuristic_ripple_start_times = active_filter_epochs_df[df_is_included_criteria_fn(active_filter_epochs_df)][start_col_name].values
+        #     excluded_heuristic_ripple_start_times = active_filter_epochs_df[df_is_excluded_criteria_fn(active_filter_epochs_df)][start_col_name].values
+        #     active_filter_epochs_df['is_included_by_heuristic_criteria'] = False # default to False
+        #     active_filter_epochs_df.loc[active_filter_epochs_df.epochs.find_data_indicies_from_epoch_times(included_heuristic_ripple_start_times), 'is_included_by_heuristic_criteria'] = True ## adds the ['is_included_by_heuristic_criteria'] column
 
 
 
@@ -2565,7 +2568,7 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
                     # print(f'fixed time_bin_edges: {time_bin_edges}')
                     
 
-            n_pos_bins: int = np.shape(a_p_x_given_n)[0]
+            # n_pos_bins: int = np.shape(a_p_x_given_n)[0]
             partition_result: SubsequencesPartitioningResult = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, flat_time_window_centers=time_window_centers, pos_bin_edges=pos_bin_edges,
                                                                                                                         max_ignore_bins=2, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm, flat_time_window_edges=time_bin_edges) # AssertionError: (len(flat_time_window_edges)-1): 49 and num_flat_positions: 1
 
@@ -2655,17 +2658,6 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
             
             an_is_epoch_included_in_filter: bool = plots_data.decoded_sequence_and_heuristics_curves_data[data_index_value].is_epoch_included
             
-            # if extant_line is not None:
-            #     # extant_line.remove()
-            #     if extant_line.axes is None:
-            #         # Re-add the line to the axis if necessary
-            #         curr_ax.add_artist(extant_line)
-            
-            #     extant_line.set_data(time_window_centers, active_most_likely_positions_1D)
-            #     most_likely_decoded_position_plot = extant_line
-            # else:
-            #     # exception from below: `ValueError: x and y must have same first dimension, but have shapes (4,) and (213,)`
-
             if (a_partition_result is not None):
                 
                 # Most likely position plots:
