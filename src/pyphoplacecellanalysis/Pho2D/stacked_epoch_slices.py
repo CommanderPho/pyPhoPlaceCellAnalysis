@@ -2682,14 +2682,14 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         return out_fig_paths_dict
 
     @function_attributes(short_name=None, tags=['export'], input_requires=[], output_provides=[], uses=['export_decoder_pagination_controller_figure_page'], used_by=[], creation_date='2024-08-13 13:05', related_items=[])
-    def export_all_pages(self, curr_active_pipeline, **kwargs):
+    def export_all_pages(self, curr_active_pipeline, enable_export_combined_img: bool=True, write_vector_format=True, write_png=True, **kwargs):
         """ exports each pages single-decoder figures separately
 
         Usage:
             export_decoder_pagination_controller_figure_page(pagination_controller_dict, curr_active_pipeline)
 
         """
-        output_figure_kwargs = dict(write_vector_format=True, write_png=True) | kwargs
+        output_figure_kwargs = dict(write_vector_format=write_vector_format, write_png=write_png) | kwargs
 
         # assert self.isPaginatorControlWidgetBackedMode
         a_controlling_pagination_controller = self.contents.pagination_controllers['long_LR'] # DecodedEpochSlicesPaginatedFigureController
@@ -2711,6 +2711,30 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             self.jump_to_page(page_idx=a_page_idx)
             self.draw()
             out_fig_paths_dict_list[a_page_idx] = self.export_decoder_pagination_controller_figure_page(curr_active_pipeline=curr_active_pipeline, **output_figure_kwargs)
+
+
+        if enable_export_combined_img:
+            from PIL import Image
+            from pyphocorehelpers.plotting.media_output_helpers import vertical_image_stack, horizontal_image_stack, image_grid
+
+            _flat_png_list = []
+            _flat_pdf_list = []
+            
+            for a_page_idx, a_page_out_dict in out_fig_paths_dict_list.items():
+                print(f'page[{a_page_idx}]: a_page_out_dict: {a_page_out_dict}')
+                for a_final_context, an_output_list in a_page_out_dict.items():
+                    # final_context
+                    _flat_pdf_list.append(an_output_list[0]) ## pdf
+                    _flat_png_list.append(an_output_list[1]) ## png
+
+            ## handle PNGs                    
+            out_parent_path = _flat_png_list[0].parent.resolve()
+            _flat_raster_imgs = [Image.open(i) for i in _flat_png_list] ## open the images from disk
+            split_list = [_flat_raster_imgs[i:i + 4] for i in range(0, len(_flat_raster_imgs), 4)]
+            _out_combined_img = vertical_image_stack([horizontal_image_stack(a_row, padding=0) for a_row in split_list], padding=4)
+
+            combined_img_out_path = out_parent_path.joinpath('combined.png')
+            _out_combined_img.save(combined_img_out_path)
 
 
         print(f'\tdone.')

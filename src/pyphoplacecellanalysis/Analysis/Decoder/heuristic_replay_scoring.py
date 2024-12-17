@@ -1643,21 +1643,11 @@ class SubsequencesPartitioningResult(ComputedResult):
                     # text_kwargs = dict(stroke_alpha=0.8, strokewidth=4, stroke_foreground='w', text_foreground=f'{cls.text_color}', font_size=9.5, text_alpha=0.75)
                     text_kwargs = dict(stroke_alpha=0.8, strokewidth=1.5, stroke_foreground=final_subseq_idx_text_outline_color, text_foreground='black', text_alpha=subseq_idx_text_alpha)
                 else:
-                    text_kwargs = dict(bbox=dict(facecolor=final_subseq_idx_text_outline_color, edgecolor='none', alpha=subseq_idx_text_alpha, pad=0.5),  # Add background for readability
-                    )
-
+                    text_kwargs = dict(bbox=dict(facecolor=final_subseq_idx_text_outline_color, edgecolor='none', alpha=subseq_idx_text_alpha, pad=0.5))  # Add background for readability
+                    
                 # Now, for each pair of adjacent positions within the group, draw arrows and labels
                 for a_subsequence_rel_idx, an_x_center, a_subsequence_position in zip(x_rel_indices, x_centers_subseq, subsequence_positions):
-                    # txt = ax.text(
-                    #     an_x_center, (a_subsequence_position + subsequence_idx_offset),
-                    #     f'{int(a_subsequence_rel_idx)}', 
-                    #     fontsize=7.5,
-                    #     ha='center',
-                    #     va='bottom',
-                    #     color=subseq_idx_text_color,
-                    #     **text_kwargs,                        
-                    # )
-
+                    # txt = ax.text(an_x_center, (a_subsequence_position + subsequence_idx_offset), f'{int(a_subsequence_rel_idx)}', fontsize=7.5, ha='center', va='bottom', color=subseq_idx_text_color, **text_kwargs)
                     txt = add_text_with_stroke(ax, text=f'{int(a_subsequence_rel_idx)}', x_pos=an_x_center, y_pos=(a_subsequence_position + subsequence_idx_offset), font_size=7.5, ha='center', va='bottom', **text_kwargs)
                     out_dict['subsequence_bin_count_labels_dict'][subsequence_idx].append(txt)
                 # end for a_subsequence_rel_idx, an_x_cente...

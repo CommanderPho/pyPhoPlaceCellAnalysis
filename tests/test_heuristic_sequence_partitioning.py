@@ -106,7 +106,21 @@ class TestSubsequenceMerging(unittest.TestCase):
             merged_subsequences = a_partition_result.merged_split_positions_arrays
             print("Number of subsequences before merging:", len(subsequences))
             print("Number of subsequences after merging:", len(merged_subsequences))
-            print(a_partition_result.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=True, should_use_no_repeat_values=False))
+            
+            position_bins_info_df = deepcopy(a_partition_result.position_bins_info_df)
+            position_changes_info_df = deepcopy(a_partition_result.position_changes_info_df)
+            subsequences_df = deepcopy(a_partition_result.subsequences_df)
+
+            longest_seq_length_dict = {'neither': a_partition_result.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=False, should_use_no_repeat_values=False),
+                'ignoring_intru': a_partition_result.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=True, should_use_no_repeat_values=False),
+                '+no_repeat': a_partition_result.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=True, should_use_no_repeat_values=True),
+            }
+
+            longest_seq_length_multiline_label_str: str = '\n'.join([': '.join([k, str(v)]) for k, v in longest_seq_length_dict.items()])
+            print(longest_seq_length_multiline_label_str)
+
+
+            # print(a_partition_result.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=True, should_use_no_repeat_values=False))
             # a_fig = figures_dict[a_name] # list(figures_dict.values())[i]
             # an_ax_dict = axs_dict[a_name] # list(axs_dict.values())[i]    
             # _out = a_partition_result._plot_step_by_step_subsequence_partition_process(extant_ax_dict=an_ax_dict)
