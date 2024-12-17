@@ -204,6 +204,32 @@ class SubsequencesPartitioningResult(ComputedResult):
             ## initialize new
             self.position_bins_info_df, self.position_changes_info_df, self.subsequences_df = self.rebuild_sequence_info_df()
 
+    # ## For serialization/pickling:
+    # def __getstate__(self):
+    #     # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
+    #     state = self.__dict__.copy()
+    #     # Remove the unpicklable entries.
+    #     _non_pickled_fields = ['curr_active_pipeline', 'track_templates']
+    #     for a_non_pickleable_field in _non_pickled_fields:
+    #         del state[a_non_pickleable_field]
+
+    #     return state
+
+
+    # def __setstate__(self, state):
+    #     # Restore instance attributes (i.e., _mapping and _keys_at_init).
+    #     # For `VersionedResultMixin`
+    #     self._VersionedResultMixin__setstate__(state)
+        
+    #     _non_pickled_field_restore_defaults = dict(zip(['curr_active_pipeline', 'track_templates'], [None, None]))
+    #     for a_field_name, a_default_restore_value in _non_pickled_field_restore_defaults.items():
+    #         if a_field_name not in state:
+    #             state[a_field_name] = a_default_restore_value
+
+    #     self.__dict__.update(state)
+    #     # # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
+    #     # super(WCorrShuffle, self).__init__() # from
+        
 
     # Computed Properties ________________________________________________________________________________________________ #
     @property
@@ -3430,3 +3456,128 @@ class InversionCount:
         return swaps
 
 
+
+@metadata_attributes(short_name=None, tags=['heuristic', 'threshold', 'filtering'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-17 02:15', related_items=[])
+class HeuristicThresholdFiltering:
+    """ 
+    
+    from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicThresholdFiltering
+    
+    
+    """
+    filter_thresholds_dict = {'mseq_len_ignoring_intrusions_and_repeats': 4, 'mseq_tcov': 0.35 }
+    
+    # df_is_included_criteria_dict = {a_col_name:(lambda df: (df[f'overall_best_{a_col_name}'] >= a_thresh)) for a_col_name, a_thresh in filter_thresholds_dict.items()}
+    # df_is_included_criteria_dict = lambda df: {a_col_name:(df[f'overall_best_{a_col_name}'] >= a_thresh) for a_col_name, a_thresh in filter_thresholds_dict.items()}
+    # df_is_included_criteria_fn = lambda df: NumpyHelpers.logical_and(*[(df[f'overall_best_{a_col_name}'] >= a_thresh) for a_col_name, a_thresh in filter_thresholds_dict.items()]) ## GOOD
+    # df_is_included_criteria_fn = lambda df: NumpyHelpers.logical_and(*[(df[f'overall_best_{a_col_name}'] >= a_thresh) for a_col_name, a_thresh in filter_thresholds_dict.items()])
+    @classmethod
+    def df_is_included_criteria_fn(cls, df: pd.DataFrame):
+        """ enforces that the criteria must be met for the same DECODER within the epoch, not split amongst two different decoders. 
+        Captures: filter_thresholds_dict
+        """
+        specific_decoder_name_list = [f'long_LR', f'long_RL', f'short_LR', f'short_RL']
+        filter_thresholds_dict = deepcopy(cls.filter_thresholds_dict)
+        _across_decoders_arr = []
+        for a_decoder_name in specific_decoder_name_list:
+            _across_decoders_arr.append(NumpyHelpers.logical_and(*[(df[f'{a_col_name}_{a_decoder_name}'] >= a_thresh) for a_col_name, a_thresh in deepcopy(filter_thresholds_dict).items()])) ## only returns True if all conditions hold for the specific decoder
+            
+        _across_decoders_arr = np.vstack(_across_decoders_arr)
+        # _across_decoders_arr.shape # (4, 412)
+        does_any_decoder_pass_heuristic_critiera = np.any(_across_decoders_arr, axis=0)
+        return does_any_decoder_pass_heuristic_critiera
+
+    @classmethod
+    def df_is_excluded_criteria_fn(cls, df: pd.DataFrame):
+        return np.logical_not(cls.df_is_included_criteria_fn(df=df))
+    
+    @function_attributes(short_name=None, tags=['dataframe'], input_requires=[], output_provides=['is_included_by_heuristic_criteria'], uses=[], used_by=[], creation_date='2024-12-17 02:12', related_items=[])
+    @classmethod
+    def add_columns(cls, df: pd.DataFrame, start_col_name: str = 'ripple_start_t', override_filter_thresholds_dict=None, allow_overwrite_extant:bool=True) -> pd.DataFrame:
+        """ 
+                    start_col_name: str = 'start'
+                    
+        Adds/Updates: ['is_included_by_heuristic_criteria']
+                    
+
+        Usage:
+            ripple_merged_complete_epoch_stats_df, (included_heuristic_ripple_start_times, excluded_heuristic_ripple_start_times) = HeuristicThresholdFiltering.add_columns(df=ripple_merged_complete_epoch_stats_df)
+            high_heuristic_only_filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(included_heuristic_ripple_start_times) for a_name, a_result in filtered_decoder_filter_epochs_decoder_result_dict.items()} # working filtered
+            low_heuristic_only_filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(excluded_heuristic_ripple_start_times) for a_name, a_result in filtered_decoder_filter_epochs_decoder_result_dict.items()} # working filtered
+
+
+        """
+        assert PandasHelpers.require_columns(df, required_columns=[start_col_name], print_missing_columns=True)
+        if override_filter_thresholds_dict is not None:
+            _tmp_backup_default_filter_thresholds_dict = deepcopy(cls.filter_thresholds_dict)
+            cls.filter_thresholds_dict = override_filter_thresholds_dict ## update
+        else:
+            _tmp_backup_default_filter_thresholds_dict = None
+            
+        if ('is_included_by_heuristic_criteria' not in df.columns) or allow_overwrite_extant:
+            ## create it
+            # 
+
+            # column_prefix: str = 'overall_best'
+            # filter_thresholds_dict = {'mseq_len_ignoring_intrusions_and_repeats': 4, 'mseq_tcov': 0.35 }
+            # df_is_included_criteria_fn = lambda df: NumpyHelpers.logical_and(*[(df[f'overall_best_{a_col_name}'] >= a_thresh) for a_col_name, a_thresh in filter_thresholds_dict.items()])
+            # df_is_included_criteria_fn = lambda df: NumpyHelpers.logical_and(*[(df[f'{a_col_name}_long_LR', f'{a_col_name}_long_RL', f'{a_col_name}_short_LR', f'{a_col_name}_short_RL'] >= a_thresh) for a_col_name, a_thresh in filter_thresholds_dict.items()])
+            # df_is_included_criteria_fn = lambda df: NumpyHelpers.logical_and(*[(df[f'{a_col_name}_long_LR', f'{a_col_name}_long_RL', f'{a_col_name}_short_LR', f'{a_col_name}_short_RL'] >= a_thresh) for a_col_name, a_thresh in filter_thresholds_dict.items()])
+            # df_is_included_criteria_fn = lambda df: NumpyHelpers.logical_and(*[(df[f'{a_col_name}'] >= a_thresh) for a_col_name, a_thresh in filter_thresholds_dict.items()])
+            # df_is_excluded_criteria_fn = lambda df: np.logical_not(df_is_included_criteria_fn(df=df))
+            # assert PandasHelpers.require_columns(df, required_columns=list(filter_thresholds_dict.keys()), print_missing_columns=True)
+            included_heuristic_ripple_start_times = df[cls.df_is_included_criteria_fn(df)][start_col_name].values
+            excluded_heuristic_ripple_start_times = df[cls.df_is_excluded_criteria_fn(df)][start_col_name].values
+            df['is_included_by_heuristic_criteria'] = False # default to False
+            df.loc[df.epochs.find_data_indicies_from_epoch_times(included_heuristic_ripple_start_times), 'is_included_by_heuristic_criteria'] = True ## adds the ['is_included_by_heuristic_criteria'] column
+            
+        # end if
+        
+        if _tmp_backup_default_filter_thresholds_dict is not None:
+            ## restore the default
+            cls.filter_thresholds_dict = _tmp_backup_default_filter_thresholds_dict
+            
+        return df, (included_heuristic_ripple_start_times, excluded_heuristic_ripple_start_times)
+    
+
+    @function_attributes(short_name=None, tags=['dataframe'], input_requires=[], output_provides=['is_included_by_heuristic_criteria'], uses=[], used_by=[], creation_date='2024-12-17 02:12', related_items=[])
+    @classmethod
+    def get_filtered_result(cls, all_epoch_result: DecodedFilterEpochsResult, included_filter_epoch_result: DecodedFilterEpochsResult, start_col_name: str = 'ripple_start_t', override_filter_thresholds_dict=None) -> pd.DataFrame:
+        """ filters the result 
+        
+        example_decoder_name = 'long_LR'
+        all_epoch_result: DecodedFilterEpochsResult = deepcopy(filtered_decoder_filter_epochs_decoder_result_dict[example_decoder_name])
+        included_filter_epoch_result: DecodedFilterEpochsResult = deepcopy(high_heuristic_only_filtered_decoder_filter_epochs_decoder_result_dict[example_decoder_name])
+        
+        
+        """
+        
+        # all_epoch_result: DecodedFilterEpochsResult = deepcopy(filtered_decoder_filter_epochs_decoder_result_dict[example_decoder_name])
+        all_filter_epochs_df: pd.DataFrame = deepcopy(all_epoch_result.filter_epochs)
+
+        
+        # included_filter_epoch_result: DecodedFilterEpochsResult = deepcopy(low_heuristic_only_filtered_decoder_filter_epochs_decoder_result_dict[example_decoder_name])
+
+        included_filter_epochs_df: pd.DataFrame = deepcopy(included_filter_epoch_result.filter_epochs)
+        included_filter_epochs_df, (included_heuristic_ripple_start_times, excluded_heuristic_ripple_start_times) = cls.add_columns(df=included_filter_epochs_df, start_col_name=start_col_name, override_filter_thresholds_dict=override_filter_thresholds_dict)
+        included_filter_epoch_result.filter_epochs = included_filter_epochs_df ## re-assign to update result
+
+        # included_filter_epoch_times = included_filter_epochs_df[['start', 'stop']].to_numpy() # Both 'start', 'stop' column matching
+        # included_filter_epoch_times = included_filter_epochs_df['start'].to_numpy() # Both 'start', 'stop' column matching
+        included_filter_epoch_times = deepcopy(included_heuristic_ripple_start_times)
+
+        included_filter_epoch_times_to_all_epoch_index_map = included_filter_epoch_result.find_epoch_times_to_data_indicies_map(epoch_times=included_filter_epoch_times)
+        included_filter_epoch_times_to_all_epoch_index_arr: NDArray = included_filter_epoch_result.find_data_indicies_from_epoch_times(epoch_times=included_filter_epoch_times)
+        # len(included_filter_epoch_times_to_all_epoch_index_arr)
+        
+        # Update the all_epochs dict _________________________________________________________________________________________ #
+        # all_filter_epochs_df['is_included_by_heuristic_criteria'] = False # default to False
+        # all_filter_epochs_df.loc[all_filter_epochs_df.epochs.find_data_indicies_from_epoch_times(included_heuristic_ripple_start_times), 'is_included_by_heuristic_criteria'] = True
+        
+        all_filter_epochs_df, (included_heuristic_ripple_start_times, excluded_heuristic_ripple_start_times) = cls.add_columns(df=all_filter_epochs_df, start_col_name=start_col_name, override_filter_thresholds_dict=override_filter_thresholds_dict)
+        all_epoch_result.filter_epochs = all_filter_epochs_df ## re-assign to update result
+        
+        return all_epoch_result, included_filter_epoch_result, (included_filter_epoch_times_to_all_epoch_index_map, included_filter_epoch_times_to_all_epoch_index_arr)
+    
+
+    
