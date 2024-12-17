@@ -1072,7 +1072,7 @@ class SubsequencesPartitioningResult(ComputedResult):
             
         return new_active_split_positions_arrays, first_order_diff_value_exceeeding_jump_distance_indicies
     
-    
+       
     @function_attributes(short_name=None, tags=['partition', 'max_jump_distance', 'split', 'subsequences'], input_requires=['self.merged_split_positions_arrays','self.position_bins_info_df'], output_provides=['self.merged_split_positions_arrays'], uses=[], used_by=['compute'], creation_date='2024-12-17 14:03', related_items=[])
     def new_simple_split_main_subsequence_on_max_jump_distance(self, debug_print=False):
         """
@@ -1282,6 +1282,7 @@ class SubsequencesPartitioningResult(ComputedResult):
         self.bridged_intrusion_bin_indicies = deepcopy(final_intrusion_values_list) # np.array([flat_positions_list.index(v) for v in final_intrusion_idxs])
         
         if self.max_jump_distance_cm is not None:
+            # new_merged_split_positions_arrays, first_order_diff_value_exceeeding_jump_distance_indicies = self.new_simple_split_main_subsequence_on_max_jump_distance(debug_print=debug_print)
             new_merged_split_positions_arrays, first_order_diff_value_exceeeding_jump_distance_indicies = self.enforce_max_jump_distance(max_jump_distance_cm=self.max_jump_distance_cm, debug_print=debug_print)
         else:
             first_order_diff_value_exceeeding_jump_distance_indicies = None
@@ -2153,32 +2154,32 @@ class SubsequencesPartitioningResult(ComputedResult):
 
 @define(slots=False, repr=False)
 class HeuristicsResult(ComputedResult):
-	""" Represents a rigorous test of decoding performance by splitting the lap epochs into Train/Test periods
-	
-	Usage:
-	
-	from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicsResult
-	
+    """ Represents a rigorous test of decoding performance by splitting the lap epochs into Train/Test periods
+    
+    Usage:
+    
+    from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicsResult
+    
     heuristics_result: HeuristicsResult = curr_active_pipeline.global_computation_results.computed_data.get('Heuristics', None)
-	if heuristics_result is None:
-		return False
+    if heuristics_result is None:
+        return False
         
-	"""
-	_VersionedResultMixin_version: str = "2024.12.16_0" # to be updated in your IMPLEMENTOR to indicate its version
+    """
+    _VersionedResultMixin_version: str = "2024.12.16_0" # to be updated in your IMPLEMENTOR to indicate its version
 
-	heuristic_scores_df_dict: Dict[types.DecoderName, pd.DataFrame] = serialized_field(default=None)
-	partition_result_dict: Dict[types.DecoderName, List[SubsequencesPartitioningResult]] = serialized_field(default=None)
+    heuristic_scores_df_dict: Dict[types.DecoderName, pd.DataFrame] = serialized_field(default=None)
+    partition_result_dict: Dict[types.DecoderName, List[SubsequencesPartitioningResult]] = serialized_field(default=None)
 
 
-	# def sliced_by_neuron_id(self, included_neuron_ids: NDArray) -> "TrainTestSplitResult":
-	# 	""" refactored out of `self.filtered_by_frate(...)` and `TrackTemplates.determine_decoder_aclus_filtered_by_frate(...)`
-	# 	Only `self.train_lap_specific_pf1D_Decoder_dict` is affected
-		
-	# 	"""
-	# 	_obj = deepcopy(self) # temporary copy of the object
-	# 	_obj.train_lap_specific_pf1D_Decoder_dict = {k:v.get_by_id(included_neuron_ids) for k, v in _obj.train_lap_specific_pf1D_Decoder_dict.items()}
-	# 	return _obj
-	
+    # def sliced_by_neuron_id(self, included_neuron_ids: NDArray) -> "TrainTestSplitResult":
+    # 	""" refactored out of `self.filtered_by_frate(...)` and `TrackTemplates.determine_decoder_aclus_filtered_by_frate(...)`
+    # 	Only `self.train_lap_specific_pf1D_Decoder_dict` is affected
+        
+    # 	"""
+    # 	_obj = deepcopy(self) # temporary copy of the object
+    # 	_obj.train_lap_specific_pf1D_Decoder_dict = {k:v.get_by_id(included_neuron_ids) for k, v in _obj.train_lap_specific_pf1D_Decoder_dict.items()}
+    # 	return _obj
+    
 
 
 class SequenceScoringComputations:
@@ -3350,7 +3351,8 @@ class InversionCount:
 
 @metadata_attributes(short_name=None, tags=['heuristic', 'threshold', 'filtering'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-17 02:15', related_items=[])
 class HeuristicThresholdFiltering:
-    """ 
+    """ Handles sorting epoch_dfs according to heuristic column requirements
+    
     
     from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicThresholdFiltering
     example_decoder_name = 'long_LR'
@@ -3415,7 +3417,7 @@ class HeuristicThresholdFiltering:
     
     @function_attributes(short_name=None, tags=['dataframe'], input_requires=[], output_provides=['is_included_by_heuristic_criteria'], uses=[], used_by=[], creation_date='2024-12-17 02:12', related_items=[])
     @classmethod
-    def add_columns(cls, df: pd.DataFrame, start_col_name: str = 'ripple_start_t', override_filter_thresholds_dict=None, allow_overwrite_extant:bool=True) -> pd.DataFrame:
+    def add_columns(cls, df: pd.DataFrame, start_col_name: str = 'ripple_start_t', override_filter_thresholds_dict=None, allow_overwrite_extant:bool=True) -> Tuple[pd.DataFrame, Tuple]:
         """ 
                     start_col_name: str = 'start'
                     
