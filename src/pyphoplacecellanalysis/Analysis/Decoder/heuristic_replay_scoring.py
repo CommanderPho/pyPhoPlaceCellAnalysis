@@ -465,7 +465,6 @@ class SubsequencesPartitioningResult(ComputedResult):
                 return 0.0 # zero it out if they are all repeats
             
 
-
     @function_attributes(short_name=None, tags=['time_bin'], input_requires=[], output_provides=[], uses=['.flat_time_window_edges', '.flat_time_window_centers'], used_by=[], creation_date='2024-12-12 09:39', related_items=[])
     def get_flat_time_bins_info(self):
         """ 
@@ -1761,13 +1760,7 @@ class SubsequencesPartitioningResult(ComputedResult):
                     next_pos = exceeding_jump_dist_diff_df['next_pos'].to_numpy()
                     
                     out_dict['direction_change_lines'] = ax.vlines(change_times, prev_pos, next_pos, **direction_change_lines_kwargs)
-                    
-                    # for change_t in exceeding_jump_dist_diff_df['t'].to_numpy():
-                    #     # line = ax.axvline(change_t, **direction_change_lines_kwargs)
-                        
-                    #     line = ax.axvline(change_t, **direction_change_lines_kwargs)
-                        
-                    #     out_dict['direction_change_lines'].append(line)
+
 
             # Plot horizontal lines with customizable color
             out_dict['subsequence_positions_hlines_dict'] = {}
@@ -1822,11 +1815,6 @@ class SubsequencesPartitioningResult(ComputedResult):
                 x_starts_subseq = x_indices
                 x_centers_subseq = x_indices + (float(bin_width) / 2.0)
                 x_ends_subseq = x_indices + bin_width
-
-                if (subsequence_idx == longest_subsequence_idx):
-                    longest_subsequence_start_x = x_starts_subseq[0]
-                    longest_subsequence_end_x = x_ends_subseq[-1]
-
 
                 if debug_print:
                     print(f'subsequence_idx: {subsequence_idx}, curr_subsequence_size_sorted_idx: {curr_subsequence_size_sorted_idx}, num_positions: {num_positions}, subsequence_positions: {subsequence_positions}, is_main_sequence: {is_main_sequence}')
