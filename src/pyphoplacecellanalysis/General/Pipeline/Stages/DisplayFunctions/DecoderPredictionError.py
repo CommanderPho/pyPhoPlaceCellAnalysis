@@ -2488,7 +2488,7 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
     """
     plots_group_identifier_key: str = 'decoded_sequence_and_heuristics_curves' # _out_pagination_controller.plots['weighted_corr']
     
-    provided_params: Dict[str, Any] = {'enable_decoded_sequence_and_heuristics_curve': True, 'show_pre_merged_debug_sequences': False, 'show_heuristic_criteria_filter_epoch_inclusion_status': True} # , enable_actual_position_curve = False
+    provided_params: Dict[str, Any] = {'enable_decoded_sequence_and_heuristics_curve': True, 'show_pre_merged_debug_sequences': False, 'show_heuristic_criteria_filter_epoch_inclusion_status': False} # , enable_actual_position_curve = False
     provided_plots_data: Dict[str, Any] = {'decoded_sequence_and_heuristics_curves_data': None}
     provided_plots: Dict[str, Any] = {'decoded_sequence_and_heuristics_curves': {}}
     column_names: List[str] = [] ## #TODO 2024-11-25 13:57: - [ ] Need column names used by this data provider
