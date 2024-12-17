@@ -1498,6 +1498,7 @@ class SubsequencesPartitioningResult(ComputedResult):
             #     intrusion_time_bin_shading_kwargs = dict(facecolor='red', alpha=0.15, zorder=0, should_skip=False),
             #     sequence_position_hlines_kwargs = dict(linewidth=4, zorder=-1, should_skip=False),
             #     main_sequence_position_dots_kwargs = dict(linewidths=2, marker ="^", edgecolor ="red", s = 200, zorder=1),
+            #     subsequence_relative_bin_idx_labels_kwargs = dict(should_skip=False, should_skip_if_non_main_sequence=True, subseq_idx_text_alpha = 0.95, subseq_idx_text_outline_color = ('color', 'color', 'color', 0.95), subsequence_idx_offset = 4.0)
             # )
             
 
