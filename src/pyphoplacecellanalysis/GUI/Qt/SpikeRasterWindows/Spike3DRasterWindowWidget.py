@@ -232,7 +232,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         app = pg.mkQApp(self.applicationName) # <PyQt5.QtWidgets.QApplication at 0x1d44a4891f0>
         self.GlobalConnectionManagerAccessingMixin_on_init(owning_application=app) # initializes self._connection_man
         
-        
         # self.ui.splitter.setSizes([900, 200])
         # self.ui.splitter.setStretchFactor(0, 5) # have the top widget by 3x the height as the bottom widget
         # self.ui.splitter.setStretchFactor(1, 1) # have the top widget by 3x the height as the bottom widget        
