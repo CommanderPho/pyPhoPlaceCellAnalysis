@@ -1,7 +1,7 @@
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from qtpy import QtCore, QtGui, QtWidgets
 from attrs import define, field, Factory
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
-
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 # from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.Qt.Menus.PhoMenuHelper import PhoMenuHelper
@@ -124,6 +124,20 @@ class BaseMenuProviderMixin(QtCore.QObject):
     def root_menu_bar(self):
         """The root_menu_bar property."""
         return self.root_window.menuBar()
+
+
+    @property
+    def menu_action_history_list(self) -> List:
+        """The menu_action_history_list property."""
+        if self.root_window is None:
+            return None
+        return self.root_window.ui.menus._menu_action_history_list # Window?
+    @menu_action_history_list.setter
+    def menu_action_history_list(self, value):
+        if self.root_window is None:
+            raise NotImplementedError()
+        self.root_window.ui.menus._menu_action_history_list = value # window
+
 
     def __init__(self, render_widget: QtWidgets.QWidget, parent=None, **kwargs):
         """ the __init__ form allows adding menus to extant widgets without modifying their class to inherit from this mixin """
