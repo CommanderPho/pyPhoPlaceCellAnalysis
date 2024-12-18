@@ -195,6 +195,7 @@ class CreateNewContextNestedDocksCommand(BaseMenuCommand):
     def execute(self, *args, **kwargs) -> None:
         """ Implicitly captures spike_raster_window """
         print(f'menu execute(): {self}')
+        self.log_command(*args, **kwargs) # adds this command to the `menu_action_history_list` 
         pass # TODO:
         # _out_synchronized_plotter = build_combined_time_synchronized_plotters_window(active_pf_2D_dt=self._active_pf_2D_dt, controlling_widget=self._spike_raster_window.spike_raster_plt_2d, context=self._context, create_new_controlling_widget=False)
         # self._display_output['comboSynchronizedPlotter'] = _out_synchronized_plotter

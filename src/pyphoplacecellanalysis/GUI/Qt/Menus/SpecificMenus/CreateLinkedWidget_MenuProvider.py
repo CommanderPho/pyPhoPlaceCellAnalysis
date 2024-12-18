@@ -164,6 +164,7 @@ class CreateNewTimeSynchronizedPlotterCommand(BaseMenuCommand):
     def execute(self, *args, **kwargs) -> None:
         """  """
         print(f'menu execute(): {self}')
+        self.log_command(*args, **kwargs) # adds this command to the `menu_action_history_list` 
         print(f'CreateNewTimeSynchronizedPlotterCommand(): {self._plotter_type} callback')
         
         if self._plotter_type == 'occupancy':
@@ -195,6 +196,7 @@ class CreateNewTimeSynchronizedCombinedPlotterCommand(BaseMenuCommand):
     def execute(self, *args, **kwargs) -> None:
         """  """
         print(f'menu execute(): {self}')
+        self.log_command(*args, **kwargs) # adds this command to the `menu_action_history_list` 
         _out_synchronized_plotter = build_combined_time_synchronized_plotters_window(active_pf_2D_dt=self._active_pf_2D_dt, controlling_widget=self._spike_raster_window.spike_raster_plt_2d, context=self._context, create_new_controlling_widget=False)
         self._display_output['comboSynchronizedPlotter'] = _out_synchronized_plotter
         # (controlling_widget, curr_sync_occupancy_plotter, curr_placefields_plotter), root_dockAreaWindow, app = _out_synchronized_plotter

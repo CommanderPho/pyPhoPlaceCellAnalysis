@@ -166,6 +166,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
         """The spikes_window property."""
         return self._spikes_window
     
+    
     @property
     def fragile_linear_neuron_IDXs(self):
         """The fragile_linear_neuron_IDXs from the whole df (not just the current window)"""

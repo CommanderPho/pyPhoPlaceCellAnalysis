@@ -369,6 +369,9 @@ class PhoMenuHelper(object):
     def initialize_global_menu_ui_variables_if_needed(cls, a_main_window):
         """ 
         sets up a_main_window.ui.menus.global_window_menus as needed for the menu providers if needed
+        
+        # initializes `_menu_action_history_list`
+        
         """
         if not hasattr(a_main_window, 'ui'):
             # if the window has no .ui property, create one:
@@ -384,6 +387,12 @@ class PhoMenuHelper(object):
         # a_main_window.ui.menus.setdefault('global_window_menus', PhoUIContainer.init_from_dict({}))
         if not a_main_window.ui.menus.has_attr('global_window_menus'):
             a_main_window.ui.menus.global_window_menus = PhoUIContainer.init_from_dict({})
+            
+        if not a_main_window.ui.menus.has_attr('_menu_action_history_list'):
+            a_main_window.ui.menus._menu_action_history_list = [] ## a list to show the history
+            
+
+            
         
     # @classmethod
     # def perform_copy_QMenu(cls, src_menu, dest_parent=None, debug_print=False):
@@ -587,7 +596,7 @@ class PhoMenuHelper(object):
 
 
 
-    @function_attributes(short_name=None, tags=['MAIN', 'menus', 'actions'], input_requires=[], output_provides=[], uses=['build_window_global_menus_dict', 'build_programmatic_menu_command_dict'], used_by=['Spike3DRasterWindowWidget .build_all_menus_dict'], creation_date='2024-12-18 16:53', related_items=[])
+    @function_attributes(short_name=None, tags=['MAIN', 'menus', 'actions'], input_requires=[], output_provides=[], uses=['build_window_global_menus_dict', 'build_programmatic_menu_command_dict'], used_by=['Spike3DRasterWindowWidget.build_all_menus_actions_dict'], creation_date='2024-12-18 16:53', related_items=[])
     @classmethod
     def build_all_programmatic_menu_command_dict(cls, spike_raster_window, active_2d_plot=None, wants_flat_actions_dict: bool=True, **kwargs) -> Tuple[Dict, Dict[str, QtWidgets.QAction]]:
         """ gets absolutely all of the possible actions (from the menus, both global and context) and returns them 

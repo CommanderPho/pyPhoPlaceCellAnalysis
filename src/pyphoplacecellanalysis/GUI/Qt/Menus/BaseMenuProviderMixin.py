@@ -35,8 +35,18 @@ class BaseMenuCommand:
     def is_enabled(self):
         return True
         
+    def log_command(self, *args, **kwargs):
+        """ adds this command to the `menu_action_history_list` """
+        if self._spike_raster_window.menu_action_history_list is None:
+            self._spike_raster_window.menu_action_history_list = [] # initialize if needed
+        ## add self to the history list
+        self._spike_raster_window.menu_action_history_list.append(self)
+        # self._spike_raster_window.menu_action_history_list.append(self.__qualname__)
+                
+
     def execute(self, *args, **kwargs) -> None:
         """ Implicitly captures spike_raster_window """
+        self.log_command(*args, **kwargs) # adds this command to the `menu_action_history_list`    
         raise NotImplementedError # implementors must override        
     
     def __call__(self, *args, **kwds):
@@ -91,6 +101,8 @@ class BaseMenuProviderMixin(QtCore.QObject):
         self._root_window
     
     """
+    action_name = 'BaseMenuProviderMixin'
+    top_level_menu_name = 'actionMenuBaseMenuProviderMixin'
     
     @property
     def has_root_window(self):
@@ -118,6 +130,8 @@ class BaseMenuProviderMixin(QtCore.QObject):
         super(BaseMenuProviderMixin, self).__init__(parent)
         self.top_level_menu_name = kwargs.get('top_level_menu_name', self.__class__.top_level_menu_name)
         self.action_name = kwargs.get('action_name', self.__class__.action_name)
+        ## TODO: need to do anything with `menu_action_history_list`?
+
         # Setup member variables:
         # Assumes that self is a QWidget subclass:
         self._render_widget = render_widget # do we really need a reference to this?

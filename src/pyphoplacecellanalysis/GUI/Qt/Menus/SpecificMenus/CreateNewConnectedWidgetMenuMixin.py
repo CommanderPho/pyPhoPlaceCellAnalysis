@@ -175,6 +175,7 @@ class CreateNewPyQtGraphPlotterCommand(BaseMenuCommand):
         
     def execute(self, *args, **kwargs) -> None:
         print(f'menu execute(): {self}')
+        self.log_command(*args, **kwargs) # adds this command to the `menu_action_history_list` 
         test_independent_pyqtgraph_raster_widget = self._spike_raster_window.create_new_connected_widget(type_of_3d_plotter=self._type_of_connected_plotter)
         test_independent_pyqtgraph_raster_widget.show()
 
@@ -190,6 +191,7 @@ class CreateNewVedoPlotterCommand(BaseMenuCommand):
     def execute(self, *args, **kwargs) -> None:
         """ Implicitly captures spike_raster_window """
         print(f'menu execute(): {self}')
+        self.log_command(*args, **kwargs) # adds this command to the `menu_action_history_list` 
         test_independent_vedo_raster_widget = self._spike_raster_window.create_new_connected_widget(type_of_3d_plotter='vedo')
         test_independent_vedo_raster_widget.show()
         # global_connected_widgets['test_independent_vedo_raster_widget'] = test_independent_vedo_raster_widget
@@ -212,6 +214,7 @@ class CreateNewDataExplorer_ipc_PlotterCommand(BaseMenuCommand):
         
     def execute(self, *args, **kwargs) -> None:
         print(f'menu execute(): {self}')
+        self.log_command(*args, **kwargs) # adds this command to the `menu_action_history_list` 
         pActiveTuningCurvesPlotter = None
         # display_output = {}
         self._display_output = self._display_output | self._curr_active_pipeline.display('_display_3d_interactive_tuning_curves_plotter', self._active_config_name, extant_plotter=self._display_output.get('pActiveTuningCurvesPlotter', None), panel_controls_mode='Qt') # Works now!
@@ -232,6 +235,7 @@ class CreateNewDataExplorer_ipspikes_PlotterCommand(BaseMenuCommand):
         
     def execute(self, *args, **kwargs) -> None:
         print(f'menu execute(): {self}')
+        self.log_command(*args, **kwargs) # adds this command to the `menu_action_history_list` 
         pActiveSpikesBehaviorPlotter = None
         # display_output = {}
         self._display_output = self._display_output | self._curr_active_pipeline.display('_display_3d_interactive_spike_and_behavior_browser', self._active_config_name, extant_plotter=self._display_output.get('pActiveSpikesBehaviorPlotter', None)) # Works now!

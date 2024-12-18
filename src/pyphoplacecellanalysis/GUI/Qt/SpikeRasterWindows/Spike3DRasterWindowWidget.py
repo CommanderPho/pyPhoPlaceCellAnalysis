@@ -4,7 +4,7 @@ import numpy as np
 
 from qtpy import QtCore, QtWidgets, QtGui
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
-
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters
@@ -191,8 +191,18 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         """The spike_raster_plt_2d property."""
         return self.ui.spike_raster_plt_3d
     
-    
-    
+
+    @property
+    def menu_action_history_list(self) -> List:
+        """The menu_action_history_list property."""
+        # return self.active_2d_plot.ui.menus._menu_action_history_list # 2DRaster
+        # return PhoMenuHelper.try_get_menu_window(self).ui.menus._menu_action_history_list # Window?
+        return self.spike_raster_plt_2d.ui.menus._menu_action_history_list ## Spike3DRasterWindowWidget
+    @menu_action_history_list.setter
+    def menu_action_history_list(self, value):
+        self.spike_raster_plt_2d.ui.menus._menu_action_history_list = value
+
+
     def __init__(self, curr_spikes_df, core_app_name='UnifiedSpikeRasterApp', window_duration=15.0, window_start_time=30.0, neuron_colors=None, neuron_sort_order=None, application_name=None, type_of_3d_plotter='pyqtgraph', parent=None):
         """_summary_
 
