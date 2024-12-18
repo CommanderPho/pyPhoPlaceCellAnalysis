@@ -950,9 +950,12 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
                 self._scheduledAnimationSteps = 0 # New method: zero it out instead of having it compound
 
             return True
+        # END if (delta is not None) a....
         else:
+            # Unknown event type
             if self.should_debug_print_interaction_events:
                 print(f'\t unhandled event {QEventLookupHelpers.get_event_string(event)}')
+
         # If not a particularlly handled case, do the default thing.
         return super().eventFilter(watched, event)
     

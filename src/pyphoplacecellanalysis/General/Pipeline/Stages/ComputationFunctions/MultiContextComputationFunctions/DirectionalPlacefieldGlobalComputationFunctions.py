@@ -7421,10 +7421,13 @@ class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
 		"""
 		from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
 		from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
+		from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import FixedCustomColormaps
+		from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
 		
 
 		## ✅ Add a new row for each of the four 1D directional decoders:
-		identifier_name: str = f'{a_decoder_name}_ContinuousDecode'
+		# identifier_name: str = f'{a_decoder_name}_ContinuousDecode'
+		identifier_name: str = f'ContinuousDecode_{a_decoder_name}'
 		print(f'identifier_name: {identifier_name}')
 		widget, matplotlib_fig, matplotlib_fig_axes = active_2d_plot.add_new_matplotlib_render_plot_widget(name=identifier_name, dockSize=(65, 200), display_config=a_dock_config)
 		an_ax = matplotlib_fig_axes[0]
@@ -7449,7 +7452,12 @@ class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
 		posterior_heatmap_imshow_kwargs = dict(
 			# cmap=get_heatmap_cmap(cmap='Oranges', bad_color='black', under_color='white', over_color='red'),
 			cmap = get_heatmap_cmap(cmap='viridis', bad_color='black', under_color='white', over_color='red'),
-												)	
+			# cmap = FixedCustomColormaps.get_custom_orange_with_low_values_dropped_cmap()
+			# cmap = FixedCustomColormaps.get_custom_black_with_low_values_dropped_cmap(low_value_cutoff=0.05)
+			# cmap = ColormapHelpers.create_colormap_transparent_below_value(active_cmap, low_value_cuttoff=0.1)
+			# cmap = FixedCustomColormaps.get_custom_greyscale_with_low_values_dropped_cmap(low_value_cutoff=0.01, full_opacity_threshold=0.25)
+			# active_cmap = FixedCustomColormaps.get_custom_orange_with_low_values_dropped_cmap()
+		)	
 
 		## Actual plotting portion:
 		fig, curr_ax = plot_1D_most_likely_position_comparsions(None, time_window_centers=time_window_centers, xbin=active_bins,
