@@ -2,7 +2,7 @@ from copy import deepcopy
 from typing import Dict
 import numpy as np
 
-from qtpy import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets, QtGui
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
@@ -10,9 +10,10 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters
 from pyphocorehelpers.gui.Qt.GlobalConnectionManager import GlobalConnectionManager, GlobalConnectionManagerAccessingMixin
 from pyphocorehelpers.gui.Qt.qevent_lookup_helpers import QEventLookupHelpers
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 
 from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Uic_AUTOGEN_Spike3DRasterWindowBase import Ui_RootWidget # Generated file from .ui
-
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike3DRaster import Spike3DRaster
@@ -350,6 +351,14 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.series_clear_all_pressed.connect(self.perform_interval_series_clear_all))
             self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.series_add_pressed.connect(self.perform_interval_series_request_add))
 
+
+            ## sigEmbeddedMatplotlibDockWidgetAdded
+            self.ui.bottom_bar_connections.append(self.ui.spike_raster_plt_2d.sigEmbeddedMatplotlibDockWidgetAdded.connect(lambda spike_raster_plt_2D, added_dock_item, added_widget: self.update_scrolling_event_filters())) ## not really a bottom_bar_connections, but who cares
+                        
+            ## update the dynamic event filters if needed
+            self.update_scrolling_event_filters()
+            
+
         # Set Window Title Options:
         if self.applicationName is not None:
             # self.setWindowFilePath(str(sess.filePrefix.resolve()))
@@ -379,7 +388,24 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             self.ui.scrollAnimTimeline = None
             
         
-          
+
+    @function_attributes(short_name=None, tags=['interactivity', 'event', 'scrolling', 'children'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 10:29', related_items=[])
+    def update_scrolling_event_filters(self, debug_print=False):
+        """ enables scrollability in the added matplotlib views just like the two upper views 
+        
+        Needs to be done when any new child widget is added, right?
+        
+        """
+        #   .installEventFilter(self)
+        ## Install the event filter in the 2D View to enable scroll wheel events:
+        if self.ui.spike_raster_plt_2d is not None: 
+            if self.ui.spike_raster_plt_2d.ui.matplotlib_view_widgets is not None:
+                for a_name, a_time_sync_widget in self.ui.spike_raster_plt_2d.ui.matplotlib_view_widgets.items():
+                    print(f'a_name: {a_name}')
+                    # a_time_sync_widget.installEventFilter(self) # plots.preview_overview_scatter_plot is a ScatterPlotItem ... does it have to be a pyqtgraph subclass to do this? I'm worried it does
+                    a_time_sync_widget.ui.canvas.installEventFilter(self)
+
+
     def __str__(self):
          return
       
@@ -858,10 +884,10 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         
         """
         # print(f'Spike3DRasterWindowWidget.eventFilter(self, watched, event)')
-        if event.type() == QtCore.QEvent.GraphicsSceneWheel:
+        delta = None
+        if (event.type() == QtCore.QEvent.GraphicsSceneWheel):
             # QtCore.QEvent.GraphicsSceneWheel
-            """ 
-            
+            """             
             event.delta(): (gives values like +/- 120, 240, etc) # Returns the distance that the wheel is rotated, in eighths (1/8s) of a degree. A positive value indicates that the wheel was rotated forwards away from the user; a negative value indicates that the wheel was rotated backwards toward the user.
                 Most mouse types work in steps of 15 degrees, in which case the delta value is a multiple of 120 (== 15 * 8).
 
@@ -876,8 +902,31 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
                 # print(f'\tevent.phase(): {event.phase()}')
                 # print(f'\tevent.pixelDelta(): {event.pixelDelta()}')
                 
+            delta = event.delta()
+        
+        
+        elif (event.type() == QtCore.QEvent.Wheel): # the second case (QtGui.QWheelEvent) doesn't even exist I don't think. IDK why ChatGPT said to use it.
+            """ the event is an instance of `QtGui.QWheelEvent`, but the event's .type() is NEVER QtGui.QWheelEvent, that's not even a possible type. """
+            if self.should_debug_print_interaction_events:
+                print(f'Spike3DRasterWindowWidget.eventFilter(...)\n\t detected event.type() == QtCore.QEvent.Wheel')
+                print(f'\twatched: {watched}\n\tevent: {event}')
+                print(f'\tevent.angleDelta(): {event.angleDelta()}')
+                
+            delta = event.angleDelta().x()
+            if delta == 0:
+                delta = event.angleDelta().y()
             
-            numDegrees = event.delta() / 8
+        else:
+            delta = None
+            if self.should_debug_print_interaction_events:
+                print(f'\t unhandled event {QEventLookupHelpers.get_event_string(event)}')
+                
+        if (delta is not None) and (delta > 0):
+            ## do the scroll
+            if self.should_debug_print_interaction_events:
+                print(f'\tperofmring scroll with delta: {delta}')
+
+            numDegrees = delta / 8
             numSteps = numDegrees / 15 # see QWheelEvent documentation
             numSteps = int(round(float(self.params.scrollStepMultiplier) * float(numSteps)))
                        

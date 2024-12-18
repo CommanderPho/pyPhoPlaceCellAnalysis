@@ -88,7 +88,11 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     # window_scrolled = QtCore.pyqtSignal(float, float) # signal is emitted on updating the 2D sliding window, where the first argument is the new start value and the 2nd is the new end value
     
     sigRenderedIntervalsListChanged = QtCore.Signal(object) # EpochRenderingMixin conformance: signal emitted whenever the list of rendered intervals changed (add/remove). Added 2023-10-16 to prevent `AttributeError: 'Spike2DRaster' does not have a signal with the signature PyQt_PyObject)`
+    # sigEmbeddedWidgetHierarchyChanged = QtCore.Signal(object) # emitted when the hierarchy of nested widgets changes, such as when a new dynamic matplotlib_render_plot_widget is added
     
+    sigEmbeddedMatplotlibDockWidgetAdded = QtCore.Signal(object, object, object) # self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name]) -  emitted when a new matplotlib dock widget is added
+    
+
     @property
     def overlay_text_lines_dict(self):
         """The lines of text to be displayed in the overlay."""    
@@ -512,6 +516,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         ## Add the epochs separator lines:
         _out_lines = self.add_raster_spikes_and_epochs_separator_line()
         
+
     def _run_delayed_gui_load_code(self):
         """ called when the self._delayed_gui_timer QTimer fires. """
         #Stop the timer.
@@ -1144,6 +1149,8 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     def add_new_matplotlib_render_plot_widget(self, row=1, col=0, name='matplotlib_view_widget', dockSize=(500,50), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None) -> Tuple[MatplotlibTimeSynchronizedWidget, Figure, List[Axis]]:
         """ creates a new dynamic MatplotlibTimeSynchronizedWidget, a container widget that holds a matplotlib figure, and adds it as a row to the main layout
         
+        emit and event so the parent can call `self.update_scrolling_event_filters()` to add the new item
+        
         """
         dDisplayItem = self.ui.dynamic_docked_widget_container.find_display_dock(identifier=name) # Dock
         if dDisplayItem is None:
@@ -1153,6 +1160,12 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             self.ui.matplotlib_view_widgets[name].setObjectName(name)
             self.ui.matplotlib_view_widgets[name].plots.fig.subplots_adjust(top=1.0, bottom=0.0, left=0.0, right=1.0, hspace=0.0, wspace=0.0)
             
+
+
+            ## Enable scrollability
+            self.ui.matplotlib_view_widgets[name].installEventFilter(self)
+            
+
             ## Add directly to the main grid layout:
             # self.ui.layout.addWidget(self.ui.matplotlib_view_widget, row, col)
             
@@ -1179,6 +1192,10 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             _single_ax = self.ui.matplotlib_view_widgets[name].getFigure().add_subplot(111) # Adds a single axes to the figure
             ax = self.ui.matplotlib_view_widgets[name].axes # return all axes instead of just the first one
         
+            ## emit the signal
+            self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name])
+            
+
         else:
             # Already had the widget
             print(f'already had the valid matplotlib view widget and its display dock. Returning extant.')

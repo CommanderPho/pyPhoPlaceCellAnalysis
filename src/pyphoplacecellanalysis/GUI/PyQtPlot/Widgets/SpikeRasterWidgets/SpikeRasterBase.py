@@ -604,7 +604,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
 
 
     def wheel_handler(self, event):
-        print(f'wheel_handler(event.angleDelta().y(): {event.angleDelta().y()})')
+        print(f'SpikeRasterBase.wheel_handler(event.angleDelta().y(): {event.angleDelta().y()})')
         # self.modify_volume(1 if event.angleDelta().y() > 0 else -1)
         # self.set_media_position(1 if event.angleDelta().y() > 0 else -1)
 
