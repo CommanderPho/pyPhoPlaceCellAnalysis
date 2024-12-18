@@ -240,10 +240,17 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
     @property
     def time_fractional_seconds(self) -> float:
         """The time_fractional_seconds property."""
-        time = self.ui.jumpToHourMinSecTimeEdit.time()  # Get the QTime object
-        # time_tuple = (time.hour(), time.minute(), time.second(), time.msec())  # Extract as tuple
-        time_fractional_seconds: float = self.total_fractional_seconds(hours=time.hour(), minutes=time.minute(), seconds=time.second(), milliseconds=time.msec())
-        return time_fractional_seconds
+        try:
+            time = self.ui.jumpToHourMinSecTimeEdit.time()  # Get the QTime object
+            # time_tuple = (time.hour(), time.minute(), time.second(), time.msec())  # Extract as tuple
+            time_fractional_seconds: float = self.total_fractional_seconds(hours=time.hour(), minutes=time.minute(), seconds=time.second(), milliseconds=time.msec())
+            return time_fractional_seconds
+        except AttributeError:
+            return None
+        except Exception as e:
+            raise e
+
+
     
     @time_fractional_seconds.setter
     def time_fractional_seconds(self, value):
