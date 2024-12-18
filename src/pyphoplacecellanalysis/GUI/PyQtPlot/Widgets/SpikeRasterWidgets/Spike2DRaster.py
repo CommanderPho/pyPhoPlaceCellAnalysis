@@ -1140,7 +1140,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         # performs required setup to enable dynamically added matplotlib render subplots.
         self.ui.matplotlib_view_widgets = {} # empty dictionary
 
-    @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 13:26', related_items=[])
+    @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=['FigureWidgetDockDisplayConfig'], used_by=[], creation_date='2023-10-17 13:26', related_items=[])
     def add_new_matplotlib_render_plot_widget(self, row=1, col=0, name='matplotlib_view_widget', dockSize=(500,50), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None) -> Tuple[MatplotlibTimeSynchronizedWidget, Figure, List[Axis]]:
         """ creates a new dynamic MatplotlibTimeSynchronizedWidget, a container widget that holds a matplotlib figure, and adds it as a row to the main layout
         
@@ -1186,7 +1186,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             ax = self.ui.matplotlib_view_widgets[name].axes # return all axes instead of just the first one
             
         ## Apply the default formatting:
-        fig.patch.set_facecolor('black')
+        fig.patch.set_facecolor('black') ## Defines the "no data" color
         fig.patch.set_alpha(0.1)
 
         for an_ax in ax:

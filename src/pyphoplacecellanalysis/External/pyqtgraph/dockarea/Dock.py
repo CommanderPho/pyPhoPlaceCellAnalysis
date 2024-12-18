@@ -36,6 +36,11 @@ class DockDisplayConfig(object):
         fg_color, bg_color, border_color = self.get_colors(orientation, is_dim)
 
         if orientation == 'vertical':
+        
+            # """
+            #     padding-top: 3px;
+            #     padding-bottom: 3px;
+            # """
             return """DockLabel {
                 background-color : %s;
                 color : %s;
@@ -45,8 +50,8 @@ class DockDisplayConfig(object):
                 border-bottom-left-radius: %s;
                 border-width: 0px;
                 border-right: 2px solid %s;
-                padding-top: 3px;
-                padding-bottom: 3px;
+                padding-top: 0px;
+                padding-bottom: 1px;
                 font-size: %s;
             }""" % (bg_color, fg_color, self.corner_radius, self.corner_radius, border_color, self.fontSize)
             
