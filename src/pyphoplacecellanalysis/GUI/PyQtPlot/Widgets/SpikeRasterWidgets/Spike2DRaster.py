@@ -7,8 +7,8 @@ from matplotlib.axis import Axis
 from matplotlib.figure import Figure
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
-
 # For Dynamic Plot Widget Adding
 # from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
 # from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DynamicDockDisplayAreaContentMixin
@@ -57,7 +57,7 @@ class SynchronizedPlotMode(ExtendedEnum):
     #     return cls.build_member_value_dict(['from','to',':'])
 
 
-
+@metadata_attributes(short_name=None, tags=['raster', 'gui'], input_requires=[], output_provides=[], uses=['LiveWindowedData'], used_by=[], creation_date='2024-12-18 12:45', related_items=[])
 class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRasterBase):
     """ Displays a 2D version of a raster plot with the spikes occuring along a plane. 
     
