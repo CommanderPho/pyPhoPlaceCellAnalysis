@@ -106,15 +106,14 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
         self.ui.button_play_pause.setModel(self.ui.play_pause_model)
         self.ui.button_play_pause.clicked.connect(self.play_pause)
         
-        
         self.is_playback_reversed = self.ui.button_reverse.isChecked()
         self._format_button_reversed()
         self.ui.button_reverse.clicked.connect(self.on_reverse_held)
         
         self.ui.btnLeft.clicked.connect(self.on_jump_left)
         self.ui.btnRight.clicked.connect(self.on_jump_right)
-        self.ui.btnJumpToSpecifiedTime.clicked.connect(self.on_jump_specified_hour_min_sec)
-
+        
+        self._INIT_UI_initialize_jump_time_edit()
 
         ## Remove Extra Buttons:
         self.ui.btnSkipLeft.hide()
@@ -143,6 +142,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
         self._update_series_action_buttons(self.has_valid_current_target_series_name) # should disable the action buttons to start
 
         
+        
     # def __str__(self):
     #      return 
     
@@ -166,7 +166,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
         pass        
 
     def on_jump_specified_hour_min_sec(self):
-        # time = self.jumpToHourMinSecTimeEdit.time()  # Get the QTime object
+        # time = self.ui.jumpToHourMinSecTimeEdit.time()  # Get the QTime object
         # time_tuple = (time.hour(), time.minute(), time.second(), time.msec())  # Extract as tuple
         time_fractional_seconds: float = self.time_fractional_seconds # self.total_fractional_seconds(hours=time.hour(), minutes=time.minute(), seconds=time.second(), milliseconds=time.msec())
         print(f'time_fractional_seconds: {time_fractional_seconds}')
@@ -239,7 +239,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
     @property
     def time_fractional_seconds(self) -> float:
         """The time_fractional_seconds property."""
-        time = self.jumpToHourMinSecTimeEdit.time()  # Get the QTime object
+        time = self.ui.jumpToHourMinSecTimeEdit.time()  # Get the QTime object
         # time_tuple = (time.hour(), time.minute(), time.second(), time.msec())  # Extract as tuple
         time_fractional_seconds: float = self.total_fractional_seconds(hours=time.hour(), minutes=time.minute(), seconds=time.second(), milliseconds=time.msec())
         return time_fractional_seconds
@@ -407,6 +407,49 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
     #     """
     #     print(f'on_series_extra_button_pressed()')
     #     # self.series_remove_pressed.emit(curr_series_name)
+    
+
+    def _INIT_UI_initialize_jump_time_edit(self):
+        """ sets up `jumpToHourMinSecTimeEdit` and `btnJumpToSpecifiedTime`
+        
+        """
+        # Set initial stylesheet
+        self.set_jump_time_light_grey_style()
+        
+        self.ui.btnJumpToSpecifiedTime.clicked.connect(self.on_jump_specified_hour_min_sec)
+
+        # Connect signals to handle focus and editing states
+        self.ui.jumpToHourMinSecTimeEdit.editingFinished.connect(self.set_jump_time_light_grey_style)
+        self.ui.jumpToHourMinSecTimeEdit.installEventFilter(self)
+        
+        
+
+
+    def set_jump_time_light_grey_style(self):
+        """Set the light grey inactive style."""
+        self.ui.jumpToHourMinSecTimeEdit.setStyleSheet("""
+            QTimeEdit {
+                color: lightgrey;
+            }
+        """)
+
+    def set_jump_time_white_style(self):
+        """Set the white active style."""
+        self.ui.jumpToHourMinSecTimeEdit.setStyleSheet("""
+            QTimeEdit {
+                color: white;
+            }
+        """)
+
+    def eventFilter(self, source, event):
+        """Handle focus events to change styles dynamically."""
+        if source == self.ui.jumpToHourMinSecTimeEdit:
+            if event.type() == event.FocusIn:
+                self.set_jump_time_white_style()
+            elif event.type() == event.FocusOut:
+                self.set_jump_time_light_grey_style()
+        return super().eventFilter(source, event)
+    
 
     
 class SpikeRasterBottomFrameControlsMixin:
@@ -437,7 +480,7 @@ class SpikeRasterBottomFrameControlsMixin:
         bottom_bar_connections.append(bottom_bar_controls.reverse_toggled.connect(self.on_reverse_held))
         return bottom_bar_connections
         
-            
+
     @QtCore.pyqtSlot()
     def SpikeRasterBottomFrameControlsMixin_on_buildUI(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """

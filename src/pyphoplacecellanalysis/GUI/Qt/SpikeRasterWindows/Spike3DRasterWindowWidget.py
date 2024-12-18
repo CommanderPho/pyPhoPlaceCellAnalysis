@@ -673,6 +673,13 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.update_animation(next_target_jump_time)
 
 
+    @pyqtExceptionPrintingSlot(float)
+    def perform_jump_specific_timestamp_only(self, next_start_timestamp: float):
+        """ Jumps to a specific time window
+        """
+        return self.perform_jump_specific_timestamp(next_start_timestamp)
+    
+
     @pyqtExceptionPrintingSlot(float, float)
     def perform_jump_specific_timestamp(self, next_start_timestamp: float, window_duration: float=None):
         """ Jumps to a specific time window (needs window size too)
