@@ -21,8 +21,13 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
     
     Conceptually, DockedWidgets are widgets that initially are docked within the main SpikeRaster2D window (usually as dockItems) and are synchronized with the scrolling of the time window.
      
+    #TODO 2024-12-18 13:57: - [ ] NOTE: compared to `LocalMenus_AddRenderable` this class is not easy to call the menus programmatically :[
     
-    
+    ## 2024-12-18 - Right:
+        _docked_menu_provider: DockedWidgets_MenuProvider = spike_raster_window.main_menu_window.ui.menus.global_window_menus.docked_widgets.menu_provider_obj
+        _docked_menu_provider
+
+    ## Wrong?
     .ui.menus.global_window_menus.debug_menu_provider.top_level_menu
     
     .ui.menus.global_window_menus.docked_widgets.actions_dict
