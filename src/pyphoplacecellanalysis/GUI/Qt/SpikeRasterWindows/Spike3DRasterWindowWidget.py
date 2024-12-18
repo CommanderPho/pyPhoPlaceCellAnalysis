@@ -1277,7 +1277,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         """
         from pyphoplacecellanalysis.GUI.Qt.Menus.PhoMenuHelper import PhoMenuHelper
 
-        return PhoMenuHelper.build_all_programmatic_menu_command_dict(spike_raster_window=spike_raster_window, wants_flat_actions_dict=wants_flat_actions_dict, **kwargs)
+        return PhoMenuHelper.build_all_programmatic_menu_command_dict(spike_raster_window=self, wants_flat_actions_dict=wants_flat_actions_dict, **kwargs)
 
 
 
