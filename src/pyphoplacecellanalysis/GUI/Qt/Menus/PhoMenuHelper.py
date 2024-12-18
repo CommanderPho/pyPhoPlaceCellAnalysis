@@ -430,10 +430,12 @@ class PhoMenuHelper(object):
         return cls.parse_action_name_for_menu_path(action_objname_str=action_objname_str) # ['AddTimeIntervals', 'Laps']
 
     
-    @function_attributes(short_name=None, tags=['menus', 'actions', 'global'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 16:29', related_items=[])
+    @function_attributes(short_name=None, tags=['menus', 'actions', 'global'], input_requires=[], output_provides=[], uses=[], used_by=['build_all_programmatic_menu_command_dict'], creation_date='2024-12-18 16:29', related_items=[])
     @classmethod
-    def build_window_global_menus_dict(cls, active_2d_plot, wants_flat_actions_dict: bool=True) -> Tuple[Dict, Dict[str, QtWidgets.QAction]]:
+    def build_window_global_menus_dict(cls, active_2d_plot, wants_flat_actions_dict: bool=True, valid_menu_names=None, **kwargs) -> Tuple[Dict, Dict[str, QtWidgets.QAction]]:
         """ gets only the window-global menu actions and returns them 
+        
+        valid_menu_names = kwargs.pop('valid_menu_names', ['create_new_connected_widget', 'debug', 'docked_widgets'])
         """
         from neuropy.utils.mixins.indexing_helpers import get_dict_subset
         from neuropy.utils.indexing_helpers import flatten_dict
@@ -497,7 +499,10 @@ class PhoMenuHelper(object):
         # active_2d_plot = self.spike_raster_plt_2d
 
         subset_excludelist = ['menuConnections', 'actions_dict', 'create_linked_widget']
-        valid_menu_names = ['create_new_connected_widget', 'debug', 'docked_widgets'] # 
+        valid_menu_names = kwargs.pop('valid_menu_names', None) # 
+        if valid_menu_names is None:
+            valid_menu_names = ['create_new_connected_widget', 'debug', 'docked_widgets']
+            
 
         ## make sure it's embedded in the window
         # main_menu_window = self.main_menu_window 
@@ -582,9 +587,9 @@ class PhoMenuHelper(object):
 
 
 
-    @function_attributes(short_name=None, tags=['MAIN', 'menus', 'actions'], input_requires=[], output_provides=[], uses=['build_window_global_menus_dict', 'build_programmatic_menu_command_dict'], used_by=[], creation_date='2024-12-18 16:53', related_items=[])
+    @function_attributes(short_name=None, tags=['MAIN', 'menus', 'actions'], input_requires=[], output_provides=[], uses=['build_window_global_menus_dict', 'build_programmatic_menu_command_dict'], used_by=['Spike3DRasterWindowWidget .build_all_menus_dict'], creation_date='2024-12-18 16:53', related_items=[])
     @classmethod
-    def build_all_programmatic_menu_command_dict(cls, spike_raster_window, active_2d_plot=None, wants_flat_actions_dict: bool=True) -> Tuple[Dict, Dict[str, QtWidgets.QAction]]:
+    def build_all_programmatic_menu_command_dict(cls, spike_raster_window, active_2d_plot=None, wants_flat_actions_dict: bool=True, **kwargs) -> Tuple[Dict, Dict[str, QtWidgets.QAction]]:
         """ gets absolutely all of the possible actions (from the menus, both global and context) and returns them 
         
         Usage:
@@ -610,7 +615,7 @@ class PhoMenuHelper(object):
         out_2d_plot_context_menus = cls.build_programmatic_menu_command_dict(active_2d_plot=active_2d_plot, container_format=dict)
         all_global_menus_actionsDict.update(out_2d_plot_context_menus)
 
-        global_action_dict, global_flat_action_dict = cls.build_window_global_menus_dict(active_2d_plot=active_2d_plot, wants_flat_actions_dict=False) # always do false so we can flatten later
+        global_action_dict, global_flat_action_dict = cls.build_window_global_menus_dict(active_2d_plot=active_2d_plot, wants_flat_actions_dict=False, **kwargs) # always do false so we can flatten later
         all_global_menus_actionsDict.update(global_action_dict)
 
         if wants_flat_actions_dict:
