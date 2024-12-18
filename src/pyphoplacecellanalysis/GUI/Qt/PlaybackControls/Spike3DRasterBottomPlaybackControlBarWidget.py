@@ -168,9 +168,10 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
     def on_jump_specified_hour_min_sec(self):
         # time = self.ui.jumpToHourMinSecTimeEdit.time()  # Get the QTime object
         # time_tuple = (time.hour(), time.minute(), time.second(), time.msec())  # Extract as tuple
-        time_fractional_seconds: float = self.time_fractional_seconds # self.total_fractional_seconds(hours=time.hour(), minutes=time.minute(), seconds=time.second(), milliseconds=time.msec())
-        print(f'time_fractional_seconds: {time_fractional_seconds}')
-        self.jump_specific_time.emit(time_fractional_seconds)
+        # time_fractional_seconds: float = self.time_fractional_seconds # self.total_fractional_seconds(hours=time.hour(), minutes=time.minute(), seconds=time.second(), milliseconds=time.msec())
+        # print(f'time_fractional_seconds: {time_fractional_seconds}')
+        # self.jump_specific_time.emit(time_fractional_seconds)
+        self.on_jump_time_editing_finished()
         
     
     def on_reverse_held(self):
@@ -419,11 +420,23 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
         self.ui.btnJumpToSpecifiedTime.clicked.connect(self.on_jump_specified_hour_min_sec)
 
         # Connect signals to handle focus and editing states
-        self.ui.jumpToHourMinSecTimeEdit.editingFinished.connect(self.set_jump_time_light_grey_style)
+        self.ui.jumpToHourMinSecTimeEdit.editingFinished.connect(self.on_jump_time_editing_finished)
         self.ui.jumpToHourMinSecTimeEdit.installEventFilter(self)
         
         
 
+    def on_jump_time_editing_finished(self):
+        """Editing of the time has finished """
+        time_fractional_seconds: float = self.time_fractional_seconds # self.total_fractional_seconds(hours=time.hour(), minutes=time.minute(), seconds=time.second(), milliseconds=time.msec())
+        print(f'time_fractional_seconds: {time_fractional_seconds}')
+        
+        self.ui.jumpToHourMinSecTimeEdit.clearFocus()
+        self.set_jump_time_light_grey_style()
+
+        ## emit the event
+        self.jump_specific_time.emit(time_fractional_seconds)
+        
+        
 
     def set_jump_time_light_grey_style(self):
         """Set the light grey inactive style."""
@@ -448,6 +461,13 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
                 self.set_jump_time_white_style()
             elif event.type() == event.FocusOut:
                 self.set_jump_time_light_grey_style()
+                
+        elif source == self.time_edit and event.type() == event.KeyPress:
+            # """Handle Enter key to finalize and lose focus."""
+            if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+                self.time_edit.clearFocus()  # Finalize and lose focus
+                return True  # Mark event as handled
+            
         return super().eventFilter(source, event)
     
 

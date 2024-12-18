@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Dict
+from typing import Dict, Tuple
 import numpy as np
 
 from qtpy import QtCore, QtWidgets, QtGui
