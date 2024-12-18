@@ -11,7 +11,7 @@ def initialize_global_menu_ui_variables_if_needed(a_main_window):
     """ 
     sets up a_main_window.ui.menus.global_window_menus as needed for the menu providers if needed
     """
-    return PhoMenuHelper.initialize_global_menu_ui_variables_if_needed(a_main_window)
+    return PhoMenuHelper.initialize_global_menu_ui_variables_if_needed(a_main_window) # sets up `global_action_history_list`
     
 
 @define(slots=False)
@@ -116,7 +116,8 @@ class BaseMenuProviderMixin(QtCore.QObject):
     def __init__(self, render_widget: QtWidgets.QWidget, parent=None, **kwargs):
         """ the __init__ form allows adding menus to extant widgets without modifying their class to inherit from this mixin """
         super(BaseMenuProviderMixin, self).__init__(parent)
-        
+        self.top_level_menu_name = kwargs.get('top_level_menu_name', self.__class__.top_level_menu_name)
+        self.action_name = kwargs.get('action_name', self.__class__.action_name)
         # Setup member variables:
         # Assumes that self is a QWidget subclass:
         self._render_widget = render_widget # do we really need a reference to this?
