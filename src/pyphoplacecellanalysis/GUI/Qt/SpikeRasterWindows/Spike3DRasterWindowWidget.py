@@ -1264,9 +1264,96 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
         # Display the sidebar:
         self.set_right_sidebar_visibility(is_visible=True)
-    
 
 
+    @function_attributes(short_name=None, tags=['menus', 'actions'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 16:29', related_items=[])
+    def build_all_menus_dict(self, wants_flat_actions_dict: bool=True) -> Tuple[Dict, Dict[str, QtWidgets.QAction]]:
+        """ gets absolutely all of the possible actions (from the menus, both global and context) and returns them 
+        """
+        from pyphoplacecellanalysis.GUI.Qt.Menus.SpecificMenus.DockedWidgets_MenuProvider import DockedWidgets_MenuProvider
+        from neuropy.utils.mixins.indexing_helpers import get_dict_subset
+        from neuropy.utils.indexing_helpers import flatten_dict
+        from pyphoplacecellanalysis.GUI.Qt.Menus.PhoMenuHelper import PhoMenuHelper
+        from benedict import benedict
+        from pyphocorehelpers.programming_helpers import VariableNameCaseFormat        
+
+        def _subfn_extract_command_dict(actions_dict, debug_print=True, should_split_on_underscore:bool=False, max_end_splits: int = 1) -> Tuple[Dict[str, QtWidgets.QAction], List[str]]:
+            """ Builds a dict of QActions from each menu item in `active_2d_plot.ui.menus.custom_context_menus.add_renderables`
+
+            Usage:
+                active_2d_plot_renderable_menus = active_2d_plot.ui.menus.custom_context_menus.add_renderables
+                # widget, renderable_menu, (submenu_addTimeIntervals, submenu_addTimeIntervalCallbacks, submenu_addTimeIntervals_Connections)
+                widget, renderable_menu, *specific_tuples_list, = active_2d_plot_renderable_menus
+
+            """
+            out_command_dict = benedict()
+            out_menu_paths = []
+            for specific_action_name, specific_action in actions_dict.items():
+                # extracted_menu_path = PhoMenuHelper.parse_QAction_for_menu_path(specific_action)
+                extracted_menu_path = PhoMenuHelper.parse_action_name_for_menu_path(specific_action_name)
+                extracted_menu_path = specific_action_name.removeprefix('action').split('.')
+                extracted_menu_path = [v.removeprefix('action') for v in extracted_menu_path]
+                if debug_print:
+                    print(f'specific_action_name: "{specific_action_name}"')
+                    print(f'\textracted_menu_path: "{extracted_menu_path}"')
+                    
+
+                extracted_menu_path[0] = VariableNameCaseFormat.convert_format(extracted_menu_path[0], target_format=VariableNameCaseFormat.CAMEL_CASE)
+                if debug_print:
+                    print(f'\textracted_menu_path[0]: "{extracted_menu_path[0]}"')
+
+                if should_split_on_underscore:
+                    ## split only the last component
+                    last_comp: str = extracted_menu_path[-1]
+                    if '_' in last_comp:
+                        last_comp_split = last_comp.split('_') ## only split the last component
+                        last_comp_split = ['_'.join(last_comp_split[:(-max_end_splits)]), *last_comp_split[(-max_end_splits):]]
+                        last_comp_split = [v for v in last_comp_split if len(v)>0]
+                        if debug_print:
+                            print(f'\tlast_comp: {last_comp}')
+                            print(f'\tlast_comp_split: {last_comp_split}')
+                        extracted_menu_path = extracted_menu_path[:-1] + last_comp_split
+                        ## otherwise it is unchanged
+
+                if debug_print:
+                    print(f'\textracted_menu_path: "{extracted_menu_path}"')
+
+                out_menu_paths.append(extracted_menu_path)
+                dot_separated_extracted_menu_path: str = '.'.join(extracted_menu_path)
+                
+                out_command_dict[dot_separated_extracted_menu_path] = specific_action # have to use a string keypath because `out_command_dict[*extracted_menu_path]` is not allowed
+
+            if debug_print:
+                print(out_menu_paths) # list<list<str>>: [['AddTimeIntervals', 'Laps'], ['AddTimeIntervals', 'PBEs'], ['AddTimeIntervals', 'Session', 'Epochs'], ['AddTimeIntervals', 'Ripples'], ['AddTimeIntervals', 'Replays'], ['AddTimeIntervals', 'Custom'], ['AddTimeCurves', 'Position'], ['AddTimeCurves', 'Random'], ['AddTimeCurves', 'Custom'], ['AddMatplotlibPlot', 'DecodedPosition'], ['AddMatplotlibPlot', 'Custom']]
+                # out_command_dict.keys() # dict_keys(['AddTimeIntervals', 'AddTimeCurves', 'AddMatplotlibPlot'])
+                print(out_command_dict.keypaths()) # ['AddMatplotlibPlot', 'AddMatplotlibPlot.Custom', 'AddMatplotlibPlot.DecodedPosition', 'AddTimeCurves', 'AddTimeCurves.Custom', 'AddTimeCurves.Position', 'AddTimeCurves.Random', 'AddTimeIntervals', 'AddTimeIntervals.Custom', 'AddTimeIntervals.Laps', 'AddTimeIntervals.PBEs', 'AddTimeIntervals.Replays', 'AddTimeIntervals.Ripples', 'AddTimeIntervals.Session', 'AddTimeIntervals.Session.Epochs']
+            return out_command_dict, out_menu_paths
+
+
+        # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+        all_global_menus_actionsDict = {}
+        # active_2d_plot.activeMenuReference
+        # active_2d_plot.ui.menus # .global_window_menus.docked_widgets.actions_dict
+        
+        active_2d_plot = self.spike_raster_plt_2d
+        out_2d_plot_context_menus = PhoMenuHelper.build_programmatic_menu_command_dict(active_2d_plot=active_2d_plot, container_format=dict)
+        all_global_menus_actionsDict.update(out_2d_plot_context_menus)
+
+        subset_excludelist = ['menuConnections', 'actions_dict', 'create_linked_widget']
+        valid_menu_names = ['create_new_connected_widget', 'debug', 'docked_widgets'] # 
+
+        active = get_dict_subset(self.main_menu_window.ui.menus.global_window_menus.to_dict(), subset_includelist=valid_menu_names)
+        global_action_dict: Dict[str, QtWidgets.QAction] = flatten_dict({k:v.actions_dict for k, v in active.items()}, sep='.')
+        # global_action_dict, out_menu_paths = _subfn_extract_command_dict(global_action_dict, debug_print=False)
+        global_action_dict, out_menu_paths = _subfn_extract_command_dict(global_action_dict, debug_print=False, should_split_on_underscore=True)
+        all_global_menus_actionsDict.update(global_action_dict)
+
+        if wants_flat_actions_dict:
+            global_flat_action_dict: Dict[str, QtWidgets.QAction] = flatten_dict({k:v for k, v in all_global_menus_actionsDict.items()}, sep='.')
+        else:
+            global_flat_action_dict = None
+            
+        return all_global_menus_actionsDict, global_flat_action_dict
 
 
 
