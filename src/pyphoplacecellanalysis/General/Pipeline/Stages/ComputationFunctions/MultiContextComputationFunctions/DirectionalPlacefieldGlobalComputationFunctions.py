@@ -7411,6 +7411,7 @@ class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
 	_context = field(default=None, alias="active_context")
 	_display_output = field(default=Factory(dict))
 
+	@function_attributes(short_name=None, tags=['row', 'posterior'], input_requires=[], output_provides=[], uses=['add_new_matplotlib_render_plot_widget'], used_by=[], creation_date='2024-12-18 08:53', related_items=[])
 	@classmethod
 	def _perform_add_new_decoded_posterior_row(cls, curr_active_pipeline, active_2d_plot, a_dock_config, a_decoder_name: str, a_pseudo2D_decoder, time_window_centers, a_1D_posterior):
 		""" used with `add_pseudo2D_decoder_decoded_epochs` - adds a single decoded row to the matplotlib dynamic output
