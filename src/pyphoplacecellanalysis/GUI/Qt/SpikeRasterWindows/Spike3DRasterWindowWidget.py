@@ -350,11 +350,15 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.series_customize_pressed.connect(self.perform_interval_series_customize_item))
             self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.series_clear_all_pressed.connect(self.perform_interval_series_clear_all))
             self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.series_add_pressed.connect(self.perform_interval_series_request_add))
-
-
-            ## sigEmbeddedMatplotlibDockWidgetAdded
+            
+            self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.jump_specific_time.connect(self.perform_jump_specific_timestamp_only))
+            # self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.jump_specific_time.connect(self.update_animation)
+            # self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.jump_specific_time.connect((lambda new_time: self.update_animation(new_time))))
             self.ui.bottom_bar_connections.append(self.ui.spike_raster_plt_2d.sigEmbeddedMatplotlibDockWidgetAdded.connect(lambda spike_raster_plt_2D, added_dock_item, added_widget: self.update_scrolling_event_filters())) ## not really a bottom_bar_connections, but who cares
                         
+            # ## update the jump time when it scrolls
+            # self.ui.bottomPlaybackControlBarWidget.time_fractional_seconds
+            
             ## update the dynamic event filters if needed
             self.update_scrolling_event_filters()
             
@@ -771,6 +775,18 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             print(f'Spike3DRasterWindowWidget.on_window_duration_changed(start_t: {start_t}, end_t: {end_t}, duration: {duration})')
         # TODO 2023-03-29 19:03: - [ ] Shouldn't this at least update the plots like on_window_changed does? I know duration changing is more involved than just start_t changing.
 
+    @pyqtExceptionPrintingSlot(float)
+    def on_window_start_changed(self, start_t):
+        # called when the window is updated
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.on_window_start_changed(start_t: {start_t})')
+        if self.enable_debug_print:
+            profiler = pg.debug.Profiler(disabled=True, delayed=True)
+        self._update_plots()
+        self.SpikeRasterBottomFrameControlsMixin_on_window_update(start_t, None)
+        if self.enable_debug_print:
+            profiler('Finished calling _update_plots()')
+
 
     @pyqtExceptionPrintingSlot(float, float)
     def on_window_changed(self, start_t, end_t):
@@ -959,6 +975,26 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # If not a particularlly handled case, do the default thing.
         return super().eventFilter(watched, event)
     
+
+    @function_attributes(short_name=None, tags=['TODO', 'ACTIVE', 'programmatic', 'scrolling', 'time'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 12:09', related_items=[])
+    def programmatically_scroll_to_time(self, new_time):
+        numSteps: int = 3
+        updatedNumScheduledScalings = self._scheduledAnimationSteps + numSteps
+        if (updatedNumScheduledScalings * numSteps < 0):
+            updatedNumScheduledScalings = numSteps # if user moved the wheel in another direction, we reset previously scheduled scalings
+        
+        if self.enable_smooth_scrolling_animation:
+            ## QTimeline version:
+            self._scheduledAnimationSteps = updatedNumScheduledScalings # Set the updated number of scalings:
+            self.ui.scrollAnimTimeline.setEndFrame(self._scheduledAnimationSteps)
+            self.ui.scrollAnimTimeline.start() # Start the timeline's animation event
+        else:
+            # No animation, just update directly ("old way")
+            self._scheduledAnimationSteps = updatedNumScheduledScalings
+            self.shift_animation_frame_val(self._scheduledAnimationSteps)
+            self._scheduledAnimationSteps = 0 # New method: zero it out instead of having it compound
+
+
     
     ##-----------------------------------------
     def wheelEvent(self, event):

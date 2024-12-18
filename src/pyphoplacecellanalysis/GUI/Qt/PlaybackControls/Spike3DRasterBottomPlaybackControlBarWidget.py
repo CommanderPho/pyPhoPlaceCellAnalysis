@@ -9,7 +9,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets, uic
 from PyQt5.QtWidgets import QMessageBox, QToolTip, QStackedWidget, QHBoxLayout, QVBoxLayout, QSplitter, QFormLayout, QLabel, QFrame, QPushButton, QTableWidget, QTableWidgetItem
 from PyQt5.QtWidgets import QApplication, QFileSystemModel, QTreeView, QWidget, QHeaderView
 from PyQt5.QtGui import QPainter, QBrush, QPen, QColor, QFont, QIcon
-from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlot, QSize, QDir
+from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlot, QSize, QDir, QTime
 
 ## IMPORTS:
 # from ...pyPhoPlaceCellAnalysis.src.pyphoplacecellanalysis.GUI.Qt.PlaybackControls import Spike3DRasterBottomPlaybackControlBar
@@ -45,6 +45,10 @@ btnJumpToNext
 btnCurrentIntervals_Remove
 btnCurrentIntervals_Customize
 
+
+btnJumpToSpecifiedTime
+jumpToHourMinSecTimeEdit
+
 """
 
 
@@ -60,6 +64,8 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
     jump_target_left = QtCore.pyqtSignal(str)
     jump_target_right = QtCore.pyqtSignal(str)
     jump_series_selection_changed = QtCore.pyqtSignal(str)
+    
+    jump_specific_time = QtCore.pyqtSignal(float)
     
     # Series Target Actions
     series_remove_pressed = QtCore.pyqtSignal(str)    
@@ -107,6 +113,8 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
         
         self.ui.btnLeft.clicked.connect(self.on_jump_left)
         self.ui.btnRight.clicked.connect(self.on_jump_right)
+        self.ui.btnJumpToSpecifiedTime.clicked.connect(self.on_jump_specified_hour_min_sec)
+
 
         ## Remove Extra Buttons:
         self.ui.btnSkipLeft.hide()
@@ -150,13 +158,21 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
         self.jump_left.emit()
         # self.shift_animation_frame_val(-5)
         pass
-        
+
     def on_jump_right(self):
         # Skip forward some frames
         self.jump_right.emit()
         # self.shift_animation_frame_val(5)
         pass        
 
+    def on_jump_specified_hour_min_sec(self):
+        # time = self.jumpToHourMinSecTimeEdit.time()  # Get the QTime object
+        # time_tuple = (time.hour(), time.minute(), time.second(), time.msec())  # Extract as tuple
+        time_fractional_seconds: float = self.time_fractional_seconds # self.total_fractional_seconds(hours=time.hour(), minutes=time.minute(), seconds=time.second(), milliseconds=time.msec())
+        print(f'time_fractional_seconds: {time_fractional_seconds}')
+        self.jump_specific_time.emit(time_fractional_seconds)
+        
+    
     def on_reverse_held(self):
         # Change the direction of playback by changing the sign of the updating.
         # if button is checked    
@@ -183,6 +199,59 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
     # @property
     # def combo_jump_target_series(self):
     #     return self.ui.comboActiveJumpTargetSeries
+
+    @classmethod
+    def total_fractional_seconds(cls, hours: int = 0, minutes: int = 0, seconds: int = 0, milliseconds: int = 0) -> float:
+        """ reciprocal of `.decompose_fractional_seconds(...)`
+        Calculate total fractional seconds from hours, minutes, seconds, and milliseconds.
+
+        Args:
+            hours (int): Number of hours (default: 0).
+            minutes (int): Number of minutes (default: 0).
+            seconds (int): Number of seconds (default: 0).
+            milliseconds (int): Number of milliseconds (default: 0).
+
+        Returns:
+            float: Total time in fractional seconds.
+        """
+        return (hours * 3600) + (minutes * 60) + seconds + (milliseconds / 1000)
+
+    @classmethod
+    def decompose_fractional_seconds(cls, total_seconds: float) -> tuple[int, int, int, int]:
+        """ reciprocal of `.total_fractional_seconds(...)`
+        Decompose total fractional seconds into hours, minutes, seconds, and milliseconds.
+
+        Args:
+            total_seconds (float): Total time in fractional seconds.
+
+        Returns:
+            tuple[int, int, int, int]: A tuple containing hours, minutes, seconds, and milliseconds.
+        """
+        hours = int(total_seconds // 3600)
+        total_seconds %= 3600
+        minutes = int(total_seconds // 60)
+        total_seconds %= 60
+        seconds = int(total_seconds)
+        milliseconds = int((total_seconds - seconds) * 1000)
+        return hours, minutes, seconds, milliseconds
+
+
+    @property
+    def time_fractional_seconds(self) -> float:
+        """The time_fractional_seconds property."""
+        time = self.jumpToHourMinSecTimeEdit.time()  # Get the QTime object
+        # time_tuple = (time.hour(), time.minute(), time.second(), time.msec())  # Extract as tuple
+        time_fractional_seconds: float = self.total_fractional_seconds(hours=time.hour(), minutes=time.minute(), seconds=time.second(), milliseconds=time.msec())
+        return time_fractional_seconds
+    
+    @time_fractional_seconds.setter
+    def time_fractional_seconds(self, value):
+        time_tuple = self.decompose_fractional_seconds(value)
+        assert len(time_tuple) == 4
+        # Create a QTime object from the tuple
+        time_obj = QTime(time_tuple[0], time_tuple[1], time_tuple[2], time_tuple[3])
+        # Set the QTimeEdit's time
+        self.time_edit.setTime(time_obj)
 
     @property
     def current_selected_jump_target_series_name(self):
@@ -420,6 +489,7 @@ class SpikeRasterBottomFrameControlsMixin:
     def SpikeRasterBottomFrameControlsMixin_on_window_update(self, new_start=None, new_end=None):
         """ called to perform updates when the active window changes. Redraw, recompute data, etc. """
         # Called the Implementor's update_window(...) function
+        print(f'SpikeRasterBottomFrameControlsMixin_on_window_update(new_start: {new_start}, new_end: {new_end}')
         #TODO 2023-11-21 18:49: - [ ] Doesn't work :[
         # need to block signals:
         # doubleSpinBox_ActiveWindowStartTime.blockSignals(True)
@@ -430,6 +500,12 @@ class SpikeRasterBottomFrameControlsMixin:
         #     self.ui.doubleSpinBox_ActiveWindowEndTime.setValue(new_end)
         # doubleSpinBox_ActiveWindowStartTime.blockSignals(False) # unblock the signals when done
         # doubleSpinBox_ActiveWindowEndTime.blockSignals(False)
+        if new_start is not None:
+            ## update the jump time when it scrolls
+            ## should rate-limit it:
+            # self.time_fractional_seconds = new_start
+            pass
+        
         pass
     
     # ## Update Functions:
