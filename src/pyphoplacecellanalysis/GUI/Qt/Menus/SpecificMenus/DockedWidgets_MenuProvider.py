@@ -41,6 +41,7 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
         2. Via initializing via the __init__(...) method
     
     """
+    action_name = 'DockedWidgets'
     top_level_menu_name = 'actionMenuDockedWidgets'
     
     @property

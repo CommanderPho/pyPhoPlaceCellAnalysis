@@ -30,8 +30,10 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         2. Via initializing via the __init__(...) method
     
     """
+    action_name = 'CreateLinkedWidget'
     top_level_menu_name = 'actionMenuCreateLinkedWidget'
-    
+
+
     @property
     def activeMenuReference(self):
         """The reference to the top-level PhoUIContainer for this menu where references are stored to the ui elements and their actions."""
