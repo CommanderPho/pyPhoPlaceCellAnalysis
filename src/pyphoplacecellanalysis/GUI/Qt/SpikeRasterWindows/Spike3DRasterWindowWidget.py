@@ -1176,9 +1176,140 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
 
 if __name__ == "__main__":
+    """ 
+            assert global_data_root_parent_path.exists(), f"global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
+        ## Build Pickle Path:
+        finalized_loaded_global_batch_result_pickle_path = Path(global_data_root_parent_path).joinpath(active_global_batch_result_filename).resolve() # Use Default
+
+
+        # BEGIN FUNCTION BODY
+        global_batch_run = _try_load_global_batch_result()
+    
+        
+        
+        & c:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv/Scripts/python.exe c:/Users/pho/repos/Spike3DWorkEnv/pyPhoPlaceCellAnalysis/src/pyphoplacecellanalysis/GUI/Qt/SpikeRasterWindows/Spike3DRasterWindowWidget.py
+        
+        & c:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv/Scripts/python.exe c:/Users/pho/repos/Spike3DWorkEnv/pyPhoPlaceCellAnalysis/src/pyphoplacecellanalysis/GUI/Qt/SpikeRasterWindows/Spike3DRasterWindowWidget.py
+        
+        # [--multiprocess] [--show-pqi-stack]
+        & c:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv/Scripts/python.exe -m PyQtInspect --direct --qt-support=pyqt5 --file c:/Users/pho/repos/Spike3DWorkEnv/pyPhoPlaceCellAnalysis/src/pyphoplacecellanalysis/GUI/Qt/SpikeRasterWindows/Spike3DRasterWindowWidget.py
+    """
+    import argparse
     import sys
+    from pathlib import Path
+    from typing import Optional, List, Dict
+    from neuropy.utils.result_context import IdentifyingContext
+    from pyphocorehelpers.assertion_helpers import Assert
+    from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData
+    from pyphocorehelpers.Filesystem.path_helpers import set_posix_windows
+    from pyphoplacecellanalysis.GUI.Qt.Widgets.DebugWidgetStylesheetInspector import ConnectStyleSheetInspector
+    from pyphoplacecellanalysis.General.Batch.runBatch import BatchRun, BatchResultDataframeAccessor, run_diba_batch, SessionBatchProgress, main
+    from PyQt5.QtCore import Qt
+    from PyQt5.QtGui import QKeySequence
+
+    def _subfn_run_main(pkl_path, debug_print:bool=True):
+        """ run main function to perform batch processing. """
+        
+        print(f'pkl_path: {pkl_path}')
+        
+        def _try_load_global_batch_result():
+            if debug_print:
+                print(f'pkl_path: {pkl_path}')
+            # try to load an existing batch result:
+            try:
+                curr_active_pipeline = loadData(pkl_path, debug_print=debug_print)
+                
+            except NotImplementedError:
+                # Fixes issue with pickled POSIX_PATH on windows for path.                    
+                with set_posix_windows():
+                    curr_active_pipeline = loadData(pkl_path, debug_print=debug_print) # Fails this time if it still throws an error
+
+            except (FileNotFoundError, TypeError):
+                # loading failed
+                print(f'Failure loading {pkl_path}.')
+                curr_active_pipeline = None
+                
+            return curr_active_pipeline
+        
+        curr_active_pipeline = _try_load_global_batch_result()
+        assert curr_active_pipeline is not None
+        print(f'loaded `curr_active_pipeline`, building Spike3DRasterWindowWidget...')
+        # Gets the existing SpikeRasterWindow or creates a new one if one doesn't already exist:
+        spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget) = Spike3DRasterWindowWidget.find_or_create_if_needed(curr_active_pipeline, force_create_new=True)
+        print(f'built `Spike3DRasterWindowWidget`, launching...')
+        
+        # included_session_contexts: Optional[List[IdentifyingContext]] = [IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='one',session_name='2006-6-08_14-26-15'),
+        #     IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='one',session_name='2006-6-09_1-22-43'),
+        #     IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='one',session_name='2006-6-12_15-55-31'),
+        #     IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='two',session_name='2006-6-07_16-40-19'),
+        #     IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='two',session_name='2006-6-08_21-16-25'),
+        #     IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='two',session_name='2006-6-09_22-24-40'),
+        #     IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='two',session_name='2006-6-12_16-53-46'),
+        #     IdentifyingContext(format_name='kdiba',animal='vvp01',exper_name='one',session_name='2006-4-09_17-29-30'),
+        #     IdentifyingContext(format_name='kdiba',animal='vvp01',exper_name='one',session_name='2006-4-10_12-25-50'),
+        #     IdentifyingContext(format_name='kdiba',animal='vvp01',exper_name='two',session_name='2006-4-09_16-40-54'),
+        #     IdentifyingContext(format_name='kdiba',animal='vvp01',exper_name='two',session_name='2006-4-10_12-58-3'),
+        #     IdentifyingContext(format_name='kdiba',animal='pin01',exper_name='one',session_name='11-02_17-46-44'),
+        #     IdentifyingContext(format_name='kdiba',animal='pin01',exper_name='one',session_name='11-02_19-28-0'),
+        #     IdentifyingContext(format_name='kdiba',animal='pin01',exper_name='one',session_name='11-03_12-3-25'),
+        #     IdentifyingContext(format_name='kdiba',animal='pin01',exper_name='one',session_name='fet11-01_12-58-54')]
+
+
+        # global_batch_run, result_handler, across_sessions_instantaneous_fr_dict, output_filenames_tuple = main(active_result_suffix=active_result_suffix, 
+        #                                                                                                     included_session_contexts=included_session_contexts,
+        #                                                                                                     num_processes=num_processes, 
+        #                                                                                                     should_force_reload_all=should_force_reload_all, 
+        #                                                                                                     should_perform_figure_generation_to_file=should_perform_figure_generation_to_file, 
+        #                                                                                                     debug_print=debug_print)
+        return spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget), curr_active_pipeline
+        
+
+    """ Usage:
+    
+    python scripts/runSingleBatch.py --active_result_suffix "2023-08-08_bApogee" --num_processes 4 --should_force_reload_all --debug_print
+    python scripts/runSingleBatch.py --active_result_suffix "2023-08-08_LNX00052" --num_processes 4 --should_force_reload_all --debug_print
+    
+    --should_perform_figure_generation_to_file
+    --should_perform_figure_generation_to_file
+    
+    """
+    # parser = argparse.ArgumentParser(description='Perform batch processing.')
+    # parser.add_argument('--active_result_suffix', required=True, help='Suffix used for filenames throughout the notebook.')
+    # parser.add_argument('--num_processes', type=int, default=1, help='Number of processes to use.')
+    # parser.add_argument('--should_force_reload_all', action='store_true', help='Force reload all data.')
+    # parser.add_argument('--should_perform_figure_generation_to_file', action='store_true', help='Perform figure generation to file.')
+    # parser.add_argument('--debug_print', action='store_true', help='Enable debug printing.')
+
+    # args = parser.parse_args()
+    
+    pkl_path = Path('W:/Data/KDIBA/gor01/one/2006-6-09_1-22-43/loadedSessPickle.pkl')
+    Assert.path_exists(pkl_path)
+
     app = QtWidgets.QApplication(sys.argv)
-    testWidget = Spike3DRasterWindowWidget()
+    # Define stylesheet
+    app.setStyleSheet("""
+        VContainer {
+            background-color: #00e1ff; /* Light gray background */
+            color: #ff0095;           /* Text color */
+            border: 1px solid #4400ff; /* Border around the container */
+        }
+        VContainer QLabel {
+            color: #ffd000; /* Red text inside VContainer's labels */
+        }
+        QSplitter::handle { height: 2px; width: 2px; }
+    """)
+
+    # testWidget = Spike3DRasterWindowWidget()
+
+    ## Loads `curr_active_pipeline` from the provided path
+    spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget), curr_active_pipeline = _subfn_run_main(pkl_path)
+    spike_raster_window.show()
+
     # testWidget.show()
+    
+    print(f'waiting...')
+    # ConnectStyleSheetInspector(main_window=spike_raster_window, shortcut=QKeySequence(Qt.CTRL + Qt.SHIFT + Qt.Key_F12)) # Connects the global stylesheet inspector to the window
+
+
     sys.exit(app.exec_())
 
