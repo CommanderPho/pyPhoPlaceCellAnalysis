@@ -1484,6 +1484,9 @@ def _build_additional_spikeRaster2D_menus(spike_raster_plt_2d, owning_pipeline_r
     # _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.add_renderable_context_menu(spike_raster_window.spike_raster_plt_2d, computation_result.sess)  # Adds the custom context menus for SpikeRaster2D
     
     _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.add_renderable_context_menu(spike_raster_plt_2d, owning_pipeline_reference, active_config_name)  # Adds the custom context menus for SpikeRaster2D
+    
+    spike_raster_plt_2d.menu_action_history_list = []
+    
     output_references = [_active_2d_plot_renderable_menus]
     return output_references
 
@@ -1495,6 +1498,8 @@ def _build_additional_window_menus(spike_raster_window, owning_pipeline_referenc
 
     ## SpikeRaster2D Specific Items:
     output_references = _build_additional_spikeRaster2D_menus(spike_raster_window.spike_raster_plt_2d, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx)
+
+    spike_raster_window.menu_action_history_list = []
 
     ## Note that curr_main_menu_window is usually not the same as spike_raster_window, instead curr_main_menu_window wraps it and produces the final output window
     curr_main_menu_window, menuConnections, connections_actions_dict = ConnectionControlsMenuMixin.try_add_connections_menu(spike_raster_window)

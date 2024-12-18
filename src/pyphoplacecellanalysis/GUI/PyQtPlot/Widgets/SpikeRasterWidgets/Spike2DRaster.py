@@ -35,7 +35,7 @@ from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import debug_print_QRe
 from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeEmphasisState # required for the different emphasis states in ._build_cell_configs()
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig 
-
+from pyphoplacecellanalysis.GUI.Qt.Menus.PhoMenuHelper import PhoMenuHelper
 
 from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum
 
@@ -185,6 +185,18 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     # END unit_sort_order                                                                                                  #
     # ==================================================================================================================== #
 
+
+
+    @property
+    def menu_action_history_list(self) -> List:
+        """The menu_action_history_list property."""
+        # return self.ui.menus._menu_action_history_list # 2DRaster
+        return PhoMenuHelper.try_get_menu_window(self).ui.menus._menu_action_history_list  # Window?
+    @menu_action_history_list.setter
+    def menu_action_history_list(self, value):
+        # self.ui.menus._menu_action_history_list = value
+        PhoMenuHelper.try_get_menu_window(self).ui.menus._menu_action_history_list = value
+        
 
 
     def __init__(self, params=None, spikes_window=None, playback_controller=None, neuron_colors=None, neuron_sort_order=None, application_name=None, **kwargs):
