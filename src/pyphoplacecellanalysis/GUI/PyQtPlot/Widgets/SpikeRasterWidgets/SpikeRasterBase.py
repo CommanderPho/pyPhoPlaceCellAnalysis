@@ -99,7 +99,8 @@ self._update_plots()
 def trap_exc_during_debug(*args):
     # when app raises uncaught exception, print info
     print(args)
-    _GLOBAL_spike_raster_logger.error(f'in trap_exc_during_debug(*args: {args})\n this was installed as the sys.excepthook in SpikeRasterBase above the main class.')
+    if _GLOBAL_spike_raster_logger is not None:
+        _GLOBAL_spike_raster_logger.error(f'in trap_exc_during_debug(*args: {args})\n this was installed as the sys.excepthook in SpikeRasterBase above the main class.')
 
 # install exception hook: without this, uncaught exception would cause application to exit
 sys.excepthook = trap_exc_during_debug
