@@ -382,18 +382,21 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         
         self.ui.main_content_splitter = pg.QtWidgets.QSplitter(0)
         self.ui.main_content_splitter.setObjectName('main_content_splitter')
+        # self.ui.main_content_splitter.setHandleWidth(10)
         self.ui.main_content_splitter.setHandleWidth(10)
         self.ui.main_content_splitter.setOrientation(0) # pg.Qt.Vertical
         # Qt.Horizontal
+
+        #TODO 2024-12-19 09:18: - [ ] This is where the handles become huge and RED!!
         self.ui.main_content_splitter.setStyleSheet("""
                 QSplitter::handle {
                     background: rgb(255, 0, 4);
                 }
                 QSplitter::handle:horizontal {
-                    width: 15px;
+                    width: 8px;
                 }
                 QSplitter::handle:vertical {
-                    height: 15px;
+                    height: 8px;
                 }
             """)
 
@@ -1161,7 +1164,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     def add_new_matplotlib_render_plot_widget(self, row=1, col=0, name='matplotlib_view_widget', dockSize=(500,50), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None) -> Tuple[MatplotlibTimeSynchronizedWidget, Figure, List[Axis]]:
         """ creates a new dynamic MatplotlibTimeSynchronizedWidget, a container widget that holds a matplotlib figure, and adds it as a row to the main layout
         
-        emit and event so the parent can call `self.update_scrolling_event_filters()` to add the new item
+        emit an event so the parent can call `self.update_scrolling_event_filters()` to add the new item
         
         """
         dDisplayItem = self.ui.dynamic_docked_widget_container.find_display_dock(identifier=name) # Dock
@@ -1171,13 +1174,10 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             self.ui.matplotlib_view_widgets[name] = MatplotlibTimeSynchronizedWidget(name=name) # Matplotlib widget directly
             self.ui.matplotlib_view_widgets[name].setObjectName(name)
             self.ui.matplotlib_view_widgets[name].plots.fig.subplots_adjust(top=1.0, bottom=0.0, left=0.0, right=1.0, hspace=0.0, wspace=0.0)
-            
-
 
             ## Enable scrollability
             self.ui.matplotlib_view_widgets[name].installEventFilter(self)
             
-
             ## Add directly to the main grid layout:
             # self.ui.layout.addWidget(self.ui.matplotlib_view_widget, row, col)
             
