@@ -1,7 +1,7 @@
 from copy import deepcopy
 from typing import Dict, Tuple
 import numpy as np
-
+import pandas as pd
 from qtpy import QtCore, QtWidgets, QtGui
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
@@ -1304,6 +1304,16 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         from pyphoplacecellanalysis.GUI.Qt.Menus.PhoMenuHelper import PhoMenuHelper
 
         return PhoMenuHelper.build_all_programmatic_menu_command_dict(spike_raster_window=self, wants_flat_actions_dict=wants_flat_actions_dict, **kwargs)
+
+
+    @function_attributes(short_name=None, tags=['event', 'intervals', 'epochs', 'window', 'active-window'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-19 11:31', related_items=[])
+    def find_event_intervals_in_active_window(self, included_series_names: Optional[List[str]]=None) -> Dict[str, pd.DataFrame]:
+        """find the events/intervals that are within the currently active render window:
+        Usage:
+            included_series_names=['Replays', 'Laps', 'PBEs']
+            active_2d_plot.find_event_intervals_in_active_window(included_series_names=included_series_names)
+        """
+        return self.spike_raster_plt_2d.find_event_intervals_in_active_window(included_series_names=included_series_names, debug_print=False)
 
 
 

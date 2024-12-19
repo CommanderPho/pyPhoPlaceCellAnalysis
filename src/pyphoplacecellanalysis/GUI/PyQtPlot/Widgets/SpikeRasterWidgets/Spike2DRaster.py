@@ -5,6 +5,15 @@ import sys
 from indexed import IndexedOrderedDict
 from matplotlib.axis import Axis
 from matplotlib.figure import Figure
+
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any, NewType, TypeVar
+from typing_extensions import TypeAlias
+from nptyping import NDArray
+import neuropy.utils.type_aliases as types
+import numpy as np
+import pandas as pd
+from neuropy.utils.mixins.indexing_helpers import get_dict_subset
+
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyphocorehelpers.programming_helpers import metadata_attributes
@@ -718,6 +727,30 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         self.update(sort_changed=False, colors_changed=True)
         
         
+    @function_attributes(short_name=None, tags=['epoch', 'interval', 'find', 'window'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-19 11:11', related_items=[])
+    def find_event_intervals_in_active_window(self, included_series_names: Optional[List[str]]=None, debug_print=False) -> Dict[str, pd.DataFrame]:
+        """find the events/intervals that are within the currently active render window:
+        """
+        if included_series_names is None:
+            ## include all
+            included_series_names = self.rendered_epoch_series_names
+
+        ## Get current time window:
+        curr_time_window = self.animation_active_time_window.active_time_window # (45.12114057149739, 60.12114057149739)
+        start_t, end_t = curr_time_window
+        if debug_print:
+            print(f'curr_time_window: {curr_time_window}')
+
+        active_window_series_events_dict: Dict[str, pd.DataFrame] = {}
+        for series_name, series_datasource in get_dict_subset(self.interval_datasources, subset_includelist=self.rendered_epoch_series_names).items():
+            if debug_print:
+                print(f'series_name: {series_name}, series_datasource: {series_datasource}')
+            if series_name in included_series_names:
+                ## make sure series is included:              
+                active_window_series_events_dict[series_name] = series_datasource.get_updated_data_window(new_start=start_t, new_end=end_t)
+            
+        return active_window_series_events_dict
+
 
 
     # ==================================================================================================================== #
