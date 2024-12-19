@@ -5391,10 +5391,12 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         # validate_computation_test=DirectionalDecodersContinuouslyDecodedResult.validate_has_directional_decoded_continuous_epochs,
         validate_computation_test=_workaround_validate_has_directional_decoded_continuous_epochs,
         is_global=True, computation_precidence=(1002.0))
-    def _decode_continuous_using_directional_decoders(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, time_bin_size: Optional[float]=None):
+    def _decode_continuous_using_directional_decoders(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, time_bin_size: Optional[float]=None, should_disable_cache: bool = True):
         """ Using the four 1D decoders, decodes continously streams of positions from the neural activity for each.
         
-
+        should_disable_cache: bool = True # when True, always recomputes and does not attempt to use the cache.
+        
+        
         Requires:
             ['sess']
 
@@ -5423,7 +5425,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         from neuropy.core.epoch import Epoch
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder
                 
-        should_disable_cache: bool = True # when True, always recomputes and does not attempt to use the cache.
+        
         
         # directional_decoders_decode_result = global_computation_results.computed_data.get('DirectionalDecodersDecoded', DirectionalDecodersContinuouslyDecodedResult(pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict, continuously_decoded_result_cache_dict=continuously_decoded_result_cache_dict))
         # Store all_directional_pf1D_Decoder_dict, all_directional_continuously_decoded_dict
@@ -5489,8 +5491,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             # single_global_epoch: Epoch = Epoch(pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})) # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session
             # global_spikes_df, _, _ = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=owning_pipeline_reference, num_shuffles=0) # does not do shuffling
             # spikes_df = deepcopy(global_spikes_df) #.spikes.sliced_by_neuron_id(track_templates.shared_aclus_only_neuron_IDs)
-            all_directional_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = {k:v.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=single_global_epoch, decoding_time_bin_size=time_bin_size, debug_print=False) for k,v in all_directional_pf1D_Decoder_dict.items()}
-            pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = pseudo2D_decoder.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=single_global_epoch, decoding_time_bin_size=time_bin_size, debug_print=False)
+            all_directional_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = {k:v.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=deepcopy(single_global_epoch), decoding_time_bin_size=time_bin_size, debug_print=False) for k,v in all_directional_pf1D_Decoder_dict.items()}
+            pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = pseudo2D_decoder.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=deepcopy(single_global_epoch), decoding_time_bin_size=time_bin_size, debug_print=False)
             all_directional_continuously_decoded_dict['pseudo2D'] = pseudo2D_decoder_continuously_decoded_result
             continuously_decoded_result_cache_dict = {time_bin_size:all_directional_continuously_decoded_dict} # result is a single time_bin_size
             print(f'\t computation done. Creating new DirectionalDecodersContinuouslyDecodedResult....')
