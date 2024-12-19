@@ -474,21 +474,22 @@ def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices
     
     if posterior_heatmap_imshow_kwargs is None:
         posterior_heatmap_imshow_kwargs = {}
+    ## END if posterior_heatmap_imshow_kwargs is None...
+    
+    # Get the colormap to use and set the bad color
+    # cmap = get_heatmap_cmap(cmap='viridis', bad_color='black', under_color='white', over_color='red')
+    cmap = posterior_heatmap_imshow_kwargs.get('cmap', get_heatmap_cmap(cmap='Oranges', bad_color='black', under_color='white', over_color='red'))
 
-        # Get the colormap to use and set the bad color
-        # cmap = get_heatmap_cmap(cmap='viridis', bad_color='black', under_color='white', over_color='red')
-        cmap = posterior_heatmap_imshow_kwargs.get('cmap', get_heatmap_cmap(cmap='Oranges', bad_color='black', under_color='white', over_color='red'))
-
-        # Compute extents for imshow:
-        main_plot_kwargs = {
-            'origin': 'lower',
-            'vmin': 0,
-            'vmax': 1,
-            'cmap': cmap,
-            'interpolation':'nearest',
-            'aspect':'auto',
-            'animated': False,
-        } | posterior_heatmap_imshow_kwargs # merges `posterior_heatmap_imshow_kwargs` into main_plot_kwargs, replacing the existing values if present in both
+    # Compute extents for imshow:
+    main_plot_kwargs = {
+        'origin': 'lower',
+        'vmin': 0,
+        'vmax': 1,
+        'cmap': cmap,
+        'interpolation':'nearest',
+        'aspect':'auto',
+        'animated': False,
+    } | posterior_heatmap_imshow_kwargs # merges `posterior_heatmap_imshow_kwargs` into main_plot_kwargs, replacing the existing values if present in both
 
     ## override `animated`
     user_animated_v = main_plot_kwargs.pop('animated', None)
@@ -3156,13 +3157,6 @@ class AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(BaseMenuCommand):
         self._display_output['long_decoded_replay_tuple'] = long_decoded_replay_tuple
         self._display_output['short_decoded_replay_tuple'] = short_decoded_replay_tuple
 
-        # widget, matplotlib_fig, matplotlib_fig_ax = active_2d_plot.add_new_matplotlib_render_plot_widget(name='MenuCommand_display_plot_marginal_1D_most_likely_position_comparisons')
-        # # most_likely_positions_mode: 'standard'|'corrected'
-        # fig, curr_ax = self._curr_active_pipeline.display('_display_plot_marginal_1D_most_likely_position_comparisons', self._active_config_name, variable_name='x', most_likely_positions_mode='corrected', ax=matplotlib_fig_ax) # ax=active_2d_plot.ui.matplotlib_view_widget.ax
-        # # print(f'\t AddNewDecodedPosition_MatplotlibPlotCommand.execute(...) finished with the display call...')
-        # # active_2d_plot.ui.matplotlib_view_widget.draw()
-        # widget.draw() # alternative to accessing through full path?
-        # active_2d_plot.sync_matplotlib_render_plot_widget('MenuCommand_display_plot_marginal_1D_most_likely_position_comparisons') # Sync it with the active window:
         print(f'\t AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand.execute() is done.')
 
 
