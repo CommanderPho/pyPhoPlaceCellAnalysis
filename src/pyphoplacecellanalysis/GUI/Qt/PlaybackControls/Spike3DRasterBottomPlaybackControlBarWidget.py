@@ -461,6 +461,24 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
                 color: white;
             }
         """)
+        
+
+    @pyqtExceptionPrintingSlot(float, float)
+    def on_window_changed(self, start_t, end_t):
+        print(f'on_time_window_changed(start_t: {start_t}, end_t: {end_t})')
+        # need to block signals:
+        # self.ui.doubleSpinBox_ActiveWindowStartTime.blockSignals(True)
+        # self.ui.doubleSpinBox_ActiveWindowEndTime.blockSignals(True)
+        if start_t is not None:
+            self.ui.doubleSpinBox_ActiveWindowStartTime.setValue(start_t)
+        if end_t is not None:
+            self.ui.doubleSpinBox_ActiveWindowEndTime.setValue(end_t)
+        # self.ui.doubleSpinBox_ActiveWindowStartTime.blockSignals(False) # unblock the signals when done
+        # self.ui.doubleSpinBox_ActiveWindowEndTime.blockSignals(False)
+        # self.ui.doubleSpinBox_ActiveWindowStartTime.setValue(start_t)
+        # self.ui.doubleSpinBox_ActiveWindowEndTime.setValue(end_t)
+        print(f'\tdone.')
+        
 
     def eventFilter(self, source, event):
         """Handle focus events to change styles dynamically."""
@@ -488,6 +506,12 @@ class SpikeRasterBottomFrameControlsMixin:
         
     """
     
+    # @QtCore.Property(object) # # Note that this ia *pyqt*Property, meaning it's available to pyqt
+    @property
+    def bottom_playback_control_bar_widget(self) -> Spike3DRasterBottomPlaybackControlBar:
+        """The bottom_playback_control_bar_widget property."""
+        return self.ui.bottomPlaybackControlBarWidget
+        
     @QtCore.pyqtSlot()
     def SpikeRasterBottomFrameControlsMixin_on_init(self):
         """ perform any parameters setting/checking during init """
@@ -571,11 +595,13 @@ class SpikeRasterBottomFrameControlsMixin:
         #     self.ui.doubleSpinBox_ActiveWindowEndTime.setValue(new_end)
         # doubleSpinBox_ActiveWindowStartTime.blockSignals(False) # unblock the signals when done
         # doubleSpinBox_ActiveWindowEndTime.blockSignals(False)
-        if new_start is not None:
-            ## update the jump time when it scrolls
-            ## should rate-limit it:
-            # self.time_fractional_seconds = new_start
-            pass
+        self.bottom_playback_control_bar_widget.on_window_changed(new_start, new_end)
+        # if new_start is not None:
+        #     ## update the jump time when it scrolls
+        #     ## should rate-limit it:
+        #     # self.time_fractional_seconds = new_start
+        #     # doubleSpinBox_ActiveWindowStartTime
+        #     pass
         
         pass
     
