@@ -528,12 +528,16 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.update_animation(next_start_timestamp: {next_start_timestamp})')
         # self.animation_active_time_window.update_window_start(next_start_timestamp) # calls update_window_start, so any subscribers should be notified.
+        next_end_timestamp = next_start_timestamp+self.animation_active_time_window.window_duration
+        
         # Update the windows once before showing the UI:
-        self.spike_raster_plt_2d.update_scroll_window_region(next_start_timestamp, next_start_timestamp+self.animation_active_time_window.window_duration, block_signals=True) # self.spike_raster_plt_2d.window_scrolled should be emitted        
+        self.spike_raster_plt_2d.update_scroll_window_region(next_start_timestamp, next_end_timestamp, block_signals=True) # self.spike_raster_plt_2d.window_scrolled should be emitted        
         # signal emit:
-        self.spike_raster_plt_2d.window_scrolled.emit(next_start_timestamp, next_start_timestamp+self.animation_active_time_window.window_duration)
+        self.spike_raster_plt_2d.window_scrolled.emit(next_start_timestamp, next_end_timestamp)
         # update_scroll_window_region
         # self.ui.spike_raster_plt_3d.spikes_window.update_window_start_end(self.ui.spike_raster_plt_2d.spikes_window.active_time_window[0], self.ui.spike_raster_plt_2d.spikes_window.active_time_window[1])
+        # self.bottom_playback_control_bar_widget.on_window_changed(next_start_timestamp, next_end_timestamp) ## direct
+        self.SpikeRasterBottomFrameControlsMixin_on_window_update(next_start_timestamp, next_end_timestamp) ## indirect 
         
 
     @pyqtExceptionPrintingSlot(int)
@@ -798,6 +802,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
     @pyqtExceptionPrintingSlot(float)
     def on_window_start_changed(self, start_t):
+        """ 2024-12-19 02:09 - doesn't actually seem to always be called on user scrolling? """
         # called when the window is updated
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.on_window_start_changed(start_t: {start_t})')
@@ -811,6 +816,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
     @pyqtExceptionPrintingSlot(float, float)
     def on_window_changed(self, start_t, end_t):
+        """ 2024-12-19 02:09 - doesn't actually seem to always be called on user scrolling? """
         # called when the window is updated
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.on_window_changed(start_t: {start_t}, end_t: {end_t})')
@@ -829,6 +835,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
     @pyqtExceptionPrintingSlot(float, float, object)
     def on_windowed_data_window_changed(self, start_t, end_t, updated_data_value):
+        """ 2024-12-19 02:09 - doesn't actually seem to always be called on user scrolling? """
         # called when the window is updated
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.on_windowed_data_window_changed(start_t: {start_t}, end_t: {end_t}, updated_data_value: ...)')
