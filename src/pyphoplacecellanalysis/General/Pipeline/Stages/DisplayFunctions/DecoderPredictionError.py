@@ -404,7 +404,7 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
     
 
 # A version of `plot_1D_most_likely_position_comparsions` that plots several images on the same axis: ____________________________________________________ #
-@function_attributes(short_name=None, tags=['decoder', 'plot', '1D', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['plot_most_likely_position_comparsions'], creation_date='2023-10-17 12:25', related_items=['plot_1D_most_likely_position_comparsions'])
+@function_attributes(short_name=None, tags=['decoder', 'plot', '1D', 'matplotlib', 'slices'], input_requires=[], output_provides=[], uses=[], used_by=['plot_most_likely_position_comparsions', 'AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand'], creation_date='2023-10-17 12:25', related_items=['plot_1D_most_likely_position_comparsions'])
 def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices_time_window_centers, xbin, ax=None, slices_posteriors=None, slices_active_most_likely_positions_1D=None, slices_additional_plots_data=None, enable_flat_line_drawing=False, variable_name = 'x', debug_print=False):
     """ renders a single 2D subplot in MATPLOTLIB for a 1D position axes: the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
     
@@ -2944,17 +2944,6 @@ class CreateNewStackedDecodedEpochSlicesPlotCommand(BaseMenuCommand):
     _context = field(default=None, alias="active_context")
     _filter_epochs = field(default='laps')
     _display_output = field(default=Factory(dict))
-    
-    # def __init__(self, spike_raster_window, active_pipeline, active_config_name=None, active_context=None, filter_epochs='laps', display_output={}) -> None:
-    #     super(CreateNewStackedDecodedEpochSlicesPlotCommand, self).__init__()
-    #     self._spike_raster_window = spike_raster_window
-    #     self._active_pipeline = active_pipeline
-    #     self._active_config_name = active_config_name
-    #     self._context = active_context
-    #     self._display_output = display_output
-    #     self._filter_epochs = filter_epochs
-        
-        
     def execute(self, *args, **kwargs) -> None:
         """  """
         print(f'menu execute(): {self}')
@@ -2971,19 +2960,14 @@ class CreateNewStackedDecodedEpochSlicesPlotCommand(BaseMenuCommand):
 
 @define(slots=False)
 class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
-    """ analagous to CreateNewDataExplorer_ipspikes_PlotterCommand, holds references to the variables needed to perform the entire action (such as the reference to the decoder) which aren't accessible during the building of the menus. """
+    """ analagous to CreateNewDataExplorer_ipspikes_PlotterCommand, holds references to the variables needed to perform the entire action (such as the reference to the decoder) which aren't accessible during the building of the menus.
+    adds ONE row
+    
+    """
     _spike_raster_window = field()
     _active_pipeline = field(alias='curr_active_pipeline')
     _active_config_name = field(default=None)
     _display_output = field(default=Factory(dict))
-
-    # def __init__(self, spike_raster_window, curr_active_pipeline, active_config_name, display_output={}) -> None:
-    #     super(AddNewDecodedPosition_MatplotlibPlotCommand, self).__init__()
-    #     self._spike_raster_window = spike_raster_window
-    #     self._curr_active_pipeline = curr_active_pipeline
-    #     self._active_config_name = active_config_name
-    #     self._display_output = display_output
-    #     # print(f'AddNewDecodedPosition_MatplotlibPlotCommand.__init__(...)')
 
     def execute(self, *args, **kwargs) -> None:
         print(f'menu execute(): {self}')
@@ -3011,12 +2995,16 @@ class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
         # print(f'\t AddNewDecodedPosition_MatplotlibPlotCommand.execute() is done.')
         
 
-        
 
-
+@metadata_attributes(short_name=None, tags=['GOOD', 'epoch-slices'], input_requires=[], output_provides=[], uses=['plot_slices_1D_most_likely_position_comparsions', 'plot_slices_1D_most_likely_position_comparsions'], used_by=[], creation_date='2023-10-17 00:00', related_items=[])
 @define(slots=False)
 class AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(BaseMenuCommand):
-    """ 2023-10-17. Uses `plot_slices_1D_most_likely_position_comparsions` to plot epoch slices (corresponding to certain periods in time) along the continuous session duration.  """
+    """ 2023-10-17. Creates TWO ROWS - Uses `plot_slices_1D_most_likely_position_comparsions` to plot epoch slices (corresponding to certain periods in time) along the continuous session duration.
+    
+    Plots JUST the decoded epoch slices.
+    
+    Uses: `plot_slices_1D_most_likely_position_comparsions` - to plot the decoded epoch slices to a 1D axis
+    """
     _spike_raster_window = field()
     _active_pipeline = field(alias='curr_active_pipeline')
     _active_config_name = field(default=None)

@@ -5,7 +5,8 @@ from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingS
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.Qt.Menus.PhoMenuHelper import PhoMenuHelper
 from pyphoplacecellanalysis.GUI.Qt.Menus.BaseMenuProviderMixin import BaseMenuProviderMixin
-
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 from pyphoplacecellanalysis.GUI.Qt.Menus.LocalMenus_AddRenderable.LocalMenus_AddRenderable import LocalMenus_AddRenderable
 
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.helpers import build_combined_time_synchronized_plotters_window, build_connected_time_synchronized_occupancy_plotter, build_connected_time_synchronized_placefields_plotter, build_connected_time_synchronized_decoder_plotter
@@ -15,9 +16,11 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPred
 
 
     
-
+@metadata_attributes(short_name=None, tags=['dock'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-09-29 00:00', related_items=[])
 class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
-    """ The most up-to-date (as of 2022-09-29) method of building custom menu items. 
+    """ 
+    
+    SCRATCH !! NOT THE BEST THO: The most up-to-date (as of 2022-09-29) method of building custom menu items. 
     
     Conceptually, DockedWidgets are widgets that initially are docked within the main SpikeRaster2D window (usually as dockItems) and are synchronized with the scrolling of the time window.
      
@@ -113,8 +116,8 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
         addSubmenuActionKeys = []
         curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Matplotlib View", name="actionNewDockedMatplotlibView", tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_actions_dict)
         addSubmenuActionKeys.append(curr_action_key)
-        curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Context Nested Docks", name="actionNewDockedContextNested", tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_actions_dict)
-        addSubmenuActionKeys.append(curr_action_key)
+        # curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Context Nested Docks", name="actionNewDockedContextNested", tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_actions_dict)
+        # addSubmenuActionKeys.append(curr_action_key)
         curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Long Short Decoded Epochs in Matplotlib Views", name="actionLongShortDecodedEpochsDockedMatplotlibView", tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_actions_dict)
         addSubmenuActionKeys.append(curr_action_key)
         curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Directional Decoded Epochs in Matplotlib Views", name="actionDirectionalDecodedEpochsDockedMatplotlibView", tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_actions_dict)
@@ -130,7 +133,7 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
         # Connect the relevent actions to each action:
         action_command_map = {
             'actionNewDockedMatplotlibView': AddNewDecodedPosition_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output, action_identifier='actionNewDockedMatplotlibView'),
-            'actionNewDockedContextNested': CreateNewContextNestedDocksCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionNewDockedContextNested'),
+            # 'actionNewDockedContextNested': CreateNewContextNestedDocksCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionNewDockedContextNested'),
             'actionLongShortDecodedEpochsDockedMatplotlibView': AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionLongShortDecodedEpochsDockedMatplotlibView'),
             'actionDirectionalDecodedEpochsDockedMatplotlibView': AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionDirectionalDecodedEpochsDockedMatplotlibView'),
             'actionPseudo2DDecodedEpochsDockedMatplotlibView': AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionPseudo2DDecodedEpochsDockedMatplotlibView'),
@@ -141,14 +144,6 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
             curr_actions_dict[a_name].triggered.connect(a_build_command)
             
 
-
-        # curr_actions_dict['actionNewDockedMatplotlibView'].triggered.connect(AddNewDecodedPosition_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output, action_identifier='actionNewDockedMatplotlibView'))
-        # curr_actions_dict['actionNewDockedContextNested'].triggered.connect(CreateNewContextNestedDocksCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionNewDockedContextNested'))
-        # curr_actions_dict['actionLongShortDecodedEpochsDockedMatplotlibView'].triggered.connect(AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionLongShortDecodedEpochsDockedMatplotlibView'))
-        # curr_actions_dict['actionDirectionalDecodedEpochsDockedMatplotlibView'].triggered.connect(AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionDirectionalDecodedEpochsDockedMatplotlibView'))
-        # curr_actions_dict['actionPseudo2DDecodedEpochsDockedMatplotlibView'].triggered.connect(AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionPseudo2DDecodedEpochsDockedMatplotlibView'))
-        # curr_actions_dict['actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'].triggered.connect(AddNewDecodedEpochMarginal_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'))
-        
         # curr_actions_dict['actionNewDockedCustom'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='decoder', active_context=active_context, display_output=display_output))
                 
 
@@ -191,27 +186,27 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
         pass
     
     
-# ## Actions to be executed to create new plotters:
-        
-class CreateNewContextNestedDocksCommand(BaseMenuCommand):
-    """ build_combined_time_synchronized_plotters_window
-    A command to create a plotter as needed
-    """
+# # ## Actions to be executed to create new plotters:
+# @metadata_attributes(short_name=None, tags=['time_sync'], input_requires=[], output_provides=[], uses=['build_combined_time_synchronized_plotters_window'], used_by=[], creation_date='2024-12-19 03:32', related_items=[])
+# class CreateNewContextNestedDocksCommand(BaseMenuCommand):
+#     """ build_combined_time_synchronized_plotters_window
+#     A command to create a plotter as needed
+#     """
     
-    def __init__(self, spike_raster_window, active_pipeline, active_config_name=None, active_context=None, display_output={}, action_identifier: str=None) -> None:
-        super(CreateNewContextNestedDocksCommand, self).__init__(action_identifier=action_identifier)
-        self._spike_raster_window = spike_raster_window
-        self._active_pipeline = active_pipeline
-        self._active_config_name = active_config_name
-        self._context = active_context
-        self._display_output = display_output
+#     def __init__(self, spike_raster_window, active_pipeline, active_config_name=None, active_context=None, display_output={}, action_identifier: str=None) -> None:
+#         super(CreateNewContextNestedDocksCommand, self).__init__(action_identifier=action_identifier)
+#         self._spike_raster_window = spike_raster_window
+#         self._active_pipeline = active_pipeline
+#         self._active_config_name = active_config_name
+#         self._context = active_context
+#         self._display_output = display_output
         
-    def execute(self, *args, **kwargs) -> None:
-        """ Implicitly captures spike_raster_window """
-        print(f'menu execute(): {self}')
-        self.log_command(*args, **kwargs) # adds this command to the `menu_action_history_list` 
-        pass # TODO:
-        # _out_synchronized_plotter = build_combined_time_synchronized_plotters_window(active_pf_2D_dt=self._active_pf_2D_dt, controlling_widget=self._spike_raster_window.spike_raster_plt_2d, context=self._context, create_new_controlling_widget=False)
-        # self._display_output['comboSynchronizedPlotter'] = _out_synchronized_plotter
-        # (controlling_widget, curr_sync_occupancy_plotter, curr_placefields_plotter), root_dockAreaWindow, app = _out_synchronized_plotter
+#     def execute(self, *args, **kwargs) -> None:
+#         """ Implicitly captures spike_raster_window """
+#         print(f'menu execute(): {self}')
+#         self.log_command(*args, **kwargs) # adds this command to the `menu_action_history_list` 
+#         pass # TODO:
+#         # _out_synchronized_plotter = build_combined_time_synchronized_plotters_window(active_pf_2D_dt=self._active_pf_2D_dt, controlling_widget=self._spike_raster_window.spike_raster_plt_2d, context=self._context, create_new_controlling_widget=False)
+#         # self._display_output['comboSynchronizedPlotter'] = _out_synchronized_plotter
+#         # (controlling_widget, curr_sync_occupancy_plotter, curr_placefields_plotter), root_dockAreaWindow, app = _out_synchronized_plotter
         

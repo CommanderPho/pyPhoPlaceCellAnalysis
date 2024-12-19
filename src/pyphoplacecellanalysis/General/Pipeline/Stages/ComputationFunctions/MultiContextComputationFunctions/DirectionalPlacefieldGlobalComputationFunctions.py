@@ -7402,7 +7402,8 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
 @define(slots=False)
 class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
     """ 2024-01-22 
-    Adds four rows to the SpikeRaster2D showing the continuously decoded posterior for each of the four 1D decoders
+    ??? Adds four rows to the SpikeRaster2D showing the marginal probabilities 
+    continuously decoded posterior for each of the four 1D decoders
 
     Usage:
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand
@@ -7561,7 +7562,7 @@ class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
 @define(slots=False)
 class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand):
     """ 2024-01-23
-    Adds four rows to the SpikeRaster2D showing the continuously decoded posterior for each of the four 1D decoders
+    Adds THREE rows ('non_marginalized_raw_result', 'marginal_over_direction', 'marginal_over_track_ID') to the SpikeRaster2D showing the marginalized posteriors for the continuously decoded decoder
 
     Usage:
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand
