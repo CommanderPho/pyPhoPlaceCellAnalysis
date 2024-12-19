@@ -7553,9 +7553,10 @@ class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
             identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = an_output_tuple
             self._display_output[identifier_name] = an_output_tuple
 
-        if 'command_action_history' not in self._spike_raster_window.ui:
-            self._spike_raster_window.ui.command_action_history = [] ## create it
-        self._spike_raster_window.ui.command_action_history.append(self.name)
+        if '_menu_action_history_list' not in self._spike_raster_window.params:
+            self._spike_raster_window.params._menu_action_history_list = [] ## create it
+        # self._spike_raster_window.params._menu_action_history_list.append(self.name)
+        self._spike_raster_window.menu_action_history_list.append(self)
         
         print(f'\t AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand.execute() is done.')
 
