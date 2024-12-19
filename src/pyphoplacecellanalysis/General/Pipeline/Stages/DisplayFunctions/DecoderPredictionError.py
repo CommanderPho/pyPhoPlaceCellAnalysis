@@ -2,7 +2,10 @@ from matplotlib.offsetbox import AnchoredText
 import numpy as np
 from nptyping import NDArray
 import pandas as pd
-from typing import List, Dict, Tuple, Optional, Any, Callable, Union
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing_extensions import TypeAlias
+from nptyping import NDArray
+import neuropy.utils.type_aliases as types
 from copy import deepcopy
 from attrs import define, field, Factory
 import matplotlib as mpl
@@ -36,7 +39,7 @@ from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import stacked_epoch_slic
 
 from pyphoplacecellanalysis.GUI.Qt.Menus.BaseMenuProviderMixin import BaseMenuCommand # for AddNewDecodedPosition_MatplotlibPlotCommand
 
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions import DefaultComputationFunctions # TODO: I think it's bad to include computation functions here technically
 
@@ -3088,6 +3091,130 @@ class AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(BaseMenuCommand):
         # widget.draw() # alternative to accessing through full path?
         # active_2d_plot.sync_matplotlib_render_plot_widget('MenuCommand_display_plot_marginal_1D_most_likely_position_comparisons') # Sync it with the active window:
         print(f'\t AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand.execute() is done.')
+
+
+
+
+@metadata_attributes(short_name=None, tags=['GOOD', 'TrackTemplates', 'epoch-slices'], input_requires=[], output_provides=[], uses=['plot_slices_1D_most_likely_position_comparsions', 'plot_slices_1D_most_likely_position_comparsions'], used_by=[], creation_date='2024-12-19 04:28', related_items=['AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand'])
+@define(slots=False)
+class AddNewTrackTemplatesDecodedEpochSlicesRows_MatplotlibPlotCommand(BaseMenuCommand):
+    """ 2023-10-17. Creates FOUR ROWS - Uses `plot_slices_1D_most_likely_position_comparsions` to plot epoch slices (corresponding to certain periods in time) along the continuous session duration.
+    
+    Plots JUST the decoded epoch slices.
+    
+    Uses: `plot_slices_1D_most_likely_position_comparsions` - to plot the decoded epoch slices to a 1D axis
+    """
+    _spike_raster_window = field()
+    _active_pipeline = field(alias='curr_active_pipeline')
+    _active_config_name = field(default=None)
+    _context = field(default=None, alias="active_context")
+    _display_output = field(default=Factory(dict))
+
+    @classmethod
+    def add_track_templates_decoder_decoded_replays(cls, curr_active_pipeline, active_2d_plot, debug_print=False, filtered_epochs_df=None):
+        """ adds the decoded epochs for the four track templates decoders from the global_computation_results as new matplotlib plot rows. """
+        # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions # Actual most general
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_slices_1D_most_likely_position_comparsions
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, TrackTemplates, DecoderDecodedEpochsResult, DirectionalPseudo2DDecodersResult, get_proper_global_spikes_df
+        from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import FixedCustomColormaps
+
+        # spikes_df = deepcopy(curr_active_pipeline.sess.spikes_df)
+
+        global_computation_results = curr_active_pipeline.global_computation_results
+
+        rank_order_results = curr_active_pipeline.global_computation_results.computed_data.get('RankOrder', None) # : "RankOrderComputationsContainer"
+        if rank_order_results is not None:
+            minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+            included_qclu_values: List[int] = rank_order_results.included_qclu_values
+        else:        
+            ## get from parameters:
+            minimum_inclusion_fr_Hz: float = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+            included_qclu_values: List[int] = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
+
+
+        directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
+        track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+        # print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
+        # print(f'included_qclu_values: {included_qclu_values}')
+
+        # 2024-12-19 04:09 INputs ____________________________________________________________________________________________ #
+        ## INPUTS filtered_decoder_filter_epochs_decoder_result_dict
+        # decoder_decoded_epochs_result_dict: generic
+        active_cmap = FixedCustomColormaps.get_custom_greyscale_with_low_values_dropped_cmap(low_value_cutoff=0.01, full_opacity_threshold=0.25)
+        # active_decoder_decoded_epochs_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = deepcopy(filtered_decoder_filter_epochs_decoder_result_dict)
+        # active_filter_epochs_df: pd.DataFrame = deepcopy(active_decoder_decoded_epochs_result_dict['long_LR'].filter_epochs) # deepcopy(matching_specific_start_ts_only_filter_epochs_df)
+        # epochs_name='ripple'
+        # title='Filtered PBEs'
+        # known_epochs_type = 'ripple'
+
+        # active_spikes_df = get_proper_global_spikes_df(curr_active_pipeline)
+
+        ## INPUTS: curr_active_pipeline, track_templates, a_decoded_filter_epochs_decoder_result_dict
+        directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = deepcopy(curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']) ## GENERAL
+        ## INPUTS: directional_decoders_epochs_decode_result, filtered_epochs_df
+
+        decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = deepcopy(directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict)
+        unfiltered_epochs_df = deepcopy(decoder_ripple_filter_epochs_decoder_result_dict['long_LR'].filter_epochs)
+        if filtered_epochs_df is not None:
+            ## filter
+            filtered_decoder_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(filtered_epochs_df[['start', 'stop']].to_numpy()) for a_name, a_result in decoder_ripple_filter_epochs_decoder_result_dict.items()} # working filtered
+        else:
+            filtered_decoder_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(unfiltered_epochs_df[['start', 'stop']].to_numpy()) for a_name, a_result in decoder_ripple_filter_epochs_decoder_result_dict.items()} # working unfiltered
+
+        ripple_decoding_time_bin_size: float = directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size
+        pos_bin_size: float = directional_decoders_epochs_decode_result.pos_bin_size
+        print(f'{pos_bin_size = }, {ripple_decoding_time_bin_size = }')
+
+
+        ## OUTPUTS: filtered_decoder_filter_epochs_decoder_result_dict, 
+        ## INPUTS: need `filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult]`
+        decoder_names: List[str] = track_templates.get_decoder_names()
+        track_length_dict = track_templates.get_track_length_dict()
+        
+        matplotlib_view_widget_names_map: Dict = {a_name:f'{a_name}_decoded_epoch_matplotlib_view_widget' for a_name in decoder_names}
+        
+        plot_replay_tuple_dict = {}
+        # initial_row_idx: int = 2
+        for i, (a_name, a_decoder) in enumerate(track_templates.get_decoders_dict().items()):
+            # curr_row_idx: int = (i + initial_row_idx)
+            matplotlib_view_widget_name: str = matplotlib_view_widget_names_map[a_name]
+            a_decoder_decoded_epochs_result: DecodedFilterEpochsResult = filtered_decoder_filter_epochs_decoder_result_dict[a_name] ## get the result # DecodedFilterEpochsResult
+            ## Creates a new row with `add_new_matplotlib_render_plot_widget`:
+            plot_replay_tuple_dict[a_name] = active_2d_plot.add_new_matplotlib_render_plot_widget(name=matplotlib_view_widget_name)
+            curr_decoded_replay_matplotlib_view_widget, curr_decoded_replay_fig, curr_decoded_replay_ax = plot_replay_tuple_dict[a_name]
+            _out_curr_plot_tuple = plot_slices_1D_most_likely_position_comparsions(curr_active_pipeline.sess.position.to_dataframe(), slices_time_window_centers=[v.centers for v in a_decoder_decoded_epochs_result.time_bin_containers], xbin=a_decoder.xbin.copy(),
+                                                                    slices_posteriors=a_decoder_decoded_epochs_result.p_x_given_n_list,
+                                                                    slices_active_most_likely_positions_1D=None, enable_flat_line_drawing=False, ax=curr_decoded_replay_ax[0], debug_print=debug_print)
+            # fig, ax, out_img_list = _out_long
+
+            # long_decoded_replay_fig, long_decoded_replay_ax = _out_long
+            active_2d_plot.sync_matplotlib_render_plot_widget(matplotlib_view_widget_name)
+            curr_decoded_replay_matplotlib_view_widget.draw()
+        ## END for i, (a_name, a_decoder) in en...
+
+        return plot_replay_tuple_dict, matplotlib_view_widget_names_map
+
+
+    def execute(self, *args, **kwargs) -> None:
+        print(f'menu execute(): {self}')
+        self.log_command(*args, **kwargs) # adds this command to the `menu_action_history_list` 
+        ## To begin, the destination plot must have a matplotlib widget plot to render to:
+        # print(f'AddNewDecodedPosition_MatplotlibPlotCommand.execute(...)')
+        active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
+        # If no plot to render on, do this:
+        plot_replay_tuple_dict, matplotlib_view_widget_names_map = self.add_track_templates_decoder_decoded_replays(self._active_pipeline, active_2d_plot)
+
+        # Update display output dict:
+        self._display_output['matplotlib_view_widget_names_map'] = matplotlib_view_widget_names_map
+        self._display_output.update(plot_replay_tuple_dict) ## copy the tuples from that dict to the ._display_output one
+        
+        print(f'\t AddNewTrackTemplatesDecodedEpochSlicesRows_MatplotlibPlotCommand.execute() is done.')
+
+
+
+
+
+
 
 
 # ==================================================================================================================== #
