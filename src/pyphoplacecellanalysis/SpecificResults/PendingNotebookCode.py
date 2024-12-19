@@ -52,7 +52,7 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 # 2024-12-18 Heuristic Evaluation in the continuous timeline                                                           #
 # ==================================================================================================================== #
 @function_attributes(short_name=None, tags=['2024-12-18', 'ACTIVE', 'gui', 'debugging', 'continuous'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 19:29', related_items=[])
-def _setup_spike_raster_window_for_debugging(spike_raster_window):
+def _setup_spike_raster_window_for_debugging(spike_raster_window, debug_print=False):
     """ 
     ['AddMatplotlibPlot.DecodedPosition', 'AddMatplotlibPlot.Custom',
      'AddTimeCurves.Position', 'AddTimeCurves.Velocity', 'AddTimeCurves.Random', 'AddTimeCurves.RelativeEntropySurprise', 'AddTimeCurves.Custom',
@@ -70,11 +70,12 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window):
     """
     omit_menu_item_names = ['Debug.MenuDebug', 'DockedWidgets.MenuDockedWidgets', ] # maybe , 'CreateNewConnectedWidget.MenuCreateNewConnectedWidget'    
     all_global_menus_actionsDict, global_flat_action_dict = spike_raster_window.build_all_menus_actions_dict()
-    print(list(global_flat_action_dict.keys()))
+    if debug_print:
+        print(list(global_flat_action_dict.keys()))
 
 
     # add_renderables_menu = active_2d_plot.ui.menus.custom_context_menus.add_renderables[0].programmatic_actions_dict
-    menu_commands = ['AddTimeIntervals.PBEs', 'AddTimeIntervals.Ripples', 'AddTimeIntervals.Replays', 'AddTimeIntervals.Laps'] # , 'AddTimeIntervals.SessionEpochs'
+    menu_commands = ['AddTimeIntervals.Replays', 'AddTimeIntervals.Laps'] # , 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.PBEs', 'AddTimeIntervals.Ripples', 
     for a_command in menu_commands:
         assert a_command in global_flat_action_dict, f"a_command: '{a_command}' is not present in global_flat_action_dict: {list(global_flat_action_dict.keys())}"
         # add_renderables_menu[a_command].trigger()
@@ -86,7 +87,7 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window):
     menu_commands = [
         # 'DockedWidgets.LongShortDecodedEpochsDockedMatplotlibView',
         'DockedWidgets.DirectionalDecodedEpochsDockedMatplotlibView',
-        'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView',
+        # 'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView',
         #  'DockedWidgets.ContinuousPseudo2DDecodedMarginalsDockedMatplotlibView',
     ]
     # menu_commands = ['actionPseudo2DDecodedEpochsDockedMatplotlibView', 'actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'] # , 'AddTimeIntervals.SessionEpochs'
