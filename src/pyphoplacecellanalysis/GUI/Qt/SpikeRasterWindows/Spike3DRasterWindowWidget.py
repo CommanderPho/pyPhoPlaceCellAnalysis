@@ -21,7 +21,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike3DRaste
 
 from pyphoplacecellanalysis.General.Mixins.TimeWindowPlaybackMixin import TimeWindowPlaybackPropertiesMixin, TimeWindowPlaybackController, TimeWindowPlaybackControllerActionsMixin
 
-from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarWidget import SpikeRasterBottomFrameControlsMixin
+from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarWidget import Spike3DRasterBottomPlaybackControlBar, SpikeRasterBottomFrameControlsMixin
 from pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterLeftSidebarControlBarWidget import Spike3DRasterLeftSidebarControlBar, SpikeRasterLeftSidebarControlsMixin
 from pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterRightSidebarWidget import Spike3DRasterRightSidebarWidget, SpikeRasterRightSidebarOwningMixin
 
@@ -886,6 +886,11 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             # TODO: maybe use a rate-limited signal that's emitted instead so this isn't called too often during interpolation?
             # self.shift_animation_frame_val(self._scheduledAnimationSteps) # TODO: this isn't quite right
             
+    @QtCore.Property(object) # # Note that this ia *pyqt*Property, meaning it's available to pyqt
+    def bottom_playback_control_bar_widget(self) -> Spike3DRasterBottomPlaybackControlBar:
+        """The bottom_playback_control_bar_widget property."""
+        return self.ui.bottomPlaybackControlBarWidget
+
     def onScrollingTimelineAnimationFinished(self):
         """ used for the QTimeline version of the smooth scrolling animation """
         print(f'onScrollingTimelineAnimationFinished()')
