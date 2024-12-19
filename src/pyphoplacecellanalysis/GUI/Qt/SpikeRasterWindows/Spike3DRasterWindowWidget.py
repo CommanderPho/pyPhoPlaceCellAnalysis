@@ -418,7 +418,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         if self.ui.spike_raster_plt_2d is not None: 
             if self.ui.spike_raster_plt_2d.ui.matplotlib_view_widgets is not None:
                 for a_name, a_time_sync_widget in self.ui.spike_raster_plt_2d.ui.matplotlib_view_widgets.items():
-                    print(f'a_name: {a_name}')
+                    if debug_print:
+                        print(f'a_name: {a_name}')
                     # a_time_sync_widget.installEventFilter(self) # plots.preview_overview_scatter_plot is a ScatterPlotItem ... does it have to be a pyqtgraph subclass to do this? I'm worried it does
                     a_time_sync_widget.ui.canvas.installEventFilter(self)
 
