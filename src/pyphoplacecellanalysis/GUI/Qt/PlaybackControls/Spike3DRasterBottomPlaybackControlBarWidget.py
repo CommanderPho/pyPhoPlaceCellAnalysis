@@ -21,6 +21,7 @@ from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlo
 # Custom Widget classes
 from pyphocorehelpers.gui.Qt.HighlightedJumpSlider import HighlightedJumpSlider
 from pyphocorehelpers.gui.Qt.ToggleButton import ToggleButtonModel, ToggleButton
+from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 
 # For extra button symbols:
 import qtawesome as qta
@@ -344,12 +345,12 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
         # self.ui.btnCurrentIntervals_Extra.setEnabled(has_valid_series_selection)
 
 
-    @QtCore.pyqtSlot(object)
+    @pyqtExceptionPrintingSlot(object)
     def on_rendered_intervals_list_changed(self, interval_list_owning_object):
         """ called when the list of rendered intervals changes """
         self.update_jump_target_series_options(interval_list_owning_object.list_all_rendered_intervals(debug_print=False))
 
-    @QtCore.pyqtSlot(str)
+    @pyqtExceptionPrintingSlot(str)
     def on_jump_combo_series_changed(self, series_name):
         print(f'on_jump_combo_series_changed(series_name: {series_name})')
         curr_jump_series_name = self.current_selected_jump_target_series_name # 'PBEs'
@@ -555,7 +556,7 @@ class SpikeRasterBottomFrameControlsMixin:
         # TODO: NOT CALLED
         pass
 
-    @QtCore.pyqtSlot(float, float)
+    @pyqtExceptionPrintingSlot(float, float)
     def SpikeRasterBottomFrameControlsMixin_on_window_update(self, new_start=None, new_end=None):
         """ called to perform updates when the active window changes. Redraw, recompute data, etc. """
         # Called the Implementor's update_window(...) function
@@ -579,7 +580,7 @@ class SpikeRasterBottomFrameControlsMixin:
         pass
     
     # ## Update Functions:
-    # @QtCore.pyqtSlot(bool)
+    # @pyqtExceptionPrintingSlot(bool)
     # def play_pause(self, is_playing):
     #     print(f'SpikeRasterBottomFrameControlsMixin.play_pause(is_playing: {is_playing})')
     #     if (not is_playing):
@@ -600,7 +601,7 @@ class SpikeRasterBottomFrameControlsMixin:
     #     self.shift_animation_frame_val(5)
         
 
-    # @QtCore.pyqtSlot(bool)
+    # @pyqtExceptionPrintingSlot(bool)
     # def on_reverse_held(self, is_reversed):
     #     print(f'SpikeRasterBottomFrameControlsMixin.on_reverse_held(is_reversed: {is_reversed})')
     #     pass
