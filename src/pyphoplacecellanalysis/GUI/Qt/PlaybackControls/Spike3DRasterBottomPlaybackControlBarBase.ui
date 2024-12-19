@@ -188,6 +188,12 @@ selection-background-color: rgb(75, 83, 65);
       </item>
       <item row="1" column="16">
        <widget class="QDoubleSpinBox" name="doubleSpinBox_ActiveWindowStartTime">
+        <property name="font">
+         <font>
+          <family>Liberation Mono</family>
+          <pointsize>9</pointsize>
+         </font>
+        </property>
         <property name="focusPolicy">
          <enum>Qt::NoFocus</enum>
         </property>
@@ -239,7 +245,7 @@ QDoubleSpinBox::down-arrow {
          <number>6</number>
         </property>
         <property name="maximum">
-         <double>999999990000.000000000000000</double>
+         <double>99999.000000000000000</double>
         </property>
        </widget>
       </item>
@@ -319,6 +325,12 @@ QDoubleSpinBox::down-arrow {
       </item>
       <item row="1" column="17">
        <widget class="QDoubleSpinBox" name="doubleSpinBox_ActiveWindowEndTime">
+        <property name="font">
+         <font>
+          <family>Liberation Mono</family>
+          <pointsize>9</pointsize>
+         </font>
+        </property>
         <property name="focusPolicy">
          <enum>Qt::NoFocus</enum>
         </property>
@@ -370,10 +382,10 @@ QDoubleSpinBox::down-arrow {
          <string> [sec]</string>
         </property>
         <property name="decimals">
-         <number>6</number>
+         <number>4</number>
         </property>
         <property name="maximum">
-         <double>999999.989999999990687</double>
+         <double>99999.990000000005239</double>
         </property>
        </widget>
       </item>

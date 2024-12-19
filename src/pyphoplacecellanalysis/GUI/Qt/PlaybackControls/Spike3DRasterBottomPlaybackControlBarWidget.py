@@ -237,30 +237,41 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
         milliseconds = int((total_seconds - seconds) * 1000)
         return hours, minutes, seconds, milliseconds
 
+    @property
+    def time_edit(self):
+        """The time_edit property."""
+        return self.ui.jumpToHourMinSecTimeEdit
 
     @property
     def time_fractional_seconds(self) -> float:
         """The time_fractional_seconds property."""
+        time_fractional_seconds = None
         try:
-            time = self.ui.jumpToHourMinSecTimeEdit.time()  # Get the QTime object
-            # time_tuple = (time.hour(), time.minute(), time.second(), time.msec())  # Extract as tuple
-            time_fractional_seconds: float = self.total_fractional_seconds(hours=time.hour(), minutes=time.minute(), seconds=time.second(), milliseconds=time.msec())
-            return time_fractional_seconds
+            # self.time_edit.blockSignals(True)        
+            time = self.time_edit.time()  # Get the QTime object
+            time_fractional_seconds = self.total_fractional_seconds(hours=time.hour(), minutes=time.minute(), seconds=time.second(), milliseconds=time.msec())
+            # return time_fractional_seconds
         except AttributeError:
-            return None
+            time_fractional_seconds = None
         except Exception as e:
-            raise e
-
-
-    
+            raise
+        # finally:
+        #     self.time_edit.blockSignals(False)
+        return time_fractional_seconds
     @time_fractional_seconds.setter
     def time_fractional_seconds(self, value):
         time_tuple = self.decompose_fractional_seconds(value)
         assert len(time_tuple) == 4
         # Create a QTime object from the tuple
         time_obj = QTime(time_tuple[0], time_tuple[1], time_tuple[2], time_tuple[3])
-        # Set the QTimeEdit's time
-        self.time_edit.setTime(time_obj)
+        try:
+            # Set the QTimeEdit's time
+            self.time_edit.setTime(time_obj)
+        except Exception as e:
+            raise
+        finally:
+            self.time_edit.blockSignals(False)
+        
 
     @property
     def current_selected_jump_target_series_name(self):
@@ -471,6 +482,17 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
         # self.ui.doubleSpinBox_ActiveWindowEndTime.blockSignals(True)
         if start_t is not None:
             self.ui.doubleSpinBox_ActiveWindowStartTime.setValue(start_t)
+            # self.ui.jumpToHourMinSecTimeEdit.blockSignals(True)
+            # self.ui.jumpToHourMinSecTimeEdit.setValue(
+            self.time_fractional_seconds = start_t
+            # start_time_hour_min_sec_tuple = self.decompose_fractional_seconds(start_t)
+            # assert len(start_time_hour_min_sec_tuple) == 4
+            # # Create a QTime object from the tuple
+            # start_time_obj = QTime(start_time_hour_min_sec_tuple[0], start_time_hour_min_sec_tuple[1], start_time_hour_min_sec_tuple[2], start_time_hour_min_sec_tuple[3])
+            # # Set the QTimeEdit's time
+            # self.time_edit.setTime(start_time_obj)
+            # self.ui.jumpToHourMinSecTimeEdit.blockSignals(False)
+
         if end_t is not None:
             self.ui.doubleSpinBox_ActiveWindowEndTime.setValue(end_t)
         # self.ui.doubleSpinBox_ActiveWindowStartTime.blockSignals(False) # unblock the signals when done
