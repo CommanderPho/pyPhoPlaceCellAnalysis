@@ -3120,7 +3120,7 @@ class AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(BaseMenuCommand):
         # short_desired_total_n_timebins, short_updated_is_masked_bin, short_updated_time_bin_containers, short_updated_timebins_p_x_given_n = short_decoded_epochs_result.flatten_to_masked_values()
 
 
-        long_decoded_replay_tuple = active_2d_plot.add_new_matplotlib_render_plot_widget(row=2, col=0, name='long_decoded_epoch_matplotlib_view_widget')
+        long_decoded_replay_tuple = active_2d_plot.add_new_matplotlib_render_plot_widget(row=2, col=0, name='decoded_epoch_matplotlib_view_widget_long')
         long_decoded_replay_matplotlib_view_widget, long_decoded_replay_fig, long_decoded_replay_ax = long_decoded_replay_tuple
         
         _out_long = plot_slices_1D_most_likely_position_comparsions(curr_active_pipeline.sess.position.to_dataframe(), slices_time_window_centers=[v.centers for v in long_decoded_epochs_result.time_bin_containers], xbin=long_results_obj.original_1D_decoder.xbin.copy(),
@@ -3131,10 +3131,10 @@ class AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(BaseMenuCommand):
         # fig, ax, out_img_list = _out_long
 
         # long_decoded_replay_fig, long_decoded_replay_ax = _out_long
-        active_2d_plot.sync_matplotlib_render_plot_widget('long_decoded_epoch_matplotlib_view_widget')
+        active_2d_plot.sync_matplotlib_render_plot_widget('decoded_epoch_matplotlib_view_widget_long')
         long_decoded_replay_matplotlib_view_widget.draw()
         
-        short_decoded_replay_tuple = active_2d_plot.add_new_matplotlib_render_plot_widget(row=3, col=0, name='short_decoded_epoch_matplotlib_view_widget')
+        short_decoded_replay_tuple = active_2d_plot.add_new_matplotlib_render_plot_widget(row=3, col=0, name='decoded_epoch_matplotlib_view_widget_short')
         short_decoded_replay_matplotlib_view_widget, short_decoded_replay_fig, short_decoded_replay_ax = short_decoded_replay_tuple
 
         _out_short = plot_slices_1D_most_likely_position_comparsions(curr_active_pipeline.sess.position.to_dataframe(), slices_time_window_centers=[v.centers for v in short_decoded_epochs_result.time_bin_containers], xbin=short_results_obj.original_1D_decoder.xbin.copy(),
@@ -3145,7 +3145,7 @@ class AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(BaseMenuCommand):
         # fig, ax, out_img_list = _out_short
 
         # short_decoded_replay_fig, short_decoded_replay_ax = _out_short
-        active_2d_plot.sync_matplotlib_render_plot_widget('short_decoded_epoch_matplotlib_view_widget')
+        active_2d_plot.sync_matplotlib_render_plot_widget('decoded_epoch_matplotlib_view_widget_short')
         short_decoded_replay_matplotlib_view_widget.draw()
 
         return long_decoded_replay_tuple, short_decoded_replay_tuple
@@ -3244,7 +3244,7 @@ class AddNewTrackTemplatesDecodedEpochSlicesRows_MatplotlibPlotCommand(BaseMenuC
         decoder_names: List[str] = track_templates.get_decoder_names()
         track_length_dict = track_templates.get_track_length_dict()
         
-        matplotlib_view_widget_names_map: Dict = {a_name:f'{a_name}_decoded_epoch_matplotlib_view_widget' for a_name in decoder_names}
+        matplotlib_view_widget_names_map: Dict = {a_name:f'decoded_epoch_matplotlib_view_widget_{a_name}' for a_name in decoder_names}
         
         plot_replay_tuple_dict = {}
         plot_heatmap_img_list_dict = {}
