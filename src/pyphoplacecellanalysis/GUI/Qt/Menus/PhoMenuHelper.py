@@ -11,6 +11,8 @@ from nptyping import NDArray
 from neuropy.utils.indexing_helpers import convert_to_dictlike
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.programming_helpers import VariableNameCaseFormat   
+
 
 class PhoMenuHelper(object):
     """ A static helper for building QMenu items, QActions and adding them to a window """
@@ -438,6 +440,26 @@ class PhoMenuHelper(object):
         action_objname_str = specific_action.objectName() # 'actionAddTimeIntervals_Laps'
         return cls.parse_action_name_for_menu_path(action_objname_str=action_objname_str) # ['AddTimeIntervals', 'Laps']
 
+    @function_attributes(short_name=None, tags=['FINAL'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 20:27', related_items=[])
+    @classmethod    
+    def parse_leaf_action_name_for_menu_path(cls, extracted_menu_path: str) -> str:
+        """ 
+        , should_split_on_underscore:bool=False, max_end_splits: int = 1
+        """
+         #action_objname_str:  'actionAddTimeIntervals_Laps'         
+        extracted_menu_path = extracted_menu_path.removeprefix('action')
+        extracted_menu_path = VariableNameCaseFormat.convert_format(extracted_menu_path, target_format=VariableNameCaseFormat.CAMEL_CASE)
+        # if should_split_on_underscore:
+        #     ## split only the last component
+        #     last_comp: str = extracted_menu_path[-1]
+        #     if '_' in last_comp:
+        #         last_comp_split = last_comp.split('_') ## only split the last component
+        #         last_comp_split = ['_'.join(last_comp_split[:(-max_end_splits)]), *last_comp_split[(-max_end_splits):]]
+        #         last_comp_split = [v for v in last_comp_split if len(v)>0]
+        #         extracted_menu_path = extracted_menu_path[:-1] + last_comp_split
+        ## otherwise it is unchanged
+        return extracted_menu_path # ['AddTimeIntervals', 'Laps']
+    
     
     @function_attributes(short_name=None, tags=['menus', 'actions', 'global'], input_requires=[], output_provides=[], uses=[], used_by=['build_all_programmatic_menu_command_dict'], creation_date='2024-12-18 16:29', related_items=[])
     @classmethod
@@ -449,7 +471,7 @@ class PhoMenuHelper(object):
         from neuropy.utils.mixins.indexing_helpers import get_dict_subset
         from neuropy.utils.indexing_helpers import flatten_dict
         from benedict import benedict
-        from pyphocorehelpers.programming_helpers import VariableNameCaseFormat        
+             
 
         def _subfn_extract_command_dict(actions_dict, debug_print=True, should_split_on_underscore:bool=False, max_end_splits: int = 1) -> Tuple[Dict[str, QtWidgets.QAction], List[str]]:
             """ Builds a dict of QActions from each menu item in `active_2d_plot.ui.menus.custom_context_menus.add_renderables`
@@ -471,7 +493,9 @@ class PhoMenuHelper(object):
                     print(f'specific_action_name: "{specific_action_name}"')
                     print(f'\textracted_menu_path: "{extracted_menu_path}"')
                     
-                extracted_menu_path[0] = VariableNameCaseFormat.convert_format(extracted_menu_path[0], target_format=VariableNameCaseFormat.CAMEL_CASE)
+                # extracted_menu_path[0] = VariableNameCaseFormat.convert_format(extracted_menu_path[0], target_format=VariableNameCaseFormat.CAMEL_CASE)
+                extracted_menu_path[0] = cls.parse_leaf_action_name_for_menu_path(extracted_menu_path[0])
+                
                 if debug_print:
                     print(f'\textracted_menu_path[0]: "{extracted_menu_path[0]}"')
 

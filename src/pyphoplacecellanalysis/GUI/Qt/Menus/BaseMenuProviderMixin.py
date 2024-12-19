@@ -44,7 +44,7 @@ class BaseMenuCommand:
     
     @property
     def command_identifier(self) -> str:
-        return self.action_identifier
+        return PhoMenuHelper.parse_leaf_action_name_for_menu_path(self.action_identifier)
 
     def log_command(self, *args, **kwargs):
         """ adds this command to the `menu_action_history_list` """
