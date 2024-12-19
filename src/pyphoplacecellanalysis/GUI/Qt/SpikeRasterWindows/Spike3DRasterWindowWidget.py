@@ -195,12 +195,16 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     @property
     def menu_action_history_list(self) -> List:
         """The menu_action_history_list property."""
-        return PhoMenuHelper.try_get_menu_window(self).ui.menus._menu_action_history_list # Window?
-        # return self.spike_raster_plt_2d.ui.menus._menu_action_history_list ## Spike3DRasterWindowWidget
+        # return PhoMenuHelper.try_get_menu_window(self).ui.menus._menu_action_history_list # Window?
+        # if not self.params.has_attr('_menu_action_history_list'):
+        #     self.params._menu_action_history_list = [] ## a list to show the history
+        return self.params._menu_action_history_list ## Spike3DRasterWindowWidget
+        # return self.spike_raster_plt_2d.ui._menu_action_history_list ## Spike3DRasterWindowWidget
     @menu_action_history_list.setter
     def menu_action_history_list(self, value):
-        # self.spike_raster_plt_2d.ui.menus._menu_action_history_list = value
-        PhoMenuHelper.try_get_menu_window(self).ui.menus._menu_action_history_list = value # window
+        # self.spike_raster_plt_2d.ui._menu_action_history_list = value
+        self.params._menu_action_history_list = value
+        # PhoMenuHelper.try_get_menu_window(self).ui.menus._menu_action_history_list = value # window
 
 
     def __init__(self, curr_spikes_df, core_app_name='UnifiedSpikeRasterApp', window_duration=15.0, window_start_time=30.0, neuron_colors=None, neuron_sort_order=None, application_name=None, type_of_3d_plotter='pyqtgraph', parent=None):
@@ -237,9 +241,9 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # self.ui.splitter.setStretchFactor(1, 1) # have the top widget by 3x the height as the bottom widget        
         
         
-        self.params = VisualizationParameters(self.applicationName)
+        self.params = VisualizationParameters(self.applicationName, _menu_action_history_list=[])
         self.params.type_of_3d_plotter = type_of_3d_plotter
-        
+        self.params._menu_action_history_list = []
         # Helper Mixins: INIT:
         
         self.SpikeRasterBottomFrameControlsMixin_on_init()

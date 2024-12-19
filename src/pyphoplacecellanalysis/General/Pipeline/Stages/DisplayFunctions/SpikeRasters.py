@@ -1485,7 +1485,7 @@ def _build_additional_spikeRaster2D_menus(spike_raster_plt_2d, owning_pipeline_r
     
     _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.add_renderable_context_menu(spike_raster_plt_2d, owning_pipeline_reference, active_config_name)  # Adds the custom context menus for SpikeRaster2D
     
-    spike_raster_plt_2d.menu_action_history_list = []
+    # spike_raster_plt_2d.menu_action_history_list = []
     
     output_references = [_active_2d_plot_renderable_menus]
     return output_references
@@ -1495,6 +1495,12 @@ def _build_additional_spikeRaster2D_menus(spike_raster_plt_2d, owning_pipeline_r
 def _build_additional_window_menus(spike_raster_window, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx):
     assert owning_pipeline_reference is not None
     active_config_name: str = _recover_filter_config_name_from_display_context(owning_pipeline_reference, active_display_fn_identifying_ctx) # recover active_config_name from the context
+
+    # if not spike_raster_window.ui.has_attr('_menu_action_history_list'):
+    #     spike_raster_window.ui._menu_action_history_list = [] ## a list to show the history
+
+    spike_raster_window.menu_action_history_list = []
+
 
     ## SpikeRaster2D Specific Items:
     output_references = _build_additional_spikeRaster2D_menus(spike_raster_window.spike_raster_plt_2d, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx)
