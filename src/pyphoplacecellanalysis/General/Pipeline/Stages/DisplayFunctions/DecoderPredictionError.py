@@ -3025,12 +3025,12 @@ class CreateNewStackedDecodedEpochSlicesPlotCommand(BaseMenuCommand):
     """ Creates a stacked decoded epoch slices view by calling _display_plot_decoded_epoch_slices
     
     """
-    _spike_raster_window = field()
-    _active_pipeline = field()
+    _spike_raster_window = field(repr=False)
+    _active_pipeline = field(repr=False)
     _active_config_name = field(default=None)
     _context = field(default=None, alias="active_context")
-    _filter_epochs = field(default='laps')
-    _display_output = field(default=Factory(dict))
+    _filter_epochs = field(default='lap')
+    _display_output = field(default=Factory(dict), repr=False)
     def execute(self, *args, **kwargs) -> None:
         """  """
         print(f'menu execute(): {self}')
@@ -3051,8 +3051,8 @@ class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
     adds ONE row
     
     """
-    _spike_raster_window = field()
-    _active_pipeline = field(alias='curr_active_pipeline')
+    _spike_raster_window = field(repr=False)
+    _active_pipeline = field(alias='curr_active_pipeline', repr=False)
     _active_config_name = field(default=None)
     _display_output = field(default=Factory(dict))
 
