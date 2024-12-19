@@ -61,7 +61,7 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, debug_print=Fa
      'Debug.MenuDebug', 'Debug.MenuDebugMenuActiveDrivers', 'Debug.MenuDebugMenuActiveDrivables', 'Debug.MenuDebugMenuActiveConnections',
     
      'DockedWidgets.NewDockedMatplotlibView', 'DockedWidgets.NewDockedContextNested', 'DockedWidgets.LongShortDecodedEpochsDockedMatplotlibView', 'DockedWidgets.DirectionalDecodedEpochsDockedMatplotlibView', 'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView', 'DockedWidgets.ContinuousPseudo2DDecodedMarginalsDockedMatplotlibView', 'DockedWidgets.NewDockedCustom', 'DockedWidgets.AddDockedWidget']
-     
+     ['AddMatplotlibPlot.DecodedPosition', 'AddMatplotlibPlot.Custom', 'AddTimeCurves.Position', 'AddTimeCurves.Velocity', 'AddTimeCurves.Random', 'AddTimeCurves.RelativeEntropySurprise', 'AddTimeCurves.Custom', 'AddTimeIntervals.Laps', 'AddTimeIntervals.PBEs', 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.Ripples', 'AddTimeIntervals.Replays', 'AddTimeIntervals.Bursts', 'AddTimeIntervals.Custom', 'CreateNewConnectedWidget.NewConnected2DRaster', 'CreateNewConnectedWidget.NewConnected3DRaster.PyQtGraph', 'CreateNewConnectedWidget.NewConnected3DRaster.Vedo', 'CreateNewConnectedWidget.NewConnectedDataExplorer.ipc', 'CreateNewConnectedWidget.NewConnectedDataExplorer.ipspikes', 'CreateNewConnectedWidget.AddMatplotlibPlot.DecodedPosition', 'CreateNewConnectedWidget.Decoded_Epoch_Slices.Laps', 'CreateNewConnectedWidget.Decoded_Epoch_Slices.PBEs', 'CreateNewConnectedWidget.Decoded_Epoch_Slices.Ripple', 'CreateNewConnectedWidget.Decoded_Epoch_Slices.Replay', 'CreateNewConnectedWidget.Decoded_Epoch_Slices.Custom', 'CreateNewConnectedWidget.MenuCreateNewConnectedWidget', 'CreateNewConnectedWidget.MenuCreateNewConnectedDecodedEpochSlices', 'Debug.MenuDebug', 'Debug.MenuDebugMenuActiveDrivers', 'Debug.MenuDebugMenuActiveDrivables', 'Debug.MenuDebugMenuActiveConnections', 'DockedWidgets.NewDockedMatplotlibView', 'DockedWidgets.LongShortDecodedEpochsDockedMatplotlibView', 'DockedWidgets.TrackTemplatesDecodedEpochsDockedMatplotlibView', 'DockedWidgets.DirectionalDecodedEpochsDockedMatplotlibView', 'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView', 'DockedWidgets.ContinuousPseudo2DDecodedMarginalsDockedMatplotlibView', 'DockedWidgets.NewDockedCustom', 'DockedWidgets.MenuDockedWidgets', 'DockedWidgets.AddDockedWidget'
      uSAGE:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _setup_spike_raster_window_for_debugging
         
@@ -86,9 +86,11 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, debug_print=Fa
 
     menu_commands = [
         # 'DockedWidgets.LongShortDecodedEpochsDockedMatplotlibView',
-        'DockedWidgets.DirectionalDecodedEpochsDockedMatplotlibView',
-        # 'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView',
+        # 'DockedWidgets.DirectionalDecodedEpochsDockedMatplotlibView',
+        'DockedWidgets.TrackTemplatesDecodedEpochsDockedMatplotlibView',
+        'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView',
         #  'DockedWidgets.ContinuousPseudo2DDecodedMarginalsDockedMatplotlibView',
+        
     ]
     # menu_commands = ['actionPseudo2DDecodedEpochsDockedMatplotlibView', 'actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'] # , 'AddTimeIntervals.SessionEpochs'
     for a_command in menu_commands:
