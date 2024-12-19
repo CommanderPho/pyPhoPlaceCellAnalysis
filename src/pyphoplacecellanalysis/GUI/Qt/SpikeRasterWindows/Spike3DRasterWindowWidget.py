@@ -1339,8 +1339,9 @@ if __name__ == "__main__":
     from PyQt5.QtCore import Qt
     from PyQt5.QtGui import QKeySequence
 
-    def _subfn_run_main(pkl_path, debug_print:bool=True):
+    def _subfn_run_main(pkl_path, debug_print:bool=True, debug_mode: bool=True):
         """ run main function to perform batch processing. """
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _setup_spike_raster_window_for_debugging
         
         print(f'pkl_path: {pkl_path}')
         
@@ -1366,10 +1367,19 @@ if __name__ == "__main__":
         curr_active_pipeline = _try_load_global_batch_result()
         assert curr_active_pipeline is not None
         print(f'loaded `curr_active_pipeline`, building Spike3DRasterWindowWidget...')
+        
+        ## Loads `curr_active_pipeline` from the provided path
+        if debug_mode:
+            Spike3DRasterWindowWidget.enable_interaction_events_debug_print = True    
         # Gets the existing SpikeRasterWindow or creates a new one if one doesn't already exist:
         spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget) = Spike3DRasterWindowWidget.find_or_create_if_needed(curr_active_pipeline, force_create_new=True)
         print(f'built `Spike3DRasterWindowWidget`, launching...')
-        
+        if debug_mode:
+            spike_raster_window.enable_debug_print = True
+            # spike_raster_window.should_debug_print_interaction_events = True
+            print(f'\tspike_raster_window.should_debug_print_interaction_events: {spike_raster_window.should_debug_print_interaction_events}')
+    
+
         # included_session_contexts: Optional[List[IdentifyingContext]] = [IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='one',session_name='2006-6-08_14-26-15'),
         #     IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='one',session_name='2006-6-09_1-22-43'),
         #     IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='one',session_name='2006-6-12_15-55-31'),
@@ -1393,6 +1403,9 @@ if __name__ == "__main__":
         #                                                                                                     should_force_reload_all=should_force_reload_all, 
         #                                                                                                     should_perform_figure_generation_to_file=should_perform_figure_generation_to_file, 
         #                                                                                                     debug_print=debug_print)
+        
+        all_global_menus_actionsDict, global_flat_action_dict = _setup_spike_raster_window_for_debugging(spike_raster_window)
+
         return spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget), curr_active_pipeline
         
 
@@ -1433,7 +1446,8 @@ if __name__ == "__main__":
 
     # testWidget = Spike3DRasterWindowWidget()
 
-    ## Loads `curr_active_pipeline` from the provided path
+
+
     spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget), curr_active_pipeline = _subfn_run_main(pkl_path)
     spike_raster_window.show()
 
