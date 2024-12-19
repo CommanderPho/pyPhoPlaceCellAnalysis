@@ -297,24 +297,27 @@ def perform_plot_1D_single_most_likely_position_curve(ax, time_window_centers, a
 
 
 @function_attributes(short_name=None, tags=['plot'], input_requires=[], output_provides=[], uses=[], used_by=['_subfn_try_plot_posterior_image', 'plot_slices_1D_most_likely_position_comparsions'], creation_date='2024-12-19 04:46', related_items=[])
-def _subfn_try_get_approximate_recovered_t_pos(time_window_centers, xbin):
+def _subfn_try_get_approximate_recovered_t_pos(time_window_centers, xbin, use_original_bounds: bool=False):
     """ 
     x_first_extent = _subfn_try_get_approximate_recovered_t_pos(time_window_centers, xbin)
     xmin, xmax, ymin, ymax = x_first_extent    
     x_first_extent = (xmin, xmax, ymin, ymax)
     active_extent = x_first_extent
     """
-    ## Determine the actual start/end times:
-    approximated_recovered_delta_t: float = float(np.nanmedian(np.diff(time_window_centers)))
-    approximated_recovered_half_delta_t = approximated_recovered_delta_t / 2.0
-    # xmin, xmax, ymin, ymax = (time_window_centers[0], time_window_centers[-1], xbin[0], xbin[-1]) # TODO 2024-03-27 - This is actually incorrect, the extents should be the actual start/stop of the bins, not the time_window_centers
-    return ((time_window_centers[0]-approximated_recovered_half_delta_t), (time_window_centers[-1]+approximated_recovered_half_delta_t), xbin[0], xbin[-1]) # 2024-03-27 - Corrected extents computed by adding a half-bin width to the first/last time_window_centers to recover the proper edges.
+    if use_original_bounds:
+        return (time_window_centers[0], time_window_centers[-1], xbin[0], xbin[-1])
+    else:
+        ## Determine the actual start/end times:
+        approximated_recovered_delta_t: float = float(np.nanmedian(np.diff(time_window_centers)))
+        approximated_recovered_half_delta_t = approximated_recovered_delta_t / 2.0
+        # xmin, xmax, ymin, ymax = (time_window_centers[0], time_window_centers[-1], xbin[0], xbin[-1]) # TODO 2024-03-27 - This is actually incorrect, the extents should be the actual start/stop of the bins, not the time_window_centers
+        return ((time_window_centers[0]-approximated_recovered_half_delta_t), (time_window_centers[-1]+approximated_recovered_half_delta_t), xbin[0], xbin[-1]) # 2024-03-27 - Corrected extents computed by adding a half-bin width to the first/last time_window_centers to recover the proper edges.
 
 
 @function_attributes(short_name=None, tags=['plot'], input_requires=[], output_provides=[], uses=['_subfn_try_get_approximate_recovered_t_pos'], used_by=[], creation_date='2024-12-19 04:46', related_items=[])
-def _subfn_try_plot_posterior_image(ax, time_window_centers, posterior, xbin, enable_set_axis_limits:bool=True, **main_plot_kwargs):
+def _subfn_try_plot_posterior_image(ax, time_window_centers, posterior, xbin, enable_set_axis_limits:bool=True, use_original_bounds: bool=False, **main_plot_kwargs):
     ## Determine the actual start/end times:
-    x_first_extent = _subfn_try_get_approximate_recovered_t_pos(time_window_centers, xbin)
+    x_first_extent = _subfn_try_get_approximate_recovered_t_pos(time_window_centers, xbin, use_original_bounds=use_original_bounds)
     xmin, xmax, ymin, ymax = x_first_extent
     # approximated_recovered_delta_t: float = float(np.nanmedian(np.diff(time_window_centers)))
     # approximated_recovered_half_delta_t = approximated_recovered_delta_t / 2.0
@@ -338,7 +341,7 @@ def _subfn_try_plot_posterior_image(ax, time_window_centers, posterior, xbin, en
 
 @function_attributes(short_name=None, tags=['decoder', 'plot', '1D', 'matplotlib'], input_requires=[], output_provides=[], uses=['perform_plot_1D_single_most_likely_position_curve'], used_by=['plot_most_likely_position_comparsions', '_helper_update_decoded_single_epoch_slice_plot'], creation_date='2023-05-01 00:00', related_items=['plot_slices_1D_most_likely_position_comparsions'])
 def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_centers, xbin, ax=None, posterior=None, active_most_likely_positions_1D=None, enable_flat_line_drawing=False, variable_name = 'x', debug_print=False, 
-                                             skip_plotting_measured_positions=False, skip_plotting_most_likely_positions=False, posterior_heatmap_imshow_kwargs=None):
+                                             skip_plotting_measured_positions=False, skip_plotting_most_likely_positions=False, posterior_heatmap_imshow_kwargs=None, use_original_bounds=False):
     """ renders a single 2D subplot in MATPLOTLIB for a 1D position axes: the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
     
     Animal's actual position is rendered as a red line with no markers 
@@ -411,7 +414,7 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
             } | posterior_heatmap_imshow_kwargs # merges `posterior_heatmap_imshow_kwargs` into main_plot_kwargs, replacing the existing values if present in both
             # Posterior distribution heatmaps at each point.
 
-            im_posterior_x = _subfn_try_plot_posterior_image(ax, time_window_centers=time_window_centers, posterior=posterior, xbin=xbin, **main_plot_kwargs)
+            im_posterior_x = _subfn_try_plot_posterior_image(ax, time_window_centers=time_window_centers, posterior=posterior, xbin=xbin, use_original_bounds=use_original_bounds, **main_plot_kwargs)
 
 
         else:
@@ -431,7 +434,7 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
 # A version of `plot_1D_most_likely_position_comparsions` that plots several images on the same axis: ____________________________________________________ #
 @function_attributes(short_name=None, tags=['decoder', 'plot', '1D', 'matplotlib', 'slices'], input_requires=[], output_provides=[], uses=[], used_by=['plot_most_likely_position_comparsions', 'AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand', 'AddNewTrackTemplatesDecodedEpochSlicesRows_MatplotlibPlotCommand'], creation_date='2023-10-17 12:25', related_items=['plot_1D_most_likely_position_comparsions'])
 def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices_time_window_centers, xbin, ax=None, slices_posteriors=None, slices_active_most_likely_positions_1D=None, slices_additional_plots_data=None, enable_flat_line_drawing=False, variable_name = 'x', debug_print=False, 
-                                             skip_plotting_measured_positions=False, skip_plotting_most_likely_positions=False, posterior_heatmap_imshow_kwargs=None):
+                                             skip_plotting_measured_positions=False, skip_plotting_most_likely_positions=False, posterior_heatmap_imshow_kwargs=None, use_original_bounds=True):
     """ renders a single 2D subplot in MATPLOTLIB for a 1D position axes: the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
     
     Animal's actual position is rendered as a red line with no markers 
@@ -475,6 +478,10 @@ def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices
     if posterior_heatmap_imshow_kwargs is None:
         posterior_heatmap_imshow_kwargs = {}
     ## END if posterior_heatmap_imshow_kwargs is None...
+
+    if use_original_bounds != True:
+        print(f'WARN: use_original_bounds should be true for `plot_slices_1D_most_likely_position_comparsions(...)` so it lines up properly!')
+        
     
     # Get the colormap to use and set the bad color
     # cmap = get_heatmap_cmap(cmap='viridis', bad_color='black', under_color='white', over_color='red')
@@ -527,7 +534,7 @@ def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices
             # extents_list = [(a_centers[0], a_centers[-1], ymin, ymax) for a_centers in slices_time_window_centers] ## original mode
             # extents_list = [_subfn_try_get_approximate_recovered_t_pos(a_centers, xbin) for a_centers in slices_time_window_centers] ## 2024-12-19 05:03 Attempt to make it consistent with `plot_1D_most_likely_position_comparsions`
             # out_img_list = [ax.imshow(a_posterior, extent=an_extent, **main_plot_kwargs) for an_extent, a_posterior in zip(extents_list, slices_posteriors)]
-            out_img_list = [_subfn_try_plot_posterior_image(ax, time_window_centers=a_centers, posterior=a_posterior, xbin=xbin, enable_set_axis_limits=False, **main_plot_kwargs) for a_centers, a_posterior in zip(slices_time_window_centers, slices_posteriors)]
+            out_img_list = [_subfn_try_plot_posterior_image(ax, time_window_centers=a_centers, posterior=a_posterior, xbin=xbin, enable_set_axis_limits=False, use_original_bounds=use_original_bounds, **main_plot_kwargs) for a_centers, a_posterior in zip(slices_time_window_centers, slices_posteriors)]
             ax.set_ylim((ymin, ymax)) ## only need to do once, when we are done
         # END if slices_posteriors is not None
 
@@ -3240,6 +3247,7 @@ class AddNewTrackTemplatesDecodedEpochSlicesRows_MatplotlibPlotCommand(BaseMenuC
         matplotlib_view_widget_names_map: Dict = {a_name:f'{a_name}_decoded_epoch_matplotlib_view_widget' for a_name in decoder_names}
         
         plot_replay_tuple_dict = {}
+        plot_heatmap_img_list_dict = {}
         # initial_row_idx: int = 2
         for i, (a_name, a_decoder) in enumerate(track_templates.get_decoders_dict().items()):
             # curr_row_idx: int = (i + initial_row_idx)
@@ -3253,14 +3261,15 @@ class AddNewTrackTemplatesDecodedEpochSlicesRows_MatplotlibPlotCommand(BaseMenuC
                                                                     slices_active_most_likely_positions_1D=None, enable_flat_line_drawing=False, ax=curr_decoded_replay_ax[0], debug_print=debug_print,
                                                                     posterior_heatmap_imshow_kwargs=dict(cmap=active_cmap),
                                                                     )
-            # fig, ax, out_img_list = _out_long
+            _, _, curr_out_img_list = _out_curr_plot_tuple
+            plot_heatmap_img_list_dict[a_name] = curr_out_img_list
 
             # long_decoded_replay_fig, long_decoded_replay_ax = _out_long
             active_2d_plot.sync_matplotlib_render_plot_widget(matplotlib_view_widget_name)
             curr_decoded_replay_matplotlib_view_widget.draw()
         ## END for i, (a_name, a_decoder) in en...
 
-        return plot_replay_tuple_dict, matplotlib_view_widget_names_map
+        return plot_replay_tuple_dict, matplotlib_view_widget_names_map, plot_heatmap_img_list_dict
 
 
     def execute(self, *args, **kwargs) -> None:
@@ -3271,11 +3280,13 @@ class AddNewTrackTemplatesDecodedEpochSlicesRows_MatplotlibPlotCommand(BaseMenuC
         # print(f'AddNewDecodedPosition_MatplotlibPlotCommand.execute(...)')
         active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
         # If no plot to render on, do this:
-        plot_replay_tuple_dict, matplotlib_view_widget_names_map = self.add_track_templates_decoder_decoded_replays(self._active_pipeline, active_2d_plot)
+        plot_replay_tuple_dict, matplotlib_view_widget_names_map, plot_heatmap_img_list_dict = self.add_track_templates_decoder_decoded_replays(self._active_pipeline, active_2d_plot)
 
         # Update display output dict:
         self._display_output['matplotlib_view_widget_names_map'] = matplotlib_view_widget_names_map
-        self._display_output.update(plot_replay_tuple_dict) ## copy the tuples from that dict to the ._display_output one
+        self._display_output['plot_heatmap_img_list_dict'] = plot_heatmap_img_list_dict
+        self._display_output['plot_replay_tuple_dict'] = plot_replay_tuple_dict
+        # self._display_output.update(plot_replay_tuple_dict) ## copy the tuples from that dict to the ._display_output one
         
         print(f'\t AddNewTrackTemplatesDecodedEpochSlicesRows_MatplotlibPlotCommand.execute() is done.')
 
