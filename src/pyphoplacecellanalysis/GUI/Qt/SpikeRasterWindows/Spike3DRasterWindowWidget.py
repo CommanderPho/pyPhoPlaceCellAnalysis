@@ -1317,6 +1317,10 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
 
 
+
+# ==================================================================================================================== #
+# __name__ == "__main__"                                                                                               #
+# ==================================================================================================================== #
 if __name__ == "__main__":
     """ 
             assert global_data_root_parent_path.exists(), f"global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
@@ -1414,7 +1418,7 @@ if __name__ == "__main__":
         #                                                                                                     should_perform_figure_generation_to_file=should_perform_figure_generation_to_file, 
         #                                                                                                     debug_print=debug_print)
         
-        all_global_menus_actionsDict, global_flat_action_dict = _setup_spike_raster_window_for_debugging(spike_raster_window)
+        all_global_menus_actionsDict, global_flat_action_dict = _setup_spike_raster_window_for_debugging(spike_raster_window, debug_print=debug_print)
 
         return spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget), curr_active_pipeline
         

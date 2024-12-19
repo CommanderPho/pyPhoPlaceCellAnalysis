@@ -85,6 +85,7 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, debug_print=Fa
     # active_2d_plot.ui.menus # .global_window_menus.docked_widgets.actions_dict
 
     menu_commands = [
+        'AddTimeCurves.Position',
         # 'DockedWidgets.LongShortDecodedEpochsDockedMatplotlibView',
         # 'DockedWidgets.DirectionalDecodedEpochsDockedMatplotlibView',
         'DockedWidgets.TrackTemplatesDecodedEpochsDockedMatplotlibView',
