@@ -129,12 +129,12 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
         # ==================================================================================================================== #
         # Connect the relevent actions to each action:
         
-        curr_actions_dict['actionNewDockedMatplotlibView'].triggered.connect(AddNewDecodedPosition_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output))
-        curr_actions_dict['actionNewDockedContextNested'].triggered.connect(CreateNewContextNestedDocksCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output))
-        curr_actions_dict['actionLongShortDecodedEpochsDockedMatplotlibView'].triggered.connect(AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output))
-        curr_actions_dict['actionDirectionalDecodedEpochsDockedMatplotlibView'].triggered.connect(AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output))
-        curr_actions_dict['actionPseudo2DDecodedEpochsDockedMatplotlibView'].triggered.connect(AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output))
-        curr_actions_dict['actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'].triggered.connect(AddNewDecodedEpochMarginal_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output))
+        curr_actions_dict['actionNewDockedMatplotlibView'].triggered.connect(AddNewDecodedPosition_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output, action_identifier='actionNewDockedMatplotlibView'))
+        curr_actions_dict['actionNewDockedContextNested'].triggered.connect(CreateNewContextNestedDocksCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionNewDockedContextNested'))
+        curr_actions_dict['actionLongShortDecodedEpochsDockedMatplotlibView'].triggered.connect(AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionLongShortDecodedEpochsDockedMatplotlibView'))
+        curr_actions_dict['actionDirectionalDecodedEpochsDockedMatplotlibView'].triggered.connect(AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionDirectionalDecodedEpochsDockedMatplotlibView'))
+        curr_actions_dict['actionPseudo2DDecodedEpochsDockedMatplotlibView'].triggered.connect(AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionPseudo2DDecodedEpochsDockedMatplotlibView'))
+        curr_actions_dict['actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'].triggered.connect(AddNewDecodedEpochMarginal_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'))
         
         # curr_actions_dict['actionNewDockedCustom'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='decoder', active_context=active_context, display_output=display_output))
                 
@@ -184,8 +184,9 @@ class CreateNewContextNestedDocksCommand(BaseMenuCommand):
     """ build_combined_time_synchronized_plotters_window
     A command to create a plotter as needed
     """
-    def __init__(self, spike_raster_window, active_pipeline, active_config_name=None, active_context=None, display_output={}) -> None:
-        super(CreateNewContextNestedDocksCommand, self).__init__()
+    
+    def __init__(self, spike_raster_window, active_pipeline, active_config_name=None, active_context=None, display_output={}, action_identifier: str=None) -> None:
+        super(CreateNewContextNestedDocksCommand, self).__init__(action_identifier=action_identifier)
         self._spike_raster_window = spike_raster_window
         self._active_pipeline = active_pipeline
         self._active_config_name = active_config_name

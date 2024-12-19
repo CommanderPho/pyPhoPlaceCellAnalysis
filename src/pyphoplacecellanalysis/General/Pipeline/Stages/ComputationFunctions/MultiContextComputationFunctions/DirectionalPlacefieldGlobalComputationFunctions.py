@@ -7678,6 +7678,13 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewPseudo2DDecodedEpoc
 
 
     def execute(self, *args, **kwargs) -> None:
+        """ 
+        
+        
+        """
+        print(f'menu execute(): {self}')
+        self.log_command(*args, **kwargs) # adds this command to the `menu_action_history_list` 
+        
         ## To begin, the destination plot must have a matplotlib widget plot to render to:
         # print(f'AddNewDecodedEpochMarginal_MatplotlibPlotCommand.execute(...)')
         active_2d_plot = self._spike_raster_window.spike_raster_plt_2d

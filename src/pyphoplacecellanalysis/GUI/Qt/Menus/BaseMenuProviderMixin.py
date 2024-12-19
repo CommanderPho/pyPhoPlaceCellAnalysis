@@ -24,9 +24,16 @@ class BaseMenuCommand:
     The windows themselves shouldn't hold references to computed results outside of their scope (e.g. Spike2DRaster should only have access to the `spikes_df` and a few other properties that it needs to perform its task -- in this case positions, binned firing rates, etc. are far out of scope of this class itself).
 
     """
+    action_identifier: str = field(default=None, kw_only=True, metadata={'desc':'the string identifier used to reverse-identifier the action.'})
+    
     # def __init__(self) -> None:
     #     pass
-
+    
+    def __attrs_post_init__(self):
+        # Add post-init logic here
+        if self.action_identifier is None:
+            self.action_identifier = f'{self.__class__.__name__}'
+    
     @property
     def is_visible(self):
         return True
@@ -34,13 +41,21 @@ class BaseMenuCommand:
     @property
     def is_enabled(self):
         return True
-        
+    
+    @property
+    def command_identifier(self) -> str:
+        return self.action_identifier
+
     def log_command(self, *args, **kwargs):
         """ adds this command to the `menu_action_history_list` """
-        if self._spike_raster_window.menu_action_history_list is None:
-            self._spike_raster_window.menu_action_history_list = [] # initialize if needed
+        print(f'log_command(...): {self.command_identifier}')
+        assert self._spike_raster_window.menu_action_history_list is not None
+        # if self._spike_raster_window.menu_action_history_list is None:
+        #     self._spike_raster_window.menu_action_history_list = [] # initialize if needed
+        # self._spike_raster_window.menu_action_history_list.append(self)
         ## add self to the history list
-        self._spike_raster_window.menu_action_history_list.append(self)
+        self._spike_raster_window.menu_action_history_list.append(self.command_identifier)
+        print(f'\tlen(self._spike_raster_window.menu_action_history_list): {len(self._spike_raster_window.menu_action_history_list)}')
         # self._spike_raster_window.menu_action_history_list.append(self.__qualname__)
                 
 

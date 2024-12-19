@@ -110,10 +110,10 @@ class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
         # curr_actions_dict['actionTimeSynchronizedDecoderPlotter'] = widget.ui.actionTimeSynchronizedDecoderPlotter
         # curr_actions_dict['actionCombineTimeSynchronizedPlotterWindow'] = widget.ui.actionCombineTimeSynchronizedPlotterWindow
         
-        curr_actions_dict['actionTimeSynchronizedOccupancyPlotter'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='occupancy', active_context=active_context, display_output=display_output))
-        curr_actions_dict['actionTimeSynchronizedPlacefieldsPlotter'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='placefields', active_context=active_context, display_output=display_output))
-        curr_actions_dict['actionTimeSynchronizedDecoderPlotter'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='decoder', active_context=active_context, display_output=display_output))
-        curr_actions_dict['actionCombineTimeSynchronizedPlotterWindow'].triggered.connect(CreateNewTimeSynchronizedCombinedPlotterCommand(spike_raster_window, active_pf_2D_dt, active_context=active_context, display_output=display_output))
+        curr_actions_dict['actionTimeSynchronizedOccupancyPlotter'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='occupancy', active_context=active_context, display_output=display_output, action_identifier='actionTimeSynchronizedOccupancyPlotter'))
+        curr_actions_dict['actionTimeSynchronizedPlacefieldsPlotter'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='placefields', active_context=active_context, display_output=display_output, action_identifier='actionTimeSynchronizedPlacefieldsPlotter'))
+        curr_actions_dict['actionTimeSynchronizedDecoderPlotter'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='decoder', active_context=active_context, display_output=display_output, action_identifier='actionTimeSynchronizedDecoderPlotter'))
+        curr_actions_dict['actionCombineTimeSynchronizedPlotterWindow'].triggered.connect(CreateNewTimeSynchronizedCombinedPlotterCommand(spike_raster_window, active_pf_2D_dt, active_context=active_context, display_output=display_output, action_identifier='actionCombineTimeSynchronizedPlotterWindow'))
         
         curr_window.ui.actionMenuCreateLinkedWidget = curr_menubar.addMenu(self.activeMenuReference.top_level_menu)  # add it to the menubar
 
@@ -152,8 +152,8 @@ class CreateNewTimeSynchronizedPlotterCommand(BaseMenuCommand):
     """ build_combined_time_synchronized_plotters_window
     A command to create a plotter as needed
     """
-    def __init__(self, spike_raster_window, active_pf_2D_dt, plotter_type='occupancy', active_context=None, display_output={}) -> None:
-        super(CreateNewTimeSynchronizedPlotterCommand, self).__init__()
+    def __init__(self, spike_raster_window, active_pf_2D_dt, plotter_type='occupancy', active_context=None, display_output={}, action_identifier: str=None) -> None:
+        super(CreateNewTimeSynchronizedPlotterCommand, self).__init__(action_identifier=action_identifier)
         self._spike_raster_window = spike_raster_window
         self._active_pf_2D_dt = active_pf_2D_dt
         self._context = active_context
@@ -186,8 +186,8 @@ class CreateNewTimeSynchronizedCombinedPlotterCommand(BaseMenuCommand):
     """ build_combined_time_synchronized_plotters_window
     A command to create a plotter as needed
     """
-    def __init__(self, spike_raster_window, active_pf_2D_dt, active_context=None, display_output={}) -> None:
-        super(CreateNewTimeSynchronizedCombinedPlotterCommand, self).__init__()
+    def __init__(self, spike_raster_window, active_pf_2D_dt, active_context=None, display_output={}, action_identifier: str=None) -> None:
+        super(CreateNewTimeSynchronizedCombinedPlotterCommand, self).__init__(action_identifier=action_identifier)
         self._spike_raster_window = spike_raster_window
         self._active_pf_2D_dt = active_pf_2D_dt
         self._context = active_context
