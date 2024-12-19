@@ -42,7 +42,7 @@ class CustomDockDisplayConfig(DockDisplayConfig):
     def orientation(self, value):
         self._orientation = value
 
-    def __init__(self, showCloseButton=True, fontSize='12px', corner_radius='3px', custom_get_colors_callback_fn=None, orientation=None):
+    def __init__(self, showCloseButton=True, fontSize='10px', corner_radius='2px', custom_get_colors_callback_fn=None, orientation=None):
         super(CustomDockDisplayConfig, self).__init__(showCloseButton=showCloseButton, fontSize=fontSize, corner_radius=corner_radius)
         self._custom_get_colors_callback_fn = custom_get_colors_callback_fn
         self._orientation = orientation
@@ -166,7 +166,7 @@ class CustomCyclicColorsDockDisplayConfig(CustomDockDisplayConfig):
     def named_color_scheme(self, value):
         self._named_color_scheme = value
     
-    def __init__(self, showCloseButton=True, fontSize='12px', corner_radius='3px', orientation=None, named_color_scheme=NamedColorScheme.red):
+    def __init__(self, showCloseButton=True, fontSize='10px', corner_radius='2px', orientation=None, named_color_scheme=NamedColorScheme.red):
         super(CustomCyclicColorsDockDisplayConfig, self).__init__(showCloseButton=showCloseButton, fontSize=fontSize, corner_radius=corner_radius, orientation=orientation)
         self._named_color_scheme = named_color_scheme
 
