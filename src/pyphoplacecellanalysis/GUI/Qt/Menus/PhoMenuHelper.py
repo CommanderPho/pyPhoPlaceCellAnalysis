@@ -443,7 +443,7 @@ class PhoMenuHelper(object):
     @function_attributes(short_name=None, tags=['FINAL'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 20:27', related_items=[])
     @classmethod    
     def parse_leaf_action_name_for_menu_path(cls, extracted_menu_path: str) -> str:
-        """ 
+        """ 'actionTimeSynchronizedOccupancyPlotter' -> 'TimeSynchronizedOccupancyPlotter'
         , should_split_on_underscore:bool=False, max_end_splits: int = 1
         """
          #action_objname_str:  'actionAddTimeIntervals_Laps'         
