@@ -2991,12 +2991,6 @@ class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
         ## To begin, the destination plot must have a matplotlib widget plot to render to:
         # print(f'AddNewDecodedPosition_MatplotlibPlotCommand.execute(...)')
         
-        if self._spike_raster_window.menu_action_history_list is None:
-            self._spike_raster_window.menu_action_history_list = [] # initialize if needed
-        
-        ## add self to the history list
-        self._spike_raster_window.menu_action_history_list.append(self)
-        
         active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
         # If no plot to render on, do this:
         widget, matplotlib_fig, matplotlib_fig_ax = active_2d_plot.add_new_matplotlib_render_plot_widget(name='MenuCommand_display_plot_marginal_1D_most_likely_position_comparisons')
