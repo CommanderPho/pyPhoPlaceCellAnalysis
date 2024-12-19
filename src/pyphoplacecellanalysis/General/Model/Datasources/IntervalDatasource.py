@@ -312,8 +312,23 @@ class IntervalsDatasource(BaseDatasource):
     @QtCore.pyqtSlot(float, float)
     def get_updated_data_window(self, new_start, new_end):
         """ called to get the data that should be displayed for the window starting at new_start and ending at new_end """
+        try:
+            return self.df[self.df['t_start', 't_end'].between(new_start, new_end)]
+
+        except Exception as e:
+            print(f'WARN: fallback to non-series-based filtering. Exception: {e}.')            
+            pass
+
+        is_interval_start_in_active_window = np.logical_and((new_start <= self.df['t_start']), (self.df['t_start'] < new_end))
+        is_interval_end_in_active_window = np.logical_and((new_start < self.df['t_end']), (self.df['t_end'] <= new_end))
+        is_entire_interval_contained_in_active_window = np.logical_and(is_interval_start_in_active_window, is_interval_end_in_active_window)
+        is_any_portion_of_interval_contained_in_active_window = np.logical_or(is_interval_start_in_active_window, is_interval_end_in_active_window)
+        return self.df[is_any_portion_of_interval_contained_in_active_window]
+
         # return self.df[self.df[self.time_column_names].between(new_start, new_end)]
         # self.df['t_start', 't_duration', 't_end']    
-        return self.df[self.df['t_start', 't_end'].between(new_start, new_end)]
+        # self.df[np.logical_and((new_start <= self.df['t_start']), (self.df['t_end'] <= new_end))]
+
+        # return self.df[self.df['t_start', 't_end'].between(new_start, new_end)]
     
 
