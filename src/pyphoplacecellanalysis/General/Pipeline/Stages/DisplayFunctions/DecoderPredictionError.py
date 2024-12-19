@@ -163,7 +163,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
     @function_attributes(short_name='decoded_epoch_slices', tags=['display', 'decoder', 'epoch','slices'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices', '_compute_specific_decoded_epochs', 'DefaultComputationFunctions._perform_specific_epochs_decoding'], used_by=[], creation_date='2023-03-23 15:49')
     def _display_plot_decoded_epoch_slices(computation_result, active_config, active_context=None, filter_epochs='ripple', included_epoch_indicies=None, **kwargs):
         """ renders a plot with the 1D Marginals either (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. 
-        
+        2024-12-19 11:46 This isn't working and has undefined variables?
         TODO: This display function is currently atypically implemented as it performs computations as needed.
 
         Depends on `_compute_specific_decoded_epochs` to compute the decoder for the epochs.
