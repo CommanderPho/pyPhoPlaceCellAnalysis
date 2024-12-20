@@ -62,6 +62,11 @@ class TestSubsequenceMerging(unittest.TestCase):
     """
 
     def setUp(self):
+        ## Testing Settings:
+        self.enable_debug_plotting = False
+        self.enable_debug_printing = True
+        
+        ## Configuration
         self.decoder_track_length_dict = {'long_LR': 214.0, 'long_RL': 214.0, 'short_LR': 144.0, 'short_RL': 144.0}
         self.max_ignore_bins = 2
         self.max_jump_distance_cm = 60.0
@@ -79,7 +84,9 @@ class TestSubsequenceMerging(unittest.TestCase):
                                                                         debug_print=False)
 
 
-
+    def tearDown(self):
+        pass
+    
     
     def test_single_sequence(self):
         # Test a single-bin intrusion between two long sequences
