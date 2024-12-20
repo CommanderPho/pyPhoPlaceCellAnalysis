@@ -1,78 +1,17 @@
 from copy import deepcopy
 import unittest
-from typing import List, Dict
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing_extensions import TypeAlias
+from nptyping import NDArray
+import neuropy.utils.type_aliases as types
 import numpy as np
 from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import SubsequencesPartitioningResult
 from neuropy.utils.indexing_helpers import PandasHelpers, NumpyHelpers, flatten
+from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
 
+from attr import define, field, Factory
 
-class SubsequenceDetectionSamples:
-    intrusion_example_positions_list = [
-        [252.083,248.278,248.278,252.083,240.667,229.251,38.9801,198.808,175.975,160.753,153.143,149.337,214.029,145.532,183.586,118.894,77.0343],
-        [233.056,225.446,225.446,217.835,217.835,217.835,217.835,217.835,240.667,244.473,248.278,248.278,240.667,236.862,240.667,77.0343,214.029,175.975,164.559,153.143,141.726,183.586,58.0072,54.2018],
-        [217.835,217.835,206.418,195.002,195.002,99.8668,221.64,107.478,96.0614,80.8397,73.2289,80.8397,77.0343],
-        [92.2559,84.6451,84.6451,92.2559,134.116,126.505,126.505,141.726,149.337,38.9801],
-    ]
-
-    most_likely_positions_bad_single_main_seq = np.array([38.9801,225.446,225.446,145.532,137.921,38.9801,225.446,217.835,175.975,107.478,134.116,145.532,38.9801,38.9801,172.17,149.337,248.278,225.446,153.143,145.532,111.283,69.4234])
-
-    jump_bad_list = [
-     [227.75, 250.404, 182.442, 223.974, 231.526, 84.2736, 38.9652, 235.301, 223.974, 220.199, 227.75, 227.75, 182.442, 182.442, 152.236, 239.077, 239.077, 235.301, 231.526, 250.404],
-     [182.442, 193.769, 189.993, 174.89, 148.46, 54.068],
-     [186.217, 186.217, 186.217, 163.563, 91.8249, 69.1708, 186.217, 186.217, 193.769, 201.32, 193.769, 201.32],
-     [242.853, 242.853, 205.096, 72.9465, 76.7222, 110.703, 144.685, 186.217],
-    ]
-    
-    good_long_sequences_list = [
-        [84.2736, 80.4979, 133.358, 174.89, 174.89, 186.217, 201.32],
-    ]
-    
-
-    questionable_list = [
-     [187.3913658457913, 141.72636044772838, 126.50469198170738, 84.64510370014968, 46.59093253509721,],   
-     [236.86178836035953, 122.69927486520214, 248.27803970987526, 244.47262259337003, 252.08345682638054, 244.47262259337003, 252.08345682638054, 252.08345682638054, 160.75344603025462, 187.3913658457913, 96.06135504966542, 115.08844063219165,],
-    ]
-    
-    false_positive_list = [
-        [134.116, 38.9801, 210.224, 183.586, 38.9801, 38.9801, 38.9801, 38.9801, 38.9801, 38.9801, 38.9801, 38.9801, 206.418, 206.418, 195.002, 206.418, 38.9801, 38.9801, 206.418, 38.9801, 38.9801, 38.9801, 38.9801, 38.9801, 206.418, 198.808, 206.418],
-    ]
-    
-    chose_incorrect_subsequence_as_main_list = [
-        [236.862, 236.862, 236.862, 236.862, 236.862, 236.862, 236.862, 236.862, 240.667, 244.473, 236.862, 236.862, 236.862, 236.862, 236.862, 54.2018, 187.391, 183.586, 160.753, 134.116, 96.0614, 80.8397, 77.0343, 236.862],   
-    ]
-    
-    wrongly_split_main_sequence_and_grabbed_part_list = [
-     [252.083, 252.083, 252.083, 252.083, 252.083, 252.083, 252.083, 252.083, 248.278, 244.473, 244.473, 236.862, 229.251, 221.64, 221.64, 46.5909, 191.197, 164.559, 160.753, 134.116, 96.0614, 80.8397, 46.5909, 38.9801],
-     [248.278, 244.473, 236.862, 233.056, 229.251, 225.446, 229.251, 195.002, 126.505, 77.0343, 38.9801, 50.3963, 54.2018, 58.0072, 46.5909, 54.2018, 46.5909], ## Jump too big in the middle?
-     [248.278, 248.278, 244.473, 244.473, 244.473, 225.446, 202.613, 225.446, 122.699, 149.337, 149.337, 153.143, 137.921, 130.31, 118.894, 217.835, 122.699, 96.0614, 217.835, 58.0072, 38.9801],
-     [210.224, 214.029, 210.224, 210.224, 210.224, 210.224, 210.224, 175.975, 195.002, 118.894, 96.0614, 92.2559, 187.391, 38.9801, 84.6451, 84.6451, 202.613],
-     [77.0343, 77.0343, 77.0343, 130.31, 130.31, 103.672, 115.088, 115.088, 118.894, 137.921, 221.64, 160.753],
-     [58.0072, 58.0072, 54.2018, 58.0072, 202.613, 206.418, 38.9801, 84.6451, 111.283, 126.505, 198.808, 164.559],
-     [248.278, 229.251, 233.056, 229.251, 244.473, 202.613, 244.473, 111.283, 88.4505, 38.9801, 50.3963, 38.9801],
-     [206.418, 191.197, 187.391, 164.559, 175.975, 172.17, 149.337, 149.337, 153.143, 137.921, 115.088, 118.894, 103.672, 99.8668, 96.0614, 38.9801, 96.0614, 96.0614, 179.781, 92.2559, 92.2559, 92.2559, 92.2559, 84.6451, 88.4505, 88.4505, 38.9801, 221.64, 84.6451],
-    ]
-    
-
-    false_negative_incorrect_split_list = [
-[206.418, 191.197, 187.391, 164.559, 175.975, 172.17, 149.337, 149.337, 153.143, 137.921, 115.088, 118.894, 103.672, 99.8668, 96.0614, 38.9801, 96.0614, 96.0614, 179.781, 92.2559, 92.2559, 92.2559, 92.2559, 84.6451, 88.4505, 88.4505, 38.9801, 221.64, 84.6451],
-        
-
-    ]
-    @classmethod
-    def get_all_examples(cls):
-        all_example_dict = {}
-        all_example_dict.update({f"intrusion[{i}]":np.array(arr) for i, arr in enumerate(SubsequenceDetectionSamples.intrusion_example_positions_list)})
-        all_example_dict.update({f"jump[{i}]":np.array(arr) for i, arr in enumerate(SubsequenceDetectionSamples.jump_bad_list)})
-        all_example_dict.update({f"great[{i}]":np.array(arr) for i, arr in enumerate(SubsequenceDetectionSamples.good_long_sequences_list)})
-        all_example_dict.update({f"false_positive[{i}]":np.array(arr) for i, arr in enumerate(SubsequenceDetectionSamples.false_positive_list)})
-        
-        return all_example_dict
-
-        # plot_subplot_mosaic_dict = {f"intrusion_example[{i}]":dict(sharex=True, sharey=True, mosaic=[["ax_ungrouped_seq"],["ax_grouped_seq"],["ax_merged_grouped_seq"],], gridspec_kw=dict(wspace=0, hspace=0.15)) for i, idx in enumerate(np.arange(num_tabs))}
-
-
-
-
+from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import SubsequenceDetectionSamples, GroundTruthData
 
 class TestSubsequenceMerging(unittest.TestCase):
     """ #TODO 2024-12-04 12:44: - [ ] These were written by GPT and not tested in any way. Most do not pass
@@ -90,6 +29,7 @@ class TestSubsequenceMerging(unittest.TestCase):
         self.max_jump_distance_cm = 60.0
         self.same_thresh_fraction_of_track = 0.05 ## up to 5.0% of the track
         self.same_thresh_cm_dict = {k:(v * self.same_thresh_fraction_of_track) for k, v in self.decoder_track_length_dict.items()}
+        self.decoder_track_length: float = self.decoder_track_length_dict['long_LR'] # 214.0
         self.a_same_thresh_cm = self.same_thresh_cm_dict['long_LR']
         print(f'a_same_thresh_cm: {self.a_same_thresh_cm}')
         self.pos_bin_edges = np.array([37.0774, 40.8828, 44.6882, 48.4936, 52.2991, 56.1045, 59.9099, 63.7153, 67.5207, 71.3261, 75.1316, 78.937, 82.7424, 86.5478, 90.3532, 94.1586, 97.9641, 101.769, 105.575, 109.38, 113.186, 116.991, 120.797, 124.602, 128.407, 132.213, 136.018, 139.824, 143.629, 147.434, 151.24, 155.045, 158.851, 162.656, 166.462, 170.267, 174.072, 177.878, 181.683, 185.489, 189.294, 193.099, 196.905, 200.71, 204.516, 208.321, 212.127, 215.932, 219.737, 223.543, 227.348, 231.154, 234.959, 238.764, 242.57, 246.375, 250.181, 253.986])
@@ -100,6 +40,9 @@ class TestSubsequenceMerging(unittest.TestCase):
                                                                         max_jump_distance_cm=self.max_jump_distance_cm,
                                                                         pos_bin_edges=deepcopy(self.pos_bin_edges),
                                                                         debug_print=False)
+
+        self.test_dict = SubsequenceDetectionSamples.get_all_example_dict()
+        
 
 
     def tearDown(self):

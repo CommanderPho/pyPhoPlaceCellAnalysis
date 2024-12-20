@@ -49,6 +49,16 @@ from pyphocorehelpers.DataStructure.general_parameter_containers import Visualiz
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 # ==================================================================================================================== #
+# 2024-12-20 - Heuristicy Wisticky                                                                                     #
+# ==================================================================================================================== #
+from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import SubsequencesPartitioningResult
+from neuropy.utils.indexing_helpers import PandasHelpers
+from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
+# from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import SubsequenceDetectionSamples, GroundTruthData
+
+
+
+# ==================================================================================================================== #
 # 2024-12-18 Heuristic Evaluation in the continuous timeline                                                           #
 # ==================================================================================================================== #
 @function_attributes(short_name=None, tags=['2024-12-18', 'ACTIVE', 'gui', 'debugging', 'continuous'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 19:29', related_items=[])

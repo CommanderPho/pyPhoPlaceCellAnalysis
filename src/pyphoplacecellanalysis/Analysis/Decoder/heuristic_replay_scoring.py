@@ -1559,7 +1559,29 @@ class SubsequencesPartitioningResult(ComputedResult):
         return self.position_bins_info_df, self.position_changes_info_df, self.subsequences_df
 
     
+    def get_results_dict(self, test_dict, decoder_track_length: float = 214.0, **kwargs) -> Dict:
+        """ returns summarized results for the subsequence partitioning
         
+        """
+        a_partition_result = self
+        # partition_result = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list=SubsequenceDetectionSamples.most_likely_positions_bad_single_main_seq, **SubsequencesPartitioningResult_common_init_kwargs,)
+        # Access the partitioned subsequences
+        # subsequences = partition_result.split_positions_arrays
+        # merged_subsequences = partition_result.merged_split_positions_arrays
+        # print("Number of subsequences before merging:", len(subsequences))
+        # print("Number of subsequences after merging:", len(merged_subsequences))
+        # subsequences
+        # merged_subsequences
+
+        # longest_seq_length_dict = {'neither': partition_result.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=False, should_use_no_repeat_values=False),
+        #     'ignoring_intru': partition_result.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=True, should_use_no_repeat_values=False),
+        #     '+no_repeat': partition_result.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=True, should_use_no_repeat_values=True),
+        # }
+
+        all_subseq_partitioning_score_computations_fn_dict = SubsequencesPartitioningResultScoringComputations.build_all_bin_wise_subseq_partitioning_computation_fn_dict()
+        results_dict = {score_computation_name:computation_fn(partition_result=a_partition_result, a_result=None, an_epoch_idx=-1, a_decoder_track_length=decoder_track_length, pos_bin_edges=a_partition_result.pos_bin_edges) for score_computation_name, computation_fn in all_subseq_partitioning_score_computations_fn_dict.items()}
+        return results_dict
+    
 
     # Visualization/Graphical Debugging __________________________________________________________________________________ #
     @function_attributes(short_name=None, tags=['plot', 'matplotlib', 'figure', 'debug'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-27 06:36', related_items=['SubsequencesPartitioningResult'])
@@ -2019,6 +2041,7 @@ class SubsequencesPartitioningResult(ComputedResult):
         from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
         import matplotlib.pyplot as plt
         
+        enable_axes_position_debug_colors: bool = False
 
         common_plot_time_bins_multiple_kwargs = dict(subsequence_line_color_alpha=0.95, arrow_alpha=0.4, enable_axes_formatting=True) | kwargs
         linestyle = '-'
@@ -2046,7 +2069,7 @@ class SubsequencesPartitioningResult(ComputedResult):
                         ["ax_merged_grouped_seq", "ax_label_merged_grouped_seq"],
                     ],
                     sharex=True, sharey=True,
-                    gridspec_kw=dict(width_ratios=[6,1], wspace=0, hspace=0.15) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+                    gridspec_kw=dict(width_ratios=[6,2], wspace=0, hspace=0.15) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
                 )
         else:
             ## already exists
@@ -2089,11 +2112,15 @@ class SubsequencesPartitioningResult(ComputedResult):
         longest_seq_length_multiline_label_str: str = '\n'.join([': '.join([k, str(v)]) for k, v in longest_seq_length_dict.items()])
 
 
-        ax_dict["ax_label_ungrouped_seq"].text(0.5, 0.5, "Line1\nLine2", ha="center", va="center")
-        ax_dict["ax_label_grouped_seq"].text(0.5, 0.5, "Line1\nLine2", ha="center", va="center")
-        ax_dict["ax_label_merged_grouped_seq"].text(0.5, 0.5, longest_seq_length_multiline_label_str, ha="center", va="center")
+        # ax_dict["ax_label_ungrouped_seq"].text(0.5, 0.5, "Line1\nLine2", ha="center", va="center")
+        # ax_dict["ax_label_grouped_seq"].text(0.5, 0.5, "Line1\nLine2", ha="center", va="center")
+        # ax_dict["ax_label_merged_grouped_seq"].text(0.5, 0.5, longest_seq_length_multiline_label_str, ha="center", va="center")
 
 
+        # Set text aligned to the top of the axes and centered horizontally
+        ax_dict["ax_label_ungrouped_seq"].text(0.5, 1.0, "Line1\nLine2", ha="left", va="top", transform=ax_dict["ax_label_ungrouped_seq"].transAxes)
+        ax_dict["ax_label_grouped_seq"].text(0.5, 1.0, "Line1\nLine2", ha="left", va="top", transform=ax_dict["ax_label_grouped_seq"].transAxes)
+        ax_dict["ax_label_merged_grouped_seq"].text(0.5, 1.0, longest_seq_length_multiline_label_str, ha="left", va="top", transform=ax_dict["ax_label_merged_grouped_seq"].transAxes)
         split_most_likely_positions_arrays = deepcopy(self.flat_positions) ## unsplit positions
         pre_partitioned_debug_sequences_kwargs = dict(sequence_position_hlines_kwargs=dict(linewidth=2, linestyle=linestyle, zorder=10, alpha=1.0), # high-zorder to place it on-top, linestyle is "densely-dashed"
             split_vlines_kwargs = dict(should_skip=False),
@@ -2146,7 +2173,15 @@ class SubsequencesPartitioningResult(ComputedResult):
         #     flat_time_window_edges=flat_time_window_edges, subsequence_line_color_alpha=0.95, arrow_alpha=0.9, 
         # )
         # ax = out.ax
-        
+        if enable_axes_position_debug_colors:
+            # Assign colors to each axis to visualize their positions
+            ax_dict["ax_ungrouped_seq"].set_facecolor("lightblue")  # Light blue for the ungrouped sequence axis
+            ax_dict["ax_label_ungrouped_seq"].set_facecolor("lightgreen")  # Light green for the corresponding label axis
+            ax_dict["ax_grouped_seq"].set_facecolor("lightcoral")  # Light coral for the grouped sequence axis
+            ax_dict["ax_label_grouped_seq"].set_facecolor("wheat")  # Wheat for the corresponding label axis
+            ax_dict["ax_merged_grouped_seq"].set_facecolor("lavender")  # Lavender for the merged grouped sequence axis
+            ax_dict["ax_label_merged_grouped_seq"].set_facecolor("peachpuff")  # Peach puff for the corresponding label axis
+
         merged_out = MatplotlibRenderPlots(name='merged', figures=[fig, ], ax_dict=ax_dict, plots=merged_plots_out_dict)
 
         # out2: MatplotlibRenderPlots = SubsequencesPartitioningResult._debug_plot_time_bins_multiple(positions_list=final_out_subsequences, num='debug_plot_merged_time_binned_positions')
@@ -3506,3 +3541,285 @@ class HeuristicThresholdFiltering:
     
 
     
+
+# ==================================================================================================================== #
+# 2024-12-20 - Testing Performance                                                                                     #
+# ==================================================================================================================== #
+
+def convert_to_array_recursive(data: Any) -> Any:
+    """
+    Recursively converts lists and tuples in a nested structure into np.array objects.
+
+    Args:
+        data (Any): The input data, can be a list, tuple, dict, or other nested structure.
+
+    Returns:
+        Any: The transformed structure with lists and tuples replaced by np.array.
+
+    Usage:
+        result = convert_to_array_recursive([1, 2, (3, 4, [5, 6])])
+    """
+    if isinstance(data, (list, tuple)):
+        return np.array([convert_to_array_recursive(item) for item in data])
+    elif isinstance(data, dict):
+        
+        return {key: convert_to_array_recursive(value) for key, value in data.items()}
+    else:
+        return data
+    
+
+
+@define(slots=False)
+class ComputedPartitioningData:
+    detection_quality: float = field()
+    is_good: bool = field(default=None)
+    note: str = field(default='')
+    arr: NDArray = field(default=None)
+    
+    def __attrs_post_init__(self):
+        if self.is_good is None:
+            self.is_good = (self.detection_quality > 9)
+            
+
+@define(slots=False)
+class GroundTruthData:
+    detection_quality: float = field()
+    is_good: bool = field(default=None)
+    note: str = field(default='')
+    arr: NDArray = field(default=None)
+    
+    def __attrs_post_init__(self):
+        if self.is_good is None:
+            self.is_good = (self.detection_quality > 9)
+        
+
+class SubsequenceDetectionSamples:
+    """ a series of positions with GroundTruthData for tesitng heuristic metric performance
+
+
+        from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import SubsequenceDetectionSamples, GroundTruthData
+
+    """
+    intrusion_example_positions_list = {
+        (252.083,248.278,248.278,252.083,240.667,229.251,38.9801,198.808,175.975,160.753,153.143,149.337,214.029,145.532,183.586,118.894,77.0343):GroundTruthData(detection_quality=5),
+        (233.056,225.446,225.446,217.835,217.835,217.835,217.835,217.835,240.667,244.473,248.278,248.278,240.667,236.862,240.667,77.0343,214.029,175.975,164.559,153.143,141.726,183.586,58.0072,54.2018): GroundTruthData(detection_quality=5),
+        (217.835,217.835,206.418,195.002,195.002,99.8668,221.64,107.478,96.0614,80.8397,73.2289,80.8397,77.0343): GroundTruthData(detection_quality=5),
+        (92.2559,84.6451,84.6451,92.2559,134.116,126.505,126.505,141.726,149.337,38.9801): GroundTruthData(detection_quality=5),
+    }
+
+    # most_likely_positions_bad_single_main_seq = (38.9801,225.446,225.446,145.532,137.921,38.9801,225.446,217.835,175.975,107.478,134.116,145.532,38.9801,38.9801,172.17,149.337,248.278,225.446,153.143,145.532,111.283,69.4234)
+
+    jump_bad_list = {
+     (227.75, 250.404, 182.442, 223.974, 231.526, 84.2736, 38.9652, 235.301, 223.974, 220.199, 227.75, 227.75, 182.442, 182.442, 152.236, 239.077, 239.077, 235.301, 231.526, 250.404): GroundTruthData(detection_quality=5),
+     (182.442, 193.769, 189.993, 174.89, 148.46, 54.068): GroundTruthData(detection_quality=5),
+     (186.217, 186.217, 186.217, 163.563, 91.8249, 69.1708, 186.217, 186.217, 193.769, 201.32, 193.769, 201.32): GroundTruthData(detection_quality=5),
+     (242.853, 242.853, 205.096, 72.9465, 76.7222, 110.703, 144.685, 186.217): GroundTruthData(detection_quality=5),
+    }
+    
+    good_long_sequences_list = {
+        (84.2736, 80.4979, 133.358, 174.89, 174.89, 186.217, 201.32): GroundTruthData(detection_quality=5),
+    }
+    
+
+    questionable_list = {
+     (187.3913658457913, 141.72636044772838, 126.50469198170738, 84.64510370014968, 46.59093253509721,): GroundTruthData(detection_quality=5),   
+     (236.86178836035953, 122.69927486520214, 248.27803970987526, 244.47262259337003, 252.08345682638054, 244.47262259337003, 252.08345682638054, 252.08345682638054, 160.75344603025462, 187.3913658457913, 96.06135504966542, 115.08844063219165,): GroundTruthData(detection_quality=5),
+    }
+    
+    false_positive_list = {
+        (134.116, 38.9801, 210.224, 183.586, 38.9801, 38.9801, 38.9801, 38.9801, 38.9801, 38.9801, 38.9801, 38.9801, 206.418, 206.418, 195.002, 206.418, 38.9801, 38.9801, 206.418, 38.9801, 38.9801, 38.9801, 38.9801, 38.9801, 206.418, 198.808, 206.418): GroundTruthData(detection_quality=5),
+    }
+    
+    chose_incorrect_subsequence_as_main_list = {
+        (236.862, 236.862, 236.862, 236.862, 236.862, 236.862, 236.862, 236.862, 240.667, 244.473, 236.862, 236.862, 236.862, 236.862, 236.862, 54.2018, 187.391, 183.586, 160.753, 134.116, 96.0614, 80.8397, 77.0343, 236.862): GroundTruthData(detection_quality=5),   
+    }
+    
+    wrongly_split_main_sequence_and_grabbed_part_list = {
+        (252.083, 252.083, 252.083, 252.083, 252.083, 252.083, 252.083, 252.083, 248.278, 244.473, 244.473, 236.862, 229.251, 221.64, 221.64, 46.5909, 191.197, 164.559, 160.753, 134.116, 96.0614, 80.8397, 46.5909, 38.9801):GroundTruthData(detection_quality=3),
+        (248.278, 244.473, 236.862, 233.056, 229.251, 225.446, 229.251, 195.002, 126.505, 77.0343, 38.9801, 50.3963, 54.2018, 58.0072, 46.5909, 54.2018, 46.5909): GroundTruthData(detection_quality=3), ## Jump too big in the middle?
+        (248.278, 248.278, 244.473, 244.473, 244.473, 225.446, 202.613, 225.446, 122.699, 149.337, 149.337, 153.143, 137.921, 130.31, 118.894, 217.835, 122.699, 96.0614, 217.835, 58.0072, 38.9801): GroundTruthData(detection_quality=3),
+        (210.224, 214.029, 210.224, 210.224, 210.224, 210.224, 210.224, 175.975, 195.002, 118.894, 96.0614, 92.2559, 187.391, 38.9801, 84.6451, 84.6451, 202.613): GroundTruthData(detection_quality=3),
+        (77.0343, 77.0343, 77.0343, 130.31, 130.31, 103.672, 115.088, 115.088, 118.894, 137.921, 221.64, 160.753): GroundTruthData(detection_quality=3),
+        (58.0072, 58.0072, 54.2018, 58.0072, 202.613, 206.418, 38.9801, 84.6451, 111.283, 126.505, 198.808, 164.559): GroundTruthData(detection_quality=3),
+        (248.278, 229.251, 233.056, 229.251, 244.473, 202.613, 244.473, 111.283, 88.4505, 38.9801, 50.3963, 38.9801): GroundTruthData(detection_quality=3),
+        (206.418, 191.197, 187.391, 164.559, 175.975, 172.17, 149.337, 149.337, 153.143, 137.921, 115.088, 118.894, 103.672, 99.8668, 96.0614, 38.9801, 96.0614, 96.0614, 179.781, 92.2559, 92.2559, 92.2559, 92.2559, 84.6451, 88.4505, 88.4505, 38.9801, 221.64, 84.6451): GroundTruthData(detection_quality=3),
+    }
+    
+    false_negative_incorrect_split_list = {
+        (206.418, 191.197, 187.391, 164.559, 175.975, 172.17, 149.337, 149.337, 153.143, 137.921, 115.088, 118.894, 103.672, 99.8668, 96.0614, 38.9801, 96.0614, 96.0614, 179.781, 92.2559, 92.2559, 92.2559, 92.2559, 84.6451, 88.4505, 88.4505, 38.9801, 221.64, 84.6451): GroundTruthData(detection_quality=3),
+    }
+
+
+    @classmethod
+    def build_partition_sequence(cls, positions_list, **kwargs):
+        """ kwargs are like: max_ignore_bins: int = 2, same_thresh: float = 4, max_jump_distance_cm: Optional[float]=None
+        """
+        if not isinstance(positions_list, NDArray):
+            positions_list = np.array(positions_list)
+        return SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list=positions_list, **kwargs)
+
+
+    @classmethod
+    def plot_all_tabbled_figure(cls, decoder_track_length_dict: Dict, pos_bin_edges: NDArray, debug_print=False):
+        from mpl_multitab import MplMultiTab, MplMultiTab2D, MplTabbedFigure
+        from neuropy.utils.matplotlib_helpers import TabbedMatplotlibFigures
+        # from pyphoplacecellanalysis.Pho2D.matplotlib.CustomMatplotlibTabbedWidget import CustomMplMultiTab
+
+        all_examples_plot_data_positions_arr_dict = SubsequenceDetectionSamples.get_all_examples()
+        # num_tabs: int = len(SubsequenceDetectionSamples.intrusion_example_positions_list)
+        # plot_subplot_mosaic_dict = {f"intrusion_example[{i}]":dict(sharex=True, sharey=True, mosaic=[["ax_ungrouped_seq"],["ax_grouped_seq"],["ax_merged_grouped_seq"],], gridspec_kw=dict(wspace=0, hspace=0.15)) for i, idx in enumerate(np.arange(num_tabs))}
+
+        num_tabs: int = len(all_examples_plot_data_positions_arr_dict)
+        # plot_subplot_mosaic_dict = {a_name:dict(sharex=True, sharey=True, mosaic=[["ax_ungrouped_seq"],["ax_grouped_seq"],["ax_merged_grouped_seq"],], gridspec_kw=dict(wspace=0, hspace=0.15)) for i, (a_name, arr) in enumerate(all_examples_plot_data_positions_arr_dict.items())}
+
+        plot_subplot_mosaic_dict = {a_name:dict(sharex=True, sharey=True, mosaic=[["ax_ungrouped_seq", "ax_label_ungrouped_seq"], ["ax_grouped_seq", "ax_label_grouped_seq"], ["ax_merged_grouped_seq", "ax_label_merged_grouped_seq"],], gridspec_kw=dict(width_ratios=[6,2.5], wspace=0.1, hspace=0.15)) for i, (a_name, arr) in enumerate(all_examples_plot_data_positions_arr_dict.items())}
+
+        # ui = MplMultiTab()
+        # ui, figures_dict, axs_dict = TabbedMatplotlibFigures.build_tabbed_multi_figure(plot_subplot_mosaic_dict, obj_class=MplMultiTab)
+        ui, figures_dict, axs_dict = TabbedMatplotlibFigures.build_tabbed_multi_figure(plot_subplot_mosaic_dict, obj_class=None)
+
+        same_thresh_fraction_of_track: float = 0.05 ## up to 5.0% of the track
+        same_thresh_cm: float = {k:(v * same_thresh_fraction_of_track) for k, v in decoder_track_length_dict.items()}
+        a_same_thresh_cm: float = same_thresh_cm['long_LR']
+        if debug_print:
+            print(f'a_same_thresh_cm: {a_same_thresh_cm}')
+
+        SubsequencesPartitioningResult_common_init_kwargs = dict(same_thresh=a_same_thresh_cm, max_ignore_bins=2, max_jump_distance_cm=60.0, pos_bin_edges=deepcopy(pos_bin_edges), debug_print=False)
+
+        ## rebuild
+        all_examples_plot_data_dict = {a_name:SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list=a_most_likely_positions_list, **SubsequencesPartitioningResult_common_init_kwargs) for a_name, a_most_likely_positions_list in all_examples_plot_data_positions_arr_dict.items()}
+        # all_examples_plot_data_dict = {a_name:SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list=a_most_likely_positions_list, same_thresh=a_same_thresh_cm, max_ignore_bins=2, max_jump_distance_cm=15.0, n_pos_bins=57, debug_print=False) for a_name, a_most_likely_positions_list in all_examples_plot_data_positions_arr_dict.items()}
+
+        all_examples_plot_data_name_keys = list(all_examples_plot_data_dict.keys())
+
+        # ui.show()
+
+        # def _test():
+        # for i, a_most_likely_positions_list in enumerate(SubsequenceDetectionSamples.intrusion_example_positions_list):
+        # for i, (a_name, a_most_likely_positions_list) in enumerate(all_examples_plot_data_positions_arr_dict.items()):
+        for i, (a_name, a_partition_result) in enumerate(all_examples_plot_data_dict.items()):
+            # a_most_likely_positions_list = np.array(a_most_likely_positions_list)
+            # a_partition_result = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list=a_most_likely_positions_list, **SubsequencesPartitioningResult_common_init_kwargs)
+            # Access the partitioned subsequences
+            subsequences = a_partition_result.split_positions_arrays
+            merged_subsequences = a_partition_result.merged_split_positions_arrays
+            if debug_print:
+                print("Number of subsequences before merging:", len(subsequences))
+                print("Number of subsequences after merging:", len(merged_subsequences))
+                print(a_partition_result.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=True, should_use_no_repeat_values=False))
+            a_fig = figures_dict[a_name] # list(figures_dict.values())[i]
+            an_ax_dict = axs_dict[a_name] # list(axs_dict.values())[i]    
+            _out = a_partition_result._plot_step_by_step_subsequence_partition_process(extant_ax_dict=an_ax_dict)
+
+
+        # partition_result = deepcopy(a_partition_result) ## just copy the first one
+
+        # # create plotting function
+        # def _perform_plot(fig, indices):
+        #     """ captures: all_examples_plot_data_name_keys, 
+        #     """
+        #     if debug_print:
+        #         print('Doing plot:', indices)
+        #     # i, j = indices
+        #     i = indices
+        #     a_name = all_examples_plot_data_name_keys[i]
+        #     if debug_print:
+        #         print(f'\t a_name: "{a_name}"')
+        #     # ax = fig.subplots()
+        #     a_partition_result = all_examples_plot_data_dict[a_name]
+        #     if isinstance(fig, (MplTabbedFigure, )): # , TabNode
+        #         fig = fig.figure ## get the real figure
+        #     _out = a_partition_result._plot_step_by_step_subsequence_partition_process(extant_fig=fig, extant_ax_dict=None)
+        #     return _out
+        #     # return ax.scatter(*np.random.randn(2, n), color=colours[i],  marker=f'${markers[j]}$')
+
+        # # ui.add_task(_perform_plot)   # add your plot worker
+
+        # ui.set_focus(0)      # this will trigger the plotting for group 0 tab 0
+        ui.show()
+
+        # ui.show()
+        return (ui, figures_dict, axs_dict), all_examples_plot_data_positions_arr_dict
+        
+
+    @classmethod
+    def get_all_example_dict(cls) -> Dict[str, Dict[Tuple, GroundTruthData]]:
+        return {k:convert_to_array_recursive(v) for k, v in {
+            'intrusion': cls.intrusion_example_positions_list,
+            'jump': cls.jump_bad_list,
+            'great': cls.good_long_sequences_list,
+            'false_positive': cls.false_positive_list,
+            'chose_incorrect_subsequence_as_main_list': cls.chose_incorrect_subsequence_as_main_list,
+            'wrongly_split_main_sequence_and_grabbed_part_list': cls.wrongly_split_main_sequence_and_grabbed_part_list,
+            'false_negative_incorrect_split_list': cls.false_negative_incorrect_split_list,            
+        }.items()} # type: ignore
+
+    @classmethod
+    def get_all_examples(cls) -> Dict[str, NDArray]:
+        all_example_dict = {}
+        all_example_dict.update({f"intrusion[{i}]":np.array(arr) for i, (arr, ground_truth) in enumerate(SubsequenceDetectionSamples.intrusion_example_positions_list.items())})
+        all_example_dict.update({f"jump[{i}]":np.array(arr) for i, (arr, ground_truth) in enumerate(SubsequenceDetectionSamples.jump_bad_list.items())})
+        all_example_dict.update({f"great[{i}]":np.array(arr) for i, (arr, ground_truth) in enumerate(SubsequenceDetectionSamples.good_long_sequences_list.items())})
+        all_example_dict.update({f"false_positive[{i}]":np.array(arr) for i, (arr, ground_truth) in enumerate(SubsequenceDetectionSamples.false_positive_list.items())})
+        all_example_dict.update({f"chose_incorrect_subsequence_as_main_list[{i}]":np.array(arr) for i, (arr, ground_truth) in enumerate(SubsequenceDetectionSamples.chose_incorrect_subsequence_as_main_list.items())})
+        all_example_dict.update({f"wrongly_split_main_sequence_and_grabbed_part_list[{i}]":np.array(arr) for i, (arr, ground_truth) in enumerate(SubsequenceDetectionSamples.wrongly_split_main_sequence_and_grabbed_part_list.items())})
+        all_example_dict.update({f"false_negative_incorrect_split_list[{i}]":np.array(arr) for i, (arr, ground_truth) in enumerate(SubsequenceDetectionSamples.false_negative_incorrect_split_list.items())})
+        return all_example_dict
+
+        # plot_subplot_mosaic_dict = {f"intrusion_example[{i}]":dict(sharex=True, sharey=True, mosaic=[["ax_ungrouped_seq"],["ax_grouped_seq"],["ax_merged_grouped_seq"],], gridspec_kw=dict(wspace=0, hspace=0.15)) for i, idx in enumerate(np.arange(num_tabs))}
+
+
+    @classmethod
+    def build_test_results_dict(cls, test_dict, pos_bin_edges: NDArray, max_ignore_bins: int = 2, same_thresh: float = 4, max_jump_distance_cm: float=60.0, decoder_track_length: float = 214.0, debug_print=False, **kwargs):
+        """ runs all tests
+        
+        test_dict = SubsequenceDetectionSamples.get_all_example_dict()
+        decoder_track_length: float = 214.0
+        ## INPUTS: track_templates, a_decoded_filter_epochs_decoder_result_dict
+        decoder_track_length_dict = track_templates.get_track_length_dict() # {'long_LR': 214.0, 'long_RL': 214.0, 'short_LR': 144.0, 'short_RL': 144.0}
+        same_thresh_fraction_of_track: float = 0.05 ## up to 5.0% of the track
+        same_thresh_cm: float = {k:(v * same_thresh_fraction_of_track) for k, v in decoder_track_length_dict.items()}
+        a_same_thresh_cm: float = same_thresh_cm['long_LR']
+        print(f'a_same_thresh_cm: {a_same_thresh_cm}')
+        # pos_bin_edges=deepcopy(track_templates.long_LR_decoder.xbin)
+        pos_bin_edges = np.array([37.0774, 40.8828, 44.6882, 48.4936, 52.2991, 56.1045, 59.9099, 63.7153, 67.5207, 71.3261, 75.1316, 78.937, 82.7424, 86.5478, 90.3532, 94.1586, 97.9641, 101.769, 105.575, 109.38, 113.186, 116.991, 120.797, 124.602, 128.407, 132.213, 136.018, 139.824, 143.629, 147.434, 151.24, 155.045, 158.851, 162.656, 166.462, 170.267, 174.072, 177.878, 181.683, 185.489, 189.294, 193.099, 196.905, 200.71, 204.516, 208.321, 212.127, 215.932, 219.737, 223.543, 227.348, 231.154, 234.959, 238.764, 242.57, 246.375, 250.181, 253.986])
+
+        SubsequencesPartitioningResult_common_init_kwargs = dict(same_thresh=a_same_thresh_cm, max_ignore_bins=2, max_jump_distance_cm=60.0, pos_bin_edges=deepcopy(pos_bin_edges), debug_print=False)
+
+        partitioned_results, _new_scores_df, _all_examples_scores_dict = SubsequenceDetectionSamples.build_test_results_dict(test_dict=test_dict, **SubsequencesPartitioningResult_common_init_kwargs)
+        _new_scores_df
+
+
+        """
+        if test_dict is None:
+            test_dict = cls.get_all_example_dict()
+        
+        SubsequencesPartitioningResult_common_init_kwargs = dict(same_thresh=same_thresh, max_ignore_bins=max_ignore_bins, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(pos_bin_edges), debug_print=debug_print)
+
+        partitioned_results = {}
+
+        for a_group_name, group_items in test_dict.items():
+            for i, (a_pos_tuple, a_ground_truth) in enumerate(group_items.items()):
+                print(f'a_group_name: {a_group_name}')
+                a_partitioner: SubsequencesPartitioningResult = SubsequenceDetectionSamples.build_partition_sequence(a_pos_tuple, **SubsequencesPartitioningResult_common_init_kwargs)
+                a_ground_truth.arr = deepcopy(a_partitioner.flat_positions)
+                partitioned_results[f"{a_group_name}[{i}]"] = a_partitioner
+        ## END for a_group_name, group_items....
+
+        ## OUTPUTS: partitioned_results
+
+        ## INPUTS: partitioned_results, decoder_track_length
+        all_subseq_partitioning_score_computations_fn_dict = SubsequencesPartitioningResultScoringComputations.build_all_bin_wise_subseq_partitioning_computation_fn_dict()
+
+        # for an_epoch_idx, (a_example_name, a_partition_result) in enumerate(partitioned_results.items()):
+            
+        #     {score_computation_name:computation_fn(partition_result=a_partition_result, a_result=None, an_epoch_idx=an_epoch_idx, a_decoder_track_length=decoder_track_length, pos_bin_edges=a_partition_result.pos_bin_edges) for score_computation_name, computation_fn in all_subseq_partitioning_score_computations_fn_dict.items()}
+        _all_examples_scores_dict = {a_example_name: {score_computation_name:computation_fn(partition_result=a_partition_result, a_result=None, an_epoch_idx=an_epoch_idx, a_decoder_track_length=decoder_track_length, pos_bin_edges=a_partition_result.pos_bin_edges) for score_computation_name, computation_fn in all_subseq_partitioning_score_computations_fn_dict.items()} for an_epoch_idx, (a_example_name, a_partition_result) in enumerate(partitioned_results.items())}
+
+        # _all_epochs_scores_dict[unique_full_decoder_score_column_name] = [computation_fn(partition_result=a_partition_result, a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length, pos_bin_edges=xbin_edges) for an_epoch_idx, a_partition_result in enumerate(partition_result_dict[a_name])]
+        ## OUTPUTS: _all_examples_scores_dict
+
+        # once done with all scores for this decoder, have `_a_separate_decoder_new_scores_dict`:
+        _new_scores_df =  pd.DataFrame(_all_examples_scores_dict)
+
+        return partitioned_results, _new_scores_df, _all_examples_scores_dict
