@@ -1559,7 +1559,7 @@ class SubsequencesPartitioningResult(ComputedResult):
         return self.position_bins_info_df, self.position_changes_info_df, self.subsequences_df
 
     
-    def get_results_dict(self, test_dict, decoder_track_length: float = 214.0, **kwargs) -> Dict:
+    def get_results_dict(self, decoder_track_length: float = 214.0, **kwargs) -> Dict:
         """ returns summarized results for the subsequence partitioning
         
         """
@@ -3661,6 +3661,95 @@ class SubsequenceDetectionSamples:
 
 
     @classmethod
+    def get_all_example_dict(cls) -> Dict[str, Dict[Tuple, GroundTruthData]]:
+        return {k:convert_to_array_recursive(v) for k, v in {
+            'intrusion': cls.intrusion_example_positions_list,
+            'jump': cls.jump_bad_list,
+            'great': cls.good_long_sequences_list,
+            'false_positive': cls.false_positive_list,
+            'chose_incorrect_subsequence_as_main_list': cls.chose_incorrect_subsequence_as_main_list,
+            'wrongly_split_main_sequence_and_grabbed_part_list': cls.wrongly_split_main_sequence_and_grabbed_part_list,
+            'false_negative_incorrect_split_list': cls.false_negative_incorrect_split_list,            
+        }.items()} # type: ignore
+
+    @classmethod
+    def get_all_examples(cls) -> Dict[str, NDArray]:
+        all_example_dict = {}
+        all_example_dict.update({f"intrusion[{i}]":np.array(arr) for i, (arr, ground_truth) in enumerate(SubsequenceDetectionSamples.intrusion_example_positions_list.items())})
+        all_example_dict.update({f"jump[{i}]":np.array(arr) for i, (arr, ground_truth) in enumerate(SubsequenceDetectionSamples.jump_bad_list.items())})
+        all_example_dict.update({f"great[{i}]":np.array(arr) for i, (arr, ground_truth) in enumerate(SubsequenceDetectionSamples.good_long_sequences_list.items())})
+        all_example_dict.update({f"false_positive[{i}]":np.array(arr) for i, (arr, ground_truth) in enumerate(SubsequenceDetectionSamples.false_positive_list.items())})
+        all_example_dict.update({f"chose_incorrect_subsequence_as_main_list[{i}]":np.array(arr) for i, (arr, ground_truth) in enumerate(SubsequenceDetectionSamples.chose_incorrect_subsequence_as_main_list.items())})
+        all_example_dict.update({f"wrongly_split_main_sequence_and_grabbed_part_list[{i}]":np.array(arr) for i, (arr, ground_truth) in enumerate(SubsequenceDetectionSamples.wrongly_split_main_sequence_and_grabbed_part_list.items())})
+        all_example_dict.update({f"false_negative_incorrect_split_list[{i}]":np.array(arr) for i, (arr, ground_truth) in enumerate(SubsequenceDetectionSamples.false_negative_incorrect_split_list.items())})
+        return all_example_dict
+
+        # plot_subplot_mosaic_dict = {f"intrusion_example[{i}]":dict(sharex=True, sharey=True, mosaic=[["ax_ungrouped_seq"],["ax_grouped_seq"],["ax_merged_grouped_seq"],], gridspec_kw=dict(wspace=0, hspace=0.15)) for i, idx in enumerate(np.arange(num_tabs))}
+
+
+    @classmethod
+    def build_test_results_dict(cls, pos_bin_edges: NDArray, max_ignore_bins: int = 2, same_thresh: float = 4, max_jump_distance_cm: float=60.0, decoder_track_length: float = 214.0, debug_print=False, test_dict=None, **kwargs):
+        """ runs all tests
+        
+        test_dict = SubsequenceDetectionSamples.get_all_example_dict()
+        decoder_track_length: float = 214.0
+        ## INPUTS: track_templates, a_decoded_filter_epochs_decoder_result_dict
+        decoder_track_length_dict = track_templates.get_track_length_dict() # {'long_LR': 214.0, 'long_RL': 214.0, 'short_LR': 144.0, 'short_RL': 144.0}
+        same_thresh_fraction_of_track: float = 0.05 ## up to 5.0% of the track
+        same_thresh_cm: float = {k:(v * same_thresh_fraction_of_track) for k, v in decoder_track_length_dict.items()}
+        a_same_thresh_cm: float = same_thresh_cm['long_LR']
+        print(f'a_same_thresh_cm: {a_same_thresh_cm}')
+        # pos_bin_edges=deepcopy(track_templates.long_LR_decoder.xbin)
+        pos_bin_edges = np.array([37.0774, 40.8828, 44.6882, 48.4936, 52.2991, 56.1045, 59.9099, 63.7153, 67.5207, 71.3261, 75.1316, 78.937, 82.7424, 86.5478, 90.3532, 94.1586, 97.9641, 101.769, 105.575, 109.38, 113.186, 116.991, 120.797, 124.602, 128.407, 132.213, 136.018, 139.824, 143.629, 147.434, 151.24, 155.045, 158.851, 162.656, 166.462, 170.267, 174.072, 177.878, 181.683, 185.489, 189.294, 193.099, 196.905, 200.71, 204.516, 208.321, 212.127, 215.932, 219.737, 223.543, 227.348, 231.154, 234.959, 238.764, 242.57, 246.375, 250.181, 253.986])
+
+        SubsequencesPartitioningResult_common_init_kwargs = dict(same_thresh=a_same_thresh_cm, max_ignore_bins=2, max_jump_distance_cm=60.0, pos_bin_edges=deepcopy(pos_bin_edges), debug_print=False)
+
+        partitioned_results, _new_scores_df, _all_examples_scores_dict = SubsequenceDetectionSamples.build_test_results_dict(test_dict=test_dict, **SubsequencesPartitioningResult_common_init_kwargs)
+        _new_scores_df
+
+
+        """
+        if test_dict is None:
+            test_dict = cls.get_all_example_dict()
+        
+        SubsequencesPartitioningResult_common_init_kwargs = dict(same_thresh=same_thresh, max_ignore_bins=max_ignore_bins, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(pos_bin_edges), debug_print=debug_print)
+
+        partitioned_results = {}
+        _all_examples_scores_dict = {}
+        
+        for a_group_name, group_items in test_dict.items():
+            for i, (a_pos_tuple, a_ground_truth) in enumerate(group_items.items()):
+                print(f'a_group_name: {a_group_name}')
+                a_partitioner: SubsequencesPartitioningResult = SubsequenceDetectionSamples.build_partition_sequence(a_pos_tuple, **SubsequencesPartitioningResult_common_init_kwargs)
+                a_ground_truth.arr = deepcopy(a_partitioner.flat_positions)
+                partitioned_results[f"{a_group_name}[{i}]"] = a_partitioner
+                _all_examples_scores_dict[f"{a_group_name}[{i}]"] = a_partitioner.get_results_dict(decoder_track_length=decoder_track_length)
+                
+        ## END for a_group_name, group_items....
+
+        ## OUTPUTS: partitioned_results
+
+        # ## INPUTS: partitioned_results, decoder_track_length
+        # all_subseq_partitioning_score_computations_fn_dict = SubsequencesPartitioningResultScoringComputations.build_all_bin_wise_subseq_partitioning_computation_fn_dict()
+
+        # # for an_epoch_idx, (a_example_name, a_partition_result) in enumerate(partitioned_results.items()):
+            
+        # #     {score_computation_name:computation_fn(partition_result=a_partition_result, a_result=None, an_epoch_idx=an_epoch_idx, a_decoder_track_length=decoder_track_length, pos_bin_edges=a_partition_result.pos_bin_edges) for score_computation_name, computation_fn in all_subseq_partitioning_score_computations_fn_dict.items()}
+        # _all_examples_scores_dict = {a_example_name: {score_computation_name:computation_fn(partition_result=a_partition_result, a_result=None, an_epoch_idx=an_epoch_idx, a_decoder_track_length=decoder_track_length, pos_bin_edges=a_partition_result.pos_bin_edges) for score_computation_name, computation_fn in all_subseq_partitioning_score_computations_fn_dict.items()} for an_epoch_idx, (a_example_name, a_partition_result) in enumerate(partitioned_results.items())}
+
+        # # _all_epochs_scores_dict[unique_full_decoder_score_column_name] = [computation_fn(partition_result=a_partition_result, a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length, pos_bin_edges=xbin_edges) for an_epoch_idx, a_partition_result in enumerate(partition_result_dict[a_name])]
+        # ## OUTPUTS: _all_examples_scores_dict
+        integer_column_names = ['mseq_len', 'mseq_len_ignoring_intrusions','mseq_len_ignoring_intrusions_and_repeats','mseq_len_ratio_ignoring_intrusions_and_repeats']
+        # once done with all scores for this decoder, have `_a_separate_decoder_new_scores_dict`:
+        _new_scores_df =  pd.DataFrame(_all_examples_scores_dict).T
+        _new_scores_df[integer_column_names] = _new_scores_df[integer_column_names].astype(int)
+
+        return test_dict, partitioned_results, _new_scores_df, _all_examples_scores_dict
+    
+
+
+    @function_attributes(short_name=None, tags=['plotting'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-20 17:30', related_items=[])
+    @classmethod
     def plot_all_tabbled_figure(cls, decoder_track_length_dict: Dict, pos_bin_edges: NDArray, debug_print=False):
         from mpl_multitab import MplMultiTab, MplMultiTab2D, MplTabbedFigure
         from neuropy.utils.matplotlib_helpers import TabbedMatplotlibFigures
@@ -3742,88 +3831,3 @@ class SubsequenceDetectionSamples:
         # ui.show()
         return (ui, figures_dict, axs_dict), all_examples_plot_data_positions_arr_dict
         
-
-    @classmethod
-    def get_all_example_dict(cls) -> Dict[str, Dict[Tuple, GroundTruthData]]:
-        return {k:convert_to_array_recursive(v) for k, v in {
-            'intrusion': cls.intrusion_example_positions_list,
-            'jump': cls.jump_bad_list,
-            'great': cls.good_long_sequences_list,
-            'false_positive': cls.false_positive_list,
-            'chose_incorrect_subsequence_as_main_list': cls.chose_incorrect_subsequence_as_main_list,
-            'wrongly_split_main_sequence_and_grabbed_part_list': cls.wrongly_split_main_sequence_and_grabbed_part_list,
-            'false_negative_incorrect_split_list': cls.false_negative_incorrect_split_list,            
-        }.items()} # type: ignore
-
-    @classmethod
-    def get_all_examples(cls) -> Dict[str, NDArray]:
-        all_example_dict = {}
-        all_example_dict.update({f"intrusion[{i}]":np.array(arr) for i, (arr, ground_truth) in enumerate(SubsequenceDetectionSamples.intrusion_example_positions_list.items())})
-        all_example_dict.update({f"jump[{i}]":np.array(arr) for i, (arr, ground_truth) in enumerate(SubsequenceDetectionSamples.jump_bad_list.items())})
-        all_example_dict.update({f"great[{i}]":np.array(arr) for i, (arr, ground_truth) in enumerate(SubsequenceDetectionSamples.good_long_sequences_list.items())})
-        all_example_dict.update({f"false_positive[{i}]":np.array(arr) for i, (arr, ground_truth) in enumerate(SubsequenceDetectionSamples.false_positive_list.items())})
-        all_example_dict.update({f"chose_incorrect_subsequence_as_main_list[{i}]":np.array(arr) for i, (arr, ground_truth) in enumerate(SubsequenceDetectionSamples.chose_incorrect_subsequence_as_main_list.items())})
-        all_example_dict.update({f"wrongly_split_main_sequence_and_grabbed_part_list[{i}]":np.array(arr) for i, (arr, ground_truth) in enumerate(SubsequenceDetectionSamples.wrongly_split_main_sequence_and_grabbed_part_list.items())})
-        all_example_dict.update({f"false_negative_incorrect_split_list[{i}]":np.array(arr) for i, (arr, ground_truth) in enumerate(SubsequenceDetectionSamples.false_negative_incorrect_split_list.items())})
-        return all_example_dict
-
-        # plot_subplot_mosaic_dict = {f"intrusion_example[{i}]":dict(sharex=True, sharey=True, mosaic=[["ax_ungrouped_seq"],["ax_grouped_seq"],["ax_merged_grouped_seq"],], gridspec_kw=dict(wspace=0, hspace=0.15)) for i, idx in enumerate(np.arange(num_tabs))}
-
-
-    @classmethod
-    def build_test_results_dict(cls, pos_bin_edges: NDArray, max_ignore_bins: int = 2, same_thresh: float = 4, max_jump_distance_cm: float=60.0, decoder_track_length: float = 214.0, debug_print=False, test_dict=None, **kwargs):
-        """ runs all tests
-        
-        test_dict = SubsequenceDetectionSamples.get_all_example_dict()
-        decoder_track_length: float = 214.0
-        ## INPUTS: track_templates, a_decoded_filter_epochs_decoder_result_dict
-        decoder_track_length_dict = track_templates.get_track_length_dict() # {'long_LR': 214.0, 'long_RL': 214.0, 'short_LR': 144.0, 'short_RL': 144.0}
-        same_thresh_fraction_of_track: float = 0.05 ## up to 5.0% of the track
-        same_thresh_cm: float = {k:(v * same_thresh_fraction_of_track) for k, v in decoder_track_length_dict.items()}
-        a_same_thresh_cm: float = same_thresh_cm['long_LR']
-        print(f'a_same_thresh_cm: {a_same_thresh_cm}')
-        # pos_bin_edges=deepcopy(track_templates.long_LR_decoder.xbin)
-        pos_bin_edges = np.array([37.0774, 40.8828, 44.6882, 48.4936, 52.2991, 56.1045, 59.9099, 63.7153, 67.5207, 71.3261, 75.1316, 78.937, 82.7424, 86.5478, 90.3532, 94.1586, 97.9641, 101.769, 105.575, 109.38, 113.186, 116.991, 120.797, 124.602, 128.407, 132.213, 136.018, 139.824, 143.629, 147.434, 151.24, 155.045, 158.851, 162.656, 166.462, 170.267, 174.072, 177.878, 181.683, 185.489, 189.294, 193.099, 196.905, 200.71, 204.516, 208.321, 212.127, 215.932, 219.737, 223.543, 227.348, 231.154, 234.959, 238.764, 242.57, 246.375, 250.181, 253.986])
-
-        SubsequencesPartitioningResult_common_init_kwargs = dict(same_thresh=a_same_thresh_cm, max_ignore_bins=2, max_jump_distance_cm=60.0, pos_bin_edges=deepcopy(pos_bin_edges), debug_print=False)
-
-        partitioned_results, _new_scores_df, _all_examples_scores_dict = SubsequenceDetectionSamples.build_test_results_dict(test_dict=test_dict, **SubsequencesPartitioningResult_common_init_kwargs)
-        _new_scores_df
-
-
-        """
-        if test_dict is None:
-            test_dict = cls.get_all_example_dict()
-        
-        SubsequencesPartitioningResult_common_init_kwargs = dict(same_thresh=same_thresh, max_ignore_bins=max_ignore_bins, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(pos_bin_edges), debug_print=debug_print)
-
-        partitioned_results = {}
-        _all_examples_scores_dict = {}
-        
-        for a_group_name, group_items in test_dict.items():
-            for i, (a_pos_tuple, a_ground_truth) in enumerate(group_items.items()):
-                print(f'a_group_name: {a_group_name}')
-                a_partitioner: SubsequencesPartitioningResult = SubsequenceDetectionSamples.build_partition_sequence(a_pos_tuple, **SubsequencesPartitioningResult_common_init_kwargs)
-                a_ground_truth.arr = deepcopy(a_partitioner.flat_positions)
-                partitioned_results[f"{a_group_name}[{i}]"] = a_partitioner
-                _all_examples_scores_dict[f"{a_group_name}[{i}]"] = a_partitioner.get_results_dict(decoder_track_length=decoder_track_length)
-                
-        ## END for a_group_name, group_items....
-
-        ## OUTPUTS: partitioned_results
-
-        # ## INPUTS: partitioned_results, decoder_track_length
-        # all_subseq_partitioning_score_computations_fn_dict = SubsequencesPartitioningResultScoringComputations.build_all_bin_wise_subseq_partitioning_computation_fn_dict()
-
-        # # for an_epoch_idx, (a_example_name, a_partition_result) in enumerate(partitioned_results.items()):
-            
-        # #     {score_computation_name:computation_fn(partition_result=a_partition_result, a_result=None, an_epoch_idx=an_epoch_idx, a_decoder_track_length=decoder_track_length, pos_bin_edges=a_partition_result.pos_bin_edges) for score_computation_name, computation_fn in all_subseq_partitioning_score_computations_fn_dict.items()}
-        # _all_examples_scores_dict = {a_example_name: {score_computation_name:computation_fn(partition_result=a_partition_result, a_result=None, an_epoch_idx=an_epoch_idx, a_decoder_track_length=decoder_track_length, pos_bin_edges=a_partition_result.pos_bin_edges) for score_computation_name, computation_fn in all_subseq_partitioning_score_computations_fn_dict.items()} for an_epoch_idx, (a_example_name, a_partition_result) in enumerate(partitioned_results.items())}
-
-        # # _all_epochs_scores_dict[unique_full_decoder_score_column_name] = [computation_fn(partition_result=a_partition_result, a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length, pos_bin_edges=xbin_edges) for an_epoch_idx, a_partition_result in enumerate(partition_result_dict[a_name])]
-        # ## OUTPUTS: _all_examples_scores_dict
-
-        # once done with all scores for this decoder, have `_a_separate_decoder_new_scores_dict`:
-        _new_scores_df =  pd.DataFrame(_all_examples_scores_dict)
-
-        return partitioned_results, _new_scores_df, _all_examples_scores_dict
