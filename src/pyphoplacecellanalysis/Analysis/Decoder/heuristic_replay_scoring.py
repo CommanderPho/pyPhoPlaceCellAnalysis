@@ -3569,6 +3569,7 @@ def convert_to_array_recursive(data: Any) -> Any:
     
 
 
+## UNUSED!!!
 @define(slots=False)
 class ComputedPartitioningData:
     detection_quality: float = field()
@@ -3770,7 +3771,7 @@ class SubsequenceDetectionSamples:
 
 
     @classmethod
-    def build_test_results_dict(cls, test_dict, pos_bin_edges: NDArray, max_ignore_bins: int = 2, same_thresh: float = 4, max_jump_distance_cm: float=60.0, decoder_track_length: float = 214.0, debug_print=False, **kwargs):
+    def build_test_results_dict(cls, pos_bin_edges: NDArray, max_ignore_bins: int = 2, same_thresh: float = 4, max_jump_distance_cm: float=60.0, decoder_track_length: float = 214.0, debug_print=False, test_dict=None, **kwargs):
         """ runs all tests
         
         test_dict = SubsequenceDetectionSamples.get_all_example_dict()
@@ -3797,27 +3798,30 @@ class SubsequenceDetectionSamples:
         SubsequencesPartitioningResult_common_init_kwargs = dict(same_thresh=same_thresh, max_ignore_bins=max_ignore_bins, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(pos_bin_edges), debug_print=debug_print)
 
         partitioned_results = {}
-
+        _all_examples_scores_dict = {}
+        
         for a_group_name, group_items in test_dict.items():
             for i, (a_pos_tuple, a_ground_truth) in enumerate(group_items.items()):
                 print(f'a_group_name: {a_group_name}')
                 a_partitioner: SubsequencesPartitioningResult = SubsequenceDetectionSamples.build_partition_sequence(a_pos_tuple, **SubsequencesPartitioningResult_common_init_kwargs)
                 a_ground_truth.arr = deepcopy(a_partitioner.flat_positions)
                 partitioned_results[f"{a_group_name}[{i}]"] = a_partitioner
+                _all_examples_scores_dict[f"{a_group_name}[{i}]"] = a_partitioner.get_results_dict(decoder_track_length=decoder_track_length)
+                
         ## END for a_group_name, group_items....
 
         ## OUTPUTS: partitioned_results
 
-        ## INPUTS: partitioned_results, decoder_track_length
-        all_subseq_partitioning_score_computations_fn_dict = SubsequencesPartitioningResultScoringComputations.build_all_bin_wise_subseq_partitioning_computation_fn_dict()
+        # ## INPUTS: partitioned_results, decoder_track_length
+        # all_subseq_partitioning_score_computations_fn_dict = SubsequencesPartitioningResultScoringComputations.build_all_bin_wise_subseq_partitioning_computation_fn_dict()
 
-        # for an_epoch_idx, (a_example_name, a_partition_result) in enumerate(partitioned_results.items()):
+        # # for an_epoch_idx, (a_example_name, a_partition_result) in enumerate(partitioned_results.items()):
             
-        #     {score_computation_name:computation_fn(partition_result=a_partition_result, a_result=None, an_epoch_idx=an_epoch_idx, a_decoder_track_length=decoder_track_length, pos_bin_edges=a_partition_result.pos_bin_edges) for score_computation_name, computation_fn in all_subseq_partitioning_score_computations_fn_dict.items()}
-        _all_examples_scores_dict = {a_example_name: {score_computation_name:computation_fn(partition_result=a_partition_result, a_result=None, an_epoch_idx=an_epoch_idx, a_decoder_track_length=decoder_track_length, pos_bin_edges=a_partition_result.pos_bin_edges) for score_computation_name, computation_fn in all_subseq_partitioning_score_computations_fn_dict.items()} for an_epoch_idx, (a_example_name, a_partition_result) in enumerate(partitioned_results.items())}
+        # #     {score_computation_name:computation_fn(partition_result=a_partition_result, a_result=None, an_epoch_idx=an_epoch_idx, a_decoder_track_length=decoder_track_length, pos_bin_edges=a_partition_result.pos_bin_edges) for score_computation_name, computation_fn in all_subseq_partitioning_score_computations_fn_dict.items()}
+        # _all_examples_scores_dict = {a_example_name: {score_computation_name:computation_fn(partition_result=a_partition_result, a_result=None, an_epoch_idx=an_epoch_idx, a_decoder_track_length=decoder_track_length, pos_bin_edges=a_partition_result.pos_bin_edges) for score_computation_name, computation_fn in all_subseq_partitioning_score_computations_fn_dict.items()} for an_epoch_idx, (a_example_name, a_partition_result) in enumerate(partitioned_results.items())}
 
-        # _all_epochs_scores_dict[unique_full_decoder_score_column_name] = [computation_fn(partition_result=a_partition_result, a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length, pos_bin_edges=xbin_edges) for an_epoch_idx, a_partition_result in enumerate(partition_result_dict[a_name])]
-        ## OUTPUTS: _all_examples_scores_dict
+        # # _all_epochs_scores_dict[unique_full_decoder_score_column_name] = [computation_fn(partition_result=a_partition_result, a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length, pos_bin_edges=xbin_edges) for an_epoch_idx, a_partition_result in enumerate(partition_result_dict[a_name])]
+        # ## OUTPUTS: _all_examples_scores_dict
 
         # once done with all scores for this decoder, have `_a_separate_decoder_new_scores_dict`:
         _new_scores_df =  pd.DataFrame(_all_examples_scores_dict)
