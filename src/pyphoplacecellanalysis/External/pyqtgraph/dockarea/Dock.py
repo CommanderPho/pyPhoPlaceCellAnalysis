@@ -8,7 +8,7 @@ from .DockDrop import DockDrop
 
 class DockDisplayConfig(object):
     """Holds the display and configuration options for a Dock, such as how to format its title bar (color and font), whether it's closable, etc."""
-    def __init__(self, showCloseButton=True, fontSize='12px', corner_radius='3px'):
+    def __init__(self, showCloseButton=True, fontSize='10px', corner_radius='2px'):
         super(DockDisplayConfig, self).__init__()
         self.fontSize = fontSize
         self.showCloseButton = showCloseButton
@@ -36,6 +36,11 @@ class DockDisplayConfig(object):
         fg_color, bg_color, border_color = self.get_colors(orientation, is_dim)
 
         if orientation == 'vertical':
+        
+            # """
+            #     padding-top: 3px;
+            #     padding-bottom: 3px;
+            # """
             return """DockLabel {
                 background-color : %s;
                 color : %s;
@@ -45,8 +50,8 @@ class DockDisplayConfig(object):
                 border-bottom-left-radius: %s;
                 border-width: 0px;
                 border-right: 2px solid %s;
-                padding-top: 3px;
-                padding-bottom: 3px;
+                padding-top: 0px;
+                padding-bottom: 1px;
                 font-size: %s;
             }""" % (bg_color, fg_color, self.corner_radius, self.corner_radius, border_color, self.fontSize)
             
@@ -82,7 +87,7 @@ class Dock(QtWidgets.QWidget, DockDrop):
         
         if display_config is None:
             print(f"WARNING: Dock.__init__(...): display_config is None... using old-mode fallback. This will be eventually depricated.")
-            display_config = DockDisplayConfig(kwargs.get('closable', False), fontSize=kwargs.get('fontSize', "12px"), corner_radius='3px')
+            display_config = DockDisplayConfig(kwargs.get('closable', False), fontSize=kwargs.get('fontSize', "10px"), corner_radius='2px')
             # raise NotImplementedError
         else:
             # print(f"WARNING: Dock.__init__(...): display_config is set, so the explicitly passed parameters 'closable' and 'fontSize' will be ignored.")
@@ -331,7 +336,7 @@ class Dock(QtWidgets.QWidget, DockDrop):
 
 
 class DockLabel(VerticalLabel):
-    """ the label at the top of the Dock widget that displays the title and allows dragging/closing. """
+    """ the label and 'title bar' at the top of the Dock widget that displays the title and allows dragging/closing. """
     sigClicked = QtCore.Signal(object, object)
     sigCloseClicked = QtCore.Signal()
 
@@ -339,6 +344,8 @@ class DockLabel(VerticalLabel):
         self.dim = False
         self.fixedWidth = False
         self.config = display_config
+        # self.elided_text_mode = None
+        self.elided_text_mode = QtCore.Qt.TextElideMode.ElideLeft # True
         VerticalLabel.__init__(self, text, orientation='horizontal', forceWidth=False)
         self.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop|QtCore.Qt.AlignmentFlag.AlignHCenter)
         self.dock = dock
@@ -397,13 +404,42 @@ class DockLabel(VerticalLabel):
             self.dock.float()
 
     def resizeEvent(self, ev):
+        debug_print: bool = False
         if self.closeButton:
             if self.orientation == 'vertical':
+                ## sideways mode with bar on left
                 size = ev.size().width()
                 pos = QtCore.QPoint(0, 0)
             else:
+                ## regular mode with bar on top
                 size = ev.size().height()
                 pos = QtCore.QPoint(ev.size().width() - size, 0)
             self.closeButton.setFixedSize(QtCore.QSize(size, size))
             self.closeButton.move(pos)
+        ## END if self.closeButton...
+        if self.elided_text_mode is not None:
+            # Add elided text logic
+            if debug_print:
+                print(f'self.elided_text_mode: {self.elided_text_mode} -- self.orientation: {self.orientation} -- w: {self.width()}, h: {self.height()}')
+            font_metrics = QtGui.QFontMetrics(self.font())
+            if self.orientation == 'vertical':
+                ## sideways mode with bar on left
+                available_text_space = max(0, self.height() - (size if self.closeButton else 0))
+            else:
+                ## regular mode with bar on top
+                available_text_space = max(0, self.width() - (size if self.closeButton else 0))
+            if debug_print:
+                print(f'\tavailable_text_space: {available_text_space}')
+            # Skip elision if available space is insufficient
+            if available_text_space > 0:
+                elided_text = font_metrics.elidedText(self.text(), self.elided_text_mode, available_text_space)
+                self.setText(elided_text)
+            else:
+                if debug_print:
+                    print("Insufficient space for elision; skipping.")
+
+        else:
+            if debug_print:
+                print(f'self.elided_text_mode == None so skipping eliding -- self.orientation: {self.orientation}')
+        ## END if self.elided_text_mode is not None...
         super(DockLabel,self).resizeEvent(ev)

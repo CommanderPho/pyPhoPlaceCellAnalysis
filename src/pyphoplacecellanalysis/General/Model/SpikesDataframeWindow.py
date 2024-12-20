@@ -1,6 +1,8 @@
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore
 import numpy as np
 
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 from pyphoplacecellanalysis.General.Model.TimeWindow import TimeWindow
 from pyphoplacecellanalysis.General.Model.LiveWindowedData import LiveWindowedData
@@ -22,6 +24,7 @@ Separate 2D and 3D event visualization functions should be made to transform eve
 
 
 """
+@metadata_attributes(short_name=None, tags=['time'], input_requires=[], output_provides=[], uses=[], used_by=['SpikeRasterBase'], creation_date='2024-12-18 12:44', related_items=[])
 class SpikesDataframeWindow(LiveWindowedData):
     """ a zoomable (variable sized) window into a dataframe with a time axis
     Used by Spike3DRaster

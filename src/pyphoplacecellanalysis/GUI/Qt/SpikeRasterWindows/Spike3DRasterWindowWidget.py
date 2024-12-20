@@ -1,18 +1,19 @@
 from copy import deepcopy
-from typing import Dict
+from typing import Dict, Tuple
 import numpy as np
-
-from qtpy import QtCore, QtWidgets
+import pandas as pd
+from qtpy import QtCore, QtWidgets, QtGui
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
-
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters
 from pyphocorehelpers.gui.Qt.GlobalConnectionManager import GlobalConnectionManager, GlobalConnectionManagerAccessingMixin
 from pyphocorehelpers.gui.Qt.qevent_lookup_helpers import QEventLookupHelpers
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 
 from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Uic_AUTOGEN_Spike3DRasterWindowBase import Ui_RootWidget # Generated file from .ui
-
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike3DRaster import Spike3DRaster
@@ -20,7 +21,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike3DRaste
 
 from pyphoplacecellanalysis.General.Mixins.TimeWindowPlaybackMixin import TimeWindowPlaybackPropertiesMixin, TimeWindowPlaybackController, TimeWindowPlaybackControllerActionsMixin
 
-from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarWidget import SpikeRasterBottomFrameControlsMixin
+from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarWidget import Spike3DRasterBottomPlaybackControlBar, SpikeRasterBottomFrameControlsMixin
 from pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterLeftSidebarControlBarWidget import Spike3DRasterLeftSidebarControlBar, SpikeRasterLeftSidebarControlsMixin
 from pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterRightSidebarWidget import Spike3DRasterRightSidebarWidget, SpikeRasterRightSidebarOwningMixin
 
@@ -30,7 +31,7 @@ from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSer
 from pyphoplacecellanalysis.General.Model.Configs.NeuronPlottingParamConfig import SingleNeuronPlottingExtended
 from pyphoplacecellanalysis.GUI.Qt.NeuronVisualSelectionControls.NeuronVisualSelectionControlsWidget import NeuronVisualSelectionControlsWidget, NeuronWidgetContainer, add_neuron_display_config_widget
 
-
+from pyphoplacecellanalysis.GUI.Qt.Menus.PhoMenuHelper import PhoMenuHelper
 
 # remove TimeWindowPlaybackControllerActionsMixin
 # class Spike3DRasterWindowWidget(SpikeRasterBottomFrameControlsMixin, TimeWindowPlaybackControllerActionsMixin, TimeWindowPlaybackPropertiesMixin, QtWidgets.QWidget):
@@ -190,8 +191,22 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         """The spike_raster_plt_2d property."""
         return self.ui.spike_raster_plt_3d
     
-    
-    
+
+    @property
+    def menu_action_history_list(self) -> List:
+        """The menu_action_history_list property."""
+        # return PhoMenuHelper.try_get_menu_window(self).ui.menus._menu_action_history_list # Window?
+        # if not self.params.has_attr('_menu_action_history_list'):
+        #     self.params._menu_action_history_list = [] ## a list to show the history
+        return self.params._menu_action_history_list ## Spike3DRasterWindowWidget
+        # return self.spike_raster_plt_2d.ui._menu_action_history_list ## Spike3DRasterWindowWidget
+    @menu_action_history_list.setter
+    def menu_action_history_list(self, value):
+        # self.spike_raster_plt_2d.ui._menu_action_history_list = value
+        self.params._menu_action_history_list = value
+        # PhoMenuHelper.try_get_menu_window(self).ui.menus._menu_action_history_list = value # window
+
+
     def __init__(self, curr_spikes_df, core_app_name='UnifiedSpikeRasterApp', window_duration=15.0, window_start_time=30.0, neuron_colors=None, neuron_sort_order=None, application_name=None, type_of_3d_plotter='pyqtgraph', parent=None):
         """_summary_
 
@@ -221,15 +236,14 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         app = pg.mkQApp(self.applicationName) # <PyQt5.QtWidgets.QApplication at 0x1d44a4891f0>
         self.GlobalConnectionManagerAccessingMixin_on_init(owning_application=app) # initializes self._connection_man
         
-        
         # self.ui.splitter.setSizes([900, 200])
         # self.ui.splitter.setStretchFactor(0, 5) # have the top widget by 3x the height as the bottom widget
         # self.ui.splitter.setStretchFactor(1, 1) # have the top widget by 3x the height as the bottom widget        
         
         
-        self.params = VisualizationParameters(self.applicationName)
+        self.params = VisualizationParameters(self.applicationName, _menu_action_history_list=[])
         self.params.type_of_3d_plotter = type_of_3d_plotter
-        
+        self.params._menu_action_history_list = []
         # Helper Mixins: INIT:
         
         self.SpikeRasterBottomFrameControlsMixin_on_init()
@@ -349,6 +363,18 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.series_customize_pressed.connect(self.perform_interval_series_customize_item))
             self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.series_clear_all_pressed.connect(self.perform_interval_series_clear_all))
             self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.series_add_pressed.connect(self.perform_interval_series_request_add))
+            
+            self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.jump_specific_time.connect(self.perform_jump_specific_timestamp_only))
+            # self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.jump_specific_time.connect(self.update_animation)
+            # self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.jump_specific_time.connect((lambda new_time: self.update_animation(new_time))))
+            self.ui.bottom_bar_connections.append(self.ui.spike_raster_plt_2d.sigEmbeddedMatplotlibDockWidgetAdded.connect(lambda spike_raster_plt_2D, added_dock_item, added_widget: self.update_scrolling_event_filters())) ## not really a bottom_bar_connections, but who cares
+                        
+            # ## update the jump time when it scrolls
+            # self.ui.bottomPlaybackControlBarWidget.time_fractional_seconds
+            
+            ## update the dynamic event filters if needed
+            self.update_scrolling_event_filters()
+            
 
         # Set Window Title Options:
         if self.applicationName is not None:
@@ -379,7 +405,25 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             self.ui.scrollAnimTimeline = None
             
         
-          
+
+    @function_attributes(short_name=None, tags=['interactivity', 'event', 'scrolling', 'children'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 10:29', related_items=[])
+    def update_scrolling_event_filters(self, debug_print=False):
+        """ enables scrollability in the added matplotlib views just like the two upper views 
+        
+        Needs to be done when any new child widget is added, right?
+        
+        """
+        #   .installEventFilter(self)
+        ## Install the event filter in the 2D View to enable scroll wheel events:
+        if self.ui.spike_raster_plt_2d is not None: 
+            if self.ui.spike_raster_plt_2d.ui.matplotlib_view_widgets is not None:
+                for a_name, a_time_sync_widget in self.ui.spike_raster_plt_2d.ui.matplotlib_view_widgets.items():
+                    if debug_print:
+                        print(f'a_name: {a_name}')
+                    # a_time_sync_widget.installEventFilter(self) # plots.preview_overview_scatter_plot is a ScatterPlotItem ... does it have to be a pyqtgraph subclass to do this? I'm worried it does
+                    a_time_sync_widget.ui.canvas.installEventFilter(self)
+
+
     def __str__(self):
          return
       
@@ -484,12 +528,16 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.update_animation(next_start_timestamp: {next_start_timestamp})')
         # self.animation_active_time_window.update_window_start(next_start_timestamp) # calls update_window_start, so any subscribers should be notified.
+        next_end_timestamp = next_start_timestamp+self.animation_active_time_window.window_duration
+        
         # Update the windows once before showing the UI:
-        self.spike_raster_plt_2d.update_scroll_window_region(next_start_timestamp, next_start_timestamp+self.animation_active_time_window.window_duration, block_signals=True) # self.spike_raster_plt_2d.window_scrolled should be emitted        
+        self.spike_raster_plt_2d.update_scroll_window_region(next_start_timestamp, next_end_timestamp, block_signals=True) # self.spike_raster_plt_2d.window_scrolled should be emitted        
         # signal emit:
-        self.spike_raster_plt_2d.window_scrolled.emit(next_start_timestamp, next_start_timestamp+self.animation_active_time_window.window_duration)
+        self.spike_raster_plt_2d.window_scrolled.emit(next_start_timestamp, next_end_timestamp)
         # update_scroll_window_region
         # self.ui.spike_raster_plt_3d.spikes_window.update_window_start_end(self.ui.spike_raster_plt_2d.spikes_window.active_time_window[0], self.ui.spike_raster_plt_2d.spikes_window.active_time_window[1])
+        # self.bottom_playback_control_bar_widget.on_window_changed(next_start_timestamp, next_end_timestamp) ## direct
+        self.SpikeRasterBottomFrameControlsMixin_on_window_update(next_start_timestamp, next_end_timestamp) ## indirect 
         
 
     @pyqtExceptionPrintingSlot(int)
@@ -643,6 +691,13 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.update_animation(next_target_jump_time)
 
 
+    @pyqtExceptionPrintingSlot(float)
+    def perform_jump_specific_timestamp_only(self, next_start_timestamp: float):
+        """ Jumps to a specific time window
+        """
+        return self.perform_jump_specific_timestamp(next_start_timestamp)
+    
+
     @pyqtExceptionPrintingSlot(float, float)
     def perform_jump_specific_timestamp(self, next_start_timestamp: float, window_duration: float=None):
         """ Jumps to a specific time window (needs window size too)
@@ -745,9 +800,23 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             print(f'Spike3DRasterWindowWidget.on_window_duration_changed(start_t: {start_t}, end_t: {end_t}, duration: {duration})')
         # TODO 2023-03-29 19:03: - [ ] Shouldn't this at least update the plots like on_window_changed does? I know duration changing is more involved than just start_t changing.
 
+    @pyqtExceptionPrintingSlot(float)
+    def on_window_start_changed(self, start_t):
+        """ 2024-12-19 02:09 - doesn't actually seem to always be called on user scrolling? """
+        # called when the window is updated
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.on_window_start_changed(start_t: {start_t})')
+        if self.enable_debug_print:
+            profiler = pg.debug.Profiler(disabled=True, delayed=True)
+        self._update_plots()
+        self.SpikeRasterBottomFrameControlsMixin_on_window_update(start_t, None)
+        if self.enable_debug_print:
+            profiler('Finished calling _update_plots()')
+
 
     @pyqtExceptionPrintingSlot(float, float)
     def on_window_changed(self, start_t, end_t):
+        """ 2024-12-19 02:09 - doesn't actually seem to always be called on user scrolling? """
         # called when the window is updated
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.on_window_changed(start_t: {start_t}, end_t: {end_t})')
@@ -766,6 +835,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
     @pyqtExceptionPrintingSlot(float, float, object)
     def on_windowed_data_window_changed(self, start_t, end_t, updated_data_value):
+        """ 2024-12-19 02:09 - doesn't actually seem to always be called on user scrolling? """
         # called when the window is updated
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.on_windowed_data_window_changed(start_t: {start_t}, end_t: {end_t}, updated_data_value: ...)')
@@ -823,6 +893,11 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             # TODO: maybe use a rate-limited signal that's emitted instead so this isn't called too often during interpolation?
             # self.shift_animation_frame_val(self._scheduledAnimationSteps) # TODO: this isn't quite right
             
+    @QtCore.Property(object) # # Note that this ia *pyqt*Property, meaning it's available to pyqt
+    def bottom_playback_control_bar_widget(self) -> Spike3DRasterBottomPlaybackControlBar:
+        """The bottom_playback_control_bar_widget property."""
+        return self.ui.bottomPlaybackControlBarWidget
+
     def onScrollingTimelineAnimationFinished(self):
         """ used for the QTimeline version of the smooth scrolling animation """
         print(f'onScrollingTimelineAnimationFinished()')
@@ -858,10 +933,10 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         
         """
         # print(f'Spike3DRasterWindowWidget.eventFilter(self, watched, event)')
-        if event.type() == QtCore.QEvent.GraphicsSceneWheel:
+        delta = None
+        if (event.type() == QtCore.QEvent.GraphicsSceneWheel):
             # QtCore.QEvent.GraphicsSceneWheel
-            """ 
-            
+            """             
             event.delta(): (gives values like +/- 120, 240, etc) # Returns the distance that the wheel is rotated, in eighths (1/8s) of a degree. A positive value indicates that the wheel was rotated forwards away from the user; a negative value indicates that the wheel was rotated backwards toward the user.
                 Most mouse types work in steps of 15 degrees, in which case the delta value is a multiple of 120 (== 15 * 8).
 
@@ -876,8 +951,31 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
                 # print(f'\tevent.phase(): {event.phase()}')
                 # print(f'\tevent.pixelDelta(): {event.pixelDelta()}')
                 
+            delta = event.delta()
+        
+        
+        elif (event.type() == QtCore.QEvent.Wheel): # the second case (QtGui.QWheelEvent) doesn't even exist I don't think. IDK why ChatGPT said to use it.
+            """ the event is an instance of `QtGui.QWheelEvent`, but the event's .type() is NEVER QtGui.QWheelEvent, that's not even a possible type. """
+            if self.should_debug_print_interaction_events:
+                print(f'Spike3DRasterWindowWidget.eventFilter(...)\n\t detected event.type() == QtCore.QEvent.Wheel')
+                print(f'\twatched: {watched}\n\tevent: {event}')
+                print(f'\tevent.angleDelta(): {event.angleDelta()}')
+                
+            delta = event.angleDelta().x()
+            if delta == 0:
+                delta = event.angleDelta().y()
             
-            numDegrees = event.delta() / 8
+        else:
+            delta = None
+            if self.should_debug_print_interaction_events:
+                print(f'\t unhandled event {QEventLookupHelpers.get_event_string(event)}')
+                
+        if (delta is not None) and (delta > 0):
+            ## do the scroll
+            if self.should_debug_print_interaction_events:
+                print(f'\tperofmring scroll with delta: {delta}')
+
+            numDegrees = delta / 8
             numSteps = numDegrees / 15 # see QWheelEvent documentation
             numSteps = int(round(float(self.params.scrollStepMultiplier) * float(numSteps)))
                        
@@ -901,12 +999,35 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
                 self._scheduledAnimationSteps = 0 # New method: zero it out instead of having it compound
 
             return True
+        # END if (delta is not None) a....
         else:
+            # Unknown event type
             if self.should_debug_print_interaction_events:
                 print(f'\t unhandled event {QEventLookupHelpers.get_event_string(event)}')
+
         # If not a particularlly handled case, do the default thing.
         return super().eventFilter(watched, event)
     
+
+    @function_attributes(short_name=None, tags=['TODO', 'ACTIVE', 'programmatic', 'scrolling', 'time'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 12:09', related_items=[])
+    def programmatically_scroll_to_time(self, new_time):
+        numSteps: int = 3
+        updatedNumScheduledScalings = self._scheduledAnimationSteps + numSteps
+        if (updatedNumScheduledScalings * numSteps < 0):
+            updatedNumScheduledScalings = numSteps # if user moved the wheel in another direction, we reset previously scheduled scalings
+        
+        if self.enable_smooth_scrolling_animation:
+            ## QTimeline version:
+            self._scheduledAnimationSteps = updatedNumScheduledScalings # Set the updated number of scalings:
+            self.ui.scrollAnimTimeline.setEndFrame(self._scheduledAnimationSteps)
+            self.ui.scrollAnimTimeline.start() # Start the timeline's animation event
+        else:
+            # No animation, just update directly ("old way")
+            self._scheduledAnimationSteps = updatedNumScheduledScalings
+            self.shift_animation_frame_val(self._scheduledAnimationSteps)
+            self._scheduledAnimationSteps = 0 # New method: zero it out instead of having it compound
+
+
     
     ##-----------------------------------------
     def wheelEvent(self, event):
@@ -1169,16 +1290,186 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
         # Display the sidebar:
         self.set_right_sidebar_visibility(is_visible=True)
+
+
+    @function_attributes(short_name=None, tags=['menus', 'actions'], input_requires=[], output_provides=[], uses=['PhoMenuHelper.build_all_programmatic_menu_command_dict'], used_by=[], creation_date='2024-12-18 16:29', related_items=[])
+    def build_all_menus_actions_dict(self, wants_flat_actions_dict: bool=True, **kwargs) -> Tuple[Dict, Dict[str, QtWidgets.QAction]]:
+        """ gets absolutely all of the possible actions (from the menus, both global and context) and returns them 
+        
+        Usage:
+            all_global_menus_actionsDict, global_flat_action_dict = spike_raster_window.build_all_menus_actions_dict()
+            all_global_menus_actionsDict
+         
+        """
+        from pyphoplacecellanalysis.GUI.Qt.Menus.PhoMenuHelper import PhoMenuHelper
+
+        return PhoMenuHelper.build_all_programmatic_menu_command_dict(spike_raster_window=self, wants_flat_actions_dict=wants_flat_actions_dict, **kwargs)
+
+
+    @function_attributes(short_name=None, tags=['event', 'intervals', 'epochs', 'window', 'active-window'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-19 11:31', related_items=[])
+    def find_event_intervals_in_active_window(self, included_series_names: Optional[List[str]]=None) -> Dict[str, pd.DataFrame]:
+        """find the events/intervals that are within the currently active render window:
+        Usage:
+            included_series_names=['Replays', 'Laps', 'PBEs']
+            active_2d_plot.find_event_intervals_in_active_window(included_series_names=included_series_names)
+        """
+        return self.spike_raster_plt_2d.find_event_intervals_in_active_window(included_series_names=included_series_names, debug_print=False)
+
+
+
+
+# ==================================================================================================================== #
+# __name__ == "__main__"                                                                                               #
+# ==================================================================================================================== #
+if __name__ == "__main__":
+    """ 
+            assert global_data_root_parent_path.exists(), f"global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
+        ## Build Pickle Path:
+        finalized_loaded_global_batch_result_pickle_path = Path(global_data_root_parent_path).joinpath(active_global_batch_result_filename).resolve() # Use Default
+
+
+        # BEGIN FUNCTION BODY
+        global_batch_run = _try_load_global_batch_result()
+    
+        
+        
+        & c:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv/Scripts/python.exe c:/Users/pho/repos/Spike3DWorkEnv/pyPhoPlaceCellAnalysis/src/pyphoplacecellanalysis/GUI/Qt/SpikeRasterWindows/Spike3DRasterWindowWidget.py
+        
+        & c:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv/Scripts/python.exe c:/Users/pho/repos/Spike3DWorkEnv/pyPhoPlaceCellAnalysis/src/pyphoplacecellanalysis/GUI/Qt/SpikeRasterWindows/Spike3DRasterWindowWidget.py
+        
+        # [--multiprocess] [--show-pqi-stack]
+        & c:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv/Scripts/python.exe -m PyQtInspect --direct --qt-support=pyqt5 --file c:/Users/pho/repos/Spike3DWorkEnv/pyPhoPlaceCellAnalysis/src/pyphoplacecellanalysis/GUI/Qt/SpikeRasterWindows/Spike3DRasterWindowWidget.py
+    """
+    import argparse
+    import sys
+    from pathlib import Path
+    from typing import Optional, List, Dict
+    from neuropy.utils.result_context import IdentifyingContext
+    from pyphocorehelpers.assertion_helpers import Assert
+    from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData
+    from pyphocorehelpers.Filesystem.path_helpers import set_posix_windows
+    from pyphoplacecellanalysis.GUI.Qt.Widgets.DebugWidgetStylesheetInspector import ConnectStyleSheetInspector
+    from pyphoplacecellanalysis.General.Batch.runBatch import BatchRun, BatchResultDataframeAccessor, run_diba_batch, SessionBatchProgress, main
+    from PyQt5.QtCore import Qt
+    from PyQt5.QtGui import QKeySequence
+
+    def _subfn_run_main(pkl_path, debug_print:bool=True, debug_mode: bool=True):
+        """ run main function to perform batch processing. """
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _setup_spike_raster_window_for_debugging
+        
+        print(f'pkl_path: {pkl_path}')
+        
+        def _try_load_global_batch_result():
+            if debug_print:
+                print(f'pkl_path: {pkl_path}')
+            # try to load an existing batch result:
+            try:
+                curr_active_pipeline = loadData(pkl_path, debug_print=debug_print)
+                
+            except NotImplementedError:
+                # Fixes issue with pickled POSIX_PATH on windows for path.                    
+                with set_posix_windows():
+                    curr_active_pipeline = loadData(pkl_path, debug_print=debug_print) # Fails this time if it still throws an error
+
+            except (FileNotFoundError, TypeError):
+                # loading failed
+                print(f'Failure loading {pkl_path}.')
+                curr_active_pipeline = None
+                
+            return curr_active_pipeline
+        
+        curr_active_pipeline = _try_load_global_batch_result()
+        assert curr_active_pipeline is not None
+        print(f'loaded `curr_active_pipeline`, building Spike3DRasterWindowWidget...')
+        
+        ## Loads `curr_active_pipeline` from the provided path
+        if debug_mode:
+            Spike3DRasterWindowWidget.enable_interaction_events_debug_print = True    
+        # Gets the existing SpikeRasterWindow or creates a new one if one doesn't already exist:
+        spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget) = Spike3DRasterWindowWidget.find_or_create_if_needed(curr_active_pipeline, force_create_new=True)
+        print(f'built `Spike3DRasterWindowWidget`, launching...')
+        if debug_mode:
+            spike_raster_window.enable_debug_print = True
+            # spike_raster_window.should_debug_print_interaction_events = True
+            print(f'\tspike_raster_window.should_debug_print_interaction_events: {spike_raster_window.should_debug_print_interaction_events}')
     
 
+        # included_session_contexts: Optional[List[IdentifyingContext]] = [IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='one',session_name='2006-6-08_14-26-15'),
+        #     IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='one',session_name='2006-6-09_1-22-43'),
+        #     IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='one',session_name='2006-6-12_15-55-31'),
+        #     IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='two',session_name='2006-6-07_16-40-19'),
+        #     IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='two',session_name='2006-6-08_21-16-25'),
+        #     IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='two',session_name='2006-6-09_22-24-40'),
+        #     IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='two',session_name='2006-6-12_16-53-46'),
+        #     IdentifyingContext(format_name='kdiba',animal='vvp01',exper_name='one',session_name='2006-4-09_17-29-30'),
+        #     IdentifyingContext(format_name='kdiba',animal='vvp01',exper_name='one',session_name='2006-4-10_12-25-50'),
+        #     IdentifyingContext(format_name='kdiba',animal='vvp01',exper_name='two',session_name='2006-4-09_16-40-54'),
+        #     IdentifyingContext(format_name='kdiba',animal='vvp01',exper_name='two',session_name='2006-4-10_12-58-3'),
+        #     IdentifyingContext(format_name='kdiba',animal='pin01',exper_name='one',session_name='11-02_17-46-44'),
+        #     IdentifyingContext(format_name='kdiba',animal='pin01',exper_name='one',session_name='11-02_19-28-0'),
+        #     IdentifyingContext(format_name='kdiba',animal='pin01',exper_name='one',session_name='11-03_12-3-25'),
+        #     IdentifyingContext(format_name='kdiba',animal='pin01',exper_name='one',session_name='fet11-01_12-58-54')]
 
 
+        # global_batch_run, result_handler, across_sessions_instantaneous_fr_dict, output_filenames_tuple = main(active_result_suffix=active_result_suffix, 
+        #                                                                                                     included_session_contexts=included_session_contexts,
+        #                                                                                                     num_processes=num_processes, 
+        #                                                                                                     should_force_reload_all=should_force_reload_all, 
+        #                                                                                                     should_perform_figure_generation_to_file=should_perform_figure_generation_to_file, 
+        #                                                                                                     debug_print=debug_print)
+        
+        all_global_menus_actionsDict, global_flat_action_dict = _setup_spike_raster_window_for_debugging(spike_raster_window, debug_print=debug_print)
 
+        return spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget), curr_active_pipeline
+        
 
-if __name__ == "__main__":
-    import sys
+    """ Usage:
+    
+    python scripts/runSingleBatch.py --active_result_suffix "2023-08-08_bApogee" --num_processes 4 --should_force_reload_all --debug_print
+    python scripts/runSingleBatch.py --active_result_suffix "2023-08-08_LNX00052" --num_processes 4 --should_force_reload_all --debug_print
+    
+    --should_perform_figure_generation_to_file
+    --should_perform_figure_generation_to_file
+    
+    """
+    # parser = argparse.ArgumentParser(description='Perform batch processing.')
+    # parser.add_argument('--active_result_suffix', required=True, help='Suffix used for filenames throughout the notebook.')
+    # parser.add_argument('--num_processes', type=int, default=1, help='Number of processes to use.')
+    # parser.add_argument('--should_force_reload_all', action='store_true', help='Force reload all data.')
+    # parser.add_argument('--should_perform_figure_generation_to_file', action='store_true', help='Perform figure generation to file.')
+    # parser.add_argument('--debug_print', action='store_true', help='Enable debug printing.')
+
+    # args = parser.parse_args()
+    
+    pkl_path = Path('W:/Data/KDIBA/gor01/one/2006-6-09_1-22-43/loadedSessPickle.pkl')
+    Assert.path_exists(pkl_path)
+
     app = QtWidgets.QApplication(sys.argv)
-    testWidget = Spike3DRasterWindowWidget()
+    # Define stylesheet
+    app.setStyleSheet("""
+        VContainer {
+            background-color: #00e1ff; /* Light gray background */
+            color: #ff0095;           /* Text color */
+            border: 1px solid #4400ff; /* Border around the container */
+        }
+        VContainer QLabel {
+            color: #ffd000; /* Red text inside VContainer's labels */
+        }
+        QSplitter::handle { height: 2px; width: 2px; }
+    """)
+
+    # testWidget = Spike3DRasterWindowWidget()
+
+
+
+    spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget), curr_active_pipeline = _subfn_run_main(pkl_path)
+    spike_raster_window.show()
+
     # testWidget.show()
+    
+    print(f'waiting...')
+    # ConnectStyleSheetInspector(main_window=spike_raster_window, shortcut=QKeySequence(Qt.CTRL + Qt.SHIFT + Qt.Key_F12)) # Connects the global stylesheet inspector to the window
+
+
     sys.exit(app.exec_())
 

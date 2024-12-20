@@ -5,11 +5,13 @@ import pandas as pd
 
 from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 
 from pyphoplacecellanalysis.General.Model.Datasources.Datasources import DataframeDatasource
 from pyphoplacecellanalysis.General.Model.TimeWindow import TimeWindow
 
-
+@metadata_attributes(short_name=None, tags=['time'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 12:45', related_items=[])
 class LiveWindowedData(SimplePrintable, PrettyPrintable, QtCore.QObject):
     """ an optional adapter between a DataSource and the GUI/graphic that uses it.
     Serves as an intermediate to TimeWindow and Datasource.

@@ -5,10 +5,19 @@ import sys
 from indexed import IndexedOrderedDict
 from matplotlib.axis import Axis
 from matplotlib.figure import Figure
+
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any, NewType, TypeVar
+from typing_extensions import TypeAlias
+from nptyping import NDArray
+import neuropy.utils.type_aliases as types
+import numpy as np
+import pandas as pd
+from neuropy.utils.mixins.indexing_helpers import get_dict_subset
+
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
-
 # For Dynamic Plot Widget Adding
 # from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
 # from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DynamicDockDisplayAreaContentMixin
@@ -35,7 +44,7 @@ from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import debug_print_QRe
 from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeEmphasisState # required for the different emphasis states in ._build_cell_configs()
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig 
-
+from pyphoplacecellanalysis.GUI.Qt.Menus.PhoMenuHelper import PhoMenuHelper
 
 from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum
 
@@ -57,7 +66,7 @@ class SynchronizedPlotMode(ExtendedEnum):
     #     return cls.build_member_value_dict(['from','to',':'])
 
 
-
+@metadata_attributes(short_name=None, tags=['raster', 'gui'], input_requires=[], output_provides=[], uses=['LiveWindowedData'], used_by=[], creation_date='2024-12-18 12:45', related_items=[])
 class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRasterBase):
     """ Displays a 2D version of a raster plot with the spikes occuring along a plane. 
     
@@ -88,7 +97,11 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     # window_scrolled = QtCore.pyqtSignal(float, float) # signal is emitted on updating the 2D sliding window, where the first argument is the new start value and the 2nd is the new end value
     
     sigRenderedIntervalsListChanged = QtCore.Signal(object) # EpochRenderingMixin conformance: signal emitted whenever the list of rendered intervals changed (add/remove). Added 2023-10-16 to prevent `AttributeError: 'Spike2DRaster' does not have a signal with the signature PyQt_PyObject)`
+    # sigEmbeddedWidgetHierarchyChanged = QtCore.Signal(object) # emitted when the hierarchy of nested widgets changes, such as when a new dynamic matplotlib_render_plot_widget is added
     
+    sigEmbeddedMatplotlibDockWidgetAdded = QtCore.Signal(object, object, object) # self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name]) -  emitted when a new matplotlib dock widget is added
+    
+
     @property
     def overlay_text_lines_dict(self):
         """The lines of text to be displayed in the overlay."""    
@@ -181,6 +194,18 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     # END unit_sort_order                                                                                                  #
     # ==================================================================================================================== #
 
+
+
+    @property
+    def menu_action_history_list(self) -> List:
+        """The menu_action_history_list property."""
+        # return self.ui.menus._menu_action_history_list # 2DRaster
+        return PhoMenuHelper.try_get_menu_window(self).ui.menus._menu_action_history_list  # Window?
+    @menu_action_history_list.setter
+    def menu_action_history_list(self, value):
+        # self.ui.menus._menu_action_history_list = value
+        PhoMenuHelper.try_get_menu_window(self).ui.menus._menu_action_history_list = value
+        
 
 
     def __init__(self, params=None, spikes_window=None, playback_controller=None, neuron_colors=None, neuron_sort_order=None, application_name=None, **kwargs):
@@ -366,18 +391,21 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         
         self.ui.main_content_splitter = pg.QtWidgets.QSplitter(0)
         self.ui.main_content_splitter.setObjectName('main_content_splitter')
+        # self.ui.main_content_splitter.setHandleWidth(10)
         self.ui.main_content_splitter.setHandleWidth(10)
         self.ui.main_content_splitter.setOrientation(0) # pg.Qt.Vertical
         # Qt.Horizontal
+
+        #TODO 2024-12-19 09:18: - [ ] This is where the handles become huge and RED!!
         self.ui.main_content_splitter.setStyleSheet("""
                 QSplitter::handle {
                     background: rgb(255, 0, 4);
                 }
                 QSplitter::handle:horizontal {
-                    width: 15px;
+                    width: 8px;
                 }
                 QSplitter::handle:vertical {
-                    height: 15px;
+                    height: 8px;
                 }
             """)
 
@@ -421,7 +449,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             self.plots.main_plot_widget = self.ui.active_window_container_layout.addPlot(row=1, col=0, rowspan=self.params.main_graphics_plot_widget_rowspan, colspan=1)
             # self.plots.main_plot_widget = self.ui.main_graphics_layout_widget.addPlot(col=0, rowspan=self.params.main_graphics_plot_widget_rowspan, colspan=1) # , name='main_plot_widget'
             self.plots.main_plot_widget.setObjectName('main_plot_widget') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
-            self.plots.main_plot_widget.setMinimumHeight(500.0)
+            self.plots.main_plot_widget.setMinimumHeight(300.0) # used to be 500.0 and took up too much room
 
             # curr_plot_row += (1 * self.params.main_graphics_plot_widget_rowspan)
             # self.ui.plots = [] # create an empty array for each plot, of which there will be one for each unit.
@@ -512,6 +540,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         ## Add the epochs separator lines:
         _out_lines = self.add_raster_spikes_and_epochs_separator_line()
         
+
     def _run_delayed_gui_load_code(self):
         """ called when the self._delayed_gui_timer QTimer fires. """
         #Stop the timer.
@@ -698,6 +727,30 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         self.update(sort_changed=False, colors_changed=True)
         
         
+    @function_attributes(short_name=None, tags=['epoch', 'interval', 'find', 'window'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-19 11:11', related_items=[])
+    def find_event_intervals_in_active_window(self, included_series_names: Optional[List[str]]=None, debug_print=False) -> Dict[str, pd.DataFrame]:
+        """find the events/intervals that are within the currently active render window:
+        """
+        if included_series_names is None:
+            ## include all
+            included_series_names = self.rendered_epoch_series_names
+
+        ## Get current time window:
+        curr_time_window = self.animation_active_time_window.active_time_window # (45.12114057149739, 60.12114057149739)
+        start_t, end_t = curr_time_window
+        if debug_print:
+            print(f'curr_time_window: {curr_time_window}')
+
+        active_window_series_events_dict: Dict[str, pd.DataFrame] = {}
+        for series_name, series_datasource in get_dict_subset(self.interval_datasources, subset_includelist=self.rendered_epoch_series_names).items():
+            if debug_print:
+                print(f'series_name: {series_name}, series_datasource: {series_datasource}')
+            if series_name in included_series_names:
+                ## make sure series is included:              
+                active_window_series_events_dict[series_name] = series_datasource.get_updated_data_window(new_start=start_t, new_end=end_t)
+            
+        return active_window_series_events_dict
+
 
 
     # ==================================================================================================================== #
@@ -1140,9 +1193,11 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         # performs required setup to enable dynamically added matplotlib render subplots.
         self.ui.matplotlib_view_widgets = {} # empty dictionary
 
-    @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 13:26', related_items=[])
+    @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=['FigureWidgetDockDisplayConfig'], used_by=[], creation_date='2023-10-17 13:26', related_items=[])
     def add_new_matplotlib_render_plot_widget(self, row=1, col=0, name='matplotlib_view_widget', dockSize=(500,50), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None) -> Tuple[MatplotlibTimeSynchronizedWidget, Figure, List[Axis]]:
         """ creates a new dynamic MatplotlibTimeSynchronizedWidget, a container widget that holds a matplotlib figure, and adds it as a row to the main layout
+        
+        emit an event so the parent can call `self.update_scrolling_event_filters()` to add the new item
         
         """
         dDisplayItem = self.ui.dynamic_docked_widget_container.find_display_dock(identifier=name) # Dock
@@ -1152,6 +1207,9 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             self.ui.matplotlib_view_widgets[name] = MatplotlibTimeSynchronizedWidget(name=name) # Matplotlib widget directly
             self.ui.matplotlib_view_widgets[name].setObjectName(name)
             self.ui.matplotlib_view_widgets[name].plots.fig.subplots_adjust(top=1.0, bottom=0.0, left=0.0, right=1.0, hspace=0.0, wspace=0.0)
+
+            ## Enable scrollability
+            self.ui.matplotlib_view_widgets[name].installEventFilter(self)
             
             ## Add directly to the main grid layout:
             # self.ui.layout.addWidget(self.ui.matplotlib_view_widget, row, col)
@@ -1174,11 +1232,16 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             dDisplayItem.updateStyle()
             dDisplayItem.update()
             
+            #TODO 2024-12-18 08:54: - [ ] Where the red must be coming in
             ## Add the plot:
             fig = self.ui.matplotlib_view_widgets[name].getFigure()
             _single_ax = self.ui.matplotlib_view_widgets[name].getFigure().add_subplot(111) # Adds a single axes to the figure
             ax = self.ui.matplotlib_view_widgets[name].axes # return all axes instead of just the first one
         
+            ## emit the signal
+            self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name])
+            
+
         else:
             # Already had the widget
             print(f'already had the valid matplotlib view widget and its display dock. Returning extant.')
@@ -1186,7 +1249,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             ax = self.ui.matplotlib_view_widgets[name].axes # return all axes instead of just the first one
             
         ## Apply the default formatting:
-        fig.patch.set_facecolor('black')
+        fig.patch.set_facecolor('black') ## Defines the "no data" color
         fig.patch.set_alpha(0.1)
 
         for an_ax in ax:

@@ -2,7 +2,10 @@ from matplotlib.offsetbox import AnchoredText
 import numpy as np
 from nptyping import NDArray
 import pandas as pd
-from typing import List, Dict, Tuple, Optional, Any, Callable, Union
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing_extensions import TypeAlias
+from nptyping import NDArray
+import neuropy.utils.type_aliases as types
 from copy import deepcopy
 from attrs import define, field, Factory
 import matplotlib as mpl
@@ -36,7 +39,7 @@ from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import stacked_epoch_slic
 
 from pyphoplacecellanalysis.GUI.Qt.Menus.BaseMenuProviderMixin import BaseMenuCommand # for AddNewDecodedPosition_MatplotlibPlotCommand
 
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions import DefaultComputationFunctions # TODO: I think it's bad to include computation functions here technically
 
@@ -45,6 +48,9 @@ from neuropy.utils.matplotlib_helpers import find_first_available_matplotlib_fon
 
 found_matplotlib_font_name: str = find_first_available_matplotlib_font_name(desired_fonts_list=['Source Sans Pro', 'Source Sans 3', 'DejaVu Sans Mono'])
 
+from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import FixedCustomColormaps
+from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
+from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatConverter
 
 
 class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
@@ -157,7 +163,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
     @function_attributes(short_name='decoded_epoch_slices', tags=['display', 'decoder', 'epoch','slices'], input_requires=[], output_provides=[], uses=['plot_decoded_epoch_slices', '_compute_specific_decoded_epochs', 'DefaultComputationFunctions._perform_specific_epochs_decoding'], used_by=[], creation_date='2023-03-23 15:49')
     def _display_plot_decoded_epoch_slices(computation_result, active_config, active_context=None, filter_epochs='ripple', included_epoch_indicies=None, **kwargs):
         """ renders a plot with the 1D Marginals either (x and y position axes): the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top. 
-        
+        2024-12-19 11:46 This isn't working and has undefined variables?
         TODO: This display function is currently atypically implemented as it performs computations as needed.
 
         Depends on `_compute_specific_decoded_epochs` to compute the decoder for the epochs.
@@ -172,17 +178,79 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         variable_name = 'x',
         
         """
+        from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
+        from neuropy.core.epoch import TimeColumnAliasesProtocol        
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _compute_proper_filter_epochs, EpochFilteringMode, get_proper_global_spikes_df
+        
         assert active_context is not None
         
+        use_single_time_bin_per_epoch = kwargs.pop('use_single_time_bin_per_epoch', False)
+        epochs_filtering_mode =  kwargs.pop('epochs_filtering_mode', EpochFilteringMode.DropShorter)
+        decoder_ndim: int = kwargs.pop('decoder_ndim', 2)
+        decoding_time_bin_size: float = kwargs.pop('decoding_time_bin_size', None)
+        if decoding_time_bin_size is None:
+            active_decoder = computation_result.computed_data['pf2D_Decoder']
+            if active_decoder is not None:
+                decoding_time_bin_size = active_decoder.time_bin_size ## get from existing decoder
+
+        if decoding_time_bin_size is None:
+            print(f'ERR: falling back to decoding_time_bin_size default!')
+            decoding_time_bin_size = 0.025 ## set default
+
+        assert decoding_time_bin_size is not None
+
         ## Finally, add the display function to the active context
         active_display_fn_identifying_ctx = active_context.adding_context('display_fn', display_fn_name='display_plot_decoded_epoch_slices')
 
+
+        ## NEW GET DATA
+        print(f'decoding_time_bin_size: {decoding_time_bin_size}')
+        # computation_result = DefaultComputationFunctions._perform_specific_epochs_decoding(computation_result, curr_active_pipeline.active_configs[config_name], filter_epochs='ripple', decoding_time_bin_size=decoding_time_bin_size)
+        computation_result = DefaultComputationFunctions._perform_specific_epochs_decoding(computation_result, active_config, decoder_ndim=decoder_ndim, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size)
+
+        # # external-function way:
+        # # decoder_laps_filter_epochs_decoder_result_dict[a_name], decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _compute_lap_and_ripple_epochs_decoding_for_decoder(a_decoder, curr_active_pipeline, desired_laps_decoding_time_bin_size=laps_decoding_time_bin_size, desired_ripple_decoding_time_bin_size=ripple_decoding_time_bin_size, epochs_filtering_mode=EpochFilteringMode.DropShorter)
+        # ## Decode Ripples:
+        # if decoding_time_bin_size is not None:
+        #     global_replays = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].replay))
+        #     global_replays, ripple_decoding_time_bin_size = _compute_proper_filter_epochs(epochs_df=global_replays, desired_decoding_time_bin_size=decoding_time_bin_size, minimum_event_duration=(2.0 * decoding_time_bin_size), mode=epochs_filtering_mode) # `ripple_decoding_time_bin_size` is set here! It takes a minimum value
+        #     if use_single_time_bin_per_epoch:
+        #         ripple_decoding_time_bin_size = None
+
+        #     a_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = active_decoder.decode_specific_epochs(deepcopy(curr_active_pipeline.sess.spikes_df), filter_epochs=global_replays,
+        #                                                                                                                           decoding_time_bin_size=ripple_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
+        #     # ## new `_compute_arbitrary_epochs_decoding_for_decoder` way (but untested)
+        #     # a_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = _compute_arbitrary_epochs_decoding_for_decoder(a_directional_pf1D_Decoder, deepcopy(curr_active_pipeline.sess.spikes_df), global_replays, ripple_decoding_time_bin_size, use_single_time_bin_per_epoch, epochs_filtering_mode)
+
+        # else:
+        #     a_directional_ripple_filter_epochs_decoder_result = None
+        #     # ripple_radon_transform_df = None
+        # ## OUTPUTS: a_directional_ripple_filter_epochs_decoder_result
+
+        # # returns a `DecodedFilterEpochsResult`
+        # all_directional_ripple_filter_epochs_decoder_result = active_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(owning_pipeline_reference)), filter_epochs=replay_epochs_df, ## #TODO 2024-12-19 12:03: - [ ] Fix here
+        #                                                                                                                                                                                 decoding_time_bin_size=ripple_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
+    
+
+        filter_epochs_decoder_result, active_filter_epochs, default_figure_name = computation_result.computed_data['specific_epochs_decoding'][('Ripples', decoding_time_bin_size)]
+        print(f'n_epochs: {active_filter_epochs.n_epochs}')
+
+        ## Actual plotting portion:
+        # Workaround Requirements:
         active_decoder = computation_result.computed_data['pf2D_Decoder']
-        
+        out_plot_tuple = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=computation_result.sess.position.to_dataframe(), xbin=active_decoder.xbin,
+                                                                **{'name':default_figure_name, 'debug_test_max_num_slices':1024, 'enable_flat_line_drawing':False, 'debug_print': False})
+        params, plots_data, plots, ui = out_plot_tuple
+
+
+
         ## Actual plotting portion:
         out_plot_tuple = plot_decoded_epoch_slices(active_filter_epochs, filter_epochs_decoder_result, global_pos_df=computation_result.sess.position.to_dataframe(), xbin=active_decoder.xbin, included_epoch_indicies=included_epoch_indicies,
                                                                 **overriding_dict_with(lhs_dict={'name':default_figure_name, 'debug_test_max_num_slices':256, 'enable_flat_line_drawing':False, 'debug_print': False}, **kwargs))
         params, plots_data, plots, ui = out_plot_tuple
+        
+
+
         
         
         ## Build the final context:
@@ -290,12 +358,52 @@ def perform_plot_1D_single_most_likely_position_curve(ax, time_window_centers, a
     return line_most_likely_position
 
 
+@function_attributes(short_name=None, tags=['plot'], input_requires=[], output_provides=[], uses=[], used_by=['_subfn_try_plot_posterior_image', 'plot_slices_1D_most_likely_position_comparsions'], creation_date='2024-12-19 04:46', related_items=[])
+def _subfn_try_get_approximate_recovered_t_pos(time_window_centers, xbin, use_original_bounds: bool=False):
+    """ 
+    x_first_extent = _subfn_try_get_approximate_recovered_t_pos(time_window_centers, xbin)
+    xmin, xmax, ymin, ymax = x_first_extent    
+    x_first_extent = (xmin, xmax, ymin, ymax)
+    active_extent = x_first_extent
+    """
+    if use_original_bounds:
+        return (time_window_centers[0], time_window_centers[-1], xbin[0], xbin[-1])
+    else:
+        ## Determine the actual start/end times:
+        approximated_recovered_delta_t: float = float(np.nanmedian(np.diff(time_window_centers)))
+        approximated_recovered_half_delta_t = approximated_recovered_delta_t / 2.0
+        # xmin, xmax, ymin, ymax = (time_window_centers[0], time_window_centers[-1], xbin[0], xbin[-1]) # TODO 2024-03-27 - This is actually incorrect, the extents should be the actual start/stop of the bins, not the time_window_centers
+        return ((time_window_centers[0]-approximated_recovered_half_delta_t), (time_window_centers[-1]+approximated_recovered_half_delta_t), xbin[0], xbin[-1]) # 2024-03-27 - Corrected extents computed by adding a half-bin width to the first/last time_window_centers to recover the proper edges.
 
 
+@function_attributes(short_name=None, tags=['plot'], input_requires=[], output_provides=[], uses=['_subfn_try_get_approximate_recovered_t_pos'], used_by=[], creation_date='2024-12-19 04:46', related_items=[])
+def _subfn_try_plot_posterior_image(ax, time_window_centers, posterior, xbin, enable_set_axis_limits:bool=True, use_original_bounds: bool=False, **main_plot_kwargs):
+    ## Determine the actual start/end times:
+    x_first_extent = _subfn_try_get_approximate_recovered_t_pos(time_window_centers, xbin, use_original_bounds=use_original_bounds)
+    xmin, xmax, ymin, ymax = x_first_extent
+    # approximated_recovered_delta_t: float = float(np.nanmedian(np.diff(time_window_centers)))
+    # approximated_recovered_half_delta_t = approximated_recovered_delta_t / 2.0
+    # # xmin, xmax, ymin, ymax = (time_window_centers[0], time_window_centers[-1], xbin[0], xbin[-1]) # TODO 2024-03-27 - This is actually incorrect, the extents should be the actual start/stop of the bins, not the time_window_centers
+    # xmin, xmax, ymin, ymax = ((time_window_centers[0]-approximated_recovered_half_delta_t), (time_window_centers[-1]+approximated_recovered_half_delta_t), xbin[0], xbin[-1]) # 2024-03-27 - Corrected extents computed by adding a half-bin width to the first/last time_window_centers to recover the proper edges.
+    # x_first_extent = (xmin, xmax, ymin, ymax)
+    try:
+        im_posterior_x = ax.imshow(posterior, extent=x_first_extent, **(dict(animated=False) | main_plot_kwargs)) 
+        # assert xmin < xmax
+        if enable_set_axis_limits:
+            ax.set_xlim((xmin, xmax)) # UserWarning: Attempting to set identical low and high xlims makes transformation singular; automatically expanding.
+            ax.set_ylim((ymin, ymax))
+    except ValueError as err:
+        # ValueError: Axis limits cannot be NaN or Inf
+        print(f'WARN: active_extent (xmin, xmax, ymin, ymax): {x_first_extent} contains NaN or Inf.\n\terr: {err}')
+        # ax.clear() # clear the existing and now invalid image
+        im_posterior_x = None
+        
+    return im_posterior_x
 
-@function_attributes(short_name=None, tags=['decoder', 'plot', '1D', 'matplotlib'], input_requires=[], output_provides=[], uses=['perform_plot_1D_single_most_likely_position_curve'], used_by=['plot_most_likely_position_comparsions', '_helper_update_decoded_single_epoch_slice_plot'], creation_date='2023-05-01 00:00', related_items=[])
+
+@function_attributes(short_name=None, tags=['decoder', 'plot', '1D', 'matplotlib'], input_requires=[], output_provides=[], uses=['perform_plot_1D_single_most_likely_position_curve'], used_by=['plot_most_likely_position_comparsions', '_helper_update_decoded_single_epoch_slice_plot'], creation_date='2023-05-01 00:00', related_items=['plot_slices_1D_most_likely_position_comparsions'])
 def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_centers, xbin, ax=None, posterior=None, active_most_likely_positions_1D=None, enable_flat_line_drawing=False, variable_name = 'x', debug_print=False, 
-                                             skip_plotting_measured_positions=False, skip_plotting_most_likely_positions=False, posterior_heatmap_imshow_kwargs=None):
+                                             skip_plotting_measured_positions=False, skip_plotting_most_likely_positions=False, posterior_heatmap_imshow_kwargs=None, use_original_bounds=False):
     """ renders a single 2D subplot in MATPLOTLIB for a 1D position axes: the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
     
     Animal's actual position is rendered as a red line with no markers 
@@ -368,25 +476,7 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
             } | posterior_heatmap_imshow_kwargs # merges `posterior_heatmap_imshow_kwargs` into main_plot_kwargs, replacing the existing values if present in both
             # Posterior distribution heatmaps at each point.
 
-            ## Determine the actual start/end times:
-            approximated_recovered_delta_t: float = float(np.nanmedian(np.diff(time_window_centers)))
-            approximated_recovered_half_delta_t = approximated_recovered_delta_t / 2.0
-            # xmin, xmax, ymin, ymax = (time_window_centers[0], time_window_centers[-1], xbin[0], xbin[-1]) # TODO 2024-03-27 - This is actually incorrect, the extents should be the actual start/stop of the bins, not the time_window_centers
-            xmin, xmax, ymin, ymax = ((time_window_centers[0]-approximated_recovered_half_delta_t), (time_window_centers[-1]+approximated_recovered_half_delta_t), xbin[0], xbin[-1]) # 2024-03-27 - Corrected extents computed by adding a half-bin width to the first/last time_window_centers to recover the proper edges.
-
-            x_first_extent = (xmin, xmax, ymin, ymax)
-            active_extent = x_first_extent
-            try:
-                im_posterior_x = ax.imshow(posterior, extent=active_extent, animated=False, **main_plot_kwargs) 
-                # assert xmin < xmax
-                ax.set_xlim((xmin, xmax)) # UserWarning: Attempting to set identical low and high xlims makes transformation singular; automatically expanding.
-                ax.set_ylim((ymin, ymax))
-            except ValueError as err:
-                # ValueError: Axis limits cannot be NaN or Inf
-                print(f'WARN: active_extent (xmin, xmax, ymin, ymax): {active_extent} contains NaN or Inf.\n\terr: {err}')
-                # ax.clear() # clear the existing and now invalid image
-                
-                im_posterior_x = None
+            im_posterior_x = _subfn_try_plot_posterior_image(ax, time_window_centers=time_window_centers, posterior=posterior, xbin=xbin, use_original_bounds=use_original_bounds, **main_plot_kwargs)
 
 
         else:
@@ -404,8 +494,9 @@ def plot_1D_most_likely_position_comparsions(measured_position_df, time_window_c
     
 
 # A version of `plot_1D_most_likely_position_comparsions` that plots several images on the same axis: ____________________________________________________ #
-@function_attributes(short_name=None, tags=['decoder', 'plot', '1D', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['plot_most_likely_position_comparsions'], creation_date='2023-10-17 12:25', related_items=['plot_1D_most_likely_position_comparsions'])
-def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices_time_window_centers, xbin, ax=None, slices_posteriors=None, slices_active_most_likely_positions_1D=None, slices_additional_plots_data=None, enable_flat_line_drawing=False, variable_name = 'x', debug_print=False):
+@function_attributes(short_name=None, tags=['decoder', 'plot', '1D', 'matplotlib', 'slices'], input_requires=[], output_provides=[], uses=[], used_by=['plot_most_likely_position_comparsions', 'AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand', 'AddNewTrackTemplatesDecodedEpochSlicesRows_MatplotlibPlotCommand'], creation_date='2023-10-17 12:25', related_items=['plot_1D_most_likely_position_comparsions'])
+def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices_time_window_centers, xbin, ax=None, slices_posteriors=None, slices_active_most_likely_positions_1D=None, slices_additional_plots_data=None, enable_flat_line_drawing=False, variable_name = 'x', debug_print=False, 
+                                             skip_plotting_measured_positions=False, skip_plotting_most_likely_positions=False, posterior_heatmap_imshow_kwargs=None, use_original_bounds=True):
     """ renders a single 2D subplot in MATPLOTLIB for a 1D position axes: the computed posterior for the position from the Bayesian decoder and overlays the animal's actual position over the top.
     
     Animal's actual position is rendered as a red line with no markers 
@@ -436,30 +527,78 @@ def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices
     NOTES: `, animated=True` allows blitting to speed up updates in the future with only minor overhead if blitting isn't fully implemented.
         !! WARNING: it also make the plot not update on calls to .draw() and not appear at all on non-interactive backends!
     """
-    # Get the colormap to use and set the bad color
-    cmap = mpl.colormaps.get_cmap('viridis')  # viridis is the default colormap for imshow
-    cmap.set_bad(color='black')
-    main_plot_kwargs = {'origin': 'lower', 'vmin': 0, 'vmax': 1, 'cmap': cmap, 'interpolation':'nearest', 'aspect':'auto'}
+    from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
+
+    # # Get the colormap to use and set the bad color
+    # cmap = mpl.colormaps.get_cmap('viridis')  # viridis is the default colormap for imshow
+    # cmap.set_bad(color='black')
+    
+    ## OLD:
+    # main_plot_kwargs = {'origin': 'lower', 'vmin': 0, 'vmax': 1, 'cmap': cmap, 'interpolation':'nearest', 'aspect':'auto'}
     assert ax is not None
+    
+    if posterior_heatmap_imshow_kwargs is None:
+        posterior_heatmap_imshow_kwargs = {}
+    ## END if posterior_heatmap_imshow_kwargs is None...
+
+    if use_original_bounds != True:
+        print(f'WARN: use_original_bounds should be true for `plot_slices_1D_most_likely_position_comparsions(...)` so it lines up properly!')
+        
+    
+    # Get the colormap to use and set the bad color
+    # cmap = get_heatmap_cmap(cmap='viridis', bad_color='black', under_color='white', over_color='red')
+    cmap = posterior_heatmap_imshow_kwargs.get('cmap', get_heatmap_cmap(cmap='Oranges', bad_color='black', under_color='white', over_color='red'))
+
+    # Compute extents for imshow:
+    main_plot_kwargs = {
+        'origin': 'lower',
+        'vmin': 0,
+        'vmax': 1,
+        'cmap': cmap,
+        'interpolation':'nearest',
+        'aspect':'auto',
+        'animated': False,
+    } | posterior_heatmap_imshow_kwargs # merges `posterior_heatmap_imshow_kwargs` into main_plot_kwargs, replacing the existing values if present in both
+
+    ## override `animated`
+    user_animated_v = main_plot_kwargs.pop('animated', None)
+    if user_animated_v is not None:
+        if user_animated_v != False:
+            print(f'WARN: `plot_slices_1D_most_likely_position_comparsions(...)`: user kwargs supplied `animated=True`, but this does not work I dont think in `plot_slices_1D_most_likely_position_comparsions`!! Overriding to `animated=False`.')
+    main_plot_kwargs['animated'] = False
+    
     ymin, ymax = xbin[0], xbin[-1]
     out_img_list = []
+    
+
     with plt.ion():
         if ax is None:
             fig, ax = plt.subplots(ncols=1, nrows=1, figsize=(15,15), clear=True, sharex=True, sharey=False, constrained_layout=True)
         else:
             fig = None # Calling plt.gcf() creates an empty figure and returns the wrong value 
         
-        # Actual Position Plots (red line):
-        ax.plot(measured_position_df['t'].to_numpy(), measured_position_df[variable_name].to_numpy(), label=f'measured {variable_name}', color='#ff000066', alpha=0.8, marker='+', markersize=4, animated=False) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
+
+        if ((not skip_plotting_measured_positions) and (measured_position_df is not None)):
+            # Actual Position Plots (red line):
+            # actual_postion_plot_kwargs = {'color': '#ff000066', 'alpha': 0.35, 'marker': 'none', 'animated': False}
+            actual_postion_plot_kwargs = dict(color='#ff000066', alpha=0.8, marker='+', markersize=4, animated=False)
+            line_measured_position = ax.plot(measured_position_df['t'].to_numpy(), measured_position_df[variable_name].to_numpy(), label=f'measured {variable_name}', **actual_postion_plot_kwargs) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
+        else:
+            line_measured_position = None
+
         ax.set_title(variable_name)
     
         # Posterior distribution heatmap:
         # if long_results_obj is not None:
         if slices_posteriors is not None:
-            extents_list = [(a_centers[0], a_centers[-1], ymin, ymax) for a_centers in slices_time_window_centers]
-            out_img_list = [ax.imshow(a_posterior, extent=an_extent, animated=False, **main_plot_kwargs) for an_extent, a_posterior in zip(extents_list, slices_posteriors)]
-            ax.set_ylim((ymin, ymax))
-    
+            # Posterior distribution heatmaps at each point.
+            # im_posterior_x = _subfn_try_plot_posterior_image(ax, time_window_centers=time_window_centers, posterior=posterior, xbin=xbin, **main_plot_kwargs)
+            # extents_list = [(a_centers[0], a_centers[-1], ymin, ymax) for a_centers in slices_time_window_centers] ## original mode
+            # extents_list = [_subfn_try_get_approximate_recovered_t_pos(a_centers, xbin) for a_centers in slices_time_window_centers] ## 2024-12-19 05:03 Attempt to make it consistent with `plot_1D_most_likely_position_comparsions`
+            # out_img_list = [ax.imshow(a_posterior, extent=an_extent, **main_plot_kwargs) for an_extent, a_posterior in zip(extents_list, slices_posteriors)]
+            out_img_list = [_subfn_try_plot_posterior_image(ax, time_window_centers=a_centers, posterior=a_posterior, xbin=xbin, enable_set_axis_limits=False, use_original_bounds=use_original_bounds, **main_plot_kwargs) for a_centers, a_posterior in zip(slices_time_window_centers, slices_posteriors)]
+            ax.set_ylim((ymin, ymax)) ## only need to do once, when we are done
+        # END if slices_posteriors is not None
 
         if slices_additional_plots_data is not None:
             raise NotImplementedError('slices_additional_plots_data functionality is not yet implemented as of 2023-10-17')
@@ -468,7 +607,6 @@ def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices
         # Most-likely Estimated Position Plots (grey line):
         if slices_active_most_likely_positions_1D is not None:
             # Most likely position plots:
-
             if enable_flat_line_drawing:
                 # Enable drawing flat lines for each time bin interval instead of just displaying the single point in the middle:
                 #   build separate points for the start and end of each bin interval, and the repeat every element of the x and y values to line them up.
@@ -488,8 +626,19 @@ def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices
             else:
                 active_time_window_variable = slices_time_window_centers
             
-            ax.plot(active_time_window_variable, slices_active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, label=f'1-step: most likely positions {variable_name}', animated=False) # (Num windows x 2)
-            # ax.plot(active_time_window_variable, active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.4, label=f'1-step: most likely positions {variable_name}') # (Num windows x 2)
+            # ax.plot(active_time_window_variable, slices_active_most_likely_positions_1D, lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, label=f'1-step: most likely positions {variable_name}', animated=False) # (Num windows x 2)
+            
+            # Most-likely Estimated Position Plots (grey line):
+            if ((not skip_plotting_most_likely_positions) and (slices_active_most_likely_positions_1D is not None)):
+                # Most likely position plots:                
+                # line_most_likely_position = perform_plot_1D_single_most_likely_position_curve(ax, slices_time_window_centers, slices_active_most_likely_positions_1D, enable_flat_line_drawing=enable_flat_line_drawing, lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, label=f'1-step: most likely positions {variable_name}', animated=False) # (Num windows x 2)
+                line_most_likely_position = perform_plot_1D_single_most_likely_position_curve(ax, active_time_window_variable, slices_active_most_likely_positions_1D, enable_flat_line_drawing=False, lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, label=f'1-step: most likely positions {variable_name}', animated=False) # (Num windows x 2) ## enable_flat_line_drawing=False because we already built the flat lines above
+            else:
+                line_most_likely_position = None
+                
+
+
+        # END if slices_ac....
         
         return fig, ax, out_img_list
     
@@ -2938,27 +3087,17 @@ class CreateNewStackedDecodedEpochSlicesPlotCommand(BaseMenuCommand):
     """ Creates a stacked decoded epoch slices view by calling _display_plot_decoded_epoch_slices
     
     """
-    _spike_raster_window = field()
-    _active_pipeline = field()
+    _spike_raster_window = field(repr=False)
+    _active_pipeline = field(repr=False)
     _active_config_name = field(default=None)
     _context = field(default=None, alias="active_context")
-    _filter_epochs = field(default='laps')
-    _display_output = field(default=Factory(dict))
-    
-    # def __init__(self, spike_raster_window, active_pipeline, active_config_name=None, active_context=None, filter_epochs='laps', display_output={}) -> None:
-    #     super(CreateNewStackedDecodedEpochSlicesPlotCommand, self).__init__()
-    #     self._spike_raster_window = spike_raster_window
-    #     self._active_pipeline = active_pipeline
-    #     self._active_config_name = active_config_name
-    #     self._context = active_context
-    #     self._display_output = display_output
-    #     self._filter_epochs = filter_epochs
-        
-        
+    _filter_epochs = field(default='lap')
+    _display_output = field(default=Factory(dict), repr=False)
     def execute(self, *args, **kwargs) -> None:
         """  """
         print(f'menu execute(): {self}')
-        # print(f'CreateNewStackedDecodedEpochSlicesPlotCommand(): {self._filter_epochs} callback')
+        self.log_command(*args, **kwargs) # adds this command to the `menu_action_history_list` 
+        print(f'CreateNewStackedDecodedEpochSlicesPlotCommand(): {self._filter_epochs} callback')
         _out_plot_tuple = self._active_pipeline.display('_display_plot_decoded_epoch_slices', self._active_config_name, filter_epochs=self._filter_epochs, debug_test_max_num_slices=16)
         _out_params, _out_plots_data, _out_plots, _out_ui = _out_plot_tuple
         # _out_display_key = f'stackedEpochSlicesMatplotlibSubplots_{_out_params.name}'
@@ -2970,24 +3109,21 @@ class CreateNewStackedDecodedEpochSlicesPlotCommand(BaseMenuCommand):
 
 @define(slots=False)
 class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
-    """ analagous to CreateNewDataExplorer_ipspikes_PlotterCommand, holds references to the variables needed to perform the entire action (such as the reference to the decoder) which aren't accessible during the building of the menus. """
-    _spike_raster_window = field()
-    _active_pipeline = field(alias='curr_active_pipeline')
+    """ analagous to CreateNewDataExplorer_ipspikes_PlotterCommand, holds references to the variables needed to perform the entire action (such as the reference to the decoder) which aren't accessible during the building of the menus.
+    adds ONE row
+    
+    """
+    _spike_raster_window = field(repr=False)
+    _active_pipeline = field(alias='curr_active_pipeline', repr=False)
     _active_config_name = field(default=None)
     _display_output = field(default=Factory(dict))
 
-    # def __init__(self, spike_raster_window, curr_active_pipeline, active_config_name, display_output={}) -> None:
-    #     super(AddNewDecodedPosition_MatplotlibPlotCommand, self).__init__()
-    #     self._spike_raster_window = spike_raster_window
-    #     self._curr_active_pipeline = curr_active_pipeline
-    #     self._active_config_name = active_config_name
-    #     self._display_output = display_output
-    #     # print(f'AddNewDecodedPosition_MatplotlibPlotCommand.__init__(...)')
-
     def execute(self, *args, **kwargs) -> None:
         print(f'menu execute(): {self}')
+        self.log_command(*args, **kwargs) # adds this command to the `menu_action_history_list` 
         ## To begin, the destination plot must have a matplotlib widget plot to render to:
         # print(f'AddNewDecodedPosition_MatplotlibPlotCommand.execute(...)')
+        
         active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
         # If no plot to render on, do this:
         widget, matplotlib_fig, matplotlib_fig_ax = active_2d_plot.add_new_matplotlib_render_plot_widget(name='MenuCommand_display_plot_marginal_1D_most_likely_position_comparisons')
@@ -3009,9 +3145,15 @@ class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
         
 
 
+@metadata_attributes(short_name=None, tags=['GOOD', 'epoch-slices'], input_requires=[], output_provides=[], uses=['plot_slices_1D_most_likely_position_comparsions', 'plot_slices_1D_most_likely_position_comparsions'], used_by=[], creation_date='2023-10-17 00:00', related_items=[])
 @define(slots=False)
 class AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(BaseMenuCommand):
-    """ 2023-10-17. Uses `plot_slices_1D_most_likely_position_comparsions` to plot epoch slices (corresponding to certain periods in time) along the continuous session duration.  """
+    """ 2023-10-17. Creates TWO ROWS - Uses `plot_slices_1D_most_likely_position_comparsions` to plot epoch slices (corresponding to certain periods in time) along the continuous session duration.
+    
+    Plots JUST the decoded epoch slices.
+    
+    Uses: `plot_slices_1D_most_likely_position_comparsions` - to plot the decoded epoch slices to a 1D axis
+    """
     _spike_raster_window = field()
     _active_pipeline = field(alias='curr_active_pipeline')
     _active_config_name = field(default=None)
@@ -3024,6 +3166,7 @@ class AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(BaseMenuCommand):
         # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions # Actual most general
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_slices_1D_most_likely_position_comparsions
         
+        active_cmap = get_heatmap_cmap(cmap='viridis', bad_color='black', under_color='white', over_color='red')
 
         ## long_short_decoding_analyses:
         curr_long_short_decoding_analyses = curr_active_pipeline.global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis']
@@ -3039,36 +3182,32 @@ class AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(BaseMenuCommand):
         # short_desired_total_n_timebins, short_updated_is_masked_bin, short_updated_time_bin_containers, short_updated_timebins_p_x_given_n = short_decoded_epochs_result.flatten_to_masked_values()
 
 
-        long_decoded_replay_tuple = active_2d_plot.add_new_matplotlib_render_plot_widget(row=2, col=0, name='long_decoded_epoch_matplotlib_view_widget')
+        long_decoded_replay_tuple = active_2d_plot.add_new_matplotlib_render_plot_widget(row=2, col=0, name='decoded_epoch_matplotlib_view_widget_long')
         long_decoded_replay_matplotlib_view_widget, long_decoded_replay_fig, long_decoded_replay_ax = long_decoded_replay_tuple
-        # _out_long = plot_1D_most_likely_position_comparsions(curr_active_pipeline.sess.position.to_dataframe(), time_window_centers=long_updated_time_bin_containers, xbin=long_results_obj.original_1D_decoder.xbin.copy(),
-        #                                             posterior=long_updated_timebins_p_x_given_n,
-        #                                             active_most_likely_positions_1D=None,
-        #                                             enable_flat_line_drawing=False, debug_print=False, ax=long_decoded_replay_ax[0])
         
         _out_long = plot_slices_1D_most_likely_position_comparsions(curr_active_pipeline.sess.position.to_dataframe(), slices_time_window_centers=[v.centers for v in long_decoded_epochs_result.time_bin_containers], xbin=long_results_obj.original_1D_decoder.xbin.copy(),
                                                                 slices_posteriors=long_decoded_epochs_result.p_x_given_n_list,
-                                                                slices_active_most_likely_positions_1D=None, enable_flat_line_drawing=False, ax=long_decoded_replay_ax[0], debug_print=debug_print)
+                                                                slices_active_most_likely_positions_1D=None, enable_flat_line_drawing=False, ax=long_decoded_replay_ax[0], debug_print=debug_print,
+                                                                posterior_heatmap_imshow_kwargs=dict(cmap=active_cmap),
+                                                                )
         # fig, ax, out_img_list = _out_long
 
         # long_decoded_replay_fig, long_decoded_replay_ax = _out_long
-        active_2d_plot.sync_matplotlib_render_plot_widget('long_decoded_epoch_matplotlib_view_widget')
+        active_2d_plot.sync_matplotlib_render_plot_widget('decoded_epoch_matplotlib_view_widget_long')
         long_decoded_replay_matplotlib_view_widget.draw()
         
-        short_decoded_replay_tuple = active_2d_plot.add_new_matplotlib_render_plot_widget(row=3, col=0, name='short_decoded_epoch_matplotlib_view_widget')
+        short_decoded_replay_tuple = active_2d_plot.add_new_matplotlib_render_plot_widget(row=3, col=0, name='decoded_epoch_matplotlib_view_widget_short')
         short_decoded_replay_matplotlib_view_widget, short_decoded_replay_fig, short_decoded_replay_ax = short_decoded_replay_tuple
-        # _out_short = plot_1D_most_likely_position_comparsions(curr_active_pipeline.sess.position.to_dataframe(), time_window_centers=short_updated_time_bin_containers, xbin=long_results_obj.original_1D_decoder.xbin.copy(),
-        #                                                 posterior=short_updated_timebins_p_x_given_n,
-        #                                                 active_most_likely_positions_1D=None,
-        #                                                 enable_flat_line_drawing=False, debug_print=False, ax=short_decoded_replay_ax[0])
 
         _out_short = plot_slices_1D_most_likely_position_comparsions(curr_active_pipeline.sess.position.to_dataframe(), slices_time_window_centers=[v.centers for v in short_decoded_epochs_result.time_bin_containers], xbin=short_results_obj.original_1D_decoder.xbin.copy(),
                                                                 slices_posteriors=short_decoded_epochs_result.p_x_given_n_list,
-                                                                slices_active_most_likely_positions_1D=None, enable_flat_line_drawing=False, ax=short_decoded_replay_ax[0], debug_print=debug_print)
+                                                                slices_active_most_likely_positions_1D=None, enable_flat_line_drawing=False, ax=short_decoded_replay_ax[0], debug_print=debug_print,
+                                                                posterior_heatmap_imshow_kwargs=dict(cmap=active_cmap),
+                                                                )
         # fig, ax, out_img_list = _out_short
 
         # short_decoded_replay_fig, short_decoded_replay_ax = _out_short
-        active_2d_plot.sync_matplotlib_render_plot_widget('short_decoded_epoch_matplotlib_view_widget')
+        active_2d_plot.sync_matplotlib_render_plot_widget('decoded_epoch_matplotlib_view_widget_short')
         short_decoded_replay_matplotlib_view_widget.draw()
 
         return long_decoded_replay_tuple, short_decoded_replay_tuple
@@ -3076,6 +3215,7 @@ class AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(BaseMenuCommand):
 
     def execute(self, *args, **kwargs) -> None:
         print(f'menu execute(): {self}')
+        self.log_command(*args, **kwargs) # adds this command to the `menu_action_history_list` 
         ## To begin, the destination plot must have a matplotlib widget plot to render to:
         # print(f'AddNewDecodedPosition_MatplotlibPlotCommand.execute(...)')
         active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
@@ -3086,14 +3226,137 @@ class AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(BaseMenuCommand):
         self._display_output['long_decoded_replay_tuple'] = long_decoded_replay_tuple
         self._display_output['short_decoded_replay_tuple'] = short_decoded_replay_tuple
 
-        # widget, matplotlib_fig, matplotlib_fig_ax = active_2d_plot.add_new_matplotlib_render_plot_widget(name='MenuCommand_display_plot_marginal_1D_most_likely_position_comparisons')
-        # # most_likely_positions_mode: 'standard'|'corrected'
-        # fig, curr_ax = self._curr_active_pipeline.display('_display_plot_marginal_1D_most_likely_position_comparisons', self._active_config_name, variable_name='x', most_likely_positions_mode='corrected', ax=matplotlib_fig_ax) # ax=active_2d_plot.ui.matplotlib_view_widget.ax
-        # # print(f'\t AddNewDecodedPosition_MatplotlibPlotCommand.execute(...) finished with the display call...')
-        # # active_2d_plot.ui.matplotlib_view_widget.draw()
-        # widget.draw() # alternative to accessing through full path?
-        # active_2d_plot.sync_matplotlib_render_plot_widget('MenuCommand_display_plot_marginal_1D_most_likely_position_comparisons') # Sync it with the active window:
         print(f'\t AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand.execute() is done.')
+
+
+
+
+@metadata_attributes(short_name=None, tags=['GOOD', 'TrackTemplates', 'epoch-slices'], input_requires=[], output_provides=[], uses=['plot_slices_1D_most_likely_position_comparsions', 'plot_slices_1D_most_likely_position_comparsions'], used_by=[], creation_date='2024-12-19 04:28', related_items=['AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand'])
+@define(slots=False)
+class AddNewTrackTemplatesDecodedEpochSlicesRows_MatplotlibPlotCommand(BaseMenuCommand):
+    """ 2023-10-17. Creates FOUR ROWS - Uses `plot_slices_1D_most_likely_position_comparsions` to plot epoch slices (corresponding to certain periods in time) along the continuous session duration.
+    
+    Plots JUST the decoded epoch slices.
+    
+    Uses: `plot_slices_1D_most_likely_position_comparsions` - to plot the decoded epoch slices to a 1D axis
+    """
+    _spike_raster_window = field()
+    _active_pipeline = field(alias='curr_active_pipeline')
+    _active_config_name = field(default=None)
+    _context = field(default=None, alias="active_context")
+    _display_output = field(default=Factory(dict))
+
+    @classmethod
+    def add_track_templates_decoder_decoded_replays(cls, curr_active_pipeline, active_2d_plot, debug_print=False, filtered_epochs_df=None):
+        """ adds the decoded epochs for the four track templates decoders from the global_computation_results as new matplotlib plot rows. """
+        # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions # Actual most general
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_slices_1D_most_likely_position_comparsions
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, TrackTemplates, DecoderDecodedEpochsResult, DirectionalPseudo2DDecodersResult, get_proper_global_spikes_df
+
+        
+        # spikes_df = deepcopy(curr_active_pipeline.sess.spikes_df)
+
+        global_computation_results = curr_active_pipeline.global_computation_results
+
+        rank_order_results = curr_active_pipeline.global_computation_results.computed_data.get('RankOrder', None) # : "RankOrderComputationsContainer"
+        if rank_order_results is not None:
+            minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+            included_qclu_values: List[int] = rank_order_results.included_qclu_values
+        else:        
+            ## get from parameters:
+            minimum_inclusion_fr_Hz: float = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+            included_qclu_values: List[int] = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
+
+
+        directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
+        track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+        # print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
+        # print(f'included_qclu_values: {included_qclu_values}')
+
+        # 2024-12-19 04:09 INputs ____________________________________________________________________________________________ #
+        ## INPUTS filtered_decoder_filter_epochs_decoder_result_dict
+
+        # active_cmap = FixedCustomColormaps.get_custom_greyscale_with_low_values_dropped_cmap(low_value_cutoff=0.01, full_opacity_threshold=0.25)
+        active_cmap = get_heatmap_cmap(cmap='viridis', bad_color='black', under_color='white', over_color='red')
+        
+        # epochs_name='ripple'
+        # title='Filtered PBEs'
+        # known_epochs_type = 'ripple'
+
+        ## INPUTS: curr_active_pipeline, track_templates, a_decoded_filter_epochs_decoder_result_dict
+        directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = deepcopy(curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']) ## GENERAL
+        ## INPUTS: directional_decoders_epochs_decode_result, filtered_epochs_df
+
+        decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = deepcopy(directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict)
+        unfiltered_epochs_df = deepcopy(decoder_ripple_filter_epochs_decoder_result_dict['long_LR'].filter_epochs)
+        if filtered_epochs_df is not None:
+            ## filtered
+            filtered_decoder_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(filtered_epochs_df[['start', 'stop']].to_numpy()) for a_name, a_result in decoder_ripple_filter_epochs_decoder_result_dict.items()} # working filtered
+        else:
+            filtered_decoder_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(unfiltered_epochs_df[['start', 'stop']].to_numpy()) for a_name, a_result in decoder_ripple_filter_epochs_decoder_result_dict.items()} # working unfiltered
+
+        ripple_decoding_time_bin_size: float = directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size
+        pos_bin_size: float = directional_decoders_epochs_decode_result.pos_bin_size
+        if debug_print:
+            print(f'{pos_bin_size = }, {ripple_decoding_time_bin_size = }')
+
+
+        ## OUTPUTS: filtered_decoder_filter_epochs_decoder_result_dict, 
+        ## INPUTS: need `filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult]`
+        decoder_names: List[str] = track_templates.get_decoder_names()
+        track_length_dict = track_templates.get_track_length_dict()
+        
+        matplotlib_view_widget_names_map: Dict = {a_name:f'decoded_epoch_matplotlib_view_widget_{a_name}' for a_name in decoder_names}
+        
+        plot_replay_tuple_dict = {}
+        plot_heatmap_img_list_dict = {}
+        # initial_row_idx: int = 2
+        for i, (a_name, a_decoder) in enumerate(track_templates.get_decoders_dict().items()):
+            # curr_row_idx: int = (i + initial_row_idx)
+            matplotlib_view_widget_name: str = matplotlib_view_widget_names_map[a_name]
+            a_decoder_decoded_epochs_result: DecodedFilterEpochsResult = filtered_decoder_filter_epochs_decoder_result_dict[a_name] ## get the result # DecodedFilterEpochsResult
+            ## Creates a new row with `add_new_matplotlib_render_plot_widget`:
+            plot_replay_tuple_dict[a_name] = active_2d_plot.add_new_matplotlib_render_plot_widget(name=matplotlib_view_widget_name)
+            curr_decoded_replay_matplotlib_view_widget, curr_decoded_replay_fig, curr_decoded_replay_ax = plot_replay_tuple_dict[a_name]
+            _out_curr_plot_tuple = plot_slices_1D_most_likely_position_comparsions(curr_active_pipeline.sess.position.to_dataframe(), slices_time_window_centers=[v.centers for v in a_decoder_decoded_epochs_result.time_bin_containers], xbin=a_decoder.xbin.copy(),
+                                                                    slices_posteriors=a_decoder_decoded_epochs_result.p_x_given_n_list,
+                                                                    slices_active_most_likely_positions_1D=None, enable_flat_line_drawing=False, ax=curr_decoded_replay_ax[0], debug_print=debug_print,
+                                                                    posterior_heatmap_imshow_kwargs=dict(cmap=active_cmap),
+                                                                    )
+            _, _, curr_out_img_list = _out_curr_plot_tuple
+            plot_heatmap_img_list_dict[a_name] = curr_out_img_list
+
+            # long_decoded_replay_fig, long_decoded_replay_ax = _out_long
+            active_2d_plot.sync_matplotlib_render_plot_widget(matplotlib_view_widget_name)
+            curr_decoded_replay_matplotlib_view_widget.draw()
+        ## END for i, (a_name, a_decoder) in en...
+
+        return plot_replay_tuple_dict, matplotlib_view_widget_names_map, plot_heatmap_img_list_dict
+
+
+    def execute(self, *args, **kwargs) -> None:
+        if kwargs.get('debug_print', False):
+            print(f'menu execute(): {self}')
+        self.log_command(*args, **kwargs) # adds this command to the `menu_action_history_list` 
+        ## To begin, the destination plot must have a matplotlib widget plot to render to:
+        # print(f'AddNewDecodedPosition_MatplotlibPlotCommand.execute(...)')
+        active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
+        # If no plot to render on, do this:
+        plot_replay_tuple_dict, matplotlib_view_widget_names_map, plot_heatmap_img_list_dict = self.add_track_templates_decoder_decoded_replays(self._active_pipeline, active_2d_plot)
+
+        # Update display output dict:
+        self._display_output['matplotlib_view_widget_names_map'] = matplotlib_view_widget_names_map
+        self._display_output['plot_heatmap_img_list_dict'] = plot_heatmap_img_list_dict
+        self._display_output['plot_replay_tuple_dict'] = plot_replay_tuple_dict
+        # self._display_output.update(plot_replay_tuple_dict) ## copy the tuples from that dict to the ._display_output one
+        
+        print(f'\t AddNewTrackTemplatesDecodedEpochSlicesRows_MatplotlibPlotCommand.execute() is done.')
+
+
+
+
+
+
 
 
 # ==================================================================================================================== #
