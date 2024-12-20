@@ -121,7 +121,7 @@ class NotableTrackPositions(UnpackableMixin):
 
 
 class TrackPositionClassification(Enum):
-    """ classifying various x-positions as belonging to outside the outside_maze, the track_endcaps, or the track_body
+    """ classifying various x-positions as belonging to outside the outside_maze, the track_endcaps, or the track_straightaway
 
         # TrackPositionClassification.TRACK_ENDCAPS
         # TrackPositionClassification.TRACK_BODY
@@ -129,12 +129,18 @@ class TrackPositionClassification(Enum):
     """
     OUTSIDE_MAZE = "outside_maze"
     TRACK_ENDCAPS = "track_endcaps"
-    TRACK_BODY = "track_body"
+    TRACK_STRAIGHTAWAY = "track_straightaway"
 
     @property
     def is_on_maze(self) -> bool:
         """ returns True if the point is anywhere on the track (including endcaps) """
         return self.value != TrackPositionClassification.OUTSIDE_MAZE.value
+    
+
+    @property
+    def is_track_straightaway(self) -> bool:
+        """ returns True if the point is anywhere on the track (including endcaps) """
+        return self.value == TrackPositionClassification.TRACK_STRAIGHTAWAY.value
 
     @property
     def is_endcap(self) -> bool:
@@ -149,11 +155,11 @@ def classify_test_point(test_point, rects) -> "TrackPositionClassification":
             (85.0, -0.125, 22.0, 0.25)
         ]
     """
-    assert len(rects) == 3, f"rects should contain three elements for (left_platform, track_body, right_platform). {rects}"
+    assert len(rects) == 3, f"rects should contain three elements for (left_platform, track_straightaway, right_platform). {rects}"
     if is_point_in_rect(test_point, rects[0]) or is_point_in_rect(test_point, rects[2]):
         return TrackPositionClassification.TRACK_ENDCAPS
     elif is_point_in_rect(test_point, rects[1]):
-        return TrackPositionClassification.TRACK_BODY
+        return TrackPositionClassification.TRACK_STRAIGHTAWAY
     else:
         return TrackPositionClassification.OUTSIDE_MAZE
 
