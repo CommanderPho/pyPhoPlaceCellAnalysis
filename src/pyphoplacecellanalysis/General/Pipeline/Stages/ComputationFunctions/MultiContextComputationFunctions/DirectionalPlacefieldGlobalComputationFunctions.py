@@ -7252,12 +7252,6 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                                 'parent_specific_session_output_folder': _specific_session_output_folder,
             
         }
-        # MatplotlibRenderPlots(name='directional_decoded_stacked_epoch_slices', figures=figs, axes=axs, context=ctxts, plot_data={'context': ctxts, 'paths': out_paths, 'parent_path': _specific_session_output_folder})
-        # if not defer_render:
-        #     graphics_output_dict.plot_data['app'] = app
-        #     graphics_output_dict.plot_data['root_window'] = paginated_multi_decoder_decoded_epochs_window
-        #     graphics_output_dict.plot_data['controllers'] = pagination_controller_dict
-            
         return graphics_output_dict
     
 
@@ -7272,7 +7266,9 @@ from pyphoplacecellanalysis.GUI.Qt.Menus.BaseMenuProviderMixin import BaseMenuCo
 class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
     """ 2024-01-17 
     Adds four rows to the SpikeRaster2D showing the continuously decoded posterior for each of the four 1D decoders
-
+    These are the ones Kamran wants to be normalized differently.
+    
+    
     Usage:
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand
 
@@ -7291,7 +7287,8 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
 
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
-        
+        from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
+
         ## ✅ Add a new row for each of the four 1D directional decoders:
         identifier_name: str = f'{a_decoder_name}_ContinuousDecode'
         print(f'identifier_name: {identifier_name}')
@@ -7316,14 +7313,26 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         # active_most_likely_positions = active_marginals.most_likely_positions_1D # Raw decoded positions
         active_most_likely_positions = None
         active_posterior = active_marginals.p_x_given_n
+        
 
+        posterior_heatmap_imshow_kwargs = dict(
+            # cmap=get_heatmap_cmap(cmap='Oranges', bad_color='black', under_color='white', over_color='red'),
+            cmap = get_heatmap_cmap(cmap='viridis', bad_color='black', under_color='white', over_color='red'),
+            # cmap = FixedCustomColormaps.get_custom_orange_with_low_values_dropped_cmap()
+            # cmap = FixedCustomColormaps.get_custom_black_with_low_values_dropped_cmap(low_value_cutoff=0.05)
+            # cmap = ColormapHelpers.create_colormap_transparent_below_value(active_cmap, low_value_cuttoff=0.1)
+            # cmap = FixedCustomColormaps.get_custom_greyscale_with_low_values_dropped_cmap(low_value_cutoff=0.01, full_opacity_threshold=0.25)
+            # active_cmap = FixedCustomColormaps.get_custom_orange_with_low_values_dropped_cmap()
+            vmin=0.0, vmax=1.0,
+        )
         # most_likely_positions_mode: 'standard'|'corrected'
         # fig, curr_ax = curr_active_pipeline.display('_display_plot_marginal_1D_most_likely_position_comparisons', _active_config_name, variable_name='x', most_likely_positions_mode='corrected', ax=an_ax) # ax=active_2d_plot.ui.matplotlib_view_widget.ax
         ## Actual plotting portion:
         fig, curr_ax = plot_1D_most_likely_position_comparsions(None, time_window_centers=active_decoder.time_window_centers, xbin=active_bins,
                                                                 posterior=active_posterior,
                                                                 active_most_likely_positions_1D=active_most_likely_positions,
-                                                                ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False)
+                                                                ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
+                                                                posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
 
         widget.draw() # alternative to accessing through full path?
         active_2d_plot.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
@@ -7336,7 +7345,6 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.RankOrderComputations import RankOrderAnalyses
-        
         showCloseButton = True
         dock_configs = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=showCloseButton), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, showCloseButton=showCloseButton),
                         CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=showCloseButton), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, showCloseButton=showCloseButton))))
@@ -7354,8 +7362,19 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         # Need all_directional_pf1D_Decoder_dict
         output_dict = {}
 
+
+        for a_decoder_name, a_decoder in all_directional_pf1D_Decoder_dict.items():
+            # a_decoder.conform_to_position_bins
+            active_posterior = a_decoder.marginal
+
         for a_decoder_name, a_decoder in all_directional_pf1D_Decoder_dict.items():
             a_dock_config = dock_configs[a_decoder_name]
+            
+            
+            ## renormalize all the posteriors
+
+
+
             a_decoded_result = all_directional_continuously_decoded_dict.get(a_decoder_name, None) # already decoded
             _out_tuple = cls._perform_add_new_decoded_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=a_dock_config, a_decoder_name=a_decoder_name, a_decoder=a_decoder, a_decoded_result=a_decoded_result)
             # identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = _out_tuple
@@ -7406,7 +7425,9 @@ class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
     """ 2024-01-22 
     ??? Adds four rows to the SpikeRaster2D showing the marginal probabilities 
     continuously decoded posterior for each of the four 1D decoders
-
+    -- this heatmap normalization is one that Kamran likes -- the four contexts "compete" with one another, to add up to 1.0 in each time bin (it seems).
+    
+    
     Usage:
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand
 
@@ -7565,7 +7586,8 @@ class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
 class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand):
     """ 2024-01-23
     Adds THREE rows ('non_marginalized_raw_result', 'marginal_over_direction', 'marginal_over_track_ID') to the SpikeRaster2D showing the marginalized posteriors for the continuously decoded decoder
-
+    These are the 4 x n_total_time_bins grid of context likelihoods.
+    
     Usage:
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand
 
@@ -7584,7 +7606,9 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewPseudo2DDecodedEpoc
 
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
+        from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
         
+
         ## ✅ Add a new row for each of the four 1D directional decoders:
         identifier_name: str = f'{a_variable_name}_ContinuousDecode'
         if extended_dock_title_info is not None:
@@ -7599,13 +7623,16 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewPseudo2DDecodedEpoc
         active_most_likely_positions = None
         active_posterior = deepcopy(a_1D_posterior)
         
+        posterior_heatmap_imshow_kwargs = dict()	
+        
         # most_likely_positions_mode: 'standard'|'corrected'
         # fig, curr_ax = curr_active_pipeline.display('_display_plot_marginal_1D_most_likely_position_comparisons', _active_config_name, variable_name='x', most_likely_positions_mode='corrected', ax=an_ax) # ax=active_2d_plot.ui.matplotlib_view_widget.ax
         ## Actual plotting portion:
         fig, curr_ax = plot_1D_most_likely_position_comparsions(None, time_window_centers=time_window_centers, xbin=deepcopy(xbin),
                                                                 posterior=active_posterior,
                                                                 active_most_likely_positions_1D=active_most_likely_positions,
-                                                                ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False)
+                                                                ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
+                                                                posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
 
         widget.draw() # alternative to accessing through full path?
         active_2d_plot.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
