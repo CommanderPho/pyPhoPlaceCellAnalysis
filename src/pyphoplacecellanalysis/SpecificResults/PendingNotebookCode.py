@@ -56,6 +56,54 @@ from neuropy.utils.indexing_helpers import PandasHelpers
 from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
 # from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import SubsequenceDetectionSamples, GroundTruthData
 
+@function_attributes(short_name=None, tags=['endcap', 'track_identity'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-20 19:08', related_items=[])
+def classify_pos_bins(x: NDArray):
+	"""	classifies the pos_bin_edges as being either endcaps/on the main straightaway, stc and returns a dataframe
+
+	Usage:	
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import classify_pos_bins
+	
+        pos_bin_edges = deepcopy(track_templates.get_decoders_dict()['long_LR'].xbin_centers)
+		pos_classification_df = classify_pos_bins(x=pos_bin_edges)
+		pos_classification_df
+
+	"""
+	long_track_inst, short_track_inst = LinearTrackInstance.init_tracks_from_session_config(curr_active_pipeline.sess.config)
+	## test xbins
+	pos_bin_classification = [long_track_inst.classify_x_position(x) for x in pos_bin_edges]
+	is_pos_bin_endcap = [long_track_inst.classify_x_position(x).is_endcap for x in pos_bin_edges]
+	is_pos_bin_on_maze = [long_track_inst.classify_x_position(x).is_on_maze for x in pos_bin_edges]
+	# is_pos_bin_endcap
+	# is_pos_bin_on_maze
+
+	# Create long track classification DataFrame
+	long_data = pd.DataFrame({
+		'is_endcap': [long_track_inst.classify_x_position(x).is_endcap for x in pos_bin_edges],
+		'is_track_straightaway': [long_track_inst.classify_x_position(x).is_track_straightaway for x in pos_bin_edges],
+		'is_off_track': [(not long_track_inst.classify_x_position(x).is_on_maze) for x in pos_bin_edges],
+	})
+
+	# Create short track classification DataFrame
+	short_data = pd.DataFrame({
+		'is_endcap': [short_track_inst.classify_x_position(x).is_endcap for x in pos_bin_edges],
+		'is_track_straightaway': [short_track_inst.classify_x_position(x).is_track_straightaway for x in pos_bin_edges],
+		'is_off_track': [(not short_track_inst.classify_x_position(x).is_on_maze) for x in pos_bin_edges],
+	})
+
+	# Combine into a multi-level column DataFrame
+	pos_classification_df = pd.concat(
+		[pd.DataFrame({'x': pos_bin_edges, 'flat_index': range(len(pos_bin_edges))}),
+		pd.concat({'long': long_data, 'short': short_data}, axis=1)],
+		axis=1
+	)
+
+	# Ensure columns are correctly nested
+	pos_classification_df.columns = pd.MultiIndex.from_tuples(
+		[(col if isinstance(col, str) else col[0], '' if isinstance(col, str) else col[1]) for col in pos_classification_df.columns]
+	)
+
+	# combined_df['long']
+	return pos_classification_df
 
 
 # ==================================================================================================================== #

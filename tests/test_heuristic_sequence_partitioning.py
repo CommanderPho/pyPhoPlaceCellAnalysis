@@ -49,6 +49,25 @@ class TestSubsequenceMerging(unittest.TestCase):
         pass
     
     
+    @classmethod
+    def _add_dynamic_tests(self):
+        """Dynamically add test methods based on self.test_dict."""
+        for key, example_data in self.test_dict.items():
+            test_name = f"test_{key}"  # Name for the test method
+
+            def dynamic_test(self, example_data=example_data, key=key):
+                """Dynamic test logic."""
+                # Example: Ensure the example_data can be processed
+                result = SubsequencesPartitioningResult(**self.SubsequencesPartitioningResult_common_init_kwargs)
+                # Add your actual assertions here
+                self.assertIsNotNone(result, f"Result should not be None for key: {key}")
+                self.assertTrue(isinstance(result, SubsequencesPartitioningResult), f"Result should be a SubsequencesPartitioningResult for key: {key}")
+
+            # Add the method to the class
+            setattr(self, test_name, dynamic_test)
+
+
+
     def test_single_sequence(self):
         # Test a single-bin intrusion between two long sequences
         positions_list = np.array([100, 110, 120, 130, 140, 150])
@@ -120,7 +139,6 @@ class TestSubsequenceMerging(unittest.TestCase):
         self.assertEqual(len(partition_result.merged_split_positions_arrays), len(expected_sequences))
         for seq, expected_seq in zip(partition_result.merged_split_positions_arrays, expected_sequences):
             np.testing.assert_array_equal(seq, expected_seq)
-
 
 
 
