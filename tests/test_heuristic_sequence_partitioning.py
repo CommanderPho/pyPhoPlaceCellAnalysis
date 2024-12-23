@@ -142,23 +142,23 @@ class TestSubsequenceMerging(unittest.TestCase):
 
 
 
-    # def test_single_intrusion_between_long_sequences(self):
-    #     # Test a single-bin intrusion between two long sequences
-    #     positions_list = np.array([100, 110, 120, 130, 140, 150])
-    #     # Introduce an intrusion
-    #     positions_list[3] = 125  # Intrusion at index 3
-    #     partition_result = SubsequencesPartitioningResult.init_from_positions_list(
-    #         a_most_likely_positions_list=positions_list,
-    #         n_pos_bins=self.n_pos_bins,
-    #         max_ignore_bins=self.max_ignore_bins,
-    #         same_thresh=self.same_thresh
-    #     )
-    #     # Expected merged sequences
-    #     expected_sequences = [np.array([100, 110, 120, 125, 140, 150])]
-    #     # Compare the merged sequences
-    #     self.assertEqual(len(partition_result.merged_split_positions_arrays), len(expected_sequences))
-    #     for seq, expected_seq in zip(partition_result.merged_split_positions_arrays, expected_sequences):
-    #         np.testing.assert_array_equal(seq, expected_seq)
+    def test_single_intrusion_between_long_sequences(self):
+        # Test a single-bin intrusion between two long sequences
+        positions_list = np.array([100, 110, 120, 130, 140, 150])
+        # Introduce an intrusion
+        positions_list[3] = 125  # Intrusion at index 3
+        partition_result = SubsequencesPartitioningResult.init_from_positions_list(
+            a_most_likely_positions_list=positions_list,
+            n_pos_bins=self.n_pos_bins,
+            max_ignore_bins=self.max_ignore_bins,
+            same_thresh=self.same_thresh
+        )
+        # Expected merged sequences
+        expected_sequences = [np.array([100, 110, 120, 125, 140, 150])]
+        # Compare the merged sequences
+        self.assertEqual(len(partition_result.merged_split_positions_arrays), len(expected_sequences))
+        for seq, expected_seq in zip(partition_result.merged_split_positions_arrays, expected_sequences):
+            np.testing.assert_array_equal(seq, expected_seq)
 
     # def test_multiple_intrusions_between_long_sequences(self):
     #     # Test multiple single-bin intrusions between long sequences

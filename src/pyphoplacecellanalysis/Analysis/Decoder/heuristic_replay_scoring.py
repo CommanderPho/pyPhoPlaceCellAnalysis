@@ -3747,9 +3747,11 @@ class SubsequenceDetectionSamples:
         return test_dict, partitioned_results, _new_scores_df, _all_examples_scores_dict
     
 
-    @function_attributes(short_name=None, tags=['plotting'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-20 17:30', related_items=[])
+    @function_attributes(short_name=None, tags=['plotting', 'tabbed', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-20 17:30', related_items=[])
     @classmethod
     def plot_all_tabbled_figure(cls, decoder_track_length_dict: Dict, pos_bin_edges: NDArray, debug_print=False):
+        """ plots all test series as a tabbed figure
+        """
         from mpl_multitab import MplMultiTab, MplMultiTab2D, MplTabbedFigure
         from neuropy.utils.matplotlib_helpers import TabbedMatplotlibFigures
         # from pyphoplacecellanalysis.Pho2D.matplotlib.CustomMatplotlibTabbedWidget import CustomMplMultiTab
