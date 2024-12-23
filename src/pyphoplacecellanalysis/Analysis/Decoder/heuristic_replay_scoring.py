@@ -3568,6 +3568,32 @@ def convert_to_array_recursive(data: Any) -> Any:
         return data
     
 
+desired_selected_indicies_dict = {'chose_incorrect_subsequence_as_main_list[0]': [17, 18, 19, 20, 21, 22, 16],
+						 'intrusion[0]': [11, 10, 9, 8, 7, 5, 4, 3],
+						 'intrusion[1]': [17, 18, 19, 20],
+						 'intrusion[2]': [7, 8, 9, 10],
+						 'intrusion[3]': [2, 3, 5, 6, 7, 8],
+                         'intrusion[4]': [11, 10, 9, 8, 7, 6, 5, 3, 2],
+						 'false_negative_incorrect_split_list[0]': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 20, 21, 23, 22, 24, 25],
+                         'false_negative_incorrect_split_list[1]': [4, 5, 6, 7, 8, 9, 10],
+                         'false_negative_incorrect_split_list[2]': [0, 1, 2, 4, 5, 6, 9, 10, 11],
+						 'wrongly_split_main_sequence_and_grabbed_part_list[0]': [7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 20, 21, 22, 23, 6],
+						 'wrongly_split_main_sequence_and_grabbed_part_list[1]': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], ## seems split artificially in the middle several times based on step-size.
+						 'wrongly_split_main_sequence_and_grabbed_part_list[2]': [5, 4, 6, 9, 10, 11, 12, 13, 14, 16, 17, 19, 20, 3, 2, 1, 0],
+						 'wrongly_split_main_sequence_and_grabbed_part_list[3]': [6, 7, 9, 10, 11, 14, 15, 5, 4, 3, 2, 1],
+						 'wrongly_split_main_sequence_and_grabbed_part_list[4]': [5, 6, 7, 8, 9, 10],
+						 'wrongly_split_main_sequence_and_grabbed_part_list[5]': [6, 7, 8, 9, 10],
+						 'wrongly_split_main_sequence_and_grabbed_part_list[6]': [7, 8, 9, 10, 11, 6],
+						 'wrongly_split_main_sequence_and_grabbed_part_list[7]': [0, 2, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 20, 22, 23, 24, 25],
+						 'jump[0]': [7, 8, 9, 10, 11, 12, 13, 14],
+						 'jump[1]': [1, 2, 3, 4, 5],
+						 'jump[2]': [2, 3, 4, 5],
+						 'jump[3]': [4, 3, 5, 6, 7],
+						 'great[0]': [1, 2, 3, 4, 5, 6],
+						 'false_positive[0]': [],
+						 
+                        }
+
 
 ## UNUSED!!!
 @define(slots=False)
@@ -3600,12 +3626,37 @@ class SubsequenceDetectionSamples:
 
         from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import SubsequenceDetectionSamples, GroundTruthData
 
+        ## INPUTS: track_templates, a_decoded_filter_epochs_decoder_result_dict
+        decoder_track_length_dict = track_templates.get_track_length_dict() # {'long_LR': 214.0, 'long_RL': 214.0, 'short_LR': 144.0, 'short_RL': 144.0}
+        ## INPUTS: a_heuristics_result
+        same_thresh_fraction_of_track: float = 0.05 ## up to 5.0% of the track
+        max_jump_distance_cm: float = (same_thresh_fraction_of_track * 214.0)
+        pos_bin_edges = np.array([37.0774, 40.8828, 44.6882, 48.4936, 52.2991, 56.1045, 59.9099, 63.7153, 67.5207, 71.3261, 75.1316, 78.937, 82.7424, 86.5478, 90.3532, 94.1586, 97.9641, 101.769, 105.575, 109.38, 113.186, 116.991, 120.797, 124.602, 128.407, 132.213, 136.018, 139.824, 143.629, 147.434, 151.24, 155.045, 158.851, 162.656, 166.462, 170.267, 174.072, 177.878, 181.683, 185.489, 189.294, 193.099, 196.905, 200.71, 204.516, 208.321, 212.127, 215.932, 219.737, 223.543, 227.348, 231.154, 234.959, 238.764, 242.57, 246.375, 250.181, 253.986])
+
+        # SubsequenceDetectionSamples.get_all_examples()
+        test_dict = SubsequenceDetectionSamples.get_all_example_dict()
+        # same_thresh = 0.0
+        # same_thresh = 4.0
+        same_thresh = 60.0
+
+        max_ignore_bins = 0
+        # max_ignore_bins = 2
+
+        test_dict, partitioned_results, _new_scores_df, _all_examples_scores_dict = SubsequenceDetectionSamples.build_test_results_dict(test_dict=test_dict, same_thresh=same_thresh, max_ignore_bins=max_ignore_bins, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(pos_bin_edges))
+        _new_scores_df
+
+        fig, ax_dict = SubsequenceDetectionSamples.plot_test_subsequences_as_ax_stack(partitioned_results=partitioned_results, desired_selected_indicies_dict=desired_selected_indicies_dict)
+
+
+        
+
     """
     intrusion_example_positions_list = {
         (252.083,248.278,248.278,252.083,240.667,229.251,38.9801,198.808,175.975,160.753,153.143,149.337,214.029,145.532,183.586,118.894,77.0343):GroundTruthData(detection_quality=5),
         (233.056,225.446,225.446,217.835,217.835,217.835,217.835,217.835,240.667,244.473,248.278,248.278,240.667,236.862,240.667,77.0343,214.029,175.975,164.559,153.143,141.726,183.586,58.0072,54.2018): GroundTruthData(detection_quality=5),
         (217.835,217.835,206.418,195.002,195.002,99.8668,221.64,107.478,96.0614,80.8397,73.2289,80.8397,77.0343): GroundTruthData(detection_quality=5),
         (92.2559,84.6451,84.6451,92.2559,134.116,126.505,126.505,141.726,149.337,38.9801): GroundTruthData(detection_quality=5),
+        (92.0762, 152.765, 202.074, 198.281, 88.2832, 156.558, 148.972, 107.248, 99.6623, 95.8692, 92.0762, 88.2832): GroundTruthData(detection_quality=5),
     }
 
     # most_likely_positions_bad_single_main_seq = (38.9801,225.446,225.446,145.532,137.921,38.9801,225.446,217.835,175.975,107.478,134.116,145.532,38.9801,38.9801,172.17,149.337,248.278,225.446,153.143,145.532,111.283,69.4234)
@@ -3648,6 +3699,27 @@ class SubsequenceDetectionSamples:
     
     false_negative_incorrect_split_list = {
         (206.418, 191.197, 187.391, 164.559, 175.975, 172.17, 149.337, 149.337, 153.143, 137.921, 115.088, 118.894, 103.672, 99.8668, 96.0614, 38.9801, 96.0614, 96.0614, 179.781, 92.2559, 92.2559, 92.2559, 92.2559, 84.6451, 88.4505, 88.4505, 38.9801, 221.64, 84.6451): GroundTruthData(detection_quality=3),
+        (80.6972, 38.9739, 38.9739, 38.9739, 38.9739, 80.6972, 88.2832, 95.8692, 126.213, 126.213, 198.281): GroundTruthData(detection_quality=3),
+        (84.4902, 122.42, 122.42, 38.9739, 148.972, 156.558, 164.144, 38.9739, 38.9739, 175.523, 202.074, 202.074, 194.488, 38.9739, 38.9739, 186.902, 76.9041): GroundTruthData(detection_quality=3),
+    }
+    
+    true_positives = { ## GOOD, correct detections
+        (232.418, 236.211, 232.418, 202.074, 179.316, 156.558, 130.006, 114.834, 73.1111): GroundTruthData(detection_quality=10),
+        (232.418, 209.66, 167.937, 171.73, 141.386, 122.42, 73.1111, 61.732): GroundTruthData(detection_quality=10),
+        (221.039, 205.867, 183.109, 186.902, 167.937, 141.386, 126.213, 107.248, 69.3181): GroundTruthData(detection_quality=10),
+        (88.2832, 99.6623, 122.42, 156.558, 186.902, 205.867): GroundTruthData(detection_quality=10),
+        (232.418, 217.246, 198.281, 183.109, 167.937, 152.765, 122.42, 99.6623): GroundTruthData(detection_quality=10),
+        (224.832, 243.797, 251.383, 232.418, 209.66, 205.867, 152.765, 133.799, 130.006, 103.455, 95.8692, 99.6623, 76.9041, 95.8692, 88.2832, 84.4902, 61.732): GroundTruthData(detection_quality=10),
+        (92.0762, 88.2832, 118.627, 126.213, 130.006, 164.144, 205.867, 213.453): GroundTruthData(detection_quality=10),
+        (202.074, 202.074, 198.281, 183.109, 145.179, 122.42, 88.2832, 88.2832): GroundTruthData(detection_quality=10),
+        (38.9739, 54.146, 69.3181, 84.4902, 80.6972, 137.593, 141.386, 175.523, 198.281, 183.109): GroundTruthData(detection_quality=10),
+        (38.9739, 38.9739, 38.9739, 38.9739, 38.9739, 38.9739, 42.7669, 46.5599, 61.732, 65.5251, 92.0762, 137.593, 160.351, 240.004): GroundTruthData(detection_quality=10),
+        (122.42, 186.902, 122.42, 190.695, 38.9739, 38.9739, 205.867, 205.867, 202.074, 198.281, 190.695, 167.937, 164.144, 137.593, 118.627, 99.6623, 88.2832): GroundTruthData(detection_quality=10),
+        (251.383, 247.59, 240.004, 240.004, 205.867, 179.316, 145.179, 111.041, 80.6972): GroundTruthData(detection_quality=10),
+        (84.4902, 88.2832, 95.8692, 95.8692, 99.6623, 114.834, 141.386, 167.937, 198.281): GroundTruthData(detection_quality=10),
+        (202.074, 194.488, 183.109, 167.937, 148.972, 126.213, 111.041): GroundTruthData(detection_quality=10),
+        (80.6972, 92.0762, 92.0762, 111.041, 137.593, 179.316, 202.074): GroundTruthData(detection_quality=10),
+        (95.8692, 107.248, 141.386, 164.144, 198.281): GroundTruthData(detection_quality=10),   
     }
 
 
@@ -3669,7 +3741,8 @@ class SubsequenceDetectionSamples:
             'false_positive': cls.false_positive_list,
             'chose_incorrect_subsequence_as_main_list': cls.chose_incorrect_subsequence_as_main_list,
             'wrongly_split_main_sequence_and_grabbed_part_list': cls.wrongly_split_main_sequence_and_grabbed_part_list,
-            'false_negative_incorrect_split_list': cls.false_negative_incorrect_split_list,            
+            'false_negative_incorrect_split_list': cls.false_negative_incorrect_split_list,
+            'true_positives': cls.true_positives,            
         }.items()} # type: ignore
 
     @classmethod
@@ -3682,10 +3755,8 @@ class SubsequenceDetectionSamples:
         all_example_dict.update({f"chose_incorrect_subsequence_as_main_list[{i}]":np.array(arr) for i, (arr, ground_truth) in enumerate(SubsequenceDetectionSamples.chose_incorrect_subsequence_as_main_list.items())})
         all_example_dict.update({f"wrongly_split_main_sequence_and_grabbed_part_list[{i}]":np.array(arr) for i, (arr, ground_truth) in enumerate(SubsequenceDetectionSamples.wrongly_split_main_sequence_and_grabbed_part_list.items())})
         all_example_dict.update({f"false_negative_incorrect_split_list[{i}]":np.array(arr) for i, (arr, ground_truth) in enumerate(SubsequenceDetectionSamples.false_negative_incorrect_split_list.items())})
+        all_example_dict.update({f"true_positives[{i}]":np.array(arr) for i, (arr, ground_truth) in enumerate(SubsequenceDetectionSamples.true_positives.items())})
         return all_example_dict
-
-        # plot_subplot_mosaic_dict = {f"intrusion_example[{i}]":dict(sharex=True, sharey=True, mosaic=[["ax_ungrouped_seq"],["ax_grouped_seq"],["ax_merged_grouped_seq"],], gridspec_kw=dict(wspace=0, hspace=0.15)) for i, idx in enumerate(np.arange(num_tabs))}
-
 
     @classmethod
     def build_test_results_dict(cls, pos_bin_edges: NDArray, max_ignore_bins: int = 2, same_thresh: float = 4, max_jump_distance_cm: float=60.0, decoder_track_length: float = 214.0, debug_print=False, test_dict=None, **kwargs):
@@ -3719,7 +3790,7 @@ class SubsequenceDetectionSamples:
         
         for a_group_name, group_items in test_dict.items():
             for i, (a_pos_tuple, a_ground_truth) in enumerate(group_items.items()):
-                print(f'a_group_name: {a_group_name}')
+                # print(f'a_group_name: {a_group_name}')
                 a_partitioner: SubsequencesPartitioningResult = SubsequenceDetectionSamples.build_partition_sequence(a_pos_tuple, **SubsequencesPartitioningResult_common_init_kwargs)
                 a_ground_truth.arr = deepcopy(a_partitioner.flat_positions)
                 partitioned_results[f"{a_group_name}[{i}]"] = a_partitioner
@@ -3832,3 +3903,48 @@ class SubsequenceDetectionSamples:
         # ui.show()
         return (ui, figures_dict, axs_dict), all_examples_plot_data_positions_arr_dict
         
+
+    @classmethod
+    def plot_test_subsequences_as_ax_stack(cls, partitioned_results, desired_selected_indicies_dict):
+        """ plots a vertical stack of axes containing the various subsequence paritioning examples 
+        
+        fig, ax_dict = SubsequenceDetectionSamples.plot_test_subsequences_as_ax_stack(partitioned_results, desired_selected_indicies_dict)
+        
+        """
+        import matplotlib.pyplot as plt
+        
+        _subplot_list = [[k] for k, v in partitioned_results.items()]
+        n_subplots = len(_subplot_list)
+        height_ratios = ([1] * n_subplots)
+
+
+        ## Plot single strip figure
+        fig = plt.figure(layout="constrained")
+        ax_dict = fig.subplot_mosaic(
+            _subplot_list,
+            # set the height ratios between the rows
+            height_ratios=height_ratios,
+            # height_ratios=[1, 1],
+            # set the width ratios between the columns
+            # width_ratios=[8, 1],
+            # sharex=True,
+            gridspec_kw=dict(wspace=0, hspace=0.15) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+        )
+
+        ## plot on the subaxes
+        for a_name, ax in ax_dict.items():
+            subsequence_partitioning_result: SubsequencesPartitioningResult = partitioned_results[a_name]
+            _out = subsequence_partitioning_result.plot_time_bins_multiple(ax=ax)
+            # ax.set_ylabel(f'{k}')
+            ax.set_title(f'{a_name}')
+            desired_partition_indicies = desired_selected_indicies_dict[a_name]
+            bin_index = np.unique(deepcopy(desired_partition_indicies))
+            # ax = _out.axes
+            starts_x = (bin_index - 0.0)
+            ends_x = (bin_index + 1.0)
+            # Draw multiple vertical spans
+            for start, end in zip(starts_x, ends_x):
+                ax.axvspan(start, end, ymin=-0.2, ymax=0.1, color='green', alpha=0.3)
+
+        return fig, ax_dict
+

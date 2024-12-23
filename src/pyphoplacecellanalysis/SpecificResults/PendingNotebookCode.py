@@ -67,6 +67,11 @@ class InteractivePlot:
     """ 2024-12-23 - Add bin selection 
 
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import InteractivePlot
+    
+    _out = subsequence_partitioning_result.plot_time_bins_multiple()
+    # Pass the existing ax to the InteractivePlot
+    interactive_plot = InteractivePlot(_out.axes)
+    # plt.show()
 
     """
     # Computed Properties ________________________________________________________________________________________________ #
@@ -82,7 +87,7 @@ class InteractivePlot:
     
     @property
     def selected_indicies(self) -> List[int]:
-        return np.array(list(self.selected_bins.keys())).tolist()
+        return np.unique(list(self.selected_bins.keys())).tolist()
 
 
     def __init__(self, ax: plt.Axes):
@@ -120,6 +125,13 @@ class InteractivePlot:
             rect.remove()
             self.fig.canvas.draw_idle()
 
+    @classmethod
+    def draw_bins(cls, ax, bin_index):
+        rect = ax.axvspan((bin_index - 0.0), (bin_index + 1.0), color='yellow', alpha=0.3)
+        # selected_bins[bin_index] = rect
+        fig = ax.figure
+        fig.canvas.draw_idle()
+        return rect
         
 
 
