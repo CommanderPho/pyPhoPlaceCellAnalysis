@@ -56,6 +56,49 @@ from neuropy.utils.indexing_helpers import PandasHelpers
 from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
 # from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import SubsequenceDetectionSamples, GroundTruthData
 
+
+
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+
+class InteractivePlot:
+    """ 2024-12-23 - Add bin selection 
+    """
+    def __init__(self, ax: plt.Axes):
+        self.ax = ax
+        self.fig = ax.figure
+        self.selected_bins = []
+        self.crosshair = self.ax.axvline(x=0, color='r', linestyle='--')
+        self.rects = []
+        
+        self.cid_motion = self.fig.canvas.mpl_connect('motion_notify_event', self.on_mouse_move)
+        self.cid_click = self.fig.canvas.mpl_connect('button_press_event', self.on_mouse_click)
+        
+    def on_mouse_move(self, event):
+        if event.inaxes == self.ax:
+            self.crosshair.set_xdata(event.xdata)
+            self.fig.canvas.draw_idle()
+
+    def on_mouse_click(self, event):
+        if (event.inaxes == self.ax) and (event.button == 1):  # Left mouse button
+            time_bin = int(event.xdata)
+            if time_bin not in self.selected_bins:
+                self.selected_bins.append(time_bin)
+                self.highlight_bin(time_bin)
+            print(f"Selected time bins: {self.selected_bins}")
+
+    def highlight_bin(self, bin_index):
+        # rect = self.ax.axvspan(bin_index - 0.5, bin_index + 0.5, color='yellow', alpha=0.3)
+        rect = self.ax.axvspan(bin_index - 0.0, bin_index + 1.0, color='yellow', alpha=0.3)
+        # rect = self.ax.axvspan(bin_index, bin_index, color='yellow', alpha=0.3)
+        self.rects.append(rect)
+        self.fig.canvas.draw_idle()
+        
+
+
+
 @function_attributes(short_name=None, tags=['endcap', 'track_identity'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-20 19:08', related_items=[])
 def classify_pos_bins(x: NDArray):
 	"""	classifies the pos_bin_edges as being either endcaps/on the main straightaway, stc and returns a dataframe
