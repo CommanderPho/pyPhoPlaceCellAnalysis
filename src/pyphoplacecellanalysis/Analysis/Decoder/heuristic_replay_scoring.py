@@ -3591,7 +3591,22 @@ desired_selected_indicies_dict = {'chose_incorrect_subsequence_as_main_list[0]':
 						 'jump[3]': [4, 3, 5, 6, 7],
 						 'great[0]': [1, 2, 3, 4, 5, 6],
 						 'false_positive[0]': [],
-						 
+						 'true_positives[0]': [1, 2, 3, 4, 5, 6, 7, 8],
+                         'true_positives[1]': [0, 1, 2, 3, 4, 5, 6, 7],
+                         'true_positives[2]': [0, 1, 2, 3, 4, 5, 6, 7, 8],
+                         'true_positives[3]': [0, 1, 2, 3, 4, 5],
+                         'true_positives[4]': [0, 1, 2, 3, 4, 5, 6, 7],
+                         'true_positives[5]': [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16],
+                         'true_positives[6]': [1, 2, 3, 4, 5, 6, 7],
+                         'true_positives[7]': [1, 2, 3, 4, 5, 6],
+                         'true_positives[8]': [0, 1, 2, 3, 5, 6, 7, 8],
+                         'true_positives[9]': [5, 6, 7, 8, 9, 10, 11, 12, 13],
+                         'true_positives[10]': [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+                         'true_positives[11]': [0, 1, 2, 3, 4, 5, 6, 7, 8],
+                         'true_positives[12]': [0, 1, 2, 3, 4, 5, 6, 7, 8],
+                         'true_positives[13]': [0, 1, 2, 3, 4, 5, 6],
+                         'true_positives[14]': [0, 1, 2, 3, 4, 5, 6],
+                         'true_positives[15]': [0, 1, 2, 3, 4],
                         }
 
 
