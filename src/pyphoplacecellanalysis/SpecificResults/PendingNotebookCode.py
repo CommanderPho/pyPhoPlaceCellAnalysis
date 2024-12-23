@@ -65,11 +65,30 @@ import numpy as np
 
 class InteractivePlot:
     """ 2024-12-23 - Add bin selection 
+
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import InteractivePlot
+
     """
+    # Computed Properties ________________________________________________________________________________________________ #
+    # @property
+    # def n_pos_bins(self) -> int:
+    #     "the total number of unique position bins along the track, unrelated to the number of *positions* in `flat_positions`"
+    #     return len(self.pos_bin_edges)-1
+
+
+    # @property
+    # def n_diff_bins(self) -> int:
+    #     return len(self.first_order_diff_lst)
+    
+    @property
+    def selected_indicies(self) -> List[int]:
+        return np.array(list(self.selected_bins.keys())).tolist()
+
+
     def __init__(self, ax: plt.Axes):
         self.ax = ax
         self.fig = ax.figure
-        self.selected_bins = []
+        self.selected_bins = {}
         self.crosshair = self.ax.axvline(x=0, color='r', linestyle='--')
         self.rects = []
         
@@ -82,19 +101,25 @@ class InteractivePlot:
             self.fig.canvas.draw_idle()
 
     def on_mouse_click(self, event):
-        if (event.inaxes == self.ax) and (event.button == 1):  # Left mouse button
+        if event.inaxes == self.ax and event.button == 1:  # Left mouse button
             time_bin = int(event.xdata)
-            if time_bin not in self.selected_bins:
-                self.selected_bins.append(time_bin)
-                self.highlight_bin(time_bin)
-            print(f"Selected time bins: {self.selected_bins}")
+            if time_bin in self.selected_bins:
+                self.deselect_bin(time_bin)
+            else:
+                self.select_bin(time_bin)
+            print(f"Selected time bins: {list(self.selected_bins.keys())}")
 
-    def highlight_bin(self, bin_index):
-        # rect = self.ax.axvspan(bin_index - 0.5, bin_index + 0.5, color='yellow', alpha=0.3)
-        rect = self.ax.axvspan(bin_index - 0.0, bin_index + 1.0, color='yellow', alpha=0.3)
-        # rect = self.ax.axvspan(bin_index, bin_index, color='yellow', alpha=0.3)
-        self.rects.append(rect)
+    def select_bin(self, bin_index):
+        rect = self.ax.axvspan((bin_index - 0.0), (bin_index + 1.0), color='yellow', alpha=0.3)
+        self.selected_bins[bin_index] = rect
         self.fig.canvas.draw_idle()
+
+    def deselect_bin(self, bin_index):
+        rect = self.selected_bins.pop(bin_index, None)
+        if rect:
+            rect.remove()
+            self.fig.canvas.draw_idle()
+
         
 
 
