@@ -2052,7 +2052,7 @@ class SubsequencesPartitioningResult(ComputedResult):
 
 
 
-    def _plot_step_by_step_subsequence_partition_process(self, extant_fig=None, extant_ax_dict=None, force_integer_x_axis_index: bool = True, **kwargs):
+    def _plot_step_by_step_subsequence_partition_process(self, extant_fig=None, extant_ax_dict=None, force_integer_x_axis_index: bool = True, use_debug_step_intermediates:bool=True, **kwargs):
         """ diagnostic for debugging the step-by-step sequence partitioning heuristics 
         
         out: MatplotlibRenderPlots = partition_result._plot_step_by_step_subsequence_partition_process()
@@ -2075,15 +2075,33 @@ class SubsequencesPartitioningResult(ComputedResult):
         #             ]
         
 
-        subplot_spec_list = [
-                        ["ax_ungrouped_seq", "ax_label_ungrouped_seq"],
-                        ["ax_grouped_seq", "ax_label_grouped_seq"],
-                        ["ax_merged_grouped_seq", "ax_label_merged_grouped_seq"],
-                    ]
-        
-        label_ax_names: List[str] = [v[-1] for v in subplot_spec_list]
-        
-
+        # subplot_spec_list = [
+        #                 ["ax_ungrouped_seq", "ax_label_ungrouped_seq"],
+        #                 ["ax_grouped_seq", "ax_label_grouped_seq"],
+        #                 ["ax_merged_grouped_seq", "ax_label_merged_grouped_seq"],
+        #             ]
+        # width_ratios=[6,2]
+        width_ratios=[1]
+        is_debug_step_intermediates_version: bool = False
+        # label_ax_names: List[str] = [v[-1] for v in subplot_spec_list]
+        if use_debug_step_intermediates and (len(self._debug_steps_split_positions_arrays) > 1):
+            ## has debug intermediates:
+            subplot_spec_list = [[v] for v in list(self._debug_steps_split_positions_arrays.keys())]
+            subplot_spec_list.append(["ax_label_merged_grouped_seq"])
+    
+            label_ax_names: List[str] = ["ax_label_merged_grouped_seq"]
+            is_debug_step_intermediates_version = True
+            
+        else:
+            ## Stack instead:
+            subplot_spec_list = [
+                            ["ax_ungrouped_seq"],
+                            ["ax_grouped_seq"],
+                            ["ax_merged_grouped_seq"],
+                            ["ax_label_merged_grouped_seq"],
+                        ]
+            
+            label_ax_names: List[str] = ["ax_label_merged_grouped_seq"]
 
         fig_num = kwargs.pop('num', None)
         merged_plots_out_dict = {}
@@ -2104,7 +2122,7 @@ class SubsequencesPartitioningResult(ComputedResult):
                 ## create new axes                            
                 ax_dict = fig.subplot_mosaic(subplot_spec_list,
                     sharex=True, sharey=True,
-                    gridspec_kw=dict(width_ratios=[6,2], wspace=0, hspace=0.15) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+                    gridspec_kw=dict(width_ratios=width_ratios, wspace=0, hspace=0.15) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
                 )
         else:
             ## already exists
@@ -2148,33 +2166,6 @@ class SubsequencesPartitioningResult(ComputedResult):
         longest_seq_length_multiline_label_str: str = '\n'.join([': '.join([k, str(v)]) for k, v in longest_seq_length_dict.items()])
 
 
-        # ax_dict["ax_label_ungrouped_seq"].text(0.5, 0.5, "Line1\nLine2", ha="center", va="center")
-        # ax_dict["ax_label_grouped_seq"].text(0.5, 0.5, "Line1\nLine2", ha="center", va="center")
-        # ax_dict["ax_label_merged_grouped_seq"].text(0.5, 0.5, longest_seq_length_multiline_label_str, ha="center", va="center")
-
-
-        # Set text aligned to the top of the axes and centered horizontally
-        # for a_label_ax_name in label_ax_names:
-        #     ax_dict[a_label_ax_name].text(0.5, 1.0, "Line1\nLine2", ha="left", va="top", transform=ax_dict[a_label_ax_name].transAxes) ## setup default
-
-        # ax_dict["ax_label_ungrouped_seq"].text(0.5, 1.0, "Line1\nLine2", ha="left", va="top", transform=ax_dict["ax_label_ungrouped_seq"].transAxes)
-        # ax_dict["ax_label_grouped_seq"].text(0.5, 1.0, "Line1\nLine2", ha="left", va="top", transform=ax_dict["ax_label_grouped_seq"].transAxes)
-        ax_dict["ax_label_merged_grouped_seq"].text(0.5, 1.0, longest_seq_length_multiline_label_str, ha="left", va="top", transform=ax_dict["ax_label_merged_grouped_seq"].transAxes)
-        split_most_likely_positions_arrays = deepcopy(self.flat_positions) ## unsplit positions
-        pre_partitioned_debug_sequences_kwargs = dict(sequence_position_hlines_kwargs=dict(linewidth=2, linestyle=linestyle, zorder=10, alpha=1.0), # high-zorder to place it on-top, linestyle is "densely-dashed"
-            split_vlines_kwargs = dict(should_skip=False),
-            time_bin_edges_vlines_kwargs = dict(should_skip=False),
-            direction_change_lines_kwargs = dict(should_skip=True),
-            intrusion_time_bin_shading_kwargs = dict(should_skip=True),
-            main_sequence_position_dots_kwargs = dict(should_skip=True),
-        )
-        
-        # out: MatplotlibRenderPlots = SubsequencesPartitioningResult._debug_plot_time_bins_multiple(positions_list=split_most_likely_positions_arrays, ax=ax_dict["ax_ungrouped_seq"])
-        out: MatplotlibRenderPlots = self.plot_time_bins_multiple(num='debug_plot_merged_time_binned_positions', ax=ax_dict["ax_ungrouped_seq"], enable_position_difference_indicators=True,
-            flat_time_window_edges=flat_time_window_edges, override_positions_list=split_most_likely_positions_arrays, **common_plot_time_bins_multiple_kwargs, **pre_partitioned_debug_sequences_kwargs,
-        )
-        merged_plots_out_dict["ax_ungrouped_seq"] = out.plots
-        ## Add initially-sequenced result:
         pre_merged_debug_sequences_kwargs = dict(
             sequence_position_hlines_kwargs=dict(linewidth=2, linestyle=linestyle, zorder=10, alpha=1.0), # high-zorder to place it on-top, linestyle is "densely-dashed"
             # sequence_position_hlines_kwargs=dict(linewidth=3, linestyle=linestyle, zorder=11, alpha=1.0),
@@ -2184,42 +2175,83 @@ class SubsequencesPartitioningResult(ComputedResult):
             intrusion_time_bin_shading_kwargs = dict(should_skip=False),
             main_sequence_position_dots_kwargs = dict(should_skip=False, linewidths=2, marker ="^", edgecolor ="red", s = 100, zorder=1),
         )
-        
-        split_positions_arrays = deepcopy(self.split_positions_arrays)
-        out2: MatplotlibRenderPlots = self.plot_time_bins_multiple(num='debug_plot_merged_time_binned_positions', ax=ax_dict["ax_grouped_seq"], enable_position_difference_indicators=True,
-            flat_time_window_edges=flat_time_window_edges, override_positions_list=split_positions_arrays, **common_plot_time_bins_multiple_kwargs, **pre_merged_debug_sequences_kwargs,
-            # sequence_position_hlines_kwargs=dict(linewidth=3, linestyle='-', zorder=11, alpha=1.0),
-        )
-        merged_plots_out_dict["ax_grouped_seq"] = out2.plots
-        
-        #(offset, (on_off_seq)). For example, (0, (3, 10, 1, 15)) means (3pt line, 10pt space, 1pt line, 15pt space) with no offset, while (5, (10, 3)), means (10pt line, 3pt space), but skip the first 5pt line.
-        # linestyle = (0, (5, 1))
-        # linestyle = (0, (1, 1)) # dots with 1pt dot, 0.5pt space
-        # linestyle = '-'
-        # Plot only the positions themselves, as dotted overlaying lines
+    
 
-        ## Add re-sequenced (merged) result:
-        post_merged_debug_sequences_kwargs = deepcopy(pre_merged_debug_sequences_kwargs) | dict()
-        merged_split_positions_arrays = deepcopy(self.merged_split_positions_arrays)
-        out3: MatplotlibRenderPlots = self.plot_time_bins_multiple(num='debug_plot_merged_time_binned_positions', ax=ax_dict["ax_merged_grouped_seq"], enable_position_difference_indicators=True,
-            flat_time_window_edges=flat_time_window_edges, override_positions_list=merged_split_positions_arrays, **common_plot_time_bins_multiple_kwargs, **post_merged_debug_sequences_kwargs,
-        )        
-        merged_plots_out_dict["ax_merged_grouped_seq"] = out3.plots
-        
-        # out.plots = merged_plots_out_dict ## set main plots to the dict of plots
+        if is_debug_step_intermediates_version:
+            ## `is_debug_step_intermediates_version`: if True, means it uses the position lists in the dict `self._debug_steps_split_positions_arrays` that were built up during self.compute()
+            for k, a_positions_list in self._debug_steps_split_positions_arrays.items():
+                ax = ax_dict[k]
+                ax.set_title(f'{k}')
+                a_debug_sequences_kwargs = deepcopy(pre_merged_debug_sequences_kwargs) | dict()
+                an_out: MatplotlibRenderPlots = self.plot_time_bins_multiple(ax=ax, enable_position_difference_indicators=True,
+                    flat_time_window_edges=flat_time_window_edges, override_positions_list=a_positions_list, **common_plot_time_bins_multiple_kwargs, **a_debug_sequences_kwargs,
+                )        
+                merged_plots_out_dict[k] = an_out.plots
+        else:
+            # ax_dict["ax_label_ungrouped_seq"].text(0.5, 0.5, "Line1\nLine2", ha="center", va="center")
+            # ax_dict["ax_label_grouped_seq"].text(0.5, 0.5, "Line1\nLine2", ha="center", va="center")
+            # ax_dict["ax_label_merged_grouped_seq"].text(0.5, 0.5, longest_seq_length_multiline_label_str, ha="center", va="center")
 
-        # out3: MatplotlibRenderPlots = self.plot_time_bins_multiple(num='debug_plot_merged_time_binned_positions', ax=ax_dict["ax_grouped_seq"], enable_position_difference_indicators=True,
-        #     flat_time_window_edges=flat_time_window_edges, subsequence_line_color_alpha=0.95, arrow_alpha=0.9, 
-        # )
-        # ax = out.ax
-        if enable_axes_position_debug_colors:
-            # Assign colors to each axis to visualize their positions
-            ax_dict["ax_ungrouped_seq"].set_facecolor("lightblue")  # Light blue for the ungrouped sequence axis
-            ax_dict["ax_label_ungrouped_seq"].set_facecolor("lightgreen")  # Light green for the corresponding label axis
-            ax_dict["ax_grouped_seq"].set_facecolor("lightcoral")  # Light coral for the grouped sequence axis
-            # ax_dict["ax_label_grouped_seq"].set_facecolor("wheat")  # Wheat for the corresponding label axis
-            # ax_dict["ax_merged_grouped_seq"].set_facecolor("lavender")  # Lavender for the merged grouped sequence axis
-            # ax_dict["ax_label_merged_grouped_seq"].set_facecolor("peachpuff")  # Peach puff for the corresponding label axis
+
+            # Set text aligned to the top of the axes and centered horizontally
+            # for a_label_ax_name in label_ax_names:
+            #     ax_dict[a_label_ax_name].text(0.5, 1.0, "Line1\nLine2", ha="left", va="top", transform=ax_dict[a_label_ax_name].transAxes) ## setup default
+
+            # ax_dict["ax_label_ungrouped_seq"].text(0.5, 1.0, "Line1\nLine2", ha="left", va="top", transform=ax_dict["ax_label_ungrouped_seq"].transAxes)
+            # ax_dict["ax_label_grouped_seq"].text(0.5, 1.0, "Line1\nLine2", ha="left", va="top", transform=ax_dict["ax_label_grouped_seq"].transAxes)
+            ax_dict["ax_label_merged_grouped_seq"].text(0.5, 1.0, longest_seq_length_multiline_label_str, ha="left", va="top", transform=ax_dict["ax_label_merged_grouped_seq"].transAxes)
+            split_most_likely_positions_arrays = deepcopy(self.flat_positions) ## unsplit positions
+            pre_partitioned_debug_sequences_kwargs = dict(sequence_position_hlines_kwargs=dict(linewidth=2, linestyle=linestyle, zorder=10, alpha=1.0), # high-zorder to place it on-top, linestyle is "densely-dashed"
+                split_vlines_kwargs = dict(should_skip=False),
+                time_bin_edges_vlines_kwargs = dict(should_skip=False),
+                direction_change_lines_kwargs = dict(should_skip=True),
+                intrusion_time_bin_shading_kwargs = dict(should_skip=True),
+                main_sequence_position_dots_kwargs = dict(should_skip=True),
+            )
+            
+            # out: MatplotlibRenderPlots = SubsequencesPartitioningResult._debug_plot_time_bins_multiple(positions_list=split_most_likely_positions_arrays, ax=ax_dict["ax_ungrouped_seq"])
+            out: MatplotlibRenderPlots = self.plot_time_bins_multiple(num='debug_plot_merged_time_binned_positions', ax=ax_dict["ax_ungrouped_seq"], enable_position_difference_indicators=True,
+                flat_time_window_edges=flat_time_window_edges, override_positions_list=split_most_likely_positions_arrays, **common_plot_time_bins_multiple_kwargs, **pre_partitioned_debug_sequences_kwargs,
+            )
+            merged_plots_out_dict["ax_ungrouped_seq"] = out.plots
+            ## Add initially-sequenced result:
+
+            
+            split_positions_arrays = deepcopy(self.split_positions_arrays)
+            out2: MatplotlibRenderPlots = self.plot_time_bins_multiple(num='debug_plot_merged_time_binned_positions', ax=ax_dict["ax_grouped_seq"], enable_position_difference_indicators=True,
+                flat_time_window_edges=flat_time_window_edges, override_positions_list=split_positions_arrays, **common_plot_time_bins_multiple_kwargs, **pre_merged_debug_sequences_kwargs,
+                # sequence_position_hlines_kwargs=dict(linewidth=3, linestyle='-', zorder=11, alpha=1.0),
+            )
+            merged_plots_out_dict["ax_grouped_seq"] = out2.plots
+            
+            #(offset, (on_off_seq)). For example, (0, (3, 10, 1, 15)) means (3pt line, 10pt space, 1pt line, 15pt space) with no offset, while (5, (10, 3)), means (10pt line, 3pt space), but skip the first 5pt line.
+            # linestyle = (0, (5, 1))
+            # linestyle = (0, (1, 1)) # dots with 1pt dot, 0.5pt space
+            # linestyle = '-'
+            # Plot only the positions themselves, as dotted overlaying lines
+
+            ## Add re-sequenced (merged) result:
+            a_debug_sequences_kwargs = deepcopy(pre_merged_debug_sequences_kwargs) | dict()
+            merged_split_positions_arrays = deepcopy(self.merged_split_positions_arrays)
+            an_out: MatplotlibRenderPlots = self.plot_time_bins_multiple(num='debug_plot_merged_time_binned_positions', ax=ax_dict["ax_merged_grouped_seq"], enable_position_difference_indicators=True,
+                flat_time_window_edges=flat_time_window_edges, override_positions_list=merged_split_positions_arrays, **common_plot_time_bins_multiple_kwargs, **a_debug_sequences_kwargs,
+            )        
+            merged_plots_out_dict["ax_merged_grouped_seq"] = an_out.plots
+            
+            # out.plots = merged_plots_out_dict ## set main plots to the dict of plots
+
+            # out3: MatplotlibRenderPlots = self.plot_time_bins_multiple(num='debug_plot_merged_time_binned_positions', ax=ax_dict["ax_grouped_seq"], enable_position_difference_indicators=True,
+            #     flat_time_window_edges=flat_time_window_edges, subsequence_line_color_alpha=0.95, arrow_alpha=0.9, 
+            # )
+            # ax = out.ax
+            if enable_axes_position_debug_colors:
+                # Assign colors to each axis to visualize their positions
+                ax_dict["ax_ungrouped_seq"].set_facecolor("lightblue")  # Light blue for the ungrouped sequence axis
+                ax_dict["ax_label_ungrouped_seq"].set_facecolor("lightgreen")  # Light green for the corresponding label axis
+                ax_dict["ax_grouped_seq"].set_facecolor("lightcoral")  # Light coral for the grouped sequence axis
+                # ax_dict["ax_label_grouped_seq"].set_facecolor("wheat")  # Wheat for the corresponding label axis
+                # ax_dict["ax_merged_grouped_seq"].set_facecolor("lavender")  # Lavender for the merged grouped sequence axis
+                # ax_dict["ax_label_merged_grouped_seq"].set_facecolor("peachpuff")  # Peach puff for the corresponding label axis
 
         merged_out = MatplotlibRenderPlots(name='merged', figures=[fig, ], ax_dict=ax_dict, plots=merged_plots_out_dict)
 
@@ -2330,7 +2362,7 @@ class SequenceScoringComputations:
             return 0.0 # single bin sequences have no coverage
         
         possible_track_pos_bounds = [np.min(pos_bin_edges), np.max(pos_bin_edges)] # [37.0773897438341, 253.98616538463315]
-        possible_track_pos_range: float = np.abs(possible_track_pos_bounds[1] - possible_track_pos_bounds[0])
+        possible_track_pos_range: float = np.abs(possible_track_pos_bounds[1] - possible_track_pos_bounds[0]) ## analagous to length
 
         # sequence_pos_bounds = [np.min(positions), np.max(positions)] # [37.0773897438341, 253.98616538463315]
 

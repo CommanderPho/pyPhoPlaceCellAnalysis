@@ -169,6 +169,8 @@ def classify_x_position(x, rects) -> "TrackPositionClassification":
 
 
 
+
+
 @function_attributes(short_name=None, tags=['graphics', 'track', 'shape', 'rendering'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-07 12:13', related_items=[])
 @define(slots=False)
 class LinearTrackDimensions:
@@ -775,6 +777,25 @@ class LinearTrackInstance:
 
     def is_on_endcap(self, points):
         return np.array([self.classify_x_position(test_x).is_endcap for test_x in points])
+
+    def build_x_position_classification_df(self, x_arr: NDArray) -> "TrackPositionClassification":
+        """ Builds a df with a row for every position passed in x_arr that classifies it in relation to the track
+        
+        Usage:
+            from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
+
+            long_track_inst, short_track_inst = LinearTrackInstance.init_tracks_from_session_config(curr_active_pipeline.sess.config)
+            long_track_inst
+            # track_templates.get_track_length_dict()
+
+            pos_bin_edges = deepcopy(track_templates.get_decoders_dict()['long_LR'].xbin_centers)
+            pos_bin_classification_df: pd.DataFrame = long_track_inst.build_x_position_classification_df(x_arr=pos_bin_edges)
+            pos_bin_classification_df
+        """
+        is_pos_bin_endcap = [self.classify_x_position(x).is_endcap for x in x_arr]
+        is_pos_bin_on_maze = [self.classify_x_position(x).is_on_maze for x in x_arr]
+
+        return pd.DataFrame({'x': deepcopy(x_arr), 'is_endcap': is_pos_bin_endcap, 'is_on_maze': is_pos_bin_on_maze})
 
 
     def plot_rects(self, plot_item, matplotlib_rect_kwargs_override=None):
