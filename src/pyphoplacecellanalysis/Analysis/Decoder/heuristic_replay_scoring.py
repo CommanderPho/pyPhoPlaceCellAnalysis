@@ -443,11 +443,6 @@ class SubsequencesPartitioningResult(ComputedResult):
             return int(num_longest_subsequence_good_values)
         else:
             all_subsequence_values_count_dict = self.subsequences_df[['n_intrusion_bins', 'len', 'len_excluding_repeats', 'len_excluding_intrusions', 'len_excluding_both']].sum(axis='index').to_dict()
-            # total_num_all_good_values = all_subsequence_values_count_dict['len']
-            # total_num_all_good_values = all_subsequence_values_count_dict['len_excluding_repeats']
-            # total_num_all_good_values = all_subsequence_values_count_dict['len_excluding_intrusions']
-            # total_num_all_good_values = all_subsequence_values_count_dict['len_excluding_both']
-            # n_intrusion_bins = all_subsequence_values_count_dict['n_intrusion_bins']
 
             ## Compensate for repeating bins, not counting them towards the score but also not against.
             if should_ignore_intrusion_bins:

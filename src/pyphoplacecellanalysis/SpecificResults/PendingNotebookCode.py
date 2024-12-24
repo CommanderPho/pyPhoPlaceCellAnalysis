@@ -64,7 +64,7 @@ import numpy as np
 
 
 class InteractivePlot:
-    """ 2024-12-23 - Add bin selection 
+    """ 2024-12-23 - Add bin selection to a matplotlib plot to allow selecting the desired main sequence position bins for heuristic analysis
 
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import InteractivePlot
     
