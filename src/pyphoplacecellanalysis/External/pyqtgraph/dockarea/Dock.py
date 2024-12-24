@@ -1,18 +1,19 @@
-from typing import Optional
+from typing import Optional, Callable
 import warnings
-
+from attrs import define, field, Factory
 from ..Qt import QtCore, QtGui, QtWidgets
 from ..widgets.VerticalLabel import VerticalLabel
 from .DockDrop import DockDrop
 
 
+@define(slots=False)
 class DockDisplayConfig(object):
     """Holds the display and configuration options for a Dock, such as how to format its title bar (color and font), whether it's closable, etc."""
-    def __init__(self, showCloseButton=True, fontSize='10px', corner_radius='2px'):
-        super(DockDisplayConfig, self).__init__()
-        self.fontSize = fontSize
-        self.showCloseButton = showCloseButton
-        self.corner_radius = corner_radius
+    showCloseButton: bool = field(default=True)
+    fontSize: str = field(default='10px')
+    corner_radius: str = field(default='2px')
+    # fontSize: str = field(default='10px')
+    custom_get_stylesheet_fn: Callable = field(default=None) #(self, orientation, is_dim)
         
     def get_colors(self, orientation, is_dim):
         """ point of customization """
@@ -36,7 +37,6 @@ class DockDisplayConfig(object):
         fg_color, bg_color, border_color = self.get_colors(orientation, is_dim)
 
         if orientation == 'vertical':
-        
             # """
             #     padding-top: 3px;
             #     padding-bottom: 3px;
@@ -352,7 +352,7 @@ class DockLabel(VerticalLabel):
         self.updateStyle()
         self.setAutoFillBackground(False)
         self.mouseMoved = False
-
+        self.setToolTip(self.text())
         self.closeButton = None
         if display_config.showCloseButton:
             self.closeButton = QtWidgets.QToolButton(self)
