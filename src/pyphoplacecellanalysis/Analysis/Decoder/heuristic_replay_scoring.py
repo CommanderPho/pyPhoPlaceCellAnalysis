@@ -3840,7 +3840,7 @@ class SubsequenceDetectionSamples:
         return all_example_dict
 
     @classmethod
-    def build_test_results_dict(cls, pos_bin_edges: NDArray, max_ignore_bins: int = 2, same_thresh: float = 4, max_jump_distance_cm: float=60.0, decoder_track_length: float = 214.0, debug_print=False, test_dict=None, **kwargs):
+    def build_test_results_dict(cls, pos_bin_edges: NDArray, max_ignore_bins: int = 2, same_thresh: float = 4, max_jump_distance_cm: float=60.0, decoder_track_length: float = 214.0, debug_print=False, test_dict=None, desired_selected_indicies_dict=None, **kwargs):
         """ runs all tests
         
         test_dict = SubsequenceDetectionSamples.get_all_example_dict()
@@ -3866,7 +3866,7 @@ class SubsequenceDetectionSamples:
         
         SubsequencesPartitioningResult_common_init_kwargs = dict(same_thresh=same_thresh, max_ignore_bins=max_ignore_bins, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(pos_bin_edges), debug_print=debug_print)
 
-        partitioned_results = {}
+        partitioned_results_dict: Dict[str, SubsequencesPartitioningResult] = {}
         _all_examples_scores_dict = {}
         
         for a_group_name, group_items in test_dict.items():
@@ -3874,12 +3874,34 @@ class SubsequenceDetectionSamples:
                 # print(f'a_group_name: {a_group_name}')
                 a_partitioner: SubsequencesPartitioningResult = SubsequenceDetectionSamples.build_partition_sequence(a_pos_tuple, **SubsequencesPartitioningResult_common_init_kwargs)
                 a_ground_truth.arr = deepcopy(a_partitioner.flat_positions)
-                partitioned_results[f"{a_group_name}[{i}]"] = a_partitioner
+                partitioned_results_dict[f"{a_group_name}[{i}]"] = a_partitioner
                 _all_examples_scores_dict[f"{a_group_name}[{i}]"] = a_partitioner.get_results_dict(decoder_track_length=decoder_track_length)
                 
         ## END for a_group_name, group_items....
 
         ## OUTPUTS: partitioned_results
+
+        _comparison_with_desired_dict = {}
+        if desired_selected_indicies_dict is not None:
+            ## have desired indicies corresponding to each
+            for a_name, a_partition_result in partitioned_results_dict.items():
+                if a_name in desired_selected_indicies_dict:
+                    desired_flat_indicies = np.zeros_like(a_partition_result.flat_position_indicies).astype(float)
+                    # flat_indicies = deepcopy(a_partition_result.flat_position_indicies)
+                    desired_indicies = desired_selected_indicies_dict[a_name]
+                    desired_flat_indicies[desired_indicies] = 1.0
+                    ## computed:
+                    computed_flat_indicies = np.zeros_like(a_partition_result.flat_position_indicies).astype(float)
+                    computed_main_sequence_indicies = deepcopy(a_partition_result.longest_sequence_flatindicies)
+                    computed_flat_indicies[computed_main_sequence_indicies] = 1.0
+                    ## OUTPUTS: desired_flat_indicies, computed_flat_indicies
+                    ## compute the percent overlap:
+                    desired_match_score: float = np.dot(computed_flat_indicies, desired_flat_indicies) / float(a_partition_result.n_flat_position_bins)
+                    print(f'desired_match_score: {desired_match_score}')
+                    _comparison_with_desired_dict[a_name] = desired_match_score
+                    _all_examples_scores_dict[a_name].update(desired_match_score=desired_match_score)
+                else:
+                    _all_examples_scores_dict[a_name].update(desired_match_score=np.nan)
 
         # ## INPUTS: partitioned_results, decoder_track_length
         # all_subseq_partitioning_score_computations_fn_dict = SubsequencesPartitioningResultScoringComputations.build_all_bin_wise_subseq_partitioning_computation_fn_dict()
@@ -3896,7 +3918,9 @@ class SubsequenceDetectionSamples:
         _new_scores_df =  pd.DataFrame(_all_examples_scores_dict).T
         _new_scores_df[integer_column_names] = _new_scores_df[integer_column_names].astype(int)
 
-        return test_dict, partitioned_results, _new_scores_df, _all_examples_scores_dict
+                    
+
+        return test_dict, partitioned_results_dict, _new_scores_df, _all_examples_scores_dict, _comparison_with_desired_dict
     
 
     @function_attributes(short_name=None, tags=['plotting', 'tabbed', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-20 17:30', related_items=[])
