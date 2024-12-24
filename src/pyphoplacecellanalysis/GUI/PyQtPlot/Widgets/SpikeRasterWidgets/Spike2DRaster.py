@@ -801,6 +801,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         
         return restore_dict
             
+
     def perform_restore_renderables(self, saved_state_active_renderables, debug_print=True):
         """ restore the renderables state saved by `saved_state_active_renderables = save_state_active_renderables(...)` 
         TODO: not yet complete

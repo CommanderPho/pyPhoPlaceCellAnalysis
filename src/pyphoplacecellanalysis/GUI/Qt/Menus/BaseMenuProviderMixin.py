@@ -65,6 +65,13 @@ class BaseMenuCommand:
         self.log_command(*args, **kwargs) # adds this command to the `menu_action_history_list`    
         raise NotImplementedError # implementors must override        
     
+    def remove(self, *args, **kwargs) -> None:
+        """ Removes any added docks/items """
+        # self.log_command(*args, **kwargs) # pops this command from the `menu_action_history_list`    
+        raise NotImplementedError # implementors must override        
+    
+
+
     def __call__(self, *args, **kwds):
         return self.execute(*args, **kwds)
     

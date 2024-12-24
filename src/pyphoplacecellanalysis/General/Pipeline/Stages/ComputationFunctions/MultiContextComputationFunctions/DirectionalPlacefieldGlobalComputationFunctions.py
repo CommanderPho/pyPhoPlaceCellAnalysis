@@ -52,6 +52,9 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import 
 
 decoder_name_str: TypeAlias = str # an string name of a particular decoder, such as 'Long_LR' or 'Short_RL'
 
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
+
 if TYPE_CHECKING:
     ## typehinting only imports here
     # from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, SingleEpochDecodedResult #typehinting only
@@ -7261,11 +7264,11 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 # ==================================================================================================================== #
 from pyphoplacecellanalysis.GUI.Qt.Menus.BaseMenuProviderMixin import BaseMenuCommand
 
-
+@metadata_attributes(short_name=None, tags=['epoch', 'decode'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2024-01-17 00:00', related_items=[])
 @define(slots=False)
 class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
     """ 2024-01-17 
-    Adds four rows to the SpikeRaster2D showing the continuously decoded posterior for each of the four 1D decoders
+    Adds four rows to the SpikeRaster2D showing the decoded posteriors for the PBE epochs for each of the four 1D decoders
     These are the ones Kamran wants to be normalized differently.
     
     
@@ -7291,7 +7294,7 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
 
         ## ✅ Add a new row for each of the four 1D directional decoders:
         identifier_name: str = f'{a_decoder_name}_ContinuousDecode'
-        print(f'identifier_name: {identifier_name}')
+        # print(f'identifier_name: {identifier_name}')
         widget, matplotlib_fig, matplotlib_fig_axes = active_2d_plot.add_new_matplotlib_render_plot_widget(name=identifier_name, dockSize=(65, 200), display_config=a_dock_config)
         an_ax = matplotlib_fig_axes[0]
 
@@ -7355,7 +7358,7 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
         # continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
         time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
-        print(f'time_bin_size: {time_bin_size}')
+        # print(f'time_bin_size: {time_bin_size}')
         continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.most_recent_continuously_decoded_dict
         all_directional_continuously_decoded_dict = continuously_decoded_dict or {}
 
@@ -7369,12 +7372,8 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
 
         for a_decoder_name, a_decoder in all_directional_pf1D_Decoder_dict.items():
             a_dock_config = dock_configs[a_decoder_name]
-            
-            
             ## renormalize all the posteriors
-
-
-
+            
             a_decoded_result = all_directional_continuously_decoded_dict.get(a_decoder_name, None) # already decoded
             _out_tuple = cls._perform_add_new_decoded_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=a_dock_config, a_decoder_name=a_decoder_name, a_decoder=a_decoder, a_decoded_result=a_decoded_result)
             # identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = _out_tuple
@@ -7402,7 +7401,6 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
 
     def execute(self, *args, **kwargs) -> None:
         print(f'menu execute(): {self}')
-        self.log_command(*args, **kwargs) # adds this command to the `menu_action_history_list` 
         ## To begin, the destination plot must have a matplotlib widget plot to render to:
         # print(f'AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand.execute(...)')
         active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
@@ -7420,6 +7418,7 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         
 
 
+@metadata_attributes(short_name=None, tags=['epochs', 'decoder'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2024-01-22 00:00', related_items=[])
 @define(slots=False)
 class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
     """ 2024-01-22 
@@ -7438,7 +7437,7 @@ class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
     _context = field(default=None, alias="active_context")
     _display_output = field(default=Factory(dict))
 
-    @function_attributes(short_name=None, tags=['row', 'posterior'], input_requires=[], output_provides=[], uses=['add_new_matplotlib_render_plot_widget'], used_by=[], creation_date='2024-12-18 08:53', related_items=[])
+    @function_attributes(short_name=None, tags=['row', 'posterior'], input_requires=[], output_provides=[], uses=['add_new_matplotlib_render_plot_widget', 'plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2024-12-18 08:53', related_items=[])
     @classmethod
     def _perform_add_new_decoded_posterior_row(cls, curr_active_pipeline, active_2d_plot, a_dock_config, a_decoder_name: str, a_pseudo2D_decoder, time_window_centers, a_1D_posterior):
         """ used with `add_pseudo2D_decoder_decoded_epochs` - adds a single decoded row to the matplotlib dynamic output
@@ -7467,7 +7466,6 @@ class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         # time_window_centers = deepcopy(active_decoder.time_window_centers)
         
 
-
         # active_most_likely_positions = active_marginals.most_likely_positions_1D # Raw decoded positions
         active_most_likely_positions = None
         # active_posterior = active_marginals.p_x_given_n
@@ -7484,10 +7482,10 @@ class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
             # cmap = ColormapHelpers.create_colormap_transparent_below_value(active_cmap, low_value_cuttoff=0.1)
             # cmap = FixedCustomColormaps.get_custom_greyscale_with_low_values_dropped_cmap(low_value_cutoff=0.01, full_opacity_threshold=0.25)
             # active_cmap = FixedCustomColormaps.get_custom_orange_with_low_values_dropped_cmap()
-        )	
+        )
 
         ## Actual plotting portion:
-        fig, curr_ax = plot_1D_most_likely_position_comparsions(None, time_window_centers=time_window_centers, xbin=active_bins,
+        fig, an_ax = plot_1D_most_likely_position_comparsions(None, time_window_centers=time_window_centers, xbin=active_bins,
                                                                 posterior=active_posterior,
                                                                 active_most_likely_positions_1D=active_most_likely_positions,
                                                                 ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
@@ -7512,8 +7510,9 @@ class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
 
         ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
         directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+        all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
         pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
-        
+    
         # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
         # continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
         time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
@@ -7580,8 +7579,22 @@ class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         print(f'\t AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand.execute() is done.')
 
 
+    def remove(self, *args, **kwargs) -> None:
+        """ Removes any added docks/items """
+        active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
+        # self.log_command(*args, **kwargs) # pops this command from the `menu_action_history_list`
+        for identifier_name, an_output_tuple in self._display_output.items():
+            # identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = an_output_tuple
+            # widget, matplotlib_fig, matplotlib_fig_axes = active_2d_plot.add_new_matplotlib_render_plot_widget(name=identifier_name, dockSize=(65, 200), display_config=a_dock_config)
+            active_2d_plot.remove_matplotlib_render_plot_widget(identifier_name)
 
 
+        # raise NotImplementedError # implementors must override      
+    
+
+
+
+@metadata_attributes(short_name=None, tags=['epoch', 'marginal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-24 15:47', related_items=[])
 @define(slots=False)
 class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand):
     """ 2024-01-23
@@ -7638,6 +7651,7 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewPseudo2DDecodedEpoc
         active_2d_plot.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
         return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes
     
+
     @classmethod
     def add_pseudo2D_decoder_decoded_epoch_marginals(cls, curr_active_pipeline, active_2d_plot, debug_print=False):
         """ adds the decoded epochs for the long/short decoder from the global_computation_results as new matplotlib plot rows. """
