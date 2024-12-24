@@ -152,7 +152,6 @@ class SubsequencesPartitioningResult(ComputedResult):
     _VersionedResultMixin_version: str = "2024.12.16_0" # to be updated in your IMPLEMENTOR to indicate its version
     
     flat_positions: NDArray = serialized_field(metadata={'desc': "the list of most-likely positions (in [cm]) for each time bin in a decoded posterior"})
-
     first_order_diff_lst: List = non_serialized_field() # the original list
 
     pos_bin_edges: NDArray = serialized_field(metadata={'desc': "the total number of unique position bins along the track, unrelated to the number of *positions* in `flat_positions` "})
@@ -179,10 +178,13 @@ class SubsequencesPartitioningResult(ComputedResult):
     split_positions_arrays: List[NDArray] = non_serialized_field(default=None, repr=False, metadata={'desc': "the positions in `flat_positions` but partitioned into subsequences determined by changes in direction exceeding `self.same_thresh`"})
     split_position_flatindicies_arrays: List[NDArray] = non_serialized_field(default=None, repr=False, metadata={'desc': "the positions in `flat_positions` but partitioned into subsequences determined by changes in direction exceeding `self.same_thresh`"})
 
-
     merged_split_positions_arrays: List[NDArray] = non_serialized_field(default=None, metadata={'desc': "the subsequences from `split_positions_arrays` but merged into larger subsequences by briding-over (ignoring) sequences of intrusive tbins (with the max ignored length specified by `self.max_ignore_bins`"})
     merged_split_position_flatindicies_arrays: List[NDArray] = non_serialized_field(default=None, metadata={'desc': "the subsequences from `split_positions_arrays` but merged into larger subsequences by briding-over (ignoring) sequences of intrusive tbins (with the max ignored length specified by `self.max_ignore_bins`"})
-    
+
+
+    _debug_steps_split_positions_arrays: Dict[str, List[NDArray]] = non_serialized_field(default=Factory(dict), repr=False, metadata={'desc': "intermediate split positions"})
+
+
     ## Info Dataframes:
     position_bins_info_df: pd.DataFrame = non_serialized_field(default=None, repr=False, metadata={'desc': "one entry for each entry in `flat_positions`"})
     position_changes_info_df: pd.DataFrame = non_serialized_field(default=None, repr=False, metadata={'desc': "one change for each entry in `first_order_diff_lst`"})
@@ -199,6 +201,8 @@ class SubsequencesPartitioningResult(ComputedResult):
 
         if isinstance(self.flat_positions, list):
             self.flat_positions = np.array(self.flat_positions)        
+
+        self._debug_steps_split_positions_arrays['initial'] = deepcopy([self.flat_positions]) ## a list containing only the flat positions
 
         if (self.position_bins_info_df is None) or (self.position_changes_info_df is None):
             ## initialize new
@@ -672,11 +676,12 @@ class SubsequencesPartitioningResult(ComputedResult):
         
         # list_parts = [np.array(l) for l in list_parts]
         
-        return dict(flat_positions=deepcopy(a_most_likely_positions_list), first_order_diff_lst=first_order_diff_lst, diff_split_indicies=diff_split_indicies, split_indicies=split_indicies, low_magnitude_change_indicies=sub_change_threshold_change_indicies, same_thresh=same_thresh, **kwargs)
+        return dict(flat_positions=deepcopy(a_most_likely_positions_list), first_order_diff_lst=first_order_diff_lst, diff_split_indicies=diff_split_indicies, split_indicies=split_indicies,
+                     low_magnitude_change_indicies=sub_change_threshold_change_indicies, same_thresh=same_thresh, **kwargs)
      
 
     @function_attributes(short_name=None, tags=['merge', '_compute_sequences_spanning_ignored_intrusions', 'PhoOriginal'], input_requires=['self.split_positions_arrays'], output_provides=['self.merged_split_positions_arrays', 'self.merged_split_position_flatindicies_arrays'], uses=['_compute_sequences_spanning_ignored_intrusions'], used_by=['compute'], creation_date='2024-11-27 08:17', related_items=['_compute_sequences_spanning_ignored_intrusions'])
-    def merge_over_ignored_intrusions(self, max_ignore_bins: int = 2, max_jump_distance_cm: Optional[float]=None, should_skip_epoch_with_only_short_subsequences: bool = False, debug_print=False):
+    def merge_over_ignored_intrusions(self, max_ignore_bins: int = 2, max_jump_distance_cm: Optional[float]=None, should_skip_epoch_with_only_short_subsequences: bool = False, debug_print=False, enable_debug_step_logging: bool=True):
         """ an "intrusion" refers to one or more time bins that interrupt a longer sequence that would be monotonic if the intrusions were removed.
 
         The quintessential example would be a straight ramp that is interrupted by a single point discontinuity intrusion.  
@@ -956,6 +961,11 @@ class SubsequencesPartitioningResult(ComputedResult):
         self.merged_split_positions_arrays = deepcopy(final_out_subsequences)
         self.merged_split_position_flatindicies_arrays = NumpyHelpers.split(self.flat_position_indicies, self.merged_split_indicies) 
         
+
+        if enable_debug_step_logging:
+            self._debug_steps_split_positions_arrays['merged'] = deepcopy(self.merged_split_positions_arrays)
+            
+
         # self.bridged_intrusion_bin_indicies = final_intrusion_idxs
         
         if len(final_intrusion_idxs) > 0:
@@ -966,7 +976,7 @@ class SubsequencesPartitioningResult(ComputedResult):
 
 
     @function_attributes(short_name=None, tags=['partition'], input_requires=['self.merged_split_positions_arrays'], output_provides=['self.merged_split_positions_arrays'], uses=[], used_by=['compute'], creation_date='2024-12-11 23:42', related_items=[])
-    def enforce_max_jump_distance(self, max_jump_distance_cm: float = 60.0, debug_print=False):
+    def enforce_max_jump_distance(self, max_jump_distance_cm: float = 60.0, debug_print=False, enable_debug_step_logging: bool=True):
         """ an "intrusion" refers to one or more time bins that interrupt a longer sequence that would be monotonic if the intrusions were removed.
 
         The quintessential example would be a straight ramp that is interrupted by a single point discontinuity intrusion.  
@@ -1070,11 +1080,16 @@ class SubsequencesPartitioningResult(ComputedResult):
             self.merged_split_positions_arrays = deepcopy(new_active_split_positions_arrays)
             self.merged_split_position_flatindicies_arrays = NumpyHelpers.split(self.flat_position_indicies, self.merged_split_indicies) 
             
+
+        if enable_debug_step_logging:
+            self._debug_steps_split_positions_arrays['post_enforce_max_jump_distance'] = deepcopy(new_active_split_positions_arrays)
+
+
         return new_active_split_positions_arrays, first_order_diff_value_exceeeding_jump_distance_indicies
     
        
     @function_attributes(short_name=None, tags=['partition', 'max_jump_distance', 'split', 'subsequences'], input_requires=['self.merged_split_positions_arrays','self.position_bins_info_df'], output_provides=['self.merged_split_positions_arrays'], uses=[], used_by=['compute'], creation_date='2024-12-17 14:03', related_items=[])
-    def new_simple_split_main_subsequence_on_max_jump_distance(self, debug_print=False):
+    def new_simple_split_main_subsequence_on_max_jump_distance(self, debug_print=False, enable_debug_step_logging: bool=True):
         """
         
         Replaces: `enforce_max_jump_distance`
@@ -1144,6 +1159,10 @@ class SubsequencesPartitioningResult(ComputedResult):
         else:
             new_active_split_positions_arrays = deepcopy(self.merged_split_positions_arrays)
             exceeding_jump_distance_split_indicies = [] ## no changes
+
+        if enable_debug_step_logging:
+            self._debug_steps_split_positions_arrays['post_new_simple_split_main_subsequence_on_max_jump_distance'] = deepcopy(new_active_split_positions_arrays)
+
 
         return new_active_split_positions_arrays, exceeding_jump_distance_split_indicies
     
@@ -1255,8 +1274,11 @@ class SubsequencesPartitioningResult(ComputedResult):
         
 
     @function_attributes(short_name=None, tags=['compute', 'MAIN'], input_requires=[], output_provides=[], uses=['partition_subsequences_ignoring_repeated_similar_positions', 'merge_over_ignored_intrusions', 'enforce_max_jump_distance', 'rebuild_sequence_info_df'], used_by=['init_from_positions_list'], creation_date='2024-12-11 23:43', related_items=[])
-    def compute(self, debug_print=False):
-        """ recomputes all """
+    def compute(self, debug_print=False, enable_debug_step_logging: bool=True):
+        """ recomputes all, starting from self.flat_positions only
+        """
+        if enable_debug_step_logging:
+            self._debug_steps_split_positions_arrays['initial'] = deepcopy([self.flat_positions]) ## list with just flat positions in it
         
         partition_result_dict = self.partition_subsequences_ignoring_repeated_similar_positions(a_most_likely_positions_list=self.flat_positions, flat_time_window_centers=self.flat_time_window_centers, flat_time_window_edges=self.flat_time_window_edges, 
                                                                                                 same_thresh=self.same_thresh, max_ignore_bins=self.max_ignore_bins, debug_print=debug_print)  # Add 1 because np.diff reduces the index by 1
@@ -1273,18 +1295,24 @@ class SubsequencesPartitioningResult(ComputedResult):
         split_most_likely_positions_arrays = [x for x in split_most_likely_positions_arrays if len(x) > 0] ## only non-empty subsequences
         self.split_positions_arrays = split_most_likely_positions_arrays
         self.split_position_flatindicies_arrays = NumpyHelpers.split(self.flat_position_indicies, deepcopy(self.split_indicies)) # exclude empty subsequences
-        
+
+        if enable_debug_step_logging:
+            self._debug_steps_split_positions_arrays['partition_ignoring_repeated'] = deepcopy(self.split_positions_arrays)
+
+
         
         #TODO 2024-12-13 12:26: - [ ] Are `self.split_indicies` or the merged equiv wrong if we remove empty subsequences?
         
         # Set `merged_split_positions_arrays` ________________________________________________________________________________ #
-        _tmp_merge_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_values_list) = self.merge_over_ignored_intrusions(max_ignore_bins=self.max_ignore_bins, max_jump_distance_cm=self.max_jump_distance_cm, debug_print=debug_print)
+        _tmp_merge_split_positions_arrays, final_out_subsequences, (subsequence_replace_dict, subsequences_to_add, subsequences_to_remove, final_intrusion_values_list) = self.merge_over_ignored_intrusions(max_ignore_bins=self.max_ignore_bins, max_jump_distance_cm=self.max_jump_distance_cm, debug_print=debug_print, enable_debug_step_logging=enable_debug_step_logging)
         # flat_positions_list = deepcopy(partition_result.flat_positions.tolist())
         self.bridged_intrusion_bin_indicies = deepcopy(final_intrusion_values_list) # np.array([flat_positions_list.index(v) for v in final_intrusion_idxs])
         
         if self.max_jump_distance_cm is not None:
             # new_merged_split_positions_arrays, first_order_diff_value_exceeeding_jump_distance_indicies = self.new_simple_split_main_subsequence_on_max_jump_distance(debug_print=debug_print)
-            new_merged_split_positions_arrays, first_order_diff_value_exceeeding_jump_distance_indicies = self.enforce_max_jump_distance(max_jump_distance_cm=self.max_jump_distance_cm, debug_print=debug_print)
+            new_merged_split_positions_arrays, first_order_diff_value_exceeeding_jump_distance_indicies = self.enforce_max_jump_distance(max_jump_distance_cm=self.max_jump_distance_cm, debug_print=debug_print, enable_debug_step_logging=enable_debug_step_logging)
+    
+
         else:
             first_order_diff_value_exceeeding_jump_distance_indicies = None
         
@@ -1305,10 +1333,13 @@ class SubsequencesPartitioningResult(ComputedResult):
 
         if self.max_jump_distance_cm is not None:
             ## updates self.merged_*
-            new_merged_split_positions_arrays, first_order_diff_value_exceeeding_jump_distance_indicies = self.new_simple_split_main_subsequence_on_max_jump_distance(debug_print=debug_print)
+            new_merged_split_positions_arrays, first_order_diff_value_exceeeding_jump_distance_indicies = self.new_simple_split_main_subsequence_on_max_jump_distance(debug_print=debug_print, enable_debug_step_logging=enable_debug_step_logging)
             self.position_bins_info_df, self.position_changes_info_df, self.subsequences_df = self.rebuild_sequence_info_df() ## update the dataframes and everything again
 
 
+        if enable_debug_step_logging:
+            self._debug_steps_split_positions_arrays['end_compute'] = deepcopy(self.merged_split_positions_arrays)
+        
         
 
 
@@ -1563,7 +1594,6 @@ class SubsequencesPartitioningResult(ComputedResult):
         """ returns summarized results for the subsequence partitioning
         
         """
-        a_partition_result = self
         # partition_result = SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list=SubsequenceDetectionSamples.most_likely_positions_bad_single_main_seq, **SubsequencesPartitioningResult_common_init_kwargs,)
         # Access the partitioned subsequences
         # subsequences = partition_result.split_positions_arrays
@@ -1579,7 +1609,7 @@ class SubsequencesPartitioningResult(ComputedResult):
         # }
 
         all_subseq_partitioning_score_computations_fn_dict = SubsequencesPartitioningResultScoringComputations.build_all_bin_wise_subseq_partitioning_computation_fn_dict()
-        results_dict = {score_computation_name:computation_fn(partition_result=a_partition_result, a_result=None, an_epoch_idx=-1, a_decoder_track_length=decoder_track_length, pos_bin_edges=a_partition_result.pos_bin_edges) for score_computation_name, computation_fn in all_subseq_partitioning_score_computations_fn_dict.items()}
+        results_dict = {score_computation_name:computation_fn(partition_result=self, a_result=None, an_epoch_idx=-1, a_decoder_track_length=decoder_track_length, pos_bin_edges=self.pos_bin_edges) for score_computation_name, computation_fn in all_subseq_partitioning_score_computations_fn_dict.items()}
         return results_dict
     
 
@@ -1588,7 +1618,7 @@ class SubsequencesPartitioningResult(ComputedResult):
     @classmethod
     def _debug_plot_time_bins_multiple(cls, positions_list, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True, defer_show: bool = False, flat_time_window_centers=None, flat_time_window_edges=None,
                                         enable_axes_formatting: bool = False,  arrow_alpha: float = 0.4, subsequence_line_color_alpha: float = 0.55, non_main_sequence_alpha_multiplier: float = 0.2, should_show_non_main_sequence_hlines: bool = False,
-                                        is_intrusion: Optional[NDArray] = None, direction_changes: Optional[NDArray] = None, position_info_df: Optional[pd.DataFrame]=None, position_changes_info_df: Optional[pd.DataFrame]=None, debug_print=False, **kwargs):
+                                        is_intrusion: Optional[NDArray] = None, direction_changes: Optional[NDArray] = None, position_info_df: Optional[pd.DataFrame]=None, position_changes_info_df: Optional[pd.DataFrame]=None, debug_print=False, y_lims=None, **kwargs):
             """
             Plots positions over fixed-width time bins with vertical lines separating each bin.
             Each sublist in positions_list is plotted in a different color.
@@ -1623,33 +1653,7 @@ class SubsequencesPartitioningResult(ComputedResult):
             subsequence_relative_bin_idx_labels_kwargs = dict(should_skip=False, should_skip_if_non_main_sequence=should_show_non_main_sequence_hlines,
                                                               subseq_idx_text_alpha = 0.95, subseq_idx_text_outline_color = ('color', 'color', 'color', 0.95), subsequence_idx_offset = 4.0) | kwargs.pop('subsequence_relative_bin_idx_labels_kwargs', {})
     
-
-
-            # def _helper_build_text_kwargs_outside_right(a_curr_ax):
-            #     """ Text kwargs to render outside and to the right of the axes. 
-            #     captures: found_matplotlib_font_name
-            #     """
-            #     a_curr_fig = a_curr_ax.get_figure()
-                
-            #     text_kwargs = dict(stroke_alpha=0.8, strokewidth=4, stroke_foreground='w', text_foreground=f'{cls.text_color}', font_size=9.5, text_alpha=0.75)
-
-            #     font_prop = font_manager.FontProperties(family=found_matplotlib_font_name, weight='bold')
-            #     text_kwargs['fontproperties'] = font_prop
-
-            #     # Positioning outside to the right:
-            #     text_kwargs |= dict(
-            #         loc='upper right',
-            #         horizontalalignment='left',
-            #         # horizontalalignment='right', # breaks it
-            #         bbox_to_anchor=(1.35, 1.0), bbox_transform=a_curr_ax.transAxes, transform=a_fig.transFigure, # Outside right, kinda working
-            #         # bbox_to_anchor=(1.0, 0.5), bbox_transform=a_fig.transFigure, transform=a_fig.transFigure, # Outside right, figure coordinates, fully working -- except for rows because they're all centered vertically w.r.t figure
-            #         # bbox_to_anchor=(0.95, curr_ax_top_edge), bbox_transform=a_curr_fig.transFigure, transform=a_curr_fig.transFigure, # Outside right, figure coordinates, fully working -- fixed rows
-            #         # bbox_to_anchor=(0.9, curr_ax_top_edge), bbox_transform=a_curr_fig.transFigure, transform=a_curr_fig.transFigure, # Outside right, figure coordinates, fully working -- except for rows because they're all centered vertically w.r.t figure
-            #     )
-            #     return text_kwargs
-        
             
-
             # Example override dict ______________________________________________________________________________________________ #
             # dict(
             #     split_vlines_kwargs = dict(color='black', linestyle='-', linewidth=1, should_skip=False),
@@ -1686,11 +1690,16 @@ class SubsequencesPartitioningResult(ComputedResult):
 
                 # Now, for each pair of adjacent positions within the group, draw arrows and labels
                 for i in range(num_positions - 1):
-                    delta_pos = subsequence_positions[i+1] - subsequence_positions[i]
-                    x0 = x_starts_subseq[i] + (bin_width / 2.0)
+                    delta_pos: float = subsequence_positions[i+1] - subsequence_positions[i]
+                    x0 = x_starts_subseq[i] + (bin_width / 2.0) ## Middle of the time bin
                     x1 = x_starts_subseq[i+1] + (bin_width / 2.0)
+                    # x0 = x_starts_subseq[i+1]  # Start arrow at the rising edge of the next bin
+                    # x1 = x_starts_subseq[i+1]
                     y0 = subsequence_positions[i]
                     y1 = subsequence_positions[i+1]
+
+                    # Draw a small open square at the start of the arrow
+                    # ax.plot(x0, y0, marker='s', markersize=5, markeredgewidth=1, fillstyle='none', color=arrow_color)
 
                     # Draw an arrow from (x0, y0) to (x1, y1)
                     arrow = ax.annotate(
@@ -1805,8 +1814,12 @@ class SubsequencesPartitioningResult(ComputedResult):
                 x_ends = x_bins[1:]
 
             # Calculate y-limits with padding
-            ymin = min(all_positions) - 10
-            ymax = max(all_positions) + 10
+            if y_lims is not None:
+                assert len(y_lims) == 2, f"y_lims: {y_lims}"
+                ymin, ymax = y_lims
+            else:
+                ymin = min(all_positions) - 10
+                ymax = max(all_positions) + 10
 
             # Calculate group lengths and group end indices
             group_lengths = (float(bin_width) * np.array([len(positions) for positions in positions_list]))
@@ -1976,6 +1989,11 @@ class SubsequencesPartitioningResult(ComputedResult):
                 # ax.set_xlim(0, N)
                 # ax.set_xticks(x_bins)
                 # ax.set_ylim(ymin, ymax)
+                
+            if y_lims is not None:
+                assert len(y_lims) == 2, f"y_lims: {y_lims}"
+                ymin, ymax = y_lims
+                ax.set_ylim(ymin, ymax)
 
             out = MatplotlibRenderPlots(name='test', figures=[fig, ], axes=ax, plots=out_dict, **kwargs)
             if not defer_show:
@@ -2012,6 +2030,8 @@ class SubsequencesPartitioningResult(ComputedResult):
         else:
             sorted_subsequence_idxs = None # use the default sorts
 
+        y_lims = (self.pos_bin_edges[0], self.pos_bin_edges[-1])
+        
         return self._debug_plot_time_bins_multiple(
             positions_list=override_positions_list,
             num=num,
@@ -2026,12 +2046,13 @@ class SubsequencesPartitioningResult(ComputedResult):
             direction_changes=direction_changes,  # Pass the direction change information
             position_info_df=self.position_bins_info_df, position_changes_info_df=self.position_changes_info_df, subsequences_df=self.subsequences_df,
             subsequence_len_sort_indicies=sorted_subsequence_idxs,
+            y_lims=y_lims,
             **kwargs
         )
 
 
 
-    def _plot_step_by_step_subsequence_partition_process(self, extant_fig=None, extant_ax_dict=None, **kwargs):
+    def _plot_step_by_step_subsequence_partition_process(self, extant_fig=None, extant_ax_dict=None, force_integer_x_axis_index: bool = True, **kwargs):
         """ diagnostic for debugging the step-by-step sequence partitioning heuristics 
         
         out: MatplotlibRenderPlots = partition_result._plot_step_by_step_subsequence_partition_process()
@@ -2046,11 +2067,30 @@ class SubsequencesPartitioningResult(ComputedResult):
         common_plot_time_bins_multiple_kwargs = dict(subsequence_line_color_alpha=0.95, arrow_alpha=0.4, enable_axes_formatting=True) | kwargs
         linestyle = '-'
 
+
+        # subplot_spec_list = [
+        #                 ["ax_ungrouped_seq", "ax_label_ungrouped_seq"],
+        #                 ["ax_grouped_seq", "ax_label_grouped_seq"],
+        #                 ["ax_merged_grouped_seq", "ax_label_merged_grouped_seq"],
+        #             ]
+        
+
+        subplot_spec_list = [
+                        ["ax_ungrouped_seq", "ax_label_ungrouped_seq"],
+                        ["ax_grouped_seq", "ax_label_grouped_seq"],
+                        ["ax_merged_grouped_seq", "ax_label_merged_grouped_seq"],
+                    ]
+        
+        label_ax_names: List[str] = [v[-1] for v in subplot_spec_list]
+        
+
+
+        fig_num = kwargs.pop('num', None)
         merged_plots_out_dict = {}
         if extant_ax_dict is None:
             if extant_fig is None:
                 ## needs create new fig
-                fig = plt.figure(layout="constrained", clear=True)
+                fig = plt.figure(layout="constrained", num=fig_num, clear=True)
                 ax_dict = None
             else:
                 ## already exists
@@ -2062,12 +2102,7 @@ class SubsequencesPartitioningResult(ComputedResult):
 
             if ax_dict is None:
                 ## create new axes                            
-                ax_dict = fig.subplot_mosaic(
-                    [
-                        ["ax_ungrouped_seq", "ax_label_ungrouped_seq"],
-                        ["ax_grouped_seq", "ax_label_grouped_seq"],
-                        ["ax_merged_grouped_seq", "ax_label_merged_grouped_seq"],
-                    ],
+                ax_dict = fig.subplot_mosaic(subplot_spec_list,
                     sharex=True, sharey=True,
                     gridspec_kw=dict(width_ratios=[6,2], wspace=0, hspace=0.15) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
                 )
@@ -2083,7 +2118,7 @@ class SubsequencesPartitioningResult(ComputedResult):
         # Assert.len_equals(t_bin_starts, required_length=self.n_flat_position_bins)
         # Assert.len_equals(t_bin_centers, required_length=self.n_flat_position_bins)
         # Assert.len_equals(t_bin_ends, required_length=self.n_flat_position_bins)
-        force_integer_x_axis_index: bool = True
+        
 
         if (not force_integer_x_axis_index) and (self.flat_time_window_edges is not None):
             flat_time_window_edges = deepcopy(self.flat_time_window_edges)
@@ -2098,10 +2133,11 @@ class SubsequencesPartitioningResult(ComputedResult):
         # ==================================================================================================================== #
         # Set up text label axes to the right of the plotting axes:                                                            #
         # ==================================================================================================================== #
-        ax_dict["ax_label_ungrouped_seq"].axis("off")
-        ax_dict["ax_label_grouped_seq"].axis("off")
-        ax_dict["ax_label_merged_grouped_seq"].axis("off")
-
+        # ax_dict["ax_label_ungrouped_seq"].axis("off")
+        # ax_dict["ax_label_grouped_seq"].axis("off")
+        # ax_dict["ax_label_merged_grouped_seq"].axis("off")
+        for a_label_ax_name in label_ax_names:
+            ax_dict[a_label_ax_name].axis('off')
 
         longest_seq_length_dict = {'all': self.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=False, should_use_no_repeat_values=False),
             'ignoring_intru': self.get_longest_sequence_length(return_ratio=False, should_ignore_intrusion_bins=True, should_use_no_repeat_values=False),
@@ -2118,8 +2154,11 @@ class SubsequencesPartitioningResult(ComputedResult):
 
 
         # Set text aligned to the top of the axes and centered horizontally
-        ax_dict["ax_label_ungrouped_seq"].text(0.5, 1.0, "Line1\nLine2", ha="left", va="top", transform=ax_dict["ax_label_ungrouped_seq"].transAxes)
-        ax_dict["ax_label_grouped_seq"].text(0.5, 1.0, "Line1\nLine2", ha="left", va="top", transform=ax_dict["ax_label_grouped_seq"].transAxes)
+        for a_label_ax_name in label_ax_names:
+            ax_dict[a_label_ax_name].text(0.5, 1.0, "Line1\nLine2", ha="left", va="top", transform=ax_dict[a_label_ax_name].transAxes) ## setup default
+
+        # ax_dict["ax_label_ungrouped_seq"].text(0.5, 1.0, "Line1\nLine2", ha="left", va="top", transform=ax_dict["ax_label_ungrouped_seq"].transAxes)
+        # ax_dict["ax_label_grouped_seq"].text(0.5, 1.0, "Line1\nLine2", ha="left", va="top", transform=ax_dict["ax_label_grouped_seq"].transAxes)
         ax_dict["ax_label_merged_grouped_seq"].text(0.5, 1.0, longest_seq_length_multiline_label_str, ha="left", va="top", transform=ax_dict["ax_label_merged_grouped_seq"].transAxes)
         split_most_likely_positions_arrays = deepcopy(self.flat_positions) ## unsplit positions
         pre_partitioned_debug_sequences_kwargs = dict(sequence_position_hlines_kwargs=dict(linewidth=2, linestyle=linestyle, zorder=10, alpha=1.0), # high-zorder to place it on-top, linestyle is "densely-dashed"
@@ -2178,9 +2217,9 @@ class SubsequencesPartitioningResult(ComputedResult):
             ax_dict["ax_ungrouped_seq"].set_facecolor("lightblue")  # Light blue for the ungrouped sequence axis
             ax_dict["ax_label_ungrouped_seq"].set_facecolor("lightgreen")  # Light green for the corresponding label axis
             ax_dict["ax_grouped_seq"].set_facecolor("lightcoral")  # Light coral for the grouped sequence axis
-            ax_dict["ax_label_grouped_seq"].set_facecolor("wheat")  # Wheat for the corresponding label axis
-            ax_dict["ax_merged_grouped_seq"].set_facecolor("lavender")  # Lavender for the merged grouped sequence axis
-            ax_dict["ax_label_merged_grouped_seq"].set_facecolor("peachpuff")  # Peach puff for the corresponding label axis
+            # ax_dict["ax_label_grouped_seq"].set_facecolor("wheat")  # Wheat for the corresponding label axis
+            # ax_dict["ax_merged_grouped_seq"].set_facecolor("lavender")  # Lavender for the merged grouped sequence axis
+            # ax_dict["ax_label_merged_grouped_seq"].set_facecolor("peachpuff")  # Peach puff for the corresponding label axis
 
         merged_out = MatplotlibRenderPlots(name='merged', figures=[fig, ], ax_dict=ax_dict, plots=merged_plots_out_dict)
 
@@ -3889,30 +3928,6 @@ class SubsequenceDetectionSamples:
             _out = a_partition_result._plot_step_by_step_subsequence_partition_process(extant_ax_dict=an_ax_dict)
 
 
-        # partition_result = deepcopy(a_partition_result) ## just copy the first one
-
-        # # create plotting function
-        # def _perform_plot(fig, indices):
-        #     """ captures: all_examples_plot_data_name_keys, 
-        #     """
-        #     if debug_print:
-        #         print('Doing plot:', indices)
-        #     # i, j = indices
-        #     i = indices
-        #     a_name = all_examples_plot_data_name_keys[i]
-        #     if debug_print:
-        #         print(f'\t a_name: "{a_name}"')
-        #     # ax = fig.subplots()
-        #     a_partition_result = all_examples_plot_data_dict[a_name]
-        #     if isinstance(fig, (MplTabbedFigure, )): # , TabNode
-        #         fig = fig.figure ## get the real figure
-        #     _out = a_partition_result._plot_step_by_step_subsequence_partition_process(extant_fig=fig, extant_ax_dict=None)
-        #     return _out
-        #     # return ax.scatter(*np.random.randn(2, n), color=colours[i],  marker=f'${markers[j]}$')
-
-        # # ui.add_task(_perform_plot)   # add your plot worker
-
-        # ui.set_focus(0)      # this will trigger the plotting for group 0 tab 0
         ui.show()
 
         # ui.show()
@@ -3926,6 +3941,10 @@ class SubsequenceDetectionSamples:
         fig, ax_dict = SubsequenceDetectionSamples.plot_test_subsequences_as_ax_stack(partitioned_results, desired_selected_indicies_dict)
         
         """
+        excluded_names: List[str] = ['true_positives[0]', 'true_positives[1]', 'true_positives[2]', 'true_positives[3]', 'true_positives[4]', 'true_positives[5]', 'true_positives[6]', 'true_positives[7]', 'true_positives[8]', 'true_positives[9]', 'true_positives[10]', 'true_positives[11]', 'true_positives[12]', 'true_positives[13]', 'true_positives[14]', 'true_positives[15]']
+        partitioned_results = get_dict_subset(partitioned_results, subset_excludelist=excluded_names) # don't show the good ones
+        # partitioned_results
+
         import matplotlib.pyplot as plt
         
         _subplot_list = [[k] for k, v in partitioned_results.items()]
@@ -3939,10 +3958,6 @@ class SubsequenceDetectionSamples:
             _subplot_list,
             # set the height ratios between the rows
             height_ratios=height_ratios,
-            # height_ratios=[1, 1],
-            # set the width ratios between the columns
-            # width_ratios=[8, 1],
-            # sharex=True,
             gridspec_kw=dict(wspace=0, hspace=0.15) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
         )
 
