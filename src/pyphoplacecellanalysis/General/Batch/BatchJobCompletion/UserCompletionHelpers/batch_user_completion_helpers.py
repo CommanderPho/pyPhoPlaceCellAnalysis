@@ -710,7 +710,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
 										       ripple_decoding_time_bin_size_override: Optional[float]=None, laps_decoding_time_bin_size_override: Optional[float]=None,
 												needs_recompute_heuristics: bool = False, force_recompute_all_decoding: bool = False,
-											    save_hdf:bool=True, allow_append_to_session_h5_file:bool=True, max_ignore_bins: float = 2, same_thresh_cm: float = 6, max_jump_distance_cm: float = 30) -> dict:
+											    save_hdf:bool=True, allow_append_to_session_h5_file:bool=True, max_ignore_bins: float = 2, same_thresh_cm: float = 10.7, max_jump_distance_cm: float = 60.0) -> dict:
 	"""
 	Aims to export the results of the global 'directional_decoders_evaluate_epochs' calculation
 
