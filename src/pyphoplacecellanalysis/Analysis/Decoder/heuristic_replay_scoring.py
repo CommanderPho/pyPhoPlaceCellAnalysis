@@ -2154,8 +2154,8 @@ class SubsequencesPartitioningResult(ComputedResult):
 
 
         # Set text aligned to the top of the axes and centered horizontally
-        for a_label_ax_name in label_ax_names:
-            ax_dict[a_label_ax_name].text(0.5, 1.0, "Line1\nLine2", ha="left", va="top", transform=ax_dict[a_label_ax_name].transAxes) ## setup default
+        # for a_label_ax_name in label_ax_names:
+        #     ax_dict[a_label_ax_name].text(0.5, 1.0, "Line1\nLine2", ha="left", va="top", transform=ax_dict[a_label_ax_name].transAxes) ## setup default
 
         # ax_dict["ax_label_ungrouped_seq"].text(0.5, 1.0, "Line1\nLine2", ha="left", va="top", transform=ax_dict["ax_label_ungrouped_seq"].transAxes)
         # ax_dict["ax_label_grouped_seq"].text(0.5, 1.0, "Line1\nLine2", ha="left", va="top", transform=ax_dict["ax_label_grouped_seq"].transAxes)
