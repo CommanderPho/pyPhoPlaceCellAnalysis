@@ -7367,11 +7367,9 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
 
 
         for a_decoder_name, a_decoder in all_directional_pf1D_Decoder_dict.items():
+            a_dock_config = dock_configs[a_decoder_name]
             # a_decoder.conform_to_position_bins
             active_posterior = a_decoder.marginal
-
-        for a_decoder_name, a_decoder in all_directional_pf1D_Decoder_dict.items():
-            a_dock_config = dock_configs[a_decoder_name]
             ## renormalize all the posteriors
             
             a_decoded_result = all_directional_continuously_decoded_dict.get(a_decoder_name, None) # already decoded
