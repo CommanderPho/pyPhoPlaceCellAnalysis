@@ -410,7 +410,7 @@ class EpochRenderingMixin:
         """ Returns a dictionary containing the hierarchy of all the members. Can optionally also print. 
         
         Example:
-            interval_info = active_2d_plot.list_all_rendered_intervals()
+            interval_info_dict = active_2d_plot.get_all_rendered_intervals_dict()
             >>> CONSOLE OUTPUT >>>        
                 rendered_epoch_names: ['PBEs', 'Laps']
                     name: PBEs - 0 plots:

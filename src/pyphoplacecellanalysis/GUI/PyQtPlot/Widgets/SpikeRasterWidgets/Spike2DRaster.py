@@ -449,7 +449,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             self.plots.main_plot_widget = self.ui.active_window_container_layout.addPlot(row=1, col=0, rowspan=self.params.main_graphics_plot_widget_rowspan, colspan=1)
             # self.plots.main_plot_widget = self.ui.main_graphics_layout_widget.addPlot(col=0, rowspan=self.params.main_graphics_plot_widget_rowspan, colspan=1) # , name='main_plot_widget'
             self.plots.main_plot_widget.setObjectName('main_plot_widget') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
-            self.plots.main_plot_widget.setMinimumHeight(300.0) # used to be 500.0 and took up too much room
+            self.plots.main_plot_widget.setMinimumHeight(200.0) # used to be 500.0 and took up too much room
 
             # curr_plot_row += (1 * self.params.main_graphics_plot_widget_rowspan)
             # self.ui.plots = [] # create an empty array for each plot, of which there will be one for each unit.
