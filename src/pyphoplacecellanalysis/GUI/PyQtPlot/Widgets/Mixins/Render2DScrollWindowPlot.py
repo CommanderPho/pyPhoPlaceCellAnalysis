@@ -74,15 +74,20 @@ class Render2DScrollWindowPlotMixin:
         
         #############################
         ## Bottom Windowed Scroll Plot/Widget:
-        scroll_window_plot_downsampling_rate: int = self.params.setdefault('scroll_window_plot_downsampling_rate', 1)
+        scroll_window_plot_downsampling_rate: int = self.params.setdefault('scroll_window_plot_downsampling_rate', 100)
         
         # ALL Spikes in the preview window:
-        curr_spike_x, curr_spike_y, curr_spike_pens, _all_scatterplot_tooltips_kwargs, self.plots_data.all_spots, curr_n = self._build_all_spikes_data_values(should_return_data_tooltips_kwargs=False, downsampling_rate=scroll_window_plot_downsampling_rate) #TODO 2023-06-28 21:18: - [ ] Could use returned tooltips to set the spike hover text
+        # curr_spike_x, curr_spike_y, curr_spike_pens, _all_scatterplot_tooltips_kwargs, self.plots_data.all_spots, curr_n = self._build_all_spikes_data_values(should_return_data_tooltips_kwargs=False, downsampling_rate=scroll_window_plot_downsampling_rate) #TODO 2023-06-28 21:18: - [ ] Could use returned tooltips to set the spike hover text
         
-        self.plots.preview_overview_scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=5, pen={'color': 'w', 'width': 1}, hoverable=True, )
+        curr_spike_x, _, curr_spike_pens, _all_scatterplot_tooltips_kwargs, self.plots_data.all_spots_downsampled, curr_n = self._build_all_spikes_data_values(should_return_data_tooltips_kwargs=False, downsampling_rate=scroll_window_plot_downsampling_rate) # downsampled all_spots
+        curr_spike_x, curr_spike_y, curr_spike_pens, _all_scatterplot_tooltips_kwargs, self.plots_data.all_spots, curr_n = self._build_all_spikes_data_values(should_return_data_tooltips_kwargs=False, downsampling_rate=1) ## all spots
+
+
+        self.plots.preview_overview_scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=5, pen={'color': 'w', 'width': 1}, hoverable=False, )
         self.plots.preview_overview_scatter_plot.setObjectName('preview_overview_scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
         self.plots.preview_overview_scatter_plot.opts['useCache'] = True
-        self.plots.preview_overview_scatter_plot.addPoints(self.plots_data.all_spots) # , hoverable=True
+        # self.plots.preview_overview_scatter_plot.addPoints(self.plots_data.all_spots) # , hoverable=True
+        self.plots.preview_overview_scatter_plot.addPoints(self.plots_data.all_spots_downsampled)
         background_static_scroll_window_plot.addItem(self.plots.preview_overview_scatter_plot)
         
         # Add the linear region overlay:
