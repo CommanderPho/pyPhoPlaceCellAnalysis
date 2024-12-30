@@ -14,6 +14,9 @@ from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 
+## Define the .ui file path
+path = os.path.dirname(os.path.abspath(__file__))
+uiFile = os.path.join(path, 'DockPlanningHelperWidget.ui')
 
 class DockPlanningHelperWidget(QtWidgets.QWidget):
     """ This widget is meant to be embedded in a pyqtgraph.dockarea.Dock to easily prototype/modify its properties. Allows you to create a layout interactively and then save it.
@@ -35,6 +38,7 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self.ui = Ui_Form()
         self.ui.setupUi(self) # builds the design from the .ui onto this widget.
+        self.ui = uic.loadUi(uiFile, self) # Load the .ui file
 
         self.initUI()
         self.title = dock_title
