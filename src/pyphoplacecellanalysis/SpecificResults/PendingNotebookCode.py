@@ -213,7 +213,7 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, debug_print=Fa
 
 
     # add_renderables_menu = active_2d_plot.ui.menus.custom_context_menus.add_renderables[0].programmatic_actions_dict
-    menu_commands = ['AddTimeIntervals.Replays', 'AddTimeIntervals.Laps'] # , 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.PBEs', 'AddTimeIntervals.Ripples', 
+    menu_commands = ['AddTimeIntervals.Replays', 'AddTimeIntervals.Laps', 'AddTimeIntervals.SessionEpochs'] # , 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.PBEs', 'AddTimeIntervals.Ripples', 
     for a_command in menu_commands:
         assert a_command in global_flat_action_dict, f"a_command: '{a_command}' is not present in global_flat_action_dict: {list(global_flat_action_dict.keys())}"
         # add_renderables_menu[a_command].trigger()
@@ -236,6 +236,19 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, debug_print=Fa
         # all_global_menus_actionsDict[a_command].trigger()
         global_flat_action_dict[a_command].trigger()
         
+
+    ## extract the components so the `background_static_scroll_window_plot` scroll bar is the right size:
+    active_2d_plot = spike_raster_window.spike_raster_plt_2d
+    preview_overview_scatter_plot: pg.ScatterPlotItem  = active_2d_plot.plots.preview_overview_scatter_plot # ScatterPlotItem 
+    # preview_overview_scatter_plot.setDownsampling(auto=True, method='subsample', dsRate=10)
+    main_graphics_layout_widget: pg.GraphicsLayoutWidget = active_2d_plot.ui.main_graphics_layout_widget
+    wrapper_layout: pg.QtWidgets.QVBoxLayout = active_2d_plot.ui.wrapper_layout
+    main_content_splitter = active_2d_plot.ui.main_content_splitter # QSplitter
+    layout = active_2d_plot.ui.layout
+    background_static_scroll_window_plot = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
+    background_static_scroll_window_plot.setMinimumHeight(50.0)
+    background_static_scroll_window_plot.setFixedHeight(50.0)
+
     return all_global_menus_actionsDict, global_flat_action_dict
 
 
