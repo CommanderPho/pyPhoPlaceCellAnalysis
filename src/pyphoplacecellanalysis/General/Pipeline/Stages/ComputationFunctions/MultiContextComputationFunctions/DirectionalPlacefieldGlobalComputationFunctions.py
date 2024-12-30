@@ -7264,13 +7264,15 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 # ==================================================================================================================== #
 from pyphoplacecellanalysis.GUI.Qt.Menus.BaseMenuProviderMixin import BaseMenuCommand
 
-@metadata_attributes(short_name=None, tags=['MatplotlibPlotCommand', 'epoch', 'decode'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2024-01-17 00:00', related_items=[])
+@metadata_attributes(short_name=None, tags=['MatplotlibPlotCommand', 'epoch', 'decode'],
+                      input_requires=['DirectionalDecodersDecoded', 'DirectionalDecodersDecoded.pf1D_Decoder_dict["pseudo2D"]'], output_provides=[], uses=['plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2024-01-17 00:00', related_items=[])
 @define(slots=False)
 class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
     """ 2024-01-17 
     Adds four rows to the SpikeRaster2D showing the decoded posteriors for the PBE epochs for each of the four 1D decoders
     These are the ones Kamran wants to be normalized differently.
     
+    Adds rows: `f'{a_decoder_name}_ContinuousDecode'`
     
     Usage:
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand
@@ -7301,6 +7303,7 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         # _active_config_name = None
         variable_name: str = a_decoder_name
         active_decoder = deepcopy(a_decoder)
+        assert a_decoded_result is not None, f"a_decoded_result should not be None anymore."
         
         if a_decoded_result is not None:
             active_result = deepcopy(a_decoded_result) # already decoded
@@ -7358,7 +7361,8 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
         # continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
         time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
-        # print(f'time_bin_size: {time_bin_size}')
+        if debug_print:
+            print(f'time_bin_size: {time_bin_size}')
         continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.most_recent_continuously_decoded_dict
         all_directional_continuously_decoded_dict = continuously_decoded_dict or {}
 
@@ -7369,7 +7373,7 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         for a_decoder_name, a_decoder in all_directional_pf1D_Decoder_dict.items():
             a_dock_config = dock_configs[a_decoder_name]
             # a_decoder.conform_to_position_bins
-            active_posterior = a_decoder.marginal
+            # active_posterior = a_decoder.marginal
             ## renormalize all the posteriors
             
             a_decoded_result = all_directional_continuously_decoded_dict.get(a_decoder_name, None) # already decoded
@@ -7416,7 +7420,8 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         
 
 
-@metadata_attributes(short_name=None, tags=['MatplotlibPlotCommand', 'epochs', 'decoder'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2024-01-22 00:00', related_items=[])
+@metadata_attributes(short_name=None, tags=['MatplotlibPlotCommand', 'epochs', 'decoder'],
+                      input_requires=['DirectionalDecodersDecoded', 'DirectionalDecodersDecoded.most_recent_continuously_decoded_dict["pseudo2D"]'], output_provides=[], uses=['plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2024-01-22 00:00', related_items=[])
 @define(slots=False)
 class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
     """ 2024-01-22 
@@ -7592,7 +7597,8 @@ class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
 
 
 
-@metadata_attributes(short_name=None, tags=['MatplotlibPlotCommand', 'epoch', 'marginal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-24 15:47', related_items=[])
+@metadata_attributes(short_name=None, tags=['MatplotlibPlotCommand', 'epoch', 'marginal'],
+                      input_requires=['DirectionalDecodersDecoded', 'DirectionalDecodersDecoded.most_recent_continuously_decoded_dict["pseudo2D"]'], output_provides=[], uses=[], used_by=[], creation_date='2024-12-24 15:47', related_items=[])
 @define(slots=False)
 class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand):
     """ 2024-01-23
@@ -7666,11 +7672,12 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewPseudo2DDecodedEpoc
 
         ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
         directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
-        pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder        
+        # pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder        
         # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
         # continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
         time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
-        print(f'time_bin_size: {time_bin_size}')
+        if debug_print:
+            print(f'time_bin_size: {time_bin_size}')
         
         info_string: str = f" - t_bin_size: {time_bin_size}"
 
