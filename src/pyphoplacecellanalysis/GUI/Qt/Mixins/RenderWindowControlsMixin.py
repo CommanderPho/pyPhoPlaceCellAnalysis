@@ -172,7 +172,9 @@ class RenderPlaybackControlsMixin:
         
         
 class RenderWindowControlsMixin:
-    """ 
+    """ Provides GUI controls related to the active render window, such as the window duration, the zoom multiplier, etc. Relates to the left toolbar in the SpikesRasterWindow UI.
+    
+    Implemented by SpikeRasterBase
     # self.ui.spinBoxCurrentFrame.blockSignals(True)
     """
     

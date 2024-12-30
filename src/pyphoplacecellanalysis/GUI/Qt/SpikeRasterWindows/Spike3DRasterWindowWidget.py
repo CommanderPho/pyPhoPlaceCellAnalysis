@@ -538,6 +538,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # self.ui.spike_raster_plt_3d.spikes_window.update_window_start_end(self.ui.spike_raster_plt_2d.spikes_window.active_time_window[0], self.ui.spike_raster_plt_2d.spikes_window.active_time_window[1])
         # self.bottom_playback_control_bar_widget.on_window_changed(next_start_timestamp, next_end_timestamp) ## direct
         self.SpikeRasterBottomFrameControlsMixin_on_window_update(next_start_timestamp, next_end_timestamp) ## indirect 
+        self.SpikeRasterLeftSidebarControlsMixin_on_window_update(next_start_timestamp, next_end_timestamp)
         
 
     @pyqtExceptionPrintingSlot(int)
@@ -810,6 +811,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             profiler = pg.debug.Profiler(disabled=True, delayed=True)
         self._update_plots()
         self.SpikeRasterBottomFrameControlsMixin_on_window_update(start_t, None)
+        self.SpikeRasterLeftSidebarControlsMixin_on_window_update(start_t, None)
+        
         if self.enable_debug_print:
             profiler('Finished calling _update_plots()')
 
@@ -824,6 +827,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             profiler = pg.debug.Profiler(disabled=True, delayed=True)
         self._update_plots()
         self.SpikeRasterBottomFrameControlsMixin_on_window_update(start_t, end_t)
+        self.SpikeRasterLeftSidebarControlsMixin_on_window_update(start_t, end_t)
         if self.enable_debug_print:
             profiler('Finished calling _update_plots()')
     
@@ -843,6 +847,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             profiler = pg.debug.Profiler(disabled=True, delayed=True)
         self._update_plots()
         self.SpikeRasterBottomFrameControlsMixin_on_window_update(start_t, end_t)
+        self.SpikeRasterLeftSidebarControlsMixin_on_window_update(start_t, end_t)
         
         if self.enable_debug_print:
             profiler('Finished calling _update_plots()')

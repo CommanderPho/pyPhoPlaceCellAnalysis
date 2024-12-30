@@ -86,7 +86,7 @@ class Spike3DRasterLeftSidebarControlBar(QtWidgets.QWidget):
      
 
 class SpikeRasterLeftSidebarControlsMixin:
-    """ renders the UI controls for the Spike3DRaster_Vedo class 
+    """ renders the UI controls for the Spike3DRasterWindowWidget class 
         Follows Conventions outlined in ModelViewMixin Conventions.md
         
         Implementors must have:
@@ -155,9 +155,33 @@ class SpikeRasterLeftSidebarControlsMixin:
     @QtCore.Slot(float, float)
     def SpikeRasterLeftSidebarControlsMixin_on_window_update(self, new_start=None, new_end=None):
         """ called to perform updates when the active window changes. Redraw, recompute data, etc. """
-        # TODO: NOT CALLED
-        pass
-    
+        # Called in the Implementor's update_window(...) function
+        print(f'SpikeRasterLeftSidebarControlsMixin_on_window_update(new_start: {new_start}, new_end: {new_end}')
+        
+        left_side_bar_controls = self.ui.leftSideToolbarWidget
+
+        if (new_start is not None) and (new_end is not None):
+            ## Block signals:
+            # left_side_bar_controls.ui.verticalSliderZoom.blockSignals(True)
+            # left_side_bar_controls.ui.spinAnimationTimeStep.blockSignals(True)
+            # left_side_bar_controls.ui.spinTemporalZoomFactor.blockSignals(True)
+            left_side_bar_controls.ui.spinRenderWindowDuration.blockSignals(True)            
+
+            ## Update values:
+            new_duration: float = new_end - new_start
+            # print(f'\tnew_duration: {new_duration}, self.render_window_duration: {self.render_window_duration}')
+            # left_side_bar_controls.ui.verticalSliderZoom.setValue(round(self.temporal_zoom_factor))
+            # left_side_bar_controls.ui.spinAnimationTimeStep.setValue(self.animation_time_step)
+            # left_side_bar_controls.ui.spinTemporalZoomFactor.setValue(round(self.temporal_zoom_factor))
+            # left_side_bar_controls.ui.spinRenderWindowDuration.setValue(self.render_window_duration)
+            left_side_bar_controls.ui.spinRenderWindowDuration.setValue(new_duration)
+
+            ## Unblock when done:
+            # left_side_bar_controls.ui.verticalSliderZoom.blockSignals(False)
+            # left_side_bar_controls.ui.spinAnimationTimeStep.blockSignals(False)
+            # left_side_bar_controls.ui.spinTemporalZoomFactor.blockSignals(False)
+            left_side_bar_controls.ui.spinRenderWindowDuration.blockSignals(False)
+       
     
 
         
