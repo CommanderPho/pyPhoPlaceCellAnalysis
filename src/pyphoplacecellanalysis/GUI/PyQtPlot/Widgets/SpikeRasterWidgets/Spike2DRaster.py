@@ -402,10 +402,10 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
                     background: rgb(255, 0, 4);
                 }
                 QSplitter::handle:horizontal {
-                    width: 8px;
+                    width: 2px;
                 }
                 QSplitter::handle:vertical {
-                    height: 8px;
+                    height: 2px;
                 }
             """)
 
