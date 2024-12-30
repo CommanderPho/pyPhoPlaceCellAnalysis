@@ -123,7 +123,7 @@ class RectangleRenderTupleHelpers:
     Usage:
 
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.helpers import RectangleRenderTupleHelpers
-
+        
     Known Usages:
         Used in `IntervalRectsItem` and `CustomIntervalRectsItem` to copy themselves
 

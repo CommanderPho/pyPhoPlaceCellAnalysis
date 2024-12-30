@@ -560,6 +560,54 @@ class EpochRenderingMixin:
         return all_series_positioning_dfs, all_series_compressed_positioning_dfs, all_series_compressed_positioning_update_dicts
 
 
+    def recover_interval_datasources_update_dict_properties(self, debug_print=False):
+        """ Tries to recover the positioning properties from each of the interval_datasources of active_2d_plot
+        
+        Usage:
+
+            all_series_positioning_dfs, all_series_compressed_positioning_dfs, all_series_compressed_positioning_update_dicts = active_2d_plot.recover_interval_datasources_update_dict_properties()
+            # all_series_positioning_dfs
+            all_series_compressed_positioning_dfs
+
+        all_series_compressed_positioning_dfs: {'PBEs': {'y_location': -11.666666666666668, 'height': 4.166666666666667},
+        'Ripples': {'y_location': -15.833333333333336, 'height': 4.166666666666667},
+        'Replays': {'y_location': -20.000000000000004, 'height': 4.166666666666667},
+        'Laps': {'y_location': -7.083333333333334, 'height': 4.166666666666667},
+        'SessionEpochs': {'y_location': -2.916666666666667, 'height': 2.0833333333333335}}
+
+
+        >> Can restore with:
+
+            all_series_compressed_positioning_update_dicts = { 'SessionEpochs': {'y_location': -2.916666666666667, 'height': 2.0833333333333335},
+            'Laps': {'y_location': -7.083333333333334, 'height': 4.166666666666667},
+            'PBEs': {'y_location': -11.666666666666668, 'height': 4.166666666666667},
+            'Ripples': {'y_location': -15.833333333333336, 'height': 4.166666666666667},
+            'Replays': {'y_location': -20.000000000000004, 'height': 4.166666666666667}}
+            active_2d_plot.update_rendered_intervals_visualization_properties(all_series_compressed_positioning_update_dicts)
+
+
+        """
+        all_series_positioning_dfs = {}
+        all_series_compressed_positioning_dfs = {}
+        all_series_compressed_positioning_update_dicts = {}
+        for a_name, a_ds in self.interval_datasources.items():
+            # print(a_name, a_ds)
+            if isinstance(a_ds, IntervalsDatasource):
+                all_series_positioning_dfs[a_name], all_series_compressed_positioning_dfs[a_name], series_compressed_positioning_update_dict = a_ds.recover_update_dict_properties()
+                if series_compressed_positioning_update_dict is not None:
+                    # only one entry, to be expected
+                    all_series_compressed_positioning_update_dicts[a_name] = series_compressed_positioning_update_dict
+                else:
+                    print(f'ERROR: series_compressed_positioning_update_dict is None for {a_name}. it will not be represented in the output dict.')            
+            else:
+                if debug_print:
+                    print(f'weird a_name, a_ds: {a_name}, {a_ds}, type(a_ds): {type(a_ds)}')
+                pass
+
+        return all_series_positioning_dfs, all_series_compressed_positioning_dfs, all_series_compressed_positioning_update_dicts
+
+
+
 
 
     def extract_interval_bottom_top_area(self, debug_print=False):
