@@ -791,6 +791,52 @@ class EpochRenderingMixin:
 
 
 
+    @function_attributes(short_name=None, tags=['heights', 'sizing', 'geometry', 'intervals'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-30 14:15', related_items=[])
+    def update_rendered_interval_heights(self, absolute_combined_height_px: float = 60.0):
+        """ 
+        Updates the total height
+        
+        Usage:
+        
+            update_rendered_interval_heights(active_2d_plot, absolute_combined_height_px=40.0)
+        
+        NOTE: epochs_update_dict -- hardcoded
+        
+        """
+        ## INPUTS: absolute_combined_height_px: float = 60.0
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs, Ripples_2DRenderTimeEpochs, inline_mkColor
+        
+        epochs_update_dict = {
+            'Replays':dict(y_location=-4.0, height=1.9, pen_color=inline_mkColor('orange', 0.8), brush_color=inline_mkColor('orange', 0.5)),
+            'Laps':dict(y_location=-2.0, height=0.9, pen_color=inline_mkColor('red', 0.8), brush_color=inline_mkColor('red', 0.5)),
+            'SessionEpochs ':dict(y_location=-1.0, height=0.9, pen_color=inline_mkColor('cyan', 0.8), brush_color=inline_mkColor('cyan', 0.5)),
+            # 'PBEs':dict(y_location=-2.0, height=1.5, pen_color=inline_mkColor('pink', 0.8), brush_color=inline_mkColor('pink', 0.5)),
+            # 'Ripples':dict(y_location=-12.0, height=1.5, pen_color=inline_mkColor('cyan', 0.8), brush_color=inline_mkColor('cyan', 0.5)),
+        }
+        
+        y_location_list: List[float] = []
+        for a_name, a_dict in epochs_update_dict.items():
+            a_dict['y_location_top'] = a_dict['y_location'] + a_dict['height']
+            y_location_list.append([a_dict['y_location'], a_dict['y_location_top']])
+
+        y_location_list = np.array(y_location_list)
+        y_location_min: float = np.min(y_location_list[:, 0])
+        y_location_max: float = np.max(y_location_list[:, 1]) # min, max
+
+        virtual_combined_height_px: float = np.abs(np.abs(y_location_max) - np.abs(y_location_min)) # 3.9
+        # virtual_combined_height_px
+        virtual_to_px_factor: float = absolute_combined_height_px / virtual_combined_height_px # 25.641025641025642
+        # virtual_to_px_factor
+        ## INPUTS: virtual_to_px_factor
+        scaled_epochs_update_dict = deepcopy(epochs_update_dict)
+        for a_name, a_dict in scaled_epochs_update_dict.items():
+            # a_dict['y_location_top'] = a_dict['y_location'] + a_dict['height']
+            a_dict['height'] = (a_dict['height'] * virtual_to_px_factor)
+            a_dict['y_location'] = (a_dict['y_location'] * virtual_to_px_factor)
+            del a_dict['y_location_top']
+            
+        ## OUTPUTS: scaled_epochs_update_dict   
+        self.update_rendered_intervals_visualization_properties(scaled_epochs_update_dict)
 
 
     @function_attributes(short_name=None, tags=['intervals', 'active_window', 'jump', 'find'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-30 16:30', related_items=[])
