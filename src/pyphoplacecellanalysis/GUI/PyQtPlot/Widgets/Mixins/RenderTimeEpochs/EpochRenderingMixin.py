@@ -864,9 +864,6 @@ class EpochRenderingMixin:
                 is_interval_entire_right_of_window = (selected_rendered_interval_series_times_df['t_start'].to_numpy() >= curr_time_window[1]) # starts after the end of the curr_time_window
                 is_interval_entire_outside_window = np.logical_or(is_interval_entire_left_of_window, is_interval_entire_right_of_window)
                 is_any_part_of_interval_inside_window = np.logical_not(is_interval_entire_outside_window)
-                # is_interval_end_within_window = (selected_rendered_interval_series_times_df['t_end'].to_numpy() < curr_time_window[1])
-                # is_interval_start_before_window = (selected_rendered_interval_series_times_df['t_start'].to_numpy() < curr_time_window[0])
-                # filtered_times_df = selected_rendered_interval_series_times_df[(selected_rendered_interval_series_times_df['t_start'].to_numpy() < curr_time_window[0])] ## started before the start of the window
                 filtered_times_df = selected_rendered_interval_series_times_df[is_any_part_of_interval_inside_window]
                 
                 if debug_print:
@@ -890,10 +887,8 @@ class EpochRenderingMixin:
         # interval_datasources = self.spike_raster_plt_2d.interval_datasources
         rendered_epoch_series_names = self.rendered_epoch_series_names
         interval_datasources = self.interval_datasources
-        # _out_intervals_within_active_window = self.find_intervals_in_active_window(debug_print=debug_print)
 
         _out_jump_times_dict = {}
-        # for curr_jump_series_name, filtered_times_df in _out_intervals_within_active_window.items():
         for curr_jump_series_name, selected_rendered_interval_series_ds in interval_datasources.items():
             if curr_jump_series_name in rendered_epoch_series_names: ## only get the real internals, not properties like `name`
                 assert curr_jump_series_name in interval_datasources, f"curr_jump_series_name: '{curr_jump_series_name}' not in interval_datasources: {interval_datasources}"        
