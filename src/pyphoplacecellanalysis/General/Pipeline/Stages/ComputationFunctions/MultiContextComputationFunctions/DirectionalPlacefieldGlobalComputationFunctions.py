@@ -7264,7 +7264,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 # ==================================================================================================================== #
 from pyphoplacecellanalysis.GUI.Qt.Menus.BaseMenuProviderMixin import BaseMenuCommand
 
-@metadata_attributes(short_name=None, tags=['epoch', 'decode'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2024-01-17 00:00', related_items=[])
+@metadata_attributes(short_name=None, tags=['MatplotlibPlotCommand', 'epoch', 'decode'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2024-01-17 00:00', related_items=[])
 @define(slots=False)
 class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
     """ 2024-01-17 
@@ -7416,7 +7416,7 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         
 
 
-@metadata_attributes(short_name=None, tags=['epochs', 'decoder'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2024-01-22 00:00', related_items=[])
+@metadata_attributes(short_name=None, tags=['MatplotlibPlotCommand', 'epochs', 'decoder'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2024-01-22 00:00', related_items=[])
 @define(slots=False)
 class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
     """ 2024-01-22 
@@ -7592,7 +7592,7 @@ class AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
 
 
 
-@metadata_attributes(short_name=None, tags=['epoch', 'marginal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-24 15:47', related_items=[])
+@metadata_attributes(short_name=None, tags=['MatplotlibPlotCommand', 'epoch', 'marginal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-24 15:47', related_items=[])
 @define(slots=False)
 class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand):
     """ 2024-01-23

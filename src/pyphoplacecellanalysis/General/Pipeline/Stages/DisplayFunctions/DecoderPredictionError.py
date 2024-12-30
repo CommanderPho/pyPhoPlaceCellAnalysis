@@ -3145,7 +3145,7 @@ class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
         
 
 
-@metadata_attributes(short_name=None, tags=['GOOD', 'epoch-slices'], input_requires=[], output_provides=[], uses=['plot_slices_1D_most_likely_position_comparsions', 'plot_slices_1D_most_likely_position_comparsions'], used_by=[], creation_date='2023-10-17 00:00', related_items=[])
+@metadata_attributes(short_name=None, tags=['MatplotlibPlotCommand', 'GOOD', 'epoch-slices'], input_requires=[], output_provides=[], uses=['plot_slices_1D_most_likely_position_comparsions', 'plot_slices_1D_most_likely_position_comparsions'], used_by=[], creation_date='2023-10-17 00:00', related_items=[])
 @define(slots=False)
 class AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(BaseMenuCommand):
     """ 2023-10-17. Creates TWO ROWS - Uses `plot_slices_1D_most_likely_position_comparsions` to plot epoch slices (corresponding to certain periods in time) along the continuous session duration.
@@ -3231,7 +3231,7 @@ class AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(BaseMenuCommand):
 
 
 
-@metadata_attributes(short_name=None, tags=['GOOD', 'TrackTemplates', 'epoch-slices'], input_requires=[], output_provides=[], uses=['plot_slices_1D_most_likely_position_comparsions', 'plot_slices_1D_most_likely_position_comparsions'], used_by=[], creation_date='2024-12-19 04:28', related_items=['AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand'])
+@metadata_attributes(short_name=None, tags=['MatplotlibPlotCommand', 'GOOD', 'TrackTemplates', 'epoch-slices'], input_requires=[], output_provides=[], uses=['plot_slices_1D_most_likely_position_comparsions', 'plot_slices_1D_most_likely_position_comparsions'], used_by=[], creation_date='2024-12-19 04:28', related_items=['AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand'])
 @define(slots=False)
 class AddNewTrackTemplatesDecodedEpochSlicesRows_MatplotlibPlotCommand(BaseMenuCommand):
     """ 2023-10-17. Creates FOUR ROWS - Uses `plot_slices_1D_most_likely_position_comparsions` to plot epoch slices (corresponding to certain periods in time) along the continuous session duration.
