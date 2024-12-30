@@ -3252,6 +3252,8 @@ class AddNewTrackTemplatesDecodedEpochSlicesRows_MatplotlibPlotCommand(BaseMenuC
         # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions # Actual most general
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_slices_1D_most_likely_position_comparsions
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, TrackTemplates, DecoderDecodedEpochsResult, DirectionalPseudo2DDecodersResult, get_proper_global_spikes_df
+        from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
+        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
 
         
         # spikes_df = deepcopy(curr_active_pipeline.sess.spikes_df)
@@ -3304,19 +3306,24 @@ class AddNewTrackTemplatesDecodedEpochSlicesRows_MatplotlibPlotCommand(BaseMenuC
         ## OUTPUTS: filtered_decoder_filter_epochs_decoder_result_dict, 
         ## INPUTS: need `filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult]`
         decoder_names: List[str] = track_templates.get_decoder_names()
-        track_length_dict = track_templates.get_track_length_dict()
+        # track_length_dict = track_templates.get_track_length_dict()
         
         matplotlib_view_widget_names_map: Dict = {a_name:f'decoded_epoch_matplotlib_view_widget_{a_name}' for a_name in decoder_names}
-        
+        showCloseButton = True
+        dock_configs = dict(zip(decoder_names, (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=showCloseButton), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, showCloseButton=showCloseButton),
+                        CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, showCloseButton=showCloseButton), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, showCloseButton=showCloseButton))))
+
+
         plot_replay_tuple_dict = {}
         plot_heatmap_img_list_dict = {}
         # initial_row_idx: int = 2
         for i, (a_name, a_decoder) in enumerate(track_templates.get_decoders_dict().items()):
             # curr_row_idx: int = (i + initial_row_idx)
             matplotlib_view_widget_name: str = matplotlib_view_widget_names_map[a_name]
+            a_dock_config = dock_configs[a_name]
             a_decoder_decoded_epochs_result: DecodedFilterEpochsResult = filtered_decoder_filter_epochs_decoder_result_dict[a_name] ## get the result # DecodedFilterEpochsResult
             ## Creates a new row with `add_new_matplotlib_render_plot_widget`:
-            plot_replay_tuple_dict[a_name] = active_2d_plot.add_new_matplotlib_render_plot_widget(name=matplotlib_view_widget_name)
+            plot_replay_tuple_dict[a_name] = active_2d_plot.add_new_matplotlib_render_plot_widget(name=matplotlib_view_widget_name, display_config=a_dock_config)
             curr_decoded_replay_matplotlib_view_widget, curr_decoded_replay_fig, curr_decoded_replay_ax = plot_replay_tuple_dict[a_name]
             _out_curr_plot_tuple = plot_slices_1D_most_likely_position_comparsions(curr_active_pipeline.sess.position.to_dataframe(), slices_time_window_centers=[v.centers for v in a_decoder_decoded_epochs_result.time_bin_containers], xbin=a_decoder.xbin.copy(),
                                                                     slices_posteriors=a_decoder_decoded_epochs_result.p_x_given_n_list,
