@@ -793,8 +793,105 @@ class EpochRenderingMixin:
 
 
 
+    @function_attributes(short_name=None, tags=['intervals', 'active_window', 'jump', 'find'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-30 16:30', related_items=[])
+    def find_intervals_in_active_window(self, debug_print=False) -> Dict[str, pd.DataFrame]:
+        """ returns the intervals that fall completely within the current viewport window
+        
+        _out_intervals_within_active_window = active_2d_plot.find_intervals_in_active_window() # {'Replays': 633.6662150828633, 'Laps': 584.5415960000828, 'SessionEpochs': 0.0}
+        _out_intervals_within_active_window
+
+        """
+        ## Get Interval Datasources:
+        # interval_datasources = self.spike_raster_plt_2d.interval_datasources
+        rendered_epoch_series_names = self.rendered_epoch_series_names
+        interval_datasources = self.interval_datasources
+        _out_intervals_within_active_window = {}
+        for curr_jump_series_name, selected_rendered_interval_series_ds in interval_datasources.items():
+            if curr_jump_series_name in rendered_epoch_series_names: ## only get the real internals, not properties like `name`
+                assert curr_jump_series_name in interval_datasources, f"curr_jump_series_name: '{curr_jump_series_name}' not in interval_datasources: {interval_datasources}"
+                # selected_rendered_interval_series_ds = interval_datasources[curr_jump_series_name] # IntervalsDatasource
+                selected_rendered_interval_series_times_df = selected_rendered_interval_series_ds.time_column_values
+                ## Get current time window:
+                curr_time_window = self.animation_active_time_window.active_time_window # (45.12114057149739, 60.12114057149739)
+                ## Find the events beyond that time:
+                is_interval_entire_left_of_window = (selected_rendered_interval_series_times_df['t_end'].to_numpy() < curr_time_window[0]) # ends before the curr_time_window even starts
+                is_interval_entire_right_of_window = (selected_rendered_interval_series_times_df['t_start'].to_numpy() >= curr_time_window[1]) # starts after the end of the curr_time_window
+                is_interval_entire_outside_window = np.logical_or(is_interval_entire_left_of_window, is_interval_entire_right_of_window)
+                is_any_part_of_interval_inside_window = np.logical_not(is_interval_entire_outside_window)
+                # is_interval_end_within_window = (selected_rendered_interval_series_times_df['t_end'].to_numpy() < curr_time_window[1])
+                # is_interval_start_before_window = (selected_rendered_interval_series_times_df['t_start'].to_numpy() < curr_time_window[0])
+                # filtered_times_df = selected_rendered_interval_series_times_df[(selected_rendered_interval_series_times_df['t_start'].to_numpy() < curr_time_window[0])] ## started before the start of the window
+                filtered_times_df = selected_rendered_interval_series_times_df[is_any_part_of_interval_inside_window]
+                
+                if debug_print:
+                    print(f'curr_time_window: {curr_time_window}, filtered_times_df: {filtered_times_df}')
+                    
+                _out_intervals_within_active_window[curr_jump_series_name] = filtered_times_df
+            ## END if curr_jump_series_name in rendered_epoch_series_names
+        # END for curr_jump_series_name, selecte...
+        return _out_intervals_within_active_window
 
 
+    @function_attributes(short_name=None, tags=['intervals', 'active_window', 'jump', 'find'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-30 16:30', related_items=[])
+    def find_next_jump_intervals_in_active_window(self, is_jump_left:bool=True, debug_print=False) -> Dict[str, Optional[float]]:
+        """ returns the intervals that fall completely within the current viewport window
+        
+        next_target_jump_times_dict = active_2d_plot.find_next_jump_intervals_in_active_window(is_jump_left=True) # {'Replays': 633.6662150828633, 'Laps': 584.5415960000828, 'SessionEpochs': 0.0}
+        next_target_jump_times_dict
+
+        """
+        ## Get Interval Datasources:
+        # interval_datasources = self.spike_raster_plt_2d.interval_datasources
+        rendered_epoch_series_names = self.rendered_epoch_series_names
+        interval_datasources = self.interval_datasources
+        # _out_intervals_within_active_window = self.find_intervals_in_active_window(debug_print=debug_print)
+
+        _out_jump_times_dict = {}
+        # for curr_jump_series_name, filtered_times_df in _out_intervals_within_active_window.items():
+        for curr_jump_series_name, selected_rendered_interval_series_ds in interval_datasources.items():
+            if curr_jump_series_name in rendered_epoch_series_names: ## only get the real internals, not properties like `name`
+                assert curr_jump_series_name in interval_datasources, f"curr_jump_series_name: '{curr_jump_series_name}' not in interval_datasources: {interval_datasources}"        
+
+                ## Get current time window:
+                curr_time_window = self.animation_active_time_window.active_time_window # (45.12114057149739, 60.12114057149739)
+                selected_rendered_interval_series_times_df = selected_rendered_interval_series_ds.time_column_values
+                
+                ## Find the events:
+                next_target_jump_time = None       
+                if is_jump_left:
+                    ## jump left:
+                    is_interval_entire_left_of_window = (selected_rendered_interval_series_times_df['t_end'].to_numpy() < curr_time_window[0]) # ends before the curr_time_window even starts
+                    is_interval_entire_right_of_window = (selected_rendered_interval_series_times_df['t_start'].to_numpy() >= curr_time_window[1]) # starts after the end of the curr_time_window
+                    is_interval_entire_outside_window = np.logical_or(is_interval_entire_left_of_window, is_interval_entire_right_of_window)
+                    is_any_part_of_interval_inside_window = np.logical_not(is_interval_entire_outside_window)
+                    is_any_part_of_interval_inside_or_left_of_window = np.logical_or(is_interval_entire_left_of_window, is_any_part_of_interval_inside_window)
+                    filtered_times_df = selected_rendered_interval_series_times_df[is_any_part_of_interval_inside_or_left_of_window]
+                    if len(filtered_times_df) > 0:
+                        next_target_jump_time = filtered_times_df['t_start'].to_numpy()[-1] ## return the latest interval start time
+                    
+                else:
+                    ## jump right
+                    # print(f'WARN: .find_next_jump_intervals_in_active_window(is_jump_left=False) is not fully implemented! Only supports jumping left now!')
+                    is_interval_entire_left_of_window = (selected_rendered_interval_series_times_df['t_end'].to_numpy() < curr_time_window[0]) # ends before the curr_time_window even starts
+                    is_interval_entire_right_of_window = (selected_rendered_interval_series_times_df['t_start'].to_numpy() >= curr_time_window[1]) # starts after the end of the curr_time_window
+                    is_interval_entire_outside_window = np.logical_or(is_interval_entire_left_of_window, is_interval_entire_right_of_window)
+                    is_any_part_of_interval_inside_window = np.logical_not(is_interval_entire_outside_window)
+                    is_any_part_of_interval_inside_or_right_of_window = np.logical_or(is_interval_entire_right_of_window, is_any_part_of_interval_inside_window)
+                    filtered_times_df = selected_rendered_interval_series_times_df[is_any_part_of_interval_inside_or_right_of_window]
+                    if len(filtered_times_df) > 1:
+                        ## not the first, which we may have just jumped to, but the second
+                        next_target_jump_time = filtered_times_df['t_start'].to_numpy()[1] ## return the earliest interval start time... does this include ones within the window?
+                        
+
+                if debug_print:
+                    print(f'curr_time_window: {curr_time_window}, next_target_jump_time: {next_target_jump_time}')
+                    
+                _out_jump_times_dict[curr_jump_series_name] = next_target_jump_time
+                ## END if curr_jump_series_name in rendered_epoch_series_names
+                
+        # END for curr_jump_series_name, selecte...
+        return _out_jump_times_dict
+    
 
     # ---------------------------------------------------------------------------- #
     #                          Private Implementor Methods                         #
