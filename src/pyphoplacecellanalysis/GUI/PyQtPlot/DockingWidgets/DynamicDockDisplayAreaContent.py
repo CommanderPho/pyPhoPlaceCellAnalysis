@@ -238,53 +238,73 @@ class CustomCyclicColorsDockDisplayConfig(CustomDockDisplayConfig):
     def named_color_scheme(self, value):
         self._named_color_scheme = value
     
-    def __init__(self, showCloseButton=True, fontSize='10px', corner_radius='2px', orientation=None, named_color_scheme=NamedColorScheme.red, custom_get_colors_callback_fn=None):
+    def __init__(self, showCloseButton=True, fontSize='10px', corner_radius='2px', orientation=None, named_color_scheme=NamedColorScheme.red, custom_get_colors_callback_fn=None, custom_get_colors_dict=None):
         super(CustomCyclicColorsDockDisplayConfig, self).__init__(showCloseButton=showCloseButton, fontSize=fontSize, corner_radius=corner_radius, orientation=orientation, custom_get_colors_callback_fn=custom_get_colors_callback_fn)
         self._named_color_scheme = named_color_scheme
+        if custom_get_colors_dict is None:
+            # custom_get_colors_dict = {False: DockDisplayColors(fg_color='#fff', bg_color='#66cc66', border_color='#54ba54'),
+            #     True: DockDisplayColors(fg_color='#aaa', bg_color='#44aa44', border_color='#339933'),
+            # }
+            pass                        
+        self.custom_get_colors_dict = custom_get_colors_dict
+        
 
     def get_colors(self, orientation, is_dim):
-        # Common to all:
-        if is_dim:
-            fg_color = '#aaa' # Grey
-        else:
-            fg_color = '#fff' # White
+        if self.custom_get_colors_callback is not None:
+            # Use the custom function instead
+            return self.custom_get_colors_callback(orientation, is_dim)
 
-        if self._named_color_scheme.name == NamedColorScheme.blue.name:
-            # Blue/Purple-based:
-            if is_dim:
-                bg_color = '#4444aa' # Dark Blue - (240°, 60, 66.66)
-                border_color = '#339' # More Vibrant Dark Blue - (240°, 66.66, 60)
-            else:
-                bg_color = '#6666cc' # Default Purple Color - (240°, 50, 80)
-                border_color = '#55B' # Similar Purple Color - (240°, 54.54, 73.33)
-        elif self._named_color_scheme.name == NamedColorScheme.green.name:
-            # Green-based:
-            if is_dim:
-                bg_color = '#44aa44' # (120°, 60%, 67%)
-                border_color = '#339933' # (120°, 67%, 60%)
-            else:
-                bg_color = '#66cc66' # (120°, 50, 80)
-                border_color = '#54ba54' # (120°, 55%, 73%)
-        elif self._named_color_scheme.name == NamedColorScheme.red.name:
-            # Red-based:
-            if is_dim:
-                bg_color = '#aa4444' # (0°, 60%, 67%)
-                border_color = '#993232' # (0°, 67%, 60%)
-            else:
-                bg_color = '#cc6666' # (0°, 50, 80)
-                border_color = '#ba5454' # (0°, 55%, 73%)
-        elif self._named_color_scheme.name == NamedColorScheme.grey.name:
-            # Grey-based:
-            if is_dim:
-                bg_color = '#d8d8d8' 
-                border_color = '#717171' 
-            else:
-                bg_color = '#9d9d9d' 
-                border_color = '#3a3a3a' 
         else:
-            raise NotImplementedError
+            if self.custom_get_colors_dict is not None:
+                ## otherwise use the `self.custom_get_colors_dict`
+                active_colors_dict = self.custom_get_colors_dict[is_dim]
+                fg_color = active_colors_dict.fg_color
+                bg_color = active_colors_dict.bg_color
+                border_color = active_colors_dict.border_color      
 
-        return fg_color, bg_color, border_color
+            else:
+                # Common to all:
+                if is_dim:
+                    fg_color = '#aaa' # Grey
+                else:
+                    fg_color = '#fff' # White
+
+                if self._named_color_scheme.name == NamedColorScheme.blue.name:
+                    # Blue/Purple-based:
+                    if is_dim:
+                        bg_color = '#4444aa' # Dark Blue - (240°, 60, 66.66)
+                        border_color = '#339' # More Vibrant Dark Blue - (240°, 66.66, 60)
+                    else:
+                        bg_color = '#6666cc' # Default Purple Color - (240°, 50, 80)
+                        border_color = '#55B' # Similar Purple Color - (240°, 54.54, 73.33)
+                elif self._named_color_scheme.name == NamedColorScheme.green.name:
+                    # Green-based:
+                    if is_dim:
+                        bg_color = '#44aa44' # (120°, 60%, 67%)
+                        border_color = '#339933' # (120°, 67%, 60%)
+                    else:
+                        bg_color = '#66cc66' # (120°, 50, 80)
+                        border_color = '#54ba54' # (120°, 55%, 73%)
+                elif self._named_color_scheme.name == NamedColorScheme.red.name:
+                    # Red-based:
+                    if is_dim:
+                        bg_color = '#aa4444' # (0°, 60%, 67%)
+                        border_color = '#993232' # (0°, 67%, 60%)
+                    else:
+                        bg_color = '#cc6666' # (0°, 50, 80)
+                        border_color = '#ba5454' # (0°, 55%, 73%)
+                elif self._named_color_scheme.name == NamedColorScheme.grey.name:
+                    # Grey-based:
+                    if is_dim:
+                        bg_color = '#d8d8d8' 
+                        border_color = '#717171' 
+                    else:
+                        bg_color = '#9d9d9d' 
+                        border_color = '#3a3a3a' 
+                else:
+                    raise NotImplementedError
+            # END else:
+            return fg_color, bg_color, border_color
 
 
 
