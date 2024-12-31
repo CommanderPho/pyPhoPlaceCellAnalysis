@@ -223,7 +223,7 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, debug_print=Fa
     # active_2d_plot.ui.menus # .global_window_menus.docked_widgets.actions_dict
 
     menu_commands = [
-        'AddTimeCurves.Position',
+        # 'AddTimeCurves.Position',
         # 'DockedWidgets.LongShortDecodedEpochsDockedMatplotlibView',
         # 'DockedWidgets.DirectionalDecodedEpochsDockedMatplotlibView',
         'DockedWidgets.TrackTemplatesDecodedEpochsDockedMatplotlibView',
@@ -245,9 +245,16 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, debug_print=Fa
     wrapper_layout: pg.QtWidgets.QVBoxLayout = active_2d_plot.ui.wrapper_layout
     main_content_splitter = active_2d_plot.ui.main_content_splitter # QSplitter
     layout = active_2d_plot.ui.layout
+    main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
+    main_plot_widget.setMinimumHeight(20.0)
     background_static_scroll_window_plot = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
     background_static_scroll_window_plot.setMinimumHeight(50.0)
-    background_static_scroll_window_plot.setFixedHeight(50.0)
+    background_static_scroll_window_plot.setMaximumHeight(75.0)
+    # background_static_scroll_window_plot.setFixedHeight(50.0)
+    
+    # Set stretch factors to control priority
+    main_graphics_layout_widget.ci.layout.setRowStretchFactor(0, 1)  # Plot1: lowest priority
+    main_graphics_layout_widget.ci.layout.setRowStretchFactor(1, 2)  # Plot2: medium priority
 
     return all_global_menus_actionsDict, global_flat_action_dict
 
