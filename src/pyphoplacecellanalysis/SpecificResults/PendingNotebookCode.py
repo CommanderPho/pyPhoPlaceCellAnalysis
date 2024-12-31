@@ -89,19 +89,10 @@ def build_lap_bin_by_bin_performance_analysis_df(test_all_directional_laps_decod
     _position_col_names = []
 
     all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult = deepcopy(test_all_directional_laps_decoder_result.decoder_result)
-    # all_directional_laps_filter_epochs_decoder_result
 
-    ## INPUTS: all_directional_laps_filter_epochs_decoder_result, active_pf_2D
-    # global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap'])
-    # measured_decoded_position_comparion: MeasuredDecodedPositionComparison = CustomDecodeEpochsResult.build_single_measured_decoded_position_comparison(all_directional_laps_filter_epochs_decoder_result, global_measured_position_df=global_measured_position_df)
-    
-    measured_decoded_position_comparion: MeasuredDecodedPositionComparison = deepcopy(test_all_directional_laps_decoder_result.measured_decoded_position_comparion)
+    measured_decoded_position_comparion: MeasuredDecodedPositionComparison = deepcopy(test_all_directional_laps_decoder_result.measured_decoded_position_comparion) ## provides actual measured positions at each of these bins
     
     active_filter_epochs: pd.DataFrame = deepcopy(all_directional_laps_filter_epochs_decoder_result.active_filter_epochs)
-
-    # measured_decoded_position_comparion.decoded_measured_diff_df
-    # measured_decoded_position_comparion.measured_positions_dfs_list
-    # measured_decoded_position_comparion.decoded_positions_df_list
 
     Assert.same_length(active_filter_epochs, measured_decoded_position_comparion.measured_positions_dfs_list)
     Assert.same_length(active_filter_epochs, measured_decoded_position_comparion.decoded_positions_df_list)
@@ -111,15 +102,11 @@ def build_lap_bin_by_bin_performance_analysis_df(test_all_directional_laps_decod
         decoded_positions_df_list = [a_decoded_pos_df.rename(columns={'x': 'x_decode', 'y': 'y_decode'}) for a_decoded_pos_df in measured_decoded_position_comparion.decoded_positions_df_list]
 
         
-    # measured_positions_dfs_list
-    ## need actual measured positions at each of these bins
-    # all_directional_laps_filter_epochs_decoder_result.most_likely_positions_list
-
     ## INPUTS: test_all_directional_decoder_result
     (laps_directional_marginals_tuple, laps_track_identity_marginals_tuple, laps_non_marginalized_decoder_marginals_tuple), laps_marginals_df = all_directional_laps_filter_epochs_decoder_result.compute_marginals(epoch_idx_col_name='lap_idx', epoch_start_t_col_name='lap_start_t',
                                                                                                                                                                     additional_transfer_column_names=['start','stop','label','duration','lap_id','lap_dir','maze_id','is_LR_dir'])
 
-
+    ## adds marginal columns:
     epochs_directional_marginals, epochs_directional_all_epoch_bins_marginal, epochs_most_likely_direction_from_decoder, epochs_is_most_likely_direction_LR_dir  = laps_directional_marginals_tuple
     epochs_directional_marginal_p_x_given_n_list: List[NDArray] = [v['p_x_given_n'] for v in epochs_directional_marginals] ## List[DynamicContainer]
     Assert.same_length(active_filter_epochs, epochs_directional_marginal_p_x_given_n_list) 
@@ -132,14 +119,7 @@ def build_lap_bin_by_bin_performance_analysis_df(test_all_directional_laps_decod
     epochs_non_marginalized_decoder_marginals_p_x_given_n_list: List[NDArray] = [v['p_x_given_n'] for v in non_marginalized_decoder_marginals] ## List[DynamicContainer]
     Assert.same_length(active_filter_epochs, epochs_non_marginalized_decoder_marginals_p_x_given_n_list)
     
-
-    # epochs_most_likely_track_identity_from_decoder
-    # epochs_is_most_likely_track_identity_Long
-    # epochs_track_identity_all_epoch_bins_marginal ## all epoch bins separately
-
-
-    # epochs_track_identity_marginal_df_list: List[pd.DataFrame] = [pd.DataFrame(np.hstack([p_x_given_n.T, np.full((p_x_given_n.T.shape[0], 1), i).astype(int)]), columns=['P_Long', 'P_Short', 'lap_idx']) for i, p_x_given_n in enumerate(epochs_track_identity_marginal_p_x_given_n_list)]
-
+    ## Begin Building Dataframes:
     lambda_full_correctly_sized_value_fn = lambda p_x_given_n, x: np.full((p_x_given_n.T.shape[0], 1), x)
     epochs_track_identity_marginal_df_list: List[pd.DataFrame] = [pd.DataFrame(np.hstack([track_identity_p_x_given_n.T,
                                                                                           lambda_full_correctly_sized_value_fn(track_identity_p_x_given_n, i), lambda_full_correctly_sized_value_fn(track_identity_p_x_given_n, a_lap_tuple.lap_id), lambda_full_correctly_sized_value_fn(track_identity_p_x_given_n, a_lap_tuple.maze_id),
@@ -150,12 +130,6 @@ def build_lap_bin_by_bin_performance_analysis_df(test_all_directional_laps_decod
 
     epochs_track_identity_marginal_df_list = [pd.concat([a_df, pd.DataFrame(directional_marginal_p_x_given_n.T, columns=['P_LR', 'P_RL'])], axis='columns', ignore_index=False) for a_df, directional_marginal_p_x_given_n in zip(epochs_track_identity_marginal_df_list, epochs_directional_marginal_p_x_given_n_list)]
     epochs_track_identity_marginal_df_list = [pd.concat([a_df, pd.DataFrame(non_marginalized_p_x_given_n.T, columns=['P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL'])], axis='columns', ignore_index=False) for a_df, non_marginalized_p_x_given_n in zip(epochs_track_identity_marginal_df_list, epochs_non_marginalized_decoder_marginals_p_x_given_n_list)]
-    
-    # epochs_track_identity_marginal_df_list: List[pd.DataFrame] = [pd.concat([pd.DataFrame(np.hstack([p_x_given_n.T, np.full((p_x_given_n.T.shape[0], 1), i).astype(int), np.full((p_x_given_n.T.shape[0], 1), a_lap_tuple.lap_id), lambda_full_correctly_sized_value_fn(p_x_given_n, a_lap_tuple.maze_id),
-    #                                                                                     lambda_full_correctly_sized_value_fn(p_x_given_n, a_lap_tuple.lap_dir),
-    #                                                                                     lambda_full_correctly_sized_value_fn(p_x_given_n, a_lap_tuple.is_LR_dir),
-    #                                                                                     lambda_full_correctly_sized_value_fn(p_x_given_n, a_lap_tuple.start),lambda_full_correctly_sized_value_fn(p_x_given_n, a_lap_tuple.stop),lambda_full_correctly_sized_value_fn(p_x_given_n, a_lap_tuple.duration),
-    #                                                                                     ]), columns=['P_Long', 'P_Short', 'lap_idx', 'lap_id', 'maze_id', 'lap_dir', 'is_LR_dir', 'start', 'stop', 'duration']), a_measured_pos_df[['x_meas', 'y_meas']]], axis='columns', ignore_index=False) for i, (a_lap_tuple, a_measured_pos_df, p_x_given_n) in enumerate(zip(active_filter_epochs.itertuples(index=True, name='LapTuple'), measured_positions_dfs_list, epochs_track_identity_marginal_p_x_given_n_list))]
     
 
     # epochs_track_identity_marginal_df_list = [pd.concat([a_df, a_measured_pos_df[['x_meas', 'y_meas']]], axis='columns', ignore_index=False) for i, (a_df, a_measured_pos_df, directional_marginal_p_x_given_n) in enumerate(zip(epochs_track_identity_marginal_df_list, measured_positions_dfs_list, epochs_directional_marginal_p_x_given_n_list))]
@@ -177,29 +151,31 @@ def build_lap_bin_by_bin_performance_analysis_df(test_all_directional_laps_decod
     # Assert.same_length(active_filter_epochs, epochs_track_identity_marginal_df_list)
 
 
-
-
-    # deepcopy(train_lap_specific_pf1D_Decoder_dict['long_LR'].xbin)
-    # deepcopy(train_lap_specific_pf1D_Decoder_dict['long_LR'].ybin)
-    # epochs_track_identity_marginal_df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(deepcopy(epochs_track_identity_marginal_df), bin_values=(deepcopy(active_pf_2D.xbin), deepcopy(active_pf_2D.ybin)),
-    #                                                                                                             position_column_names = ('x_meas', 'y_meas'),  binned_column_names = ('binned_x', 'binned_y'),
-    #                                                                                                             force_recompute=False, debug_print=True)
-    # _position_col_names.extend(['binned_x_meas', 'binned_y_meas'])
-    
-    epochs_track_identity_marginal_df, (xbin, ), bin_infos = build_df_discretized_binned_position_columns(deepcopy(epochs_track_identity_marginal_df), bin_values=(deepcopy(active_pf_2D.xbin),),
+    if (active_pf_2D.ybin is not None) and (len(active_pf_2D.ybin) > 0):
+        epochs_track_identity_marginal_df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(deepcopy(epochs_track_identity_marginal_df), bin_values=(deepcopy(active_pf_2D.xbin), deepcopy(active_pf_2D.ybin)),
+                                                                                                                    position_column_names = ('x_meas', 'y_meas'),  binned_column_names = ('binned_x', 'binned_y'),
+                                                                                                                    force_recompute=False, debug_print=True)
+        _position_col_names.extend(['binned_x_meas', 'binned_y_meas'])
+    else:
+        # x-only:
+        epochs_track_identity_marginal_df, (xbin, ), bin_infos = build_df_discretized_binned_position_columns(deepcopy(epochs_track_identity_marginal_df), bin_values=(deepcopy(active_pf_2D.xbin),),
                                                                                                                 position_column_names = ('x_meas',),  binned_column_names = ('binned_x_meas', ),
                                                                                                                 force_recompute=False, debug_print=True)
-    _position_col_names.extend(['binned_x_meas'])
+        _position_col_names.extend(['binned_x_meas'])
+
 
     if should_include_decoded_pos_columns:
-        # epochs_track_identity_marginal_df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(deepcopy(epochs_track_identity_marginal_df), bin_values=(deepcopy(active_pf_2D.xbin), deepcopy(active_pf_2D.ybin)),
-        #                                                                                                     position_column_names = ('x_decode', 'y_decode'),  binned_column_names = ('binned_x_decode', 'binned_y_decode'),
-        #                                                                                                     force_recompute=False, debug_print=True)
-        _position_col_names.extend(['binned_x_decode', 'binned_y_decode'])
-        epochs_track_identity_marginal_df, (xbin, ), bin_infos = build_df_discretized_binned_position_columns(deepcopy(epochs_track_identity_marginal_df), bin_values=(deepcopy(active_pf_2D.xbin),),
-                                                                                                                    position_column_names = ('x_decode',),  binned_column_names = ('binned_x_decode', ),
-                                                                                                                    force_recompute=False, debug_print=True)
-        _position_col_names.extend(['binned_x_decode'])
+        if (active_pf_2D.ybin is not None) and (len(active_pf_2D.ybin) > 0):
+            epochs_track_identity_marginal_df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(deepcopy(epochs_track_identity_marginal_df), bin_values=(deepcopy(active_pf_2D.xbin), deepcopy(active_pf_2D.ybin)),
+                                                                                                                position_column_names = ('x_decode', 'y_decode'),  binned_column_names = ('binned_x_decode', 'binned_y_decode'),
+                                                                                                                force_recompute=False, debug_print=True)
+            _position_col_names.extend(['binned_x_decode', 'binned_y_decode'])
+        else:
+            # x-only:
+            epochs_track_identity_marginal_df, (xbin, ), bin_infos = build_df_discretized_binned_position_columns(deepcopy(epochs_track_identity_marginal_df), bin_values=(deepcopy(active_pf_2D.xbin),),
+                                                                                                                        position_column_names = ('x_decode',),  binned_column_names = ('binned_x_decode', ),
+                                                                                                                        force_recompute=False, debug_print=True)
+            _position_col_names.extend(['binned_x_decode'])
     
     # Add ground-truth/performance comparisons ___________________________________________________________________________ #
     epochs_track_identity_marginal_df['is_Long'] = (epochs_track_identity_marginal_df['lap_dir'] > 0)
@@ -217,17 +193,9 @@ def build_lap_bin_by_bin_performance_analysis_df(test_all_directional_laps_decod
         epochs_track_identity_marginal_df['P_RL']
     )
     
-    ## TODO: ## switch between the four columns based on the value of 'correct_decoder_idx'
+    ## switch between the four columns based on the value of 'correct_decoder_idx' using `np.select(...)`:
     epochs_track_identity_marginal_df['correct_decoder_idx'] = (2 * epochs_track_identity_marginal_df['maze_id']) + epochs_track_identity_marginal_df['lap_dir'] # ['correct_decoder_idx'] is [0, 1, 2, 3]
 
-    # epochs_track_identity_marginal_df['estimation_correctness_decoder_idx'] = np.where( ## switch between the four columns based on the value of 'correct_decoder_idx'
-    #     epochs_track_identity_marginal_df['correct_decoder_idx'],
-    #     epochs_track_identity_marginal_df['P_Long_LR'],
-    #     epochs_track_identity_marginal_df['P_Long_RL'],
-    #     epochs_track_identity_marginal_df['P_Short_LR'],
-    #     epochs_track_identity_marginal_df['P_Short_RL'],
-    # )
-    
     # Define the conditions
     conditions = [
         epochs_track_identity_marginal_df['correct_decoder_idx'] == 0,
@@ -251,8 +219,6 @@ def build_lap_bin_by_bin_performance_analysis_df(test_all_directional_laps_decod
         print(list(epochs_track_identity_marginal_df.columns)) # ['P_Long', 'P_Short', 'lap_idx', 'lap_id', 'maze_id', 'lap_dir', 'is_LR_dir', 'start', 'stop', 'duration', 'x_meas', 'y_meas', 'binned_x_meas', 'is_Long', 'estimation_correctness_track_ID']
     # ['P_Long', 'P_Short', 'lap_idx', 'lap_id', 'maze_id', 'lap_dir', 'is_LR_dir', 'start', 'stop', 'duration', 'P_LR', 'P_RL', 'P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL', 'x_meas', 'y_meas', 'binned_x_meas', 'is_Long', 'estimation_correctness_track_ID', 'estimation_correctness_track_dir', 'correct_decoder_idx', 'estimation_correctness_decoder_idx']
 
-    ## Move the "height" columns to the end
-    # epochs_track_identity_marginal_df = reorder_columns_relative(epochs_track_identity_marginal_df, column_names=list(filter(lambda column: column.endswith('_peak_heights'), existing_columns)), relative_mode='end')
     if debug_print:
         print(f'_position_col_names: {_position_col_names}')
     
