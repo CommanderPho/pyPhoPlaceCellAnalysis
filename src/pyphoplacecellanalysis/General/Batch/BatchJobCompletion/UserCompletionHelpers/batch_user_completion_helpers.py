@@ -989,7 +989,7 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 	return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['TrialByTrialActivityResult'], input_requires=[], output_provides=[], uses=['TrialByTrialActivity.directional_compute_trial_by_trial_correlation_matrix', ''], used_by=[], creation_date='2024-10-08 16:07', 
+@function_attributes(short_name=None, tags=['TrialByTrialActivityResult'], input_requires=[], output_provides=[], uses=['TrialByTrialActivity.directional_compute_trial_by_trial_correlation_matrix', '_perform_run_rigorous_decoder_performance_assessment'], used_by=[], creation_date='2024-10-08 16:07', 
 					 requires_global_keys=['DirectionalLaps'], provides_global_keys=['DirectionalMergedDecoders'], related_items=[])
 def compute_and_export_session_trial_by_trial_performance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
 																			  active_laps_decoding_time_bin_size: float = 0.25, minimum_one_point_stability: float = 0.6, zero_point_stability: float = 0.1, save_hdf:bool=True, save_across_session_hdf:bool=False,

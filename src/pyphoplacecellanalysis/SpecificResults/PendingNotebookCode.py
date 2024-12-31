@@ -48,6 +48,258 @@ from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
+
+# ==================================================================================================================== #
+# 2024-12-31 - Decoder ID x Position                                                                                   #
+# ==================================================================================================================== #
+
+@function_attributes(short_name=None, tags=['laps', 'performance', 'position'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 11:55', related_items=[])
+def build_lap_bin_by_bin_performance_analysis_df(all_directional_laps_filter_epochs_decoder_result, active_pf_2D, active_filter_epochs):
+    """ 
+    """
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import CustomDecodeEpochsResult, MeasuredDecodedPositionComparison, DecodedFilterEpochsResult
+    from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
+
+    ## INPUTS: all_directional_laps_filter_epochs_decoder_result, active_pf_2D
+    global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap'])
+    measured_decoded_position_comparion: MeasuredDecodedPositionComparison = CustomDecodeEpochsResult.build_single_measured_decoded_position_comparison(all_directional_laps_filter_epochs_decoder_result, global_measured_position_df=global_measured_position_df)
+    # measured_decoded_position_comparion.decoded_measured_diff_df
+    # measured_decoded_position_comparion.measured_positions_dfs_list
+    # measured_decoded_position_comparion.decoded_positions_df_list
+
+    Assert.same_length(active_filter_epochs, measured_decoded_position_comparion.measured_positions_dfs_list)
+    Assert.same_length(active_filter_epochs, measured_decoded_position_comparion.decoded_positions_df_list)
+
+    measured_positions_dfs_list = [a_measured_pos_df.rename(columns={'x': 'x_meas', 'y': 'y_meas'}) for a_measured_pos_df in measured_decoded_position_comparion.measured_positions_dfs_list]
+    decoded_positions_df_list = [a_decoded_pos_df.rename(columns={'x': 'x_decode', 'y': 'y_decode'}) for a_decoded_pos_df in measured_decoded_position_comparion.decoded_positions_df_list]
+    # measured_positions_dfs_list
+    ## need actual measured positions at each of these bins
+    # all_directional_laps_filter_epochs_decoder_result.most_likely_positions_list
+
+    ## INPUTS: test_all_directional_decoder_result
+    (laps_directional_marginals_tuple, laps_track_identity_marginals_tuple, laps_non_marginalized_decoder_marginals_tuple), laps_marginals_df = all_directional_laps_filter_epochs_decoder_result.compute_marginals(epoch_idx_col_name='lap_idx', epoch_start_t_col_name='lap_start_t',
+                                                                                                                                                                    additional_transfer_column_names=['start','stop','label','duration','lap_id','lap_dir','maze_id','is_LR_dir'])
+
+
+    epochs_directional_marginals, epochs_directional_all_epoch_bins_marginal, epochs_most_likely_direction_from_decoder, epochs_is_most_likely_direction_LR_dir  = laps_directional_marginals_tuple
+    epochs_track_identity_marginals, epochs_track_identity_all_epoch_bins_marginal, epochs_most_likely_track_identity_from_decoder, epochs_is_most_likely_track_identity_Long = laps_track_identity_marginals_tuple
+    non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df = laps_non_marginalized_decoder_marginals_tuple
+
+    # epochs_most_likely_track_identity_from_decoder
+    # epochs_is_most_likely_track_identity_Long
+    # epochs_track_identity_all_epoch_bins_marginal ## all epoch bins separately
+    epochs_track_identity_marginal_p_x_given_n_list: List[NDArray] = [v['p_x_given_n'] for v in epochs_track_identity_marginals] ## List[DynamicContainer]
+    # epochs_track_identity_marginal_p_x_given_n_list
+    Assert.same_length(active_filter_epochs, epochs_track_identity_marginal_p_x_given_n_list)
+
+    # epochs_track_identity_marginal_df_list: List[pd.DataFrame] = [pd.DataFrame(np.hstack([p_x_given_n.T, np.full((p_x_given_n.T.shape[0], 1), i).astype(int)]), columns=['P_Long', 'P_Short', 'lap_idx']) for i, p_x_given_n in enumerate(epochs_track_identity_marginal_p_x_given_n_list)]
+
+    lambda_full_correctly_sized_value_fn = lambda p_x_given_n, x: np.full((p_x_given_n.T.shape[0], 1), x)
+    # epochs_track_identity_marginal_df_list: List[pd.DataFrame] = [pd.DataFrame(np.hstack([p_x_given_n.T, np.full((p_x_given_n.T.shape[0], 1), i).astype(int), np.full((p_x_given_n.T.shape[0], 1), a_lap_tuple.lap_id), lambda_full_correctly_sized_value_fn(p_x_given_n, a_lap_tuple.maze_id),
+    # 																					  lambda_full_correctly_sized_value_fn(p_x_given_n, a_lap_tuple.lap_dir),
+    # 																					  lambda_full_correctly_sized_value_fn(p_x_given_n, a_lap_tuple.is_LR_dir),
+    # 																					  lambda_full_correctly_sized_value_fn(p_x_given_n, a_lap_tuple.start),lambda_full_correctly_sized_value_fn(p_x_given_n, a_lap_tuple.stop),lambda_full_correctly_sized_value_fn(p_x_given_n, a_lap_tuple.duration),
+    # 																					  ]), columns=['P_Long', 'P_Short', 'lap_idx', 'lap_id', 'maze_id', 'lap_dir', 'is_LR_dir', 'start', 'stop', 'duration']) for i, (a_lap_tuple, p_x_given_n) in enumerate(zip(active_filter_epochs.itertuples(index=True, name='LapTuple'), epochs_track_identity_marginal_p_x_given_n_list))]
+
+    epochs_track_identity_marginal_df_list: List[pd.DataFrame] = [pd.concat([pd.DataFrame(np.hstack([p_x_given_n.T, np.full((p_x_given_n.T.shape[0], 1), i).astype(int), np.full((p_x_given_n.T.shape[0], 1), a_lap_tuple.lap_id), lambda_full_correctly_sized_value_fn(p_x_given_n, a_lap_tuple.maze_id),
+                                                                                        lambda_full_correctly_sized_value_fn(p_x_given_n, a_lap_tuple.lap_dir),
+                                                                                        lambda_full_correctly_sized_value_fn(p_x_given_n, a_lap_tuple.is_LR_dir),
+                                                                                        lambda_full_correctly_sized_value_fn(p_x_given_n, a_lap_tuple.start),lambda_full_correctly_sized_value_fn(p_x_given_n, a_lap_tuple.stop),lambda_full_correctly_sized_value_fn(p_x_given_n, a_lap_tuple.duration),
+                                                                                        ]), columns=['P_Long', 'P_Short', 'lap_idx', 'lap_id', 'maze_id', 'lap_dir', 'is_LR_dir', 'start', 'stop', 'duration']), a_measured_pos_df[['x_meas', 'y_meas']]], axis='columns', ignore_index=False) for i, (a_lap_tuple, a_measured_pos_df, p_x_given_n) in enumerate(zip(active_filter_epochs.itertuples(index=True, name='LapTuple'), measured_positions_dfs_list, epochs_track_identity_marginal_p_x_given_n_list))]
+    # .itertuples(index=True, name='MeasuredPositionTuple')
+
+    Assert.same_length(active_filter_epochs, epochs_track_identity_marginal_df_list)
+
+    # epochs_track_identity_marginal_df_list
+
+    epochs_track_identity_marginal_df: pd.DataFrame = pd.concat(epochs_track_identity_marginal_df_list).reset_index(drop=True) #.astype({'lap_idx': int,'lap_id': int,'maze_id': int,'lap_dir': int,'is_LR_dir':bool})
+    epochs_track_identity_marginal_df = epochs_track_identity_marginal_df.astype({'lap_idx': int,'lap_id': int,'maze_id': int,'lap_dir': int,'is_LR_dir':bool})
+    # Assert.same_length(active_filter_epochs, epochs_track_identity_marginal_df_list)
+
+
+
+
+    # deepcopy(train_lap_specific_pf1D_Decoder_dict['long_LR'].xbin)
+    # deepcopy(train_lap_specific_pf1D_Decoder_dict['long_LR'].ybin)
+    # epochs_track_identity_marginal_df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(deepcopy(epochs_track_identity_marginal_df), bin_values=(deepcopy(active_pf_2D.xbin), deepcopy(active_pf_2D.ybin)),
+    #                                                                                                             position_column_names = ('x_meas', 'y_meas'),  binned_column_names = ('binned_x', 'binned_y'),
+    #                                                                                                             force_recompute=False, debug_print=True)
+
+    epochs_track_identity_marginal_df, (xbin, ), bin_infos = build_df_discretized_binned_position_columns(deepcopy(epochs_track_identity_marginal_df), bin_values=(deepcopy(active_pf_2D.xbin),),
+                                                                                                                position_column_names = ('x_meas',),  binned_column_names = ('binned_x_meas', ),
+                                                                                                                force_recompute=False, debug_print=True)
+
+
+
+    epochs_track_identity_marginal_df
+
+    # Add ground-truth/performance comparisons ___________________________________________________________________________ #
+    epochs_track_identity_marginal_df['is_Long'] = (epochs_track_identity_marginal_df['lap_dir'] > 0)
+    # if epochs_track_identity_marginal_df['is_Long'] assign epochs_track_identity_marginal_df['P_Long'], else assign assign epochs_track_identity_marginal_df['P_Short']
+    # epochs_track_identity_marginal_df['estimation_correctness_track_ID'] = epochs_track_identity_marginal_df['P_Long'] * epochs_track_identity_marginal_df['is_Long'].astype(float)
+    epochs_track_identity_marginal_df['estimation_correctness_track_ID'] = np.where(
+        epochs_track_identity_marginal_df['is_Long'],
+        epochs_track_identity_marginal_df['P_Long'],
+        epochs_track_identity_marginal_df['P_Short']
+    )
+
+
+    # epochs_track_identity_marginal_df['estimation_correctness_track_dir'] = np.where(
+    #     epochs_track_identity_marginal_df['is_LR_dir'],
+    #     epochs_track_identity_marginal_df['P_LR'],
+    #     epochs_track_identity_marginal_df['P_RL']
+    # )
+
+    print(list(epochs_track_identity_marginal_df.columns)) # ['P_Long', 'P_Short', 'lap_idx', 'lap_id', 'maze_id', 'lap_dir', 'is_LR_dir', 'start', 'stop', 'duration', 'x_meas', 'y_meas', 'binned_x_meas', 'is_Long', 'estimation_correctness_track_ID']
+
+    return epochs_track_identity_marginal_df
+    
+
+
+@function_attributes(short_name=None, tags=['transition_matrix', 'position', 'decoder_id', '2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 10:05', related_items=[])
+def build_position_by_decoder_transition_matrix(p_x_given_n):
+    """ 
+    given a decoder that gives a probability that the generating process is one of two possibilities, what methods are available to estimate the probability for a contiguous epoch made of many time bins? 
+    Note: there is most certainly temporal dependence, how should I go about dealing with this?
+    
+    Usage:
+    
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_position_by_decoder_transition_matrix, plot_blocked_transition_matrix
+    
+        ## INPUTS: p_x_given_n
+        n_position_bins, n_decoding_models, n_time_bins = p_x_given_n.shape
+        A_position, A_model, A_big = build_position_by_decoder_transition_matrix(p_x_given_n)
+        
+        ## Plotting:
+        import matplotlib.pyplot as plt; import seaborn as sns
+
+        # plt.figure(figsize=(8,6)); sns.heatmap(A_big, cmap='viridis'); plt.title("Transition Matrix A_big"); plt.show()
+        plt.figure(figsize=(8,6)); sns.heatmap(A_position, cmap='viridis'); plt.title("Transition Matrix A_position"); plt.show()
+        plt.figure(figsize=(8,6)); sns.heatmap(A_model, cmap='viridis'); plt.title("Transition Matrix A_model"); plt.show()
+
+        plot_blocked_transition_matrix(A_big, n_position_bins, n_decoding_models)
+        
+        
+    """
+    # Assume p_x_given_n is already loaded with shape (57, 4, 29951).
+    # We'll demonstrate by generating random data:
+    # p_x_given_n = np.random.rand(57, 4, 29951)
+
+    n_position_bins, n_decoding_models, n_time_bins = p_x_given_n.shape
+
+    # 1. Determine the most likely model for each time bin
+    sum_over_positions = p_x_given_n.sum(axis=0)  # (n_decoding_models, n_time_bins)
+    best_model_each_bin = sum_over_positions.argmax(axis=0)  # (n_time_bins,)
+
+    # 2. Determine the most likely position for each time bin (conditional on chosen model)
+    best_position_each_bin = np.array([
+        p_x_given_n[:, best_model_each_bin[t], t].argmax() 
+        for t in range(n_time_bins)
+    ])
+
+    # 3. Build position transition matrix
+    A_position_counts = np.zeros((n_position_bins, n_position_bins))
+    for t in range(n_time_bins - 1):
+        A_position_counts[best_position_each_bin[t], best_position_each_bin[t+1]] += 1
+    A_position = A_position_counts / A_position_counts.sum(axis=1, keepdims=True)
+    A_position = np.nan_to_num(A_position)  # handle rows with zero counts
+
+    # 4. Build model transition matrix
+    A_model_counts = np.zeros((n_decoding_models, n_decoding_models))
+    for t in range(n_time_bins - 1):
+        A_model_counts[best_model_each_bin[t], best_model_each_bin[t+1]] += 1
+    A_model = A_model_counts / A_model_counts.sum(axis=1, keepdims=True)
+    A_model = np.nan_to_num(A_model)
+
+    # 5. Construct combined transition matrix (Kronecker product)
+    A_big = np.kron(A_position, A_model)
+
+    print("A_position:", A_position)
+    print("A_model:", A_model)
+    print("A_big shape:", A_big.shape)
+    return A_position, A_model, A_big
+
+
+
+def plot_blocked_transition_matrix(A_big, n_position_bins, n_decoding_models, tick_labels=('long_LR', 'long_RL', 'short_LR', 'short_RL'), should_show_marginals:bool=True):
+    """ 
+    
+    plot_blocked_transition_matrix(A_big, n_position_bins, n_decoding_models)
+    
+    
+    """
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import matplotlib.gridspec as gridspec
+
+    if should_show_marginals:
+        fig = plt.figure(figsize=(9, 9))
+        gs = gridspec.GridSpec(2, 2, width_ratios=[10, 1], height_ratios=[1, 10])
+        
+        ax_heatmap = fig.add_subplot(gs[1, 0])
+        ax_row_sums = fig.add_subplot(gs[1, 1], sharey=ax_heatmap)
+        ax_col_sums = fig.add_subplot(gs[0, 0], sharex=ax_heatmap)
+
+        # Hide tick labels on margin plots
+        plt.setp(ax_row_sums.get_yticklabels(), visible=False)
+        plt.setp(ax_col_sums.get_xticklabels(), visible=False)
+
+        # Main heatmap
+        sns.heatmap(A_big, cmap='viridis', ax=ax_heatmap, cbar=False)
+
+        # Draw lines separating decoder blocks
+        for i in range(1, n_decoding_models):
+            ax_heatmap.axhline(i * n_position_bins, color='white')
+            ax_heatmap.axvline(i * n_position_bins, color='white')
+
+        # Row sums (marginal over columns)
+        row_sums = A_big.sum(axis=1)
+        ax_row_sums.barh(np.arange(len(row_sums)), row_sums, color='gray')
+        ax_row_sums.invert_xaxis()
+
+        # Column sums (marginal over rows)
+        col_sums = A_big.sum(axis=0)
+        ax_col_sums.bar(np.arange(len(col_sums)), col_sums, color='gray')
+
+        # Tick positions (centered in each block)
+        tick_locs = [i * n_position_bins + n_position_bins / 2 for i in range(n_decoding_models)]
+        if tick_labels is not None:
+            assert len(tick_labels) == n_decoding_models, f"n_decoding_models: {n_decoding_models}, len(tick_labels): {len(tick_labels)}"
+            tick_labels = list(tick_labels)
+        else:
+            tick_labels = [f'Decoder {i}' for i in range(n_decoding_models)]
+
+        # Apply block-centered labels
+        ax_heatmap.set_xticks(tick_locs)
+        ax_heatmap.set_xticklabels(tick_labels, rotation=90)
+        ax_heatmap.set_yticks(tick_locs)
+        ax_heatmap.set_yticklabels(tick_labels)
+
+        plt.tight_layout()
+        plt.show()
+    else:
+        plt.figure(figsize=(8,8))
+        sns.heatmap(A_big, cmap='viridis')
+
+        for i in range(1, n_decoding_models):
+            plt.axhline(i * n_position_bins, color='white')
+            plt.axvline(i * n_position_bins, color='white')
+
+        tick_locs = [i * n_position_bins + n_position_bins / 2 for i in range(n_decoding_models)]
+        if tick_labels is not None:
+            assert len(tick_labels) == n_decoding_models, f"n_decoding_models: {n_decoding_models}, len(tick_labels): {len(tick_labels)}"
+            tick_labels = list(tick_labels)
+        else:
+            tick_labels = [f'Decoder {i}' for i in range(n_decoding_models)]
+
+        plt.xticks(tick_locs, tick_labels, rotation=90)
+        plt.yticks(tick_locs, tick_labels, rotation=0)
+        plt.title("Transition Matrix Blocks by Decoder")
+        plt.show()
+
+
+
+
 # ==================================================================================================================== #
 # 2024-12-20 - Heuristicy Wisticky                                                                                     #
 # ==================================================================================================================== #
@@ -2444,7 +2696,7 @@ def _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline, i
     
     # MAIN _______________________________________________________________________________________________________________ #
     
-    complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results = _do_train_test_split_decode_and_evaluate(curr_active_pipeline=curr_active_pipeline, active_laps_decoding_time_bin_size=active_laps_decoding_time_bin_size,
+    complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, test_all_directional_decoder_result, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results = _do_train_test_split_decode_and_evaluate(curr_active_pipeline=curr_active_pipeline, active_laps_decoding_time_bin_size=active_laps_decoding_time_bin_size,
                                                                                                                                                                                                                                                   included_neuron_IDs=included_neuron_IDs,
                                                                                                                                                                                                                                                   force_recompute_directional_train_test_split_result=False, compute_separate_decoder_results=True)
     (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = complete_decoded_context_correctness_tuple
