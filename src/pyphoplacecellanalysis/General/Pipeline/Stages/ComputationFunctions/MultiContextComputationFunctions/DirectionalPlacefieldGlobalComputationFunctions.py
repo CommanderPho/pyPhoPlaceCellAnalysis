@@ -1641,7 +1641,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         
     # Higher-level likelihood access functions ___________________________________________________________________________ #
     @classmethod
-    def determine_directional_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result) -> DecodedMarginalResultTuple:
+    def determine_directional_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult) -> DecodedMarginalResultTuple:
         """ 
 
         determine_directional_likelihoods
@@ -3882,7 +3882,7 @@ class TrainTestLapsSplitting:
         test_laps_decoder_results_dict: Dict[str, DecodedFilterEpochsResult] = {k:v.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=deepcopy(test_epochs_dict[k]), decoding_time_bin_size=laps_decoding_time_bin_size, debug_print=False) for k,v in train_lap_specific_pf1D_Decoder_dict.items()}
         return test_laps_decoder_results_dict
 
-    @function_attributes(short_name=None, tags=['split', 'train-test'], input_requires=[], output_provides=[], uses=['split_laps_training_and_test'], used_by=[], creation_date='2024-03-29 22:14', related_items=[])
+    @function_attributes(short_name=None, tags=['split', 'train-test'], input_requires=[], output_provides=[], uses=['split_laps_training_and_test'], used_by=['_split_train_test_laps_data'], creation_date='2024-03-29 22:14', related_items=[])
     @classmethod
     def compute_train_test_split_laps_decoders(cls, directional_laps_results: DirectionalLapsResult, track_templates: TrackTemplates, training_data_portion: float=5.0/6.0,
                                             debug_output_hdf5_file_path=None, debug_plot: bool = False, debug_print: bool = False) -> TrainTestSplitResult: #Tuple[Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]], Dict[str, BasePositionDecoder], Dict[str, DynamicContainer]]:
@@ -6084,7 +6084,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
 
     @function_attributes(short_name='directional_train_test_split', tags=['train-test-split', 'global_computation'],
-                        input_requires=['global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values', 'global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz'], output_provides=[], uses=[], used_by=[], creation_date='2024-04-09 06:09', related_items=[],
+                        input_requires=['global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values', 'global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz'], output_provides=[], uses=['TrainTestLapsSplitting.compute_train_test_split_laps_decoders'], used_by=[], creation_date='2024-04-09 06:09', related_items=[],
                         requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders'], provides_global_keys=['TrainTestSplit'],
                         validate_computation_test=_workaround_validate_has_directional_train_test_split_result, 
                         is_global=True, computation_precidence=(1002.3))
