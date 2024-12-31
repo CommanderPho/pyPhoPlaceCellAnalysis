@@ -31,7 +31,7 @@ class PyqtgraphTimeSynchronizedWidget(PlottingBackendSpecifyingMixin, TimeSynchr
     applicationName = 'PyqtgraphTimeSynchronizedWidgetApp'
     windowName = 'PyqtgraphTimeSynchronizedWidgetWindow'
     
-    enable_debug_print = False
+    enable_debug_print = True
         
     @classmethod
     def get_plot_backing_type(cls) -> PlottingBackendType:
@@ -67,6 +67,12 @@ class PyqtgraphTimeSynchronizedWidget(PlottingBackendSpecifyingMixin, TimeSynchr
             self.window().setWindowTitle(self.params.window_title)
 
     
+
+    @property
+    def last_t(self):
+        raise NotImplementedError(f'Parent property that should not be accessed!')
+
+
     def __init__(self, name='PyqtgraphTimeSynchronizedWidget', plot_function_name=None, scrollable_figure=True, application_name=None, window_name=None, parent=None, **kwargs):
         """_summary_
         , disable_toolbar=True, size=(5.0, 4.0), dpi=72
@@ -138,10 +144,10 @@ class PyqtgraphTimeSynchronizedWidget(PlottingBackendSpecifyingMixin, TimeSynchr
         self.ui.root_plot.setObjectName('RootPlot')
         # self.ui.root_plot.addItem(self.ui.imv, defaultPadding=0.0)  # add ImageItem to PlotItem
         ## TODO: add item here
-        self.ui.root_plot.showAxes(True)
+        # self.ui.root_plot.showAxes(True)
         self.ui.root_plot.hideButtons() # Hides the auto-scale button
         
-        # self.ui.root_plot.showAxes(False)        
+        self.ui.root_plot.showAxes(False)     
         # self.ui.root_plot.setRange(xRange=self.params.x_range, yRange=self.params.y_range, padding=0.0)
         # Sets only the panning limits:
         # self.ui.root_plot.setLimits(xMin=self.params.x_range[0], xMax=self.params.x_range[-1], yMin=self.params.y_range[0], yMax=self.params.y_range[-1])
@@ -169,6 +175,9 @@ class PyqtgraphTimeSynchronizedWidget(PlottingBackendSpecifyingMixin, TimeSynchr
 
     
     def update(self, t, defer_render=False):
+        if self.enable_debug_print:
+            print(f'PyqtgraphTimeSynchronizedWidget.update(t: {t})')
+    
         # Finds the nearest previous decoded position for the time t:
         self.last_window_index = np.searchsorted(self.time_window_centers, t, side='left') # side='left' ensures that no future values (later than 't') are ever returned
         self.last_window_time = self.time_window_centers[self.last_window_index] # If there is no suitable index, return either 0 or N (where N is the length of `a`).
@@ -182,7 +191,16 @@ class PyqtgraphTimeSynchronizedWidget(PlottingBackendSpecifyingMixin, TimeSynchr
             print(f'PyqtgraphTimeSynchronizedWidget._update_plots()')
 
         # Update the existing one:
+        # self.ui.root_plot.setRange(xRange=self.params.x_range, yRange=self.params.y_range, padding=0.0)
+        # Sets only the panning limits:
+        # self.ui.root_plot.setLimits(xMin=self.params.x_range[0], xMax=self.params.x_range[-1], yMin=self.params.y_range[0], yMax=self.params.y_range[-1])
 
+        ## Sets all limits:
+        # _x, _y, _width, _height = self.params.image_bounds_extent # [23.923329354140844, 123.85967782096927, 241.7178791533281, 30.256480996256016]
+        # self.ui.root_plot.setLimits(minXRange=_width, maxXRange=_width, minYRange=_height, maxYRange=_height)
+        # self.ui.root_plot.setLimits(xMin=self.params.x_range[0], xMax=self.params.x_range[-1], yMin=self.params.y_range[0], yMax=self.params.y_range[-1],
+        #                             minXRange=_width, maxXRange=_width, minYRange=_height, maxYRange=_height)
+        
         # Update the plots:
         # curr_time_window_index = self.last_window_index
         # curr_t = self.last_window_time
@@ -193,6 +211,23 @@ class PyqtgraphTimeSynchronizedWidget(PlottingBackendSpecifyingMixin, TimeSynchr
         # self.setWindowTitle(f'{self.windowName} - {image_title} t = {curr_t}')
         # self.setWindowTitle(f'PyqtgraphTimeSynchronizedWidget - {image_title} t = {curr_t}')
         pass
+
+    # ==================================================================================================================== #
+    # QT Slots                                                                                                             #
+    # ==================================================================================================================== #
+    
+    @QtCore.Slot(float, float)
+    def on_window_changed(self, start_t, end_t):
+        # called when the window is updated
+        if self.enable_debug_print:
+            print(f'PyqtgraphTimeSynchronizedWidget.on_window_changed(start_t: {start_t}, end_t: {end_t})')
+        # if self.enable_debug_print:
+        #     profiler = pg.debug.Profiler(disabled=True, delayed=True)
+
+        self.update(end_t, defer_render=False)
+        # if self.enable_debug_print:
+        #     profiler('Finished calling _update_plots()')
+            
 
     def getRootLayout(self) -> QtWidgets.QGridLayout:
         return self.ui.layout

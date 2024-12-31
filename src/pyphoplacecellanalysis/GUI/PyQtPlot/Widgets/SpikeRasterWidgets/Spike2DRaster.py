@@ -435,6 +435,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         self.update_series_identity_y_values()
         self._build_cell_configs()
         
+        use_docked_pyqtgraph_plots: bool = self.params.setdefault('use_docked_pyqtgraph_plots', True)
         
         ## New: Build a container layout to contain all elements that will represent the active window 
         self.params.main_graphics_active_window_container_layout_rowspan = 1
@@ -450,7 +451,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             self.plots.main_plot_widget = self.ui.active_window_container_layout.addPlot(row=1, col=0, rowspan=self.params.main_graphics_plot_widget_rowspan, colspan=1)
             # self.plots.main_plot_widget = self.ui.main_graphics_layout_widget.addPlot(col=0, rowspan=self.params.main_graphics_plot_widget_rowspan, colspan=1) # , name='main_plot_widget'
             self.plots.main_plot_widget.setObjectName('main_plot_widget') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
-            self.plots.main_plot_widget.setMinimumHeight(200.0) # used to be 500.0 and took up too much room
+            self.plots.main_plot_widget.setMinimumHeight(40.0) # used to be 500.0 and took up too much room
 
             # curr_plot_row += (1 * self.params.main_graphics_plot_widget_rowspan)
             # self.ui.plots = [] # create an empty array for each plot, of which there will be one for each unit.
@@ -1163,7 +1164,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
          new_curves_separate_plot: a PlotItem
             
         """
-        use_docked_pyqtgraph_plots: bool = self.params.setdefault('use_docked_pyqtgraph_plots', True)
+        use_docked_pyqtgraph_plots: bool = self.params.use_docked_pyqtgraph_plots
         if use_docked_pyqtgraph_plots:
             a_time_sync_pyqtgraph_widget, root_graphics_layout_widget, plot_item = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(500,50))
             target_graphics_layout_widget = root_graphics_layout_widget
@@ -1192,10 +1193,19 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     @function_attributes(short_name=None, tags=['pyqtgraph', 'render_plot_group'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 04:59', related_items=[])
     def remove_separate_render_plot_items(self, separate_plot_item):
         """ removes the PlotItem separate_plot_item created by calling self.create_separate_render_plot_item(...) from the layout. """
-        use_docked_pyqtgraph_plots: bool = self.params.setdefault('use_docked_pyqtgraph_plots', True)
+        use_docked_pyqtgraph_plots: bool = self.params.use_docked_pyqtgraph_plots
         if use_docked_pyqtgraph_plots:
-            a_time_sync_pyqtgraph_widget, root_graphics_layout_widget, plot_item = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(500,50))
-            target_graphics_layout_widget = root_graphics_layout_widget
+            ## how do I find the plot?
+            active_time_sync_pyqtgraph_widgets: Dict[str, PyqtgraphTimeSynchronizedWidget] = {identifier:active_matplotlib_view_widget for identifier, active_matplotlib_view_widget in self.ui.matplotlib_view_widgets.items() if active_matplotlib_view_widget.is_pyqtgraph_based()}
+            
+            # active_time_sync_pyqtgraph_plot_items = {identifier:active_matplotlib_view_widget.getRootPlotItem() for identifier, active_matplotlib_view_widget in active_time_sync_pyqtgraph_widgets.items()}
+            active_time_sync_pyqtgraph_plot_item_to_layout_map = {active_matplotlib_view_widget.getRootPlotItem():active_matplotlib_view_widget.getRootGraphicsLayoutWidget() for identifier, active_matplotlib_view_widget in active_time_sync_pyqtgraph_widgets.items()}
+            assert separate_plot_item in active_time_sync_pyqtgraph_plot_item_to_layout_map, f"active_time_sync_pyqtgraph_plot_item_to_layout_map: {active_time_sync_pyqtgraph_plot_item_to_layout_map}, separate_plot_item: {separate_plot_item}, active_time_sync_pyqtgraph_widgets: {active_time_sync_pyqtgraph_widgets}"
+            target_graphics_layout_widget = active_time_sync_pyqtgraph_plot_item_to_layout_map[separate_plot_item]
+            assert target_graphics_layout_widget is not None            
+            # raise NotImplementedError(f'Not finished, how do I find the embedding widget from the plot item?')
+            # a_time_sync_pyqtgraph_widget, root_graphics_layout_widget, plot_item = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(500,50))
+            # target_graphics_layout_widget = root_graphics_layout_widget
         else:
             # main_graphics_layout_widget = self.ui.main_graphics_layout_widget # GraphicsLayoutWidget
             target_graphics_layout_widget = self.ui.active_window_container_layout # GraphicsLayoutWidget
