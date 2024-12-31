@@ -1412,12 +1412,33 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
     # Low-level direct marginal computation functions ____________________________________________________________________ #
     @classmethod
-    def build_top_level_raw_posteriors(cls, filter_epochs_decoder_result: DecodedFilterEpochsResult, debug_print=False) -> List[DynamicContainer]:
+    def get_proper_p_x_given_n_list(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult]) -> List[DynamicContainer]:
+        """ only works for the all-directional coder with the four items
+        
+        Requires: filter_epochs_decoder_result.p_x_given_n_list
+        
+        Usage:
+           
+        """            
+        if isinstance(filter_epochs_decoder_result, (List, NDArray)):
+            ## assume it's already `p_x_given_n_list` format
+            p_x_given_n_list = filter_epochs_decoder_result
+        else:
+            ## assume it's in the `DecodedFilterEpochsResult` format, access its `.p_x_given_n_list`
+            p_x_given_n_list = filter_epochs_decoder_result.p_x_given_n_list
+
+        return p_x_given_n_list
+    
+
+    @classmethod
+    def build_top_level_raw_posteriors(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], debug_print=False) -> List[DynamicContainer]:
         """ only works for the all-directional coder with the four items
         
         NOTE OUTPUT WILL BE 3D!!
         
+        Requires: filter_epochs_decoder_result.p_x_given_n_list
         """
+        
         custom_curr_unit_marginal_list = []
         
         for a_p_x_given_n in filter_epochs_decoder_result.p_x_given_n_list:
@@ -1430,8 +1451,10 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
 
     @classmethod
-    def build_non_marginalized_raw_posteriors(cls, filter_epochs_decoder_result: DecodedFilterEpochsResult, debug_print=False) -> List[DynamicContainer]:
+    def build_non_marginalized_raw_posteriors(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], debug_print=False) -> List[DynamicContainer]:
         """ only works for the all-directional coder with the four items
+        
+        Requires: filter_epochs_decoder_result.p_x_given_n_list
         
         Usage:
             from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
@@ -1448,9 +1471,11 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         1: RL
         
         """
+        p_x_given_n_list = cls.get_proper_p_x_given_n_list(filter_epochs_decoder_result)
+        
         custom_curr_unit_marginal_list = []
         
-        for a_p_x_given_n in filter_epochs_decoder_result.p_x_given_n_list:
+        for a_p_x_given_n in p_x_given_n_list:
             # an_array = all_directional_laps_filter_epochs_decoder_result.p_x_given_n_list[0] # .shape # (62, 4, 236)
             curr_array_shape = np.shape(a_p_x_given_n) # .shape # (62, 4, 236) - (n_pos_bins, 4, n_epoch_t_bins[i])
             if debug_print:
@@ -1482,8 +1507,11 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
 
     @classmethod
-    def build_custom_marginal_over_direction(cls, filter_epochs_decoder_result: DecodedFilterEpochsResult, debug_print=False) -> List[DynamicContainer]:
+    def build_custom_marginal_over_direction(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], debug_print=False) -> List[DynamicContainer]:
         """ only works for the all-directional coder with the four items
+        
+        Requires: filter_epochs_decoder_result.p_x_given_n_list
+
         
         Usage:
             from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
@@ -1500,9 +1528,11 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         1: RL
         
         """
+        p_x_given_n_list = cls.get_proper_p_x_given_n_list(filter_epochs_decoder_result)
+        
         custom_curr_unit_marginal_list = []
         
-        for a_p_x_given_n in filter_epochs_decoder_result.p_x_given_n_list:
+        for a_p_x_given_n in p_x_given_n_list:
             # an_array = all_directional_laps_filter_epochs_decoder_result.p_x_given_n_list[0] # .shape # (62, 4, 236)
             curr_array_shape = np.shape(a_p_x_given_n)
             if debug_print:
@@ -1545,7 +1575,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         return custom_curr_unit_marginal_list
 
     @classmethod
-    def build_custom_marginal_over_long_short(cls, filter_epochs_decoder_result: DecodedFilterEpochsResult, debug_print=False) -> List[DynamicContainer]:
+    def build_custom_marginal_over_long_short(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], debug_print=False) -> List[DynamicContainer]:
         """ only works for the all-directional coder with the four items
         
         Usage:
@@ -1563,9 +1593,11 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         1: RL
         
         """
+        p_x_given_n_list = cls.get_proper_p_x_given_n_list(filter_epochs_decoder_result)
+        
         custom_curr_unit_marginal_list = []
         
-        for a_p_x_given_n in filter_epochs_decoder_result.p_x_given_n_list:
+        for a_p_x_given_n in p_x_given_n_list:
             # an_array = all_directional_laps_filter_epochs_decoder_result.p_x_given_n_list[0] # .shape # (62, 4, 236)
             curr_array_shape = np.shape(a_p_x_given_n)
             if debug_print:
@@ -1641,7 +1673,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         
     # Higher-level likelihood access functions ___________________________________________________________________________ #
     @classmethod
-    def determine_directional_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult) -> DecodedMarginalResultTuple:
+    def determine_directional_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult]) -> DecodedMarginalResultTuple:
         """ 
 
         determine_directional_likelihoods
@@ -1662,7 +1694,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         return directional_marginals, directional_all_epoch_bins_marginal, most_likely_direction_from_decoder, is_most_likely_direction_LR_dir
     
     @classmethod
-    def determine_long_short_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult) -> DecodedMarginalResultTuple:
+    def determine_long_short_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult]) -> DecodedMarginalResultTuple:
         """ 
         
         laps_track_identity_marginals = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
@@ -1682,7 +1714,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         return track_identity_marginals, track_identity_all_epoch_bins_marginal, most_likely_track_identity_from_decoder, is_most_likely_track_identity_Long
 
     @classmethod
-    def determine_non_marginalized_decoder_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult, debug_print=False) -> Tuple[List[DynamicContainer], NDArray[float], NDArray[int], pd.DataFrame]:
+    def determine_non_marginalized_decoder_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], debug_print=False) -> Tuple[List[DynamicContainer], NDArray[float], NDArray[int], pd.DataFrame]:
         """ 
         
         non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df = DirectionalPseudo2DDecodersResult.determine_non_marginalized_decoder_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)

@@ -995,7 +995,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
 
     @function_attributes(short_name=None, tags=['marginal', 'direction', 'track_id'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-08 00:40', related_items=[]) 
     @classmethod
-    def perform_compute_marginals(cls, filter_epochs: pd.DataFrame, epoch_idx_col_name: str = 'lap_idx', epoch_start_t_col_name: str = 'lap_start_t', additional_transfer_column_names: Optional[List[str]]=None, auto_transfer_all_columns:bool=True): # -> tuple[tuple["DecodedMarginalResultTuple", "DecodedMarginalResultTuple", Tuple[List[DynamicContainer], Any, Any, pd.DataFrame]], pd.DataFrame]:
+    def perform_compute_marginals(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, "DecodedFilterEpochsResult"], filter_epochs: pd.DataFrame, epoch_idx_col_name: str = 'lap_idx', epoch_start_t_col_name: str = 'lap_start_t', additional_transfer_column_names: Optional[List[str]]=None, auto_transfer_all_columns:bool=True): # -> tuple[tuple["DecodedMarginalResultTuple", "DecodedMarginalResultTuple", Tuple[List[DynamicContainer], Any, Any, pd.DataFrame]], pd.DataFrame]:
         """Computes and initializes the marginal properties
         
         (epochs_directional_marginals_tuple, epochs_track_identity_marginals_tuple, epochs_non_marginalized_decoder_marginals_tuple), epochs_marginals_df = a_result.compute_marginals(additional_transfer_column_names=['start','stop','label','duration','lap_id','lap_dir'])
@@ -1009,11 +1009,11 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         
         epochs_epochs_df: pd.DataFrame = ensure_dataframe(deepcopy(filter_epochs))
         
-        epochs_directional_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_directional_likelihoods(self)
+        epochs_directional_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_directional_likelihoods(filter_epochs_decoder_result)
         epochs_directional_marginals, epochs_directional_all_epoch_bins_marginal, epochs_most_likely_direction_from_decoder, epochs_is_most_likely_direction_LR_dir  = epochs_directional_marginals_tuple
-        epochs_track_identity_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(self)
+        epochs_track_identity_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(filter_epochs_decoder_result)
         epochs_track_identity_marginals, epochs_track_identity_all_epoch_bins_marginal, epochs_most_likely_track_identity_from_decoder, epochs_is_most_likely_track_identity_Long = epochs_track_identity_marginals_tuple
-        epochs_non_marginalized_decoder_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_non_marginalized_decoder_likelihoods(self, debug_print=False)
+        epochs_non_marginalized_decoder_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_non_marginalized_decoder_likelihoods(filter_epochs_decoder_result, debug_print=False)
         non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df = epochs_non_marginalized_decoder_marginals_tuple
                 
         ## Build combined marginals df:
@@ -1051,7 +1051,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         
         """
         epochs_epochs_df: pd.DataFrame = ensure_dataframe(deepcopy(self.filter_epochs))
-        return self.perform_compute_marginals(filter_epochs=epochs_epochs_df, epoch_idx_col_name=epoch_idx_col_name, epoch_start_t_col_name=epoch_start_t_col_name, additional_transfer_column_names=additional_transfer_column_names, auto_transfer_all_columns=auto_transfer_all_columns)
+        return self.perform_compute_marginals(filter_epochs_decoder_result=self, filter_epochs=epochs_epochs_df, epoch_idx_col_name=epoch_idx_col_name, epoch_start_t_col_name=epoch_start_t_col_name, additional_transfer_column_names=additional_transfer_column_names, auto_transfer_all_columns=auto_transfer_all_columns)
 
         
 
