@@ -2604,7 +2604,7 @@ def _perform_build_individual_time_bin_decoded_posteriors_df(curr_active_pipelin
 
 # appearing_or_disappearing_aclus, appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus
 @function_attributes(short_name=None, tags=['performance'], input_requires=[], output_provides=[], uses=['_do_train_test_split_decode_and_evaluate'], used_by=[], creation_date='2024-10-08 00:00', related_items=[])
-def _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline, included_neuron_IDs, active_laps_decoding_time_bin_size: float = 0.25):
+def _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline, included_neuron_IDs, active_laps_decoding_time_bin_size: float = 0.25, force_recompute_directional_train_test_split_result: bool = False, debug_print=False):
     """ runs for a specific subset of cells 
     """
     # Inputs: all_directional_pf1D_Decoder, alt_directional_merged_decoders_result
@@ -2628,18 +2628,21 @@ def _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline, i
         return epochs_df
 
     directional_train_test_split_result: TrainTestSplitResult = curr_active_pipeline.global_computation_results.computed_data.get('TrainTestSplit', None)
-    force_recompute_directional_train_test_split_result: bool = False
+    
     if (directional_train_test_split_result is None) or force_recompute_directional_train_test_split_result:
         ## recompute
-        print(f"'TrainTestSplit' not computed, recomputing...")
+        if debug_print:
+            print(f"'TrainTestSplit' not computed, recomputing...")
         curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_train_test_split'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
         directional_train_test_split_result: TrainTestSplitResult = curr_active_pipeline.global_computation_results.computed_data['TrainTestSplit']
         assert directional_train_test_split_result is not None, f"faiiled even after recomputation"
-        print('\tdone.')
+        if debug_print:
+            print('\tdone.')
 
     training_data_portion: float = directional_train_test_split_result.training_data_portion
     test_data_portion: float = directional_train_test_split_result.test_data_portion
-    print(f'training_data_portion: {training_data_portion}, test_data_portion: {test_data_portion}')
+    if debug_print:
+        print(f'training_data_portion: {training_data_portion}, test_data_portion: {test_data_portion}')
 
     test_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = directional_train_test_split_result.test_epochs_dict
     train_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = directional_train_test_split_result.train_epochs_dict
@@ -2650,9 +2653,10 @@ def _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline, i
     
     complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, test_all_directional_decoder_result, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results = _do_train_test_split_decode_and_evaluate(curr_active_pipeline=curr_active_pipeline, active_laps_decoding_time_bin_size=active_laps_decoding_time_bin_size,
                                                                                                                                                                                                                                                   included_neuron_IDs=included_neuron_IDs,
-                                                                                                                                                                                                                                                  force_recompute_directional_train_test_split_result=False, compute_separate_decoder_results=True)
+                                                                                                                                                                                                                                                  force_recompute_directional_train_test_split_result=force_recompute_directional_train_test_split_result, compute_separate_decoder_results=True, debug_print=debug_print)
     (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = complete_decoded_context_correctness_tuple
-    print(f"percent_laps_track_identity_estimated_correctly: {round(percent_laps_track_identity_estimated_correctly*100.0, ndigits=3)}%")
+    if debug_print:
+        print(f"percent_laps_track_identity_estimated_correctly: {round(percent_laps_track_identity_estimated_correctly*100.0, ndigits=3)}%")
 
     if _out_separate_decoder_results is not None:
         assert len(_out_separate_decoder_results) == 3, f"_out_separate_decoder_results: {_out_separate_decoder_results}"

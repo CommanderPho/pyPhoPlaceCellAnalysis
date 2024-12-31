@@ -3369,12 +3369,12 @@ class CustomDecodeEpochsResult(UnpackableMixin):
 
 
 @function_attributes(short_name=None, tags=['decode'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-05 11:59', related_items=[])
-def _do_custom_decode_epochs(global_spikes_df: pd.DataFrame,  global_measured_position_df: pd.DataFrame, pf1D_Decoder: BasePositionDecoder, epochs_to_decode_df: pd.DataFrame, decoding_time_bin_size: float) -> CustomDecodeEpochsResult: #Tuple[MeasuredDecodedPositionComparison, DecodedFilterEpochsResult]:
+def _do_custom_decode_epochs(global_spikes_df: pd.DataFrame,  global_measured_position_df: pd.DataFrame, pf1D_Decoder: BasePositionDecoder, epochs_to_decode_df: pd.DataFrame, decoding_time_bin_size: float, debug_print=False, **kwargs) -> CustomDecodeEpochsResult: #Tuple[MeasuredDecodedPositionComparison, DecodedFilterEpochsResult]:
     """
     Do a single position decoding using a single decoder for a single set of epochs
     """
     ## INPUTS: global_spikes_df, train_lap_specific_pf1D_Decoder_dict, test_epochs_dict, laps_decoding_time_bin_size
-    decoder_result: DecodedFilterEpochsResult = pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=deepcopy(epochs_to_decode_df), decoding_time_bin_size=decoding_time_bin_size, debug_print=False)
+    decoder_result: DecodedFilterEpochsResult = pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=deepcopy(epochs_to_decode_df), decoding_time_bin_size=decoding_time_bin_size, debug_print=debug_print)
     # Interpolated measured position DataFrame - looks good
     # measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df = build_single_measured_decoded_position_comparison(decoder_result, global_measured_position_df=global_measured_position_df)
     measured_decoded_position_comparion: MeasuredDecodedPositionComparison = CustomDecodeEpochsResult.build_single_measured_decoded_position_comparison(decoder_result, global_measured_position_df=global_measured_position_df)
@@ -3384,7 +3384,7 @@ def _do_custom_decode_epochs(global_spikes_df: pd.DataFrame,  global_measured_po
 
 
 @function_attributes(short_name=None, tags=['decode', 'general', 'epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-05 11:59', related_items=[])
-def _do_custom_decode_epochs_dict(global_spikes_df: pd.DataFrame, global_measured_position_df: pd.DataFrame, pf1D_Decoder_dict: Dict[str, BasePositionDecoder], epochs_to_decode_dict: Dict[str, pd.DataFrame], decoding_time_bin_size: float, decoder_and_epoch_keys_independent:bool=True) -> Union[Dict[decoder_name, CustomDecodeEpochsResult], Dict[epoch_split_key, Dict[decoder_name, CustomDecodeEpochsResult]]]:
+def _do_custom_decode_epochs_dict(global_spikes_df: pd.DataFrame, global_measured_position_df: pd.DataFrame, pf1D_Decoder_dict: Dict[str, BasePositionDecoder], epochs_to_decode_dict: Dict[str, pd.DataFrame], decoding_time_bin_size: float, decoder_and_epoch_keys_independent:bool=True, **kwargs) -> Union[Dict[decoder_name, CustomDecodeEpochsResult], Dict[epoch_split_key, Dict[decoder_name, CustomDecodeEpochsResult]]]:
     """
     Do a single position decoding for a set of epochs
 
@@ -3438,7 +3438,7 @@ def _do_custom_decode_epochs_dict(global_spikes_df: pd.DataFrame, global_measure
             else:
                 full_decoder_result: CustomDecodeEpochsResult = _do_custom_decode_epochs(global_spikes_df=global_spikes_df, global_measured_position_df=global_measured_position_df,
                     pf1D_Decoder=a_pf1D_Decoder, epochs_to_decode_df=an_epoch_to_decode_df,
-                    decoding_time_bin_size=decoding_time_bin_size)
+                    decoding_time_bin_size=decoding_time_bin_size, **kwargs)
 
                 # measured_decoded_position_comparion, decoder_result = decoder_result
                 final_decoder_results_dict[epoch_name][a_decoder_name] = full_decoder_result
@@ -3455,7 +3455,7 @@ def _do_custom_decode_epochs_dict(global_spikes_df: pd.DataFrame, global_measure
 
 @function_attributes(short_name=None, tags=['TrainTestSplit', 'decode'], input_requires=[], output_provides=[],
                       uses=['_do_custom_decode_epochs', '_check_result_laps_epochs_df_performance', 'DirectionalPseudo2DDecodersResult'], used_by=['_perform_run_rigorous_decoder_performance_assessment'], creation_date='2024-10-08 02:35', related_items=[])
-def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_decoding_time_bin_size: float=1.5, force_recompute_directional_train_test_split_result: bool=False, compute_separate_decoder_results: bool=True, included_neuron_IDs=None):
+def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_decoding_time_bin_size: float=1.5, force_recompute_directional_train_test_split_result: bool=False, compute_separate_decoder_results: bool=True, included_neuron_IDs=None, debug_print=False):
     """ 
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _do_train_test_split_decode_and_evaluate
 
@@ -3489,15 +3489,18 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
     directional_train_test_split_result: TrainTestSplitResult = curr_active_pipeline.global_computation_results.computed_data.get('TrainTestSplit', None)
     if (directional_train_test_split_result is None) or force_recompute_directional_train_test_split_result:
         ## recompute
-        print(f"'TrainTestSplit' not computed, recomputing...")
+        if debug_print:
+            print(f"'TrainTestSplit' not computed, recomputing...")
         curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_train_test_split'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
         directional_train_test_split_result: TrainTestSplitResult = curr_active_pipeline.global_computation_results.computed_data['TrainTestSplit']
         assert directional_train_test_split_result is not None, f"faiiled even after recomputation"
-        print('\tdone.')
+        if debug_print:
+            print('\tdone.')
 
     training_data_portion: float = directional_train_test_split_result.training_data_portion
     test_data_portion: float = directional_train_test_split_result.test_data_portion
-    print(f'training_data_portion: {training_data_portion}, test_data_portion: {test_data_portion}')
+    if debug_print:
+        print(f'training_data_portion: {training_data_portion}, test_data_portion: {test_data_portion}')
 
     test_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = directional_train_test_split_result.test_epochs_dict
     train_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = directional_train_test_split_result.train_epochs_dict
@@ -3535,7 +3538,7 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
                                                                                                                                         pf1D_Decoder_dict=train_lap_specific_pf1D_Decoder_dict,
                                                                                                                                         epochs_to_decode_dict=deepcopy(test_epochs_dict), 
                                                                                                                                         decoding_time_bin_size=active_laps_decoding_time_bin_size,
-                                                                                                                                        decoder_and_epoch_keys_independent=False)
+                                                                                                                                        decoder_and_epoch_keys_independent=False, debug_print=debug_print)
         train_decoded_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {k:v.decoder_result for k, v in test_decoder_results_dict.items()}
         # weighted_corr_data_dict = compute_weighted_correlations(train_decoded_results_dict, debug_print=True)
         # # weighted_corr_data_dict
@@ -3551,7 +3554,7 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
     ## Decoding of the test epochs (what matters) for `all_directional_pf1D_Decoder`:
     test_all_directional_decoder_result: CustomDecodeEpochsResult = _do_custom_decode_epochs(global_spikes_df=get_proper_global_spikes_df(curr_active_pipeline), global_measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']),
                                                             pf1D_Decoder=all_directional_pf1D_Decoder, epochs_to_decode_df=deepcopy(all_test_epochs_df),
-                                                            decoding_time_bin_size=active_laps_decoding_time_bin_size)
+                                                            decoding_time_bin_size=active_laps_decoding_time_bin_size, debug_print=debug_print)
     all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult = test_all_directional_decoder_result.decoder_result
     ## INPUTS: test_all_directional_decoder_result
     (laps_directional_marginals_tuple, laps_track_identity_marginals_tuple, laps_non_marginalized_decoder_marginals_tuple), laps_marginals_df = all_directional_laps_filter_epochs_decoder_result.compute_marginals(epoch_idx_col_name='lap_idx', epoch_start_t_col_name='lap_start_t',
@@ -6112,7 +6115,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         # debug_output_hdf5_file_path = Path('output', 'laps_train_test_split.h5').resolve()
         debug_output_hdf5_file_path = None
         a_train_test_result: TrainTestSplitResult = TrainTestLapsSplitting.compute_train_test_split_laps_decoders(directional_laps_results=directional_laps_results, track_templates=track_templates, training_data_portion=training_data_portion,
-                                                                                                                                    debug_output_hdf5_file_path=debug_output_hdf5_file_path, debug_plot=False, debug_print=True)  # type: Tuple[Tuple[Dict[str, Any], Dict[str, Any]], Dict[str, BasePositionDecoder], Any]
+                                                                                                                                    debug_output_hdf5_file_path=debug_output_hdf5_file_path, debug_plot=False, debug_print=debug_print)  # type: Tuple[Tuple[Dict[str, Any], Dict[str, Any]], Dict[str, BasePositionDecoder], Any]
 
         global_computation_results.computed_data['TrainTestSplit'] = a_train_test_result
         
