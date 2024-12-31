@@ -13,10 +13,11 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchro
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import pyqtplot_build_image_bounds_extent
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.plotting.mixins.plotting_backend_mixin import PlottingBackendSpecifyingMixin, PlottingBackendType
 
 
 @metadata_attributes(short_name=None, tags=['pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 03:42', related_items=['MatplotlibTimeSynchronizedWidget'])
-class PyqtgraphTimeSynchronizedWidget(TimeSynchronizedPlotterBase):
+class PyqtgraphTimeSynchronizedWidget(PlottingBackendSpecifyingMixin, TimeSynchronizedPlotterBase):
     """ Plots the decoded position at a given moment in time. 
 
     Simple pyqtgraph-based alternative to `MatplotlibTimeSynchronizedWidget`
@@ -32,6 +33,12 @@ class PyqtgraphTimeSynchronizedWidget(TimeSynchronizedPlotterBase):
     
     enable_debug_print = False
         
+    @classmethod
+    def get_plot_backing_type(cls) -> PlottingBackendType:
+        """PlottingBackendSpecifyingMixin conformance: Implementor should return either [PlottingBackendType.Matplotlib, PlottingBackendType.PyQtGraph]."""
+        return PlottingBackendType.PyQtGraph
+    
+
     # @property
     # def time_window_centers(self):
     #     """The time_window_centers property."""

@@ -18,12 +18,12 @@ from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 
 from pyphocorehelpers.gui.Qt.widgets.toast_notification_widget import ToastWidget, ToastShowingWidgetMixin
-
+from pyphocorehelpers.plotting.mixins.plotting_backend_mixin import PlottingBackendSpecifyingMixin, PlottingBackendType
 
 __all__ = ['CustomMatplotlibWidget']
 
 @metadata_attributes(short_name=None, tags=['matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-08 14:20')
-class CustomMatplotlibWidget(ToastShowingWidgetMixin, QtWidgets.QWidget):
+class CustomMatplotlibWidget(ToastShowingWidgetMixin, PlottingBackendSpecifyingMixin, QtWidgets.QWidget):
     """
     Implements a Matplotlib figure inside a QWidget.
     Use getFigure() and redraw() to interact with matplotlib.
@@ -37,6 +37,12 @@ class CustomMatplotlibWidget(ToastShowingWidgetMixin, QtWidgets.QWidget):
         subplot.plot(x,y)
         mw.draw()
     """
+    
+    @classmethod
+    def get_plot_backing_type(cls) -> PlottingBackendType:
+        """PlottingBackendSpecifyingMixin conformance: Implementor should return either [PlottingBackendType.Matplotlib, PlottingBackendType.PyQtGraph]."""
+        return PlottingBackendType.Matplotlib
+
     
     def __init__(self, name='CustomMatplotlibWidget', plot_function_name=None, disable_toolbar=True, scrollable_figure=True, size=(5.0, 4.0), dpi=72, **kwargs):
         """_summary_
