@@ -1152,6 +1152,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             
         return plt
     
+    @function_attributes(short_name=None, tags=['pyqtgraph', 'render_plot_group'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 04:59', related_items=[])
     def create_separate_render_plot_item(self, row=None, col=None, rowspan=1, colspan=1, name='new_curves_separate_plot'):
         """ Adds a separate pyqtgraph independent plot for epoch time rects to the 2D plot above the others:
         
@@ -1162,8 +1163,14 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
          new_curves_separate_plot: a PlotItem
             
         """
-        # main_graphics_layout_widget = self.ui.main_graphics_layout_widget # GraphicsLayoutWidget
-        target_graphics_layout_widget = self.ui.active_window_container_layout # GraphicsLayoutWidget
+        use_docked_pyqtgraph_plots: bool = self.params.setdefault('use_docked_pyqtgraph_plots', True)
+        if use_docked_pyqtgraph_plots:
+            a_time_sync_pyqtgraph_widget, root_graphics_layout_widget, plot_item = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(500,50))
+            target_graphics_layout_widget = root_graphics_layout_widget
+        else:
+            # main_graphics_layout_widget = self.ui.main_graphics_layout_widget # GraphicsLayoutWidget
+            target_graphics_layout_widget = self.ui.active_window_container_layout # GraphicsLayoutWidget
+            
         # self.ui.active_window_container_layout.
         new_curves_separate_plot = target_graphics_layout_widget.addPlot(row=row, col=col, rowspan=rowspan, colspan=colspan) # PlotItem
         new_curves_separate_plot.setObjectName(name)
@@ -1182,10 +1189,19 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         
         return new_curves_separate_plot
         
-
+    @function_attributes(short_name=None, tags=['pyqtgraph', 'render_plot_group'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 04:59', related_items=[])
     def remove_separate_render_plot_items(self, separate_plot_item):
         """ removes the PlotItem separate_plot_item created by calling self.create_separate_render_plot_item(...) from the layout. """
-        target_graphics_layout_widget = self.ui.active_window_container_layout # GraphicsLayoutWidget
+        use_docked_pyqtgraph_plots: bool = self.params.setdefault('use_docked_pyqtgraph_plots', True)
+        if use_docked_pyqtgraph_plots:
+            a_time_sync_pyqtgraph_widget, root_graphics_layout_widget, plot_item = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(500,50))
+            target_graphics_layout_widget = root_graphics_layout_widget
+        else:
+            # main_graphics_layout_widget = self.ui.main_graphics_layout_widget # GraphicsLayoutWidget
+            target_graphics_layout_widget = self.ui.active_window_container_layout # GraphicsLayoutWidget
+
+
+
         target_graphics_layout_widget.removeItem(separate_plot_item)
 
         
@@ -1337,10 +1353,18 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         """
         active_matplotlib_view_widget = self.ui.matplotlib_view_widgets.get(identifier, None)
         if active_matplotlib_view_widget is not None:
-            return active_matplotlib_view_widget, active_matplotlib_view_widget.getFigure(), active_matplotlib_view_widget.axes # return all axes instead of just the first one
+            if active_matplotlib_view_widget.is_matplotlib_based():
+                ## matplotlib-based:
+                return active_matplotlib_view_widget, active_matplotlib_view_widget.getFigure(), active_matplotlib_view_widget.axes # return all axes instead of just the first one
+            elif active_matplotlib_view_widget.is_pyqtgraph_based():
+                ## pyqtgraph-based:
+                return active_matplotlib_view_widget, active_matplotlib_view_widget.getRootGraphicsLayoutWidget(), active_matplotlib_view_widget.getRootPlotItem()
+            else:
+                raise NotImplementedError(f'active_matplotlib_view_widget: {active_matplotlib_view_widget}')
         else:
             print(f'active_matplotlib_view_widget with identifier {identifier} was not found!')
             return None, None, None
+
 
     @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 13:27', related_items=[])
     def remove_matplotlib_render_plot_widget(self, identifier):
