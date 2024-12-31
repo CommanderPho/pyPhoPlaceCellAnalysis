@@ -1177,12 +1177,25 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         new_curves_separate_plot.setObjectName(name)
 
         # Setup axes bounds for the bottom windowed plot:
-        # new_curves_separate_plot.hideAxis('left')
-        new_curves_separate_plot.showAxis('left')
+        new_curves_separate_plot.hideAxis('left')
+        # new_curves_separate_plot.showAxis('left')
         new_curves_separate_plot.hideAxis('bottom') # hide the shared time axis since it's synced with the other plot
         # new_curves_separate_plot.showAxis('bottom')
         
-        new_curves_separate_plot.setMouseEnabled(x=False, y=True)
+        # Setup axes bounds for the bottom windowed plot:
+        # background_static_scroll_window_plot.setLabel('bottom', 'Time', units='s')
+        # new_curves_separate_plot.setMouseEnabled(x=False, y=False)
+        new_curves_separate_plot.setMouseEnabled(x=False, y=True) ## unusual
+        # new_curves_separate_plot.disableAutoRange('xy')
+        # background_static_scroll_window_plot.enableAutoRange(x=False, y=False)
+        # new_curves_separate_plot.setAutoVisible(x=False, y=False)
+        # new_curves_separate_plot.setAutoPan(x=False, y=False)
+        
+        # Setup range for plot:
+        earliest_t, latest_t = self.spikes_window.total_df_start_end_times
+        new_curves_separate_plot.setXRange(earliest_t, latest_t, padding=0)
+        # new_curves_separate_plot.setYRange(np.nanmin(curr_spike_y), np.nanmax(curr_spike_y), padding=0)
+        
         
         # # setup the new_curves_separate_plot to have a linked X-axis to the other scroll plot:
         main_plot_widget = self.plots.main_plot_widget # PlotItem
