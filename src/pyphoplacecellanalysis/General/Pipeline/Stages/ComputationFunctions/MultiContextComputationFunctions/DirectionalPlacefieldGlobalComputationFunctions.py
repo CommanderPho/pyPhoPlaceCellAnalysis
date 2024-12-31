@@ -3084,6 +3084,8 @@ class CustomDecodeEpochsResult(UnpackableMixin):
     """
     measured_decoded_position_comparion: MeasuredDecodedPositionComparison = field()
     decoder_result: DecodedFilterEpochsResult = field()
+    epochs_bin_by_bin_performance_analysis_df: pd.DataFrame = field()
+    
 
     @classmethod
     def build_single_measured_decoded_position_comparison(cls, a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame) -> MeasuredDecodedPositionComparison:
@@ -3379,8 +3381,12 @@ def _do_custom_decode_epochs(global_spikes_df: pd.DataFrame,  global_measured_po
     # measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df = build_single_measured_decoded_position_comparison(decoder_result, global_measured_position_df=global_measured_position_df)
     measured_decoded_position_comparion: MeasuredDecodedPositionComparison = CustomDecodeEpochsResult.build_single_measured_decoded_position_comparison(decoder_result, global_measured_position_df=global_measured_position_df)
 
-    # return measured_decoded_position_comparion, decoder_result
-    return CustomDecodeEpochsResult(measured_decoded_position_comparion=measured_decoded_position_comparion, decoder_result=decoder_result)
+    ## INPUTS: test_all_directional_decoder_result, all_directional_pf1D_Decoder
+    test_all_directional_decoder_result: CustomDecodeEpochsResult = CustomDecodeEpochsResult(measured_decoded_position_comparion=measured_decoded_position_comparion, decoder_result=decoder_result, epochs_bin_by_bin_performance_analysis_df=None)
+    test_all_directional_decoder_result.epochs_bin_by_bin_performance_analysis_df = test_all_directional_decoder_result.get_lap_bin_by_bin_performance_analysis_df(active_pf_2D=deepcopy(pf1D_Decoder), debug_print=debug_print) # active_pf_2D: used for binning position columns # active_pf_2D: used for binning position columns\
+    # epochs_bin_by_bin_performance_analysis_df = test_all_directional_decoder_result.epochs_bin_by_bin_performance_analysis_df ## UNPACK WITH: 
+    
+    return test_all_directional_decoder_result
 
 
 @function_attributes(short_name=None, tags=['decode', 'general', 'epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-05 11:59', related_items=[])
@@ -3579,7 +3585,6 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
     
     # Unpack like:
     # (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = complete_decoded_context_correctness_tuple
-    all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult = test_all_directional_decoder_result.decoder_result
     # complete_decoded_context_correctness_tuple
     # percent_laps_track_identity_estimated_correctly
     # percent_laps_direction_estimated_correctly
