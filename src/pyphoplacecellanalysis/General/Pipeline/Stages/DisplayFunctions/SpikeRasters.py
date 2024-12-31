@@ -85,7 +85,7 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
 
     ## 2D Controlled 3D Raster Plots:
 
-    @function_attributes(short_name='spike_rasters_pyqtplot_3D_with_2D_controls', tags=['display','interactive', 'raster', '2D', 'ui', '3D', 'pyqtplot'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-11 03:05')
+    @function_attributes(short_name='spike_rasters_pyqtplot_3D_with_2D_controls', tags=['display','interactive', 'raster', '2D', 'ui', '3D', 'pyqtplot'], input_requires=[], output_provides=[], uses=['LocalMenus_AddRenderable.add_renderable_context_menu'], used_by=[], creation_date='2023-04-11 03:05')
     @staticmethod
     def _display_spike_rasters_pyqtplot_3D_with_2D_controls(computation_result, active_config, enable_saving_to_disk=False, **kwargs):
         """ Plots a standalone 3D raster plot (via pyqtgraph) with a separate 2D raster plot as the window with which you can adjust the viewed window. 
@@ -102,7 +102,7 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         return {'spike_raster_plt_2d':spike_raster_plt_2d, 'spike_raster_plt_3d':spike_raster_plt_3d, 'spike_3d_to_2d_window_connection':spike_3d_to_2d_window_connection, 'spike_raster_window': spike_raster_window}
 
 
-    @function_attributes(short_name='spike_rasters_vedo_3D_with_2D_controls', tags=['display','interactive', 'raster', '2D', 'ui', '3D', 'vedo'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-11 03:05')
+    @function_attributes(short_name='spike_rasters_vedo_3D_with_2D_controls', tags=['display','interactive', 'raster', '2D', 'ui', '3D', 'vedo'], input_requires=[], output_provides=[], uses=['LocalMenus_AddRenderable.add_renderable_context_menu'], used_by=[], creation_date='2023-04-11 03:05')
     @staticmethod
     def _display_spike_rasters_vedo_3D_with_2D_controls(computation_result, active_config, enable_saving_to_disk=False, **kwargs):
         """ Plots a standalone 3D raster plot (via Vedo) with a separate 2D raster plot as the window with which you can adjust the viewed window. 

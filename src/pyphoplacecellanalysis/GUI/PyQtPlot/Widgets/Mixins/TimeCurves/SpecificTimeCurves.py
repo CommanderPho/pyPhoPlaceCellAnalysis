@@ -97,6 +97,7 @@ class BasePositionDataframeRenderTimeCurves(GeneralRenderTimeCurves):
     def add_render_time_curves(cls, curr_sess, destination_plot, **kwargs):
         """ CONSTANT: directly-called method 
         destination_plot should implement add_rendered_intervals
+        Calls `destination_plot.add_3D_time_curves(...)`
         
         ## TODO: figure out how data should be provided to enable maximum generality. It seems that all datasources are currently dataframe based. 
         
@@ -275,6 +276,7 @@ class ConfigurableRenderTimeCurves(BasePositionDataframeRenderTimeCurves):
     def add_render_time_curves(cls, curr_sess, destination_plot, **kwargs):
         """ CONSTANT: directly-called method 
         destination_plot should implement add_rendered_intervals
+        destination_plot.add_3D_time_curves(...)
         
         ## TODO: figure out how data should be provided to enable maximum generality. It seems that all datasources are currently dataframe based. 
         

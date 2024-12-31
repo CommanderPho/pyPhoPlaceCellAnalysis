@@ -58,6 +58,7 @@ class Render2DScrollWindowPlotMixin:
             self.spikes_window.total_df_start_end_times # to get the current start/end times to set the linear region to
         Creates:
             self.plots_data.all_spots # data for all spikes to be rendered on a scatter plot
+            self.plots_data.all_spots_downsampled # temporally downsampled data for all spikes to be rendered on a scatter plot
             self.ui.scroll_window_region # a pg.LinearRegionItem                        
             self.plots.preview_overview_scatter_plot # a pg.ScatterPlotItem
         
