@@ -52,17 +52,47 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 # ==================================================================================================================== #
 # 2024-12-31 - Decoder ID x Position                                                                                   #
 # ==================================================================================================================== #
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import CustomDecodeEpochsResult, MeasuredDecodedPositionComparison, DecodedFilterEpochsResult
 
-@function_attributes(short_name=None, tags=['laps', 'performance', 'position'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 11:55', related_items=[])
-def build_lap_bin_by_bin_performance_analysis_df(all_directional_laps_filter_epochs_decoder_result, active_pf_2D, active_filter_epochs):
+@function_attributes(short_name=None, tags=['laps', 'performance', 'position'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 11:55', related_items=['plot_estimation_correctness_with_raw_data'])
+def build_lap_bin_by_bin_performance_analysis_df(test_all_directional_laps_decoder_result: "CustomDecodeEpochsResult", active_pf_2D):
     """ 
+    
+    
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _perform_run_rigorous_decoder_performance_assessment, build_lap_bin_by_bin_performance_analysis_df, plot_estimation_correctness_with_raw_data
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import CustomDecodeEpochsResult, MeasuredDecodedPositionComparison, DecodedFilterEpochsResult
+
+    ## INPUTS: curr_active_pipeline, all_directional_pf1D_Decoder
+
+    active_laps_decoding_time_bin_size: float = 0.025
+    ## INPUTS: active_laps_decoding_time_bin_size: float = 0.025
+    _out_subset_decode_results = _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline=curr_active_pipeline, included_neuron_IDs=None, active_laps_decoding_time_bin_size=active_laps_decoding_time_bin_size)
+    ## extract results:
+    complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, test_all_directional_laps_decoder_result, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results = _out_subset_decode_results
+    (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = complete_decoded_context_correctness_tuple
+    test_all_directional_laps_decoder_result: CustomDecodeEpochsResult = deepcopy(test_all_directional_laps_decoder_result)
+    active_pf_2D = deepcopy(all_directional_pf1D_Decoder) # active_pf_2D: used for binning position columns # active_pf_2D: used for binning position columns
+    epochs_track_identity_marginal_df = build_lap_bin_by_bin_performance_analysis_df(test_all_directional_laps_decoder_result, active_pf_2D)
+    epochs_track_identity_marginal_df
+
+    # Example Plotting Viz:
+    plot_estimation_correctness_with_raw_data(epochs_track_identity_marginal_df, 'binned_x_meas', 'estimation_correctness_track_ID')
+
     """
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import CustomDecodeEpochsResult, MeasuredDecodedPositionComparison, DecodedFilterEpochsResult
     from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
 
+    all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult = deepcopy(test_all_directional_laps_decoder_result.decoder_result)
+    # all_directional_laps_filter_epochs_decoder_result
+
     ## INPUTS: all_directional_laps_filter_epochs_decoder_result, active_pf_2D
-    global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap'])
-    measured_decoded_position_comparion: MeasuredDecodedPositionComparison = CustomDecodeEpochsResult.build_single_measured_decoded_position_comparison(all_directional_laps_filter_epochs_decoder_result, global_measured_position_df=global_measured_position_df)
+    # global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap'])
+    # measured_decoded_position_comparion: MeasuredDecodedPositionComparison = CustomDecodeEpochsResult.build_single_measured_decoded_position_comparison(all_directional_laps_filter_epochs_decoder_result, global_measured_position_df=global_measured_position_df)
+    
+    measured_decoded_position_comparion: MeasuredDecodedPositionComparison = deepcopy(test_all_directional_laps_decoder_result.measured_decoded_position_comparion)
+    
+    active_filter_epochs: pd.DataFrame = deepcopy(all_directional_laps_filter_epochs_decoder_result.active_filter_epochs)
+
     # measured_decoded_position_comparion.decoded_measured_diff_df
     # measured_decoded_position_comparion.measured_positions_dfs_list
     # measured_decoded_position_comparion.decoded_positions_df_list
@@ -82,15 +112,22 @@ def build_lap_bin_by_bin_performance_analysis_df(all_directional_laps_filter_epo
 
 
     epochs_directional_marginals, epochs_directional_all_epoch_bins_marginal, epochs_most_likely_direction_from_decoder, epochs_is_most_likely_direction_LR_dir  = laps_directional_marginals_tuple
+    epochs_directional_marginal_p_x_given_n_list: List[NDArray] = [v['p_x_given_n'] for v in epochs_directional_marginals] ## List[DynamicContainer]
+    Assert.same_length(active_filter_epochs, epochs_directional_marginal_p_x_given_n_list) 
+
     epochs_track_identity_marginals, epochs_track_identity_all_epoch_bins_marginal, epochs_most_likely_track_identity_from_decoder, epochs_is_most_likely_track_identity_Long = laps_track_identity_marginals_tuple
+    epochs_track_identity_marginal_p_x_given_n_list: List[NDArray] = [v['p_x_given_n'] for v in epochs_track_identity_marginals] ## List[DynamicContainer]
+    Assert.same_length(active_filter_epochs, epochs_track_identity_marginal_p_x_given_n_list)
+        
     non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df = laps_non_marginalized_decoder_marginals_tuple
+    epochs_non_marginalized_decoder_marginals_p_x_given_n_list: List[NDArray] = [v['p_x_given_n'] for v in non_marginalized_decoder_marginals] ## List[DynamicContainer]
+    Assert.same_length(active_filter_epochs, epochs_non_marginalized_decoder_marginals_p_x_given_n_list)
+    
 
     # epochs_most_likely_track_identity_from_decoder
     # epochs_is_most_likely_track_identity_Long
     # epochs_track_identity_all_epoch_bins_marginal ## all epoch bins separately
-    epochs_track_identity_marginal_p_x_given_n_list: List[NDArray] = [v['p_x_given_n'] for v in epochs_track_identity_marginals] ## List[DynamicContainer]
-    # epochs_track_identity_marginal_p_x_given_n_list
-    Assert.same_length(active_filter_epochs, epochs_track_identity_marginal_p_x_given_n_list)
+
 
     # epochs_track_identity_marginal_df_list: List[pd.DataFrame] = [pd.DataFrame(np.hstack([p_x_given_n.T, np.full((p_x_given_n.T.shape[0], 1), i).astype(int)]), columns=['P_Long', 'P_Short', 'lap_idx']) for i, p_x_given_n in enumerate(epochs_track_identity_marginal_p_x_given_n_list)]
 
@@ -154,6 +191,58 @@ def build_lap_bin_by_bin_performance_analysis_df(all_directional_laps_filter_epo
 
     return epochs_track_identity_marginal_df
     
+
+@function_attributes(short_name=None, tags=['performance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 12:32', related_items=['build_lap_bin_by_bin_performance_analysis_df'])
+def plot_estimation_correctness_with_raw_data(epochs_df: pd.DataFrame, x_col: str, y_col: str):
+    """
+    Plots a bar plot with error bars for the mean and variability of a metric across bins,
+    overlayed with a swarm-like plot showing raw data points, ensuring proper alignment.
+    
+    Args:
+        epochs_df (pd.DataFrame): DataFrame containing the data.
+        x_col (str): Column name for the x-axis (binned variable).
+        y_col (str): Column name for the y-axis (metric to visualize).
+        
+    Usage:
+        # Example usage
+        plot_estimation_correctness_with_raw_data(epochs_track_identity_marginal_df, 'binned_x_meas', 'estimation_correctness_track_ID')
+
+
+    """
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+
+    # Clip the values to the range [0, 1]
+    epochs_df[y_col] = epochs_df[y_col].clip(lower=0, upper=1)
+
+    # Ensure x_col is treated consistently as a categorical variable
+    epochs_df[x_col] = pd.Categorical(epochs_df[x_col], ordered=True)
+    grouped = epochs_df.groupby(x_col)[y_col].agg(['mean', 'std']).reset_index()
+
+    # Plotting
+    plt.figure(figsize=(10, 6))
+
+    # Bar plot with error bars
+    plt.bar(grouped[x_col].cat.codes, grouped['mean'], yerr=grouped['std'], capsize=5, color='skyblue', alpha=0.7, label='Mean ± Std')
+
+    # Overlay raw data as a strip plot
+    sns.stripplot(data=epochs_df, x=x_col, y=y_col, color='black', alpha=0.6, jitter=True, size=5)
+
+    # Manually add legend for raw data once
+    plt.scatter([], [], color='black', alpha=0.6, label='Raw Data')
+
+    # Align x-axis ticks and labels
+    plt.xticks(ticks=range(len(grouped[x_col].cat.categories)), labels=grouped[x_col].cat.categories)
+
+    plt.title('Estimation Correctness Across Binned X Measurements')
+    plt.xlabel(x_col)
+    plt.ylabel(y_col)
+    plt.legend()
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    plt.show()
+
+
 
 
 @function_attributes(short_name=None, tags=['transition_matrix', 'position', 'decoder_id', '2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 10:05', related_items=[])
