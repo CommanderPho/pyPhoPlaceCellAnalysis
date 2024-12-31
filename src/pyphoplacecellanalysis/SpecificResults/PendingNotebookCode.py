@@ -55,7 +55,7 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import CustomDecodeEpochsResult, MeasuredDecodedPositionComparison, DecodedFilterEpochsResult
 
 @function_attributes(short_name=None, tags=['laps', 'performance', 'position'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 11:55', related_items=['plot_estimation_correctness_with_raw_data'])
-def build_lap_bin_by_bin_performance_analysis_df(test_all_directional_laps_decoder_result: "CustomDecodeEpochsResult", active_pf_2D, should_include_decoded_pos_columns: bool=False, debug_print:bool=False):
+def build_lap_bin_by_bin_performance_analysis_df(test_all_directional_laps_decoder_result: "CustomDecodeEpochsResult", active_pf_2D, should_include_decoded_pos_columns: bool=False, debug_print:bool=False) -> pd.DataFrame:
     """ 
     Adds columns:
         ['P_Long', 'P_Short', 'lap_idx', 'lap_id', 'maze_id', 'lap_dir', 'is_LR_dir', 'start', 'stop', 'duration', 'P_LR', 'P_RL', 'P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL', 'x_meas', 'y_meas', 'binned_x_meas', 'is_Long', 'estimation_correctness_track_ID', 'estimation_correctness_track_dir', 'correct_decoder_idx', 'estimation_correctness_decoder_idx']
@@ -85,6 +85,8 @@ def build_lap_bin_by_bin_performance_analysis_df(test_all_directional_laps_decod
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import CustomDecodeEpochsResult, MeasuredDecodedPositionComparison, DecodedFilterEpochsResult
     from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
     from pyphocorehelpers.indexing_helpers import reorder_columns, reorder_columns_relative
+    
+    min_number_ybins_to_consider_as_spatial: int = 6 ## prevents detecting pseudo2D y-bins (array([0, 1, 2, 3, 4])) incorrectly as spatial
     
     _position_col_names = []
 
@@ -151,7 +153,8 @@ def build_lap_bin_by_bin_performance_analysis_df(test_all_directional_laps_decod
     # Assert.same_length(active_filter_epochs, epochs_track_identity_marginal_df_list)
 
 
-    if (active_pf_2D.ybin is not None) and (len(active_pf_2D.ybin) > 0):
+
+    if (active_pf_2D.ybin is not None) and (len(active_pf_2D.ybin) > min_number_ybins_to_consider_as_spatial):
         epochs_track_identity_marginal_df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(deepcopy(epochs_track_identity_marginal_df), bin_values=(deepcopy(active_pf_2D.xbin), deepcopy(active_pf_2D.ybin)),
                                                                                                                     position_column_names = ('x_meas', 'y_meas'),  binned_column_names = ('binned_x', 'binned_y'),
                                                                                                                     force_recompute=False, debug_print=True)
@@ -165,7 +168,7 @@ def build_lap_bin_by_bin_performance_analysis_df(test_all_directional_laps_decod
 
 
     if should_include_decoded_pos_columns:
-        if (active_pf_2D.ybin is not None) and (len(active_pf_2D.ybin) > 0):
+        if (active_pf_2D.ybin is not None) and (len(active_pf_2D.ybin) > min_number_ybins_to_consider_as_spatial):
             epochs_track_identity_marginal_df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(deepcopy(epochs_track_identity_marginal_df), bin_values=(deepcopy(active_pf_2D.xbin), deepcopy(active_pf_2D.ybin)),
                                                                                                                 position_column_names = ('x_decode', 'y_decode'),  binned_column_names = ('binned_x_decode', 'binned_y_decode'),
                                                                                                                 force_recompute=False, debug_print=True)
@@ -232,7 +235,7 @@ def build_lap_bin_by_bin_performance_analysis_df(test_all_directional_laps_decod
     
 
 @function_attributes(short_name=None, tags=['performance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 12:32', related_items=['build_lap_bin_by_bin_performance_analysis_df'])
-def plot_estimation_correctness_with_raw_data(epochs_df: pd.DataFrame, x_col: str, y_col: str):
+def plot_estimation_correctness_with_raw_data(epochs_df: pd.DataFrame, x_col: str, y_col: str, extra_info_str: str=''):
     """
     Plots a bar plot with error bars for the mean and variability of a metric across bins,
     overlayed with a swarm-like plot showing raw data points, ensuring proper alignment.
@@ -273,7 +276,7 @@ def plot_estimation_correctness_with_raw_data(epochs_df: pd.DataFrame, x_col: st
     # Align x-axis ticks and labels
     plt.xticks(ticks=range(len(grouped[x_col].cat.categories)), labels=grouped[x_col].cat.categories)
 
-    plt.title('Estimation Correctness Across Binned X Measurements')
+    plt.title(f'Estimation Correctness Across Binned X Measurements: {extra_info_str}')
     plt.xlabel(x_col)
     plt.ylabel(y_col)
     plt.legend()
