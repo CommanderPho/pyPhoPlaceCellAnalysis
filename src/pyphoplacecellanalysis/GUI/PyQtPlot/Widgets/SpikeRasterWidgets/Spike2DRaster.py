@@ -25,6 +25,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.NestedDockAreaWidget imp
 
 # For a specific type of dynamic plot widget
 from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.PyqtgraphTimeSynchronizedWidget import PyqtgraphTimeSynchronizedWidget ## potential import issue due to Qt?
 
 import numpy as np
 
@@ -1194,7 +1195,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         # performs required setup to enable dynamically added matplotlib render subplots.
         self.ui.matplotlib_view_widgets = {} # empty dictionary
 
-    @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=['FigureWidgetDockDisplayConfig'], used_by=[], creation_date='2023-10-17 13:26', related_items=[])
+    @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=['FigureWidgetDockDisplayConfig'], used_by=[], creation_date='2023-10-17 13:26', related_items=['add_new_embedded_pyqtgraph_render_plot_widget'])
     def add_new_matplotlib_render_plot_widget(self, row=1, col=0, name='matplotlib_view_widget', dockSize=(500,50), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None) -> Tuple[MatplotlibTimeSynchronizedWidget, Figure, List[Axis]]:
         """ creates a new dynamic MatplotlibTimeSynchronizedWidget, a container widget that holds a matplotlib figure, and adds it as a row to the main layout
         
@@ -1260,6 +1261,74 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
 
         # self.sync_matplotlib_render_plot_widget()
         return self.ui.matplotlib_view_widgets[name], fig, ax
+    
+
+    @function_attributes(short_name=None, tags=['pyqtgraph_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget', 'pyqtgraph'], input_requires=[], output_provides=[], uses=['PyqtgraphTimeSynchronizedWidget'], used_by=[], creation_date='2024-12-31 03:35', related_items=['add_new_matplotlib_render_plot_widget'])
+    def add_new_embedded_pyqtgraph_render_plot_widget(self, name='pyqtgraph_view_widget', dockSize=(500,50), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None) -> Tuple[PyqtgraphTimeSynchronizedWidget, Any, Any]:
+        """ creates a new dynamic MatplotlibTimeSynchronizedWidget, a container widget that holds a matplotlib figure, and adds it as a row to the main layout
+        
+        based off of `add_new_matplotlib_render_plot_widget`, but to support embedded pyqtgraph plots instead of matplotlib plots
+        
+        emit an event so the parent can call `self.update_scrolling_event_filters()` to add the new item
+        
+        Usage:
+        
+            a_time_sync_pyqtgraph_widget, root_graphics_layout_widget, plot_item = self.add_new_embedded_pyqtgraph_render_plot_widget(name='test_pyqtgraph_view_widget', dockSize=(500,50))
+            
+        """
+        
+        
+        dDisplayItem = self.ui.dynamic_docked_widget_container.find_display_dock(identifier=name) # Dock
+        if dDisplayItem is None:
+            # No extant matplotlib_view_widget and display_dock currently, create a new one:
+            ## TODO: hardcoded single-widget: used to be named `self.ui.matplotlib_view_widget`
+            self.ui.matplotlib_view_widgets[name] = PyqtgraphTimeSynchronizedWidget(name=name) # Matplotlib widget directly
+            self.ui.matplotlib_view_widgets[name].setObjectName(name)
+            # self.ui.matplotlib_view_widgets[name].plots.fig.subplots_adjust(top=1.0, bottom=0.0, left=0.0, right=1.0, hspace=0.0, wspace=0.0)
+
+            ## Enable scrollability
+            # self.ui.matplotlib_view_widgets[name].installEventFilter(self)
+            
+            ## Add directly to the main grid layout:
+            # self.ui.layout.addWidget(self.ui.matplotlib_view_widget, row, col)
+            
+            ## Add to dynamic_docked_widget_container:
+            # min_width = 500
+            # min_height = 50
+            # if _last_dock_outer_nested_item is not None:
+            #     #NOTE: to stack two dock widgets on top of each other, do area.moveDock(d6, 'above', d4)   ## move d6 to stack on top of d4
+            #     dockAddLocationOpts = ['above', _last_dock_outer_nested_item] # position relative to the _last_dock_outer_nested_item for this figure
+            # else:
+            # dockAddLocationOpts = ['bottom'] #no previous dock for this filter, so use absolute positioning
+            
+            if display_config is None:
+                display_config = FigureWidgetDockDisplayConfig(showCloseButton=True)
+            
+            _, dDisplayItem = self.ui.dynamic_docked_widget_container.add_display_dock(name, dockSize=dockSize, display_config=display_config,
+                                                                                    widget=self.ui.matplotlib_view_widgets[name], dockAddLocationOpts=dockAddLocationOpts, autoOrientation=False)
+            dDisplayItem.setOrientation('horizontal', force=True)
+            dDisplayItem.updateStyle()
+            dDisplayItem.update()
+            
+            ## Add the plot:
+            root_graphics_layout_widget = self.ui.matplotlib_view_widgets[name].getRootGraphicsLayoutWidget()
+            plot_item = self.ui.matplotlib_view_widgets[name].getRootPlotItem()
+
+            ## emit the signal
+            self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name])
+            
+
+        else:
+            # Already had the widget
+            print(f'already had the valid pyqtgraph view widget and its display dock. Returning extant.')
+            root_graphics_layout_widget = self.ui.matplotlib_view_widgets[name].getRootGraphicsLayoutWidget()
+            plot_item = self.ui.matplotlib_view_widgets[name].getRootPlotItem()
+            
+
+        # self.sync_matplotlib_render_plot_widget()
+        return self.ui.matplotlib_view_widgets[name], root_graphics_layout_widget, plot_item
+    
+
 
     @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 13:23', related_items=[])
     def find_matplotlib_render_plot_widget(self, identifier):
