@@ -7747,6 +7747,49 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewPseudo2DDecodedEpoc
 
 
 
+
+    @classmethod
+    def add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epoch_marginals(cls, curr_active_pipeline, active_2d_plot, debug_print=False, **kwargs):
+        """ adds all computed time_bin_sizes in `curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'].continuously_decoded_result_cache_dict` from the global_computation_results as new matplotlib plot rows. """
+        
+        ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
+        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+        # pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder        
+        # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+        continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
+
+        
+        # enable_rows_config_kwargs = dict(enable_non_marginalized_raw_result=_cmd.enable_non_marginalized_raw_result, enable_marginal_over_direction=_cmd.enable_marginal_over_direction, enable_marginal_over_track_ID=_cmd.enable_marginal_over_track_ID)
+
+        all_time_bin_sizes_output_dict = {'non_marginalized_raw_result': [], 'marginal_over_direction': [], 'marginal_over_track_ID': []}
+        # flat_all_time_bin_sizes_output_tuples_list: List[Tuple] = []
+        flat_all_time_bin_sizes_output_tuples_dict: Dict[str, Tuple] = {}
+        for time_bin_size, a_continuously_decoded_dict in continuously_decoded_result_cache_dict.items():
+            # a_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult]
+            if debug_print:
+                print(f'time_bin_size: {time_bin_size}')
+
+            info_string: str = f" - t_bin_size: {time_bin_size}"
+            # output_dict = _cmd.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals(curr_active_pipeline=_cmd._active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, **enable_rows_config_kwargs)
+            output_dict = cls.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, debug_print=debug_print, **kwargs)
+            for a_key, an_output_tuple in output_dict.items():
+                identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = an_output_tuple
+                
+                if a_key not in all_time_bin_sizes_output_dict:
+                    all_time_bin_sizes_output_dict[a_key] = [] ## init empty list
+                all_time_bin_sizes_output_dict[a_key].append(an_output_tuple)
+                
+                assert (identifier_name not in flat_all_time_bin_sizes_output_tuples_dict), f"identifier_name: {identifier_name} already in flat_all_time_bin_sizes_output_tuples_dict: {list(flat_all_time_bin_sizes_output_tuples_dict.keys())}"
+                flat_all_time_bin_sizes_output_tuples_dict[identifier_name] = an_output_tuple
+                
+            # all_time_bin_sizes_output_dict['non_marginalized_raw_result'].append(output_dict['non_marginalized_raw_result']) #= all_time_bin_sizes_output_dict['non_marginalized_raw_result'] + 
+            # all_time_bin_sizes_output_dict['marginal_over_direction'].append(output_dict['marginal_over_direction'])
+            # all_time_bin_sizes_output_dict['marginal_over_track_ID'].append(output_dict['marginal_over_track_ID'])
+            
+        ## OUTPUTS: all_time_bin_sizes_output_dict
+        return flat_all_time_bin_sizes_output_tuples_dict
+
+
     def execute(self, *args, **kwargs) -> None:
         """ 
         
@@ -7760,7 +7803,8 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewPseudo2DDecodedEpoc
         active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
         enable_rows_config_kwargs = dict(enable_non_marginalized_raw_result=self.enable_non_marginalized_raw_result, enable_marginal_over_direction=self.enable_marginal_over_direction, enable_marginal_over_track_ID=self.enable_marginal_over_track_ID)
         
-        output_dict = self.add_pseudo2D_decoder_decoded_epoch_marginals(self._active_pipeline, active_2d_plot, **enable_rows_config_kwargs)
+        # output_dict = self.add_pseudo2D_decoder_decoded_epoch_marginals(self._active_pipeline, active_2d_plot, **enable_rows_config_kwargs)
+        output_dict = self.add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epoch_marginals(self._active_pipeline, active_2d_plot, **enable_rows_config_kwargs)
         
         # Update display output dict:
         for a_decoder_name, an_output_tuple in output_dict.items():
