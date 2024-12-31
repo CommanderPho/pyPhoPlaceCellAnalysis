@@ -128,7 +128,10 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     @property    
     def interval_rendering_plots(self):
         """ returns the list of child subplots/graphics (usually PlotItems) that participate in rendering intervals """
-        return [self.plots.background_static_scroll_window_plot, self.plots.main_plot_widget] # for spike_raster_plt_2d
+        if self.params.get('custom_interval_rendering_plots', None) is not None:
+            return self.params.custom_interval_rendering_plots
+        else:
+            return [self.plots.background_static_scroll_window_plot, self.plots.main_plot_widget] # for spike_raster_plt_2d
     
     
     ######  Get/Set Properties ######:
@@ -1460,8 +1463,71 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         print(f'clear_all_matplotlib_plots()')
         raise NotImplementedError
     
-    
+
+
+    @function_attributes(short_name=None, tags=['intervals', 'tracks', 'pyqtgraph', 'specific', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 07:29', related_items=[])
+    def prepare_pyqtgraph_interval_tracks(self, enable_interval_overview_track: bool = False, should_remove_all_and_re_add: bool=True, debug_print=False):
+        """ adds to separate pyqtgraph-backed tracks to the SpikeRaster2D plotter for rendering intervals, and updates `active_2d_plot.params.custom_interval_rendering_plots` so the intervals are rendered on these new tracks in addition to any normal ones
         
+        enable_interval_overview_track: bool: if True, renders a track to show all the intervals during the sessions (overview) in addition to the track for the intervals within the current active window
+        should_remove_all_and_re_add: bool: if True, all intervals are removed from all plots and then re-added (safer) method
+        
+        Updates:
+            active_2d_plot.params.custom_interval_rendering_plots
+            
+            
+        """
+        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, CustomCyclicColorsDockDisplayConfig, NamedColorScheme
+
+        _interval_tracks_out_dict = {}
+        if enable_interval_overview_track:
+            dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=True, corner_radius=0)
+            intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item = self.add_new_embedded_pyqtgraph_render_plot_widget(name='interval_overview', dockSize=(500, 60), display_config=dock_config)
+            _interval_tracks_out_dict['interval_overview'] = (dock_config, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item)
+        ## Enables creating a new pyqtgraph-based track to display the intervals/epochs
+        interval_window_dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=True, corner_radius=0)
+        intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item = self.add_new_embedded_pyqtgraph_render_plot_widget(name='intervals', dockSize=(500, 40), display_config=interval_window_dock_config)
+        self.params.custom_interval_rendering_plots = [self.plots.background_static_scroll_window_plot, self.plots.main_plot_widget, intervals_plot_item]
+        # active_2d_plot.params.custom_interval_rendering_plots = [active_2d_plot.plots.background_static_scroll_window_plot, active_2d_plot.plots.main_plot_widget, intervals_plot_item, intervals_overview_plot_item]
+        if enable_interval_overview_track:
+            self.params.custom_interval_rendering_plots.append(intervals_overview_plot_item)
+            
+        # active_2d_plot.interval_rendering_plots
+        main_plot_widget = self.plots.main_plot_widget # PlotItem
+        intervals_plot_item.setXLink(main_plot_widget) # works to synchronize the main zoomed plot (current window) with the epoch_rect_separate_plot (rectangles plotter)
+        
+        _interval_tracks_out_dict['intervals'] = (interval_window_dock_config, intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item)
+
+        ## #TODO 2024-12-31 07:20: - [ ] need to clear/re-add the epochs to make this work
+        extant_rendered_interval_plots_lists = {k:list(v.keys()) for k, v in self.list_all_rendered_intervals(debug_print=False).items()}
+        # active_target_interval_render_plots = active_2d_plot.params.custom_interval_rendering_plots
+
+        # active_target_interval_render_plots = [v.objectName() for v in active_2d_plot.interval_rendering_plots]
+        active_target_interval_render_plots_dict = {v.objectName():v for v in self.interval_rendering_plots}
+
+        for a_name in self.interval_datasource_names:
+            a_ds = self.interval_datasources[a_name]
+            an_already_added_plot_list = extant_rendered_interval_plots_lists[a_name]
+            if debug_print:
+                print(f'a_name: {a_name}\n\tan_already_added_plot_list: {an_already_added_plot_list}')
+                
+
+            if should_remove_all_and_re_add:
+                extant_already_added_plots = {k:v for k, v in active_target_interval_render_plots_dict.items() if k in an_already_added_plot_list}
+                extant_already_added_plots_list = list(extant_already_added_plots.values())
+                self.remove_rendered_intervals(name=a_name, child_plots_removal_list=extant_already_added_plots_list)
+                self.add_rendered_intervals(interval_datasource=a_ds, name=a_name, child_plots=self.interval_rendering_plots) ## re-add ALL
+                
+            else:
+                remaining_new_plots = {k:v for k, v in active_target_interval_render_plots_dict.items() if k not in an_already_added_plot_list}
+                remaining_new_plots_list = list(remaining_new_plots.values())
+                self.add_rendered_intervals(interval_datasource=a_ds, name=a_name, child_plots=remaining_new_plots_list) ## ADD only the new
+            
+
+        return _interval_tracks_out_dict
+
+
+
     # Overrides for Render3DTimeCurvesBaseGridMixin, since this 2D class can't draw a 3D background grid _________________ #
     def init_3D_time_curves_baseline_grid_mesh(self):
         self.params.setdefault('time_curves_enable_baseline_grid', False) # this is False for this class (until it's implemented at least)

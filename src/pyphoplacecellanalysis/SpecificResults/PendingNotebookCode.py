@@ -212,6 +212,31 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, debug_print=Fa
         print(list(global_flat_action_dict.keys()))
 
 
+    ## extract the components so the `background_static_scroll_window_plot` scroll bar is the right size:
+    active_2d_plot = spike_raster_window.spike_raster_plt_2d
+    preview_overview_scatter_plot: pg.ScatterPlotItem  = active_2d_plot.plots.preview_overview_scatter_plot # ScatterPlotItem 
+    # preview_overview_scatter_plot.setDownsampling(auto=True, method='subsample', dsRate=10)
+    main_graphics_layout_widget: pg.GraphicsLayoutWidget = active_2d_plot.ui.main_graphics_layout_widget
+    wrapper_layout: pg.QtWidgets.QVBoxLayout = active_2d_plot.ui.wrapper_layout
+    main_content_splitter = active_2d_plot.ui.main_content_splitter # QSplitter
+    layout = active_2d_plot.ui.layout
+    main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
+    main_plot_widget.setMinimumHeight(20.0)
+    background_static_scroll_window_plot = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
+    background_static_scroll_window_plot.setMinimumHeight(50.0)
+    background_static_scroll_window_plot.setMaximumHeight(75.0)
+    # background_static_scroll_window_plot.setFixedHeight(50.0)
+    
+    # Set stretch factors to control priority
+    main_graphics_layout_widget.ci.layout.setRowStretchFactor(0, 1)  # Plot1: lowest priority
+    main_graphics_layout_widget.ci.layout.setRowStretchFactor(1, 2)  # Plot2: mid priority
+    main_graphics_layout_widget.ci.layout.setRowStretchFactor(2, 3)  # Plot3: highest priority
+
+    _interval_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_interval_tracks(enable_interval_overview_track=False)
+    interval_window_dock_config, intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item = _interval_tracks_out_dict['intervals']
+    # dock_config, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item = _interval_tracks_out_dict['interval_overview']
+
+    # Add Renderables ____________________________________________________________________________________________________ #
     # add_renderables_menu = active_2d_plot.ui.menus.custom_context_menus.add_renderables[0].programmatic_actions_dict
     menu_commands = ['AddTimeIntervals.Replays', 'AddTimeIntervals.Laps', 'AddTimeIntervals.SessionEpochs'] # , 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.PBEs', 'AddTimeIntervals.Ripples', 
     for a_command in menu_commands:
@@ -237,24 +262,6 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, debug_print=Fa
         global_flat_action_dict[a_command].trigger()
         
 
-    ## extract the components so the `background_static_scroll_window_plot` scroll bar is the right size:
-    active_2d_plot = spike_raster_window.spike_raster_plt_2d
-    preview_overview_scatter_plot: pg.ScatterPlotItem  = active_2d_plot.plots.preview_overview_scatter_plot # ScatterPlotItem 
-    # preview_overview_scatter_plot.setDownsampling(auto=True, method='subsample', dsRate=10)
-    main_graphics_layout_widget: pg.GraphicsLayoutWidget = active_2d_plot.ui.main_graphics_layout_widget
-    wrapper_layout: pg.QtWidgets.QVBoxLayout = active_2d_plot.ui.wrapper_layout
-    main_content_splitter = active_2d_plot.ui.main_content_splitter # QSplitter
-    layout = active_2d_plot.ui.layout
-    main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
-    main_plot_widget.setMinimumHeight(20.0)
-    background_static_scroll_window_plot = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
-    background_static_scroll_window_plot.setMinimumHeight(50.0)
-    background_static_scroll_window_plot.setMaximumHeight(75.0)
-    # background_static_scroll_window_plot.setFixedHeight(50.0)
-    
-    # Set stretch factors to control priority
-    main_graphics_layout_widget.ci.layout.setRowStretchFactor(0, 1)  # Plot1: lowest priority
-    main_graphics_layout_widget.ci.layout.setRowStretchFactor(1, 2)  # Plot2: medium priority
 
     return all_global_menus_actionsDict, global_flat_action_dict
 
