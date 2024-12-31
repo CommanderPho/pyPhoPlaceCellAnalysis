@@ -1662,7 +1662,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         return directional_marginals, directional_all_epoch_bins_marginal, most_likely_direction_from_decoder, is_most_likely_direction_LR_dir
     
     @classmethod
-    def determine_long_short_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result) -> DecodedMarginalResultTuple:
+    def determine_long_short_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult) -> DecodedMarginalResultTuple:
         """ 
         
         laps_track_identity_marginals = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
@@ -1682,7 +1682,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         return track_identity_marginals, track_identity_all_epoch_bins_marginal, most_likely_track_identity_from_decoder, is_most_likely_track_identity_Long
 
     @classmethod
-    def determine_non_marginalized_decoder_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result, debug_print=False) -> Tuple[List[DynamicContainer], NDArray[float], NDArray[int], pd.DataFrame]:
+    def determine_non_marginalized_decoder_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult, debug_print=False) -> Tuple[List[DynamicContainer], NDArray[float], NDArray[int], pd.DataFrame]:
         """ 
         
         non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df = DirectionalPseudo2DDecodersResult.determine_non_marginalized_decoder_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
