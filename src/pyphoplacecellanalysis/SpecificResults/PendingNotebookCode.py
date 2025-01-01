@@ -48,6 +48,125 @@ from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
+# ==================================================================================================================== #
+# @ 2025-01-01 - Better Aggregation of Probabilities across bins                                                       #
+# ==================================================================================================================== #
+class TimeBinAggregation:
+    """ 
+    
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import TimeBinAggregation
+    
+    
+    """
+    @function_attributes(short_name=None, tags=['NDArray', 'streak', 'sequence', 'probability', 'likelihood'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 14:00', related_items=[])
+    @classmethod
+    def compute_epoch_p_long_with_streaks(cls, p_long: List[float], min_probability_threshold: float = 0.5) -> float:
+        """ Prior to `compute_streak_weighted_p_long` version, which operates on dataframes
+        
+        
+        Computes the overall P_Long for an epoch, giving higher weight to uninterrupted streaks.
+        
+        Args:
+            p_long (List[float]): Probabilities of being in the "Long" state for each time bin.
+            threshold (float): Minimum probability to consider a bin as part of a streak. Default is 0.5.
+
+        Returns:
+            float: The overall P_Long for the epoch.
+            
+        Usage:
+            # Example usage
+            p_long = a_lap_df[a_var_name].to_numpy() # [0.8, 0.7, 0.2, 0.9, 0.95, 0.3, 0.85, 0.87, 0.86]
+            min_probability_threshold = 0.5  # Minimum probability to count as "Long"
+            overall_p_long = compute_epoch_p_long_with_streaks(p_long, min_probability_threshold)
+            print(f"Overall P_Long with streak weighting: {overall_p_long}")
+
+        """
+        streaks = []
+        current_streak = []
+        
+        # Identify streaks
+        for i, prob in enumerate(p_long):
+            if prob >= min_probability_threshold:
+                current_streak.append(i)
+            else:
+                if current_streak:
+                    streaks.append(current_streak)
+                    current_streak = []
+        if current_streak:  # Add the last streak if it ends at the last bin
+            streaks.append(current_streak)
+        
+        # Assign weights based on streak length (linearly)
+        weights = [0] * len(p_long)
+        for streak in streaks:
+            streak_length = len(streak)
+            for idx in streak:
+                weights[idx] = streak_length
+        
+        # Compute weighted average
+        weighted_sum = np.sum(w * p for w, p in zip(weights, p_long))
+        total_weight = np.sum(weights)
+        return weighted_sum / total_weight if total_weight > 0 else 0.0
+
+
+
+    @function_attributes(short_name=None, tags=['streak', 'sequence', 'dataframe', 'probability', 'likelihood'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 14:11', related_items=[])
+    @classmethod
+    def compute_streak_weighted_p_long(cls, df: pd.DataFrame, column: str, threshold: float = 0.5) -> float:
+        """
+        Computes the streak-weighted P_Long for a given DataFrame, giving higher weight to longer sequences of adjacent bins.
+        
+        Args:
+            df (pd.DataFrame): Input DataFrame containing the P_Long column.
+            column (str): The column name for P_Long.
+            threshold (float): Minimum probability to consider a bin as part of a streak. Default is 0.5.
+        
+        Returns:
+            float: The streak-weighted P_Long for the DataFrame.
+        """
+        p_long = df[column].values
+        streaks = []
+        current_streak = []
+        
+        # Identify streaks
+        for i, prob in enumerate(p_long):
+            if prob >= threshold:
+                current_streak.append(i)
+            else:
+                if current_streak:
+                    streaks.append(current_streak)
+                    current_streak = []
+        if current_streak:  # Add the last streak if it ends at the last bin
+            streaks.append(current_streak)
+        
+        # Assign weights based on streak length
+        weights = [0] * len(p_long)
+        for streak in streaks:
+            streak_length = len(streak)
+            for idx in streak:
+                weights[idx] = streak_length
+        
+        # Compute weighted average
+        weighted_sum = sum(w * p for w, p in zip(weights, p_long))
+        total_weight = sum(weights)
+        return weighted_sum / total_weight if total_weight > 0 else 0.0
+
+
+    @classmethod
+    def peak_rolling_avg(cls, df: pd.DataFrame, column: str, window: int=3, *args, **kwargs) -> float:
+        """
+        Computes the streak-weighted P_Long for a given DataFrame, giving higher weight to longer sequences of adjacent bins.
+        
+        Args:
+            df (pd.DataFrame): Input DataFrame containing the P_Long column.
+            column (str): The column name for P_Long.
+            threshold (float): Minimum probability to consider a bin as part of a streak. Default is 0.5.
+        
+        Returns:
+            float: The streak-weighted P_Long for the DataFrame.
+        """
+        return df[column].rolling(window, *args, **kwargs).max().max()
+
+
 
 # ==================================================================================================================== #
 # 2024-12-31 - Decoder ID x Position                                                                                   #
