@@ -3257,6 +3257,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
         epochs_non_marginalized_decoder_marginals_p_x_given_n_list: List[NDArray] = [v['p_x_given_n'] for v in non_marginalized_decoder_marginals] ## List[DynamicContainer]
         Assert.same_length(active_filter_epochs, epochs_non_marginalized_decoder_marginals_p_x_given_n_list)
         
+        ## NEW COMPUTE MARGINALS:
         PandasHelpers.require_columns(active_filter_epochs, required_columns=['long_LR', 'long_RL', 'short_LR', 'short_RL', 'P_LR', 'P_RL', 'P_Long', 'P_Short'], print_missing_columns=True)
         
 
