@@ -3226,7 +3226,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
         """
         # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import CustomDecodeEpochsResult, MeasuredDecodedPositionComparison, DecodedFilterEpochsResult
         from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
-        from pyphocorehelpers.indexing_helpers import reorder_columns, reorder_columns_relative
+        from pyphocorehelpers.indexing_helpers import reorder_columns_relative
         
         min_number_ybins_to_consider_as_spatial: int = 6 ## prevents detecting pseudo2D y-bins (array([0, 1, 2, 3, 4])) incorrectly as spatial
         
