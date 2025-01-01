@@ -3261,7 +3261,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
         PandasHelpers.require_columns(active_filter_epochs, required_columns=['long_LR', 'long_RL', 'short_LR', 'short_RL', 'P_LR', 'P_RL', 'P_Long', 'P_Short'], print_missing_columns=True)
         
 
-        DecodedFilterEpochsResult.perform_compute_marginals(filter_epochs_decoder_result=epochs_directional_marginal_p_x_given_n_list, filter_epochs=active_filter_epochs, epoch_idx_col_name='lap_idx', epoch_start_t_col_name='lap_start_t', additional_transfer_column_names=['start','stop','label','duration','lap_id','lap_dir','maze_id','is_LR_dir'])
+        # DecodedFilterEpochsResult.perform_compute_marginals(filter_epochs_decoder_result=epochs_directional_marginal_p_x_given_n_list, filter_epochs=active_filter_epochs, epoch_idx_col_name='lap_idx', epoch_start_t_col_name='lap_start_t', additional_transfer_column_names=['start','stop','label','duration','lap_id','lap_dir','maze_id','is_LR_dir'])
         
         ## Begin Building Dataframes:
         lambda_full_correctly_sized_value_fn = lambda p_x_given_n, x: np.full((p_x_given_n.T.shape[0], 1), x)
