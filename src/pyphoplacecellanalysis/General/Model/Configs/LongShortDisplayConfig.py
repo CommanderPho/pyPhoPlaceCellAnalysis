@@ -390,6 +390,93 @@ class PlottingHelpers:
         return output_dict
 
 
+    @function_attributes(short_name=None, tags=['matplotlib', 'draw'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 18:44', related_items=[])
+    @classmethod
+    def helper_matplotlib_add_pseudo2D_marginal_labels(cls, ax, y_bin_labels: List[str], enable_draw_decoder_labels: bool = True, enable_draw_decoder_colored_lines: bool = False) -> Dict[str, Dict]:
+        """ adds fixed inner-y labels (along the inside left edge of the ax) containing reference names -- such as ('Long_LR', etc)
+        
+        Valid options:
+        
+        y_bin_labels = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+        y_bin_labels = ['long', 'short']
+        y_bin_labels = ['LR', 'RL']
+
+        Usage:
+            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+            output_dict = {}
+            for i, ax in enumerate(attached_yellow_blue_marginals_viewer_widget.plots.axs):
+                output_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['long_LR', 'long_RL', 'short_LR', 'short_RL'], enable_draw_decoder_colored_lines=False)
+                # output_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['long', 'short'], enable_draw_decoder_colored_lines=False)
+                # output_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['LR', 'RL'], enable_draw_decoder_colored_lines=False)
+            ## can remove them by
+            for decoder_name, inner_output_dict in output_dict.items():
+                for a_name, an_artist in inner_output_dict.items():
+                    an_artist.remove()
+                    
+        """
+        
+
+        ## INPUTS: ax
+        assert y_bin_labels in [['long_LR', 'long_RL', 'short_LR', 'short_RL'], ['long', 'short'], ['LR', 'RL']], f"y_bin_labels must be one of the known marginal values but instead y_bin_labels: {y_bin_labels}"
+        
+        n_ybins: int = len(y_bin_labels)
+        
+        long_epoch_config = long_short_display_config_manager.long_epoch_config #.as_pyqtgraph_kwargs()
+        short_epoch_config = long_short_display_config_manager.short_epoch_config #.as_pyqtgraph_kwargs()
+
+        Long_color = long_epoch_config.mpl_color
+        Short_color = short_epoch_config.mpl_color
+
+        RL_color = DisplayColorsEnum.Laps.RL #.get_RL_dock_colors(None, is_dim=False)
+        LR_color = DisplayColorsEnum.Laps.LR # get_LR_dock_colors(None, is_dim=False)
+
+        # track_id_dir_color_dict = {'long_LR':(Long_color, LR_color), 'long_RL':(Long_color, RL_color),
+        #     'short_LR':(Short_color, LR_color), 'short_RL':(Short_color, RL_color)}
+        
+        all_colors_dict = {'long_LR':(Long_color, LR_color), 'long_RL':(Long_color, RL_color),
+            'short_LR':(Short_color, LR_color), 'short_RL':(Short_color, RL_color), 'long': (Long_color, None), 'short': (Short_color, None), 'LR': (None, LR_color), 'RL': (None, RL_color)}
+
+
+        active_color_dict = {k:all_colors_dict[k] for k in y_bin_labels}
+
+
+        # BEGIN PLOTTING: ____________________________________________________________________________________________________ #
+        # ax.get_
+        x_start_ax, x_stop_ax = ax.get_xlim()
+        y_start_ax, y_stop_ax = ax.get_ylim() # (37.0773897438341, 253.98616538463315)
+
+        y_height: float = (y_stop_ax - y_start_ax)
+        single_y_bin_height: float = (y_height/float(n_ybins))
+        y_bin_starts = (np.arange(n_ybins) * single_y_bin_height) + y_start_ax # array([0, 54.2272, 108.454, 162.682])
+        y_bin_centers = y_bin_starts + (single_y_bin_height * 0.5)
+        # y_bin_centers
+
+        if enable_draw_decoder_colored_lines:
+            center_offset: float = 0.25
+            center_offset_px: float = (center_offset * single_y_bin_height)
+            center_offset_px: float = 5
+            # track_ID_line_y = y_bin_starts + (single_y_bin_height * 0.25)
+            # track_dir_line_y = y_bin_starts + (single_y_bin_height * 0.75)
+            track_ID_line_y = y_bin_centers - center_offset_px
+            track_dir_line_y = y_bin_centers + center_offset_px
+            _common_kwargs = dict(alpha=0.6, linewidths=4)
+            
+        output_dict = {}
+        for i, (decoder_name, (a_track_id_color, a_track_dir_color)) in enumerate(active_color_dict.items()):
+            if enable_draw_decoder_colored_lines:
+                if a_track_id_color is not None:
+                    output_dict[f"{decoder_name}_track_ID"] = ax.hlines(track_ID_line_y[i], xmin=x_start_ax, xmax=x_stop_ax, color=a_track_id_color, zorder=25, label=f'{decoder_name}', **_common_kwargs) # divider should be in very front
+                if a_track_dir_color is not None:
+                    output_dict[f"{decoder_name}_track_dir"] = ax.hlines(track_dir_line_y[i], xmin=x_start_ax, xmax=x_stop_ax, color=a_track_dir_color, zorder=25, label=f'{decoder_name}', **_common_kwargs) # divider should be in very front
+            if enable_draw_decoder_labels:
+                output_dict[f"{decoder_name}_label"] = ax.annotate(f'{decoder_name}', (x_start_ax, y_bin_centers[i]), alpha=0.8, fontsize=10, va='center')
+
+        # y_start_ax, y_stop_ax
+
+        return output_dict
+        
+
+
 class FixedCustomColormaps:
     """ 
     
