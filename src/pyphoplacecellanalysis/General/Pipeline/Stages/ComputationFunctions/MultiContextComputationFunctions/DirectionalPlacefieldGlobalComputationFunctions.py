@@ -1532,6 +1532,12 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         
         custom_curr_unit_marginal_list = []
         
+        ## Make sure it is the Pseudo2D (all-directional) decoder by checking shape:
+        p_x_given_n_list_second_dim_sizes = np.array([np.shape(a_p_x_given_n)[1] for a_p_x_given_n in p_x_given_n_list])
+        is_pseudo2D_decoder = np.all((p_x_given_n_list_second_dim_sizes == 4)) # only works with the Pseudo2D (all-directional) decoder with posteriors with .shape[1] == 4, corresponding to ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+        if not is_pseudo2D_decoder:
+            raise ValueError(f"this only works with the Pseudo2D (all-directional) decoder with posteriors with .shape[1] == 4, corresponding to ['long_LR', 'long_RL', 'short_LR', 'short_RL'] but p_x_given_n_list_second_dim_sizes: {p_x_given_n_list_second_dim_sizes} ")
+        
         for a_p_x_given_n in p_x_given_n_list:
             # an_array = all_directional_laps_filter_epochs_decoder_result.p_x_given_n_list[0] # .shape # (62, 4, 236)
             curr_array_shape = np.shape(a_p_x_given_n)
@@ -3259,7 +3265,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
         
         ## NEW COMPUTE MARGINALS:
         PandasHelpers.require_columns(active_filter_epochs, required_columns=['long_LR', 'long_RL', 'short_LR', 'short_RL', 'P_LR', 'P_RL', 'P_Long', 'P_Short'], print_missing_columns=True)
-        
+
 
         # DecodedFilterEpochsResult.perform_compute_marginals(filter_epochs_decoder_result=epochs_directional_marginal_p_x_given_n_list, filter_epochs=active_filter_epochs, epoch_idx_col_name='lap_idx', epoch_start_t_col_name='lap_start_t', additional_transfer_column_names=['start','stop','label','duration','lap_id','lap_dir','maze_id','is_LR_dir'])
         
@@ -3421,7 +3427,14 @@ def _do_custom_decode_epochs(global_spikes_df: pd.DataFrame,  global_measured_po
 
     ## INPUTS: test_all_directional_decoder_result, all_directional_pf1D_Decoder
     test_all_directional_decoder_result: CustomDecodeEpochsResult = CustomDecodeEpochsResult(measured_decoded_position_comparion=measured_decoded_position_comparion, decoder_result=decoder_result, epochs_bin_by_bin_performance_analysis_df=None)
-    test_all_directional_decoder_result.epochs_bin_by_bin_performance_analysis_df = test_all_directional_decoder_result.get_lap_bin_by_bin_performance_analysis_df(active_pf_2D=deepcopy(pf1D_Decoder), debug_print=debug_print) # active_pf_2D: used for binning position columns # active_pf_2D: used for binning position columns\
+    try:
+        test_all_directional_decoder_result.epochs_bin_by_bin_performance_analysis_df = test_all_directional_decoder_result.get_lap_bin_by_bin_performance_analysis_df(active_pf_2D=deepcopy(pf1D_Decoder), debug_print=debug_print) # active_pf_2D: used for binning position columns # active_pf_2D: used for binning position columns\
+    except ValueError as e:
+        # AssertionError: curr_array_shape: (57, 3) but this only works with the Pseudo2D (all-directional) decoder with posteriors with .shape[1] == 4, corresponding to ['long_LR', 'long_RL', 'short_LR', 'short_RL'] 
+        pass # skip this for now
+    except Exception as e:
+        raise
+
     # epochs_bin_by_bin_performance_analysis_df = test_all_directional_decoder_result.epochs_bin_by_bin_performance_analysis_df ## UNPACK WITH: 
     
     return test_all_directional_decoder_result
