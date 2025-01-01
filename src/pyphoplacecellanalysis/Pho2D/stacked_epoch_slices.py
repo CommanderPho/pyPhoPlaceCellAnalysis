@@ -3287,15 +3287,18 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
         directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders'] # DirectionalPseudo2DDecodersResult, pull from global computations
 
+
+        
         _shared_plotting_kwargs = {                # 'debug_print': True,
-                'max_subplots_per_page': 3,
-                'scrollable_figure': False,
+                'max_subplots_per_page': kwargs.get('params_kwargs', {}).get('max_subplots_per_page', 3),
+                'scrollable_figure': kwargs.get('params_kwargs', {}).get('scrollable_figure', False),
                 # 'scrollable_figure': True,
                 # 'posterior_heatmap_imshow_kwargs': dict(vmin=0.0075),
-                'use_AnchoredCustomText': False,
-                'should_suppress_callback_exceptions': False,
+                'use_AnchoredCustomText': kwargs.get('params_kwargs', {}).get('use_AnchoredCustomText', False),
+                'should_suppress_callback_exceptions': kwargs.get('params_kwargs', {}).get('should_suppress_callback_exceptions', False),
                 # 'build_fn': 'insets_view',
-                'should_draw_time_bin_boundaries': True, 'time_bin_edges_display_kwargs': dict(color='grey', alpha=0.5, linewidth=1.5),   
+                'should_draw_time_bin_boundaries': kwargs.get('params_kwargs', {}).get('should_draw_time_bin_boundaries', True),
+                 'time_bin_edges_display_kwargs': kwargs.get('params_kwargs', {}).get('time_bin_edges_display_kwargs', dict(color='grey', alpha=0.5, linewidth=1.5)),   
         }
         
         params_kwargs = {'known_epochs_type': known_epochs_type,
@@ -3336,7 +3339,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         
         # directional_merged_decoders_result.filtered_by_epoch_times()
         yellow_blue_trackID_marginals_plot_tuple = paginated_multi_decoder_decoded_epochs_window.build_attached_yellow_blue_track_identity_marginal_window(directional_merged_decoders_result, global_session=global_session, filter_epochs=deepcopy(active_filter_epochs_df), epochs_name=known_epochs_type, 
-                                                                                                                                                           **active_build_attached_yellow_blue_track_identity_marginal_window_kwargs, **_shared_plotting_kwargs, active_context=yellow_blue_plot_context)
+                                                                                                                                                           **active_build_attached_yellow_blue_track_identity_marginal_window_kwargs, **_shared_plotting_kwargs,
+                                                                                                                                                            active_context=yellow_blue_plot_context)
 
         return (app, paginated_multi_decoder_decoded_epochs_window, pagination_controller_dict), ripple_rasters_plot_tuple, yellow_blue_trackID_marginals_plot_tuple
 
