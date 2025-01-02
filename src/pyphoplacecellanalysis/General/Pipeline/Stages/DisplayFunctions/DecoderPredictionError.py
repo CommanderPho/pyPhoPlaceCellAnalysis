@@ -3002,13 +3002,14 @@ class MarginalLabelsPlotDataProvider(PaginatedPlotDataProvider):
         ## Plot the line plot. Could update this like I did for the text?        
         if should_enable_plot:
             an_marginal_label_artists_dict = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(curr_ax, y_bin_labels=marginal_y_bin_labels, enable_draw_decoder_colored_lines=False, should_use_ax_fraction_positioning=True) ## use this because we used `DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors(a_filter_epochs_decoder_result)` up above
-            
+            # Store the plot objects for future updates:
+            plots[cls.plots_group_identifier_key][data_index_value] = an_marginal_label_artists_dict # {'line':most_likely_decoded_position_plot}
+                        
         else:
             # ## Already removed above, just don't re-add it
             pass
 
-        # Store the plot objects for future updates:
-        plots[cls.plots_group_identifier_key][data_index_value] = an_marginal_label_artists_dict # {'line':most_likely_decoded_position_plot}
+
         
         if debug_print:
             print(f'\t success!')

@@ -7302,6 +7302,15 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                         params, plots_data, plots, ui = out_plot_tuple # [2] corresponds to 'plots' in params, plots_data, plots, ui = laps_plots_tuple
                         # post_hoc_append to collector
                         mw = ui.mw # MatplotlibTimeSynchronizedWidget
+                        
+                        y_bin_labels = _mod_plot_kwargs.get('y_bin_labels', None)
+                        if y_bin_labels is not None:
+                            label_artists_dict = {}
+                            for i, ax in enumerate(plots.axs):
+                                label_artists_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=y_bin_labels, enable_draw_decoder_colored_lines=False)
+                            plots['label_artists_dict'] = label_artists_dict
+                            
+
                         if mw is not None:
                             fig = mw.getFigure()
                             collector.post_hoc_append(figs=mw.fig, axes=mw.axes, contexts=sub_context)
@@ -7337,9 +7346,15 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                             active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors(filter_epochs_decoder_result),
                             single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_lap_epochs,
                             size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
-                            _mod_plot_kwargs=dict(final_context=_main_context),
+                            _mod_plot_kwargs=dict(final_context=_main_context, y_bin_labels=['long_LR', 'long_RL', 'short_LR', 'short_RL']),
                             **deepcopy(kwargs)
-                        )
+                        )            
+                        # identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = output_dict[a_posterior_name]
+                        # label_artists_dict = {}
+                        # for i, ax in enumerate(matplotlib_fig_axes):
+                        #     label_artists_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['long_LR', 'long_RL', 'short_LR', 'short_RL'], enable_draw_decoder_colored_lines=False)
+                        # output_dict[a_posterior_name] = (identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, label_artists_dict)
+                        
                         
 
                     if render_directional_marginal_laps:
@@ -7353,7 +7368,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                             active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_custom_marginal_over_direction(filter_epochs_decoder_result),
                             single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_lap_epochs,
                             size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
-                            _mod_plot_kwargs=dict(final_context=_main_context),
+                            _mod_plot_kwargs=dict(final_context=_main_context, y_bin_labels=['LR', 'RL']),
                             **deepcopy(kwargs)
                         )
 
@@ -7369,7 +7384,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                             active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_custom_marginal_over_direction(filter_epochs_decoder_result),
                             single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_ripple_epochs,
                             size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
-                            _mod_plot_kwargs=dict(final_context=_main_context),
+                            _mod_plot_kwargs=dict(final_context=_main_context, y_bin_labels=['LR', 'RL']),
                             **deepcopy(kwargs)
                         )
 
@@ -7385,7 +7400,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                             active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
                             single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_lap_epochs,
                             size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
-                            _mod_plot_kwargs=dict(final_context=_main_context),
+                            _mod_plot_kwargs=dict(final_context=_main_context, y_bin_labels=['long', 'short']),
                             **deepcopy(kwargs)
                         )
 
@@ -7402,7 +7417,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                             active_marginal_fn=lambda filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(filter_epochs_decoder_result),
                             single_plot_fixed_height=single_plot_fixed_height, debug_test_max_num_slices=max_num_ripple_epochs,
                             size=size, dpi=dpi, constrained_layout=constrained_layout, scrollable_figure=scrollable_figure,
-                            _mod_plot_kwargs=dict(final_context=_main_context),
+                            _mod_plot_kwargs=dict(final_context=_main_context, y_bin_labels=['long', 'short']),
                             **deepcopy(kwargs)
                         )
 

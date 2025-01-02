@@ -1806,8 +1806,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             print(f'add_data_overlays(...): decoder_track_length is None so skipping heuristics plotting')
 
 
-        marginal_y_bin_labels = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
-        
+        marginal_y_bin_labels = self.params.setdefault('marginal_y_bin_labels', ['long_LR', 'long_RL', 'short_LR', 'short_RL'])
         # self.params.enable_marginal_labels = True
         marginal_labels_data = MarginalLabelsPlotDataProvider.decoder_build_single_marginal_labels_data(deepcopy(decoder_decoded_epochs_result), included_columns=included_columns, pos_bin_edges=pos_bin_edges, decoder_track_length=decoder_track_length, marginal_y_bin_labels=marginal_y_bin_labels) # , pos_bin_edges=pos_bin_edges, decoder_track_length=decoder_track_length not needed
         if marginal_labels_data is not None:
@@ -3115,6 +3114,16 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         assert (filter_epochs_decoder_result is not None)
         
         debug_print = kwargs.get('debug_print', False)
+        
+        # TrackID ____________________________________________________________________________________________________________ #
+        marginal_y_bin_labels = kwargs.get('marginal_y_bin_labels', ['long', 'short'])
+        active_marginal_fn =  kwargs.get('active_marginal_fn', lambda a_filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(a_filter_epochs_decoder_result))
+
+        # # All-four ___________________________________________________________________________________________________________ #
+        # marginal_y_bin_labels = kwargs.get('marginal_y_bin_labels', ['long_LR', 'long_RL', 'short_LR', 'short_RL'])
+        # active_marginal_fn = kwargs.get('active_marginal_fn', lambda a_filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors(a_filter_epochs_decoder_result)) ## IMPORTANT: `active_marginal_fn` is what makes this a yellow-blue plot
+
+
 
         ## Extract params_kwargs
         params_kwargs = kwargs.pop('params_kwargs', {})
@@ -3123,7 +3132,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                 'should_suppress_callback_exceptions': False, 'isPaginatorControlWidgetBackedMode': True,
                 'enable_update_window_title_on_page_change': False, 'build_internal_callbacks': True, 'debug_print': True, 'skip_plotting_measured_positions': True,  'enable_decoded_most_likely_position_curve': False, 
                                                                                                     'enable_decoded_sequence_and_heuristics_curve': False, 'show_pre_merged_debug_sequences': False, 'show_heuristic_criteria_filter_epoch_inclusion_status': False,
-                                                                                                     'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False, 'enable_weighted_corr_data_provider_modify_axes_rect': False, 'enable_marginal_labels': True} | params_kwargs
+                                                                                                     'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False, 'enable_weighted_corr_data_provider_modify_axes_rect': False, 'enable_marginal_labels': True, 'marginal_y_bin_labels': marginal_y_bin_labels} | params_kwargs
         
         print(f'params_kwargs: {params_kwargs}')
         
@@ -3145,10 +3154,6 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         # long_short_marginals: List[NDArray] = [x.p_x_given_n for x in DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(all_directional_ripple_filter_epochs_decoder_result)] # these work if I want all of them
 
         first_controller = list(self.pagination_controllers.values())[0]
-        # included_page_data_indicies, (curr_page_active_filter_epochs, curr_page_epoch_labels, curr_page_time_bin_containers, curr_page_posterior_containers) = first_controller.plots_data.paginator.get_page_data(page_idx=first_controller.current_page_idx)
-        # curr_page_epoch_labels # these actually do seem correct to pass in as `included_epoch_indicies`
-        # curr_page_epoch_labels = [int(v.removeprefix('Epoch[').removesuffix(']')) for v in curr_page_epoch_labels] # ['Epoch[70]' 'Epoch[72]'] -> [70, 72]
-        # print(curr_page_epoch_labels)
         # Ripple Track-identity (Long/Short) Marginal:
         ## INPUTS: all_directional_ripple_filter_epochs_decoder_result, global_session, ripple_decoding_time_bin_size
         # _main_context = {'decoded_epochs': 'Ripple', 'Marginal': 'TrackID', 't_bin': decoding_time_bin_size}
@@ -3167,8 +3172,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                                                                                             filter_epochs_decoder_result=filter_epochs_decoder_result,
                                                                                             xbin=active_decoder.xbin, global_pos_df=global_session.position.to_dataframe(),
                                                                                             a_name=f'YellowBlueMarginalEpochSlices', active_context=active_context,
-                                                                                            # active_marginal_fn=lambda a_filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(a_filter_epochs_decoder_result), ## IMPORTANT: `active_marginal_fn` is what makes this a yellow-blue plot
-                                                                                            active_marginal_fn=lambda a_filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors(a_filter_epochs_decoder_result), ## IMPORTANT: `active_marginal_fn` is what makes this a yellow-blue plot
+                                                                                            active_marginal_fn=active_marginal_fn, ## IMPORTANT: `active_marginal_fn` is what makes this a yellow-blue plot
                                                                                             # active_marginal_fn=None,
                                                                                             max_subplots_per_page=max_subplots_per_page, debug_print=debug_print,
                                                                                             # included_epoch_indicies=curr_page_epoch_labels, ## This is what broke rendering on every page except the first one
