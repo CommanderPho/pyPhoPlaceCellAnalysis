@@ -268,58 +268,213 @@ def measurement_func(state):
 # ==================================================================================================================== #
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import CustomDecodeEpochsResult, MeasuredDecodedPositionComparison, DecodedFilterEpochsResult
 
-
-@function_attributes(short_name=None, tags=['performance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 12:32', related_items=['build_lap_bin_by_bin_performance_analysis_df'])
-def plot_estimation_correctness_with_raw_data(epochs_df: pd.DataFrame, x_col: str, y_col: str, extra_info_str: str=''):
-    """
-    Plots a bar plot with error bars for the mean and variability of a metric across bins,
-    overlayed with a swarm-like plot showing raw data points, ensuring proper alignment.
+@metadata_attributes(short_name=None, tags=['validation', 'plot', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-02 09:10', related_items=[])
+class EstimationCorrectnessPlots:
+    """ 
     
-    Args:
-        epochs_df (pd.DataFrame): DataFrame containing the data.
-        x_col (str): Column name for the x-axis (binned variable).
-        y_col (str): Column name for the y-axis (metric to visualize).
-        
-    Usage:
-        # Example usage
-        plot_estimation_correctness_with_raw_data(epochs_track_identity_marginal_df, 'binned_x_meas', 'estimation_correctness_track_ID')
+    EstimationCorrectnessPlots.plot_estimation_correctness_vertical_stack(
+        _out_subset_decode_dfs_dict, 'binned_x_meas', 'estimation_correctness_track_ID'
+    )
 
+    # Example usage
+    # EstimationCorrectnessPlots.plot_estimation_correctness_bean_plot(
+    #     _out_subset_decode_dfs_dict, 'binned_x_meas', 'estimation_correctness_track_ID'
+    # )
 
     """
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-
-    # Clip the values to the range [0, 1]
-    epochs_df[y_col] = epochs_df[y_col].clip(lower=0, upper=1)
-
-    # Ensure x_col is treated consistently as a categorical variable
-    epochs_df[x_col] = pd.Categorical(epochs_df[x_col], ordered=True)
-    grouped = epochs_df.groupby(x_col)[y_col].agg(['mean', 'std']).reset_index()
-
-    # Plotting
-    plt.figure(figsize=(10, 6))
-
-    # Bar plot with error bars
-    plt.bar(grouped[x_col].cat.codes, grouped['mean'], yerr=grouped['std'], capsize=5, color='skyblue', alpha=0.7, label='Mean ± Std')
-
-    # Overlay raw data as a strip plot
-    sns.stripplot(data=epochs_df, x=x_col, y=y_col, color='black', alpha=0.6, jitter=True, size=5)
-
-    # Manually add legend for raw data once
-    plt.scatter([], [], color='black', alpha=0.6, label='Raw Data')
-
-    # Align x-axis ticks and labels
-    plt.xticks(ticks=range(len(grouped[x_col].cat.categories)), labels=grouped[x_col].cat.categories)
-
-    plt.title(f'Estimation Correctness Across Binned X Measurements: {extra_info_str}')
-    plt.xlabel(x_col)
-    plt.ylabel(y_col)
-    plt.legend()
-    plt.grid(True, linestyle='--', alpha=0.7)
-    plt.tight_layout()
-    plt.show()
+    @function_attributes(short_name=None, tags=['performance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 12:32', related_items=['build_lap_bin_by_bin_performance_analysis_df'])
+    def plot_estimation_correctness_with_raw_data(epochs_df: pd.DataFrame, x_col: str, y_col: str, extra_info_str: str=''):
+        """
+        Plots a bar plot with error bars for the mean and variability of a metric across bins,
+        overlayed with a swarm-like plot showing raw data points, ensuring proper alignment.
+        
+        Args:
+            epochs_df (pd.DataFrame): DataFrame containing the data.
+            x_col (str): Column name for the x-axis (binned variable).
+            y_col (str): Column name for the y-axis (metric to visualize).
+            
+        Usage:
+            # Example usage
+            EstimationCorrectnessPlots.plot_estimation_correctness_with_raw_data(epochs_track_identity_marginal_df, 'binned_x_meas', 'estimation_correctness_track_ID')
 
 
+        """
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+
+        # Clip the values to the range [0, 1]
+        epochs_df[y_col] = epochs_df[y_col].clip(lower=0, upper=1)
+
+        # Ensure x_col is treated consistently as a categorical variable
+        epochs_df[x_col] = pd.Categorical(epochs_df[x_col], ordered=True)
+        grouped = epochs_df.groupby(x_col)[y_col].agg(['mean', 'std']).reset_index()
+
+        # Plotting
+        plt.figure(figsize=(10, 6))
+
+        # Bar plot with error bars
+        plt.bar(grouped[x_col].cat.codes, grouped['mean'], yerr=grouped['std'], capsize=5, color='skyblue', alpha=0.7, label='Mean ± Std')
+
+        # Overlay raw data as a strip plot
+        sns.stripplot(data=epochs_df, x=x_col, y=y_col, color='black', alpha=0.6, jitter=True, size=5)
+
+        # Manually add legend for raw data once
+        plt.scatter([], [], color='black', alpha=0.6, label='Raw Data')
+
+        # Align x-axis ticks and labels
+        plt.xticks(ticks=range(len(grouped[x_col].cat.categories)), labels=grouped[x_col].cat.categories)
+
+        plt.title(f'Estimation Correctness Across Binned X Measurements: {extra_info_str}')
+        plt.xlabel(x_col)
+        plt.ylabel(y_col)
+        plt.legend()
+        plt.grid(True, linestyle='--', alpha=0.7)
+        plt.tight_layout()
+        plt.show()
+
+    @function_attributes(short_name=None, tags=['performance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 12:32', related_items=['build_lap_bin_by_bin_performance_analysis_df'])
+    def plot_estimation_correctness_vertical_stack(epochs_dict: dict, x_col: str, y_col: str):
+        """
+        Plots a vertical stack of estimation correctness across multiple time bin sizes.
+        Each time bin size is rendered in a separate subplot with consistent y-limits [0, 1].
+        
+        Args:
+            epochs_dict (dict): Dictionary where keys are time bin sizes and values are DataFrames containing the data.
+            x_col (str): Column name for the x-axis (binned variable).
+            y_col (str): Column name for the y-axis (metric to visualize).
+            
+        Usage:
+            # Example usage
+            plot_estimation_correctness_vertical_stack(
+                _out_subset_decode_dict, 'binned_x_meas', 'estimation_correctness_track_ID'
+            )
+        """
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        import pandas as pd
+
+        n_bins = len(epochs_dict)
+        fig, axes = plt.subplots(n_bins, 1, figsize=(10, 5 * n_bins), sharex=True)
+        color_palette = sns.color_palette("Set2", n_bins)
+
+        for i, (time_bin, df) in enumerate(epochs_dict.items()):
+            ax = axes[i] if n_bins > 1 else axes
+
+            # Clip the values to the range [0, 1]
+            df[y_col] = df[y_col].clip(lower=0, upper=1)
+
+            # Ensure x_col is treated consistently as a categorical variable
+            df[x_col] = pd.Categorical(df[x_col], ordered=True)
+            grouped = df.groupby(x_col)[y_col].agg(['mean', 'std']).reset_index()
+
+            # Bar plot with error bars
+            ax.bar(
+                grouped[x_col].cat.codes,
+                grouped['mean'],
+                yerr=grouped['std'],
+                capsize=5,
+                color=color_palette[i],
+                alpha=0.7,
+                label=f'Time Bin: {time_bin}'
+            )
+
+            # Overlay raw data as a strip plot
+            sns.stripplot(
+                data=df,
+                x=pd.Categorical(df[x_col]).codes,
+                y=y_col,
+                color='black',
+                alpha=0.6,
+                jitter=True,
+                size=4,
+                ax=ax
+            )
+
+            # Adjust y-axis and title
+            ax.set_ylim(0, 1)
+            ax.set_title(f'Estimation Correctness (Time Bin: {time_bin})')
+            ax.set_ylabel(y_col)
+            ax.grid(True, linestyle='--', alpha=0.7)
+
+        # X-axis adjustments (shared)
+        grouped_x_labels = grouped[x_col].cat.categories
+        ax.set_xticks(range(len(grouped_x_labels)))
+        ax.set_xticklabels(grouped_x_labels)
+        ax.set_xlabel(x_col)
+
+        plt.tight_layout()
+        plt.show()
+
+
+    @function_attributes(short_name=None, tags=['performance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 12:32', related_items=['build_lap_bin_by_bin_performance_analysis_df'])
+    def plot_estimation_correctness_bean_plot(epochs_dict: dict, x_col: str, y_col: str):
+        """
+        Plots a vertical stack of bean plots for estimation correctness across multiple time bin sizes.
+        Each time bin size is rendered in a separate subplot with consistent y-limits [0, 1].
+        
+        Args:
+            epochs_dict (dict): Dictionary where keys are time bin sizes and values are DataFrames containing the data.
+            x_col (str): Column name for the x-axis (binned variable).
+            y_col (str): Column name for the y-axis (metric to visualize).
+            
+        Usage:
+            # Example usage
+            plot_estimation_correctness_bean_plot(
+                _out_subset_decode_dict, 'binned_x_meas', 'estimation_correctness_track_ID'
+            )
+        """
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        import pandas as pd
+
+        n_bins = len(epochs_dict)
+        fig, axes = plt.subplots(n_bins, 1, figsize=(10, 5 * n_bins), sharex=True)
+
+        for i, (time_bin, df) in enumerate(epochs_dict.items()):
+            ax = axes[i] if n_bins > 1 else axes
+
+            # Clip the values to the range [0, 1]
+            df[y_col] = df[y_col].clip(lower=0, upper=1)
+
+            # Ensure x_col is treated consistently as a categorical variable
+            df[x_col] = pd.Categorical(df[x_col], ordered=True)
+
+            # Violin plot (density estimates)
+            sns.violinplot(
+                data=df,
+                x=x_col,
+                y=y_col,
+                scale='width',
+                inner=None,  # Remove internal bars to focus on raw points
+                bw=0.2,  # Bandwidth adjustment for smoother density
+                cut=0,  # Restrict to data range
+                linewidth=1,
+                color='skyblue',
+                ax=ax
+            )
+
+            # Overlay raw data points
+            sns.stripplot(
+                data=df,
+                x=x_col,
+                y=y_col,
+                color='black',
+                alpha=0.6,
+                jitter=True,
+                size=4,
+                ax=ax
+            )
+
+            # Adjust y-axis and title
+            ax.set_ylim(0, 1)
+            ax.set_title(f'Estimation Correctness (Time Bin: {time_bin})')
+            ax.set_ylabel(y_col)
+            ax.grid(True, linestyle='--', alpha=0.7)
+
+        # Shared X-axis adjustments
+        ax.set_xlabel(x_col)
+        plt.tight_layout()
+        plt.show()
 
 
 @function_attributes(short_name=None, tags=['transition_matrix', 'position', 'decoder_id', '2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 10:05', related_items=[])
