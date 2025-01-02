@@ -1223,6 +1223,8 @@ def validate_has_directional_laps(curr_active_pipeline, computation_filter_name=
     return (has_matching_filter_name and has_updated_laps_dirs)
     # return (computation_filter_name in computed_base_epoch_names)
 
+# Avoid division by zero and handle NaN values
+_prevent_div_by_zero_epsilon: float = 1e-10
 
 @define(slots=False, repr=False)
 class DirectionalPseudo2DDecodersResult(ComputedResult):
@@ -1547,6 +1549,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
             assert curr_array_shape[1] == 4, f"curr_array_shape: {curr_array_shape} but this only works with the Pseudo2D (all-directional) decoder with posteriors with .shape[1] == 4, corresponding to ['long_LR', 'long_RL', 'short_LR', 'short_RL'] "
 
             out_p_x_given_n = np.zeros((curr_array_shape[0], 2, curr_array_shape[-1]))
+            ## I don't want to use np.nansum(...) here because I DO want to propgate NaNs if one of the elements are NaN:
             out_p_x_given_n[:, 0, :] = (a_p_x_given_n[:, 0, :] + a_p_x_given_n[:, 2, :]) # LR_marginal = long_LR + short_LR
             out_p_x_given_n[:, 1, :] = (a_p_x_given_n[:, 1, :] + a_p_x_given_n[:, 3, :]) # RL_marginal = long_RL + short_RL
 
@@ -1693,7 +1696,14 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         directional_marginals: List[DynamicContainer] = cls.build_custom_marginal_over_direction(all_directional_laps_filter_epochs_decoder_result)
         
         # gives the likelihood of [LR, RL] for each epoch using information from both Long/Short:
-        directional_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in directional_marginals], axis=0) # sum over all time-bins within the epoch to reach a consensus
+        # directional_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in directional_marginals], axis=0) # sum over all time-bins within the epoch to reach a consensus
+        
+        # Compute the likelihood of [LR, RL] for each epoch using information from both Long/Short
+        directional_all_epoch_bins_marginal = np.stack([
+            np.nansum(v.p_x_given_n, axis=-1) / np.maximum(np.nansum(v.p_x_given_n, axis=(-2, -1)), _prevent_div_by_zero_epsilon)
+            for v in directional_marginals
+        ], axis=0)  # sum over all time-bins within the epoch to reach a consensus
+
         # Find the indicies via this method:
         most_likely_direction_from_decoder = np.argmax(directional_all_epoch_bins_marginal, axis=1) # consistent with 'lap_dir' columns. for LR_dir, values become more positive with time
         is_most_likely_direction_LR_dir = np.logical_not(most_likely_direction_from_decoder) # consistent with 'is_LR_dir' column. for LR_dir, values become more positive with time
@@ -1713,7 +1723,13 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         track_identity_marginals: List[DynamicContainer] = cls.build_custom_marginal_over_long_short(all_directional_laps_filter_epochs_decoder_result)
         
         # gives the likelihood of [LR, RL] for each epoch using information from both Long/Short:
-        track_identity_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in track_identity_marginals], axis=0) # sum over all time-bins within the epoch to reach a consensus
+        # track_identity_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in track_identity_marginals], axis=0) # sum over all time-bins within the epoch to reach a consensus
+        # Compute the likelihood of [LR, RL] for each epoch using information from both Long/Short
+        track_identity_all_epoch_bins_marginal = np.stack([
+            np.nansum(v.p_x_given_n, axis=-1) / np.maximum(np.nansum(v.p_x_given_n, axis=(-2, -1)), _prevent_div_by_zero_epsilon)
+            for v in track_identity_marginals
+        ], axis=0)  # sum over all time-bins within the epoch to reach a consensus
+
         # Find the indicies via this method:
         most_likely_track_identity_from_decoder = np.argmax(track_identity_all_epoch_bins_marginal, axis=1) # consistent with 'lap_dir' columns. for LR_dir, values become more positive with time
         is_most_likely_track_identity_Long = np.logical_not(most_likely_track_identity_from_decoder) # consistent with 'is_LR_dir' column. for LR_dir, values become more positive with time
@@ -1731,9 +1747,14 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         """
         non_marginalized_decoder_marginals: List[DynamicContainer] = cls.build_non_marginalized_raw_posteriors(all_directional_laps_filter_epochs_decoder_result, debug_print=debug_print) # each P-x[i].shape: (4, n_epoch_t_bins[i])
         # gives the likelihood of [LR, RL] for each epoch using information from both Long/Short:
-        non_marginalized_decoder_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in non_marginalized_decoder_marginals], axis=0) # sum over all time-bins within the epoch to reach a consensus .shape: (4, )
+        # non_marginalized_decoder_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in non_marginalized_decoder_marginals], axis=0) # sum over all time-bins within the epoch to reach a consensus .shape: (4, )
+        non_marginalized_decoder_all_epoch_bins_marginal = np.stack([
+            np.nansum(v.p_x_given_n, axis=-1) / np.maximum(np.nansum(v.p_x_given_n, axis=(-2, -1)), _prevent_div_by_zero_epsilon)
+            for v in non_marginalized_decoder_marginals
+        ], axis=0) # sum over all time-bins within the epoch to reach a consensus .shape: (4, )
+
         # non_marginalized_decoder_all_epoch_bins_marginal.shape: [n_epochs, 4]
-        most_likely_decoder_idxs = np.argmax(non_marginalized_decoder_all_epoch_bins_marginal, axis=1) # consistent with 'lap_dir' columns. for LR_dir, values become more positive with time
+        most_likely_decoder_idxs = np.argmax(non_marginalized_decoder_all_epoch_bins_marginal, axis=1) # consistent with 'lap_dir' columns. for LR_dir, values become more positive with time | most_likely_decoder_idxs will always contain valid indices, not NaN.
         # build the dataframe:
         assert (np.shape(non_marginalized_decoder_all_epoch_bins_marginal)[1] == 4), f"shape of non_marginalized_decoder_all_epoch_bins_marginal must be 4 (corresponding to the 4 decoders) but instead np.shape(non_marginalized_decoder_all_epoch_bins_marginal): {np.shape(non_marginalized_decoder_all_epoch_bins_marginal)}"
         non_marginalized_decoder_all_epoch_bins_decoder_probs_df: pd.DataFrame = pd.DataFrame(non_marginalized_decoder_all_epoch_bins_marginal, columns=['long_LR', 'long_RL', 'short_LR', 'short_RL'])
