@@ -3126,6 +3126,29 @@ class CustomDecodeEpochsResult(UnpackableMixin):
     
 
     @classmethod
+    def init_from_single_decoder_decoding_result_and_measured_pos_df(cls, a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame, pf1D_Decoder: Optional[BasePositionDecoder]=None, debug_print:bool=False) -> "CustomDecodeEpochsResult":
+        """ compare the decoded most-likely-positions and the measured positions interpolated to the same time bins.
+        
+         all_directional_laps_filter_epochs_decoder_custom_result: CustomDecodeEpochsResult = CustomDecodeEpochsResult.init_from_single_decoder_decoding_result_and_measured_pos_df(a_decoder_decoding_result=deepcopy(all_directional_laps_filter_epochs_decoder_result), global_measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']))
+         all_directional_laps_filter_epochs_decoder_custom_result
+        """
+        # all_directional_laps_filter_epochs_decoder_custom_result: MeasuredDecodedPositionComparison = cls.build_single_measured_decoded_position_comparison(a_decoder_decoding_result=deepcopy(all_directional_laps_filter_epochs_decoder_result), global_measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']))
+        a_custom_decoder_decoding_result = cls(measured_decoded_position_comparion=cls.build_single_measured_decoded_position_comparison(a_decoder_decoding_result=a_decoder_decoding_result, global_measured_position_df=global_measured_position_df),
+                                                                                                 decoder_result=a_decoder_decoding_result,
+                                                                                                 epochs_bin_by_bin_performance_analysis_df=None,
+        )
+        if pf1D_Decoder is not None:
+            try:
+                a_custom_decoder_decoding_result.epochs_bin_by_bin_performance_analysis_df = a_custom_decoder_decoding_result.get_lap_bin_by_bin_performance_analysis_df(active_pf_2D=deepcopy(pf1D_Decoder), debug_print=debug_print) # active_pf_2D: used for binning position columns # active_pf_2D: used for binning position columns\
+            except ValueError as e:
+                # AssertionError: curr_array_shape: (57, 3) but this only works with the Pseudo2D (all-directional) decoder with posteriors with .shape[1] == 4, corresponding to ['long_LR', 'long_RL', 'short_LR', 'short_RL'] 
+                pass # skip this for now
+            except Exception as e:
+                raise
+        return a_custom_decoder_decoding_result
+        
+
+    @classmethod
     def build_single_measured_decoded_position_comparison(cls, a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame) -> MeasuredDecodedPositionComparison:
         """ compare the decoded most-likely-positions and the measured positions interpolated to the same time bins.
         
@@ -3423,18 +3446,20 @@ def _do_custom_decode_epochs(global_spikes_df: pd.DataFrame,  global_measured_po
     decoder_result: DecodedFilterEpochsResult = pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=deepcopy(epochs_to_decode_df), decoding_time_bin_size=decoding_time_bin_size, debug_print=debug_print)
     # Interpolated measured position DataFrame - looks good
     # measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df = build_single_measured_decoded_position_comparison(decoder_result, global_measured_position_df=global_measured_position_df)
-    measured_decoded_position_comparion: MeasuredDecodedPositionComparison = CustomDecodeEpochsResult.build_single_measured_decoded_position_comparison(decoder_result, global_measured_position_df=global_measured_position_df)
+    # measured_decoded_position_comparion: MeasuredDecodedPositionComparison = CustomDecodeEpochsResult.build_single_measured_decoded_position_comparison(decoder_result, global_measured_position_df=global_measured_position_df)
 
     ## INPUTS: test_all_directional_decoder_result, all_directional_pf1D_Decoder
-    test_all_directional_decoder_result: CustomDecodeEpochsResult = CustomDecodeEpochsResult(measured_decoded_position_comparion=measured_decoded_position_comparion, decoder_result=decoder_result, epochs_bin_by_bin_performance_analysis_df=None)
-    try:
-        test_all_directional_decoder_result.epochs_bin_by_bin_performance_analysis_df = test_all_directional_decoder_result.get_lap_bin_by_bin_performance_analysis_df(active_pf_2D=deepcopy(pf1D_Decoder), debug_print=debug_print) # active_pf_2D: used for binning position columns # active_pf_2D: used for binning position columns\
-    except ValueError as e:
-        # AssertionError: curr_array_shape: (57, 3) but this only works with the Pseudo2D (all-directional) decoder with posteriors with .shape[1] == 4, corresponding to ['long_LR', 'long_RL', 'short_LR', 'short_RL'] 
-        pass # skip this for now
-    except Exception as e:
-        raise
-
+    test_all_directional_decoder_result: CustomDecodeEpochsResult = CustomDecodeEpochsResult.init_from_single_decoder_decoding_result_and_measured_pos_df(decoder_result, global_measured_position_df=global_measured_position_df,
+                                                                                                                                                          pf1D_Decoder=deepcopy(pf1D_Decoder), debug_print=debug_print,
+                                                                                                                                                          )
+    # test_all_directional_decoder_result: CustomDecodeEpochsResult = CustomDecodeEpochsResult(measured_decoded_position_comparion=measured_decoded_position_comparion, decoder_result=decoder_result, epochs_bin_by_bin_performance_analysis_df=None)
+    # try:
+    #     test_all_directional_decoder_result.epochs_bin_by_bin_performance_analysis_df = test_all_directional_decoder_result.get_lap_bin_by_bin_performance_analysis_df(active_pf_2D=deepcopy(pf1D_Decoder), debug_print=debug_print) # active_pf_2D: used for binning position columns # active_pf_2D: used for binning position columns\
+    # except ValueError as e:
+    #     # AssertionError: curr_array_shape: (57, 3) but this only works with the Pseudo2D (all-directional) decoder with posteriors with .shape[1] == 4, corresponding to ['long_LR', 'long_RL', 'short_LR', 'short_RL'] 
+    #     pass # skip this for now
+    # except Exception as e:
+    #     raise
     # epochs_bin_by_bin_performance_analysis_df = test_all_directional_decoder_result.epochs_bin_by_bin_performance_analysis_df ## UNPACK WITH: 
     
     return test_all_directional_decoder_result
