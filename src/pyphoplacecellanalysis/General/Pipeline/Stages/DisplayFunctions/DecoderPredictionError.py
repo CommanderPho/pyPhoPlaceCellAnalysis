@@ -2913,6 +2913,113 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
         return params, plots_data, plots, ui
 
 
+# ==================================================================================================================== #
+# MarginalLabelsPlotDataProvider                                                                                        #
+# ==================================================================================================================== #
+@metadata_attributes(short_name=None, tags=['marginal', 'labels', 'plot'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-02 03:07', related_items=[])
+class MarginalLabelsPlotDataProvider(PaginatedPlotDataProvider):
+    """ Adds the static y-axis marginal Pseudo2D labels to the marginalized posterior heatmap.
+
+    from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import MarginalLabelsPlotDataProvider
+    
+    """
+    plots_group_identifier_key: str = 'marginal_labels' # _out_pagination_controller.plots['marginal_labels']
+    
+    provided_params: Dict[str, Any] = {'enable_marginal_labels': False} # , enable_actual_position_curve = False, 'marginal_y_bin_labels': ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+    provided_plots_data: Dict[str, Any] = {'marginal_labels_data': None}
+    provided_plots: Dict[str, Any] = {'marginal_labels': {}}
+    column_names: List[str] = [] ## #TODO 2024-11-25 13:57: - [ ] Need column names used by this data provider
+    
+
+    @classmethod
+    def get_provided_callbacks(cls) -> Dict[str, Dict]:
+        return {'on_render_page_callbacks': 
+                {'plot_decoded_marginal_labels_data': cls._callback_update_curr_single_epoch_slice_plot}
+        }
+
+    
+    @classmethod
+    def decoder_build_single_marginal_labels_data(cls, curr_results_obj, decoder_track_length: float, pos_bin_edges: NDArray, marginal_y_bin_labels: List[str]=None, included_columns=None):
+        """ builds for a single decoder. 
+        """
+        if marginal_y_bin_labels is None:
+            marginal_y_bin_labels = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+
+        return {'marginal_y_bin_labels': deepcopy(marginal_y_bin_labels)}
+
+
+    @classmethod
+    def _callback_update_curr_single_epoch_slice_plot(cls, curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", data_idx:int, curr_time_bins, *args, epoch_slice=None, curr_time_bin_container=None, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
+        """ 2025-01-02 - Based off of `_helper_update_decoded_single_epoch_slice_plot` to enable plotting subsequence identities (as separate colors) for each time bin's most-likely decoded position lines 
+
+
+        
+        """
+        from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+        
+        debug_print = kwargs.pop('debug_print', True)
+        if debug_print:
+            print(f'MarginalLabelsPlotDataProvider._callback_update_curr_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})')
+        
+        if epoch_slice is not None:
+            if debug_print:
+                print(f'\tepoch_slice: {epoch_slice}')
+            assert len(epoch_slice) == 2
+            epoch_start_t, epoch_end_t = epoch_slice # unpack
+            if debug_print:
+                print(f'\tepoch_start_t: {epoch_start_t}, epoch_end_t: {epoch_end_t}')
+        else:
+            raise NotImplementedError(f'epoch_slice is REQUIRED to index into the wcorr_data dict, but is None!')
+        
+        if curr_time_bin_container is not None:
+            if debug_print:
+                print(f'\tcurr_time_bin_container: {curr_time_bin_container}')
+
+
+        ## Extract the visibility:
+        should_enable_plot: bool = params.setdefault('enable_marginal_labels', False)
+
+        marginal_y_bin_labels: List[str] = plots_data.marginal_labels_data['marginal_y_bin_labels']
+        data_index_value = curr_ax
+        
+        if debug_print:
+            print(f'{params.name}: _callback_update_curr_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})\n\tdata_index_value: {data_index_value}')
+    
+        extant_marginal_label_artists_dict = plots[cls.plots_group_identifier_key].get(data_index_value, None)
+
+        # plot the radon transform line on the epoch:    
+        if (extant_marginal_label_artists_dict is not None):
+            # already exists, clear the existing ones. 
+            # Let's assume we want to remove the 'Quadratic' line (line2)
+            if len(extant_marginal_label_artists_dict) > 0:
+                for a_name, an_artist in extant_marginal_label_artists_dict.items():
+                    an_artist.remove()
+            
+                # extant_marginal_label_artists_dict.remove()
+            extant_marginal_label_artists_dict = None
+
+
+        ## Plot the line plot. Could update this like I did for the text?        
+        if should_enable_plot:
+            an_marginal_label_artists_dict = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(curr_ax, y_bin_labels=marginal_y_bin_labels, enable_draw_decoder_colored_lines=False, should_use_ax_fraction_positioning=True) ## use this because we used `DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors(a_filter_epochs_decoder_result)` up above
+            
+        else:
+            # ## Already removed above, just don't re-add it
+            pass
+
+        # Store the plot objects for future updates:
+        plots[cls.plots_group_identifier_key][data_index_value] = an_marginal_label_artists_dict # {'line':most_likely_decoded_position_plot}
+        
+        if debug_print:
+            print(f'\t success!')
+
+        # If you are in an interactive environment, you might need to refresh the figure.
+        # curr_ax.figure.canvas.draw()
+
+        return params, plots_data, plots, ui
+
+
+
 
 
 

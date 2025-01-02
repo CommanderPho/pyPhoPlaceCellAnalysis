@@ -1768,7 +1768,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import RadonTransformPlotDataProvider
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import WeightedCorrelationPaginatedPlotDataProvider
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DecodedPositionsPlotDataProvider, DecodedSequenceAndHeuristicsPlotDataProvider
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DecodedPositionsPlotDataProvider, DecodedSequenceAndHeuristicsPlotDataProvider, MarginalLabelsPlotDataProvider
         # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import TrainTestSplitPlotDataProvider, TrainTestSplitPlotData
         # self: PaginatedFigureController
 
@@ -1794,13 +1794,24 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         if decoded_position_curves_epochs_data is not None:
             DecodedPositionsPlotDataProvider.add_data_to_pagination_controller(self, decoded_position_curves_epochs_data, update_controller_on_apply=False)
 
-        decoder_track_length: float = self.params.get('track_length_cm', None)
-        assert decoder_track_length is not None
-        # Build Decoded Positions Data and add them:    
         pos_bin_edges = deepcopy(self.params.xbin)
-        decoded_sequence_and_heuristics_curves_data = DecodedSequenceAndHeuristicsPlotDataProvider.decoder_build_single_decoded_sequence_and_heuristics_curves_data(deepcopy(decoder_decoded_epochs_result), pos_bin_edges=pos_bin_edges, decoder_track_length=decoder_track_length, included_columns=included_columns)
-        if decoded_sequence_and_heuristics_curves_data is not None:
-            DecodedSequenceAndHeuristicsPlotDataProvider.add_data_to_pagination_controller(self, decoded_sequence_and_heuristics_curves_data, update_controller_on_apply=False)
+        decoder_track_length: float = self.params.get('track_length_cm', None)
+        # assert decoder_track_length is not None
+        if decoder_track_length is not None:
+            # Build Decoded Positions Data and add them:    
+            decoded_sequence_and_heuristics_curves_data = DecodedSequenceAndHeuristicsPlotDataProvider.decoder_build_single_decoded_sequence_and_heuristics_curves_data(deepcopy(decoder_decoded_epochs_result), pos_bin_edges=pos_bin_edges, decoder_track_length=decoder_track_length, included_columns=included_columns)
+            if decoded_sequence_and_heuristics_curves_data is not None:
+                DecodedSequenceAndHeuristicsPlotDataProvider.add_data_to_pagination_controller(self, decoded_sequence_and_heuristics_curves_data, update_controller_on_apply=False)
+        else:
+            print(f'add_data_overlays(...): decoder_track_length is None so skipping heuristics plotting')
+
+
+        marginal_y_bin_labels = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+        
+        # self.params.enable_marginal_labels = True
+        marginal_labels_data = MarginalLabelsPlotDataProvider.decoder_build_single_marginal_labels_data(deepcopy(decoder_decoded_epochs_result), included_columns=included_columns, pos_bin_edges=pos_bin_edges, decoder_track_length=decoder_track_length, marginal_y_bin_labels=marginal_y_bin_labels) # , pos_bin_edges=pos_bin_edges, decoder_track_length=decoder_track_length not needed
+        if marginal_labels_data is not None:
+            MarginalLabelsPlotDataProvider.add_data_to_pagination_controller(self, marginal_labels_data, update_controller_on_apply=False)
 
 
         if not defer_refresh:
@@ -3110,7 +3121,9 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         params_kwargs = dict(skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, isPaginatorControlWidgetBackedMode=True) | params_kwargs ## merge 
         params_kwargs = {'max_subplots_per_page': 10, 'scrollable_figure': False, 'use_AnchoredCustomText': False,
                 'should_suppress_callback_exceptions': False, 'isPaginatorControlWidgetBackedMode': True,
-                'enable_update_window_title_on_page_change': False, 'build_internal_callbacks': True, 'debug_print': True,} | params_kwargs
+                'enable_update_window_title_on_page_change': False, 'build_internal_callbacks': True, 'debug_print': True, 'skip_plotting_measured_positions': True,  'enable_decoded_most_likely_position_curve': False, 
+                                                                                                    'enable_decoded_sequence_and_heuristics_curve': False, 'show_pre_merged_debug_sequences': False, 'show_heuristic_criteria_filter_epoch_inclusion_status': False,
+                                                                                                     'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False, 'enable_weighted_corr_data_provider_modify_axes_rect': False, 'enable_marginal_labels': True} | params_kwargs
         
         print(f'params_kwargs: {params_kwargs}')
         
@@ -3221,21 +3234,23 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         self.ui.attached_yellow_blue_marginals_viewer_widget = a_yellow_blue_controller
         # self.ui.connections['attached_yellow_blue_marginals_viewer_widget'] = new_connections_dict
         
-        extant_marginal_label_artists_dict = self.ui.attached_yellow_blue_marginals_viewer_widget.plots.get('marginal_label_artists_dict', {})
-        ## can remove them by
-        for decoder_name, inner_output_dict in extant_marginal_label_artists_dict.items():
-            for a_name, an_artist in inner_output_dict.items():
-                an_artist.remove()
+        # extant_marginal_label_artists_dict = self.ui.attached_yellow_blue_marginals_viewer_widget.plots.get('marginal_label_artists_dict', {})
+        # ## can remove them by
+        # for decoder_name, inner_output_dict in extant_marginal_label_artists_dict.items():
+        #     for a_name, an_artist in inner_output_dict.items():
+        #         an_artist.remove()
         
-        marginal_label_artists_dict = {}
+        # marginal_label_artists_dict = {}
 
-        for i, ax in enumerate(self.ui.attached_yellow_blue_marginals_viewer_widget.plots.axs):
-            marginal_label_artists_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['long_LR', 'long_RL', 'short_LR', 'short_RL'], enable_draw_decoder_colored_lines=False) ## use this because we used `DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors(a_filter_epochs_decoder_result)` up above
-            # marginal_label_artists_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['long', 'short'], enable_draw_decoder_colored_lines=False)
-            # marginal_label_artists_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['LR', 'RL'], enable_draw_decoder_colored_lines=False)
+        # for i, ax in enumerate(self.ui.attached_yellow_blue_marginals_viewer_widget.plots.axs):
+        #     marginal_label_artists_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['long_LR', 'long_RL', 'short_LR', 'short_RL'], enable_draw_decoder_colored_lines=False, should_use_ax_fraction_positioning=True) ## use this because we used `DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors(a_filter_epochs_decoder_result)` up above
+        #     # marginal_label_artists_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['long', 'short'], enable_draw_decoder_colored_lines=False)
+        #     # marginal_label_artists_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['LR', 'RL'], enable_draw_decoder_colored_lines=False)
 
-        self.ui.attached_yellow_blue_marginals_viewer_widget.plots['marginal_label_artists_dict'] = marginal_label_artists_dict
+        # self.ui.attached_yellow_blue_marginals_viewer_widget.plots['marginal_label_artists_dict'] = marginal_label_artists_dict
 
+        a_yellow_blue_controller.add_data_overlays(decoder_decoded_epochs_result=filter_epochs_decoder_result, included_columns=[])
+        
         return yellow_blue_attached_render_plot
 
 
@@ -3314,7 +3329,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                 'should_suppress_callback_exceptions': kwargs.get('params_kwargs', {}).get('should_suppress_callback_exceptions', False),
                 # 'build_fn': 'insets_view',
                 'should_draw_time_bin_boundaries': kwargs.get('params_kwargs', {}).get('should_draw_time_bin_boundaries', True),
-                 'time_bin_edges_display_kwargs': kwargs.get('params_kwargs', {}).get('time_bin_edges_display_kwargs', dict(color='grey', alpha=0.5, linewidth=1.5)),   
+                 'time_bin_edges_display_kwargs': kwargs.get('params_kwargs', {}).get('time_bin_edges_display_kwargs', dict(color='grey', alpha=0.5, linewidth=1.5)),
         }
         
         params_kwargs = {'known_epochs_type': known_epochs_type,
@@ -3356,7 +3371,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         # directional_merged_decoders_result.filtered_by_epoch_times()
         yellow_blue_trackID_marginals_plot_tuple = paginated_multi_decoder_decoded_epochs_window.build_attached_yellow_blue_track_identity_marginal_window(directional_merged_decoders_result, global_session=global_session, filter_epochs=deepcopy(active_filter_epochs_df), epochs_name=known_epochs_type, 
                                                                                                                                                            **active_build_attached_yellow_blue_track_identity_marginal_window_kwargs, **_shared_plotting_kwargs,
-                                                                                                                                                            active_context=yellow_blue_plot_context)
+                                                                                                                                                           active_context=yellow_blue_plot_context)
 
         return (app, paginated_multi_decoder_decoded_epochs_window, pagination_controller_dict), ripple_rasters_plot_tuple, yellow_blue_trackID_marginals_plot_tuple
 
