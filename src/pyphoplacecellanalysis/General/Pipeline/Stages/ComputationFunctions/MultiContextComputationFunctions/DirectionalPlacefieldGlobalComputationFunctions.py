@@ -5130,6 +5130,12 @@ def _compute_nonmarginalized_decoder_prob(an_all_epoch_bins_marginals_df: pd.Dat
     a_marginals_df['P_Short_LR'] = a_marginals_df['P_LR'] * a_marginals_df['P_Short']
     a_marginals_df['P_Short_RL'] = a_marginals_df['P_RL'] * a_marginals_df['P_Short']
     assert np.allclose(a_marginals_df[['P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL']].dropna().sum(axis=1), 1.0) # why are there NaN rows? All four decoders have NaN values for these rows.
+    # # an_arr = a_marginals_df[['P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL']].dropna().sum(axis=1)
+    # an_arr = a_marginals_df[['P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL']].sum(axis=1)
+    # invalid_idxs = np.where(np.logical_not(np.isclose(an_arr, 1.0, equal_nan=True)))[0] # , rtol=0.000000001, atol=0.0
+
+    # array([182, 281, 349], dtype=int64)
+
     # Get the column name with the maximum value for each row
     # a_marginals_df['most_likely_decoder_index'] = a_marginals_df[['P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL']].idxmax(axis=1)
     a_marginals_df['most_likely_decoder_index'] = a_marginals_df[['P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL']].apply(lambda row: np.argmax(row.values), axis=1)
@@ -5221,8 +5227,8 @@ def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "Dire
     # The output CSVs have the base columns from the `ripple_all_epoch_bins_marginals_df`, which is a bit surprising
 
     ## Get the 1D decoder probabilities explicitly and add them as columns to the dfs:
-    _laps_all_epoch_bins_marginals_df =  _compute_nonmarginalized_decoder_prob(deepcopy(directional_merged_decoders_result.laps_all_epoch_bins_marginals_df))
-    _ripple_all_epoch_bins_marginals_df =  _compute_nonmarginalized_decoder_prob(deepcopy(directional_merged_decoders_result.ripple_all_epoch_bins_marginals_df))
+    _laps_all_epoch_bins_marginals_df =  _compute_nonmarginalized_decoder_prob(deepcopy(directional_merged_decoders_result.laps_all_epoch_bins_marginals_df)) # incomming df has columns: ['P_LR', 'P_RL', 'P_Long', 'P_Short', 'lap_idx', 'lap_start_t']
+    _ripple_all_epoch_bins_marginals_df =  _compute_nonmarginalized_decoder_prob(deepcopy(directional_merged_decoders_result.ripple_all_epoch_bins_marginals_df)) # incomming ['P_LR', 'P_RL', 'P_Long', 'P_Short', 'ripple_idx', 'ripple_start_t']
     
     ## Merge in the RadonTransform df:
     laps_metric_merged_df: pd.DataFrame = _laps_all_epoch_bins_marginals_df.join(laps_metric_merged_df)
