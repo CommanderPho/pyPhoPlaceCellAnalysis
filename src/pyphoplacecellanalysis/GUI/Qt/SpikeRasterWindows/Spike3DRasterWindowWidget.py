@@ -1403,7 +1403,7 @@ if __name__ == "__main__":
         print(f'built `Spike3DRasterWindowWidget`, launching...')
         if debug_mode:
             spike_raster_window.enable_debug_print = True
-            # spike_raster_window.should_debug_print_interaction_events = True
+            spike_raster_window.should_debug_print_interaction_events = True
             print(f'\tspike_raster_window.should_debug_print_interaction_events: {spike_raster_window.should_debug_print_interaction_events}')
     
 
