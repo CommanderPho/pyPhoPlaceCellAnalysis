@@ -26,6 +26,7 @@ class CustomGraphicsLayoutWidget(DraggableGraphicsWidgetMixin, pg.GraphicsLayout
     # ==================================================================================================================== #
     
     def mouseDragEvent(self, ev):
+        print(f'CustomGraphicsLayoutWidget.mouseDragEvent(ev: {ev}')
         if self.target_event_handler_child:
             # Forward the event to the child
             self.target_event_handler_child.mouseDragEvent(ev)
@@ -35,6 +36,7 @@ class CustomGraphicsLayoutWidget(DraggableGraphicsWidgetMixin, pg.GraphicsLayout
 
             
     def mouseClickEvent(self, ev):
+        print(f'CustomGraphicsLayoutWidget.mouseClickEvent(ev: {ev}')
         if self.target_event_handler_child:
             # Forward the event to the child
             self.target_event_handler_child.mouseClickEvent(ev)
