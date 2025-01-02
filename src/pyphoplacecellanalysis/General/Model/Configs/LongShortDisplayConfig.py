@@ -392,14 +392,16 @@ class PlottingHelpers:
 
     @function_attributes(short_name=None, tags=['matplotlib', 'draw'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 18:44', related_items=[])
     @classmethod
-    def helper_matplotlib_add_pseudo2D_marginal_labels(cls, ax, y_bin_labels: List[str], enable_draw_decoder_labels: bool = True, enable_draw_decoder_colored_lines: bool = False) -> Dict[str, Dict]:
+    def helper_matplotlib_add_pseudo2D_marginal_labels(cls, ax, y_bin_labels: List[str], enable_draw_decoder_labels: bool = True, enable_draw_decoder_colored_lines: bool = False, should_use_ax_fraction_positioning: bool = True) -> Dict[str, Dict]:
         """ adds fixed inner-y labels (along the inside left edge of the ax) containing reference names -- such as ('Long_LR', etc)
         
-        Valid options:
+        should_use_ax_fraction_positioning: bool : if True, the labels and lines are positioned relative to the ax frame in [0, 1] coords, independent of the data ylims
         
-        y_bin_labels = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
-        y_bin_labels = ['long', 'short']
-        y_bin_labels = ['LR', 'RL']
+        Valid options:
+            
+            y_bin_labels = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+            y_bin_labels = ['long', 'short']
+            y_bin_labels = ['LR', 'RL']
 
         Usage:
             from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
@@ -430,8 +432,6 @@ class PlottingHelpers:
         RL_color = DisplayColorsEnum.Laps.RL #.get_RL_dock_colors(None, is_dim=False)
         LR_color = DisplayColorsEnum.Laps.LR # get_LR_dock_colors(None, is_dim=False)
 
-        # track_id_dir_color_dict = {'long_LR':(Long_color, LR_color), 'long_RL':(Long_color, RL_color),
-        #     'short_LR':(Short_color, LR_color), 'short_RL':(Short_color, RL_color)}
         
         all_colors_dict = {'long_LR':(Long_color, LR_color), 'long_RL':(Long_color, RL_color),
             'short_LR':(Short_color, LR_color), 'short_RL':(Short_color, RL_color), 'long': (Long_color, None), 'short': (Short_color, None), 'LR': (None, LR_color), 'RL': (None, RL_color)}
@@ -441,37 +441,43 @@ class PlottingHelpers:
 
 
         # BEGIN PLOTTING: ____________________________________________________________________________________________________ #
-        # ax.get_
-        x_start_ax, x_stop_ax = ax.get_xlim()
-        y_start_ax, y_stop_ax = ax.get_ylim() # (37.0773897438341, 253.98616538463315)
+        
+        _common_label_kwargs = dict(alpha=0.8, fontsize=10, va='center')
+        _common_hlines_kwargs = dict(alpha=0.6, linewidths=4)
+        
+        if should_use_ax_fraction_positioning:
+            _common_label_kwargs.update(xycoords="axes fraction")
+            _common_hlines_kwargs.update(transform=ax.transAxes)
+            
+            x_start_ax, x_stop_ax = 0.0, 1.0
+            y_start_ax, y_stop_ax = 0.0, 1.0 # (37.0773897438341, 253.98616538463315)
+            
+        else:
+            x_start_ax, x_stop_ax = ax.get_xlim()
+            y_start_ax, y_stop_ax = ax.get_ylim() # (37.0773897438341, 253.98616538463315)
 
         y_height: float = (y_stop_ax - y_start_ax)
         single_y_bin_height: float = (y_height/float(n_ybins))
         y_bin_starts = (np.arange(n_ybins) * single_y_bin_height) + y_start_ax # array([0, 54.2272, 108.454, 162.682])
         y_bin_centers = y_bin_starts + (single_y_bin_height * 0.5)
-        # y_bin_centers
-
+        
         if enable_draw_decoder_colored_lines:
             center_offset: float = 0.25
             center_offset_px: float = (center_offset * single_y_bin_height)
-            center_offset_px: float = 5
-            # track_ID_line_y = y_bin_starts + (single_y_bin_height * 0.25)
-            # track_dir_line_y = y_bin_starts + (single_y_bin_height * 0.75)
+            # center_offset_px: float = 5
             track_ID_line_y = y_bin_centers - center_offset_px
             track_dir_line_y = y_bin_centers + center_offset_px
-            _common_kwargs = dict(alpha=0.6, linewidths=4)
+            
             
         output_dict = {}
         for i, (decoder_name, (a_track_id_color, a_track_dir_color)) in enumerate(active_color_dict.items()):
             if enable_draw_decoder_colored_lines:
                 if a_track_id_color is not None:
-                    output_dict[f"{decoder_name}_track_ID"] = ax.hlines(track_ID_line_y[i], xmin=x_start_ax, xmax=x_stop_ax, color=a_track_id_color, zorder=25, label=f'{decoder_name}', **_common_kwargs) # divider should be in very front
+                    output_dict[f"{decoder_name}_track_ID"] = ax.hlines(track_ID_line_y[i], xmin=x_start_ax, xmax=x_stop_ax, color=a_track_id_color, zorder=25, label=f'{decoder_name}', **_common_hlines_kwargs) # divider should be in very front
                 if a_track_dir_color is not None:
-                    output_dict[f"{decoder_name}_track_dir"] = ax.hlines(track_dir_line_y[i], xmin=x_start_ax, xmax=x_stop_ax, color=a_track_dir_color, zorder=25, label=f'{decoder_name}', **_common_kwargs) # divider should be in very front
+                    output_dict[f"{decoder_name}_track_dir"] = ax.hlines(track_dir_line_y[i], xmin=x_start_ax, xmax=x_stop_ax, color=a_track_dir_color, zorder=25, label=f'{decoder_name}', **_common_hlines_kwargs) # divider should be in very front
             if enable_draw_decoder_labels:
-                output_dict[f"{decoder_name}_label"] = ax.annotate(f'{decoder_name}', (x_start_ax, y_bin_centers[i]), alpha=0.8, fontsize=10, va='center')
-
-        # y_start_ax, y_stop_ax
+                output_dict[f"{decoder_name}_label"] = ax.annotate(f'{decoder_name}', (x_start_ax, y_bin_centers[i]), **_common_label_kwargs)
 
         return output_dict
         
