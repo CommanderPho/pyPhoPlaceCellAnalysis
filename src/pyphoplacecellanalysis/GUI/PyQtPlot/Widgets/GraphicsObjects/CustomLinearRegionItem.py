@@ -3,22 +3,11 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.LinearRegionItem import LinearRegionItem
 # from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.GraphicsObject import GraphicsObject
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.CustomInfiniteLine import CustomInfiniteLine
-
-from dataclasses import dataclass
-
-
-@dataclass
-class MouseInteractionCriteria(object):
-    """Docstring for MouseInteractionCriteria."""
-    drag: Callable
-    hover: Callable
-    click: Callable
-    
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.DraggableGraphicsWidgetMixin import MouseInteractionCriteria, DraggableGraphicsWidgetMixin
 
 
-    
 
-class CustomLinearRegionItem(LinearRegionItem):
+class CustomLinearRegionItem(DraggableGraphicsWidgetMixin, LinearRegionItem):
     """ A custom pg.LinearRegionItem` subclass that allows the user to easily translate/scroll the window without resizing it.
     
     NOTE: also uses CustomInfiniteLine subclass
