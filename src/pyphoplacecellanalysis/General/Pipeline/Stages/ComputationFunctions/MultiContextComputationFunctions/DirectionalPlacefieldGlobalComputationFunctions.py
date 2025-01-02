@@ -5195,7 +5195,8 @@ def _subfn_compute_epoch_decoding_radon_transform_for_decoder(a_directional_pf1D
 
 
 @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=['_compute_all_df_score_metrics'], creation_date='2024-05-22 18:07', related_items=[])
-def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "DirectionalPseudo2DDecodersResult", track_templates, decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, decoder_laps_df_dict: Dict[str, pd.DataFrame], decoder_ripple_df_dict: Dict[str, pd.DataFrame], active_df_columns = ['wcorr'], suppress_exceptions: bool = False):
+def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "DirectionalPseudo2DDecodersResult", track_templates, decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, decoder_laps_df_dict: Dict[str, pd.DataFrame], decoder_ripple_df_dict: Dict[str, pd.DataFrame],
+                                        active_df_columns = ['wcorr'], suppress_exceptions: bool = False):
     """ Called one for each specific score metric (e.g. (Radon Transform, WCorr, PearsonR)) after it is computed to compute its merged dataframes and dataframe dicts. 
     
     Generalized to work with any result dfs not just Radon Transforms
@@ -5225,14 +5226,22 @@ def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "Dire
     ## OUTPUTS: laps_metric_merged_df, ripple_metric_merged_df
 
     # The output CSVs have the base columns from the `ripple_all_epoch_bins_marginals_df`, which is a bit surprising
-
+    ## why is this even needed? The `directional_merged_decoders_result.laps_all_epoch_bins_marginals_df` come in with the marginals but not the original non-marginalized P_decoder values. 
     ## Get the 1D decoder probabilities explicitly and add them as columns to the dfs:
     _laps_all_epoch_bins_marginals_df =  _compute_nonmarginalized_decoder_prob(deepcopy(directional_merged_decoders_result.laps_all_epoch_bins_marginals_df)) # incomming df has columns: ['P_LR', 'P_RL', 'P_Long', 'P_Short', 'lap_idx', 'lap_start_t']
     _ripple_all_epoch_bins_marginals_df =  _compute_nonmarginalized_decoder_prob(deepcopy(directional_merged_decoders_result.ripple_all_epoch_bins_marginals_df)) # incomming ['P_LR', 'P_RL', 'P_Long', 'P_Short', 'ripple_idx', 'ripple_start_t']
     
+
     ## Merge in the RadonTransform df:
-    laps_metric_merged_df: pd.DataFrame = _laps_all_epoch_bins_marginals_df.join(laps_metric_merged_df)
-    ripple_metric_merged_df: pd.DataFrame = _ripple_all_epoch_bins_marginals_df.join(ripple_metric_merged_df) # has ['ripple_idx', 'ripple_start_t'] to join on
+    _mergev_laps_metric_merged_df: pd.DataFrame = deepcopy(_laps_all_epoch_bins_marginals_df).join(deepcopy(laps_metric_merged_df)) #TODO 2025-01-02 13:12: - [ ] !!PITFALL!! `df.join(...)` always seems to mess things up, is this where the problems are happening?
+    _mergev_ripple_metric_merged_df: pd.DataFrame = deepcopy(_ripple_all_epoch_bins_marginals_df).join(deepcopy(ripple_metric_merged_df)) # has ['ripple_idx', 'ripple_start_t'] to join on
+    
+    # from neuropy.utils.indexing_helpers import PandasHelpers
+    laps_metric_merged_df = PandasHelpers.adding_additional_df_columns(original_df=_laps_all_epoch_bins_marginals_df, additional_cols_df=laps_metric_merged_df) # update the filter_epochs with the new columns
+    ripple_metric_merged_df = PandasHelpers.adding_additional_df_columns(original_df=_ripple_all_epoch_bins_marginals_df, additional_cols_df=ripple_metric_merged_df)
+
+    assert _mergev_laps_metric_merged_df.equals(laps_metric_merged_df) # == does NOT work at all, and it doesn't even make sense. (_mergev_laps_metric_merged_df == laps_metric_merged_df)
+    assert _mergev_ripple_metric_merged_df.equals(ripple_metric_merged_df) # == does NOT work at all, and it doesn't even make sense.  (_mergev_ripple_metric_merged_df == ripple_metric_merged_df)
 
     ## Extract the individual decoder probability into the .active_epochs:
     shared_index_column_names = ['ripple_idx', 'ripple_start_t']
