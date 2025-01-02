@@ -8018,6 +8018,7 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewPseudo2DDecodedEpoc
     enable_non_marginalized_raw_result: bool = field(default=True)
     enable_marginal_over_direction: bool = field(default=False)
     enable_marginal_over_track_ID: bool = field(default=True)
+    allow_overwrite_enabled_marginals_from_params: bool = field(default=True, metadata={'desc': 'if True, allows overwriting self.enable_* properties with the values in `self._spike_raster_window.spike_raster_plt_2d.params`.'})
 
     @classmethod
     def _perform_add_new_decoded_posterior_marginal_row(cls, curr_active_pipeline, active_2d_plot, a_dock_config, a_variable_name: str, time_window_centers, xbin, a_1D_posterior, extended_dock_title_info: Optional[str]=None):
@@ -8226,8 +8227,26 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewPseudo2DDecodedEpoc
         ## To begin, the destination plot must have a matplotlib widget plot to render to:
         # print(f'AddNewDecodedEpochMarginal_MatplotlibPlotCommand.execute(...)')
         active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
+        
+        # Allow overwriting with `self._spike_raster_window.spike_raster_plt_2d.params`
+        if self.allow_overwrite_enabled_marginals_from_params:
+            enable_non_marginalized_raw_result = active_2d_plot.params.get('enable_non_marginalized_raw_result', None)
+            if enable_non_marginalized_raw_result is not None:
+                self.enable_non_marginalized_raw_result = enable_non_marginalized_raw_result
+                
+            enable_marginal_over_direction = active_2d_plot.params.get('enable_marginal_over_direction', None)
+            if enable_marginal_over_direction is not None:
+                self.enable_marginal_over_direction = enable_marginal_over_direction
+                
+            enable_marginal_over_track_ID = active_2d_plot.params.get('enable_marginal_over_track_ID', None)
+            if enable_marginal_over_track_ID is not None:
+                self.enable_marginal_over_track_ID = enable_marginal_over_track_ID
+
         enable_rows_config_kwargs = dict(enable_non_marginalized_raw_result=self.enable_non_marginalized_raw_result, enable_marginal_over_direction=self.enable_marginal_over_direction, enable_marginal_over_track_ID=self.enable_marginal_over_track_ID)
         
+
+        
+
         # output_dict = self.add_pseudo2D_decoder_decoded_epoch_marginals(self._active_pipeline, active_2d_plot, **enable_rows_config_kwargs)
         output_dict = self.add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epoch_marginals(self._active_pipeline, active_2d_plot, **enable_rows_config_kwargs)
         

@@ -172,6 +172,18 @@ class ParticleFilter:
     """ Example:
     
         ## TEST
+        
+        # Example usage
+        def state_transition_func(particles):
+            # Example state transition function: simple linear motion.
+            return particles + 1  # Each state increases by 1
+
+        def measurement_func(state):
+            # Example measurement function: identity mapping.
+            return state
+
+
+            
         num_particles = 1000
         state_dim = 1
         process_noise = 1.0
@@ -251,15 +263,6 @@ class ParticleFilter:
         :return: The estimated state.
         """
         return np.average(self.particles, weights=self.weights, axis=0)
-
-# Example usage
-def state_transition_func(particles):
-    """ Example state transition function: simple linear motion. """
-    return particles + 1  # Each state increases by 1
-
-def measurement_func(state):
-    """ Example measurement function: identity mapping. """
-    return state
 
 
 
@@ -819,6 +822,11 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, debug_print=Fa
         
     # active_2d_plot.activeMenuReference
     # active_2d_plot.ui.menus # .global_window_menus.docked_widgets.actions_dict
+
+    active_2d_plot.params.enable_non_marginalized_raw_result = False
+    active_2d_plot.params.enable_marginal_over_direction = False
+    active_2d_plot.params.enable_marginal_over_track_ID = True
+
 
     menu_commands = [
         'AddTimeCurves.Position',
