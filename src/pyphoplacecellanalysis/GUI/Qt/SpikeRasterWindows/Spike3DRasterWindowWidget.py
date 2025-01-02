@@ -88,7 +88,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     @property
     def should_debug_print_interaction_events(self):
         """ Whether to debug print user interaction events like mouse clicks, mouse wheel, key presses, etc. """
-        return (self.enable_debug_print and Spike3DRasterWindowWidget.enable_interaction_events_debug_print)
+        return (self.enable_debug_print and self.enable_interaction_events_debug_print) # note self is accessing `Spike3DRasterWindowWidget.enable_interaction_events_debug_print`
     
     @property
     def temporal_zoom_factor(self):
