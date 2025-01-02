@@ -31,7 +31,7 @@ class TestSubsequenceMerging(unittest.TestCase):
         self.same_thresh_cm_dict = {k:(v * self.same_thresh_fraction_of_track) for k, v in self.decoder_track_length_dict.items()}
         self.decoder_track_length: float = self.decoder_track_length_dict['long_LR'] # 214.0
         self.a_same_thresh_cm = self.same_thresh_cm_dict['long_LR']
-        print(f'a_same_thresh_cm: {self.a_same_thresh_cm}')
+        print(f'a_same_thresh_cm: {self.a_same_thresh_cm}') ## same_thresh_cm: 10.7
         self.pos_bin_edges = np.array([37.0774, 40.8828, 44.6882, 48.4936, 52.2991, 56.1045, 59.9099, 63.7153, 67.5207, 71.3261, 75.1316, 78.937, 82.7424, 86.5478, 90.3532, 94.1586, 97.9641, 101.769, 105.575, 109.38, 113.186, 116.991, 120.797, 124.602, 128.407, 132.213, 136.018, 139.824, 143.629, 147.434, 151.24, 155.045, 158.851, 162.656, 166.462, 170.267, 174.072, 177.878, 181.683, 185.489, 189.294, 193.099, 196.905, 200.71, 204.516, 208.321, 212.127, 215.932, 219.737, 223.543, 227.348, 231.154, 234.959, 238.764, 242.57, 246.375, 250.181, 253.986])
         # self.n_pos_bins = (len(self.pos_bin_edges)-1)  # Adjust as needed
 
