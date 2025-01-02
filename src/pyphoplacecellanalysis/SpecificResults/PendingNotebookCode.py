@@ -2983,9 +2983,9 @@ def _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline, i
     from neuropy.core.session.dataSession import Laps
     # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _check_result_laps_epochs_df_performance
 
-    t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+    # t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-    global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
+    # global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
 
     directional_train_test_split_result: TrainTestSplitResult = curr_active_pipeline.global_computation_results.computed_data.get('TrainTestSplit', None)
     
