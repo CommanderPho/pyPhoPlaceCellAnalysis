@@ -2500,12 +2500,24 @@ class TrainTestSplitPlotDataProvider(PaginatedPlotDataProvider):
         # plot the radon transform line on the epoch:    
         for k, v in extant_epochs_collection_dict.items():
             if v is not None:
-                v.remove()
+                if isinstance(v, (list, tuple)):
+                    for vv in v:
+                        vv.remove() # iterate through the list and remove those items (hopefully artists)
+                else:
+                    ## hopefully a top-level artist
+                    v.remove()
+
         extant_epochs_collection_dict = {}
         
         for k, v in extant_epoch_labels_dict.items():
             if v is not None:
-                v.remove()
+                if isinstance(v, (list, tuple)):
+                    for vv in v:
+                        vv.remove() # iterate through the list and remove those items (hopefully artists)
+                else:
+                    ## hopefully a top-level artist
+                    v.remove()
+
         extant_epoch_labels_dict = {}
 
 
