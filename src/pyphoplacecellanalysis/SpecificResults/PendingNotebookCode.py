@@ -2987,15 +2987,6 @@ def _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline, i
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
     global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
 
-    def _add_extra_epochs_df_columns(epochs_df: pd.DataFrame):
-        """ captures: global_session, t_start, t_delta, t_end
-        """
-        epochs_df = epochs_df.sort_values(['start', 'stop', 'label']).reset_index(drop=True) # Sort by columns: 'start' (ascending), 'stop' (ascending), 'label' (ascending)
-        epochs_df = epochs_df.drop_duplicates(subset=['start', 'stop', 'label'])
-        epochs_df = epochs_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
-        epochs_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=epochs_df, global_session=deepcopy(global_session), replace_existing=True)
-        return epochs_df
-
     directional_train_test_split_result: TrainTestSplitResult = curr_active_pipeline.global_computation_results.computed_data.get('TrainTestSplit', None)
     
     if (directional_train_test_split_result is None) or force_recompute_directional_train_test_split_result:
@@ -3013,9 +3004,9 @@ def _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline, i
     if debug_print:
         print(f'training_data_portion: {training_data_portion}, test_data_portion: {test_data_portion}')
 
-    test_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = directional_train_test_split_result.test_epochs_dict
-    train_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = directional_train_test_split_result.train_epochs_dict
-    train_lap_specific_pf1D_Decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = directional_train_test_split_result.train_lap_specific_pf1D_Decoder_dict
+    # test_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = directional_train_test_split_result.test_epochs_dict
+    # train_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = directional_train_test_split_result.train_epochs_dict
+    # train_lap_specific_pf1D_Decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = directional_train_test_split_result.train_lap_specific_pf1D_Decoder_dict
     # OUTPUTS: train_test_split_laps_df_dict
     
     # MAIN _______________________________________________________________________________________________________________ #
