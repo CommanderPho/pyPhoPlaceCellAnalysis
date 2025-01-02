@@ -3098,6 +3098,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
         # directional_merged_decoders_result # all_directional_ripple_filter_epochs_decoder_result, ripple_track_identity_marginals_tuple
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
+        from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
         
         assert (filter_epochs is not None)
         assert (filter_epochs_decoder_result is not None)
@@ -3220,6 +3221,21 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         self.ui.attached_yellow_blue_marginals_viewer_widget = a_yellow_blue_controller
         # self.ui.connections['attached_yellow_blue_marginals_viewer_widget'] = new_connections_dict
         
+        extant_marginal_label_artists_dict = self.ui.attached_yellow_blue_marginals_viewer_widget.plots.get('marginal_label_artists_dict', {})
+        ## can remove them by
+        for decoder_name, inner_output_dict in extant_marginal_label_artists_dict.items():
+            for a_name, an_artist in inner_output_dict.items():
+                an_artist.remove()
+        
+        marginal_label_artists_dict = {}
+
+        for i, ax in enumerate(self.ui.attached_yellow_blue_marginals_viewer_widget.plots.axs):
+            marginal_label_artists_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['long_LR', 'long_RL', 'short_LR', 'short_RL'], enable_draw_decoder_colored_lines=False) ## use this because we used `DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors(a_filter_epochs_decoder_result)` up above
+            # marginal_label_artists_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['long', 'short'], enable_draw_decoder_colored_lines=False)
+            # marginal_label_artists_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['LR', 'RL'], enable_draw_decoder_colored_lines=False)
+
+        self.ui.attached_yellow_blue_marginals_viewer_widget.plots['marginal_label_artists_dict'] = marginal_label_artists_dict
+
         return yellow_blue_attached_render_plot
 
 
