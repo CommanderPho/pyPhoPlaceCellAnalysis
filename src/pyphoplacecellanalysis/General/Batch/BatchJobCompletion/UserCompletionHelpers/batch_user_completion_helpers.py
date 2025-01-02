@@ -860,7 +860,7 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 		curr_active_pipeline.reload_default_computation_functions()
 		## This recreates the Pseudo2D placefields from the 4 directional ones, which is NOT needed and seems a bit excessive.
 		curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields'], # 'merged_directional_placefields': `_build_merged_directional_placefields`
-														computation_kwargs_list=[{'laps_decoding_time_bin_size': None, 'ripple_decoding_time_bin_size': ripple_decoding_time_bin_size_override},],
+														computation_kwargs_list=[{'laps_decoding_time_bin_size': laps_decoding_time_bin_size_override, 'ripple_decoding_time_bin_size': ripple_decoding_time_bin_size_override},],
 														enabled_filter_names=None, fail_on_exception=True, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
 		
 		# 'DirectionalDecodersEpochsEvaluations': `directional_decoders_evaluate_epochs`
