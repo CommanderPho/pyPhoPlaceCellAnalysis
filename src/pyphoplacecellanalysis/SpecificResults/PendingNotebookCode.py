@@ -51,10 +51,11 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 # ==================================================================================================================== #
 # @ 2025-01-01 - Better Aggregation of Probabilities across bins                                                       #
 # ==================================================================================================================== #
+@metadata_attributes(short_name=None, tags=['aggregation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 00:00', related_items=[])
 class TimeBinAggregation:
     """ 
     
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import TimeBinAggregation
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import TimeBinAggregation, ParticleFilter
     
     
     """
@@ -165,6 +166,100 @@ class TimeBinAggregation:
             float: The streak-weighted P_Long for the DataFrame.
         """
         return df[column].rolling(window, *args, **kwargs).max().max()
+
+@metadata_attributes(short_name=None, tags=['UNUSED', 'ChatGPT', 'aggregation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 00:00', related_items=['TimeBinAggregation'])
+class ParticleFilter:
+    """ Example:
+    
+        ## TEST
+        num_particles = 1000
+        state_dim = 1
+        process_noise = 1.0
+        measurement_noise = 2.0
+
+        pf = ParticleFilter(num_particles, state_dim, process_noise, measurement_noise)
+
+        # Simulate a series of observations
+        # observations = np.array([5, 6, 7, 8, 9])
+        observations = a_lap_df[a_var_name].to_numpy()
+
+        for obs in observations:
+            pf.predict(state_transition_func)
+            pf.update(obs, measurement_func)
+            pf.resample()
+
+            estimated_state = pf.estimate()
+            print(f"Estimated State: {estimated_state}")
+
+            
+    """
+    def __init__(self, num_particles: int, state_dim: int, process_noise: float, measurement_noise: float):
+        """
+        Initialize the Particle Filter.
+
+        :param num_particles: Number of particles to use.
+        :param state_dim: Dimension of the state space.
+        :param process_noise: Standard deviation of process noise.
+        :param measurement_noise: Standard deviation of measurement noise.
+        """
+        self.num_particles = num_particles
+        self.state_dim = state_dim
+        self.process_noise = process_noise
+        self.measurement_noise = measurement_noise
+
+        # Initialize particles randomly within the state space
+        self.particles = np.random.rand(num_particles, state_dim)
+        self.weights = np.ones(num_particles) / num_particles
+
+    def predict(self, state_transition_func):
+        """
+        Predict the next state of each particle using the state transition function.
+
+        :param state_transition_func: A function to apply the state transition.
+        """
+        noise = np.random.normal(0, self.process_noise, size=(self.num_particles, self.state_dim))
+        self.particles = state_transition_func(self.particles) + noise
+
+    def update(self, observation: np.ndarray, measurement_func):
+        """
+        Update the particle weights based on the observation.
+
+        :param observation: The observed data.
+        :param measurement_func: A function to calculate the expected observation from a particle state.
+        """
+        for i in range(self.num_particles):
+            predicted_obs = measurement_func(self.particles[i])
+            error = observation - predicted_obs
+            likelihood = np.exp(-0.5 * np.sum(error**2) / self.measurement_noise**2)
+            self.weights[i] = likelihood
+
+        # Normalize weights to sum to 1
+        self.weights /= np.sum(self.weights)
+
+    def resample(self):
+        """
+        Resample particles based on their weights.
+        """
+        indices = np.random.choice(self.num_particles, self.num_particles, p=self.weights)
+        self.particles = self.particles[indices]
+        self.weights.fill(1.0 / self.num_particles)
+
+    def estimate(self) -> np.ndarray:
+        """
+        Estimate the state as the weighted mean of the particles.
+
+        :return: The estimated state.
+        """
+        return np.average(self.particles, weights=self.weights, axis=0)
+
+# Example usage
+def state_transition_func(particles):
+    """ Example state transition function: simple linear motion. """
+    return particles + 1  # Each state increases by 1
+
+def measurement_func(state):
+    """ Example measurement function: identity mapping. """
+    return state
 
 
 
