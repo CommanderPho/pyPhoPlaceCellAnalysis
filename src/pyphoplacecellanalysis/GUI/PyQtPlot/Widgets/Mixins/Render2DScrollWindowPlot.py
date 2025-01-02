@@ -139,6 +139,8 @@ class Render2DScrollWindowPlotMixin:
         ## THIS SHOULD FIX THE INITIAL SCROLLWINDOW ISSUE, preventing it from being outside the window it's rendered on top of, unless the active window is set wrong.
         # self.update_scroll_window_region(confirmed_valid_window_start_t, confirmed_valid_window_end_t, block_signals=False)
         self.Render2DScrollWindowPlot_on_window_update(confirmed_valid_window_start_t, confirmed_valid_window_end_t)
+        ## TODO: attach the event forwarder 2025-01-02
+        self.ui.main_graphics_layout_widget.set_target_event_forwarding_child(self.ui.scroll_window_region)
         
         
     def update_rasters(self):

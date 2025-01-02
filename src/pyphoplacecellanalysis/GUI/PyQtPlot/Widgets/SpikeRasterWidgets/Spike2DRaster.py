@@ -389,6 +389,8 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             
             
         """
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.CustomGraphicsLayoutWidget import CustomGraphicsLayoutWidget
+
         self.logger.debug(f'Spike2DRaster._buildGraphics()')
         
         # create a splitter
@@ -415,7 +417,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
 
         ##### Main Raster Plot Content Top ##########
         
-        self.ui.main_graphics_layout_widget = pg.GraphicsLayoutWidget()
+        self.ui.main_graphics_layout_widget = CustomGraphicsLayoutWidget()
         self.ui.main_graphics_layout_widget.setObjectName('main_graphics_layout_widget')
         self.ui.main_graphics_layout_widget.useOpenGL(True)
         self.ui.main_graphics_layout_widget.resize(1000,600)
