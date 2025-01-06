@@ -375,6 +375,11 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             ## update the dynamic event filters if needed
             self.update_scrolling_event_filters()
             
+            ## `LiveWindowEventIntervalMonitoringMixin` event setup
+            connections = {}
+            connections['LiveWindowEventIntervalMonitoringMixin_entered'] = self.ui.spike_raster_plt_2d.sigOnIntervalEnteredWindow.connect(self.on_visible_event_intervals_added)
+            connections['LiveWindowEventIntervalMonitoringMixin_exited'] = self.ui.spike_raster_plt_2d.sigOnIntervalExitedindow.connect(self.on_visible_event_intervals_removed)
+            
 
         # Set Window Title Options:
         if self.applicationName is not None:
@@ -1196,6 +1201,19 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             active_2d_plot.find_event_intervals_in_active_window(included_series_names=included_series_names)
         """
         return self.spike_raster_plt_2d.find_event_intervals_in_active_window(included_series_names=included_series_names, debug_print=False)
+
+
+
+    @QtCore.Slot(object)
+    def on_visible_event_intervals_added(self, added_rows):
+        print(f'Spike3DRasterWindowWidget.on_visible_event_intervals_added(added_rows: {added_rows})')
+        self.bottom_playback_control_bar_logger.add_log_line(f'visible_event_intervals_added(added_rows: {added_rows})')
+        
+    @QtCore.Slot(object)
+    def on_visible_event_intervals_removed(self, removed_rows):
+        print(f'Spike3DRasterWindowWidget.visible_event_intervals_removed(removed_rows: {removed_rows})')
+        self.bottom_playback_control_bar_logger.add_log_line(f'visible_event_intervals_removed(removed_rows: {removed_rows})')
+
 
 
     # ==================================================================================================================== #
