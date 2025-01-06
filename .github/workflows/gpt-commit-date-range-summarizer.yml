@@ -1,5 +1,5 @@
-name: Run Action with Date Range
-# Summary: This action will write a comment about every commit in a pull request, 
+name: GPT Commit Summary between Date Range
+# Summary: This action will write a comment about every commit in a date range, 
 # as well as generate a summary for every file that was modified and add it to the
 # review page, compile a PR summary from all commit summaries and file diff 
 # summaries, and delete outdated code review comments
