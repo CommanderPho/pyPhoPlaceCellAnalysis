@@ -29,7 +29,6 @@ import qtawesome as qta
 
 from pyphocorehelpers.DataStructure.logging_data_structures import LoggingBaseClass
 from pyphoplacecellanalysis.GUI.Qt.Mixins.ComboBoxMixins import KeysListAccessingMixin, ComboBoxCtrlOwningMixin
-from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarBase import Spike3DRasterBottomPlaybackControlBarBase
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.LoggingOutputWidget.LoggingOutputWidget import LoggingOutputWidget
@@ -67,7 +66,7 @@ speed_controls = [self.ui.button_slow_down, self.ui.doubleSpinBoxPlaybackSpeed, 
 
 mark_controls = [self.ui.button_mark_start, self.ui.button_mark_end, self.ui.horizontalSpacer_2]
 
-epoch_controls = [self.ui.frame_Epoch, self.ui.btnJumpToPrevious, self.ui.comboActiveJumpTargetSeries, self.ui.btnJumpToUnused, self.ui.btnCurrentIntervals_Extra, self.ui.btnCurrentIntervals_Remove, self.ui.self.ui.btnCurrentIntervals_Customize,
+epoch_controls = [self.ui.frame_Epoch, self.ui.btnJumpToPrevious, self.ui.comboActiveJumpTargetSeries, self.ui.btnJumpToUnused, self.ui.btnCurrentIntervals_Extra, self.ui.btnCurrentIntervals_Remove, self.ui.btnCurrentIntervals_Customize,
     self.ui.btnJumpToNext, self.ui.horizontalSpacer_2]
 
 jump_to_destination_controls = [self.ui.frame_JumpToDestination, self.ui.spinBoxJumpDestination, self.ui.btnJumpToDestination]
@@ -117,9 +116,9 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         self._logger = value
 
     def __init__(self, parent=None):
-        # super().__init__(parent=parent) # Call the inherited classes __init__ method
+        super().__init__(parent=parent) # Call the inherited classes __init__ method
         # Spike3DRasterBottomPlaybackControlBarBase.__init__(self, parent=parent)
-        QWidget.__init__(self, parent=parent)
+        # QWidget.__init__(self, parent=parent)
         self.ui = uic.loadUi(uiFile, self) # Load the .ui file
     
         # # Auto
@@ -137,7 +136,8 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         move_controls = [self.ui.btnSkipLeft, self.ui.btnLeft, self.ui.spinBoxFrameJumpMultiplier, self.ui.btnRight, self.ui.btnSkipRight] # , self.ui.horizontalSpacer_3
         # debug_log_controls = [self.ui.txtLogLine, self.ui.btnToggleExternalLogWindow]
 
-        controls_to_hide = [self.ui.button_full_screen, self.ui.self.ui.btnCurrentIntervals_Customize, *move_controls]
+        controls_to_hide = [self.ui.button_full_screen, self.ui.btnCurrentIntervals_Customize, *move_controls]
+        # controls_to_hide = []
         
         self.ui.slider_progress.hide()
         
