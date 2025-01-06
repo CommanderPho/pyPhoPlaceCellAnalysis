@@ -26,6 +26,7 @@ from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingS
 # For extra button symbols:
 import qtawesome as qta
 
+from pyphocorehelpers.DataStructure.logging_data_structures import LoggingBaseClass
 from pyphoplacecellanalysis.GUI.Qt.Mixins.ComboBoxMixins import KeysListAccessingMixin, ComboBoxCtrlOwningMixin
 from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarBase import Spike3DRasterBottomPlaybackControlBarBase
 
@@ -49,6 +50,30 @@ btnCurrentIntervals_Customize
 
 btnJumpToSpecifiedTime
 jumpToHourMinSecTimeEdit
+
+
+## Logging Widgets:
+txtLogLine -- shows a preview of the last log entries
+btnToggleExternalLogWindow -- opens the separate logging window
+
+playback_controls = [self.ui.button_play_pause, self.ui.button_reverse, self.ui.horizontalSpacer_5]
+
+speed_controls = [self.ui.button_slow_down, self.ui.doubleSpinBoxPlaybackSpeed, self.ui.toolButton_SpeedBurstEnabled, self.ui.button_speed_up, self.ui.horizontalSpacer_6]
+
+mark_controls = [self.ui.button_mark_start, self.ui.button_mark_end, self.ui.horizontalSpacer_2]
+
+epoch_controls = [self.ui.frame_Epoch, self.ui.btnJumpToPrevious, self.ui.comboActiveJumpTargetSeries, self.ui.btnJumpToUnused, self.ui.btnCurrentIntervals_Extra, self.ui.btnCurrentIntervals_Remove, self.ui.self.ui.btnCurrentIntervals_Customize,
+    self.ui.btnJumpToNext, self.ui.horizontalSpacer_2]
+
+jump_to_destination_controls = [self.ui.frame_JumpToDestination, self.ui.spinBoxJumpDestination, self.ui.btnJumpToDestination]
+
+move_controls = [self.ui.btnSkipLeft, self.ui.btnLeft, self.ui.spinBoxFrameJumpMultiplier, self.ui.btnRight, self.ui.btnSkipRight, self.ui.horizontalSpacer_3]
+
+debug_log_controls = [self.ui.txtLogLine, self.ui.btnToggleExternalLogWindow]
+
+standalone_extra_controls = [self.ui.btnHelp]
+
+
 
 """
 
@@ -75,6 +100,14 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
     series_clear_all_pressed = QtCore.pyqtSignal()
     series_add_pressed = QtCore.pyqtSignal()
 
+    @property
+    def logger(self) -> LoggingBaseClass:
+        """The logger property."""
+        return self._logger
+    @logger.setter
+    def logger(self, value: LoggingBaseClass):
+        self._logger = value
+
     def __init__(self, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         
@@ -82,10 +115,20 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
         # self.ui = Ui_RootWidget()
         # self.ui.setupUi(self) # builds the design from the .ui onto this widget.
         
+        self._logger = LoggingBaseClass(log_records=[])
+        self._logger.sigLogUpdated.connect(self.on_log_updated)
+            
+
         self.initUI()
         self.show() # Show the GUI
 
     def initUI(self):
+        """ setup the UI
+        """
+        move_controls = [self.ui.btnSkipLeft, self.ui.btnLeft, self.ui.spinBoxFrameJumpMultiplier, self.ui.btnRight, self.ui.btnSkipRight, self.ui.horizontalSpacer_3]
+
+        controls_to_hide = [self.ui.button_full_screen, self.ui.self.ui.btnCurrentIntervals_Customize, *move_controls]
+        
         self.ui.slider_progress.hide()
         
         # Setup Button: Play/Pause
@@ -142,7 +185,12 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
         self.ui.btnCurrentIntervals_Extra.setMenu(self.ui._series_extra_menu)
         self._update_series_action_buttons(self.has_valid_current_target_series_name) # should disable the action buttons to start
 
+        ## Hide any controls in `controls_to_hide`
+        for a_ctrl in controls_to_hide:
+            a_ctrl.hide()
         
+
+
         
     # def __str__(self):
     #      return 
@@ -501,6 +549,30 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
         # self.ui.doubleSpinBox_ActiveWindowEndTime.setValue(end_t)
         print(f'\tdone.')
         
+
+    # ==================================================================================================================== #
+    # Debug Logging Controls                                                                                               #
+    # ==================================================================================================================== #
+    # debug_log_controls = [self.ui.txtLogLine, self.ui.btnToggleExternalLogWindow]
+    
+    @pyqtExceptionPrintingSlot(object)
+    def on_log_updated(self, logger):
+        print(f'on_log_updated(logger: {logger})')
+        # logger: LoggingBaseClass
+        target_text: str = logger.get_flattened_log_text(flattening_delimiter='|', limit_to_n_most_recent=3)
+        self.ui.txtLogLine.setText(target_text)
+        
+
+    def toggle_log_window(self):
+        # self.ui.btnToggleExternalLogWindow.
+        if self.ui._attached_log_window is None:
+            ## open a new one
+            self.ui._attached_log_window = 
+
+    # ==================================================================================================================== #
+    # eventFilter                                                                                                          #
+    # ==================================================================================================================== #
+
 
     def eventFilter(self, source, event):
         """Handle focus events to change styles dynamically."""

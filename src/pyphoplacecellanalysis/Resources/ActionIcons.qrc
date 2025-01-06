@@ -1,5 +1,6 @@
 <RCC>
   <qresource prefix="Icons">
+    <file>Icons/Icon/log-40.png</file>
     <file>Icons/Icon/JumpToNext.png</file>
     <file>Icons/Icon/JumpToPrev.png</file>
     <file>Icons/Icon/Rectangles.png</file>

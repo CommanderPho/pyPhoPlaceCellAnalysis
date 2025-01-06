@@ -79,8 +79,8 @@ selection-background-color: rgb(75, 83, 65);
       <property name="bottomMargin">
        <number>2</number>
       </property>
-      <item row="1" column="21">
-       <spacer name="horizontalSpacer">
+      <item row="1" column="23">
+       <spacer name="horizontalSpacer_8">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
         </property>
@@ -105,8 +105,8 @@ selection-background-color: rgb(75, 83, 65);
         </property>
        </widget>
       </item>
-      <item row="1" column="23">
-       <spacer name="horizontalSpacer_8">
+      <item row="1" column="21">
+       <spacer name="horizontalSpacer">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
         </property>
@@ -117,473 +117,10 @@ selection-background-color: rgb(75, 83, 65);
          </size>
         </property>
        </spacer>
-      </item>
-      <item row="1" column="20">
-       <widget class="QPushButton" name="button_full_screen">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="toolTip">
-         <string>Set the video to full screen</string>
-        </property>
-        <property name="text">
-         <string>Full Screen</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="28">
-       <widget class="QToolButton" name="btnSkipRight">
-        <property name="toolTip">
-         <string>Skip Frames Right</string>
-        </property>
-        <property name="text">
-         <string>-&gt;</string>
-        </property>
-        <property name="shortcut">
-         <string>Ctrl+Right</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="29">
-       <spacer name="horizontalSpacer_3">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
-      <item row="1" column="19">
-       <spacer name="horizontalSpacer_7">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
-      <item row="1" column="14">
-       <spacer name="horizontalSpacer_4">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
-      <item row="1" column="16">
-       <widget class="QDoubleSpinBox" name="doubleSpinBox_ActiveWindowStartTime">
-        <property name="font">
-         <font>
-          <family>Liberation Mono</family>
-          <pointsize>9</pointsize>
-         </font>
-        </property>
-        <property name="focusPolicy">
-         <enum>Qt::NoFocus</enum>
-        </property>
-        <property name="contextMenuPolicy">
-         <enum>Qt::NoContextMenu</enum>
-        </property>
-        <property name="toolTip">
-         <string>Window Start Time [sec]</string>
-        </property>
-        <property name="statusTip">
-         <string>Window Start Time [sec]</string>
-        </property>
-        <property name="whatsThis">
-         <string>Window Start Time [sec]</string>
-        </property>
-        <property name="styleSheet">
-         <string notr="true">QDoubleSpinBox {
-	background: rgb(62, 57, 52);
-	border : 1px solid black;
-};
-QDoubleSpinBox::hover {
-	background: rgb(75, 83, 65);
-	border : 1px solid black;
-};
-QDoubleSpinBox::up-arrow {
-	background: rgb(62, 57, 52);
-	color: rgb(255, 255, 255);
-	border :1px solid black;
-};
-QDoubleSpinBox::down-arrow {
-	background: rgb(62, 57, 52);
-	color: rgb(255, 255, 255);
-	border : 1px solid black;
-};</string>
-        </property>
-        <property name="readOnly">
-         <bool>false</bool>
-        </property>
-        <property name="buttonSymbols">
-         <enum>QAbstractSpinBox::NoButtons</enum>
-        </property>
-        <property name="keyboardTracking">
-         <bool>false</bool>
-        </property>
-        <property name="suffix">
-         <string> [sec]</string>
-        </property>
-        <property name="decimals">
-         <number>6</number>
-        </property>
-        <property name="maximum">
-         <double>99999.000000000000000</double>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="11">
-       <spacer name="horizontalSpacer_2">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
-      <item row="1" column="4">
-       <widget class="QDoubleSpinBox" name="doubleSpinBoxPlaybackSpeed">
-        <property name="toolTip">
-         <string notr="true">Playback Speed Multiplier</string>
-        </property>
-        <property name="whatsThis">
-         <string notr="true">Playback Speed Multiplier</string>
-        </property>
-        <property name="styleSheet">
-         <string notr="true">QDoubleSpinBox {
-	background: rgb(62, 57, 52);
-	border : 1px solid black;
-};
-QDoubleSpinBox::hover {
-	background: rgb(75, 83, 65);
-	border : 1px solid black;
-};
-QDoubleSpinBox::up-arrow {
-	background: rgb(62, 57, 52);
-	color: rgb(255, 255, 255);
-	border :1px solid black;
-};
-QDoubleSpinBox::down-arrow {
-	background: rgb(62, 57, 52);
-	color: rgb(255, 255, 255);
-	border : 1px solid black;
-};</string>
-        </property>
-        <property name="minimum">
-         <double>0.200000000000000</double>
-        </property>
-        <property name="maximum">
-         <double>6.000000000000000</double>
-        </property>
-        <property name="value">
-         <double>1.000000000000000</double>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="5">
-       <widget class="QToolButton" name="toolButton_SpeedBurstEnabled">
-        <property name="enabled">
-         <bool>false</bool>
-        </property>
-        <property name="statusTip">
-         <string>Trigger speedburst with the hotkey</string>
-        </property>
-        <property name="whatsThis">
-         <string>Trigger speedburst with the hotkey</string>
-        </property>
-        <property name="text">
-         <string>SpeedBurst</string>
-        </property>
-        <property name="checkable">
-         <bool>true</bool>
-        </property>
-        <property name="checked">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="17">
-       <widget class="QDoubleSpinBox" name="doubleSpinBox_ActiveWindowEndTime">
-        <property name="font">
-         <font>
-          <family>Liberation Mono</family>
-          <pointsize>9</pointsize>
-         </font>
-        </property>
-        <property name="focusPolicy">
-         <enum>Qt::NoFocus</enum>
-        </property>
-        <property name="contextMenuPolicy">
-         <enum>Qt::NoContextMenu</enum>
-        </property>
-        <property name="toolTip">
-         <string>Window End Time [sec]</string>
-        </property>
-        <property name="statusTip">
-         <string>Window End Time [sec]</string>
-        </property>
-        <property name="whatsThis">
-         <string>Window End Time [sec]</string>
-        </property>
-        <property name="styleSheet">
-         <string notr="true">QDoubleSpinBox {
-	background: rgb(62, 57, 52);
-	border : 1px solid black;
-};
-QDoubleSpinBox::hover {
-	background: rgb(75, 83, 65);
-	border : 1px solid black;
-};
-QDoubleSpinBox::up-arrow {
-	background: rgb(62, 57, 52);
-	color: rgb(255, 255, 255);
-	border :1px solid black;
-};
-QDoubleSpinBox::down-arrow {
-	background: rgb(62, 57, 52);
-	color: rgb(255, 255, 255);
-	border : 1px solid black;
-};</string>
-        </property>
-        <property name="readOnly">
-         <bool>false</bool>
-        </property>
-        <property name="buttonSymbols">
-         <enum>QAbstractSpinBox::NoButtons</enum>
-        </property>
-        <property name="keyboardTracking">
-         <bool>false</bool>
-        </property>
-        <property name="showGroupSeparator" stdset="0">
-         <bool>false</bool>
-        </property>
-        <property name="suffix">
-         <string> [sec]</string>
-        </property>
-        <property name="decimals">
-         <number>4</number>
-        </property>
-        <property name="maximum">
-         <double>99999.990000000005239</double>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="6">
-       <widget class="QPushButton" name="button_speed_up">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="toolTip">
-         <string notr="true">Speed up the playback</string>
-        </property>
-        <property name="text">
-         <string>Speed Up</string>
-        </property>
-        <property name="shortcut">
-         <string>Ctrl+=</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="2">
-       <spacer name="horizontalSpacer_5">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>20</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
-      <item row="1" column="30">
-       <widget class="QPushButton" name="btnHelp">
-        <property name="text">
-         <string>Help</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="10">
-       <widget class="QPushButton" name="button_mark_end">
-        <property name="toolTip">
-         <string>Mark the end of the entry</string>
-        </property>
-        <property name="text">
-         <string>Mark End</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="0">
-       <widget class="ToggleButton" name="button_play_pause">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="toolTip">
-         <string notr="true">Toggle Play/Pause</string>
-        </property>
-        <property name="text">
-         <string>Play/Pause</string>
-        </property>
-        <property name="checkable">
-         <bool>false</bool>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="3">
-       <widget class="QPushButton" name="button_slow_down">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="toolTip">
-         <string notr="true">Slow down the playback</string>
-        </property>
-        <property name="text">
-         <string>Slow Down</string>
-        </property>
-        <property name="shortcut">
-         <string>Ctrl+S</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="9">
-       <widget class="QPushButton" name="button_mark_start">
-        <property name="toolTip">
-         <string>Mark the start of the entry</string>
-        </property>
-        <property name="text">
-         <string>Mark Start</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="26">
-       <widget class="QSpinBox" name="spinBoxFrameJumpMultiplier">
-        <property name="toolTip">
-         <string notr="true" extracomment="Larger means bigger jumps">Frame Jump Multiplier</string>
-        </property>
-        <property name="whatsThis">
-         <string notr="true" extracomment="Larger means bigger jumps">Frame Jump Multiplier</string>
-        </property>
-        <property name="styleSheet">
-         <string notr="true">QSpinBox {
-	background: rgb(62, 57, 52);
-	border : 1px solid black;
-};
-QSpinBox::hover {
-	background: rgb(75, 83, 65);
-	border : 1px solid black;
-};
-</string>
-        </property>
-        <property name="minimum">
-         <number>1</number>
-        </property>
-        <property name="maximum">
-         <number>1000</number>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="27">
-       <widget class="QToolButton" name="btnRight">
-        <property name="toolTip">
-         <string>Step Frames Right</string>
-        </property>
-        <property name="text">
-         <string>&gt;</string>
-        </property>
-        <property name="shortcut">
-         <string>Right</string>
-        </property>
-        <property name="arrowType">
-         <enum>Qt::RightArrow</enum>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="1">
-       <widget class="QPushButton" name="button_reverse">
-        <property name="minimumSize">
-         <size>
-          <width>30</width>
-          <height>25</height>
-         </size>
-        </property>
-        <property name="styleSheet">
-         <string notr="true">color: rgb(255, 255, 255);
-selection-color: rgb(85, 170, 255);
-selection-background-color: rgb(85, 170, 255);
-background-color: rgb(65, 60, 54);
-alternate-background-color: rgb(222, 222, 222);</string>
-        </property>
-        <property name="text">
-         <string>Reverse</string>
-        </property>
-        <property name="checkable">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="8">
-       <spacer name="horizontalSpacer_6">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
-      <item row="1" column="25">
-       <widget class="QToolButton" name="btnLeft">
-        <property name="toolTip">
-         <string>Step Frames Left</string>
-        </property>
-        <property name="text">
-         <string>&lt;</string>
-        </property>
-        <property name="shortcut">
-         <string>Left</string>
-        </property>
-        <property name="arrowType">
-         <enum>Qt::LeftArrow</enum>
-        </property>
-       </widget>
       </item>
       <item row="1" column="13">
        <widget class="QFrame" name="frame">
-        <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,0,0,0,0,0,0,0,0">
+        <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,0,0,0,0,0,0,0">
          <property name="topMargin">
           <number>0</number>
          </property>
@@ -723,17 +260,7 @@ alternate-background-color: rgb(222, 222, 222);</string>
           </widget>
          </item>
          <item>
-          <widget class="QLabel" name="label">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-           <property name="text">
-            <string/>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QFrame" name="frame_2">
+          <widget class="QFrame" name="frame_JumpToDestination">
            <property name="minimumSize">
             <size>
              <width>50</width>
@@ -803,25 +330,6 @@ QDoubleSpinBox::down-arrow {
           </widget>
          </item>
         </layout>
-       </widget>
-      </item>
-      <item row="0" column="0" colspan="31">
-       <widget class="HighlightedJumpSlider" name="slider_progress">
-        <property name="enabled">
-         <bool>false</bool>
-        </property>
-        <property name="maximum">
-         <number>9999</number>
-        </property>
-        <property name="pageStep">
-         <number>1</number>
-        </property>
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="tickPosition">
-         <enum>QSlider::NoTicks</enum>
-        </property>
        </widget>
       </item>
       <item row="1" column="22">
@@ -1346,6 +854,511 @@ QDoubleSpinBox::down-arrow {
          </item>
         </layout>
        </widget>
+      </item>
+      <item row="0" column="0" colspan="33">
+       <widget class="HighlightedJumpSlider" name="slider_progress">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="maximum">
+         <number>9999</number>
+        </property>
+        <property name="pageStep">
+         <number>1</number>
+        </property>
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="tickPosition">
+         <enum>QSlider::NoTicks</enum>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="20">
+       <widget class="QPushButton" name="button_full_screen">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="toolTip">
+         <string>Set the video to full screen</string>
+        </property>
+        <property name="text">
+         <string>Full Screen</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="19">
+       <spacer name="horizontalSpacer_7">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item row="1" column="28">
+       <widget class="QToolButton" name="btnSkipRight">
+        <property name="toolTip">
+         <string>Skip Frames Right</string>
+        </property>
+        <property name="text">
+         <string>-&gt;</string>
+        </property>
+        <property name="shortcut">
+         <string>Ctrl+Right</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="29">
+       <spacer name="horizontalSpacer_3">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item row="1" column="14">
+       <spacer name="horizontalSpacer_4">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item row="1" column="5">
+       <widget class="QToolButton" name="toolButton_SpeedBurstEnabled">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="statusTip">
+         <string>Trigger speedburst with the hotkey</string>
+        </property>
+        <property name="whatsThis">
+         <string>Trigger speedburst with the hotkey</string>
+        </property>
+        <property name="text">
+         <string>SpeedBurst</string>
+        </property>
+        <property name="checkable">
+         <bool>true</bool>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="4">
+       <widget class="QDoubleSpinBox" name="doubleSpinBoxPlaybackSpeed">
+        <property name="toolTip">
+         <string notr="true">Playback Speed Multiplier</string>
+        </property>
+        <property name="whatsThis">
+         <string notr="true">Playback Speed Multiplier</string>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">QDoubleSpinBox {
+	background: rgb(62, 57, 52);
+	border : 1px solid black;
+};
+QDoubleSpinBox::hover {
+	background: rgb(75, 83, 65);
+	border : 1px solid black;
+};
+QDoubleSpinBox::up-arrow {
+	background: rgb(62, 57, 52);
+	color: rgb(255, 255, 255);
+	border :1px solid black;
+};
+QDoubleSpinBox::down-arrow {
+	background: rgb(62, 57, 52);
+	color: rgb(255, 255, 255);
+	border : 1px solid black;
+};</string>
+        </property>
+        <property name="minimum">
+         <double>0.200000000000000</double>
+        </property>
+        <property name="maximum">
+         <double>6.000000000000000</double>
+        </property>
+        <property name="value">
+         <double>1.000000000000000</double>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="16">
+       <widget class="QDoubleSpinBox" name="doubleSpinBox_ActiveWindowStartTime">
+        <property name="font">
+         <font>
+          <family>Liberation Mono</family>
+          <pointsize>9</pointsize>
+         </font>
+        </property>
+        <property name="focusPolicy">
+         <enum>Qt::NoFocus</enum>
+        </property>
+        <property name="contextMenuPolicy">
+         <enum>Qt::NoContextMenu</enum>
+        </property>
+        <property name="toolTip">
+         <string>Window Start Time [sec]</string>
+        </property>
+        <property name="statusTip">
+         <string>Window Start Time [sec]</string>
+        </property>
+        <property name="whatsThis">
+         <string>Window Start Time [sec]</string>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">QDoubleSpinBox {
+	background: rgb(62, 57, 52);
+	border : 1px solid black;
+};
+QDoubleSpinBox::hover {
+	background: rgb(75, 83, 65);
+	border : 1px solid black;
+};
+QDoubleSpinBox::up-arrow {
+	background: rgb(62, 57, 52);
+	color: rgb(255, 255, 255);
+	border :1px solid black;
+};
+QDoubleSpinBox::down-arrow {
+	background: rgb(62, 57, 52);
+	color: rgb(255, 255, 255);
+	border : 1px solid black;
+};</string>
+        </property>
+        <property name="readOnly">
+         <bool>false</bool>
+        </property>
+        <property name="buttonSymbols">
+         <enum>QAbstractSpinBox::NoButtons</enum>
+        </property>
+        <property name="keyboardTracking">
+         <bool>false</bool>
+        </property>
+        <property name="suffix">
+         <string> [sec]</string>
+        </property>
+        <property name="decimals">
+         <number>6</number>
+        </property>
+        <property name="maximum">
+         <double>99999.000000000000000</double>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="11">
+       <spacer name="horizontalSpacer_2">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item row="1" column="17">
+       <widget class="QDoubleSpinBox" name="doubleSpinBox_ActiveWindowEndTime">
+        <property name="font">
+         <font>
+          <family>Liberation Mono</family>
+          <pointsize>9</pointsize>
+         </font>
+        </property>
+        <property name="focusPolicy">
+         <enum>Qt::NoFocus</enum>
+        </property>
+        <property name="contextMenuPolicy">
+         <enum>Qt::NoContextMenu</enum>
+        </property>
+        <property name="toolTip">
+         <string>Window End Time [sec]</string>
+        </property>
+        <property name="statusTip">
+         <string>Window End Time [sec]</string>
+        </property>
+        <property name="whatsThis">
+         <string>Window End Time [sec]</string>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">QDoubleSpinBox {
+	background: rgb(62, 57, 52);
+	border : 1px solid black;
+};
+QDoubleSpinBox::hover {
+	background: rgb(75, 83, 65);
+	border : 1px solid black;
+};
+QDoubleSpinBox::up-arrow {
+	background: rgb(62, 57, 52);
+	color: rgb(255, 255, 255);
+	border :1px solid black;
+};
+QDoubleSpinBox::down-arrow {
+	background: rgb(62, 57, 52);
+	color: rgb(255, 255, 255);
+	border : 1px solid black;
+};</string>
+        </property>
+        <property name="readOnly">
+         <bool>false</bool>
+        </property>
+        <property name="buttonSymbols">
+         <enum>QAbstractSpinBox::NoButtons</enum>
+        </property>
+        <property name="keyboardTracking">
+         <bool>false</bool>
+        </property>
+        <property name="showGroupSeparator" stdset="0">
+         <bool>false</bool>
+        </property>
+        <property name="suffix">
+         <string> [sec]</string>
+        </property>
+        <property name="decimals">
+         <number>4</number>
+        </property>
+        <property name="maximum">
+         <double>99999.990000000005239</double>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="6">
+       <widget class="QPushButton" name="button_speed_up">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="toolTip">
+         <string notr="true">Speed up the playback</string>
+        </property>
+        <property name="text">
+         <string>Speed Up</string>
+        </property>
+        <property name="shortcut">
+         <string>Ctrl+=</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="2">
+       <spacer name="horizontalSpacer_5">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>20</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item row="1" column="32">
+       <widget class="QPushButton" name="btnHelp">
+        <property name="text">
+         <string>Help</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="10">
+       <widget class="QPushButton" name="button_mark_end">
+        <property name="toolTip">
+         <string>Mark the end of the entry</string>
+        </property>
+        <property name="text">
+         <string>Mark End</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="ToggleButton" name="button_play_pause">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="toolTip">
+         <string notr="true">Toggle Play/Pause</string>
+        </property>
+        <property name="text">
+         <string>Play/Pause</string>
+        </property>
+        <property name="checkable">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="3">
+       <widget class="QPushButton" name="button_slow_down">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="toolTip">
+         <string notr="true">Slow down the playback</string>
+        </property>
+        <property name="text">
+         <string>Slow Down</string>
+        </property>
+        <property name="shortcut">
+         <string>Ctrl+S</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="9">
+       <widget class="QPushButton" name="button_mark_start">
+        <property name="toolTip">
+         <string>Mark the start of the entry</string>
+        </property>
+        <property name="text">
+         <string>Mark Start</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="26">
+       <widget class="QSpinBox" name="spinBoxFrameJumpMultiplier">
+        <property name="toolTip">
+         <string notr="true" extracomment="Larger means bigger jumps">Frame Jump Multiplier</string>
+        </property>
+        <property name="whatsThis">
+         <string notr="true" extracomment="Larger means bigger jumps">Frame Jump Multiplier</string>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">QSpinBox {
+	background: rgb(62, 57, 52);
+	border : 1px solid black;
+};
+QSpinBox::hover {
+	background: rgb(75, 83, 65);
+	border : 1px solid black;
+};
+</string>
+        </property>
+        <property name="minimum">
+         <number>1</number>
+        </property>
+        <property name="maximum">
+         <number>1000</number>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="27">
+       <widget class="QToolButton" name="btnRight">
+        <property name="toolTip">
+         <string>Step Frames Right</string>
+        </property>
+        <property name="text">
+         <string>&gt;</string>
+        </property>
+        <property name="shortcut">
+         <string>Right</string>
+        </property>
+        <property name="arrowType">
+         <enum>Qt::RightArrow</enum>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QPushButton" name="button_reverse">
+        <property name="minimumSize">
+         <size>
+          <width>30</width>
+          <height>25</height>
+         </size>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">color: rgb(255, 255, 255);
+selection-color: rgb(85, 170, 255);
+selection-background-color: rgb(85, 170, 255);
+background-color: rgb(65, 60, 54);
+alternate-background-color: rgb(222, 222, 222);</string>
+        </property>
+        <property name="text">
+         <string>Reverse</string>
+        </property>
+        <property name="checkable">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="8">
+       <spacer name="horizontalSpacer_6">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item row="1" column="25">
+       <widget class="QToolButton" name="btnLeft">
+        <property name="toolTip">
+         <string>Step Frames Left</string>
+        </property>
+        <property name="text">
+         <string>&lt;</string>
+        </property>
+        <property name="shortcut">
+         <string>Left</string>
+        </property>
+        <property name="arrowType">
+         <enum>Qt::LeftArrow</enum>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="31">
+       <widget class="QToolButton" name="btnToggleExternalLogWindow">
+        <property name="toolTip">
+         <string>Log Window</string>
+        </property>
+        <property name="statusTip">
+         <string>Log Window</string>
+        </property>
+        <property name="whatsThis">
+         <string>Log Window</string>
+        </property>
+        <property name="text">
+         <string/>
+        </property>
+        <property name="icon">
+         <iconset resource="../../../Resources/ActionIcons.qrc">
+          <normaloff>:/Icons/Icons/Icon/log-40.png</normaloff>:/Icons/Icons/Icon/log-40.png</iconset>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="30">
+       <widget class="QLineEdit" name="txtLogLine"/>
       </item>
      </layout>
     </widget>
