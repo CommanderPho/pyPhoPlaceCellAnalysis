@@ -119,7 +119,7 @@ selection-background-color: rgb(75, 83, 65);
        </spacer>
       </item>
       <item row="1" column="13">
-       <widget class="QFrame" name="frame">
+       <widget class="QFrame" name="frame_Epoch">
         <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,0,0,0,0,0,0,0">
          <property name="topMargin">
           <number>0</number>
@@ -1337,8 +1337,33 @@ alternate-background-color: rgb(222, 222, 222);</string>
         </property>
        </widget>
       </item>
+      <item row="1" column="30">
+       <widget class="QLineEdit" name="txtLogLine">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+          <horstretch>1</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>100</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="baseSize">
+         <size>
+          <width>200</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="readOnly">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
       <item row="1" column="31">
-       <widget class="QToolButton" name="btnToggleExternalLogWindow">
+       <widget class="QPushButton" name="btnToggleExternalLogWindow">
         <property name="toolTip">
          <string>Log Window</string>
         </property>
@@ -1348,6 +1373,9 @@ alternate-background-color: rgb(222, 222, 222);</string>
         <property name="whatsThis">
          <string>Log Window</string>
         </property>
+        <property name="styleSheet">
+         <string notr="true">color: rgb(255, 255, 255);\nselection-color: rgb(85, 170, 255);\nselection-background-color: rgb(85, 170, 255);\nbackground-color: rgb(65, 60, 54);\nalternate-background-color: rgb(222, 222, 222);</string>
+        </property>
         <property name="text">
          <string/>
         </property>
@@ -1355,10 +1383,13 @@ alternate-background-color: rgb(222, 222, 222);</string>
          <iconset resource="../../../Resources/ActionIcons.qrc">
           <normaloff>:/Icons/Icons/Icon/log-40.png</normaloff>:/Icons/Icons/Icon/log-40.png</iconset>
         </property>
+        <property name="checkable">
+         <bool>true</bool>
+        </property>
+        <property name="checked">
+         <bool>false</bool>
+        </property>
        </widget>
-      </item>
-      <item row="1" column="30">
-       <widget class="QLineEdit" name="txtLogLine"/>
       </item>
      </layout>
     </widget>

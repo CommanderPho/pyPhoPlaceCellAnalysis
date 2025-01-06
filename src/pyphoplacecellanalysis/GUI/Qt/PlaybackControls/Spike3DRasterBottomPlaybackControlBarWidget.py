@@ -29,6 +29,8 @@ import qtawesome as qta
 from pyphocorehelpers.DataStructure.logging_data_structures import LoggingBaseClass
 from pyphoplacecellanalysis.GUI.Qt.Mixins.ComboBoxMixins import KeysListAccessingMixin, ComboBoxCtrlOwningMixin
 from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarBase import Spike3DRasterBottomPlaybackControlBarBase
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 
 """ TODO: Refactor from pyphoplacecellanalysis\GUI\PyQtPlot\Widgets\Mixins\RenderWindowControlsMixin.py
 
@@ -116,9 +118,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
         # self.ui.setupUi(self) # builds the design from the .ui onto this widget.
         
         self._logger = LoggingBaseClass(log_records=[])
-        self._logger.sigLogUpdated.connect(self.on_log_updated)
-            
-
+        
         self.initUI()
         self.show() # Show the GUI
 
@@ -126,6 +126,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
         """ setup the UI
         """
         move_controls = [self.ui.btnSkipLeft, self.ui.btnLeft, self.ui.spinBoxFrameJumpMultiplier, self.ui.btnRight, self.ui.btnSkipRight, self.ui.horizontalSpacer_3]
+        debug_log_controls = [self.ui.txtLogLine, self.ui.btnToggleExternalLogWindow]
 
         controls_to_hide = [self.ui.button_full_screen, self.ui.self.ui.btnCurrentIntervals_Customize, *move_controls]
         
@@ -189,7 +190,25 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
         for a_ctrl in controls_to_hide:
             a_ctrl.hide()
         
+        # debug_log_controls _________________________________________________________________________________________________ #
+        self.ui._attached_log_window = None
+        self._logger.sigLogUpdated.connect(self.on_log_updated)
+        # debug_log_controls = [self.ui.txtLogLine, self.ui.btnToggleExternalLogWindow]
+        self._format_button_toggle_log_window()
+        self.ui.btnToggleExternalLogWindow.pressed.connect(self.toggle_log_window)
 
+
+    @function_attributes(short_name=None, tags=['format', 'button'], input_requires=[], output_provides=[], uses=[], used_by=['_format_button_reversed', '_format_button_toggle_log_window'], creation_date='2025-01-06 08:39', related_items=[])
+    def _format_boolean_toggle_button(self, button):
+        """ formats the any checkable button based on whether it is checked or not """
+        if button.isChecked():
+            # setting background color to an energized blue with white text
+            button.setStyleSheet("color : rgb(255, 255, 255); background-color : rgb(85, 170, 255);")
+        # if it is unchecked
+        else:
+            # set background color back to default (dark grey) with grey text
+            button.setStyleSheet("color : rgb(180, 180, 180); background-color : rgb(65, 60, 54)")
+            
 
         
     # def __str__(self):
@@ -233,15 +252,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
 
     def _format_button_reversed(self):
         """ formats the reverse button based on whether it is checked or not """
-        if self.ui.button_reverse.isChecked():
-            # setting background color to an energized blue with white text
-            self.ui.button_reverse.setStyleSheet("color : rgb(255, 255, 255); background-color : rgb(85, 170, 255);")
-  
-        # if it is unchecked
-        else:
-            # set background color back to default (dark grey) with grey text
-            self.ui.button_reverse.setStyleSheet("color : rgb(180, 180, 180); background-color : rgb(65, 60, 54)")
-
+        self._format_boolean_toggle_button(button=self.ui.button_reverse)
 
     # ==================================================================================================================== #
     # Jump Target Controls                                                                                                 #
@@ -554,13 +565,26 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
     # Debug Logging Controls                                                                                               #
     # ==================================================================================================================== #
     # debug_log_controls = [self.ui.txtLogLine, self.ui.btnToggleExternalLogWindow]
-    
+
+    @property
+    def attached_log_window(self):
+        """The attached_log_window property."""
+        return self._attached_log_window
+    @attached_log_window.setter
+    def attached_log_window(self, value):
+        self._attached_log_window = value    
+
     @pyqtExceptionPrintingSlot(object)
     def on_log_updated(self, logger):
         print(f'on_log_updated(logger: {logger})')
         # logger: LoggingBaseClass
         target_text: str = logger.get_flattened_log_text(flattening_delimiter='|', limit_to_n_most_recent=3)
         self.ui.txtLogLine.setText(target_text)
+
+
+    def _format_button_toggle_log_window(self):
+        """ formats the toggle_log_window button based on whether it is checked or not """
+        self._format_boolean_toggle_button(button=self.ui.btnToggleExternalLogWindow)
         
 
     def toggle_log_window(self):
@@ -568,6 +592,10 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
         if self.ui._attached_log_window is None:
             ## open a new one
             self.ui._attached_log_window = 
+
+
+        self._format_button_toggle_log_window()
+
 
     # ==================================================================================================================== #
     # eventFilter                                                                                                          #
