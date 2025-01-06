@@ -11,17 +11,20 @@ from nptyping import NDArray
 
 from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable, iPythonKeyCompletingMixin
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
+from neuropy.utils.indexing_helpers import PandasHelpers
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters, RenderPlots, RenderPlotsData
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphocorehelpers.gui.Qt.connections_container import ConnectionsContainer
-
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem, RectangleRenderTupleHelpers
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Render2DEventRectanglesHelper import Render2DEventRectanglesHelper
 
 from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import IntervalsDatasource
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs # required for `update_interval_visualization_properties(...)`
+from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 
 
 class RenderedEpochsItemsContainer(iPythonKeyCompletingMixin, DynamicParameters):
@@ -42,8 +45,108 @@ class RenderedEpochsItemsContainer(iPythonKeyCompletingMixin, DynamicParameters)
                 independent_data_copy = RectangleRenderTupleHelpers.copy_data(rendered_rects_item.data)
                 self[a_plot] = IntervalRectsItem(data=independent_data_copy)
 
-   
-class EpochRenderingMixin:
+
+
+@metadata_attributes(short_name=None, tags=['live-window', 'intervals'], input_requires=[], output_provides=[], uses=[], used_by=['EpochRenderingMixin'], creation_date='2025-01-06 15:09', related_items=[])
+class LiveWindowEventIntervalMonitoringMixin:
+    """ 
+    
+    sets:
+        self._active_window_visible_intervals_dict
+        
+    Implementors must:
+        self.LiveWindowEventIntervalMonitoringMixin_on_window_update(new_start, new_end)
+    """
+    sigOnIntervalEnteredWindow = QtCore.Signal(object) # pyqtSignal(object)
+    # sigOnIntervalInWindow = None
+    sigOnIntervalExitedindow = QtCore.Signal(object)
+    
+    @pyqtExceptionPrintingSlot()
+    def LiveWindowEventIntervalMonitoringMixin_on_init(self):
+        """ perform any parameters setting/checking during init """
+        self._active_window_visible_intervals_dict = {}
+
+    @pyqtExceptionPrintingSlot()
+    def LiveWindowEventIntervalMonitoringMixin_on_setup(self):
+        """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
+        pass
+
+
+    @pyqtExceptionPrintingSlot()
+    def LiveWindowEventIntervalMonitoringMixin_on_buildUI(self):
+        """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
+        connections = {}
+        connections['LiveWindowEventIntervalMonitoringMixin_entered'] = self.sigOnIntervalEnteredWindow.connect(self.on_visible_event_intervals_added)
+        connections['LiveWindowEventIntervalMonitoringMixin_exited'] = self.sigOnIntervalExitedindow.connect(self.on_visible_event_intervals_removed)
+
+
+    @pyqtExceptionPrintingSlot()
+    def LiveWindowEventIntervalMonitoringMixin_on_destroy(self):
+        """ perfrom teardown/destruction of anything that needs to be manually removed or released """
+        pass
+
+    @pyqtExceptionPrintingSlot(float, float)
+    def LiveWindowEventIntervalMonitoringMixin_on_window_update(self, new_start=None, new_end=None):
+        """ called to perform updates when the active window changes. Redraw, recompute data, etc. """
+        self.on_visible_intervals_changed()
+            
+    @pyqtExceptionPrintingSlot(object)
+    def LiveWindowEventIntervalMonitoringMixin_on_window_update_rate_limited(self, evt):
+        self.LiveWindowEventIntervalMonitoringMixin_on_window_update(*evt)
+        
+
+    @property
+    def active_window_visible_intervals_dict(self):
+        """The active_window_visible_intervals_dict property."""
+        return self._active_window_visible_intervals_dict
+    @active_window_visible_intervals_dict.setter
+    def active_window_visible_intervals_dict(self, value):
+        self._active_window_visible_intervals_dict = value
+
+    def find_intervals_in_active_window(self, debug_print=False) -> Dict[str, pd.DataFrame]:
+        raise NotImplementedError(f'Implementors must override!')
+
+    @pyqtExceptionPrintingSlot()
+    def on_visible_intervals_changed(self):
+        """ called to get the changes after intervals are updated. 
+        """        
+
+        all_live_window_included_intervals_dict = self.find_intervals_in_active_window()
+
+        curr_all_live_window_visible_interval_changes_dict: Dict[str, Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]] = {} ## current changes dict
+
+        for k, intervals_df in all_live_window_included_intervals_dict.items():
+            extant_intervals_df = self.active_window_visible_intervals_dict.get(k, PandasHelpers.empty_df_like(intervals_df))
+            
+            # ## INPUTS: intervals_df, extant_intervals_df
+            curr_all_live_window_visible_interval_changes_dict[k] = PandasHelpers.get_df_row_changes(potentially_updated_df=intervals_df, prev_df=extant_intervals_df) 
+            (added_rows, same_rows, removed_rows) = curr_all_live_window_visible_interval_changes_dict[k]
+
+        ## OUTPUTS: curr_all_live_window_visible_interval_changes_dict
+        ## done with update
+        self.active_window_visible_intervals_dict = deepcopy(all_live_window_included_intervals_dict)
+        if len(added_rows) > 0:
+            self.sigOnIntervalEnteredWindow.emit(added_rows)
+        # if len(same_rows) > 0:
+        #     self.sigOnIntervalEnteredWindow.emit(same_rows)
+        if len(removed_rows) > 0:
+            self.sigOnIntervalExitedindow.emit(removed_rows)            
+
+
+    @pyqtExceptionPrintingSlot(object)
+    def on_visible_event_intervals_added(self, added_rows):
+        print(f'LiveWindowEventIntervalMonitoringMixin.on_visible_event_intervals_added(added_rows: {added_rows})')
+        # spike_raster_window.bottom_playback_control_bar_logger.add_log_line(f'visible_event_intervals_added(added_rows: {added_rows})')
+        
+    @pyqtExceptionPrintingSlot(object)
+    def on_visible_event_intervals_removed(self, removed_rows):
+        print(f'LiveWindowEventIntervalMonitoringMixin.visible_event_intervals_removed(removed_rows: {removed_rows})')
+        # spike_raster_window.bottom_playback_control_bar_logger.add_log_line(f'visible_event_intervals_removed(removed_rows: {removed_rows})')
+
+
+
+@metadata_attributes(short_name=None, tags=['epoch', 'intervals', 'rendering'], input_requires=[], output_provides=[], uses=['LiveWindowEventIntervalMonitoringMixin'], used_by=['Spike2DRaster'], creation_date='2025-01-06 15:10', related_items=[])
+class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
     """ Implementors render Epochs/Intervals
     
     Requires:
@@ -121,21 +224,23 @@ class EpochRenderingMixin:
 
     #######################################################################################################################################
     
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def EpochRenderingMixin_on_init(self):
         """ perform any parameters setting/checking during init """
         self.plots_data['interval_datasources'] = RenderPlotsData('EpochRenderingMixin')
-        
+        self.LiveWindowEventIntervalMonitoringMixin_on_init()
         
 
         # self.plots_data['interval_datasource_updating_connections'] = ConnectionsContainer('EpochRenderingMixin')
     
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def EpochRenderingMixin_on_setup(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         self.plots.rendered_epochs = RenderPlots('EpochRenderingMixin') # the container to hold the time rectangles
+        self.LiveWindowEventIntervalMonitoringMixin_on_setup()
+        
 
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def EpochRenderingMixin_on_buildUI(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         # Adds the self.ui and self.ui.connections if they don't exist
@@ -150,16 +255,21 @@ class EpochRenderingMixin:
             if not hasattr(self.ui, 'connections'):
                 self.ui.connections = ConnectionsContainer()
 
-    @QtCore.Slot()
+        self.LiveWindowEventIntervalMonitoringMixin_on_buildUI()
+        
+
+    @pyqtExceptionPrintingSlot()
     def EpochRenderingMixin_on_destroy(self):
         """ perfrom teardown/destruction of anything that needs to be manually removed or released """
         # TODO: REGISTER AND IMPLEMENT
+        self.LiveWindowEventIntervalMonitoringMixin_on_destroy()
         raise NotImplementedError
         pass
 
-    @QtCore.Slot(float, float)
+    @pyqtExceptionPrintingSlot(float, float)
     def EpochRenderingMixin_on_window_update(self, new_start=None, new_end=None):
         """ called to perform updates when the active window changes. Redraw, recompute data, etc. """
+        self.LiveWindowEventIntervalMonitoringMixin_on_window_update(new_start, new_end)
         raise NotImplementedError
         pass
 
@@ -167,7 +277,7 @@ class EpochRenderingMixin:
     ##################################################
     ## For use with pg.SignalProxy
     # using signal proxy turns original arguments into a tuple
-    @QtCore.Slot(object)
+    @pyqtExceptionPrintingSlot(object)
     def EpochRenderingMixin_on_window_update_rate_limited(self, evt):
         self.EpochRenderingMixin_on_window_update(*evt)
         
@@ -175,7 +285,7 @@ class EpochRenderingMixin:
     
     #######################################################################################################################################
     
-    @QtCore.Slot(object)
+    @pyqtExceptionPrintingSlot(object)
     def EpochRenderingMixin_on_interval_datasource_changed(self, datasource: IntervalsDatasource):
         """ emit our own custom signal when the general datasource update method returns """
         # print(f'datasource: {datasource.custom_datasource_name}')
