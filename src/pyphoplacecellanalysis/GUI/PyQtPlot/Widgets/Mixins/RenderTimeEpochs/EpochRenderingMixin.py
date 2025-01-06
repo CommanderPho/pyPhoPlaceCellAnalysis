@@ -110,27 +110,36 @@ class LiveWindowEventIntervalMonitoringMixin:
     def on_visible_intervals_changed(self):
         """ called to get the changes after intervals are updated. 
         """        
-
+        print(f'LiveWindowEventIntervalMonitoringMixin.on_visible_intervals_changed()')
         all_live_window_included_intervals_dict = self.find_intervals_in_active_window()
 
         curr_all_live_window_visible_interval_changes_dict: Dict[str, Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]] = {} ## current changes dict
 
-        for k, intervals_df in all_live_window_included_intervals_dict.items():
-            extant_intervals_df = self.active_window_visible_intervals_dict.get(k, PandasHelpers.empty_df_like(intervals_df))
+        added_rows_dict: Dict[str, pd.DataFrame] = {}
+        removed_rows_dict: Dict[str, pd.DataFrame] = {}
+        
+
+        for dataseries_name, intervals_df in all_live_window_included_intervals_dict.items():
+            extant_intervals_df = self.active_window_visible_intervals_dict.get(dataseries_name, PandasHelpers.empty_df_like(intervals_df))
             
             # ## INPUTS: intervals_df, extant_intervals_df
-            curr_all_live_window_visible_interval_changes_dict[k] = PandasHelpers.get_df_row_changes(potentially_updated_df=intervals_df, prev_df=extant_intervals_df) 
-            (added_rows, same_rows, removed_rows) = curr_all_live_window_visible_interval_changes_dict[k]
+            curr_all_live_window_visible_interval_changes_dict[dataseries_name] = PandasHelpers.get_df_row_changes(potentially_updated_df=intervals_df, prev_df=extant_intervals_df) 
+            (added_rows, same_rows, removed_rows) = curr_all_live_window_visible_interval_changes_dict[dataseries_name]
+            if len(added_rows) > 0:
+                added_rows_dict[dataseries_name] = added_rows
+            if len(removed_rows) > 0:
+                removed_rows_dict[dataseries_name] = removed_rows
+            
 
         ## OUTPUTS: curr_all_live_window_visible_interval_changes_dict
         ## done with update
         self.active_window_visible_intervals_dict = deepcopy(all_live_window_included_intervals_dict)
-        if len(added_rows) > 0:
-            self.sigOnIntervalEnteredWindow.emit(added_rows)
+        if len(added_rows_dict) > 0:
+            self.sigOnIntervalEnteredWindow.emit(added_rows_dict)
         # if len(same_rows) > 0:
         #     self.sigOnIntervalEnteredWindow.emit(same_rows)
-        if len(removed_rows) > 0:
-            self.sigOnIntervalExitedindow.emit(removed_rows)            
+        if len(removed_rows_dict) > 0:
+            self.sigOnIntervalExitedindow.emit(removed_rows_dict)            
 
 
     @pyqtExceptionPrintingSlot(object)
