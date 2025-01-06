@@ -11,6 +11,8 @@ from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlo
 
 ## IMPORTS:
 # 
+from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
+from pyphocorehelpers.DataStructure.logging_data_structures import LoggingBaseClass
 
 ## Define the .ui file path
 path = os.path.dirname(os.path.abspath(__file__))
@@ -29,7 +31,18 @@ class LoggingOutputWidget(QWidget):
         self.show() # Show the GUI
 
     def initUI(self):
+        self.setWindowTitle('Logging Output Window')
+        
         pass
+
+    @pyqtExceptionPrintingSlot(object)
+    def on_log_updated(self, logger):
+        print(f'on_log_updated(logger: {logger})')
+        # logger: LoggingBaseClass
+        target_text: str = logger.get_flattened_log_text(flattening_delimiter='\n', limit_to_n_most_recent=None)
+        self.ui.logTextEdit.setText(target_text)
+        
+
 
 
 ## Start Qt event loop
