@@ -503,25 +503,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         return output_widget
         
     
-    ###################################
-    #### EVENT HANDLERS
-    ##################################
-    def closeEvent(self, event):
-        """closeEvent(self, event): pyqt default event, doesn't have to be registered. Called when the widget will close.
-        """
-        if self.enable_window_close_confirmation:
-            reply = QtWidgets.QMessageBox.question(self, 'Window Close', 'Are you sure you want to close the window?',
-                    QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.No)
-        else:
-            reply = QtWidgets.QMessageBox.Yes
-            
-        if reply == QtWidgets.QMessageBox.Yes:
-            self.GlobalConnectionManagerAccessingMixin_on_destroy() # call destroy to tear down the registered children for the global connection mannager
-            self.deleteLater() # schedule the object for deletion
-            event.accept()
-            print('Window closed')
-        else:
-            event.ignore()
+
    
     ###################################
     #### EVENT HANDLERS
@@ -871,28 +853,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         
     
 
-    ########################################################
-    ## For Key Press Events:
-    ########################################################
 
-    ##-----------------------------------------
-    def keyPressEvent(self, event):
-        if self.should_debug_print_interaction_events:
-            print(f'pressed from Spike3DRasterWindowWidget.keyPressEvent(event): {event.key()}')
-            print(f'\t event.modifiers(): {event.modifiers()}')
-            # e.Modifiers()
-            print('event received @ Spike3DRasterWindowWidget')
-        super(Spike3DRasterWindowWidget, self).keyPressEvent(event)
-        if self.should_debug_print_interaction_events:
-            if event.key() == QtCore.Qt.Key_Space:
-                print(f'\t detected event: {event.key()}')
-            elif event.key() == QtCore.Qt.Key_0:
-                print(f'\t detected event: {event.key()}')
-            else:
-                print(f'\t undetected event')
-        # self.keyPressed.emit(event)
-
-    ##-----------------------------------------
     
     @QtCore.Property(int) # Note that this ia *pyqt*Property, meaning it's available to pyqt
     def scheduledAnimationSteps(self):
@@ -937,90 +898,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         print(f'\t curr_shifted_next_start_time: {curr_shifted_next_start_time}')
         self.update_animation(curr_shifted_next_start_time)
         self._scheduledAnimationSteps = self._scheduledAnimationSteps - x # subtract off the frames that have been shifted
-        
-    def eventFilter(self, watched, event):
-        """  has to be installed on an item like:
-            self.grid = pg.GraphicsLayoutWidget()
-            self.top_left = self.grid.addViewBox(row=1, col=1)
-            self.top_left.installEventFilter(self)
-        
-        """
-        # print(f'Spike3DRasterWindowWidget.eventFilter(self, watched, event)')
-        delta = None
-        if (event.type() == QtCore.QEvent.GraphicsSceneWheel):
-            # QtCore.QEvent.GraphicsSceneWheel
-            """             
-            event.delta(): (gives values like +/- 120, 240, etc) # Returns the distance that the wheel is rotated, in eighths (1/8s) of a degree. A positive value indicates that the wheel was rotated forwards away from the user; a negative value indicates that the wheel was rotated backwards toward the user.
-                Most mouse types work in steps of 15 degrees, in which case the delta value is a multiple of 120 (== 15 * 8).
 
-            event.orientation(): 1 for alternative scroll wheel dir and 2 for primary scroll wheel dir
-            
-            """
-            if self.should_debug_print_interaction_events:
-                print(f'Spike3DRasterWindowWidget.eventFilter(...)\n\t detected event.type() == QtCore.QEvent.GraphicsSceneWheel')
-                print(f'\twatched: {watched}\n\tevent: {event}')
-                print(f'\tevent.delta(): {event.delta()}')
-                print(f'\tevent.orientation(): {event.orientation()}')
-                # print(f'\tevent.phase(): {event.phase()}')
-                # print(f'\tevent.pixelDelta(): {event.pixelDelta()}')
-                
-            delta = event.delta()
-        
-        
-        elif (event.type() == QtCore.QEvent.Wheel): # the second case (QtGui.QWheelEvent) doesn't even exist I don't think. IDK why ChatGPT said to use it.
-            """ the event is an instance of `QtGui.QWheelEvent`, but the event's .type() is NEVER QtGui.QWheelEvent, that's not even a possible type. """
-            if self.should_debug_print_interaction_events:
-                print(f'Spike3DRasterWindowWidget.eventFilter(...)\n\t detected event.type() == QtCore.QEvent.Wheel')
-                print(f'\twatched: {watched}\n\tevent: {event}')
-                print(f'\tevent.angleDelta(): {event.angleDelta()}')
-                
-            delta = event.angleDelta().x()
-            if delta == 0:
-                delta = event.angleDelta().y()
-            
-        else:
-            delta = None
-            if self.should_debug_print_interaction_events:
-                print(f'\t unhandled event {QEventLookupHelpers.get_event_string(event)}')
-                
-        if (delta is not None) and (delta > 0):
-            ## do the scroll
-            if self.should_debug_print_interaction_events:
-                print(f'\tperofmring scroll with delta: {delta}')
-
-            numDegrees = delta / 8
-            numSteps = numDegrees / 15 # see QWheelEvent documentation
-            numSteps = int(round(float(self.params.scrollStepMultiplier) * float(numSteps)))
-                       
-            updatedNumScheduledScalings = self._scheduledAnimationSteps + numSteps
-            if (updatedNumScheduledScalings * numSteps < 0):
-                updatedNumScheduledScalings = numSteps # if user moved the wheel in another direction, we reset previously scheduled scalings
-            
-            if self.enable_smooth_scrolling_animation:
-                # ## pyqt Property Animation Method:            
-                # self.ui.scrollAnim.setEndValue(updatedNumScheduledScalings) # Update the end value
-                # self.ui.scrollAnim.start() # start the animation
-                
-                ## QTimeline version:
-                self._scheduledAnimationSteps = updatedNumScheduledScalings # Set the updated number of scalings:
-                self.ui.scrollAnimTimeline.setEndFrame(self._scheduledAnimationSteps)
-                self.ui.scrollAnimTimeline.start() # Start the timeline's animation event
-            else:
-                # No animation, just update directly ("old way")
-                self._scheduledAnimationSteps = updatedNumScheduledScalings
-                self.shift_animation_frame_val(self._scheduledAnimationSteps)
-                self._scheduledAnimationSteps = 0 # New method: zero it out instead of having it compound
-
-            return True
-        # END if (delta is not None) a....
-        else:
-            # Unknown event type
-            if self.should_debug_print_interaction_events:
-                print(f'\t unhandled event {QEventLookupHelpers.get_event_string(event)}')
-
-        # If not a particularlly handled case, do the default thing.
-        return super().eventFilter(watched, event)
-    
 
     @function_attributes(short_name=None, tags=['TODO', 'ACTIVE', 'programmatic', 'scrolling', 'time'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 12:09', related_items=[])
     def programmatically_scroll_to_time(self, new_time):
@@ -1043,15 +921,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
     
     ##-----------------------------------------
-    def wheelEvent(self, event):
-        super(Spike3DRasterWindowWidget, self).wheelEvent(event)
-        if self.should_debug_print_interaction_events:
-            print(f'Spike3DRasterWindowWidget.wheelEvent(...)')
-            # self.x = self.x + event.delta()/120
-            # print self.x
-            # self.label.setText("Total Steps: "+QString.number(self.x))        
-            print(f'\t wheelEvent(event: {event}')
-    
 
     @classmethod
     def find_or_create_if_needed(cls, curr_active_pipeline, force_create_new:bool=False, **kwargs):
@@ -1329,6 +1198,147 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         return self.spike_raster_plt_2d.find_event_intervals_in_active_window(included_series_names=included_series_names, debug_print=False)
 
 
+    # ==================================================================================================================== #
+    # Events                                                                                                               #
+    # ==================================================================================================================== #
+        
+    def eventFilter(self, watched, event):
+        """  has to be installed on an item like:
+            self.grid = pg.GraphicsLayoutWidget()
+            self.top_left = self.grid.addViewBox(row=1, col=1)
+            self.top_left.installEventFilter(self)
+        
+        """
+        # print(f'Spike3DRasterWindowWidget.eventFilter(self, watched, event)')
+        delta = None
+        if (event.type() == QtCore.QEvent.GraphicsSceneWheel):
+            # QtCore.QEvent.GraphicsSceneWheel
+            """             
+            event.delta(): (gives values like +/- 120, 240, etc) # Returns the distance that the wheel is rotated, in eighths (1/8s) of a degree. A positive value indicates that the wheel was rotated forwards away from the user; a negative value indicates that the wheel was rotated backwards toward the user.
+                Most mouse types work in steps of 15 degrees, in which case the delta value is a multiple of 120 (== 15 * 8).
+
+            event.orientation(): 1 for alternative scroll wheel dir and 2 for primary scroll wheel dir
+            
+            """
+            if self.should_debug_print_interaction_events:
+                print(f'Spike3DRasterWindowWidget.eventFilter(...)\n\t detected event.type() == QtCore.QEvent.GraphicsSceneWheel')
+                print(f'\twatched: {watched}\n\tevent: {event}')
+                print(f'\tevent.delta(): {event.delta()}')
+                print(f'\tevent.orientation(): {event.orientation()}')
+                # print(f'\tevent.phase(): {event.phase()}')
+                # print(f'\tevent.pixelDelta(): {event.pixelDelta()}')
+                
+            delta = event.delta()
+        
+        
+        elif (event.type() == QtCore.QEvent.Wheel): # the second case (QtGui.QWheelEvent) doesn't even exist I don't think. IDK why ChatGPT said to use it.
+            """ the event is an instance of `QtGui.QWheelEvent`, but the event's .type() is NEVER QtGui.QWheelEvent, that's not even a possible type. """
+            if self.should_debug_print_interaction_events:
+                print(f'Spike3DRasterWindowWidget.eventFilter(...)\n\t detected event.type() == QtCore.QEvent.Wheel')
+                print(f'\twatched: {watched}\n\tevent: {event}')
+                print(f'\tevent.angleDelta(): {event.angleDelta()}')
+                
+            delta = event.angleDelta().x()
+            if delta == 0:
+                delta = event.angleDelta().y()
+            
+        else:
+            delta = None
+            if self.should_debug_print_interaction_events:
+                print(f'\t unhandled event {QEventLookupHelpers.get_event_string(event)}')
+                
+        if (delta is not None) and (delta > 0):
+            ## do the scroll
+            if self.should_debug_print_interaction_events:
+                print(f'\tperofmring scroll with delta: {delta}')
+
+            numDegrees = delta / 8
+            numSteps = numDegrees / 15 # see QWheelEvent documentation
+            numSteps = int(round(float(self.params.scrollStepMultiplier) * float(numSteps)))
+                       
+            updatedNumScheduledScalings = self._scheduledAnimationSteps + numSteps
+            if (updatedNumScheduledScalings * numSteps < 0):
+                updatedNumScheduledScalings = numSteps # if user moved the wheel in another direction, we reset previously scheduled scalings
+            
+            if self.enable_smooth_scrolling_animation:
+                # ## pyqt Property Animation Method:            
+                # self.ui.scrollAnim.setEndValue(updatedNumScheduledScalings) # Update the end value
+                # self.ui.scrollAnim.start() # start the animation
+                
+                ## QTimeline version:
+                self._scheduledAnimationSteps = updatedNumScheduledScalings # Set the updated number of scalings:
+                self.ui.scrollAnimTimeline.setEndFrame(self._scheduledAnimationSteps)
+                self.ui.scrollAnimTimeline.start() # Start the timeline's animation event
+            else:
+                # No animation, just update directly ("old way")
+                self._scheduledAnimationSteps = updatedNumScheduledScalings
+                self.shift_animation_frame_val(self._scheduledAnimationSteps)
+                self._scheduledAnimationSteps = 0 # New method: zero it out instead of having it compound
+
+            return True
+        # END if (delta is not None) a....
+        else:
+            # Unknown event type
+            if self.should_debug_print_interaction_events:
+                print(f'\t unhandled event {QEventLookupHelpers.get_event_string(event)}')
+
+        # If not a particularlly handled case, do the default thing.
+        return super().eventFilter(watched, event)
+
+
+
+    def wheelEvent(self, event):
+        super(Spike3DRasterWindowWidget, self).wheelEvent(event)
+        if self.should_debug_print_interaction_events:
+            print(f'Spike3DRasterWindowWidget.wheelEvent(...)')
+            # self.x = self.x + event.delta()/120
+            # print self.x
+            # self.label.setText("Total Steps: "+QString.number(self.x))        
+            print(f'\t wheelEvent(event: {event}')
+    
+
+    ########################################################
+    ## For Key Press Events:
+    ########################################################
+
+    ##-----------------------------------------
+    def keyPressEvent(self, event):
+        if self.should_debug_print_interaction_events:
+            print(f'pressed from Spike3DRasterWindowWidget.keyPressEvent(event): {event.key()}')
+            print(f'\t event.modifiers(): {event.modifiers()}')
+            # e.Modifiers()
+            print('event received @ Spike3DRasterWindowWidget')
+        super(Spike3DRasterWindowWidget, self).keyPressEvent(event)
+        if self.should_debug_print_interaction_events:
+            if event.key() == QtCore.Qt.Key_Space:
+                print(f'\t detected event: {event.key()}')
+            elif event.key() == QtCore.Qt.Key_0:
+                print(f'\t detected event: {event.key()}')
+            else:
+                print(f'\t undetected event')
+        # self.keyPressed.emit(event)
+
+    ##-----------------------------------------
+    ###################################
+    #### EVENT HANDLERS
+    ##################################
+    def closeEvent(self, event):
+        """closeEvent(self, event): pyqt default event, doesn't have to be registered. Called when the widget will close.
+        """
+        if self.enable_window_close_confirmation:
+            reply = QtWidgets.QMessageBox.question(self, 'Window Close', 'Are you sure you want to close the window?',
+                    QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.No)
+        else:
+            reply = QtWidgets.QMessageBox.Yes
+            
+        if reply == QtWidgets.QMessageBox.Yes:
+            self.GlobalConnectionManagerAccessingMixin_on_destroy() # call destroy to tear down the registered children for the global connection mannager
+            self.deleteLater() # schedule the object for deletion
+            event.accept()
+            print('Window closed')
+        else:
+            event.ignore()
+            
 
 
 # ==================================================================================================================== #
