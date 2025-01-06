@@ -33,6 +33,7 @@ from pyphoplacecellanalysis.GUI.Qt.Mixins.ComboBoxMixins import KeysListAccessin
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.LoggingOutputWidget.LoggingOutputWidget import LoggingOutputWidget
+from pyphocorehelpers.DataStructure.logging_data_structures import LoggingBaseClass, LoggingBaseClassLoggerOwningMixin
 
 
 """ TODO: Refactor from pyphoplacecellanalysis\GUI\PyQtPlot\Widgets\Mixins\RenderWindowControlsMixin.py
@@ -85,6 +86,7 @@ standalone_extra_controls = [self.ui.btnHelp]
 path = os.path.dirname(os.path.abspath(__file__))
 uiFile = os.path.join(path, 'Spike3DRasterBottomPlaybackControlBarBase.ui')
 
+@metadata_attributes(short_name=None, tags=['logging', 'widget'], input_requires=[], output_provides=[], uses=['LoggingOutputWidget', 'LoggingBaseClass'], used_by=[], creation_date='2025-01-06 12:04', related_items=[])
 class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
     """ A playback bar with buttons loaded from a Qt .ui file. """
     # _logger = None  # ensure the attribute exists at class scope
@@ -109,11 +111,10 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
     series_add_pressed = QtCore.pyqtSignal()
 
     def __init__(self, parent=None):
-        super().__init__(parent=parent) # Call the inherited classes __init__ method
-        # Spike3DRasterBottomPlaybackControlBarBase.__init__(self, parent=parent)
-        # QWidget.__init__(self, parent=parent)
+        # super().__init__(parent=parent) # Call the inherited classes __init__ method
+        QWidget.__init__(self, parent=parent)
         self.ui = uic.loadUi(uiFile, self) # Load the .ui file
-    
+        self.ui.connections = {} 
         # # Auto
         # self.ui = Ui_RootWidget()
         # self.ui.setupUi(self) # builds the design from the .ui onto this widget.
@@ -128,12 +129,11 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         """
         move_controls = [self.ui.btnSkipLeft, self.ui.btnLeft, self.ui.spinBoxFrameJumpMultiplier, self.ui.btnRight, self.ui.btnSkipRight] # , self.ui.horizontalSpacer_3
         # debug_log_controls = [self.ui.txtLogLine, self.ui.btnToggleExternalLogWindow]
+        standalone_extra_controls = [self.ui.btnHelp]
+        
+        controls_to_hide = [self.ui.slider_progress, self.ui.button_full_screen, self.ui.btnCurrentIntervals_Customize, *move_controls, *standalone_extra_controls]
 
-        controls_to_hide = [self.ui.button_full_screen, self.ui.btnCurrentIntervals_Customize, *move_controls]
-        # controls_to_hide = []
-        
-        self.ui.slider_progress.hide()
-        
+
         # Setup Button: Play/Pause
         self.ui.button_play_pause.setMinimumHeight(25)
         self.ui.button_play_pause.setMinimumWidth(30)
@@ -194,10 +194,17 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         
         # debug_log_controls _________________________________________________________________________________________________ #
         self.ui._attached_log_window = None
-        self._logger.sigLogUpdated.connect(self.on_log_updated)
+        self.ui.connections['_logger_sigLogUpdated'] = self._logger.sigLogUpdated.connect(self.on_log_updated)
+        self.ui.connections['_logger_sigLogUpdateFinished'] = self._logger.sigLogUpdateFinished.connect(self.on_log_update_finished)
+
+
         # debug_log_controls = [self.ui.txtLogLine, self.ui.btnToggleExternalLogWindow]
         self._format_button_toggle_log_window()
-        self.ui.btnToggleExternalLogWindow.pressed.connect(self.toggle_log_window)
+        self.ui.connections['btnToggleExternalLogWindow_pressed'] = self.ui.btnToggleExternalLogWindow.pressed.connect(self.toggle_log_window)
+
+        # Help/Utility Controls and Buttons __________________________________________________________________________________ #
+        self.ui.btnHelp.pressed.connect(self.on_help_button_pressed)
+        
 
 
     @function_attributes(short_name=None, tags=['format', 'button'], input_requires=[], output_provides=[], uses=[], used_by=['_format_button_reversed', '_format_button_toggle_log_window'], creation_date='2025-01-06 08:39', related_items=[])
@@ -220,18 +227,20 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
     def play_pause(self):
         # THIS IS NOT TRUE: the play_pause_model uses inverted logic, so we negate the current state value to determine if is_playing
         is_playing = self.ui.play_pause_model.getState()
-        # print(f'is_playing: {is_playing}')
+        self.log_print(f'is_playing: {is_playing}')
         self.play_pause_toggled.emit(is_playing)
 
     def on_jump_left(self):
         # Skip back some frames
         self.jump_left.emit()
+        self.log_print(f'on_jump_left()')
         # self.shift_animation_frame_val(-5)
         pass
 
     def on_jump_right(self):
         # Skip forward some frames
         self.jump_right.emit()
+        self.log_print(f'on_jump_left()')
         # self.shift_animation_frame_val(5)
         pass        
 
@@ -416,6 +425,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
     def on_rendered_intervals_list_changed(self, interval_list_owning_object):
         """ called when the list of rendered intervals changes """
         self.update_jump_target_series_options(interval_list_owning_object.list_all_rendered_intervals(debug_print=False))
+        self.log_print(f'on_rendered_intervals_list_changed(interval_list_owning_object: {interval_list_owning_object})')
 
     @pyqtExceptionPrintingSlot(str)
     def on_jump_combo_series_changed(self, series_name):
@@ -579,9 +589,18 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
 
     @pyqtExceptionPrintingSlot(object)
     def on_log_updated(self, logger):
-        print(f'on_log_updated(logger: {logger})')
+        print(f'Spike3DRasterBottomPlaybackControlBar.on_log_updated(logger: {logger})')
         # logger: LoggingBaseClass
         target_text: str = logger.get_flattened_log_text(flattening_delimiter='|', limit_to_n_most_recent=3)
+        self.ui.txtLogLine.setText(target_text)
+        ## don't need to update the connected window, as it will update itself
+        
+
+    @pyqtExceptionPrintingSlot()
+    def on_log_update_finished(self):
+        print(f'Spike3DRasterBottomPlaybackControlBar.on_log_update_finished()')
+        # logger: LoggingBaseClass
+        target_text: str = self.logger.get_flattened_log_text(flattening_delimiter='|', limit_to_n_most_recent=3)
         self.ui.txtLogLine.setText(target_text)
         ## don't need to update the connected window, as it will update itself
         
@@ -600,6 +619,9 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
             ## open a new one
             self.ui._attached_log_window = LoggingOutputWidget()
             self._logger.sigLogUpdated.connect(self.ui._attached_log_window.on_log_updated)
+            self.ui.connections['_attached_log_window'] = {'_logger_sigLogUpdated': self._logger.sigLogUpdated.connect(self.ui._attached_log_window.on_log_updated),
+                                                           '_logger_sigLogUpdateFinished': self._logger.sigLogUpdateFinished.connect(self.ui._attached_log_window.on_log_update_finished),
+            }
             self.ui._attached_log_window.show()
         else:
             print(f'hide.')
@@ -607,19 +629,30 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
 
         self._format_button_toggle_log_window()
 
-
-    def add_log_line(self, new_line: str, allow_split_newlines: bool = True):
+    @function_attributes(short_name=None, tags=['logging'], input_requires=[], output_provides=[], uses=[], used_by=['add_log_lines'], creation_date='2025-01-06 11:26', related_items=[])
+    def add_log_line(self, new_line: str, allow_split_newlines: bool = True, defer_log_changed_event:bool=False):
         """ adds an additional entry to the log """
-        self.logger.add_log_line(new_line=new_line, allow_split_newlines=allow_split_newlines)
+        print(f'.add_log_line(...): self.logger: {self.logger.get_flattened_log_text()}')
+        self.logger.add_log_line(new_line=new_line, allow_split_newlines=allow_split_newlines, defer_log_changed_event=defer_log_changed_event)
             
-    def add_log_lines(self, new_lines: List[str], allow_split_newlines: bool = True):
+    @function_attributes(short_name=None, tags=['logging'], input_requires=[], output_provides=[], uses=['add_log_line'], used_by=['log_print'], creation_date='2025-01-06 11:26', related_items=[])
+    def add_log_lines(self, new_lines: List[str], allow_split_newlines: bool = True, defer_log_changed_event:bool=False):
         """ adds an additional entries to the log """
-        self.logger.add_log_lines(new_lines=new_lines, allow_split_newlines=allow_split_newlines)
+        print(f'.add_log_lines(...): self.logger: {self.logger.get_flattened_log_text()}')
+        self.logger.add_log_lines(new_lines=new_lines, allow_split_newlines=allow_split_newlines, defer_log_changed_event=defer_log_changed_event)
                     
+    @function_attributes(short_name=None, tags=['logging', 'print'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-06 11:25', related_items=[])
     def log_print(self, *args):
         """ adds an additional entry to the log """
         print(*args)
-        self.add_log_lines(new_lines=args)
+        self.add_log_lines(new_lines=args, defer_log_changed_event=False)
+
+
+    # ==================================================================================================================== #
+    # Help/Utility Buttons                                                                                                 #
+    # ==================================================================================================================== #
+    def on_help_button_pressed(self):
+        self.log_print(f'on_help_button_pressed()')
         
 
 
@@ -642,11 +675,12 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
                 self.time_edit.clearFocus()  # Finalize and lose focus
                 return True  # Mark event as handled
             
+        print(f'.eventFilter(source: {source}, event: {event})')
         return super().eventFilter(source, event)
     
 
     
-class SpikeRasterBottomFrameControlsMixin:
+class SpikeRasterBottomFrameControlsMixin(LoggingBaseClassLoggerOwningMixin):
     """ renders the UI controls for the Spike3DRaster_Vedo class 
         Follows Conventions outlined in ModelViewMixin Conventions.md
         
@@ -691,33 +725,6 @@ class SpikeRasterBottomFrameControlsMixin:
     def SpikeRasterBottomFrameControlsMixin_on_buildUI(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         # CALLED:
-        
-        # controls_frame = QtWidgets.QFrame()
-        # controls_layout = QtWidgets.QHBoxLayout() # H-box layout
-        
-        # # controls_layout = QtWidgets.QGridLayout()
-        # # controls_layout.setContentsMargins(0, 0, 0, 0)
-        # # controls_layout.setVerticalSpacing(0)
-        # # controls_layout.setHorizontalSpacing(0)
-        # # controls_layout.setStyleSheet("background : #1B1B1B; color : #727272")
-        
-        # # Set-up the rest of the Qt window
-        # button = QtWidgets.QPushButton("My Button makes the cone red")
-        # button.setToolTip('This is an example button')
-        # button.clicked.connect(self.onClick)
-        # controls_layout.addWidget(button)
-        
-        # button2 = QtWidgets.QPushButton("<")
-        # button2.setToolTip('<')
-        # # button2.clicked.connect(self.onClick)
-        # controls_layout.addWidget(button2)
-        
-        # button3 = QtWidgets.QPushButton(">")
-        # button3.setToolTip('>')
-        # controls_layout.addWidget(button3)
-        
-        # # Set Final Layouts:
-        # controls_frame.setLayout(controls_layout)
         
         controls_frame = Spike3DRasterBottomPlaybackControlBar() # Initialize new controls class from the Spike3DRasterBottomPlaybackControlBar class.
         controls_layout = controls_frame.layout() # Get the layout
@@ -787,7 +794,10 @@ class SpikeRasterBottomFrameControlsMixin:
     #     pass
 
 
-
+    # ==================================================================================================================== #
+    # LoggingBaseClassLoggerOwningMixin Implementation                                                                     #
+    # ==================================================================================================================== #
+    
 
 
 ## Start Qt event loop

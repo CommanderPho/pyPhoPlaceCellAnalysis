@@ -84,6 +84,9 @@ selection-background-color: rgb(75, 83, 65);
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
         </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::Preferred</enum>
+        </property>
         <property name="sizeHint" stdset="0">
          <size>
           <width>40</width>
@@ -109,6 +112,9 @@ selection-background-color: rgb(75, 83, 65);
        <spacer name="horizontalSpacer">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::Preferred</enum>
         </property>
         <property name="sizeHint" stdset="0">
          <size>
@@ -847,6 +853,12 @@ QDoubleSpinBox::down-arrow {
             <iconset resource="../../../Resources/ActionIcons.qrc">
              <normaloff>:/Icons/Icons/Icon/JumpToNext.png</normaloff>:/Icons/Icons/Icon/JumpToNext.png</iconset>
            </property>
+           <property name="iconSize">
+            <size>
+             <width>24</width>
+             <height>24</height>
+            </size>
+           </property>
            <property name="shortcut">
             <string>Return</string>
            </property>
@@ -895,6 +907,9 @@ QDoubleSpinBox::down-arrow {
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
         </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::Preferred</enum>
+        </property>
         <property name="sizeHint" stdset="0">
          <size>
           <width>40</width>
@@ -921,6 +936,9 @@ QDoubleSpinBox::down-arrow {
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
         </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::Preferred</enum>
+        </property>
         <property name="sizeHint" stdset="0">
          <size>
           <width>40</width>
@@ -933,6 +951,9 @@ QDoubleSpinBox::down-arrow {
        <spacer name="horizontalSpacer_4">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::Preferred</enum>
         </property>
         <property name="sizeHint" stdset="0">
          <size>
@@ -955,6 +976,16 @@ QDoubleSpinBox::down-arrow {
         </property>
         <property name="text">
          <string>SpeedBurst</string>
+        </property>
+        <property name="icon">
+         <iconset resource="../../../Resources/ActionIcons.qrc">
+          <normaloff>:/Icons/Icons/actions/nos-nitrous-oxide-white.png</normaloff>:/Icons/Icons/actions/nos-nitrous-oxide-white.png</iconset>
+        </property>
+        <property name="iconSize">
+         <size>
+          <width>24</width>
+          <height>24</height>
+         </size>
         </property>
         <property name="checkable">
          <bool>true</bool>
@@ -1071,6 +1102,9 @@ QDoubleSpinBox::down-arrow {
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
         </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::Preferred</enum>
+        </property>
         <property name="sizeHint" stdset="0">
          <size>
           <width>40</width>
@@ -1156,8 +1190,27 @@ QDoubleSpinBox::down-arrow {
         <property name="toolTip">
          <string notr="true">Speed up the playback</string>
         </property>
-        <property name="text">
+        <property name="statusTip">
          <string>Speed Up</string>
+        </property>
+        <property name="whatsThis">
+         <string>Speed Up</string>
+        </property>
+        <property name="accessibleName">
+         <string>Speed Up</string>
+        </property>
+        <property name="text">
+         <string/>
+        </property>
+        <property name="icon">
+         <iconset resource="../../../Resources/ActionIcons.qrc">
+          <normaloff>:/Icons/Icons/actions/fast-download-white.png</normaloff>:/Icons/Icons/actions/fast-download-white.png</iconset>
+        </property>
+        <property name="iconSize">
+         <size>
+          <width>24</width>
+          <height>24</height>
+         </size>
         </property>
         <property name="shortcut">
          <string>Ctrl+=</string>
@@ -1168,6 +1221,9 @@ QDoubleSpinBox::down-arrow {
        <spacer name="horizontalSpacer_5">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::Preferred</enum>
         </property>
         <property name="sizeHint" stdset="0">
          <size>
@@ -1224,8 +1280,27 @@ QDoubleSpinBox::down-arrow {
         <property name="toolTip">
          <string notr="true">Slow down the playback</string>
         </property>
-        <property name="text">
+        <property name="statusTip">
          <string>Slow Down</string>
+        </property>
+        <property name="whatsThis">
+         <string>Slow Down</string>
+        </property>
+        <property name="accessibleName">
+         <string>Slow Down</string>
+        </property>
+        <property name="text">
+         <string/>
+        </property>
+        <property name="icon">
+         <iconset resource="../../../Resources/ActionIcons.qrc">
+          <normaloff>:/Icons/Icons/actions/slow-download-white.png</normaloff>:/Icons/Icons/actions/slow-download-white.png</iconset>
+        </property>
+        <property name="iconSize">
+         <size>
+          <width>24</width>
+          <height>24</height>
+         </size>
         </property>
         <property name="shortcut">
          <string>Ctrl+S</string>
@@ -1293,6 +1368,18 @@ QSpinBox::hover {
           <height>25</height>
          </size>
         </property>
+        <property name="toolTip">
+         <string>Toggle Reversal of the action direction</string>
+        </property>
+        <property name="statusTip">
+         <string>Reverse</string>
+        </property>
+        <property name="whatsThis">
+         <string>Reverse</string>
+        </property>
+        <property name="accessibleName">
+         <string>Reverse</string>
+        </property>
         <property name="styleSheet">
          <string notr="true">color: rgb(255, 255, 255);
 selection-color: rgb(85, 170, 255);
@@ -1301,7 +1388,17 @@ background-color: rgb(65, 60, 54);
 alternate-background-color: rgb(222, 222, 222);</string>
         </property>
         <property name="text">
-         <string>Reverse</string>
+         <string/>
+        </property>
+        <property name="icon">
+         <iconset resource="../../../Resources/ActionIcons.qrc">
+          <normaloff>:/Icons/Icons/actions/clock-rollback-white.png</normaloff>:/Icons/Icons/actions/clock-rollback-white.png</iconset>
+        </property>
+        <property name="iconSize">
+         <size>
+          <width>20</width>
+          <height>20</height>
+         </size>
         </property>
         <property name="checkable">
          <bool>true</bool>
@@ -1312,6 +1409,9 @@ alternate-background-color: rgb(222, 222, 222);</string>
        <spacer name="horizontalSpacer_6">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::Preferred</enum>
         </property>
         <property name="sizeHint" stdset="0">
          <size>
@@ -1351,9 +1451,15 @@ alternate-background-color: rgb(222, 222, 222);</string>
           <height>0</height>
          </size>
         </property>
+        <property name="maximumSize">
+         <size>
+          <width>1000</width>
+          <height>16777215</height>
+         </size>
+        </property>
         <property name="baseSize">
          <size>
-          <width>200</width>
+          <width>800</width>
           <height>0</height>
          </size>
         </property>
