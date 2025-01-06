@@ -42,7 +42,7 @@ class Spike3DRasterLeftSidebarControlBar(QtWidgets.QWidget):
         self.ui.spinRenderWindowDuration.sigValueChanged.connect(self.render_window_duration_valueChanged)
              
  
-    @QtCore.Slot(object)
+    @pyqtExceptionPrintingSlot(object)
     def animation_time_step_valueChanged(self, sb):
         # print(f'sb: {sb}, sb.value(): {str(sb.value())}')
         # old_value = self.animation_time_step
@@ -51,7 +51,7 @@ class Spike3DRasterLeftSidebarControlBar(QtWidgets.QWidget):
         # self.animation_time_step = 
         # changedLabel.setText("Final value: %s" % str(sb.value()))
     
-    @QtCore.Slot(object)
+    @pyqtExceptionPrintingSlot(object)
     def temporal_zoom_factor_valueChanged(self, sb):
         # print(f'sb: {sb}, sb.value(): {str(sb.value())}')
         # old_value = self.temporal_zoom_factor
@@ -64,14 +64,14 @@ class Spike3DRasterLeftSidebarControlBar(QtWidgets.QWidget):
         # self.ui.verticalSliderZoom.setValue(slider_int_val)
         # self.ui.verticalSliderZoom.blockSignals(False) # done
                 
-    @QtCore.Slot(object)
+    @pyqtExceptionPrintingSlot(object)
     def render_window_duration_valueChanged(self, sb):
         # print(f'sb: {sb}, sb.value(): {str(sb.value())}')
         # old_value = self.render_window_duration
         self.render_window_duration_changed.emit(sb.value())
         # self.render_window_duration = 
         
-    @QtCore.Slot(int)
+    @pyqtExceptionPrintingSlot(int)
     def temporal_zoom_slider_valueChanged(self, int_slider_val):
         # print(f'sb: {sb}, sb.value(): {str(sb.value())}')
         print(f'temporal_zoom_slider_valueChanged({int_slider_val})')
@@ -91,29 +91,29 @@ class SpikeRasterLeftSidebarControlsMixin:
         
         Implementors must have:
     
-            @QtCore.Slot(float)
+            @pyqtExceptionPrintingSlot(float)
             def on_animation_timestep_valueChanged(self, updated_val)
             
-            @QtCore.Slot(float)
+            @pyqtExceptionPrintingSlot(float)
             def on_temporal_zoom_factor_valueChanged(self, updated_val)
         
-            @QtCore.Slot(float)
+            @pyqtExceptionPrintingSlot(float)
             def on_render_window_duration_valueChanged(self, updated_val)
         
         Currently used in Spike3DRasterWindowWidget to implement the left sidebar
     """
     
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def SpikeRasterLeftSidebarControlsMixin_on_init(self):
         """ perform any parameters setting/checking during init """
         pass
 
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def SpikeRasterLeftSidebarControlsMixin_on_setup(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         pass
     
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def SpikeRasterLeftSidebarControlsMixin_connectSignals(self, left_side_bar_controls):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         left_side_bar_connections = []
@@ -123,7 +123,7 @@ class SpikeRasterLeftSidebarControlsMixin:
         return left_side_bar_connections
         
             
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def SpikeRasterLeftSidebarControlsMixin_on_buildUI(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         # CALLED:
@@ -146,13 +146,13 @@ class SpikeRasterLeftSidebarControlsMixin:
         left_side_bar_controls.ui.spinRenderWindowDuration.blockSignals(False)
         
         
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def SpikeRasterLeftSidebarControlsMixin_on_destroy(self):
         """ perfrom teardown/destruction of anything that needs to be manually removed or released """
         # TODO: NOT CALLED
         pass
 
-    @QtCore.Slot(float, float)
+    @pyqtExceptionPrintingSlot(float, float)
     def SpikeRasterLeftSidebarControlsMixin_on_window_update(self, new_start=None, new_end=None):
         """ called to perform updates when the active window changes. Redraw, recompute data, etc. """
         # Called in the Implementor's update_window(...) function
