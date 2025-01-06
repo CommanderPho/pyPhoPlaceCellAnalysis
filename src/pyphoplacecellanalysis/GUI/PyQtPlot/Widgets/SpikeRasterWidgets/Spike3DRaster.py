@@ -14,7 +14,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GLGraphicsItems.GLDebugAxisItem
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GLGraphicsItems.GLViewportOverlayPainterItem import GLViewportOverlayPainterItem
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.SpikeRasterBase import SpikeRasterBase
-
+from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.RenderTimeEpoch3DMeshesMixin import RenderTimeEpoch3DMeshesMixin
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.RenderTimeCurvesMixin import PyQtGraphSpecificTimeCurvesMixin
@@ -477,7 +477,7 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpoch3DMeshesMix
     #### EVENT HANDLERS
     ##################################
     
-    @QtCore.pyqtSlot()
+    @pyqtExceptionPrintingSlot()
     def on_adjust_temporal_spatial_mapping(self):
         """ called when the spatio-temporal mapping property is changed.
         
@@ -618,13 +618,13 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpoch3DMeshesMix
 
         
     # unit_sort_order_changed_signal
-    @QtCore.pyqtSlot(object)
+    @pyqtExceptionPrintingSlot(object)
     def on_unit_sort_order_changed(self, new_sort_order):
         print(f'unit_sort_order_changed_signal(new_sort_order: {new_sort_order})')        
         self.update(sort_changed=True, colors_changed=False)
 
 
-    @QtCore.pyqtSlot(object)
+    @pyqtExceptionPrintingSlot(object)
     def on_neuron_colors_changed(self, neuron_id_color_update_dict):
         """ Called when the neuron colors have finished changing (changed) to update the rendered elements.
         """
