@@ -9,11 +9,11 @@ on:
       start_date:
         description: "Start date for the action"
         required: true
-        default: "2023-01-01"
+        default: "2024-12-29"
       end_date:
         description: "End date for the action"
         required: true
-        default: "2023-01-31"
+        default: "2025-01-06"
 
 jobs:
   summarize_changes:
