@@ -230,7 +230,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         self.unit_sort_order_changed_signal.connect(self.on_unit_sort_order_changed)
 
         self.EpochRenderingMixin_on_init()
-        
+
         if self.enable_show_on_init:
             self.show()
             

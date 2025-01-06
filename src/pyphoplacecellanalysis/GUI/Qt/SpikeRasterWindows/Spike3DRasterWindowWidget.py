@@ -381,6 +381,9 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             connections = {}
             connections['LiveWindowEventIntervalMonitoringMixin_entered'] = self.ui.spike_raster_plt_2d.sigOnIntervalEnteredWindow.connect(self.on_visible_event_intervals_added)
             connections['LiveWindowEventIntervalMonitoringMixin_exited'] = self.ui.spike_raster_plt_2d.sigOnIntervalExitedindow.connect(self.on_visible_event_intervals_removed)
+            self.ui.bottom_bar_connections.append(connections['LiveWindowEventIntervalMonitoringMixin_entered'])
+            self.ui.bottom_bar_connections.append(connections['LiveWindowEventIntervalMonitoringMixin_exited'])
+        # END if self.ui.spike_raster_plt_2d is not None
             
 
         # Set Window Title Options:
