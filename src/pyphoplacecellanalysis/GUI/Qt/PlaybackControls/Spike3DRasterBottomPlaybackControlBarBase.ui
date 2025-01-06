@@ -1386,9 +1386,6 @@ alternate-background-color: rgb(222, 222, 222);</string>
         <property name="checkable">
          <bool>true</bool>
         </property>
-        <property name="checked">
-         <bool>false</bool>
-        </property>
        </widget>
       </item>
      </layout>

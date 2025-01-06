@@ -1,6 +1,7 @@
 # Spike3DRasterBottomPlaybackControlBar.py
 # Generated from c:\Users\pho\repos\pyPhoPlaceCellAnalysis\src\pyphoplacecellanalysis\GUI\Qt\PlaybackControls\Spike3DRasterBottomPlaybackControlBar.ui automatically by PhoPyQtClassGenerator VSCode Extension
 import sys
+import os
 from datetime import datetime, timezone, timedelta
 import numpy as np
 from enum import Enum
@@ -31,6 +32,8 @@ from pyphoplacecellanalysis.GUI.Qt.Mixins.ComboBoxMixins import KeysListAccessin
 from pyphoplacecellanalysis.GUI.Qt.PlaybackControls.Spike3DRasterBottomPlaybackControlBarBase import Spike3DRasterBottomPlaybackControlBarBase
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.LoggingOutputWidget.LoggingOutputWidget import LoggingOutputWidget
+
 
 """ TODO: Refactor from pyphoplacecellanalysis\GUI\PyQtPlot\Widgets\Mixins\RenderWindowControlsMixin.py
 
@@ -78,10 +81,13 @@ standalone_extra_controls = [self.ui.btnHelp]
 
 
 """
+## Define the .ui file path
+path = os.path.dirname(os.path.abspath(__file__))
+uiFile = os.path.join(path, 'Spike3DRasterBottomPlaybackControlBarBase.ui')
 
-
-class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRasterBottomPlaybackControlBarBase):
+class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
     """ A playback bar with buttons loaded from a Qt .ui file. """
+    _logger = None  # ensure the attribute exists at class scope
     
     play_pause_toggled = QtCore.pyqtSignal(bool) # returns bool indicating whether is_playing
     jump_left = QtCore.pyqtSignal()
@@ -111,8 +117,11 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
         self._logger = value
 
     def __init__(self, parent=None):
-        super().__init__(parent=parent) # Call the inherited classes __init__ method
-        
+        # super().__init__(parent=parent) # Call the inherited classes __init__ method
+        # Spike3DRasterBottomPlaybackControlBarBase.__init__(self, parent=parent)
+        QWidget.__init__(self, parent=parent)
+        self.ui = uic.loadUi(uiFile, self) # Load the .ui file
+    
         # # Auto
         # self.ui = Ui_RootWidget()
         # self.ui.setupUi(self) # builds the design from the .ui onto this widget.
@@ -125,8 +134,8 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
     def initUI(self):
         """ setup the UI
         """
-        move_controls = [self.ui.btnSkipLeft, self.ui.btnLeft, self.ui.spinBoxFrameJumpMultiplier, self.ui.btnRight, self.ui.btnSkipRight, self.ui.horizontalSpacer_3]
-        debug_log_controls = [self.ui.txtLogLine, self.ui.btnToggleExternalLogWindow]
+        move_controls = [self.ui.btnSkipLeft, self.ui.btnLeft, self.ui.spinBoxFrameJumpMultiplier, self.ui.btnRight, self.ui.btnSkipRight] # , self.ui.horizontalSpacer_3
+        # debug_log_controls = [self.ui.txtLogLine, self.ui.btnToggleExternalLogWindow]
 
         controls_to_hide = [self.ui.button_full_screen, self.ui.self.ui.btnCurrentIntervals_Customize, *move_controls]
         
@@ -566,13 +575,13 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
     # ==================================================================================================================== #
     # debug_log_controls = [self.ui.txtLogLine, self.ui.btnToggleExternalLogWindow]
 
-    @property
-    def attached_log_window(self):
-        """The attached_log_window property."""
-        return self._attached_log_window
-    @attached_log_window.setter
-    def attached_log_window(self, value):
-        self._attached_log_window = value    
+    # @property
+    # def attached_log_window(self):
+    #     """The attached_log_window property."""
+    #     return self._attached_log_window
+    # @attached_log_window.setter
+    # def attached_log_window(self, value):
+    #     self._attached_log_window = value    
 
     @pyqtExceptionPrintingSlot(object)
     def on_log_updated(self, logger):
@@ -589,10 +598,15 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, Spike3DRast
 
     def toggle_log_window(self):
         # self.ui.btnToggleExternalLogWindow.
-        if self.ui._attached_log_window is None:
+        is_external_window_opened: bool = self.ui.btnToggleExternalLogWindow
+        print(f'is_external_window_opened: {is_external_window_opened}')
+        if (self.ui._attached_log_window is None) and (is_external_window_opened):
             ## open a new one
-            self.ui._attached_log_window = 
-
+            self.ui._attached_log_window = LoggingOutputWidget(parent=self)
+            self.ui._attached_log_window.show()
+        else:
+            print(f'hide.')
+            self.ui._attached_log_window.hide()
 
         self._format_button_toggle_log_window()
 
