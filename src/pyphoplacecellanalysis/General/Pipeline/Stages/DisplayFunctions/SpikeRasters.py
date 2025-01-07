@@ -85,7 +85,7 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
 
     ## 2D Controlled 3D Raster Plots:
 
-    @function_attributes(short_name='spike_rasters_pyqtplot_3D_with_2D_controls', tags=['display','interactive', 'raster', '2D', 'ui', '3D', 'pyqtplot'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-11 03:05')
+    @function_attributes(short_name='spike_rasters_pyqtplot_3D_with_2D_controls', tags=['display','interactive', 'raster', '2D', 'ui', '3D', 'pyqtplot'], input_requires=[], output_provides=[], uses=['LocalMenus_AddRenderable.add_renderable_context_menu'], used_by=[], creation_date='2023-04-11 03:05')
     @staticmethod
     def _display_spike_rasters_pyqtplot_3D_with_2D_controls(computation_result, active_config, enable_saving_to_disk=False, **kwargs):
         """ Plots a standalone 3D raster plot (via pyqtgraph) with a separate 2D raster plot as the window with which you can adjust the viewed window. 
@@ -102,7 +102,7 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         return {'spike_raster_plt_2d':spike_raster_plt_2d, 'spike_raster_plt_3d':spike_raster_plt_3d, 'spike_3d_to_2d_window_connection':spike_3d_to_2d_window_connection, 'spike_raster_window': spike_raster_window}
 
 
-    @function_attributes(short_name='spike_rasters_vedo_3D_with_2D_controls', tags=['display','interactive', 'raster', '2D', 'ui', '3D', 'vedo'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-11 03:05')
+    @function_attributes(short_name='spike_rasters_vedo_3D_with_2D_controls', tags=['display','interactive', 'raster', '2D', 'ui', '3D', 'vedo'], input_requires=[], output_provides=[], uses=['LocalMenus_AddRenderable.add_renderable_context_menu'], used_by=[], creation_date='2023-04-11 03:05')
     @staticmethod
     def _display_spike_rasters_vedo_3D_with_2D_controls(computation_result, active_config, enable_saving_to_disk=False, **kwargs):
         """ Plots a standalone 3D raster plot (via Vedo) with a separate 2D raster plot as the window with which you can adjust the viewed window. 
@@ -1484,6 +1484,9 @@ def _build_additional_spikeRaster2D_menus(spike_raster_plt_2d, owning_pipeline_r
     # _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.add_renderable_context_menu(spike_raster_window.spike_raster_plt_2d, computation_result.sess)  # Adds the custom context menus for SpikeRaster2D
     
     _active_2d_plot_renderable_menus = LocalMenus_AddRenderable.add_renderable_context_menu(spike_raster_plt_2d, owning_pipeline_reference, active_config_name)  # Adds the custom context menus for SpikeRaster2D
+    
+    # spike_raster_plt_2d.menu_action_history_list = []
+    
     output_references = [_active_2d_plot_renderable_menus]
     return output_references
 
@@ -1493,8 +1496,16 @@ def _build_additional_window_menus(spike_raster_window, owning_pipeline_referenc
     assert owning_pipeline_reference is not None
     active_config_name: str = _recover_filter_config_name_from_display_context(owning_pipeline_reference, active_display_fn_identifying_ctx) # recover active_config_name from the context
 
+    # if not spike_raster_window.ui.has_attr('_menu_action_history_list'):
+    #     spike_raster_window.ui._menu_action_history_list = [] ## a list to show the history
+
+    spike_raster_window.menu_action_history_list = []
+
+
     ## SpikeRaster2D Specific Items:
     output_references = _build_additional_spikeRaster2D_menus(spike_raster_window.spike_raster_plt_2d, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx)
+
+    spike_raster_window.menu_action_history_list = []
 
     ## Note that curr_main_menu_window is usually not the same as spike_raster_window, instead curr_main_menu_window wraps it and produces the final output window
     curr_main_menu_window, menuConnections, connections_actions_dict = ConnectionControlsMenuMixin.try_add_connections_menu(spike_raster_window)

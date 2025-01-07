@@ -630,6 +630,26 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         The two representational formats are:
             1. 
     
+            
+            
+    WARNING/BUGS/LIMITATIONS: when there's only one bin in epoch, `time_bin_edges` has a drastically wrong number of elements (e.g. len (30, )) while `time_window_centers` is right
+        Workaround: can be fixed with the following code:
+    
+        n_time_bins: int = a_result.nbins[an_epoch_idx]
+        time_window_centers = a_result.time_window_centers[an_epoch_idx]
+        time_bin_edges = a_result.time_bin_edges[an_epoch_idx] # (30, )
+        
+        if (n_time_bins == 1) and (len(time_window_centers) == 1):
+            ## fix time_bin_edges -- it has been noticed when there's only one bin, `time_bin_edges` has a drastically wrong number of elements (e.g. len (30, )) while `time_window_centers` is right.
+            if len(time_bin_edges) != 2:
+                ## fix em
+                time_bin_container = a_result.time_bin_containers[an_epoch_idx]
+                time_bin_edges = np.array(list(time_bin_container.center_info.variable_extents))
+                assert len(time_bin_edges) == 2, f"tried to fix but FAILED!"
+                # print(f'fixed time_bin_edges: {time_bin_edges}')
+
+                
+            
     Usage:
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 
@@ -880,7 +900,11 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         subset.marginal_y_list = [subset.marginal_y_list[i] for i in old_fashioned_indicies]
         subset.most_likely_position_indicies_list = [subset.most_likely_position_indicies_list[i] for i in old_fashioned_indicies]
         subset.spkcount = [subset.spkcount[i] for i in old_fashioned_indicies]
-        subset.nbins = subset.nbins[old_fashioned_indicies] # can be subset because it's an ndarray. `IndexError: arrays used as indices must be of integer (or boolean) type`: occurs because when it is empty it seems to default to float64 dtype
+        if len(old_fashioned_indicies) > 0:
+            subset.nbins = subset.nbins[old_fashioned_indicies] # can be subset because it's an ndarray. `IndexError: arrays used as indices must be of integer (or boolean) type`: occurs because when it is empty it seems to default to float64 dtype
+        else:    
+            subset.nbins = [] # empty list
+        
         subset.time_bin_containers = [subset.time_bin_containers[i] for i in old_fashioned_indicies]
         subset.num_filter_epochs = len(included_epoch_indicies)
         subset.time_bin_edges = [subset.time_bin_edges[i] for i in old_fashioned_indicies]
@@ -970,20 +994,26 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
 
 
     @function_attributes(short_name=None, tags=['marginal', 'direction', 'track_id'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-08 00:40', related_items=[]) 
-    def compute_marginals(self, epoch_idx_col_name: str = 'lap_idx', epoch_start_t_col_name: str = 'lap_start_t', additional_transfer_column_names: Optional[List[str]]=None, auto_transfer_all_columns:bool=True): # -> tuple[tuple["DecodedMarginalResultTuple", "DecodedMarginalResultTuple", Tuple[List[DynamicContainer], Any, Any, pd.DataFrame]], pd.DataFrame]:
+    @classmethod
+    def perform_compute_marginals(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, "DecodedFilterEpochsResult"], filter_epochs: pd.DataFrame, epoch_idx_col_name: str = 'lap_idx', epoch_start_t_col_name: str = 'lap_start_t', additional_transfer_column_names: Optional[List[str]]=None, auto_transfer_all_columns:bool=True): # -> tuple[tuple["DecodedMarginalResultTuple", "DecodedMarginalResultTuple", Tuple[List[DynamicContainer], Any, Any, pd.DataFrame]], pd.DataFrame]:
         """Computes and initializes the marginal properties
         
         (epochs_directional_marginals_tuple, epochs_track_identity_marginals_tuple, epochs_non_marginalized_decoder_marginals_tuple), epochs_marginals_df = a_result.compute_marginals(additional_transfer_column_names=['start','stop','label','duration','lap_id','lap_dir'])
+        epochs_directional_marginals, epochs_directional_all_epoch_bins_marginal, epochs_most_likely_direction_from_decoder, epochs_is_most_likely_direction_LR_dir  = epochs_directional_marginals_tuple
+        epochs_track_identity_marginals, epochs_track_identity_all_epoch_bins_marginal, epochs_most_likely_track_identity_from_decoder, epochs_is_most_likely_track_identity_Long = epochs_track_identity_marginals_tuple
+        non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df = epochs_non_marginalized_decoder_marginals_tuple
+        
+        
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
         
-        epochs_epochs_df: pd.DataFrame = ensure_dataframe(deepcopy(self.filter_epochs))
+        epochs_epochs_df: pd.DataFrame = ensure_dataframe(deepcopy(filter_epochs))
         
-        epochs_directional_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_directional_likelihoods(self)
+        epochs_directional_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_directional_likelihoods(filter_epochs_decoder_result)
         epochs_directional_marginals, epochs_directional_all_epoch_bins_marginal, epochs_most_likely_direction_from_decoder, epochs_is_most_likely_direction_LR_dir  = epochs_directional_marginals_tuple
-        epochs_track_identity_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(self)
+        epochs_track_identity_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(filter_epochs_decoder_result)
         epochs_track_identity_marginals, epochs_track_identity_all_epoch_bins_marginal, epochs_most_likely_track_identity_from_decoder, epochs_is_most_likely_track_identity_Long = epochs_track_identity_marginals_tuple
-        epochs_non_marginalized_decoder_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_non_marginalized_decoder_likelihoods(self, debug_print=False)
+        epochs_non_marginalized_decoder_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_non_marginalized_decoder_likelihoods(filter_epochs_decoder_result, debug_print=False)
         non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df = epochs_non_marginalized_decoder_marginals_tuple
                 
         ## Build combined marginals df:
@@ -1006,6 +1036,23 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         
         
         return (epochs_directional_marginals_tuple, epochs_track_identity_marginals_tuple, epochs_non_marginalized_decoder_marginals_tuple), epochs_marginals_df
+        
+
+
+    @function_attributes(short_name=None, tags=['marginal', 'direction', 'track_id'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-08 00:40', related_items=[]) 
+    def compute_marginals(self, epoch_idx_col_name: str = 'lap_idx', epoch_start_t_col_name: str = 'lap_start_t', additional_transfer_column_names: Optional[List[str]]=None, auto_transfer_all_columns:bool=True): # -> tuple[tuple["DecodedMarginalResultTuple", "DecodedMarginalResultTuple", Tuple[List[DynamicContainer], Any, Any, pd.DataFrame]], pd.DataFrame]:
+        """Computes and initializes the marginal properties
+        
+        (epochs_directional_marginals_tuple, epochs_track_identity_marginals_tuple, epochs_non_marginalized_decoder_marginals_tuple), epochs_marginals_df = a_result.compute_marginals(additional_transfer_column_names=['start','stop','label','duration','lap_id','lap_dir'])
+        epochs_directional_marginals, epochs_directional_all_epoch_bins_marginal, epochs_most_likely_direction_from_decoder, epochs_is_most_likely_direction_LR_dir  = epochs_directional_marginals_tuple
+        epochs_track_identity_marginals, epochs_track_identity_all_epoch_bins_marginal, epochs_most_likely_track_identity_from_decoder, epochs_is_most_likely_track_identity_Long = epochs_track_identity_marginals_tuple
+        non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df = epochs_non_marginalized_decoder_marginals_tuple
+        
+        
+        """
+        epochs_epochs_df: pd.DataFrame = ensure_dataframe(deepcopy(self.filter_epochs))
+        return self.perform_compute_marginals(filter_epochs_decoder_result=self, filter_epochs=epochs_epochs_df, epoch_idx_col_name=epoch_idx_col_name, epoch_start_t_col_name=epoch_start_t_col_name, additional_transfer_column_names=additional_transfer_column_names, auto_transfer_all_columns=auto_transfer_all_columns)
+
         
 
     @function_attributes(short_name=None, tags=['per_time_bin', 'marginals', 'IMPORTANT'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-09 07:06', related_items=[])

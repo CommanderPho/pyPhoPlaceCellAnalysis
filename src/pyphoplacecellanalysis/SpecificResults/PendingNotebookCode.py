@@ -49,6 +49,918 @@ from pyphocorehelpers.DataStructure.general_parameter_containers import Visualiz
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 # ==================================================================================================================== #
+# @ 2025-01-01 - Better Aggregation of Probabilities across bins                                                       #
+# ==================================================================================================================== #
+@metadata_attributes(short_name=None, tags=['aggregation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 00:00', related_items=[])
+class TimeBinAggregation:
+    """ 
+    
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import TimeBinAggregation, ParticleFilter
+    
+    
+    """
+    @function_attributes(short_name=None, tags=['NDArray', 'streak', 'sequence', 'probability', 'likelihood'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 14:00', related_items=[])
+    @classmethod
+    def compute_epoch_p_long_with_streaks(cls, p_long: List[float], min_probability_threshold: float = 0.5) -> float:
+        """ Prior to `compute_streak_weighted_p_long` version, which operates on dataframes
+        
+        
+        Computes the overall P_Long for an epoch, giving higher weight to uninterrupted streaks.
+        
+        Args:
+            p_long (List[float]): Probabilities of being in the "Long" state for each time bin.
+            threshold (float): Minimum probability to consider a bin as part of a streak. Default is 0.5.
+
+        Returns:
+            float: The overall P_Long for the epoch.
+            
+        Usage:
+            # Example usage
+            p_long = a_lap_df[a_var_name].to_numpy() # [0.8, 0.7, 0.2, 0.9, 0.95, 0.3, 0.85, 0.87, 0.86]
+            min_probability_threshold = 0.5  # Minimum probability to count as "Long"
+            overall_p_long = compute_epoch_p_long_with_streaks(p_long, min_probability_threshold)
+            print(f"Overall P_Long with streak weighting: {overall_p_long}")
+
+        """
+        streaks = []
+        current_streak = []
+        
+        # Identify streaks
+        for i, prob in enumerate(p_long):
+            if prob >= min_probability_threshold:
+                current_streak.append(i)
+            else:
+                if current_streak:
+                    streaks.append(current_streak)
+                    current_streak = []
+        if current_streak:  # Add the last streak if it ends at the last bin
+            streaks.append(current_streak)
+        
+        # Assign weights based on streak length (linearly)
+        weights = [0] * len(p_long)
+        for streak in streaks:
+            streak_length = len(streak)
+            for idx in streak:
+                weights[idx] = streak_length
+        
+        # Compute weighted average
+        weighted_sum = np.sum(w * p for w, p in zip(weights, p_long))
+        total_weight = np.sum(weights)
+        return weighted_sum / total_weight if total_weight > 0 else 0.0
+
+
+
+    @function_attributes(short_name=None, tags=['streak', 'sequence', 'dataframe', 'probability', 'likelihood'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 14:11', related_items=[])
+    @classmethod
+    def compute_streak_weighted_p_long(cls, df: pd.DataFrame, column: str, threshold: float = 0.5) -> float:
+        """
+        Computes the streak-weighted P_Long for a given DataFrame, giving higher weight to longer sequences of adjacent bins.
+        
+        Args:
+            df (pd.DataFrame): Input DataFrame containing the P_Long column.
+            column (str): The column name for P_Long.
+            threshold (float): Minimum probability to consider a bin as part of a streak. Default is 0.5.
+        
+        Returns:
+            float: The streak-weighted P_Long for the DataFrame.
+        """
+        p_long = df[column].values
+        streaks = []
+        current_streak = []
+        
+        # Identify streaks
+        for i, prob in enumerate(p_long):
+            if prob >= threshold:
+                current_streak.append(i)
+            else:
+                if current_streak:
+                    streaks.append(current_streak)
+                    current_streak = []
+        if current_streak:  # Add the last streak if it ends at the last bin
+            streaks.append(current_streak)
+        
+        # Assign weights based on streak length
+        weights = [0] * len(p_long)
+        for streak in streaks:
+            streak_length = len(streak)
+            for idx in streak:
+                weights[idx] = streak_length
+        
+        # Compute weighted average
+        weighted_sum = sum(w * p for w, p in zip(weights, p_long))
+        total_weight = sum(weights)
+        return weighted_sum / total_weight if total_weight > 0 else 0.0
+
+
+    @classmethod
+    def peak_rolling_avg(cls, df: pd.DataFrame, column: str, window: int=3, *args, **kwargs) -> float:
+        """
+        Computes the streak-weighted P_Long for a given DataFrame, giving higher weight to longer sequences of adjacent bins.
+        
+        Args:
+            df (pd.DataFrame): Input DataFrame containing the P_Long column.
+            column (str): The column name for P_Long.
+            threshold (float): Minimum probability to consider a bin as part of a streak. Default is 0.5.
+        
+        Returns:
+            float: The streak-weighted P_Long for the DataFrame.
+        """
+        return df[column].rolling(window, *args, **kwargs).max().max()
+
+@metadata_attributes(short_name=None, tags=['UNUSED', 'ChatGPT', 'aggregation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 00:00', related_items=['TimeBinAggregation'])
+class ParticleFilter:
+    """ Example:
+    
+        ## TEST
+        
+        # Example usage
+        def state_transition_func(particles):
+            # Example state transition function: simple linear motion.
+            return particles + 1  # Each state increases by 1
+
+        def measurement_func(state):
+            # Example measurement function: identity mapping.
+            return state
+
+
+            
+        num_particles = 1000
+        state_dim = 1
+        process_noise = 1.0
+        measurement_noise = 2.0
+
+        pf = ParticleFilter(num_particles, state_dim, process_noise, measurement_noise)
+
+        # Simulate a series of observations
+        # observations = np.array([5, 6, 7, 8, 9])
+        observations = a_lap_df[a_var_name].to_numpy()
+
+        for obs in observations:
+            pf.predict(state_transition_func)
+            pf.update(obs, measurement_func)
+            pf.resample()
+
+            estimated_state = pf.estimate()
+            print(f"Estimated State: {estimated_state}")
+
+            
+    """
+    def __init__(self, num_particles: int, state_dim: int, process_noise: float, measurement_noise: float):
+        """
+        Initialize the Particle Filter.
+
+        :param num_particles: Number of particles to use.
+        :param state_dim: Dimension of the state space.
+        :param process_noise: Standard deviation of process noise.
+        :param measurement_noise: Standard deviation of measurement noise.
+        """
+        self.num_particles = num_particles
+        self.state_dim = state_dim
+        self.process_noise = process_noise
+        self.measurement_noise = measurement_noise
+
+        # Initialize particles randomly within the state space
+        self.particles = np.random.rand(num_particles, state_dim)
+        self.weights = np.ones(num_particles) / num_particles
+
+    def predict(self, state_transition_func):
+        """
+        Predict the next state of each particle using the state transition function.
+
+        :param state_transition_func: A function to apply the state transition.
+        """
+        noise = np.random.normal(0, self.process_noise, size=(self.num_particles, self.state_dim))
+        self.particles = state_transition_func(self.particles) + noise
+
+    def update(self, observation: np.ndarray, measurement_func):
+        """
+        Update the particle weights based on the observation.
+
+        :param observation: The observed data.
+        :param measurement_func: A function to calculate the expected observation from a particle state.
+        """
+        for i in range(self.num_particles):
+            predicted_obs = measurement_func(self.particles[i])
+            error = observation - predicted_obs
+            likelihood = np.exp(-0.5 * np.sum(error**2) / self.measurement_noise**2)
+            self.weights[i] = likelihood
+
+        # Normalize weights to sum to 1
+        self.weights /= np.sum(self.weights)
+
+    def resample(self):
+        """
+        Resample particles based on their weights.
+        """
+        indices = np.random.choice(self.num_particles, self.num_particles, p=self.weights)
+        self.particles = self.particles[indices]
+        self.weights.fill(1.0 / self.num_particles)
+
+    def estimate(self) -> np.ndarray:
+        """
+        Estimate the state as the weighted mean of the particles.
+
+        :return: The estimated state.
+        """
+        return np.average(self.particles, weights=self.weights, axis=0)
+
+
+
+# ==================================================================================================================== #
+# 2024-12-31 - Decoder ID x Position                                                                                   #
+# ==================================================================================================================== #
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import CustomDecodeEpochsResult, MeasuredDecodedPositionComparison, DecodedFilterEpochsResult
+
+@metadata_attributes(short_name=None, tags=['validation', 'plot', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-02 09:10', related_items=[])
+class EstimationCorrectnessPlots:
+    """ 
+    
+    EstimationCorrectnessPlots.plot_estimation_correctness_vertical_stack(
+        _out_subset_decode_dfs_dict, 'binned_x_meas', 'estimation_correctness_track_ID'
+    )
+
+    # Example usage
+    # EstimationCorrectnessPlots.plot_estimation_correctness_bean_plot(
+    #     _out_subset_decode_dfs_dict, 'binned_x_meas', 'estimation_correctness_track_ID'
+    # )
+
+    """
+    @function_attributes(short_name=None, tags=['performance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 12:32', related_items=['build_lap_bin_by_bin_performance_analysis_df'])
+    def plot_estimation_correctness_with_raw_data(epochs_df: pd.DataFrame, x_col: str, y_col: str, extra_info_str: str=''):
+        """
+        Plots a bar plot with error bars for the mean and variability of a metric across bins,
+        overlayed with a swarm-like plot showing raw data points, ensuring proper alignment.
+        
+        Args:
+            epochs_df (pd.DataFrame): DataFrame containing the data.
+            x_col (str): Column name for the x-axis (binned variable).
+            y_col (str): Column name for the y-axis (metric to visualize).
+            
+        Usage:
+            # Example usage
+            EstimationCorrectnessPlots.plot_estimation_correctness_with_raw_data(epochs_track_identity_marginal_df, 'binned_x_meas', 'estimation_correctness_track_ID')
+
+
+        """
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+
+        # Clip the values to the range [0, 1]
+        epochs_df[y_col] = epochs_df[y_col].clip(lower=0, upper=1)
+
+        # Ensure x_col is treated consistently as a categorical variable
+        epochs_df[x_col] = pd.Categorical(epochs_df[x_col], ordered=True)
+        grouped = epochs_df.groupby(x_col)[y_col].agg(['mean', 'std']).reset_index()
+
+        # Plotting
+        plt.figure(figsize=(10, 6))
+
+        # Bar plot with error bars
+        plt.bar(grouped[x_col].cat.codes, grouped['mean'], yerr=grouped['std'], capsize=5, color='skyblue', alpha=0.7, label='Mean ± Std')
+
+        # Overlay raw data as a strip plot
+        sns.stripplot(data=epochs_df, x=x_col, y=y_col, color='black', alpha=0.6, jitter=True, size=5)
+
+        # Manually add legend for raw data once
+        plt.scatter([], [], color='black', alpha=0.6, label='Raw Data')
+
+        # Align x-axis ticks and labels
+        plt.xticks(ticks=range(len(grouped[x_col].cat.categories)), labels=grouped[x_col].cat.categories)
+
+        plt.title(f'Estimation Correctness Across Binned X Measurements: {extra_info_str}')
+        plt.xlabel(x_col)
+        plt.ylabel(y_col)
+        plt.legend()
+        plt.grid(True, linestyle='--', alpha=0.7)
+        plt.tight_layout()
+        plt.show()
+
+    @function_attributes(short_name=None, tags=['performance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 12:32', related_items=['build_lap_bin_by_bin_performance_analysis_df'])
+    def plot_estimation_correctness_vertical_stack(epochs_dict: dict, x_col: str, y_col: str):
+        """
+        Plots a vertical stack of estimation correctness across multiple time bin sizes.
+        Each time bin size is rendered in a separate subplot with consistent y-limits [0, 1].
+        
+        Args:
+            epochs_dict (dict): Dictionary where keys are time bin sizes and values are DataFrames containing the data.
+            x_col (str): Column name for the x-axis (binned variable).
+            y_col (str): Column name for the y-axis (metric to visualize).
+            
+        Usage:
+            # Example usage
+            plot_estimation_correctness_vertical_stack(
+                _out_subset_decode_dict, 'binned_x_meas', 'estimation_correctness_track_ID'
+            )
+        """
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        import pandas as pd
+
+        n_bins = len(epochs_dict)
+        fig, axes = plt.subplots(n_bins, 1, figsize=(10, 5 * n_bins), sharex=True)
+        color_palette = sns.color_palette("Set2", n_bins)
+
+        for i, (time_bin, df) in enumerate(epochs_dict.items()):
+            ax = axes[i] if n_bins > 1 else axes
+
+            # Clip the values to the range [0, 1]
+            df[y_col] = df[y_col].clip(lower=0, upper=1)
+
+            # Ensure x_col is treated consistently as a categorical variable
+            df[x_col] = pd.Categorical(df[x_col], ordered=True)
+            grouped = df.groupby(x_col)[y_col].agg(['mean', 'std']).reset_index()
+
+            # Bar plot with error bars
+            ax.bar(
+                grouped[x_col].cat.codes,
+                grouped['mean'],
+                yerr=grouped['std'],
+                capsize=5,
+                color=color_palette[i],
+                alpha=0.7,
+                label=f'Time Bin: {time_bin}'
+            )
+
+            # Overlay raw data as a strip plot
+            sns.stripplot(
+                data=df,
+                x=pd.Categorical(df[x_col]).codes,
+                y=y_col,
+                color='black',
+                alpha=0.6,
+                jitter=True,
+                size=4,
+                ax=ax
+            )
+
+            # Adjust y-axis and title
+            ax.set_ylim(0, 1)
+            ax.set_title(f'Estimation Correctness (Time Bin: {time_bin})')
+            ax.set_ylabel(y_col)
+            ax.grid(True, linestyle='--', alpha=0.7)
+
+        # X-axis adjustments (shared)
+        grouped_x_labels = grouped[x_col].cat.categories
+        ax.set_xticks(range(len(grouped_x_labels)))
+        ax.set_xticklabels(grouped_x_labels)
+        ax.set_xlabel(x_col)
+
+        plt.tight_layout()
+        plt.show()
+
+
+    @function_attributes(short_name=None, tags=['performance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 12:32', related_items=['build_lap_bin_by_bin_performance_analysis_df'])
+    def plot_estimation_correctness_bean_plot(epochs_dict: dict, x_col: str, y_col: str):
+        """
+        Plots a vertical stack of bean plots for estimation correctness across multiple time bin sizes.
+        Each time bin size is rendered in a separate subplot with consistent y-limits [0, 1].
+        
+        Args:
+            epochs_dict (dict): Dictionary where keys are time bin sizes and values are DataFrames containing the data.
+            x_col (str): Column name for the x-axis (binned variable).
+            y_col (str): Column name for the y-axis (metric to visualize).
+            
+        Usage:
+            # Example usage
+            plot_estimation_correctness_bean_plot(
+                _out_subset_decode_dict, 'binned_x_meas', 'estimation_correctness_track_ID'
+            )
+        """
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        import pandas as pd
+
+        n_bins = len(epochs_dict)
+        fig, axes = plt.subplots(n_bins, 1, figsize=(10, 5 * n_bins), sharex=True)
+
+        for i, (time_bin, df) in enumerate(epochs_dict.items()):
+            ax = axes[i] if n_bins > 1 else axes
+
+            # Clip the values to the range [0, 1]
+            df[y_col] = df[y_col].clip(lower=0, upper=1)
+
+            # Ensure x_col is treated consistently as a categorical variable
+            df[x_col] = pd.Categorical(df[x_col], ordered=True)
+
+            # Violin plot (density estimates)
+            sns.violinplot(
+                data=df,
+                x=x_col,
+                y=y_col,
+                scale='width',
+                inner=None,  # Remove internal bars to focus on raw points
+                bw=0.2,  # Bandwidth adjustment for smoother density
+                cut=0,  # Restrict to data range
+                linewidth=1,
+                color='skyblue',
+                ax=ax
+            )
+
+            # Overlay raw data points
+            sns.stripplot(
+                data=df,
+                x=x_col,
+                y=y_col,
+                color='black',
+                alpha=0.6,
+                jitter=True,
+                size=4,
+                ax=ax
+            )
+
+            # Adjust y-axis and title
+            ax.set_ylim(0, 1)
+            ax.set_title(f'Estimation Correctness (Time Bin: {time_bin})')
+            ax.set_ylabel(y_col)
+            ax.grid(True, linestyle='--', alpha=0.7)
+
+        # Shared X-axis adjustments
+        ax.set_xlabel(x_col)
+        plt.tight_layout()
+        plt.show()
+
+
+@function_attributes(short_name=None, tags=['transition_matrix', 'position', 'decoder_id', '2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 10:05', related_items=[])
+def build_position_by_decoder_transition_matrix(p_x_given_n):
+    """ 
+    given a decoder that gives a probability that the generating process is one of two possibilities, what methods are available to estimate the probability for a contiguous epoch made of many time bins? 
+    Note: there is most certainly temporal dependence, how should I go about dealing with this?
+    
+    Usage:
+    
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_position_by_decoder_transition_matrix, plot_blocked_transition_matrix
+    
+        ## INPUTS: p_x_given_n
+        n_position_bins, n_decoding_models, n_time_bins = p_x_given_n.shape
+        A_position, A_model, A_big = build_position_by_decoder_transition_matrix(p_x_given_n)
+        
+        ## Plotting:
+        import matplotlib.pyplot as plt; import seaborn as sns
+
+        # plt.figure(figsize=(8,6)); sns.heatmap(A_big, cmap='viridis'); plt.title("Transition Matrix A_big"); plt.show()
+        plt.figure(figsize=(8,6)); sns.heatmap(A_position, cmap='viridis'); plt.title("Transition Matrix A_position"); plt.show()
+        plt.figure(figsize=(8,6)); sns.heatmap(A_model, cmap='viridis'); plt.title("Transition Matrix A_model"); plt.show()
+
+        plot_blocked_transition_matrix(A_big, n_position_bins, n_decoding_models)
+        
+        
+    """
+    # Assume p_x_given_n is already loaded with shape (57, 4, 29951).
+    # We'll demonstrate by generating random data:
+    # p_x_given_n = np.random.rand(57, 4, 29951)
+
+    n_position_bins, n_decoding_models, n_time_bins = p_x_given_n.shape
+
+    # 1. Determine the most likely model for each time bin
+    sum_over_positions = p_x_given_n.sum(axis=0)  # (n_decoding_models, n_time_bins)
+    best_model_each_bin = sum_over_positions.argmax(axis=0)  # (n_time_bins,)
+
+    # 2. Determine the most likely position for each time bin (conditional on chosen model)
+    best_position_each_bin = np.array([
+        p_x_given_n[:, best_model_each_bin[t], t].argmax() 
+        for t in range(n_time_bins)
+    ])
+
+    # 3. Build position transition matrix
+    A_position_counts = np.zeros((n_position_bins, n_position_bins))
+    for t in range(n_time_bins - 1):
+        A_position_counts[best_position_each_bin[t], best_position_each_bin[t+1]] += 1
+    A_position = A_position_counts / A_position_counts.sum(axis=1, keepdims=True)
+    A_position = np.nan_to_num(A_position)  # handle rows with zero counts
+
+    # 4. Build model transition matrix
+    A_model_counts = np.zeros((n_decoding_models, n_decoding_models))
+    for t in range(n_time_bins - 1):
+        A_model_counts[best_model_each_bin[t], best_model_each_bin[t+1]] += 1
+    A_model = A_model_counts / A_model_counts.sum(axis=1, keepdims=True)
+    A_model = np.nan_to_num(A_model)
+
+    # 5. Construct combined transition matrix (Kronecker product)
+    A_big = np.kron(A_position, A_model)
+
+    print("A_position:", A_position)
+    print("A_model:", A_model)
+    print("A_big shape:", A_big.shape)
+    return A_position, A_model, A_big
+
+
+
+def plot_blocked_transition_matrix(A_big, n_position_bins, n_decoding_models, tick_labels=('long_LR', 'long_RL', 'short_LR', 'short_RL'), should_show_marginals:bool=True):
+    """ 
+    
+    plot_blocked_transition_matrix(A_big, n_position_bins, n_decoding_models)
+    
+    
+    """
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import matplotlib.gridspec as gridspec
+
+    if should_show_marginals:
+        fig = plt.figure(figsize=(9, 9))
+        gs = gridspec.GridSpec(2, 2, width_ratios=[10, 1], height_ratios=[1, 10])
+        
+        ax_heatmap = fig.add_subplot(gs[1, 0])
+        ax_row_sums = fig.add_subplot(gs[1, 1], sharey=ax_heatmap)
+        ax_col_sums = fig.add_subplot(gs[0, 0], sharex=ax_heatmap)
+
+        # Hide tick labels on margin plots
+        plt.setp(ax_row_sums.get_yticklabels(), visible=False)
+        plt.setp(ax_col_sums.get_xticklabels(), visible=False)
+
+        # Main heatmap
+        sns.heatmap(A_big, cmap='viridis', ax=ax_heatmap, cbar=False)
+
+        # Draw lines separating decoder blocks
+        for i in range(1, n_decoding_models):
+            ax_heatmap.axhline(i * n_position_bins, color='white')
+            ax_heatmap.axvline(i * n_position_bins, color='white')
+
+        # Row sums (marginal over columns)
+        row_sums = A_big.sum(axis=1)
+        ax_row_sums.barh(np.arange(len(row_sums)), row_sums, color='gray')
+        ax_row_sums.invert_xaxis()
+
+        # Column sums (marginal over rows)
+        col_sums = A_big.sum(axis=0)
+        ax_col_sums.bar(np.arange(len(col_sums)), col_sums, color='gray')
+
+        # Tick positions (centered in each block)
+        tick_locs = [i * n_position_bins + n_position_bins / 2 for i in range(n_decoding_models)]
+        if tick_labels is not None:
+            assert len(tick_labels) == n_decoding_models, f"n_decoding_models: {n_decoding_models}, len(tick_labels): {len(tick_labels)}"
+            tick_labels = list(tick_labels)
+        else:
+            tick_labels = [f'Decoder {i}' for i in range(n_decoding_models)]
+
+        # Apply block-centered labels
+        ax_heatmap.set_xticks(tick_locs)
+        ax_heatmap.set_xticklabels(tick_labels, rotation=90)
+        ax_heatmap.set_yticks(tick_locs)
+        ax_heatmap.set_yticklabels(tick_labels)
+
+        plt.tight_layout()
+        plt.show()
+    else:
+        plt.figure(figsize=(8,8))
+        sns.heatmap(A_big, cmap='viridis')
+
+        for i in range(1, n_decoding_models):
+            plt.axhline(i * n_position_bins, color='white')
+            plt.axvline(i * n_position_bins, color='white')
+
+        tick_locs = [i * n_position_bins + n_position_bins / 2 for i in range(n_decoding_models)]
+        if tick_labels is not None:
+            assert len(tick_labels) == n_decoding_models, f"n_decoding_models: {n_decoding_models}, len(tick_labels): {len(tick_labels)}"
+            tick_labels = list(tick_labels)
+        else:
+            tick_labels = [f'Decoder {i}' for i in range(n_decoding_models)]
+
+        plt.xticks(tick_locs, tick_labels, rotation=90)
+        plt.yticks(tick_locs, tick_labels, rotation=0)
+        plt.title("Transition Matrix Blocks by Decoder")
+        plt.show()
+
+
+
+
+# ==================================================================================================================== #
+# 2024-12-20 - Heuristicy Wisticky                                                                                     #
+# ==================================================================================================================== #
+from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import SubsequencesPartitioningResult
+from neuropy.utils.indexing_helpers import PandasHelpers
+from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
+# from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import SubsequenceDetectionSamples, GroundTruthData
+
+
+
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+
+class InteractivePlot:
+    """ 2024-12-23 - Add bin selection to a matplotlib plot to allow selecting the desired main sequence position bins for heuristic analysis
+
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import InteractivePlot
+    
+    _out = subsequence_partitioning_result.plot_time_bins_multiple()
+    # Pass the existing ax to the InteractivePlot
+    interactive_plot = InteractivePlot(_out.axes)
+    # plt.show()
+
+    """
+    # Computed Properties ________________________________________________________________________________________________ #
+    # @property
+    # def n_pos_bins(self) -> int:
+    #     "the total number of unique position bins along the track, unrelated to the number of *positions* in `flat_positions`"
+    #     return len(self.pos_bin_edges)-1
+
+
+    # @property
+    # def n_diff_bins(self) -> int:
+    #     return len(self.first_order_diff_lst)
+    
+    @property
+    def selected_indicies(self) -> List[int]:
+        return np.unique(list(self.selected_bins.keys())).tolist()
+
+
+    def __init__(self, ax: plt.Axes):
+        self.ax = ax
+        self.fig = ax.figure
+        self.selected_bins = {}
+        self.crosshair = self.ax.axvline(x=0, color='r', linestyle='--')
+        self.rects = []
+        
+        self.cid_motion = self.fig.canvas.mpl_connect('motion_notify_event', self.on_mouse_move)
+        self.cid_click = self.fig.canvas.mpl_connect('button_press_event', self.on_mouse_click)
+        
+    def on_mouse_move(self, event):
+        if event.inaxes == self.ax:
+            self.crosshair.set_xdata(event.xdata)
+            self.fig.canvas.draw_idle()
+
+    def on_mouse_click(self, event):
+        if event.inaxes == self.ax and event.button == 1:  # Left mouse button
+            time_bin = int(event.xdata)
+            if time_bin in self.selected_bins:
+                self.deselect_bin(time_bin)
+            else:
+                self.select_bin(time_bin)
+            print(f"Selected time bins: {list(self.selected_bins.keys())}")
+
+    def select_bin(self, bin_index):
+        rect = self.ax.axvspan((bin_index - 0.0), (bin_index + 1.0), color='yellow', alpha=0.3)
+        self.selected_bins[bin_index] = rect
+        self.fig.canvas.draw_idle()
+
+    def deselect_bin(self, bin_index):
+        rect = self.selected_bins.pop(bin_index, None)
+        if rect:
+            rect.remove()
+            self.fig.canvas.draw_idle()
+
+    @classmethod
+    def draw_bins(cls, ax, bin_index):
+        rect = ax.axvspan((bin_index - 0.0), (bin_index + 1.0), color='yellow', alpha=0.3)
+        # selected_bins[bin_index] = rect
+        fig = ax.figure
+        fig.canvas.draw_idle()
+        return rect
+        
+
+
+
+@function_attributes(short_name=None, tags=['endcap', 'track_identity'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-20 19:08', related_items=[])
+def classify_pos_bins(x: NDArray):
+    """	classifies the pos_bin_edges as being either endcaps/on the main straightaway, stc and returns a dataframe
+
+    Usage:	
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import classify_pos_bins
+    
+        pos_bin_edges = deepcopy(track_templates.get_decoders_dict()['long_LR'].xbin_centers)
+        pos_classification_df = classify_pos_bins(x=pos_bin_edges)
+        pos_classification_df
+
+    """
+    long_track_inst, short_track_inst = LinearTrackInstance.init_tracks_from_session_config(curr_active_pipeline.sess.config)
+    ## test xbins
+    pos_bin_classification = [long_track_inst.classify_x_position(x) for x in pos_bin_edges]
+    is_pos_bin_endcap = [long_track_inst.classify_x_position(x).is_endcap for x in pos_bin_edges]
+    is_pos_bin_on_maze = [long_track_inst.classify_x_position(x).is_on_maze for x in pos_bin_edges]
+    # is_pos_bin_endcap
+    # is_pos_bin_on_maze
+
+    # Create long track classification DataFrame
+    long_data = pd.DataFrame({
+        'is_endcap': [long_track_inst.classify_x_position(x).is_endcap for x in pos_bin_edges],
+        'is_track_straightaway': [long_track_inst.classify_x_position(x).is_track_straightaway for x in pos_bin_edges],
+        'is_off_track': [(not long_track_inst.classify_x_position(x).is_on_maze) for x in pos_bin_edges],
+    })
+
+    # Create short track classification DataFrame
+    short_data = pd.DataFrame({
+        'is_endcap': [short_track_inst.classify_x_position(x).is_endcap for x in pos_bin_edges],
+        'is_track_straightaway': [short_track_inst.classify_x_position(x).is_track_straightaway for x in pos_bin_edges],
+        'is_off_track': [(not short_track_inst.classify_x_position(x).is_on_maze) for x in pos_bin_edges],
+    })
+
+    # Combine into a multi-level column DataFrame
+    pos_classification_df = pd.concat(
+        [pd.DataFrame({'x': pos_bin_edges, 'flat_index': range(len(pos_bin_edges))}),
+        pd.concat({'long': long_data, 'short': short_data}, axis=1)],
+        axis=1
+    )
+
+    # Ensure columns are correctly nested
+    pos_classification_df.columns = pd.MultiIndex.from_tuples(
+        [(col if isinstance(col, str) else col[0], '' if isinstance(col, str) else col[1]) for col in pos_classification_df.columns]
+    )
+
+    # combined_df['long']
+    return pos_classification_df
+
+
+# ==================================================================================================================== #
+# 2024-12-18 Heuristic Evaluation in the continuous timeline                                                           #
+# ==================================================================================================================== #
+@function_attributes(short_name=None, tags=['2024-12-18', 'ACTIVE', 'gui', 'debugging', 'continuous'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 19:29', related_items=[])
+def _setup_spike_raster_window_for_debugging(spike_raster_window, debug_print=False):
+    """ 
+    ['AddMatplotlibPlot.DecodedPosition', 'AddMatplotlibPlot.Custom',
+     'AddTimeCurves.Position', 'AddTimeCurves.Velocity', 'AddTimeCurves.Random', 'AddTimeCurves.RelativeEntropySurprise', 'AddTimeCurves.Custom',
+     'AddTimeIntervals.Laps', 'AddTimeIntervals.PBEs', 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.Ripples', 'AddTimeIntervals.Replays', 'AddTimeIntervals.Bursts', 'AddTimeIntervals.Custom',
+     'CreateNewConnectedWidget.NewConnected2DRaster', 'CreateNewConnectedWidget.NewConnected3DRaster.PyQtGraph', 'CreateNewConnectedWidget.NewConnected3DRaster.Vedo', 'CreateNewConnectedWidget.NewConnectedDataExplorer.ipc', 'CreateNewConnectedWidget.NewConnectedDataExplorer.ipspikes', 'CreateNewConnectedWidget.AddMatplotlibPlot.DecodedPosition', 'CreateNewConnectedWidget.Decoded_Epoch_Slices.Laps', 'CreateNewConnectedWidget.Decoded_Epoch_Slices.PBEs', 'CreateNewConnectedWidget.Decoded_Epoch_Slices.Ripple', 'CreateNewConnectedWidget.Decoded_Epoch_Slices.Replay', 'CreateNewConnectedWidget.Decoded_Epoch_Slices.Custom', 'CreateNewConnectedWidget.MenuCreateNewConnectedWidget', 'CreateNewConnectedWidget.MenuCreateNewConnectedDecodedEpochSlices',
+     'Debug.MenuDebug', 'Debug.MenuDebugMenuActiveDrivers', 'Debug.MenuDebugMenuActiveDrivables', 'Debug.MenuDebugMenuActiveConnections',
+    
+     'DockedWidgets.NewDockedMatplotlibView', 'DockedWidgets.NewDockedContextNested', 'DockedWidgets.LongShortDecodedEpochsDockedMatplotlibView', 'DockedWidgets.DirectionalDecodedEpochsDockedMatplotlibView', 'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView', 'DockedWidgets.ContinuousPseudo2DDecodedMarginalsDockedMatplotlibView', 'DockedWidgets.NewDockedCustom', 'DockedWidgets.AddDockedWidget']
+     ['AddMatplotlibPlot.DecodedPosition', 'AddMatplotlibPlot.Custom', 'AddTimeCurves.Position', 'AddTimeCurves.Velocity', 'AddTimeCurves.Random', 'AddTimeCurves.RelativeEntropySurprise', 'AddTimeCurves.Custom', 'AddTimeIntervals.Laps', 'AddTimeIntervals.PBEs', 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.Ripples', 'AddTimeIntervals.Replays', 'AddTimeIntervals.Bursts', 'AddTimeIntervals.Custom', 'CreateNewConnectedWidget.NewConnected2DRaster', 'CreateNewConnectedWidget.NewConnected3DRaster.PyQtGraph', 'CreateNewConnectedWidget.NewConnected3DRaster.Vedo', 'CreateNewConnectedWidget.NewConnectedDataExplorer.ipc', 'CreateNewConnectedWidget.NewConnectedDataExplorer.ipspikes', 'CreateNewConnectedWidget.AddMatplotlibPlot.DecodedPosition', 'CreateNewConnectedWidget.Decoded_Epoch_Slices.Laps', 'CreateNewConnectedWidget.Decoded_Epoch_Slices.PBEs', 'CreateNewConnectedWidget.Decoded_Epoch_Slices.Ripple', 'CreateNewConnectedWidget.Decoded_Epoch_Slices.Replay', 'CreateNewConnectedWidget.Decoded_Epoch_Slices.Custom', 'CreateNewConnectedWidget.MenuCreateNewConnectedWidget', 'CreateNewConnectedWidget.MenuCreateNewConnectedDecodedEpochSlices', 'Debug.MenuDebug', 'Debug.MenuDebugMenuActiveDrivers', 'Debug.MenuDebugMenuActiveDrivables', 'Debug.MenuDebugMenuActiveConnections', 'DockedWidgets.NewDockedMatplotlibView', 'DockedWidgets.LongShortDecodedEpochsDockedMatplotlibView', 'DockedWidgets.TrackTemplatesDecodedEpochsDockedMatplotlibView', 'DockedWidgets.DirectionalDecodedEpochsDockedMatplotlibView', 'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView', 'DockedWidgets.ContinuousPseudo2DDecodedMarginalsDockedMatplotlibView', 'DockedWidgets.NewDockedCustom', 'DockedWidgets.MenuDockedWidgets', 'DockedWidgets.AddDockedWidget'
+     uSAGE:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _setup_spike_raster_window_for_debugging
+        
+        all_global_menus_actionsDict, global_flat_action_dict = _setup_spike_raster_window_for_debugging(spike_raster_window)
+     
+    """
+    omit_menu_item_names = ['Debug.MenuDebug', 'DockedWidgets.MenuDockedWidgets', ] # maybe , 'CreateNewConnectedWidget.MenuCreateNewConnectedWidget'    
+    all_global_menus_actionsDict, global_flat_action_dict = spike_raster_window.build_all_menus_actions_dict()
+    if debug_print:
+        print(list(global_flat_action_dict.keys()))
+
+
+    ## extract the components so the `background_static_scroll_window_plot` scroll bar is the right size:
+    active_2d_plot = spike_raster_window.spike_raster_plt_2d
+    preview_overview_scatter_plot: pg.ScatterPlotItem  = active_2d_plot.plots.preview_overview_scatter_plot # ScatterPlotItem 
+    # preview_overview_scatter_plot.setDownsampling(auto=True, method='subsample', dsRate=10)
+    main_graphics_layout_widget: pg.GraphicsLayoutWidget = active_2d_plot.ui.main_graphics_layout_widget
+    wrapper_layout: pg.QtWidgets.QVBoxLayout = active_2d_plot.ui.wrapper_layout
+    main_content_splitter = active_2d_plot.ui.main_content_splitter # QSplitter
+    layout = active_2d_plot.ui.layout
+    main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
+    main_plot_widget.setMinimumHeight(20.0)
+    background_static_scroll_window_plot = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
+    background_static_scroll_window_plot.setMinimumHeight(50.0)
+    background_static_scroll_window_plot.setMaximumHeight(75.0)
+    # background_static_scroll_window_plot.setFixedHeight(50.0)
+    
+    # Set stretch factors to control priority
+    main_graphics_layout_widget.ci.layout.setRowStretchFactor(0, 1)  # Plot1: lowest priority
+    main_graphics_layout_widget.ci.layout.setRowStretchFactor(1, 2)  # Plot2: mid priority
+    main_graphics_layout_widget.ci.layout.setRowStretchFactor(2, 3)  # Plot3: highest priority
+
+    _interval_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_interval_tracks(enable_interval_overview_track=False)
+    interval_window_dock_config, intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item = _interval_tracks_out_dict['intervals']
+    # dock_config, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item = _interval_tracks_out_dict['interval_overview']
+
+    # Add Renderables ____________________________________________________________________________________________________ #
+    # add_renderables_menu = active_2d_plot.ui.menus.custom_context_menus.add_renderables[0].programmatic_actions_dict
+    menu_commands = ['AddTimeIntervals.Replays', 'AddTimeIntervals.Laps', 'AddTimeIntervals.SessionEpochs'] # , 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.PBEs', 'AddTimeIntervals.Ripples', 
+    for a_command in menu_commands:
+        assert a_command in global_flat_action_dict, f"a_command: '{a_command}' is not present in global_flat_action_dict: {list(global_flat_action_dict.keys())}"
+        # add_renderables_menu[a_command].trigger()
+        global_flat_action_dict[a_command].trigger()
+        
+    # active_2d_plot.activeMenuReference
+    # active_2d_plot.ui.menus # .global_window_menus.docked_widgets.actions_dict
+
+    active_2d_plot.params.enable_non_marginalized_raw_result = False
+    active_2d_plot.params.enable_marginal_over_direction = False
+    active_2d_plot.params.enable_marginal_over_track_ID = True
+
+
+    menu_commands = [
+        'AddTimeCurves.Position',
+        # 'DockedWidgets.LongShortDecodedEpochsDockedMatplotlibView',
+        # 'DockedWidgets.DirectionalDecodedEpochsDockedMatplotlibView',
+        # 'DockedWidgets.TrackTemplatesDecodedEpochsDockedMatplotlibView',
+        'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView',
+        #  'DockedWidgets.ContinuousPseudo2DDecodedMarginalsDockedMatplotlibView',
+        
+    ]
+    # menu_commands = ['actionPseudo2DDecodedEpochsDockedMatplotlibView', 'actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'] # , 'AddTimeIntervals.SessionEpochs'
+    for a_command in menu_commands:
+        # all_global_menus_actionsDict[a_command].trigger()
+        global_flat_action_dict[a_command].trigger()
+        
+
+
+    return all_global_menus_actionsDict, global_flat_action_dict
+
+
+# ==================================================================================================================== #
+# 2024-12-17 Heuristic Evaluation and Filtering Helpers                                                                #
+# ==================================================================================================================== #
+@function_attributes(short_name=None, tags=['heuristic_filter', 'heuristic', 'plotting'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-17 09:51', related_items=[])
+def _plot_heuristic_evaluation_epochs(curr_active_pipeline, track_templates, filtered_decoder_filter_epochs_decoder_result_dict, ripple_merged_complete_epoch_stats_df: pd.DataFrame):
+    """ Plots two GUI Windows: one with the high-heuristic-score epochs, and the other with the lows
+    
+    
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _plot_heuristic_evaluation_epochs
+    
+    app, (high_heuristic_paginated_multi_decoder_decoded_epochs_window, high_heuristic_pagination_controller_dict), (low_heuristic_paginated_multi_decoder_decoded_epochs_window, low_heuristic_pagination_controller_dict) = _plot_heuristic_evaluation_epochs(curr_active_pipeline, track_templates, filtered_decoder_filter_epochs_decoder_result_dict, ripple_merged_complete_epoch_stats_df=ripple_merged_complete_epoch_stats_df)
+
+    """
+    from neuropy.utils.indexing_helpers import flatten, NumpyHelpers, PandasHelpers
+    from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicThresholdFiltering
+    from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
+    from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatConverter
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import FixedCustomColormaps
+    from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import PhoPaginatedMultiDecoderDecodedEpochsWindow, DecodedEpochSlicesPaginatedFigureController, EpochSelectionsObject, ClickActionCallbacks
+    from pyphoplacecellanalysis.GUI.Qt.Widgets.ThinButtonBar.ThinButtonBarWidget import ThinButtonBarWidget
+    from pyphoplacecellanalysis.GUI.Qt.Widgets.PaginationCtrl.PaginationControlWidget import PaginationControlWidget, PaginationControlWidgetState
+    from neuropy.core.user_annotations import UserAnnotationsManager
+    from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons, silx_resources_rc
+
+    # active_cmap = FixedCustomColormaps.get_custom_orange_with_low_values_dropped_cmap()
+    # active_cmap = FixedCustomColormaps.get_custom_black_with_low_values_dropped_cmap(low_value_cutoff=0.05)
+    # active_cmap = ColormapHelpers.create_colormap_transparent_below_value(active_cmap, low_value_cuttoff=0.1)
+    active_cmap = FixedCustomColormaps.get_custom_greyscale_with_low_values_dropped_cmap(low_value_cutoff=0.05, full_opacity_threshold=0.4)
+    
+    ## filter by 'is_valid_epoch' first:
+    ripple_merged_complete_epoch_stats_df = ripple_merged_complete_epoch_stats_df[ripple_merged_complete_epoch_stats_df['is_valid_epoch']] ## 136, 71 included requiring both
+
+    ## filter by `included_epoch_indicies`
+    # filter_thresholds_dict = {'mseq_len_ignoring_intrusions': 5, 'mseq_tcov': 0.35}
+    # df_is_included_criteria_fn = lambda df: NumpyHelpers.logical_and(*[(df[f'overall_best_{a_col_name}'] >= a_thresh) for a_col_name, a_thresh in filter_thresholds_dict.items()])
+    # included_heuristic_ripple_start_times = ripple_merged_complete_epoch_stats_df[df_is_included_criteria_fn(ripple_merged_complete_epoch_stats_df)]['ripple_start_t'].values
+    # high_heuristic_only_filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(included_heuristic_ripple_start_times) for a_name, a_result in filtered_decoder_filter_epochs_decoder_result_dict.items()} # working filtered
+    ripple_merged_complete_epoch_stats_df, (included_heuristic_ripple_start_times, excluded_heuristic_ripple_start_times) = HeuristicThresholdFiltering.add_columns(df=ripple_merged_complete_epoch_stats_df)
+    high_heuristic_only_filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(included_heuristic_ripple_start_times) for a_name, a_result in filtered_decoder_filter_epochs_decoder_result_dict.items()} # working filtered
+    low_heuristic_only_filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = {a_name:a_result.filtered_by_epoch_times(excluded_heuristic_ripple_start_times) for a_name, a_result in filtered_decoder_filter_epochs_decoder_result_dict.items()} # working filtered
+
+    example_decoder_name = 'long_LR'
+    all_epoch_result: DecodedFilterEpochsResult = deepcopy(filtered_decoder_filter_epochs_decoder_result_dict[example_decoder_name])
+    all_filter_epochs_df: pd.DataFrame = deepcopy(all_epoch_result.filter_epochs)
+
+    included_filter_epoch_result: DecodedFilterEpochsResult = deepcopy(high_heuristic_only_filtered_decoder_filter_epochs_decoder_result_dict[example_decoder_name])
+    # included_filter_epoch_result: DecodedFilterEpochsResult = deepcopy(low_heuristic_only_filtered_decoder_filter_epochs_decoder_result_dict[example_decoder_name])
+
+    included_filter_epochs_df: pd.DataFrame = deepcopy(included_filter_epoch_result.filter_epochs)
+    # included_filter_epoch_times = included_filter_epochs_df[['start', 'stop']].to_numpy() # Both 'start', 'stop' column matching
+    included_filter_epoch_times = included_filter_epochs_df['start'].to_numpy() # Both 'start', 'stop' column matching
+
+    # included_filter_epoch_times_to_all_epoch_index_map = included_filter_epoch_result.find_epoch_times_to_data_indicies_map(epoch_times=included_filter_epoch_times)
+    included_filter_epoch_times_to_all_epoch_index_arr: NDArray = included_filter_epoch_result.find_data_indicies_from_epoch_times(epoch_times=included_filter_epoch_times)
+
+    ## OUTPUTS: all_filter_epochs_df, all_filter_epochs_df
+    ## OUTPUTS: included_filter_epoch_times_to_all_epoch_index_arr
+    common_data_overlay_included_columns=['P_decoder', #'ratio_jump_valid_bins', 
+                    #    'wcorr',
+    #'avg_jump_cm', 'max_jump_cm',
+        'mseq_len', 'mseq_len_ignoring_intrusions', 'mseq_tcov', 'mseq_tdist', # , 'mseq_len_ratio_ignoring_intrusions_and_repeats', 'mseq_len_ignoring_intrusions_and_repeats'
+    ]
+    
+    common_params_kwargs={'enable_per_epoch_action_buttons': False,
+            'skip_plotting_most_likely_positions': True, 'skip_plotting_measured_positions': True, 
+            'enable_decoded_most_likely_position_curve': False, 
+            'enable_decoded_sequence_and_heuristics_curve': True, 'show_pre_merged_debug_sequences': True,
+                'enable_radon_transform_info': False, 'enable_weighted_correlation_info': True, 'enable_weighted_corr_data_provider_modify_axes_rect': False,
+            # 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False,
+            # 'disable_y_label': True,
+            'isPaginatorControlWidgetBackedMode': True,
+            'enable_update_window_title_on_page_change': False, 'build_internal_callbacks': True,
+            # 'debug_print': True,
+            'max_subplots_per_page': 9,
+            # 'scrollable_figure': False,
+            'scrollable_figure': True,
+            # 'posterior_heatmap_imshow_kwargs': dict(vmin=0.0075),
+            'use_AnchoredCustomText': False,
+            'should_suppress_callback_exceptions': False,
+            # 'build_fn': 'insets_view',
+            'track_length_cm_dict': deepcopy(track_templates.get_track_length_dict()),
+            'posterior_heatmap_imshow_kwargs': dict(cmap=active_cmap), # , vmin=0.1, vmax=1.0   
+    }
+
+    app, high_heuristic_paginated_multi_decoder_decoded_epochs_window, high_heuristic_pagination_controller_dict = PhoPaginatedMultiDecoderDecodedEpochsWindow.init_from_track_templates(curr_active_pipeline, track_templates,
+        # decoder_decoded_epochs_result_dict=decoder_ripple_filter_epochs_decoder_result_dict, epochs_name='ripple',
+        # decoder_decoded_epochs_result_dict=filtered_decoder_filter_epochs_decoder_result_dict, epochs_name='ripple', title='High-sequence Score Ripples Only',
+        decoder_decoded_epochs_result_dict=high_heuristic_only_filtered_decoder_filter_epochs_decoder_result_dict, epochs_name='ripple', title='High-Heuristic Score Ripples Only', ## RIPPLE
+        included_epoch_indicies=None, ## NO FILTERING
+        # included_epoch_indicies=included_filter_epoch_times_to_all_epoch_index_arr, ## unsorted
+        # decoder_decoded_epochs_result_dict=sorted_filtered_decoder_filter_epochs_decoder_result_dict, epochs_name='ripple',  ## SORTED
+        # included_epoch_indicies=sorted_included_filter_epoch_times_to_all_epoch_index_arr, ## SORTED
+        debug_print=False,
+        params_kwargs=common_params_kwargs)
+    high_heuristic_paginated_multi_decoder_decoded_epochs_window.add_data_overlays(included_columns=common_data_overlay_included_columns, defer_refresh=False)
+    high_heuristic_paginated_multi_decoder_decoded_epochs_window.setWindowTitle('High-Heuristic Score DecodedEpochs Only')
+    
+
+    app, low_heuristic_paginated_multi_decoder_decoded_epochs_window, low_heuristic_pagination_controller_dict = PhoPaginatedMultiDecoderDecodedEpochsWindow.init_from_track_templates(curr_active_pipeline, track_templates,
+        decoder_decoded_epochs_result_dict=low_heuristic_only_filtered_decoder_filter_epochs_decoder_result_dict, epochs_name='ripple', title='Low-Heuristic Score Ripples Only', ## RIPPLE
+        included_epoch_indicies=None, ## NO FILTERING
+        debug_print=False,
+        params_kwargs=common_params_kwargs)
+    low_heuristic_paginated_multi_decoder_decoded_epochs_window.add_data_overlays(included_columns=common_data_overlay_included_columns, defer_refresh=False)    
+    low_heuristic_paginated_multi_decoder_decoded_epochs_window.setWindowTitle('LOW-Heuristic Score DecodedEpochs Only')
+    
+    return app, (high_heuristic_paginated_multi_decoder_decoded_epochs_window, high_heuristic_pagination_controller_dict), (low_heuristic_paginated_multi_decoder_decoded_epochs_window, low_heuristic_pagination_controller_dict)
+
+
+
+
+
+
+# ==================================================================================================================== #
 # 2024-11-25 - Save/Load Heuristic Helpers                                                                             #
 # ==================================================================================================================== #
 from pyphocorehelpers.programming_helpers import function_attributes
@@ -70,7 +982,7 @@ class SerializationHelperBaseClass:
 class SerializationHelper_CustomDecodingResults(SerializationHelperBaseClass):
     @function_attributes(short_name=None, tags=['save', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-25 12:58', related_items=[])
     @classmethod
-    def save(cls, a_directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult, long_pf2D, save_path):
+    def save(cls, a_directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult, long_pf2D, save_path, debug_print=False):
         """ Used for "2024-08-01 - Heuristic Analysis.ipynb"
         Usage:
             directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = deepcopy(curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']) ## GENERAL
@@ -90,13 +1002,15 @@ class SerializationHelper_CustomDecodingResults(SerializationHelperBaseClass):
         ybin = deepcopy(long_pf2D.ybin)
         ybin_centers = deepcopy(long_pf2D.ybin_centers)
 
-        print(xbin_centers)
+        if debug_print:
+            print(xbin_centers)
         save_dict = {
         'directional_decoders_epochs_decode_result': a_directional_decoders_epochs_decode_result.__getstate__(),
         'xbin': xbin, 'xbin_centers': xbin_centers}
 
         saveData(save_path, save_dict)
-        print(f'save_path: {save_path}')
+        if debug_print:
+            print(f'save_path: {save_path}')
         return save_path
 
 
@@ -2067,7 +2981,7 @@ def _perform_build_individual_time_bin_decoded_posteriors_df(curr_active_pipelin
 
 # appearing_or_disappearing_aclus, appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus
 @function_attributes(short_name=None, tags=['performance'], input_requires=[], output_provides=[], uses=['_do_train_test_split_decode_and_evaluate'], used_by=[], creation_date='2024-10-08 00:00', related_items=[])
-def _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline, included_neuron_IDs, active_laps_decoding_time_bin_size: float = 0.25):
+def _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline, included_neuron_IDs, active_laps_decoding_time_bin_size: float = 0.25, force_recompute_directional_train_test_split_result: bool = False, debug_print=False):
     """ runs for a specific subset of cells 
     """
     # Inputs: all_directional_pf1D_Decoder, alt_directional_merged_decoders_result
@@ -2077,45 +2991,40 @@ def _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline, i
     from neuropy.core.session.dataSession import Laps
     # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _check_result_laps_epochs_df_performance
 
-    t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+    # t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
     long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-    global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
-
-    def _add_extra_epochs_df_columns(epochs_df: pd.DataFrame):
-        """ captures: global_session, t_start, t_delta, t_end
-        """
-        epochs_df = epochs_df.sort_values(['start', 'stop', 'label']).reset_index(drop=True) # Sort by columns: 'start' (ascending), 'stop' (ascending), 'label' (ascending)
-        epochs_df = epochs_df.drop_duplicates(subset=['start', 'stop', 'label'])
-        epochs_df = epochs_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
-        epochs_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=epochs_df, global_session=deepcopy(global_session), replace_existing=True)
-        return epochs_df
+    # global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
 
     directional_train_test_split_result: TrainTestSplitResult = curr_active_pipeline.global_computation_results.computed_data.get('TrainTestSplit', None)
-    force_recompute_directional_train_test_split_result: bool = False
+    
     if (directional_train_test_split_result is None) or force_recompute_directional_train_test_split_result:
         ## recompute
-        print(f"'TrainTestSplit' not computed, recomputing...")
+        if debug_print:
+            print(f"'TrainTestSplit' not computed, recomputing...")
         curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_train_test_split'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
         directional_train_test_split_result: TrainTestSplitResult = curr_active_pipeline.global_computation_results.computed_data['TrainTestSplit']
         assert directional_train_test_split_result is not None, f"faiiled even after recomputation"
-        print('\tdone.')
+        if debug_print:
+            print('\tdone.')
 
     training_data_portion: float = directional_train_test_split_result.training_data_portion
     test_data_portion: float = directional_train_test_split_result.test_data_portion
-    print(f'training_data_portion: {training_data_portion}, test_data_portion: {test_data_portion}')
+    if debug_print:
+        print(f'training_data_portion: {training_data_portion}, test_data_portion: {test_data_portion}')
 
-    test_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = directional_train_test_split_result.test_epochs_dict
-    train_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = directional_train_test_split_result.train_epochs_dict
-    train_lap_specific_pf1D_Decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = directional_train_test_split_result.train_lap_specific_pf1D_Decoder_dict
+    # test_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = directional_train_test_split_result.test_epochs_dict
+    # train_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = directional_train_test_split_result.train_epochs_dict
+    # train_lap_specific_pf1D_Decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = directional_train_test_split_result.train_lap_specific_pf1D_Decoder_dict
     # OUTPUTS: train_test_split_laps_df_dict
     
     # MAIN _______________________________________________________________________________________________________________ #
     
-    complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results = _do_train_test_split_decode_and_evaluate(curr_active_pipeline=curr_active_pipeline, active_laps_decoding_time_bin_size=active_laps_decoding_time_bin_size,
+    complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, test_all_directional_decoder_result, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results = _do_train_test_split_decode_and_evaluate(curr_active_pipeline=curr_active_pipeline, active_laps_decoding_time_bin_size=active_laps_decoding_time_bin_size,
                                                                                                                                                                                                                                                   included_neuron_IDs=included_neuron_IDs,
-                                                                                                                                                                                                                                                  force_recompute_directional_train_test_split_result=False, compute_separate_decoder_results=True)
+                                                                                                                                                                                                                                                  force_recompute_directional_train_test_split_result=force_recompute_directional_train_test_split_result, compute_separate_decoder_results=True, debug_print=debug_print)
     (is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = complete_decoded_context_correctness_tuple
-    print(f"percent_laps_track_identity_estimated_correctly: {round(percent_laps_track_identity_estimated_correctly*100.0, ndigits=3)}%")
+    if debug_print:
+        print(f"percent_laps_track_identity_estimated_correctly: {round(percent_laps_track_identity_estimated_correctly*100.0, ndigits=3)}%")
 
     if _out_separate_decoder_results is not None:
         assert len(_out_separate_decoder_results) == 3, f"_out_separate_decoder_results: {_out_separate_decoder_results}"
@@ -2129,7 +3038,13 @@ def _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline, i
     #     _remerged_laps_dfs_dict[a_decoder_name] = pd.concat([a_train_epochs_df, a_test_epochs_df], axis='index')
     #     _remerged_laps_dfs_dict[a_decoder_name] = _add_extra_epochs_df_columns(epochs_df=_remerged_laps_dfs_dict[a_decoder_name])
         
-    return (complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results) 
+    ## INPUTS: test_all_directional_decoder_result, all_directional_pf1D_Decoder
+    # epochs_bin_by_bin_performance_analysis_df = test_all_directional_decoder_result.get_lap_bin_by_bin_performance_analysis_df(active_pf_2D=deepcopy(all_directional_pf1D_Decoder), debug_print=debug_print) # active_pf_2D: used for binning position columns # active_pf_2D: used for binning position columns
+    # epochs_bin_by_bin_performance_analysis_df: pd.DataFrame = test_all_directional_decoder_result.epochs_bin_by_bin_performance_analysis_df
+    # _out_subset_decode_dict[active_laps_decoding_time_bin_size] = epochs_track_identity_marginal_df
+    # epochs_bin_by_bin_performance_analysis_df['shuffle_idx'] = int(i)
+
+    return (complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, test_all_directional_decoder_result, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results) 
 
 
 @function_attributes(short_name=None, tags=['long_short', 'firing_rate'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-17 05:22', related_items=['determine_neuron_exclusivity_from_firing_rate'])
@@ -3177,7 +4092,7 @@ def _perform_filter_replay_epochs(curr_active_pipeline, global_epoch_name, track
     # filtered_decoder_filter_epochs_decoder_result_dict
 
     # 🟪 2024-02-29 - `compute_pho_heuristic_replay_scores`
-    filtered_decoder_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=filtered_decoder_filter_epochs_decoder_result_dict)
+    filtered_decoder_filter_epochs_decoder_result_dict, _out_new_scores, partition_result_dict = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=filtered_decoder_filter_epochs_decoder_result_dict)
 
     if should_only_include_user_selected_epochs:
         filtered_epochs_df = filtered_epochs_df.epochs.matching_epoch_times_slice(any_good_selected_epoch_times)

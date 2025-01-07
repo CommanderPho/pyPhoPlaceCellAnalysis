@@ -390,6 +390,152 @@ class PlottingHelpers:
         return output_dict
 
 
+    @function_attributes(short_name=None, tags=['matplotlib', 'draw'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 18:44', related_items=[])
+    @classmethod
+    def helper_matplotlib_add_pseudo2D_marginal_labels(cls, ax, y_bin_labels: List[str], enable_draw_decoder_labels: bool = True, enable_draw_decoder_colored_lines: bool = False, should_use_ax_fraction_positioning: bool = True) -> Dict[str, Dict]:
+        """ adds fixed inner-y labels (along the inside left edge of the ax) containing reference names -- such as ('Long_LR', etc)
+        
+        should_use_ax_fraction_positioning: bool : if True, the labels and lines are positioned relative to the ax frame in [0, 1] coords, independent of the data ylims
+        
+        Valid options:
+            
+            y_bin_labels = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+            y_bin_labels = ['long', 'short']
+            y_bin_labels = ['LR', 'RL']
+
+        Usage:
+            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+            output_dict = {}
+            for i, ax in enumerate(attached_yellow_blue_marginals_viewer_widget.plots.axs):
+                output_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['long_LR', 'long_RL', 'short_LR', 'short_RL'], enable_draw_decoder_colored_lines=False)
+                # output_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['long', 'short'], enable_draw_decoder_colored_lines=False)
+                # output_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['LR', 'RL'], enable_draw_decoder_colored_lines=False)
+            ## can remove them by
+            for decoder_name, inner_output_dict in output_dict.items():
+                for a_name, an_artist in inner_output_dict.items():
+                    an_artist.remove()
+                    
+        """
+        
+
+        ## INPUTS: ax
+        assert y_bin_labels in [['long_LR', 'long_RL', 'short_LR', 'short_RL'], ['long', 'short'], ['LR', 'RL']], f"y_bin_labels must be one of the known marginal values but instead y_bin_labels: {y_bin_labels}"
+        
+        n_ybins: int = len(y_bin_labels)
+        
+        long_epoch_config = long_short_display_config_manager.long_epoch_config #.as_pyqtgraph_kwargs()
+        short_epoch_config = long_short_display_config_manager.short_epoch_config #.as_pyqtgraph_kwargs()
+
+        Long_color = long_epoch_config.mpl_color
+        Short_color = short_epoch_config.mpl_color
+
+        RL_color = DisplayColorsEnum.Laps.RL #.get_RL_dock_colors(None, is_dim=False)
+        LR_color = DisplayColorsEnum.Laps.LR # get_LR_dock_colors(None, is_dim=False)
+
+        
+        all_colors_dict = {'long_LR':(Long_color, LR_color), 'long_RL':(Long_color, RL_color),
+            'short_LR':(Short_color, LR_color), 'short_RL':(Short_color, RL_color), 'long': (Long_color, None), 'short': (Short_color, None), 'LR': (None, LR_color), 'RL': (None, RL_color)}
+
+
+        active_color_dict = {k:all_colors_dict[k] for k in y_bin_labels}
+
+
+        # BEGIN PLOTTING: ____________________________________________________________________________________________________ #
+        
+        _common_label_kwargs = dict(alpha=0.8, fontsize=10, va='center')
+        _common_hlines_kwargs = dict(alpha=0.6, linewidths=4)
+        
+        if should_use_ax_fraction_positioning:
+            _common_label_kwargs.update(xycoords="axes fraction")
+            _common_hlines_kwargs.update(transform=ax.transAxes)
+            
+            x_start_ax, x_stop_ax = 0.0, 1.0
+            y_start_ax, y_stop_ax = 0.0, 1.0 # (37.0773897438341, 253.98616538463315)
+            
+        else:
+            x_start_ax, x_stop_ax = ax.get_xlim()
+            y_start_ax, y_stop_ax = ax.get_ylim() # (37.0773897438341, 253.98616538463315)
+
+        y_height: float = (y_stop_ax - y_start_ax)
+        single_y_bin_height: float = (y_height/float(n_ybins))
+        y_bin_starts = (np.arange(n_ybins) * single_y_bin_height) + y_start_ax # array([0, 54.2272, 108.454, 162.682])
+        y_bin_centers = y_bin_starts + (single_y_bin_height * 0.5)
+        
+        if enable_draw_decoder_colored_lines:
+            center_offset: float = 0.25
+            center_offset_px: float = (center_offset * single_y_bin_height)
+            # center_offset_px: float = 5
+            track_ID_line_y = y_bin_centers - center_offset_px
+            track_dir_line_y = y_bin_centers + center_offset_px
+            
+            
+        output_dict = {}
+        for i, (decoder_name, (a_track_id_color, a_track_dir_color)) in enumerate(active_color_dict.items()):
+            if enable_draw_decoder_colored_lines:
+                if a_track_id_color is not None:
+                    output_dict[f"{decoder_name}_track_ID"] = ax.hlines(track_ID_line_y[i], xmin=x_start_ax, xmax=x_stop_ax, color=a_track_id_color, zorder=25, label=f'{decoder_name}', **_common_hlines_kwargs) # divider should be in very front
+                if a_track_dir_color is not None:
+                    output_dict[f"{decoder_name}_track_dir"] = ax.hlines(track_dir_line_y[i], xmin=x_start_ax, xmax=x_stop_ax, color=a_track_dir_color, zorder=25, label=f'{decoder_name}', **_common_hlines_kwargs) # divider should be in very front
+            if enable_draw_decoder_labels:
+                output_dict[f"{decoder_name}_label"] = ax.annotate(f'{decoder_name}', (x_start_ax, y_bin_centers[i]), **_common_label_kwargs)
+
+        return output_dict
+        
+
+
+class FixedCustomColormaps:
+    """ 
+    
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import FixedCustomColormaps
+    
+    """
+    @classmethod
+    def get_custom_orange_with_low_values_dropped_cmap(cls):
+        """ Oranges with low values omitted
+        """
+        from matplotlib.colors import LinearSegmentedColormap
+        return LinearSegmentedColormap.from_list(f"dropping_low_values_oranges_colormap", [
+            [0.87306,0.62718,0.34353,0.     ],
+            #[0.33725,0.14902,0.33333,0.     ],
+            # [0.33725,0.14902,0.33333,1.     ],
+            [0.87306,0.62718,0.34353,1.     ],
+            [0.87306,0.62718,0.34353,1.     ],
+            [0.80485,0.48515,0.24302,1.     ],
+            [0.76402,0.36984,0.181  ,1.     ],
+            [0.72319,0.28559,0.13887,1.     ],
+            [0.65098,0.19608,0.10588,1.     ]])
+
+
+    @classmethod
+    def get_custom_black_with_low_values_dropped_cmap(cls, low_value_cutoff:float=0.1):
+        """ Oranges with low values omitted
+        """
+        from matplotlib.colors import LinearSegmentedColormap, Colormap
+        assert low_value_cutoff < 1.0, f"low_value_cutoff: {low_value_cutoff}"
+        # Each point is (normalized value, color)
+        colors = [
+            (0.0, [0.0,0.0,0.0, 0.0]),    # Start: 0.0 mapped to blue
+            (low_value_cutoff, [0.0,0.0,0.0, 0.0]),   # Middle: 0.5 mapped to white
+            (1.0, [0.0,0.0,0.0, 1.0])      # End: 1.0 mapped to red
+        ]
+        return LinearSegmentedColormap.from_list(f"dropping_low_values_black_colormap", colors)
+
+    @classmethod
+    def get_custom_greyscale_with_low_values_dropped_cmap(cls, low_value_cutoff:float=0.05, full_opacity_threshold:float=0.4, grey_value: float = 0.1):
+        """ Oranges with low values omitted
+        """
+        from matplotlib.colors import LinearSegmentedColormap, Colormap
+        assert low_value_cutoff < 1.0, f"low_value_cutoff: {low_value_cutoff}"
+        # Each point is (normalized value, color)
+        assert full_opacity_threshold > low_value_cutoff
+        colors = [
+            (0.0, [grey_value, grey_value, grey_value, 0.0]),    # Start: 0.0 mapped to blue
+            (low_value_cutoff, [grey_value, grey_value, grey_value, 0.0]),   # Middle: 0.5 mapped to white
+            (full_opacity_threshold, [grey_value, grey_value, grey_value, 1.0]),   # Middle: 0.5 mapped to white
+            (1.0, [0.0, 0.0, 0.0, 1.0])      # End: 1.0 mapped to red
+        ]
+        return LinearSegmentedColormap.from_list(f"dropping_low_values_black_colormap", colors)
+
 
 
 @function_attributes(short_name=None, tags=['cmap', 'matplotlib', 'USEFUL', 'posterior', 'DEFAULT'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-04 05:45', related_items=[])
@@ -402,15 +548,5 @@ def get_custom_orange_with_low_values_dropped_cmap():
     active_cmap = get_custom_orange_with_low_values_dropped_cmap()
     
     """
-    from matplotlib.colors import LinearSegmentedColormap
-    return LinearSegmentedColormap.from_list(f"dropping_low_values_oranges_colormap", [
-        [0.87306,0.62718,0.34353,0.     ],
-        #[0.33725,0.14902,0.33333,0.     ],
-        # [0.33725,0.14902,0.33333,1.     ],
-        [0.87306,0.62718,0.34353,1.     ],
-        [0.87306,0.62718,0.34353,1.     ],
-        [0.80485,0.48515,0.24302,1.     ],
-        [0.76402,0.36984,0.181  ,1.     ],
-        [0.72319,0.28559,0.13887,1.     ],
-        [0.65098,0.19608,0.10588,1.     ]])
+    return FixedCustomColormaps.get_custom_orange_with_low_values_dropped_cmap()
     

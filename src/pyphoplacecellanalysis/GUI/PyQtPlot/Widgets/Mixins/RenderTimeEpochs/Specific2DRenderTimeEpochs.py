@@ -255,6 +255,7 @@ class Laps2DRenderTimeEpochs(General2DRenderTimeEpochs):
         interval_datasource = cls.build_render_time_epochs_datasource(active_epochs_obj=active_Epochs, **kwargs)
         out_rects = destination_plot.add_rendered_intervals(interval_datasource, name=kwargs.setdefault('name', cls.default_datasource_name), debug_print=True)
         
+
 ##########################################
 ## PBE (Population Burst Events)
 class PBE_2DRenderTimeEpochs(General2DRenderTimeEpochs):

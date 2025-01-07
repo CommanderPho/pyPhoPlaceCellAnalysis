@@ -37,6 +37,7 @@ from pyphoplacecellanalysis.Resources.icon_helpers import try_get_icon
 
 from pyphocorehelpers.indexing_helpers import Paginator
 from pyphocorehelpers.exception_helpers import ExceptionPrintingContext
+from pyphocorehelpers.assertion_helpers import Assert
 
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import build_scrollable_graphics_layout_widget_ui, build_scrollable_graphics_layout_widget_with_nested_viewbox_ui
 from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget
@@ -968,13 +969,62 @@ class ClickActionCallbacks:
                     a_thin_button_bar_widget = self.thin_button_bar_widget
                     a_thin_button_bar_widget.label_message = f"<clicked> {code_string}"
                     
-                except BaseException as e:
+                except Exception as e:
                     print(f"log_clicked_epoch_times_to_message_box_callback(...): err: {e}. Continuing.") # expected in leftmost (index 0) plot
                     
                 # self.show_message(message=f"{code_string}", durationMs=1000)
                 # print(f'done.')
 
+    def copy_selected_most_likely_positions_to_clipboard_callback(self, event, clicked_ax, clicked_data_index, clicked_epoch_is_selected, clicked_epoch_start_stop_time):
+        """ called when the user alt-clicks an epoch 
+        
+        captures: active_captured_single_epoch_result
+        """
+        from pyphocorehelpers.programming_helpers import copy_to_clipboard
+        
+        if self.params.debug_print:
+            print(f'copy_selected_most_likely_positions_to_clipboard_callback(clicked_data_index: {clicked_data_index}, clicked_epoch_is_selected: {clicked_epoch_is_selected}, clicked_epoch_start_stop_time: {clicked_epoch_start_stop_time})')
+        if clicked_epoch_start_stop_time is not None:
+            if len(clicked_epoch_start_stop_time) == 2:
+                start_t, end_t = clicked_epoch_start_stop_time
+                # print(f'start_t: {start_t}')
+                clicked_data_index: int = self.find_data_indicies_from_epoch_times(epoch_times=np.array([start_t, end_t]))[0]
+                if self.params.debug_print:
+                    print(f'\tclicked_data_index: {clicked_data_index}')            
+                active_captured_single_epoch_result = self.filter_epochs_decoder_result.get_result_for_epoch(active_epoch_idx=clicked_data_index)
+                if self.params.debug_print:
+                    print(f'\tactive_captured_single_epoch_result.epoch_info_tuple: {active_captured_single_epoch_result.epoch_info_tuple}')
+                    print(f'\tdone.')
+                    
+                # most_likely_position_indicies = deepcopy(active_captured_single_epoch_result.most_likely_position_indicies)
+                # most_likely_position_indicies = np.squeeze(most_likely_position_indicies)
+
+                most_likely_positions = deepcopy(active_captured_single_epoch_result.most_likely_positions)
+                most_likely_positions = np.squeeze(most_likely_positions)
+
                 
+                # t_bin_centers = deepcopy(active_captured_single_epoch_result.time_bin_container.centers)
+                # t_bin_indicies = np.arange(len(np.squeeze(most_likely_position_indicies)))
+                # p_x_given_n = deepcopy(active_captured_single_epoch_result.marginal_x.p_x_given_n)
+                try:
+                    copy_to_clipboard(code_str=f"{np.array2string(most_likely_positions, separator=', ')}", message_print=True)
+                except Exception as e:
+                    print(f"ERR: copy_selected_most_likely_positions_to_clipboard_callback(...): err: {e}. Continuing.")
+                    raise
+
+                # out_df = pd.DataFrame({'t': t_bin_centers, 'pos': most_likely_position_indicies})
+                # code_string: str = f"[{start_t}, {end_t}, {out_df}]"
+                # try:
+                #     out_df.to_clipboard(excel=True, sep=', ')
+                    
+                #     # a_thin_button_bar_widget = self.ui.mw.ui.thin_button_bar_widget
+                #     a_thin_button_bar_widget = self.thin_button_bar_widget
+                #     a_thin_button_bar_widget.label_message = f"<clicked> {code_string}"
+                    
+                # except Exception as e:
+                #     print(f"ERR: copy_selected_most_likely_positions_to_clipboard_callback(...): err: {e}. Continuing.") # expected in leftmost (index 0) plot
+                    
+
 
 
 class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
@@ -1718,7 +1768,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import RadonTransformPlotDataProvider
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import WeightedCorrelationPaginatedPlotDataProvider
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DecodedPositionsPlotDataProvider, DecodedSequenceAndHeuristicsPlotDataProvider
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DecodedPositionsPlotDataProvider, DecodedSequenceAndHeuristicsPlotDataProvider, MarginalLabelsPlotDataProvider
         # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import TrainTestSplitPlotDataProvider, TrainTestSplitPlotData
         # self: PaginatedFigureController
 
@@ -1744,13 +1794,23 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         if decoded_position_curves_epochs_data is not None:
             DecodedPositionsPlotDataProvider.add_data_to_pagination_controller(self, decoded_position_curves_epochs_data, update_controller_on_apply=False)
 
+        pos_bin_edges = deepcopy(self.params.xbin)
         decoder_track_length: float = self.params.get('track_length_cm', None)
-        assert decoder_track_length is not None
-        # Build Decoded Positions Data and add them:    
-        decoded_sequence_and_heuristics_curves_data = DecodedSequenceAndHeuristicsPlotDataProvider.decoder_build_single_decoded_sequence_and_heuristics_curves_data(deepcopy(decoder_decoded_epochs_result), decoder_track_length=decoder_track_length, included_columns=included_columns)
-        if decoded_sequence_and_heuristics_curves_data is not None:
-            DecodedSequenceAndHeuristicsPlotDataProvider.add_data_to_pagination_controller(self, decoded_sequence_and_heuristics_curves_data, update_controller_on_apply=False)
+        # assert decoder_track_length is not None
+        if decoder_track_length is not None:
+            # Build Decoded Positions Data and add them:    
+            decoded_sequence_and_heuristics_curves_data = DecodedSequenceAndHeuristicsPlotDataProvider.decoder_build_single_decoded_sequence_and_heuristics_curves_data(deepcopy(decoder_decoded_epochs_result), pos_bin_edges=pos_bin_edges, decoder_track_length=decoder_track_length, included_columns=included_columns)
+            if decoded_sequence_and_heuristics_curves_data is not None:
+                DecodedSequenceAndHeuristicsPlotDataProvider.add_data_to_pagination_controller(self, decoded_sequence_and_heuristics_curves_data, update_controller_on_apply=False)
+        else:
+            print(f'add_data_overlays(...): decoder_track_length is None so skipping heuristics plotting')
 
+
+        marginal_y_bin_labels = self.params.setdefault('marginal_y_bin_labels', ['long_LR', 'long_RL', 'short_LR', 'short_RL'])
+        # self.params.enable_marginal_labels = True
+        marginal_labels_data = MarginalLabelsPlotDataProvider.decoder_build_single_marginal_labels_data(deepcopy(decoder_decoded_epochs_result), included_columns=included_columns, pos_bin_edges=pos_bin_edges, decoder_track_length=decoder_track_length, marginal_y_bin_labels=marginal_y_bin_labels) # , pos_bin_edges=pos_bin_edges, decoder_track_length=decoder_track_length not needed
+        if marginal_labels_data is not None:
+            MarginalLabelsPlotDataProvider.add_data_to_pagination_controller(self, marginal_labels_data, update_controller_on_apply=False)
 
 
         if not defer_refresh:
@@ -1921,7 +1981,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
     # Pass-through properties ____________________________________________________________________________________________ #
     @property
     def decoder_filter_epochs_decoder_result_dict(self) -> Dict[types.DecoderName, DecodedFilterEpochsResult]:
-        """The global_thin_button_bar_widget property."""
+        """ each child has a `.filter_epochs_decoder_result` property """
         return self.get_children_props(prop_path='plots_data.filter_epochs_decoder_result')
  
 
@@ -1994,6 +2054,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             app, root_dockAreaWindow, _out_dock_widgets, dock_configs = merge_single_window(pagination_controller_dict)
 
         """
+        import inspect
         from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
 
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
@@ -2061,18 +2122,24 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         global_thin_button_bar_widget.setObjectName("global_thin_button_bar_widget")
         global_thin_button_bar_widget.setFixedHeight(21)
         global_thin_button_bar_widget.label_message = "<shared>"
+        
+        possible_mouse_actions_dict: Dict[str, Callable] = {method[0]:method[1] for method in inspect.getmembers(ClickActionCallbacks, predicate=inspect.isfunction)}
+        # root_dockAreaWindow.update_params(possible_mouse_actions_dict = possible_mouse_actions_dict, # { 'copy_axis_image_to_clipboard_callback': ClickActionCallbacks.copy_axis_image_to_clipboard_callback, 'copy_click_time_to_clipboard_callback': ClickActionCallbacks.copy_click_time_to_clipboard_callback, 'copy_epoch_times_to_clipboard_callback': ClickActionCallbacks.copy_epoch_times_to_clipboard_callback, 'log_clicked_epoch_times_to_message_box_callback': ClickActionCallbacks.log_clicked_epoch_times_to_message_box_callback },
+        # )
+        
         _out_dock_widgets[utility_footer_name] = root_dockAreaWindow.add_display_dock(identifier=utility_footer_name, widget=global_thin_button_bar_widget, dockSize=(1200, 30), dockAddLocationOpts=['bottom'], display_config=dock_configs[utility_footer_name], autoOrientation=False)
 
         # ## Build final .plots and .plots_data:
         root_dockAreaWindow.ui._contents = PhoUIContainer(name=name, names=main_plot_identifiers_list, pagination_controllers=pagination_controller_dict, 
                                                     dock_widgets=_out_dock_widgets, dock_configs=dock_configs,
                                                     widgets=all_widgets, windows=all_windows, plots=all_separate_plots, plots_data=all_separate_plots_data, params=all_separate_params,
-                                                    global_thin_button_bar_widget=global_thin_button_bar_widget) # do I need this extracted data or is it redundant?
+                                                    global_thin_button_bar_widget=global_thin_button_bar_widget,
+                                                    possible_mouse_actions_dict=possible_mouse_actions_dict) # do I need this extracted data or is it redundant?
         
 
         ## Convert to controlled by global paginator:
         new_connections_dict = cls._build_globally_controlled_pagination(paginated_multi_decoder_decoded_epochs_window=root_dockAreaWindow, pagination_controller_dict=pagination_controller_dict)
-        
+        root_dockAreaWindow._init_UI_additional_mouse_click_action_selection_combos()
 
         # Add functions ______________________________________________________________________________________________________ #
 
@@ -2082,6 +2149,83 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             root_dockAreaWindow.show()
             
         return app, root_dockAreaWindow
+
+
+    @function_attributes(short_name=None, tags=['settings', 'ui', 'private'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-11 20:20', related_items=[])
+    def _init_UI_additional_mouse_click_action_selection_combos(self, debug_print: bool=False):
+        """ adds 3 GUI controls for selecting the desired mouse button actions - 3 separate controls to be added to a thin horizontal toolbar: 1. allows choosing the LMB action from a list `methods_list` of 4 items, 2. allows choosing the MMB action from the same list, 3. allows choosing the RMB action from the same list. All 3 controls should be independent.
+        
+        """
+        # from qtpy import QtCore, QtWidgets
+        from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui, QtWidgets
+                
+        def update_callbacks(selected_combo_box_text: str, action_key: str):
+            """ captures self
+            """
+            methods_list = list(self.ui._contents.possible_mouse_actions_dict.keys())
+            possible_mouse_actions_dict = self.ui._contents.possible_mouse_actions_dict
+            assert selected_combo_box_text in possible_mouse_actions_dict
+            selected_callback_fn = possible_mouse_actions_dict[selected_combo_box_text]
+
+            on_click_item_callbacks_dict = self.get_children_props(prop_path=action_key) # 'params.on_middle_click_item_callbacks'
+            
+            for a_name, a_callback_dict in on_click_item_callbacks_dict.items():
+                if debug_print:
+                    print(f'a_name: {a_name}')
+                ## remove old method names
+                for old_method_name in methods_list:
+                    a_callback_dict.pop(old_method_name, None)
+        
+                a_callback_dict[selected_combo_box_text] = selected_callback_fn
+                # a_callback_dict.update(selected_combo_box_text=selected_callback_fn)
+                
+            if debug_print:
+                print(f'action_key: {action_key} - new action: {selected_combo_box_text}')
+            
+            # if not hasattr(self.params, 'on_left_click_item_callbacks'):
+            #     self.params.params['on_left_click_item_callbacks'] = {}
+            # if not hasattr(self.params, 'on_middle_click_item_callbacks'):
+            #     self.params.params['on_middle_click_item_callbacks'] = {}
+            # if not hasattr(self.params, 'on_secondary_click_item_callbacks'):
+            #     self.params.params['on_secondary_click_item_callbacks'] = {}
+
+            # getattr(self.params.params, action_key)[selected_text] = selected_callback
+
+        # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+        # parent_bar_add_widget_fn = lambda x: global_thin_button_bar_widget.addWidget(x)
+        parent_bar_add_widget_fn = lambda x: global_thin_button_bar_widget.horizontalLayout.insertWidget(-1, x)
+        
+        methods_list = list(self.ui._contents.possible_mouse_actions_dict.keys())
+        global_thin_button_bar_widget = self.global_thin_button_bar_widget
+        
+        # # Create and add the left mouse button (LMB) combo box
+        # self.ui._contents.lmb_action_combo = QtWidgets.QComboBox()
+        # self.ui._contents.lmb_action_combo.addItems(methods_list)
+        # lmb_action = QtGui.QAction("LMB Action", self)
+        # global_thin_button_bar_widget.addAction(lmb_action)
+        # global_thin_button_bar_widget.horizontalLayout.insertWidget(2, self.ui._contents.lmb_action_combo)
+        # self.ui._contents.lmb_action_combo.currentIndexChanged.connect(lambda selected_index: update_callbacks(self.ui._contents.lmb_action_combo.itemText(selected_index), 'params.on_left_click_item_callbacks'))
+        # self.ui._contents.lmb_action_combo.setCurrentIndex(methods_list.index('copy_click_time_to_clipboard_callback'))
+        
+        # Create and add the middle mouse button (MMB) combo box
+        self.ui._contents.mmb_action_combo = QtWidgets.QComboBox()
+        self.ui._contents.mmb_action_combo.addItems(methods_list)
+        mmb_action = QtGui.QAction("MMB Action", self)
+        global_thin_button_bar_widget.addAction(mmb_action)
+        global_thin_button_bar_widget.horizontalLayout.insertWidget(2, self.ui._contents.mmb_action_combo)
+        self.ui._contents.mmb_action_combo.currentIndexChanged.connect(lambda selected_index: update_callbacks(self.ui._contents.mmb_action_combo.itemText(selected_index), 'params.on_middle_click_item_callbacks'))
+        self.ui._contents.mmb_action_combo.setCurrentIndex(methods_list.index('copy_axis_image_to_clipboard_callback')) # copy_click_time_to_clipboard_callback # Set default index for MMB combo box
+
+
+        # Create and add the right mouse button (RMB) combo box
+        self.ui._contents.rmb_action_combo = QtWidgets.QComboBox()
+        self.ui._contents.rmb_action_combo.addItems(methods_list)
+        rmb_action = QtGui.QAction("RMB Action", self)
+        global_thin_button_bar_widget.addAction(rmb_action)
+        global_thin_button_bar_widget.horizontalLayout.insertWidget(3, self.ui._contents.rmb_action_combo)
+        self.ui._contents.rmb_action_combo.currentIndexChanged.connect(lambda selected_index: update_callbacks(self.ui._contents.rmb_action_combo.itemText(selected_index), 'params.on_secondary_click_item_callbacks'))
+        self.ui._contents.rmb_action_combo.setCurrentIndex(methods_list.index('log_clicked_epoch_times_to_message_box_callback')) # Set default index for RMB combo box
+
 
 
     @classmethod
@@ -2099,15 +2243,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         # 'enable_update_window_title_on_page_change'
         pagination_controller_dict =  cls._subfn_prepare_plot_multi_decoders_stacked_epoch_slices(curr_active_pipeline, track_templates, decoder_decoded_epochs_result_dict=decoder_decoded_epochs_result_dict, epochs_name=epochs_name, included_epoch_indicies=included_epoch_indicies, defer_render=True, save_figure=False, **kwargs)
         app, paginated_multi_decoder_decoded_epochs_window = cls.init_from_pagination_controller_dict(pagination_controller_dict, name=name, title=title, defer_show=defer_show) # Combine to a single figure
-        
-        if epochs_name == 'ripple':
-            button_kwargs = dict(decoder_laps_filter_epochs_decoder_result_dict=None, filtered_decoder_filter_epochs_decoder_result_dict=decoder_decoded_epochs_result_dict)
-        elif epochs_name == 'laps':
-            button_kwargs = dict(decoder_laps_filter_epochs_decoder_result_dict=decoder_decoded_epochs_result_dict, filtered_decoder_filter_epochs_decoder_result_dict=None)
-        else:
-            raise NotImplementedError(f'unknown epochs_name: "{epochs_name}", expected "ripple" or "laps"')
-        
-        build_extra_programmatic_buttons(paginated_multi_decoder_decoded_epochs_window, **button_kwargs)
+        build_extra_programmatic_buttons(paginated_multi_decoder_decoded_epochs_window)
     
         # paginated_multi_decoder_decoded_epochs_window.params['track_length_cm_dict'] = track_templates.get_track_length_dict()
         return app, paginated_multi_decoder_decoded_epochs_window, pagination_controller_dict
@@ -2141,7 +2277,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         
         
     @function_attributes(short_name=None, tags=['data-overlays', 'add'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-12 00:00', related_items=['remove_data_overlays'])
-    def add_data_overlays(self, decoder_laps_filter_epochs_decoder_result_dict=None, decoder_ripple_filter_epochs_decoder_result_dict=None, included_columns=None, defer_refresh=False):
+    def add_data_overlays(self, included_columns=None, defer_refresh=False):
         """ builds the Radon Transforms and Weighted Correlation data and adds them to the plot.
         
         REFINEMENT: note that it only plots either 'laps' or 'ripple', not both, so it doesn't need all this data.
@@ -2150,31 +2286,20 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import WeightedCorrelationPaginatedPlotDataProvider
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DecodedPositionsPlotDataProvider, DecodedSequenceAndHeuristicsPlotDataProvider
         
-        if decoder_laps_filter_epochs_decoder_result_dict is not None:
-            assert isinstance(decoder_laps_filter_epochs_decoder_result_dict, dict), f"type(decoder_laps_filter_epochs_decoder_result_dict) is {type(decoder_laps_filter_epochs_decoder_result_dict)}, if it's TrackTemplates we forgot to update the function calls"
-
         ## Choose which columns from the filter_epochs dataframe to include on the plot.
         if included_columns is None:
             included_columns = []
 
-        epoch_type_names_list: List[str] = [a_pagination_controller.params.active_identifying_figure_ctx.epochs for a_pagination_controller in self.pagination_controllers.values()]
-        # All epoch_type_names should be the same, either 'laps' or 'ripple':
-        assert (len(set(epoch_type_names_list)) == 1), f"All epoch_type_names should be the same, either 'laps' or 'ripple', but they are not: epoch_type_names_list: {epoch_type_names_list}"
-        epoch_type_name: str = epoch_type_names_list[0]
-        assert epoch_type_name in ['laps', 'ripple']
-        if epoch_type_name == 'laps':
-            decoder_decoded_epochs_result_dict = decoder_laps_filter_epochs_decoder_result_dict
-        elif epoch_type_name == 'ripple':
-            decoder_decoded_epochs_result_dict = decoder_ripple_filter_epochs_decoder_result_dict
-        else:
-            raise NotImplementedError(f"epoch_type_name: {epoch_type_name}")
-
-        ## Add the radon_transform_lines to each of the four figures:
-        for a_name, a_pagination_controller in self.pagination_controllers.items():            
+        decoder_decoded_epochs_result_dict = deepcopy(self.decoder_filter_epochs_decoder_result_dict)
+        
+        ## Add the overlays to each of the four figures:
+        for a_name, a_pagination_controller in self.pagination_controllers.items():          
+            # a_pagination_controller.params.xbin 
             a_pagination_controller.add_data_overlays(decoder_decoded_epochs_result=decoder_decoded_epochs_result_dict[a_name], included_columns=included_columns, defer_refresh=True)
 
         if not defer_refresh:
             self.refresh_current_page()
+            
 
 
     @function_attributes(short_name=None, tags=['data-overlays', 'remove'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-12 00:00', related_items=['add_data_overlays'])
@@ -2322,8 +2447,10 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
 
 
-    def print_user_annotations(self, should_copy_to_clipboard=True):
+    def print_user_annotations(self, should_copy_to_clipboard=True, use_new_concise_nested_context_format = True):
         """ Builds user annotations and outputs them. 
+
+        use_new_concise_nested_context_format = True # 2024-03-04 - Concise 
 
         >>> Prints Output Like:
         Add the following code to `pyphoplacecellanalysis.General.Model.user_annotations.UserAnnotationsManager.get_user_annotations()` function body:
@@ -2415,8 +2542,6 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
         # Updates the context. Needs to generate the code.
 
-        use_new_concise_nested_context_format = True # 2024-03-04 - Concise 
-
         # ## Generate code to insert int user_annotations:
         self.ui.print('Add the following code to `pyphoplacecellanalysis.General.Model.user_annotations.UserAnnotationsManager.get_user_annotations()` function body:')
 
@@ -2467,11 +2592,28 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         
         # Uses: paginated_multi_decoder_decoded_epochs_window, user_annotations
         # figure_ctx_dict = {a_name:v.params.active_identifying_figure_ctx for a_name, v in self.pagination_controllers.items()} 
-        figure_ctx_dict = self.figure_ctx_dict
-        loaded_selections_context_dict = {a_name:a_figure_ctx.adding_context_if_missing(user_annotation='selections', **additional_selections_context) for a_name, a_figure_ctx in figure_ctx_dict.items()}
-        loaded_selections_dict = {a_name:user_annotations.get(a_selections_ctx, None) for a_name, a_selections_ctx in loaded_selections_context_dict.items()}
+        # figure_ctx_dict = self.figure_ctx_dict
+        # loaded_selections_context_dict = {a_name:a_figure_ctx.adding_context_if_missing(user_annotation='selections', **additional_selections_context) for a_name, a_figure_ctx in figure_ctx_dict.items()}
+        # loaded_selections_dict = {a_name:user_annotations.get(a_selections_ctx, None) for a_name, a_selections_ctx in loaded_selections_context_dict.items()}
 
         new_selections_dict = {a_decoder_name:a_pagination_controller.restore_selections_from_user_annotations(user_annotations, defer_render=defer_render, **additional_selections_context) for a_decoder_name, a_pagination_controller in self.pagination_controllers.items()}
+        
+
+        enable_all_row_selection_sync: bool = True
+        if enable_all_row_selection_sync:
+            children_is_epoch_selected: NDArray = np.vstack([deepcopy(a_pagination_controller.is_selected) for a_name, a_pagination_controller in self.pagination_controllers.items()]) #.shape (4, 136)
+            any_child_epoch_is_selected: NDArray = np.any(children_is_epoch_selected, axis=0) # (136,)
+            ## assign to all 
+            for a_decoder_name, a_pagination_controller in self.pagination_controllers.items():
+                # a_pagination_controller.is_selected = deepcopy(any_child_epoch_is_selected) ## make it independent  # params.update(**updated_values)
+                # a_pagination_controller.params.is_selected
+
+                # Replace values in the dictionary with new_values
+                Assert.same_length(a_pagination_controller.params.is_selected, any_child_epoch_is_selected)
+                a_pagination_controller.params.is_selected = {k: v for k, v in zip(a_pagination_controller.params.is_selected.keys(), any_child_epoch_is_selected)}
+                a_pagination_controller.perform_update_selections(defer_render=False)
+                
+
         # self.draw()
         return new_selections_dict
     
@@ -2548,16 +2690,48 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         # end for
 
         return out_fig_paths_dict
+    
 
-    @function_attributes(short_name=None, tags=['export'], input_requires=[], output_provides=[], uses=['export_decoder_pagination_controller_figure_page'], used_by=[], creation_date='2024-08-13 13:05', related_items=[])
-    def export_all_pages(self, curr_active_pipeline, **kwargs):
+    @function_attributes(short_name=None, tags=['export', 'combine', 'image'], input_requires=[], output_provides=[], uses=[], used_by=['export_all_pages'], creation_date='2024-12-17 10:32', related_items=[])
+    @classmethod
+    def build_combined_all_pages_image(cls, out_fig_paths_dict_list: Dict, combined_image_basename: str = 'combined'):
+        """ builds a concatenated image from the individually exported decoded epochs produced by `out_fig_paths_dict_list = export_all_pages(...)` """
+        from PIL import Image
+        from pyphocorehelpers.plotting.media_output_helpers import vertical_image_stack, horizontal_image_stack, image_grid
+
+        _flat_png_list = []
+        _flat_pdf_list = []
+        
+        for a_page_idx, a_page_out_dict in out_fig_paths_dict_list.items():
+            print(f'page[{a_page_idx}]: a_page_out_dict: {a_page_out_dict}')
+            for a_final_context, an_output_list in a_page_out_dict.items():
+                # final_context
+                _flat_pdf_list.append(an_output_list[0]) ## pdf
+                _flat_png_list.append(an_output_list[1]) ## png
+
+        ## handle PNGs                    
+        out_parent_path = _flat_png_list[0].parent.resolve()
+        _flat_raster_imgs = [Image.open(i) for i in _flat_png_list] ## open the images from disk
+        split_list = [_flat_raster_imgs[i:i + 4] for i in range(0, len(_flat_raster_imgs), 4)]
+        _out_combined_img = vertical_image_stack([horizontal_image_stack(a_row, padding=0) for a_row in split_list], padding=4)
+
+        combined_img_out_path = out_parent_path.joinpath(f'{combined_image_basename}.png')
+        _out_combined_img.save(combined_img_out_path)
+        
+        return (_flat_png_list, _out_combined_img, combined_img_out_path)
+    
+
+    @function_attributes(short_name=None, tags=['export'], input_requires=[], output_provides=[], uses=['export_decoder_pagination_controller_figure_page', 'build_combined_all_pages_image'], used_by=[], creation_date='2024-08-13 13:05', related_items=[])
+    def export_all_pages(self, curr_active_pipeline, write_vector_format=True, write_png=True, enable_export_combined_img: bool=False, combined_image_basename: str = 'combined', **kwargs):
         """ exports each pages single-decoder figures separately
 
         Usage:
             export_decoder_pagination_controller_figure_page(pagination_controller_dict, curr_active_pipeline)
 
+            _out_paths, (_out_combined_img, combined_img_out_path) = paginated_multi_decoder_decoded_epochs_window.export_all_pages(curr_active_pipeline, enable_export_combined_img=True, combined_image_basename=f'{DAY_DATE_TO_USE}_combined_All_Epochs')
+            
         """
-        output_figure_kwargs = dict(write_vector_format=True, write_png=True) | kwargs
+        output_figure_kwargs = dict(write_vector_format=write_vector_format, write_png=write_png) | kwargs
 
         # assert self.isPaginatorControlWidgetBackedMode
         a_controlling_pagination_controller = self.contents.pagination_controllers['long_LR'] # DecodedEpochSlicesPaginatedFigureController
@@ -2580,9 +2754,13 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             self.draw()
             out_fig_paths_dict_list[a_page_idx] = self.export_decoder_pagination_controller_figure_page(curr_active_pipeline=curr_active_pipeline, **output_figure_kwargs)
 
-
         print(f'\tdone.')
-        return out_fig_paths_dict_list
+
+        if enable_export_combined_img:
+            (_flat_png_list, _out_combined_img, combined_img_out_path) = self.build_combined_all_pages_image(out_fig_paths_dict_list=out_fig_paths_dict_list, combined_image_basename=combined_image_basename)
+            return out_fig_paths_dict_list, (_out_combined_img, combined_img_out_path)
+        else:
+            return out_fig_paths_dict_list
     
     
     #endregion Export/Output ______________________________________________________________________________________________________ #
@@ -2640,7 +2818,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
     #     return {a_name:getattr(a_pagination_controller, prop_name) for a_name, a_pagination_controller in self.pagination_controllers.items()}
 
     @function_attributes(short_name=None, tags=['USEFUL', 'children', 'simplification'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-04 05:18', related_items=[])
-    def get_children_props(self, prop_path):
+    def get_children_props(self, prop_path: str):
         """ 
         paginated_multi_decoder_decoded_epochs_window.get_children_props(prop_path='plots_data.epoch_slices')
         paginated_multi_decoder_decoded_epochs_window.get_children_props(prop_path='plots_data.filter_epochs_decoder_result')
@@ -2659,9 +2837,37 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
         return {a_name:get_nested_prop(a_pagination_controller, prop_path) for a_name, a_pagination_controller in self.pagination_controllers.items()}
 
-    # def set_child_props(self, prop_name, value):
-    #     for child in self.findChildren(QWidget):
-    #         setattr(child, prop_name, value)
+
+    def set_children_props(self, prop_path: str, value):
+        """ sets the property from a path for each child object 
+        """
+        # def get_nested_prop(obj, prop_path):
+        #     attrs = prop_path.split(".")
+        #     for attr in attrs:
+        #         obj = getattr(obj, attr, None)
+        #         if obj is None:
+        #             break
+        #     return obj
+                
+        prop_name_parts = prop_path.split('.')
+        if len(prop_name_parts) >= 2:
+            ## at least two parts
+            container_prop_name = '.'.join(prop_name_parts[:-1]) ## all but the last prop
+            final_property_name: str = prop_name_parts[-1]
+            
+            child_container_props_dict = self.get_children_props(prop_path=container_prop_name)
+            
+            for a_name, a_pagination_controller in self.pagination_controllers.items():
+                a_container = child_container_props_dict[a_name]                
+                setattr(a_container, final_property_name, value) ## hopefully updates in-place?                
+                # get_nested_prop(a_pagination_controller, container_prop_name)
+                
+        else:
+            raise NotImplementedError(f'')
+            
+        # for child in self.findChildren(QWidget):
+        #     setattr(child, prop_name, value)
+
 
 
     def show_message(self, message: str, durationMs:int=4000):
@@ -2902,18 +3108,31 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
 
         # directional_merged_decoders_result # all_directional_ripple_filter_epochs_decoder_result, ripple_track_identity_marginals_tuple
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
+        from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
         
         assert (filter_epochs is not None)
         assert (filter_epochs_decoder_result is not None)
         
         debug_print = kwargs.get('debug_print', False)
+        
+        # TrackID ____________________________________________________________________________________________________________ #
+        marginal_y_bin_labels = kwargs.get('marginal_y_bin_labels', ['long', 'short'])
+        active_marginal_fn =  kwargs.get('active_marginal_fn', lambda a_filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(a_filter_epochs_decoder_result))
+
+        # # All-four ___________________________________________________________________________________________________________ #
+        # marginal_y_bin_labels = kwargs.get('marginal_y_bin_labels', ['long_LR', 'long_RL', 'short_LR', 'short_RL'])
+        # active_marginal_fn = kwargs.get('active_marginal_fn', lambda a_filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors(a_filter_epochs_decoder_result)) ## IMPORTANT: `active_marginal_fn` is what makes this a yellow-blue plot
+
+
 
         ## Extract params_kwargs
         params_kwargs = kwargs.pop('params_kwargs', {})
         params_kwargs = dict(skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, isPaginatorControlWidgetBackedMode=True) | params_kwargs ## merge 
         params_kwargs = {'max_subplots_per_page': 10, 'scrollable_figure': False, 'use_AnchoredCustomText': False,
                 'should_suppress_callback_exceptions': False, 'isPaginatorControlWidgetBackedMode': True,
-                'enable_update_window_title_on_page_change': False, 'build_internal_callbacks': True, 'debug_print': True,} | params_kwargs
+                'enable_update_window_title_on_page_change': False, 'build_internal_callbacks': True, 'debug_print': True, 'skip_plotting_measured_positions': True,  'enable_decoded_most_likely_position_curve': False, 
+                                                                                                    'enable_decoded_sequence_and_heuristics_curve': False, 'show_pre_merged_debug_sequences': False, 'show_heuristic_criteria_filter_epoch_inclusion_status': False,
+                                                                                                     'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False, 'enable_weighted_corr_data_provider_modify_axes_rect': False, 'enable_marginal_labels': True, 'marginal_y_bin_labels': marginal_y_bin_labels} | params_kwargs
         
         print(f'params_kwargs: {params_kwargs}')
         
@@ -2935,10 +3154,6 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         # long_short_marginals: List[NDArray] = [x.p_x_given_n for x in DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(all_directional_ripple_filter_epochs_decoder_result)] # these work if I want all of them
 
         first_controller = list(self.pagination_controllers.values())[0]
-        # included_page_data_indicies, (curr_page_active_filter_epochs, curr_page_epoch_labels, curr_page_time_bin_containers, curr_page_posterior_containers) = first_controller.plots_data.paginator.get_page_data(page_idx=first_controller.current_page_idx)
-        # curr_page_epoch_labels # these actually do seem correct to pass in as `included_epoch_indicies`
-        # curr_page_epoch_labels = [int(v.removeprefix('Epoch[').removesuffix(']')) for v in curr_page_epoch_labels] # ['Epoch[70]' 'Epoch[72]'] -> [70, 72]
-        # print(curr_page_epoch_labels)
         # Ripple Track-identity (Long/Short) Marginal:
         ## INPUTS: all_directional_ripple_filter_epochs_decoder_result, global_session, ripple_decoding_time_bin_size
         # _main_context = {'decoded_epochs': 'Ripple', 'Marginal': 'TrackID', 't_bin': decoding_time_bin_size}
@@ -2957,8 +3172,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                                                                                             filter_epochs_decoder_result=filter_epochs_decoder_result,
                                                                                             xbin=active_decoder.xbin, global_pos_df=global_session.position.to_dataframe(),
                                                                                             a_name=f'YellowBlueMarginalEpochSlices', active_context=active_context,
-                                                                                            # active_marginal_fn=lambda a_filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(a_filter_epochs_decoder_result), ## IMPORTANT: `active_marginal_fn` is what makes this a yellow-blue plot
-                                                                                            active_marginal_fn=lambda a_filter_epochs_decoder_result: DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors(a_filter_epochs_decoder_result), ## IMPORTANT: `active_marginal_fn` is what makes this a yellow-blue plot
+                                                                                            active_marginal_fn=active_marginal_fn, ## IMPORTANT: `active_marginal_fn` is what makes this a yellow-blue plot
                                                                                             # active_marginal_fn=None,
                                                                                             max_subplots_per_page=max_subplots_per_page, debug_print=debug_print,
                                                                                             # included_epoch_indicies=curr_page_epoch_labels, ## This is what broke rendering on every page except the first one
@@ -3024,6 +3238,23 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         self.ui.attached_yellow_blue_marginals_viewer_widget = a_yellow_blue_controller
         # self.ui.connections['attached_yellow_blue_marginals_viewer_widget'] = new_connections_dict
         
+        # extant_marginal_label_artists_dict = self.ui.attached_yellow_blue_marginals_viewer_widget.plots.get('marginal_label_artists_dict', {})
+        # ## can remove them by
+        # for decoder_name, inner_output_dict in extant_marginal_label_artists_dict.items():
+        #     for a_name, an_artist in inner_output_dict.items():
+        #         an_artist.remove()
+        
+        # marginal_label_artists_dict = {}
+
+        # for i, ax in enumerate(self.ui.attached_yellow_blue_marginals_viewer_widget.plots.axs):
+        #     marginal_label_artists_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['long_LR', 'long_RL', 'short_LR', 'short_RL'], enable_draw_decoder_colored_lines=False, should_use_ax_fraction_positioning=True) ## use this because we used `DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors(a_filter_epochs_decoder_result)` up above
+        #     # marginal_label_artists_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['long', 'short'], enable_draw_decoder_colored_lines=False)
+        #     # marginal_label_artists_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['LR', 'RL'], enable_draw_decoder_colored_lines=False)
+
+        # self.ui.attached_yellow_blue_marginals_viewer_widget.plots['marginal_label_artists_dict'] = marginal_label_artists_dict
+
+        a_yellow_blue_controller.add_data_overlays(decoder_decoded_epochs_result=filter_epochs_decoder_result, included_columns=[])
+        
         return yellow_blue_attached_render_plot
 
 
@@ -3062,7 +3293,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
     @classmethod
     def plot_full_paginated_decoded_epochs_window(cls, curr_active_pipeline, track_templates, active_spikes_df,
                                                 active_decoder_decoded_epochs_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], directional_decoders_epochs_decode_result: "DecoderDecodedEpochsResult", 
-                                                active_filter_epochs_df: pd.DataFrame, known_epochs_type='ripple', title='Long-like post-Delta Ripples Only'):
+                                                active_filter_epochs_df: pd.DataFrame, known_epochs_type='ripple', title='Long-like post-Delta Ripples Only', **kwargs):
         """ 
         Plots 3 connected windows: the main decoded position posteriors, the track identity posteriors, and the rasters
 
@@ -3091,23 +3322,22 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
         directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders'] # DirectionalPseudo2DDecodersResult, pull from global computations
 
+
+        
         _shared_plotting_kwargs = {                # 'debug_print': True,
-                'max_subplots_per_page': 3,
-                'scrollable_figure': False,
+                'max_subplots_per_page': kwargs.get('params_kwargs', {}).get('max_subplots_per_page', 3),
+                'scrollable_figure': kwargs.get('params_kwargs', {}).get('scrollable_figure', False),
                 # 'scrollable_figure': True,
                 # 'posterior_heatmap_imshow_kwargs': dict(vmin=0.0075),
-                'use_AnchoredCustomText': False,
-                'should_suppress_callback_exceptions': False,
+                'use_AnchoredCustomText': kwargs.get('params_kwargs', {}).get('use_AnchoredCustomText', False),
+                'should_suppress_callback_exceptions': kwargs.get('params_kwargs', {}).get('should_suppress_callback_exceptions', False),
                 # 'build_fn': 'insets_view',
-                'should_draw_time_bin_boundaries': True, 'time_bin_edges_display_kwargs': dict(color='grey', alpha=0.5, linewidth=1.5),   
+                'should_draw_time_bin_boundaries': kwargs.get('params_kwargs', {}).get('should_draw_time_bin_boundaries', True),
+                 'time_bin_edges_display_kwargs': kwargs.get('params_kwargs', {}).get('time_bin_edges_display_kwargs', dict(color='grey', alpha=0.5, linewidth=1.5)),
         }
-
-        # Build main Decoded Posterior Window ________________________________________________________________________________ #
-        ## uses `active_decoder_decoded_epochs_result_dict`
-        app, paginated_multi_decoder_decoded_epochs_window, pagination_controller_dict = PhoPaginatedMultiDecoderDecodedEpochsWindow.init_from_track_templates(curr_active_pipeline, track_templates,
-            decoder_decoded_epochs_result_dict=active_decoder_decoded_epochs_result_dict, epochs_name=known_epochs_type, title=title,
-            included_epoch_indicies=None, debug_print=False,
-            params_kwargs={'enable_per_epoch_action_buttons': False,
+        
+        params_kwargs = {'known_epochs_type': known_epochs_type,
+                         'enable_per_epoch_action_buttons': False,
                 'skip_plotting_most_likely_positions': True, 'skip_plotting_measured_positions': True, 
                 'enable_decoded_most_likely_position_curve': False, 'enable_decoded_sequence_and_heuristics_curve': False, 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False,
                 # 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False,
@@ -3116,8 +3346,17 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                 'enable_update_window_title_on_page_change': False, 'build_internal_callbacks': True,
                 'posterior_heatmap_imshow_kwargs': dict(cmap=get_heatmap_cmap(cmap='Oranges', bad_color='black', under_color='white', over_color='red')),
                 # 'debug_print': True,
-                **_shared_plotting_kwargs,            
-        })
+                **_shared_plotting_kwargs,
+        } | kwargs.pop('params_kwargs', {})
+        
+        # Build main Decoded Posterior Window ________________________________________________________________________________ #
+        ## uses `active_decoder_decoded_epochs_result_dict`
+        app, paginated_multi_decoder_decoded_epochs_window, pagination_controller_dict = PhoPaginatedMultiDecoderDecodedEpochsWindow.init_from_track_templates(curr_active_pipeline, track_templates,
+            decoder_decoded_epochs_result_dict=active_decoder_decoded_epochs_result_dict, epochs_name=known_epochs_type, title=title,
+            included_epoch_indicies=None, debug_print=False,
+            params_kwargs = params_kwargs,
+            **kwargs,
+        )
         
         # Build Raster Widget ________________________________________________________________________________________________ #
         ripple_rasters_plot_tuple = paginated_multi_decoder_decoded_epochs_window.build_attached_raster_viewer_widget(track_templates=track_templates, active_spikes_df=active_spikes_df, filtered_epochs_df=active_filter_epochs_df) 
@@ -3135,7 +3374,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         
         # directional_merged_decoders_result.filtered_by_epoch_times()
         yellow_blue_trackID_marginals_plot_tuple = paginated_multi_decoder_decoded_epochs_window.build_attached_yellow_blue_track_identity_marginal_window(directional_merged_decoders_result, global_session=global_session, filter_epochs=deepcopy(active_filter_epochs_df), epochs_name=known_epochs_type, 
-                                                                                                                                                           **active_build_attached_yellow_blue_track_identity_marginal_window_kwargs, **_shared_plotting_kwargs, active_context=yellow_blue_plot_context)
+                                                                                                                                                           **active_build_attached_yellow_blue_track_identity_marginal_window_kwargs, **_shared_plotting_kwargs,
+                                                                                                                                                           active_context=yellow_blue_plot_context)
 
         return (app, paginated_multi_decoder_decoded_epochs_window, pagination_controller_dict), ripple_rasters_plot_tuple, yellow_blue_trackID_marginals_plot_tuple
 
@@ -3318,7 +3558,7 @@ def _build_attached_raster_viewer(paginated_multi_decoder_decoded_epochs_window:
 
 
 @function_attributes(short_name=None, tags=['ui', 'buttons'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-25 16:03', related_items=[])
-def build_extra_programmatic_buttons(paginated_multi_decoder_decoded_epochs_window: PhoPaginatedMultiDecoderDecodedEpochsWindow, decoder_laps_filter_epochs_decoder_result_dict=None, filtered_decoder_filter_epochs_decoder_result_dict=None):
+def build_extra_programmatic_buttons(paginated_multi_decoder_decoded_epochs_window: PhoPaginatedMultiDecoderDecodedEpochsWindow):
     """ Builds a row of buttons that populate the bottom-most toolbar in the window to provide page-specific functionality and perform various tasks.
     
  
@@ -3346,7 +3586,7 @@ def build_extra_programmatic_buttons(paginated_multi_decoder_decoded_epochs_wind
     dict(icon_path=':/png/gui/icons/view-refresh.png', name="Refresh", callback=(lambda self, *args, **kwargs: paginated_multi_decoder_decoded_epochs_window.refresh_current_page())), ## captures: paginated_multi_decoder_decoded_epochs_window
     # dict(icon_path=':/png/gui/icons/nxdata-create.png', name="AddDataOverlays", callback=(lambda self, *args, **kwargs: paginated_multi_decoder_decoded_epochs_window.add_data_overlays(decoder_laps_filter_epochs_decoder_result_dict, filtered_decoder_filter_epochs_decoder_result_dict))), ## captures: paginated_multi_decoder_decoded_epochs_window, decoder_laps_filter_epochs_decoder_result_dict, filtered_decoder_filter_epochs_decoder_result_dict
     # dict(icon_path=':/png/gui/icons/mask-clear-all.png', name="RemoveDataOverlays", callback=(lambda self, *args, **kwargs: paginated_multi_decoder_decoded_epochs_window.remove_data_overlays())), ## captures: paginated_multi_decoder_decoded_epochs_window
-    dict(icon_path=':/png/gui/icons/image-select-add.png', name="AddDataOverlays", callback=(lambda self, *args, **kwargs: paginated_multi_decoder_decoded_epochs_window.add_data_overlays(decoder_laps_filter_epochs_decoder_result_dict, filtered_decoder_filter_epochs_decoder_result_dict))), ## captures: paginated_multi_decoder_decoded_epochs_window, decoder_laps_filter_epochs_decoder_result_dict, filtered_decoder_filter_epochs_decoder_result_dict
+    dict(icon_path=':/png/gui/icons/image-select-add.png', name="AddDataOverlays", callback=(lambda self, *args, **kwargs: paginated_multi_decoder_decoded_epochs_window.add_data_overlays())), ## captures: paginated_multi_decoder_decoded_epochs_window, decoder_laps_filter_epochs_decoder_result_dict, filtered_decoder_filter_epochs_decoder_result_dict
     dict(icon_path=':/png/gui/icons/image-select-erase.png', name="RemoveDataOverlays", callback=(lambda self, *args, **kwargs: paginated_multi_decoder_decoded_epochs_window.remove_data_overlays())), ## captures: paginated_multi_decoder_decoded_epochs_window
     dict(icon_path=':/png/gui/icons/document-print.png', name="PrintUserAnnotations", callback=(lambda self, *args, **kwargs: paginated_multi_decoder_decoded_epochs_window.print_user_annotations())), ## captures: paginated_multi_decoder_decoded_epochs_window
     dict(icon_path=':/png/gui/icons/document-open.png', name="LoadUserAnnotations", callback=(lambda self, *args, **kwargs: paginated_multi_decoder_decoded_epochs_window.restore_selections_from_user_annotations())), ## captures: paginated_multi_decoder_decoded_epochs_window

@@ -11,17 +11,20 @@ from nptyping import NDArray
 
 from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable, iPythonKeyCompletingMixin
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
+from neuropy.utils.indexing_helpers import PandasHelpers
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters, RenderPlots, RenderPlotsData
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphocorehelpers.gui.Qt.connections_container import ConnectionsContainer
-
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem, RectangleRenderTupleHelpers
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Render2DEventRectanglesHelper import Render2DEventRectanglesHelper
 
 from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import IntervalsDatasource
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs # required for `update_interval_visualization_properties(...)`
+from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 
 
 class RenderedEpochsItemsContainer(iPythonKeyCompletingMixin, DynamicParameters):
@@ -42,8 +45,108 @@ class RenderedEpochsItemsContainer(iPythonKeyCompletingMixin, DynamicParameters)
                 independent_data_copy = RectangleRenderTupleHelpers.copy_data(rendered_rects_item.data)
                 self[a_plot] = IntervalRectsItem(data=independent_data_copy)
 
-   
-class EpochRenderingMixin:
+
+
+@metadata_attributes(short_name=None, tags=['live-window', 'intervals'], input_requires=[], output_provides=[], uses=[], used_by=['EpochRenderingMixin'], creation_date='2025-01-06 15:09', related_items=[])
+class LiveWindowEventIntervalMonitoringMixin:
+    """ 
+    
+    sets:
+        self._active_window_visible_intervals_dict
+        
+    Implementors must:
+        self.LiveWindowEventIntervalMonitoringMixin_on_window_update(new_start, new_end)
+    """
+    sigOnIntervalEnteredWindow = QtCore.Signal(object) # pyqtSignal(object)
+    # sigOnIntervalInWindow = None
+    sigOnIntervalExitedindow = QtCore.Signal(object)
+    
+    @pyqtExceptionPrintingSlot()
+    def LiveWindowEventIntervalMonitoringMixin_on_init(self):
+        """ perform any parameters setting/checking during init """
+        self._active_window_visible_intervals_dict = {}
+
+    @pyqtExceptionPrintingSlot()
+    def LiveWindowEventIntervalMonitoringMixin_on_setup(self):
+        """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
+        pass
+
+
+    @pyqtExceptionPrintingSlot()
+    def LiveWindowEventIntervalMonitoringMixin_on_buildUI(self):
+        """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
+        connections = {}
+        connections['LiveWindowEventIntervalMonitoringMixin_entered'] = self.sigOnIntervalEnteredWindow.connect(self.on_visible_event_intervals_added)
+        connections['LiveWindowEventIntervalMonitoringMixin_exited'] = self.sigOnIntervalExitedindow.connect(self.on_visible_event_intervals_removed)
+
+
+    @pyqtExceptionPrintingSlot()
+    def LiveWindowEventIntervalMonitoringMixin_on_destroy(self):
+        """ perfrom teardown/destruction of anything that needs to be manually removed or released """
+        pass
+
+    @pyqtExceptionPrintingSlot(float, float)
+    def LiveWindowEventIntervalMonitoringMixin_on_window_update(self, new_start=None, new_end=None):
+        """ called to perform updates when the active window changes. Redraw, recompute data, etc. """
+        self.on_visible_intervals_changed()
+            
+    @pyqtExceptionPrintingSlot(object)
+    def LiveWindowEventIntervalMonitoringMixin_on_window_update_rate_limited(self, evt):
+        self.LiveWindowEventIntervalMonitoringMixin_on_window_update(*evt)
+        
+
+    @property
+    def active_window_visible_intervals_dict(self):
+        """The active_window_visible_intervals_dict property."""
+        return self._active_window_visible_intervals_dict
+    @active_window_visible_intervals_dict.setter
+    def active_window_visible_intervals_dict(self, value):
+        self._active_window_visible_intervals_dict = value
+
+    def find_intervals_in_active_window(self, debug_print=False) -> Dict[str, pd.DataFrame]:
+        raise NotImplementedError(f'Implementors must override!')
+
+    @pyqtExceptionPrintingSlot()
+    def on_visible_intervals_changed(self):
+        """ called to get the changes after intervals are updated. 
+        """        
+
+        all_live_window_included_intervals_dict = self.find_intervals_in_active_window()
+
+        curr_all_live_window_visible_interval_changes_dict: Dict[str, Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]] = {} ## current changes dict
+
+        for k, intervals_df in all_live_window_included_intervals_dict.items():
+            extant_intervals_df = self.active_window_visible_intervals_dict.get(k, PandasHelpers.empty_df_like(intervals_df))
+            
+            # ## INPUTS: intervals_df, extant_intervals_df
+            curr_all_live_window_visible_interval_changes_dict[k] = PandasHelpers.get_df_row_changes(potentially_updated_df=intervals_df, prev_df=extant_intervals_df) 
+            (added_rows, same_rows, removed_rows) = curr_all_live_window_visible_interval_changes_dict[k]
+
+        ## OUTPUTS: curr_all_live_window_visible_interval_changes_dict
+        ## done with update
+        self.active_window_visible_intervals_dict = deepcopy(all_live_window_included_intervals_dict)
+        if len(added_rows) > 0:
+            self.sigOnIntervalEnteredWindow.emit(added_rows)
+        # if len(same_rows) > 0:
+        #     self.sigOnIntervalEnteredWindow.emit(same_rows)
+        if len(removed_rows) > 0:
+            self.sigOnIntervalExitedindow.emit(removed_rows)            
+
+
+    @pyqtExceptionPrintingSlot(object)
+    def on_visible_event_intervals_added(self, added_rows):
+        print(f'LiveWindowEventIntervalMonitoringMixin.on_visible_event_intervals_added(added_rows: {added_rows})')
+        # spike_raster_window.bottom_playback_control_bar_logger.add_log_line(f'visible_event_intervals_added(added_rows: {added_rows})')
+        
+    @pyqtExceptionPrintingSlot(object)
+    def on_visible_event_intervals_removed(self, removed_rows):
+        print(f'LiveWindowEventIntervalMonitoringMixin.visible_event_intervals_removed(removed_rows: {removed_rows})')
+        # spike_raster_window.bottom_playback_control_bar_logger.add_log_line(f'visible_event_intervals_removed(removed_rows: {removed_rows})')
+
+
+
+@metadata_attributes(short_name=None, tags=['epoch', 'intervals', 'rendering'], input_requires=[], output_provides=[], uses=['LiveWindowEventIntervalMonitoringMixin'], used_by=['Spike2DRaster'], creation_date='2025-01-06 15:10', related_items=[])
+class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
     """ Implementors render Epochs/Intervals
     
     Requires:
@@ -121,21 +224,23 @@ class EpochRenderingMixin:
 
     #######################################################################################################################################
     
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def EpochRenderingMixin_on_init(self):
         """ perform any parameters setting/checking during init """
         self.plots_data['interval_datasources'] = RenderPlotsData('EpochRenderingMixin')
-        
+        self.LiveWindowEventIntervalMonitoringMixin_on_init()
         
 
         # self.plots_data['interval_datasource_updating_connections'] = ConnectionsContainer('EpochRenderingMixin')
     
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def EpochRenderingMixin_on_setup(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         self.plots.rendered_epochs = RenderPlots('EpochRenderingMixin') # the container to hold the time rectangles
+        self.LiveWindowEventIntervalMonitoringMixin_on_setup()
+        
 
-    @QtCore.Slot()
+    @pyqtExceptionPrintingSlot()
     def EpochRenderingMixin_on_buildUI(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         # Adds the self.ui and self.ui.connections if they don't exist
@@ -150,16 +255,21 @@ class EpochRenderingMixin:
             if not hasattr(self.ui, 'connections'):
                 self.ui.connections = ConnectionsContainer()
 
-    @QtCore.Slot()
+        self.LiveWindowEventIntervalMonitoringMixin_on_buildUI()
+        
+
+    @pyqtExceptionPrintingSlot()
     def EpochRenderingMixin_on_destroy(self):
         """ perfrom teardown/destruction of anything that needs to be manually removed or released """
         # TODO: REGISTER AND IMPLEMENT
+        self.LiveWindowEventIntervalMonitoringMixin_on_destroy()
         raise NotImplementedError
         pass
 
-    @QtCore.Slot(float, float)
+    @pyqtExceptionPrintingSlot(float, float)
     def EpochRenderingMixin_on_window_update(self, new_start=None, new_end=None):
         """ called to perform updates when the active window changes. Redraw, recompute data, etc. """
+        self.LiveWindowEventIntervalMonitoringMixin_on_window_update(new_start, new_end)
         raise NotImplementedError
         pass
 
@@ -167,7 +277,7 @@ class EpochRenderingMixin:
     ##################################################
     ## For use with pg.SignalProxy
     # using signal proxy turns original arguments into a tuple
-    @QtCore.Slot(object)
+    @pyqtExceptionPrintingSlot(object)
     def EpochRenderingMixin_on_window_update_rate_limited(self, evt):
         self.EpochRenderingMixin_on_window_update(*evt)
         
@@ -175,7 +285,7 @@ class EpochRenderingMixin:
     
     #######################################################################################################################################
     
-    @QtCore.Slot(object)
+    @pyqtExceptionPrintingSlot(object)
     def EpochRenderingMixin_on_interval_datasource_changed(self, datasource: IntervalsDatasource):
         """ emit our own custom signal when the general datasource update method returns """
         # print(f'datasource: {datasource.custom_datasource_name}')
@@ -410,7 +520,7 @@ class EpochRenderingMixin:
         """ Returns a dictionary containing the hierarchy of all the members. Can optionally also print. 
         
         Example:
-            interval_info = active_2d_plot.list_all_rendered_intervals()
+            interval_info_dict = active_2d_plot.get_all_rendered_intervals_dict()
             >>> CONSOLE OUTPUT >>>        
                 rendered_epoch_names: ['PBEs', 'Laps']
                     name: PBEs - 0 plots:
@@ -558,6 +668,54 @@ class EpochRenderingMixin:
                 pass
 
         return all_series_positioning_dfs, all_series_compressed_positioning_dfs, all_series_compressed_positioning_update_dicts
+
+
+    def recover_interval_datasources_update_dict_properties(self, debug_print=False):
+        """ Tries to recover the positioning properties from each of the interval_datasources of active_2d_plot
+        
+        Usage:
+
+            all_series_positioning_dfs, all_series_compressed_positioning_dfs, all_series_compressed_positioning_update_dicts = active_2d_plot.recover_interval_datasources_update_dict_properties()
+            # all_series_positioning_dfs
+            all_series_compressed_positioning_dfs
+
+        all_series_compressed_positioning_dfs: {'PBEs': {'y_location': -11.666666666666668, 'height': 4.166666666666667},
+        'Ripples': {'y_location': -15.833333333333336, 'height': 4.166666666666667},
+        'Replays': {'y_location': -20.000000000000004, 'height': 4.166666666666667},
+        'Laps': {'y_location': -7.083333333333334, 'height': 4.166666666666667},
+        'SessionEpochs': {'y_location': -2.916666666666667, 'height': 2.0833333333333335}}
+
+
+        >> Can restore with:
+
+            all_series_compressed_positioning_update_dicts = { 'SessionEpochs': {'y_location': -2.916666666666667, 'height': 2.0833333333333335},
+            'Laps': {'y_location': -7.083333333333334, 'height': 4.166666666666667},
+            'PBEs': {'y_location': -11.666666666666668, 'height': 4.166666666666667},
+            'Ripples': {'y_location': -15.833333333333336, 'height': 4.166666666666667},
+            'Replays': {'y_location': -20.000000000000004, 'height': 4.166666666666667}}
+            active_2d_plot.update_rendered_intervals_visualization_properties(all_series_compressed_positioning_update_dicts)
+
+
+        """
+        all_series_positioning_dfs = {}
+        all_series_compressed_positioning_dfs = {}
+        all_series_compressed_positioning_update_dicts = {}
+        for a_name, a_ds in self.interval_datasources.items():
+            # print(a_name, a_ds)
+            if isinstance(a_ds, IntervalsDatasource):
+                all_series_positioning_dfs[a_name], all_series_compressed_positioning_dfs[a_name], series_compressed_positioning_update_dict = a_ds.recover_update_dict_properties()
+                if series_compressed_positioning_update_dict is not None:
+                    # only one entry, to be expected
+                    all_series_compressed_positioning_update_dicts[a_name] = series_compressed_positioning_update_dict
+                else:
+                    print(f'ERROR: series_compressed_positioning_update_dict is None for {a_name}. it will not be represented in the output dict.')            
+            else:
+                if debug_print:
+                    print(f'weird a_name, a_ds: {a_name}, {a_ds}, type(a_ds): {type(a_ds)}')
+                pass
+
+        return all_series_positioning_dfs, all_series_compressed_positioning_dfs, all_series_compressed_positioning_update_dicts
+
 
 
 
@@ -743,10 +901,148 @@ class EpochRenderingMixin:
 
 
 
+    @function_attributes(short_name=None, tags=['heights', 'sizing', 'geometry', 'intervals'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-30 14:15', related_items=[])
+    def update_rendered_interval_heights(self, absolute_combined_height_px: float = 60.0):
+        """ 
+        Updates the total height
+        
+        Usage:
+        
+            update_rendered_interval_heights(active_2d_plot, absolute_combined_height_px=40.0)
+        
+        NOTE: epochs_update_dict -- hardcoded
+        
+        """
+        ## INPUTS: absolute_combined_height_px: float = 60.0
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs, Ripples_2DRenderTimeEpochs, inline_mkColor
+        
+        epochs_update_dict = {
+            'Replays':dict(y_location=-4.0, height=1.9, pen_color=inline_mkColor('orange', 0.8), brush_color=inline_mkColor('orange', 0.5)),
+            'Laps':dict(y_location=-2.0, height=0.9, pen_color=inline_mkColor('red', 0.8), brush_color=inline_mkColor('red', 0.5)),
+            'SessionEpochs ':dict(y_location=-1.0, height=0.9, pen_color=inline_mkColor('cyan', 0.8), brush_color=inline_mkColor('cyan', 0.5)),
+            # 'PBEs':dict(y_location=-2.0, height=1.5, pen_color=inline_mkColor('pink', 0.8), brush_color=inline_mkColor('pink', 0.5)),
+            # 'Ripples':dict(y_location=-12.0, height=1.5, pen_color=inline_mkColor('cyan', 0.8), brush_color=inline_mkColor('cyan', 0.5)),
+        }
+        
+        y_location_list: List[float] = []
+        for a_name, a_dict in epochs_update_dict.items():
+            a_dict['y_location_top'] = a_dict['y_location'] + a_dict['height']
+            y_location_list.append([a_dict['y_location'], a_dict['y_location_top']])
+
+        y_location_list = np.array(y_location_list)
+        y_location_min: float = np.min(y_location_list[:, 0])
+        y_location_max: float = np.max(y_location_list[:, 1]) # min, max
+
+        virtual_combined_height_px: float = np.abs(np.abs(y_location_max) - np.abs(y_location_min)) # 3.9
+        # virtual_combined_height_px
+        virtual_to_px_factor: float = absolute_combined_height_px / virtual_combined_height_px # 25.641025641025642
+        # virtual_to_px_factor
+        ## INPUTS: virtual_to_px_factor
+        scaled_epochs_update_dict = deepcopy(epochs_update_dict)
+        for a_name, a_dict in scaled_epochs_update_dict.items():
+            # a_dict['y_location_top'] = a_dict['y_location'] + a_dict['height']
+            a_dict['height'] = (a_dict['height'] * virtual_to_px_factor)
+            a_dict['y_location'] = (a_dict['y_location'] * virtual_to_px_factor)
+            del a_dict['y_location_top']
+            
+        ## OUTPUTS: scaled_epochs_update_dict   
+        self.update_rendered_intervals_visualization_properties(scaled_epochs_update_dict)
 
 
+    @function_attributes(short_name=None, tags=['intervals', 'active_window', 'jump', 'find'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-30 16:30', related_items=[])
+    def find_intervals_in_active_window(self, debug_print=False) -> Dict[str, pd.DataFrame]:
+        """ returns the intervals that fall completely within the current viewport window
+        
+        _out_intervals_within_active_window = active_2d_plot.find_intervals_in_active_window() # {'Replays': 633.6662150828633, 'Laps': 584.5415960000828, 'SessionEpochs': 0.0}
+        _out_intervals_within_active_window
+
+        """
+        ## Get Interval Datasources:
+        # interval_datasources = self.spike_raster_plt_2d.interval_datasources
+        rendered_epoch_series_names = self.rendered_epoch_series_names
+        interval_datasources = self.interval_datasources
+        _out_intervals_within_active_window = {}
+        for curr_jump_series_name, selected_rendered_interval_series_ds in interval_datasources.items():
+            if curr_jump_series_name in rendered_epoch_series_names: ## only get the real internals, not properties like `name`
+                assert curr_jump_series_name in interval_datasources, f"curr_jump_series_name: '{curr_jump_series_name}' not in interval_datasources: {interval_datasources}"
+                # selected_rendered_interval_series_ds = interval_datasources[curr_jump_series_name] # IntervalsDatasource
+                selected_rendered_interval_series_times_df = selected_rendered_interval_series_ds.time_column_values
+                ## Get current time window:
+                curr_time_window = self.animation_active_time_window.active_time_window # (45.12114057149739, 60.12114057149739)
+                ## Find the events beyond that time:
+                is_interval_entire_left_of_window = (selected_rendered_interval_series_times_df['t_end'].to_numpy() < curr_time_window[0]) # ends before the curr_time_window even starts
+                is_interval_entire_right_of_window = (selected_rendered_interval_series_times_df['t_start'].to_numpy() >= curr_time_window[1]) # starts after the end of the curr_time_window
+                is_interval_entire_outside_window = np.logical_or(is_interval_entire_left_of_window, is_interval_entire_right_of_window)
+                is_any_part_of_interval_inside_window = np.logical_not(is_interval_entire_outside_window)
+                filtered_times_df = selected_rendered_interval_series_times_df[is_any_part_of_interval_inside_window]
+                
+                if debug_print:
+                    print(f'curr_time_window: {curr_time_window}, filtered_times_df: {filtered_times_df}')
+                    
+                _out_intervals_within_active_window[curr_jump_series_name] = filtered_times_df
+            ## END if curr_jump_series_name in rendered_epoch_series_names
+        # END for curr_jump_series_name, selecte...
+        return _out_intervals_within_active_window
 
 
+    @function_attributes(short_name=None, tags=['intervals', 'active_window', 'jump', 'find'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-30 16:30', related_items=[])
+    def find_next_jump_intervals_in_active_window(self, is_jump_left:bool=True, debug_print=False) -> Dict[str, Optional[float]]:
+        """ returns the intervals that fall completely within the current viewport window
+        
+        next_target_jump_times_dict = active_2d_plot.find_next_jump_intervals_in_active_window(is_jump_left=True) # {'Replays': 633.6662150828633, 'Laps': 584.5415960000828, 'SessionEpochs': 0.0}
+        next_target_jump_times_dict
+
+        """
+        ## Get Interval Datasources:
+        # interval_datasources = self.spike_raster_plt_2d.interval_datasources
+        rendered_epoch_series_names = self.rendered_epoch_series_names
+        interval_datasources = self.interval_datasources
+
+        _out_jump_times_dict = {}
+        for curr_jump_series_name, selected_rendered_interval_series_ds in interval_datasources.items():
+            if curr_jump_series_name in rendered_epoch_series_names: ## only get the real internals, not properties like `name`
+                assert curr_jump_series_name in interval_datasources, f"curr_jump_series_name: '{curr_jump_series_name}' not in interval_datasources: {interval_datasources}"        
+
+                ## Get current time window:
+                curr_time_window = self.animation_active_time_window.active_time_window # (45.12114057149739, 60.12114057149739)
+                selected_rendered_interval_series_times_df = selected_rendered_interval_series_ds.time_column_values
+                
+                ## Find the events:
+                next_target_jump_time = None       
+                if is_jump_left:
+                    ## jump left:
+                    is_interval_entire_left_of_window = (selected_rendered_interval_series_times_df['t_end'].to_numpy() < curr_time_window[0]) # ends before the curr_time_window even starts
+                    is_interval_entire_right_of_window = (selected_rendered_interval_series_times_df['t_start'].to_numpy() >= curr_time_window[1]) # starts after the end of the curr_time_window
+                    is_interval_entire_outside_window = np.logical_or(is_interval_entire_left_of_window, is_interval_entire_right_of_window)
+                    is_any_part_of_interval_inside_window = np.logical_not(is_interval_entire_outside_window)
+                    is_any_part_of_interval_inside_or_left_of_window = np.logical_or(is_interval_entire_left_of_window, is_any_part_of_interval_inside_window)
+                    filtered_times_df = selected_rendered_interval_series_times_df[is_any_part_of_interval_inside_or_left_of_window]
+                    if len(filtered_times_df) > 0:
+                        next_target_jump_time = filtered_times_df['t_start'].to_numpy()[-1] ## return the latest interval start time
+                    
+                else:
+                    ## jump right
+                    # print(f'WARN: .find_next_jump_intervals_in_active_window(is_jump_left=False) is not fully implemented! Only supports jumping left now!')
+                    is_interval_entire_left_of_window = (selected_rendered_interval_series_times_df['t_end'].to_numpy() < curr_time_window[0]) # ends before the curr_time_window even starts
+                    is_interval_entire_right_of_window = (selected_rendered_interval_series_times_df['t_start'].to_numpy() >= curr_time_window[1]) # starts after the end of the curr_time_window
+                    is_interval_entire_outside_window = np.logical_or(is_interval_entire_left_of_window, is_interval_entire_right_of_window)
+                    is_any_part_of_interval_inside_window = np.logical_not(is_interval_entire_outside_window)
+                    is_any_part_of_interval_inside_or_right_of_window = np.logical_or(is_interval_entire_right_of_window, is_any_part_of_interval_inside_window)
+                    filtered_times_df = selected_rendered_interval_series_times_df[is_any_part_of_interval_inside_or_right_of_window]
+                    if len(filtered_times_df) > 1:
+                        ## not the first, which we may have just jumped to, but the second
+                        next_target_jump_time = filtered_times_df['t_start'].to_numpy()[1] ## return the earliest interval start time... does this include ones within the window?
+                        
+
+                if debug_print:
+                    print(f'curr_time_window: {curr_time_window}, next_target_jump_time: {next_target_jump_time}')
+                    
+                _out_jump_times_dict[curr_jump_series_name] = next_target_jump_time
+                ## END if curr_jump_series_name in rendered_epoch_series_names
+                
+        # END for curr_jump_series_name, selecte...
+        return _out_jump_times_dict
+    
 
     # ---------------------------------------------------------------------------- #
     #                          Private Implementor Methods                         #

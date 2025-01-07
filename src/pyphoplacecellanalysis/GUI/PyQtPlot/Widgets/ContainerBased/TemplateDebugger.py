@@ -78,6 +78,61 @@ class TemplateDebugger:
     curr_win, curr_img = _out_plots.pf1D_heatmaps[a_decoder_name] # win, img
 
 
+    
+    ### Enable emphasizing/demphasizing aclus for TemplateDebugger
+    
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import TemplateDebugger
+
+    template_debugger: TemplateDebugger = _out['obj']
+
+    # a_decoder_idx = 0
+    # a_decoder_name = 'long_LR'
+
+
+    # template_debugger.params.solo_emphasized_aclus = None # remove custom emphasis/demphasis
+    # template_debugger.params.solo_emphasized_aclus = [31, 26, 14, 29, 11]
+
+
+    # plots_data = template_debugger.plots_data
+    # template_debugger.plots_data.unsorted_included_any_context_neuron_ids
+
+
+    # out_colors_heatmap_image_matrix_dicts = plots_data['out_colors_heatmap_image_matrix_dicts'][a_decoder_name]
+    # sort_helper_neuron_id_to_neuron_colors_dict = plots_data['sort_helper_neuron_id_to_neuron_colors_dicts'][a_decoder_idx] # Only one for all decoders, which is good actually
+    # sorted_neuron_IDs_list = plots_data['sorted_neuron_IDs_lists'][a_decoder_idx] # Only one for all decoders, which is good actually
+
+    # out_data['out_colors_heatmap_image_matrix_dicts'][a_decoder_name]
+    #  'sort_helper_neuron_id_to_sort_IDX_dicts'
+    # 'sort_helper_neuron_id_to_neuron_colors_dicts'
+    # 'sorted_neuron_IDs_lists'
+    # sort_helper_neuron_id_to_neuron_colors_dict
+
+    template_debugger.update_cell_emphasis(solo_emphasized_aclus=[31, 26, 14, 29, 11])
+    template_debugger.update_cell_emphasis(solo_emphasized_aclus=None)
+
+    template_debugger.params.included_any_context_neuron_ids
+
+    # adjusted_sort_helper_neuron_id_to_neuron_colors_dict = deepcopy(sort_helper_neuron_id_to_neuron_colors_dict) # a list of four dicts in it for some reason??
+    # adjusted_sort_helper_neuron_id_to_neuron_colors_dict
+
+    template_debugger.params.solo_emphasized_aclus = [31, 26, 14, 29, 11]
+    # demphasized_aclus = ## build from the non-solo_emphasized_aclus
+    # len(adjusted_sort_helper_neuron_id_to_neuron_colors_dicts)
+
+    adjusted_sort_helper_neuron_id_to_neuron_colors_dict = {}
+    for aclu, a_color in sort_helper_neuron_id_to_neuron_colors_dict.items():
+        if aclu in template_debugger.params.solo_emphasized_aclus:
+            # original color:
+            adjusted_sort_helper_neuron_id_to_neuron_colors_dict[aclu] = deepcopy(a_color)
+        else:
+            # desaturate the color:
+            desaturated_color = build_adjusted_color(deepcopy(a_color), saturation_scale=0.02, value_scale=0.1)
+            adjusted_sort_helper_neuron_id_to_neuron_colors_dict[aclu] = desaturated_color
+            
+
+        
+        
+        
     """
     # track_templates: TrackTemplates = field(repr=False)
     # RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict: Union[Dict,pd.DataFrame] = field(repr=False)

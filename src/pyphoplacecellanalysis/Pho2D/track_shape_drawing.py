@@ -121,7 +121,7 @@ class NotableTrackPositions(UnpackableMixin):
 
 
 class TrackPositionClassification(Enum):
-    """ classifying various x-positions as belonging to outside the outside_maze, the track_endcaps, or the track_body
+    """ classifying various x-positions as belonging to outside the outside_maze, the track_endcaps, or the track_straightaway
 
         # TrackPositionClassification.TRACK_ENDCAPS
         # TrackPositionClassification.TRACK_BODY
@@ -129,12 +129,18 @@ class TrackPositionClassification(Enum):
     """
     OUTSIDE_MAZE = "outside_maze"
     TRACK_ENDCAPS = "track_endcaps"
-    TRACK_BODY = "track_body"
+    TRACK_STRAIGHTAWAY = "track_straightaway"
 
     @property
     def is_on_maze(self) -> bool:
         """ returns True if the point is anywhere on the track (including endcaps) """
         return self.value != TrackPositionClassification.OUTSIDE_MAZE.value
+    
+
+    @property
+    def is_track_straightaway(self) -> bool:
+        """ returns True if the point is anywhere on the track (including endcaps) """
+        return self.value == TrackPositionClassification.TRACK_STRAIGHTAWAY.value
 
     @property
     def is_endcap(self) -> bool:
@@ -149,16 +155,18 @@ def classify_test_point(test_point, rects) -> "TrackPositionClassification":
             (85.0, -0.125, 22.0, 0.25)
         ]
     """
-    assert len(rects) == 3, f"rects should contain three elements for (left_platform, track_body, right_platform). {rects}"
+    assert len(rects) == 3, f"rects should contain three elements for (left_platform, track_straightaway, right_platform). {rects}"
     if is_point_in_rect(test_point, rects[0]) or is_point_in_rect(test_point, rects[2]):
         return TrackPositionClassification.TRACK_ENDCAPS
     elif is_point_in_rect(test_point, rects[1]):
-        return TrackPositionClassification.TRACK_BODY
+        return TrackPositionClassification.TRACK_STRAIGHTAWAY
     else:
         return TrackPositionClassification.OUTSIDE_MAZE
 
 def classify_x_position(x, rects) -> "TrackPositionClassification":
     return classify_test_point((x, None), rects)
+
+
 
 
 
@@ -769,6 +777,25 @@ class LinearTrackInstance:
 
     def is_on_endcap(self, points):
         return np.array([self.classify_x_position(test_x).is_endcap for test_x in points])
+
+    def build_x_position_classification_df(self, x_arr: NDArray) -> "TrackPositionClassification":
+        """ Builds a df with a row for every position passed in x_arr that classifies it in relation to the track
+        
+        Usage:
+            from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
+
+            long_track_inst, short_track_inst = LinearTrackInstance.init_tracks_from_session_config(curr_active_pipeline.sess.config)
+            long_track_inst
+            # track_templates.get_track_length_dict()
+
+            pos_bin_edges = deepcopy(track_templates.get_decoders_dict()['long_LR'].xbin_centers)
+            pos_bin_classification_df: pd.DataFrame = long_track_inst.build_x_position_classification_df(x_arr=pos_bin_edges)
+            pos_bin_classification_df
+        """
+        is_pos_bin_endcap = [self.classify_x_position(x).is_endcap for x in x_arr]
+        is_pos_bin_on_maze = [self.classify_x_position(x).is_on_maze for x in x_arr]
+
+        return pd.DataFrame({'x': deepcopy(x_arr), 'is_endcap': is_pos_bin_endcap, 'is_on_maze': is_pos_bin_on_maze})
 
 
     def plot_rects(self, plot_item, matplotlib_rect_kwargs_override=None):
