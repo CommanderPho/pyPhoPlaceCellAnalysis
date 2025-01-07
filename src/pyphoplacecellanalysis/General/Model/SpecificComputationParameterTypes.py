@@ -98,24 +98,45 @@ class BaseGlobalComputationParameters(BaseConfig):
          Restore instance attributes and update child fields if needed. """
         # Handle legacy format
 
-        # loaded_keys = list(state.keys())
-        
+        loaded_keys: List[str] = list(state.keys())
+        modern_keys: List[str] = [a.name for a in self.__class__.__attrs_attrs__]
+
+        added_keys: List[str] = [k for k in modern_keys if k not in loaded_keys]
+        removed_keys: List[str] = [k for k in loaded_keys if k not in modern_keys]
+
         ## update with what we have:
         self.__dict__.update(state)
-            
-        # Update missing attributes based on the current class definition
-        for attr_name, attr_field in self.__class__.__attrs_attrs__:  # Access current class attributes
-            if attr_name not in self.__dict__:
-                # Use the default factory if available, otherwise set the default value
-                if attr_field.default is not None:
-                    self.__dict__[attr_name] = attr_field.default
-                elif attr_field.factory is not None:
-                    self.__dict__[attr_name] = attr_field.factory()
-                    
-        
+
+        if len(added_keys) > 0:
+            print(f'\tadded_keys: {added_keys}')
+            # Update missing attributes based on the current class definition
+            for a in self.__class__.__attrs_attrs__:  # Access current class attributes
+                attr_name: str = a.name
+                # attr_field = a.field
+                if attr_name in added_keys:
+                    # Use the default factory if available, otherwise set the default value
+                    if a.default is not None:
+                        print(f'\t\tadding key: {attr_name}')
+                        self.__dict__[attr_name] = a.default
+                    # elif a.factory is not None:
+                    #     self.__dict__[attr_name] = a.factory()
+        # # Update missing attributes based on the current class definition
+        # for a in self.__class__.__attrs_attrs__:  # Access current class attributes
+        #     attr_name: str = a.name
+        #     # attr_field = a.field
+        #     if attr_name not in self.__dict__:
+        #         # Use the default factory if available, otherwise set the default value
+        #         if attr_field.default is not None:
+        #             self.__dict__[attr_name] = a.default
+        #         # elif attr_field.factory is not None:
+        #         #     self.__dict__[attr_name] = attr_field.factory()
+
+        print(f'\tdone.')
+
         # # Ensure child fields are updated
         # self._post_load_update()
-        return self.__class__.from_state(state=self.__dict__)
+        # self =  self.__class__.from_state(state=self.__dict__)
+
         
 
 # ==================================================================================================================== #
