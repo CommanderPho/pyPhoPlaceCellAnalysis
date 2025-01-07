@@ -142,7 +142,7 @@ class Render2DScrollWindowPlotMixin:
         ## TODO: attach the event forwarder 2025-01-02
         # self.ui.main_graphics_layout_widget.set_target_event_forwarding_child(self.ui.scroll_window_region) #TODO 2025-01-02 07:55: - [ ] Did not work
         
-        
+
     def update_rasters(self):
         """ updates all rasters (which are scatter plots) from the self.plot_data.all_spots variable """
         # Update preview_overview_scatter_plot

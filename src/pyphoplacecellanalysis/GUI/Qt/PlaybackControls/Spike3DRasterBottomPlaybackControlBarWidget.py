@@ -713,7 +713,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         return super().eventFilter(source, event)
     
 
-    
+@metadata_attributes(short_name=None, tags=['bottom', 'ui', 'owner'], input_requires=[], output_provides=[], uses=[], used_by=['Spike3DRasterWindowWidget'], creation_date='2025-01-07 00:00', related_items=[])
 class SpikeRasterBottomFrameControlsMixin(LoggingBaseClassLoggerOwningMixin):
     """ renders the UI controls for the Spike3DRaster_Vedo class 
         Follows Conventions outlined in ModelViewMixin Conventions.md
@@ -777,7 +777,10 @@ class SpikeRasterBottomFrameControlsMixin(LoggingBaseClassLoggerOwningMixin):
 
     @pyqtExceptionPrintingSlot(float, float)
     def SpikeRasterBottomFrameControlsMixin_on_window_update(self, new_start=None, new_end=None):
-        """ called to perform updates when the active window changes. Redraw, recompute data, etc. """
+        """ called to perform updates when the active window changes. Redraw, recompute data, etc. 
+        called from: `.update_animation(...)`
+        
+        """
         # Called the Implementor's update_window(...) function
         print(f'SpikeRasterBottomFrameControlsMixin_on_window_update(new_start: {new_start}, new_end: {new_end}')
         #TODO 2023-11-21 18:49: - [ ] Doesn't work :[

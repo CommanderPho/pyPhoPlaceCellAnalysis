@@ -240,7 +240,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # self.ui.splitter.setStretchFactor(0, 5) # have the top widget by 3x the height as the bottom widget
         # self.ui.splitter.setStretchFactor(1, 1) # have the top widget by 3x the height as the bottom widget        
         
-        
         self.params = VisualizationParameters(self.applicationName, _menu_action_history_list=[])
         self.params.type_of_3d_plotter = type_of_3d_plotter
         self.params._menu_action_history_list = []
