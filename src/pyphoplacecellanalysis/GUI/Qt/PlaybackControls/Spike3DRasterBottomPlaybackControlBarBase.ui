@@ -365,6 +365,9 @@ QDoubleSpinBox::down-arrow {
         <property name="pageStep">
          <number>1</number>
         </property>
+        <property name="tracking">
+         <bool>false</bool>
+        </property>
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
         </property>
@@ -1522,12 +1525,6 @@ alternate-background-color: rgb(222, 222, 222);</string>
         </property>
         <property name="whatsThis">
          <string>Navigation Joystick</string>
-        </property>
-        <property name="accessibleName">
-         <string>NavigationJoystick</string>
-        </property>
-        <property name="text">
-         <string/>
         </property>
         <property name="checkable">
          <bool>true</bool>

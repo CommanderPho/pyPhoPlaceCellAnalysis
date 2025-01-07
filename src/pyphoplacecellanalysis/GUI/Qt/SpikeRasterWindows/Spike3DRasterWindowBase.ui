@@ -186,6 +186,9 @@ border-color: rgb(0, 0, 0);</string>
    </item>
    <item row="0" column="3" rowspan="3">
     <widget class="Spike3DRasterRightSidebarWidget" name="rightSideContainerWidget" native="true">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
      <property name="sizePolicy">
       <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
        <horstretch>0</horstretch>
