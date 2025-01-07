@@ -29,7 +29,7 @@ from pyphoplacecellanalysis.Resources.icon_helpers import try_get_icon
 from pyphocorehelpers.gui.Qt.pandas_model import SimplePandasModel, create_tabbed_table_widget
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper, PhoDockAreaContainingWindow
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget.DockPlanningHelperWidget import DockPlanningHelperWidget
-from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomCyclicColorsDockDisplayConfig, CustomDockDisplayConfig, get_utility_dock_colors
+from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomCyclicColorsDockDisplayConfig, CustomDockDisplayConfig, DockDisplayColors, get_utility_dock_colors
 
 __all__ = ['DockPlanningHelperWindow']
 
@@ -40,7 +40,7 @@ __all__ = ['DockPlanningHelperWindow']
 
 @define(slots=False, eq=False)
 class DockPlanningHelperWindow:
-    """ DockPlanningHelperWindow displays four rasters showing the same spikes but sorted according to four different templates (RL_odd, RL_even, LR_odd, LR_even)
+    """ DockPlanningHelperWindow displays several testing widgets
     
 
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.DockPlanningHelperWindow import DockPlanningHelperWindow
@@ -122,7 +122,7 @@ class DockPlanningHelperWindow:
         _dock_helper_widgets_dict = {}
         for i in np.arange(n_dock_planning_helper_widgets):
             dock_id_str: str = f'dock[{i}]'
-            a_dock_helper_widget = DockPlanningHelperWidget(dock_title=dock_id_str, dock_id=dock_id_str, defer_show=True)
+            a_dock_helper_widget = DockPlanningHelperWidget(dock_title=dock_id_str, dock_id=dock_id_str, color=None, defer_show=True)
             # _a_conn = a_dock_helper_widget.sigCreateNewDock.connect(_obj.on_click_create_new_dock)
             _dock_helper_widgets_dict[dock_id_str] = a_dock_helper_widget
 
@@ -262,13 +262,19 @@ class DockPlanningHelperWindow:
         an_extant_dock_helper_widget_connections_dict = self.ui.connections.get(dock_id_str, None)
         assert an_extant_dock_helper_widget_connections_dict is None
         _a_conn = a_dock_helper_widget.sigCreateNewDock.connect(self.on_click_create_new_dock)
-        self.ui.connections[dock_id_str] = {'sigCreateNewDock': _a_conn}
+        self.ui.connections[dock_id_str] = {'sigCreateNewDock': _a_conn, 'sigDockConfigChanged': None}
 
         ## Updates: self.dock_helper_widgets, self.dock_configs, self.dock_widgets
         self.dock_helper_widgets[dock_id_str] = a_dock_helper_widget
         self.dock_configs[dock_id_str] = CustomDockDisplayConfig(showCloseButton=False)
         self.dock_widgets[dock_id_str] = self.root_dockAreaWindow.add_display_dock(identifier=dock_id_str, widget=a_dock_helper_widget, dockSize=dockSize, dockAddLocationOpts=active_dock_add_location, display_config=self.dock_configs[dock_id_str], autoOrientation=autoOrientation)
         
+        a_widget_fg_color, a_widget_bg_color, a_widget_border_color = self.dock_configs[dock_id_str].get_colors(None, is_dim=False)
+        print(f'a_widget_color: {a_widget_bg_color}')
+        a_dock_helper_widget.color = a_widget_bg_color
+        _a_new_conn = a_dock_helper_widget.sigDockConfigChanged.connect(self.on_update_dock_config)
+        self.ui.connections[dock_id_str]['sigDockConfigChanged'] = _a_new_conn
+
         # embedded_child_widget, dDisplayItem = self.dock_widgets[dock_id_str]
 
         return self.dock_helper_widgets[dock_id_str], self.dock_configs[dock_id_str], self.dock_widgets[dock_id_str]
@@ -319,6 +325,72 @@ class DockPlanningHelperWindow:
         # print(f'DockPlanningHelperWindow.on_click_create_new_dock(child_widget: {child_widget or 'None'}, relative_location: "{relative_location or None}")')
         # self.action_create_new_dock.emit(self.embedding_dock_item, 'bottom')
         # self.action_create_new_dock.emit(self, 'bottom')
+
+
+    def on_update_dock_config(self, child_widget: DockPlanningHelperWidget):
+        """ called with the child_widget when the color or other property changes
+        
+        """
+        # [self.embedding_dock_item, 'bottom']
+        print(f'DockPlanningHelperWindow.on_update_dock_config(...)')
+        # print(f'\t')
+        
+        if child_widget is None:
+            print(f'\t child_widget is None!')
+        else:
+            print(f'\tchild_widget.identifier: {child_widget.identifier}')
+            log_string = child_widget.rebuild_output()
+            print(f'\tchild_widget: {log_string}') # TypeError: __str__ returned non-string (type NoneType)
+            new_dock_config: Dict = child_widget.rebuild_config()
+            # if isinstance(relative_location, str):
+            #     # try to convert to tuple:
+            #     _split_active_dock_add_location = relative_location.split(', ', maxsplit=2)
+            #     if len(_split_active_dock_add_location) == 2:
+            #         rel_loc, rel_dock_id = _split_active_dock_add_location
+            #         rel_dock_item = self.root_dockAreaWindow.find_display_dock(rel_dock_id)
+            #         assert rel_dock_item is not None, f"rel_dock_id: '{rel_dock_id}' does not exist. relative_location: {relative_location}"
+            #         # relative_location_tuple = tuple(_split_active_dock_add_location) # use a tuple
+            #         relative_location_tuple = (rel_loc, rel_dock_item) # use a tuple
+            #         print(f'relative_location_tuple: {relative_location_tuple}')
+            #         assert len(relative_location_tuple) == 2
+            #         new_dock_config.setdefault('dockAddLocationOpts', relative_location_tuple)
+            #     else:
+            #         # not parsable 
+            #         new_dock_config.setdefault('dockAddLocationOpts', (relative_location, ))
+            # else:
+            #         raise NotImplementedError(f'relative_location: {relative_location}')
+
+            for a_dock_id, a_widget in child_widget.dock_helper_widgets.items():
+                # print(a_widget.color)
+                a_config = child_widget.dock_configs[a_dock_id]
+                a_helper_widget, a_dock = child_widget.dock_widgets[a_dock_id]
+                # print(a_config)
+                a_hex_bg_color: str = a_widget.color.name(pg.QtGui.QColor.HexRgb)
+                print(f'a_hex_bg_color: {a_hex_bg_color}')
+                # a_config.custom_get_colors_callback
+                # a_config.custom_get_colors_callback = CustomDockDisplayConfig.build_custom_get_colors_fn(bg_color='#44aa44', border_color='#339933')
+                # a_config.custom_get_colors_callback = CustomDockDisplayConfig.build_custom_get_colors_fn(bg_color=a_hex_bg_color, border_color=a_hex_bg_color)
+                a_config.custom_get_colors_callback = None
+                a_config.custom_get_colors_dict = {False: DockDisplayColors(fg_color='#fff', bg_color=a_hex_bg_color, border_color=a_hex_bg_color),
+                            True: DockDisplayColors(fg_color='#aaa', bg_color=a_hex_bg_color, border_color=a_hex_bg_color),
+                    }
+                
+                # a_config
+                a_dock.updateStyle()
+                
+
+            # new_dock_config.setdefault('dockAddLocationOpts', (relative_location, ))
+            # new_dock_config['widget'] = child_widget
+            print(f'\t creating new child widget with config: {new_dock_config}\n')
+            # a_dock_helper_widget, a_dock_config, a_dock_widget = self.perform_create_new_dock_widget(active_dock_add_location=new_dock_config.get('dockAddLocationOpts', None), dockSize=new_dock_config.get('dockSize', None), autoOrientation=new_dock_config.get('autoOrientation', None))
+            print(f'\t done.')
+
+        
+        # print(f'DockPlanningHelperWindow.on_click_create_new_dock(child_widget: {child_widget or 'None'}, relative_location: "{relative_location or None}")')
+        # self.action_create_new_dock.emit(self.embedding_dock_item, 'bottom')
+        # self.action_create_new_dock.emit(self, 'bottom')
+
+
 
     # ==================================================================================================================== #
     # Other Functions                                                                                                      #

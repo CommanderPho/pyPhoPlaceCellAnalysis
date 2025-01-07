@@ -14,6 +14,7 @@ from pyphocorehelpers.DataStructure.general_parameter_containers import Visualiz
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphocorehelpers.gui.Qt.connections_container import ConnectionsContainer
 from pyphocorehelpers.indexing_helpers import safe_find_index_in_list
+from pyphocorehelpers.assertion_helpers import Assert
 
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore
 from pyphoplacecellanalysis.GUI.Qt.Widgets.PaginationCtrl.PaginationControlWidget import PaginationControlWidget, PaginationControlWidgetState
@@ -353,7 +354,14 @@ class PaginatedFigureBaseController:
     def is_selected(self) -> NDArray:
         """The selected_indicies property."""
         return np.array(list(self.params.is_selected.values()))
-    
+    @is_selected.setter
+    def is_selected(self, value: NDArray):
+        # Replace values in the dictionary with new_values
+        Assert.same_length(self.params.is_selected, value)
+        self.params.is_selected = {k: v for k, v in zip(self.params.is_selected.keys(), value)}
+        self.perform_update_selections(defer_render=False)
+        
+
     @property
     def selected_indicies(self):
         """The selected_indicies property. 

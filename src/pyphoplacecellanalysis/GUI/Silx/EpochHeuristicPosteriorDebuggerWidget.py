@@ -591,7 +591,9 @@ class EpochHeuristicDebugger:
 
         self.p_x_given_n_masked = ma.masked_array(p_x_given_n, mask=np.logical_not(is_higher_than_diffusion), fill_value=np.nan)
         
-        self.heuristic_scores = HeuristicReplayScoring.compute_pho_heuristic_replay_scores(a_result=self.active_decoder_decoded_epochs_result, an_epoch_idx=self.active_single_epoch_result.epoch_data_index, debug_print=False, use_bin_units_instead_of_realworld=self.use_bin_units_instead_of_realworld)
+        
+        
+        self.heuristic_scores = HeuristicReplayScoring.compute_pho_heuristic_replay_scores(a_result=self.active_decoder_decoded_epochs_result, an_epoch_idx=self.active_single_epoch_result.epoch_data_index, pos_bin_edges=deepcopy(self.xbin), debug_print=False, use_bin_units_instead_of_realworld=self.use_bin_units_instead_of_realworld)
         
         if self.all_bin_by_bin_computation_fn_dict is None:
             self.all_bin_by_bin_computation_fn_dict = HeuristicReplayScoring.build_all_bin_by_bin_computation_fn_dict()

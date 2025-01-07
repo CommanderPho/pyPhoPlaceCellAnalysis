@@ -45,7 +45,7 @@
     <number>0</number>
    </property>
    <item>
-    <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,0,0,1,1,0,0,0,0">
+    <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,0,0,1,1,0,0,0,0,0,0,0">
      <property name="spacing">
       <number>2</number>
      </property>
@@ -202,6 +202,45 @@
       </widget>
      </item>
      <item>
+      <spacer name="horizontalSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QLabel" name="label_2">
+       <property name="text">
+        <string>color</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="ColorButton" name="btnColorButton">
+       <property name="minimumSize">
+        <size>
+         <width>24</width>
+         <height>24</height>
+        </size>
+       </property>
+       <property name="baseSize">
+        <size>
+         <width>24</width>
+         <height>24</height>
+        </size>
+       </property>
+       <property name="text">
+        <string/>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QToolButton" name="btnAddWidgetRight">
        <property name="minimumSize">
         <size>
@@ -230,6 +269,13 @@
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>ColorButton</class>
+   <extends>QPushButton</extends>
+   <header location="global">pyqtgraph.widgets.ColorButton</header>
+  </customwidget>
+ </customwidgets>
  <tabstops>
   <tabstop>txtDockTitle</tabstop>
   <tabstop>spinBox_Width</tabstop>

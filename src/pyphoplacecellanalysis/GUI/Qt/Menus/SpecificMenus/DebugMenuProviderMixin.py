@@ -29,6 +29,7 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
             
             
     """
+    action_name = 'Debug'
     top_level_menu_name = 'actionMenuDebug'
     
     

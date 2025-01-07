@@ -710,7 +710,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
 										       ripple_decoding_time_bin_size_override: Optional[float]=None, laps_decoding_time_bin_size_override: Optional[float]=None,
 												needs_recompute_heuristics: bool = False, force_recompute_all_decoding: bool = False,
-											    save_hdf:bool=True, allow_append_to_session_h5_file:bool=True) -> dict:
+											    save_hdf:bool=True, allow_append_to_session_h5_file:bool=True, max_ignore_bins: float = 2, same_thresh_cm: float = 10.7, max_jump_distance_cm: float = 60.0) -> dict:
 	"""
 	Aims to export the results of the global 'directional_decoders_evaluate_epochs' calculation
 
@@ -768,7 +768,7 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 		'laps_decoding_time_bin_size_override': laps_decoding_time_bin_size_override,
 		'needs_recompute_heuristics': needs_recompute_heuristics, 'save_hdf': save_hdf, 'allow_append_to_session_h5_file': allow_append_to_session_h5_file,
 		'output_csv_paths': None, 'output_hdf_paths': None, # 'allow_append_to_session_h5_file': allow_append_to_session_h5_file,
-		
+		'max_ignore_bins':max_ignore_bins, 'same_thresh_cm':same_thresh_cm, 'max_jump_distance_cm':max_jump_distance_cm,		
 	}
 	
 	# across_session_results_extended_dict['compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function'].update({'output_csv_paths': []})
@@ -860,7 +860,7 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 		curr_active_pipeline.reload_default_computation_functions()
 		## This recreates the Pseudo2D placefields from the 4 directional ones, which is NOT needed and seems a bit excessive.
 		curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields'], # 'merged_directional_placefields': `_build_merged_directional_placefields`
-														computation_kwargs_list=[{'laps_decoding_time_bin_size': None, 'ripple_decoding_time_bin_size': ripple_decoding_time_bin_size_override},],
+														computation_kwargs_list=[{'laps_decoding_time_bin_size': laps_decoding_time_bin_size_override, 'ripple_decoding_time_bin_size': ripple_decoding_time_bin_size_override},],
 														enabled_filter_names=None, fail_on_exception=True, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
 		
 		# 'DirectionalDecodersEpochsEvaluations': `directional_decoders_evaluate_epochs`
@@ -926,8 +926,8 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 	# 🟪 2024-02-29 - `compute_pho_heuristic_replay_scores` - updates `directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict`
 	if (needs_recompute_heuristics or (not _workaround_validate_has_directional_decoded_epochs_heuristic_scoring(curr_active_pipeline))):
 		print(f'\tmissing heuristic columns. Recomputing:')
-		directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates,
-																				     a_decoded_filter_epochs_decoder_result_dict=directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict)
+		directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict, _out_new_scores, _out_new_partition_result_dict = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates,
+																				     a_decoded_filter_epochs_decoder_result_dict=directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict, max_ignore_bins=max_ignore_bins, same_thresh_cm=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm)
 		print(f'\tdone recomputing heuristics.')
 
 
@@ -989,7 +989,7 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
 	return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['TrialByTrialActivityResult'], input_requires=[], output_provides=[], uses=['TrialByTrialActivity.directional_compute_trial_by_trial_correlation_matrix', ''], used_by=[], creation_date='2024-10-08 16:07', 
+@function_attributes(short_name=None, tags=['TrialByTrialActivityResult'], input_requires=[], output_provides=[], uses=['TrialByTrialActivity.directional_compute_trial_by_trial_correlation_matrix', '_perform_run_rigorous_decoder_performance_assessment'], used_by=[], creation_date='2024-10-08 16:07', 
 					 requires_global_keys=['DirectionalLaps'], provides_global_keys=['DirectionalMergedDecoders'], related_items=[])
 def compute_and_export_session_trial_by_trial_performance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
 																			  active_laps_decoding_time_bin_size: float = 0.25, minimum_one_point_stability: float = 0.6, zero_point_stability: float = 0.1, save_hdf:bool=True, save_across_session_hdf:bool=False,
@@ -1009,7 +1009,7 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
 		directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity] = a_trial_by_trial_result.directional_active_lap_pf_results_dicts
 		_out_subset_decode_results_track_id_correct_performance_dict = callback_outputs['subset_decode_results_track_id_correct_performance_dict']
 		_out_subset_decode_results_dict = callback_outputs['subset_decode_results_dict']
-		(complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results)  = _out_subset_decode_results_dict['any_decoder'] ## get the result for all cells
+		(complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, test_all_directional_decoder_result, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results)  = _out_subset_decode_results_dict['any_decoder'] ## get the result for all cells
 		filtered_laps_time_bin_marginals_df: pd.DataFrame = callback_outputs['subset_decode_results_time_bin_marginals_df_dict']['filtered_laps_time_bin_marginals_df']
 		active_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = deepcopy({k:v.decoder_result for k, v in _out_separate_decoder_results[0].items()})
 
@@ -1158,7 +1158,7 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
 				try:
 					_out_subset_decode_results_dict[a_subset_name] = _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline=curr_active_pipeline, included_neuron_IDs=a_neuron_IDs_subset, active_laps_decoding_time_bin_size=active_laps_decoding_time_bin_size)
 					## extract results:
-					complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results = _out_subset_decode_results_dict[a_subset_name]
+					complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, test_all_directional_decoder_result, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results = _out_subset_decode_results_dict[a_subset_name]
 					(is_decoded_track_correct, is_decoded_dir_correct, are_both_decoded_properties_correct), (percent_laps_track_identity_estimated_correctly, percent_laps_direction_estimated_correctly, percent_laps_estimated_correctly) = complete_decoded_context_correctness_tuple
 					_out_subset_decode_results_track_id_correct_performance_dict[a_subset_name] = float(percent_laps_track_identity_estimated_correctly)
 					has_valid_result = True
@@ -1202,7 +1202,7 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
 		#TODO 2024-10-09 09:08: - [ ] Could easily do for each set of cells by looping through `_out_subset_decode_results_dict` dict
 		callback_outputs['subset_decode_results_time_bin_marginals_df_dict'] = None
 		
-		(complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results)  = _out_subset_decode_results_dict['any_decoder'] ## get the result for all cells
+		(complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, test_all_directional_decoder_result, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results)  = _out_subset_decode_results_dict['any_decoder'] ## get the result for all cells
 		
 
 		## INPUTS: all_directional_laps_filter_epochs_decoder_result

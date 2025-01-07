@@ -1,7 +1,7 @@
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from qtpy import QtCore, QtGui, QtWidgets
 from attrs import define, field, Factory
 from pyphoplacecellanalysis.Resources import GuiResources, ActionIcons
-
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 # from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.GUI.Qt.Menus.PhoMenuHelper import PhoMenuHelper
@@ -11,7 +11,7 @@ def initialize_global_menu_ui_variables_if_needed(a_main_window):
     """ 
     sets up a_main_window.ui.menus.global_window_menus as needed for the menu providers if needed
     """
-    return PhoMenuHelper.initialize_global_menu_ui_variables_if_needed(a_main_window)
+    return PhoMenuHelper.initialize_global_menu_ui_variables_if_needed(a_main_window) # sets up `global_action_history_list`
     
 
 @define(slots=False)
@@ -24,9 +24,16 @@ class BaseMenuCommand:
     The windows themselves shouldn't hold references to computed results outside of their scope (e.g. Spike2DRaster should only have access to the `spikes_df` and a few other properties that it needs to perform its task -- in this case positions, binned firing rates, etc. are far out of scope of this class itself).
 
     """
+    action_identifier: str = field(default=None, kw_only=True, metadata={'desc':'the string identifier used to reverse-identifier the action.'})
+    
     # def __init__(self) -> None:
     #     pass
-
+    
+    def __attrs_post_init__(self):
+        # Add post-init logic here
+        if self.action_identifier is None:
+            self.action_identifier = f'{self.__class__.__name__}'
+    
     @property
     def is_visible(self):
         return True
@@ -34,11 +41,37 @@ class BaseMenuCommand:
     @property
     def is_enabled(self):
         return True
-        
+    
+    @property
+    def command_identifier(self) -> str:
+        return self.action_identifier.removeprefix('action')
+        # return PhoMenuHelper.parse_leaf_action_name_for_menu_path(self.action_identifier)
+
+    def log_command(self, *args, **kwargs):
+        """ adds this command to the `menu_action_history_list` """
+        print(f'log_command(...): {self.command_identifier}')
+        assert self._spike_raster_window.menu_action_history_list is not None
+        # if self._spike_raster_window.menu_action_history_list is None:
+        #     self._spike_raster_window.menu_action_history_list = [] # initialize if needed
+        # self._spike_raster_window.menu_action_history_list.append(self)
+        ## add self to the history list
+        self._spike_raster_window.menu_action_history_list.append(self.command_identifier)
+        print(f'\tlen(self._spike_raster_window.menu_action_history_list): {len(self._spike_raster_window.menu_action_history_list)}')
+        # self._spike_raster_window.menu_action_history_list.append(self.__qualname__)
+                
+
     def execute(self, *args, **kwargs) -> None:
         """ Implicitly captures spike_raster_window """
+        self.log_command(*args, **kwargs) # adds this command to the `menu_action_history_list`    
         raise NotImplementedError # implementors must override        
     
+    def remove(self, *args, **kwargs) -> None:
+        """ Removes any added docks/items """
+        # self.log_command(*args, **kwargs) # pops this command from the `menu_action_history_list`    
+        raise NotImplementedError # implementors must override        
+    
+
+
     def __call__(self, *args, **kwds):
         return self.execute(*args, **kwds)
     
@@ -91,6 +124,8 @@ class BaseMenuProviderMixin(QtCore.QObject):
         self._root_window
     
     """
+    action_name = 'BaseMenuProviderMixin'
+    top_level_menu_name = 'actionMenuBaseMenuProviderMixin'
     
     @property
     def has_root_window(self):
@@ -113,10 +148,27 @@ class BaseMenuProviderMixin(QtCore.QObject):
         """The root_menu_bar property."""
         return self.root_window.menuBar()
 
+
+    @property
+    def menu_action_history_list(self) -> List:
+        """The menu_action_history_list property."""
+        if self.root_window is None:
+            return None
+        return self.root_window.ui.menus._menu_action_history_list # Window?
+    @menu_action_history_list.setter
+    def menu_action_history_list(self, value):
+        if self.root_window is None:
+            raise NotImplementedError()
+        self.root_window.ui.menus._menu_action_history_list = value # window
+
+
     def __init__(self, render_widget: QtWidgets.QWidget, parent=None, **kwargs):
         """ the __init__ form allows adding menus to extant widgets without modifying their class to inherit from this mixin """
         super(BaseMenuProviderMixin, self).__init__(parent)
-        
+        self.top_level_menu_name = kwargs.get('top_level_menu_name', self.__class__.top_level_menu_name)
+        self.action_name = kwargs.get('action_name', self.__class__.action_name)
+        ## TODO: need to do anything with `menu_action_history_list`?
+
         # Setup member variables:
         # Assumes that self is a QWidget subclass:
         self._render_widget = render_widget # do we really need a reference to this?

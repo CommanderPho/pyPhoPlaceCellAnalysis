@@ -46,7 +46,9 @@ class IntervalsDatasource(BaseDatasource):
     _all_interval_time_columns = ['t_start', 't_duration', 't_end']
     
     _required_interval_visualization_columns = ['t_start', 't_duration', 'series_vertical_offset', 'series_height', 'pen', 'brush']
-    
+    _series_update_dict_visualization_columns = ['series_vertical_offset', 'series_height', 'pen', 'brush']
+    _series_update_dict_position_columns = ['series_vertical_offset', 'series_height']
+
     _time_column_name_synonyms = {"t_start":{'begin','start','start_t'},
         't_end':['end','stop','stop_t'],
         "t_duration":['duration'],
@@ -190,7 +192,8 @@ class IntervalsDatasource(BaseDatasource):
         'SessionEpochs': {'y_location': -2.916666666666667, 'height': 2.0833333333333335}}
 
         """
-        series_positioning_df = self.df[['series_vertical_offset', 'series_height']].copy() # , 'pen', 'brush'
+        # series_positioning_df = self.df[['series_vertical_offset', 'series_height']].copy() # , 'pen', 'brush'
+        series_positioning_df = self.df[self._series_update_dict_position_columns].copy() # , 'pen', 'brush'
         # # series can render either 'above' or 'below':
         # series_positioning_df['is_series_below'] = (series_positioning_df['series_vertical_offset'] <= 0.0) # all elements less than or equal to zero indicate that it's below the plot, and its height will be added negatively to find the max-y value
         # _curr_active_effective_series_heights = series_positioning_df.series_height.values.copy()
@@ -204,7 +207,7 @@ class IntervalsDatasource(BaseDatasource):
 
         if a_compressed_series_positioning_df.shape[0] == 1:
             # only one entry, to be expected
-            series_compressed_positioning_update_dict = {k:list(v.values())[0] for k, v in a_compressed_series_positioning_df.to_dict().items() if k in ['series_vertical_offset', 'series_height']}
+            series_compressed_positioning_update_dict = {k:list(v.values())[0] for k, v in a_compressed_series_positioning_df.to_dict().items() if k in self._series_update_dict_position_columns}
             ## Rename columns for update outputs:
             series_compressed_positioning_update_dict['y_location'] = series_compressed_positioning_update_dict.pop('series_vertical_offset')
             series_compressed_positioning_update_dict['height'] = series_compressed_positioning_update_dict.pop('series_height')                
@@ -212,6 +215,63 @@ class IntervalsDatasource(BaseDatasource):
             series_compressed_positioning_update_dict = None
 
         return series_positioning_df, series_compressed_positioning_df, series_compressed_positioning_update_dict
+    
+
+    def recover_update_dict_properties(self, debug_print=False):
+        """ Tries to recover the full interval data series properties (as would be passed to `self.update_rendered_intervals_visualization_properties(...)` for each of the interval_datasources of active_2d_plot
+        
+        Usage:
+
+            series_viz_df, series_compressed_viz_df, series_compressed_viz_update_dict = active_2d_plot.recover_update_dict_properties()
+            # all_series_positioning_dfs
+            all_series_compressed_positioning_dfs
+            series_compressed_viz_update_dict
+            
+            series_compressed_viz_update_dict: {'Replays': {'y_location': -4.0, 'height': 1.9, 'pen_color': 'ffa500cc', 'brush_color': 'ffa50080'},
+             'Laps': {'y_location': -2.0, 'height': 0.9, 'pen_color': 'ff0000ff', 'brush_color': 'ff000080'}}
+
+             
+            active_2d_plot.update_rendered_intervals_visualization_properties(scaled_epochs_update_dict)
+             
+        """
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.helpers import RectangleRenderTupleHelpers
+        
+        # series_viz_df = self.df[self._series_update_dict_visualization_columns].copy() # , 'pen', 'brush'
+        series_viz_df: pd.DataFrame = deepcopy(self.df)[self._series_update_dict_visualization_columns]
+
+        ## Extract pen and brush colors to a color string (hex-formatted string), otherwise the `series_viz_df.drop_duplicates()` below fails because QPen and QBrush aren't hashable:
+        series_viz_df['pen_color'] = series_viz_df['pen'].map(lambda x: RectangleRenderTupleHelpers.QPen_to_dict(x)['color'])
+        series_viz_df['pen_width'] = series_viz_df['pen'].map(lambda x: RectangleRenderTupleHelpers.QPen_to_dict(x)['width'])
+        
+        series_viz_df['brush_color'] = series_viz_df['brush'].map(lambda x: RectangleRenderTupleHelpers.QBrush_to_dict(x)['color'])
+        series_viz_df = series_viz_df.drop(columns=['pen', 'brush'], inplace=False)
+        
+        # Generate a compressed-position representation of curr_df:
+        a_compressed_series_viz_df = series_viz_df.drop_duplicates(inplace=False)
+        if debug_print:
+            print(f'series_viz_df.columns: {list(series_viz_df.columns)}')
+            print(f'a_compressed_series_viz_df.columns: {list(a_compressed_series_viz_df.columns)}')
+        
+        series_compressed_viz_df = a_compressed_series_viz_df
+        series_compressed_viz_update_dict = None
+        _rename_dict = {'series_vertical_offset':'y_location', 'series_height':'height', 'pen':'pen_color', 'brush':'brush_color'}
+        # target_column_names = self._series_update_dict_visualization_columns
+        target_column_names = ['series_vertical_offset', 'series_height', 'pen_color', 'brush_color']
+        
+        if a_compressed_series_viz_df.shape[0] == 1:
+            # only one entry, to be expected
+            series_compressed_viz_update_dict = {k:list(v.values())[0] for k, v in a_compressed_series_viz_df.to_dict().items() if k in target_column_names}
+            ## Rename columns for update outputs:
+            series_compressed_viz_update_dict['y_location'] = series_compressed_viz_update_dict.pop('series_vertical_offset')
+            series_compressed_viz_update_dict['height'] = series_compressed_viz_update_dict.pop('series_height')
+            
+            series_compressed_viz_update_dict['pen_color'] = series_compressed_viz_update_dict.pop('pen_color')
+            series_compressed_viz_update_dict['brush_color'] = series_compressed_viz_update_dict.pop('brush_color')
+            
+        else:
+            series_compressed_viz_update_dict = None
+
+        return series_viz_df, series_compressed_viz_df, series_compressed_viz_update_dict
 
 
     def get_serialized_data(self, drop_duplicates=False):
@@ -312,8 +372,23 @@ class IntervalsDatasource(BaseDatasource):
     @QtCore.pyqtSlot(float, float)
     def get_updated_data_window(self, new_start, new_end):
         """ called to get the data that should be displayed for the window starting at new_start and ending at new_end """
+        try:
+            return self.df[self.df['t_start', 't_end'].between(new_start, new_end)]
+
+        except Exception as e:
+            print(f'WARN: fallback to non-series-based filtering. Exception: {e}.')            
+            pass
+
+        is_interval_start_in_active_window = np.logical_and((new_start <= self.df['t_start']), (self.df['t_start'] < new_end))
+        is_interval_end_in_active_window = np.logical_and((new_start < self.df['t_end']), (self.df['t_end'] <= new_end))
+        is_entire_interval_contained_in_active_window = np.logical_and(is_interval_start_in_active_window, is_interval_end_in_active_window)
+        is_any_portion_of_interval_contained_in_active_window = np.logical_or(is_interval_start_in_active_window, is_interval_end_in_active_window)
+        return self.df[is_any_portion_of_interval_contained_in_active_window]
+
         # return self.df[self.df[self.time_column_names].between(new_start, new_end)]
         # self.df['t_start', 't_duration', 't_end']    
-        return self.df[self.df['t_start', 't_end'].between(new_start, new_end)]
+        # self.df[np.logical_and((new_start <= self.df['t_start']), (self.df['t_end'] <= new_end))]
+
+        # return self.df[self.df['t_start', 't_end'].between(new_start, new_end)]
     
 

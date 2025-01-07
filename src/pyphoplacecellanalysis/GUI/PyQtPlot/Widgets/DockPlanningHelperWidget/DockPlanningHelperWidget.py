@@ -1,8 +1,10 @@
 # DockPlanningHelperWidget.py
+import os
+import sys
 # Generated from c:\Users\pho\repos\pyPhoPlaceCellAnalysis\src\pyphoplacecellanalysis\GUI\PyQtPlot\Widgets\DockPlanningHelperWidget\DockPlanningHelperWidget.ui automatically by PhoPyQtClassGenerator VSCode Extension
 from typing import Dict, Union
 import pyphoplacecellanalysis.External.pyqtgraph as pg
-from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp, uic
 ## IMPORTS:
 # from ...pyPhoPlaceCellAnalysis.src.pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget import DockPlanningHelperWidget
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget.Uic_AUTOGEN_DockPlanningHelperWidget import Ui_Form
@@ -14,6 +16,9 @@ from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 
+## Define the .ui file path
+path = os.path.dirname(os.path.abspath(__file__))
+uiFile = os.path.join(path, 'DockPlanningHelperWidget.ui')
 
 class DockPlanningHelperWidget(QtWidgets.QWidget):
     """ This widget is meant to be embedded in a pyqtgraph.dockarea.Dock to easily prototype/modify its properties. Allows you to create a layout interactively and then save it.
@@ -27,18 +32,22 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
     
     sigCreateNewDock = QtCore.pyqtSignal(object, str) # signal emitted when the mapping from the temporal window to the spatial layout is changed
     # sigCreateNewDock = QtCore.pyqtSignal(object, Union[str, tuple[str, str]]) # signal emitted when the mapping from the temporal window to the spatial layout is changed
-    
+    sigDockConfigChanged = QtCore.pyqtSignal(object) # (self)    
+
     sigClose = QtCore.pyqtSignal() # Called when the window is closing. 
     
     
-    def __init__(self, dock_title='Position Decoder', dock_id='PositionDecoder', defer_show=False, parent=None):
+    def __init__(self, dock_title='Position Decoder', dock_id='PositionDecoder', color=None, defer_show=False, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self.ui = Ui_Form()
+        # self.ui = uic.loadUi(uiFile, self) # Load the .ui file
         self.ui.setupUi(self) # builds the design from the .ui onto this widget.
 
         self.initUI()
         self.title = dock_title
         self.identifier = dock_id
+        if color is not None:
+            self.color = color
         if not defer_show:
             self.show() # Show the GUI
         self.rebuild_output()
@@ -74,6 +83,14 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
     @title.setter
     def title(self, value):
         self.ui.txtDockTitle.setText(value)
+        
+    @property
+    def color(self) -> QtGui.QColor:
+        """The title property."""
+        return self.ui.btnColorButton.color(mode='qcolor')
+    @color.setter
+    def color(self, value):
+        self.ui.btnColorButton.setColor(value)
         
         
     @property
@@ -159,6 +176,8 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
             
             
         """
+        
+        
         self.ui.txtDockIdentifier.textChanged.connect(self.on_values_updated)
         self.ui.txtDockIdentifier.textChanged.connect(self.on_values_updated)
         
@@ -178,6 +197,8 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
 
         self.ui.spinBox_Width.editingFinished.connect(self.on_values_updated)        
         self.ui.spinBox_Height.editingFinished.connect(self.on_values_updated)
+        
+        self.ui.btnColorButton.sigColorChanged.connect(self.on_change_dock_config_color)
         
         ## hide non-needed widgets:
         self.ui.txtExtendedLabel.setEnabled(False)
@@ -205,7 +226,7 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
         
         
     def rebuild_output(self, debug_print=False):
-        log_string = f'title: "{self.title}"\nid: "{self.identifier}"\n'
+        log_string: str = f'title: "{self.title}"\nid: "{self.identifier}"\n'
         log_string = log_string + str(self.geometry())
         
         self.extendedLabel = log_string
@@ -221,7 +242,7 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
         `root_dockAreaWindow.add_display_dock(identifier='LongShortColumnsInfo_dock', widget=long_short_info_layout, dockSize=(600,60), dockAddLocationOpts=['top'], display_config=CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False, corner_radius='0px'))`
         
         """
-        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
+        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, DockDisplayColors
         
         _custom_display_config = CustomDockDisplayConfig(showCloseButton=False, corner_radius='0px') # custom_get_colors_callback_fn=get_utility_dock_colors,
         # width = self.ui.spinBox_Width.value
@@ -229,6 +250,12 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
         # _geometry = self.geometry()
         width = int(self.width())
         height = int(self.height())
+        
+        a_hex_bg_color: str = self.color.name(pg.QtGui.QColor.HexRgb)
+        _custom_display_config.custom_get_colors_dict = {False: DockDisplayColors(fg_color='#fff', bg_color=a_hex_bg_color, border_color=a_hex_bg_color),
+                True: DockDisplayColors(fg_color='#aaa', bg_color=a_hex_bg_color, border_color=a_hex_bg_color),
+        }
+
         # missing keys: dict(widget=self, dockAddLocationOpts=None)
         # return dict(identifier=self.identifier, widget=self, dockSize=(width,height), dockAddLocationOpts=None, display_config=_custom_display_config, autoOrientation=False)
         return dict(identifier=self.identifier, dockSize=(width,height), display_config=_custom_display_config, autoOrientation=False)
@@ -294,6 +321,13 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
         # self.sigCreateNewDock.emit(self, ('above', self.identifier,))
         self.sigCreateNewDock.emit(self, f'above, {self.identifier}')
         
+
+    def on_change_dock_config_color(self, a_color_button):
+        """ called when the color button changes"""
+        print(f'DockPlanningHelperWidget.on_change_dock_config_color()')
+        self.sigDockConfigChanged.emit(self)
+
+
     # def __str__(self):
     #      return 
 

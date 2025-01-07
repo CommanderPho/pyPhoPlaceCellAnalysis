@@ -1,7 +1,7 @@
 from copy import deepcopy
 import time
 import sys
-from typing import OrderedDict, Union
+from typing import Optional, OrderedDict, Union
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 import pyphoplacecellanalysis.External.pyqtgraph.opengl as gl # for 3D raster plot
@@ -32,6 +32,7 @@ from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSer
 import logging
 # from pyphoplacecellanalysis.General.Pipeline.Stages.BaseNeuropyPipelineStage import pipeline_module_logger
 from pyphocorehelpers.print_helpers import build_run_log_task_identifier, build_logger
+from pyphocorehelpers.DataStructure.logging_data_structures import LoggingBaseClass, LoggingBaseClassLoggerOwningMixin
 _GLOBAL_spike_raster_logger = None 
 
 """ 
@@ -99,7 +100,8 @@ self._update_plots()
 def trap_exc_during_debug(*args):
     # when app raises uncaught exception, print info
     print(args)
-    _GLOBAL_spike_raster_logger.error(f'in trap_exc_during_debug(*args: {args})\n this was installed as the sys.excepthook in SpikeRasterBase above the main class.')
+    if _GLOBAL_spike_raster_logger is not None:
+        _GLOBAL_spike_raster_logger.error(f'in trap_exc_during_debug(*args: {args})\n this was installed as the sys.excepthook in SpikeRasterBase above the main class.')
 
 # install exception hook: without this, uncaught exception would cause application to exit
 sys.excepthook = trap_exc_during_debug
@@ -129,7 +131,7 @@ class UnitSortableMixin:
         self.unit_sort_order_changed_signal.emit(self._unit_sort_order)
         
 
-class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, SpikesWindowOwningMixin, SpikesDataframeOwningMixin, RenderPlaybackControlsMixin, RenderWindowControlsMixin, QtWidgets.QWidget):
+class SpikeRasterBase(LoggingBaseClassLoggerOwningMixin, UnitSortableMixin, DataSeriesToSpatialTransformingMixin, NeuronIdentityAccessingMixin, SpikeRenderingBaseMixin, SpikesWindowOwningMixin, SpikesDataframeOwningMixin, RenderPlaybackControlsMixin, RenderWindowControlsMixin, QtWidgets.QWidget):
     
     """ Displays a raster plot with the spikes occuring along a plane. 
     
@@ -165,6 +167,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     def spikes_window(self):
         """The spikes_window property."""
         return self._spikes_window
+    
     
     @property
     def fragile_linear_neuron_IDXs(self):
@@ -246,6 +249,15 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
     @logger.setter
     def logger(self, value):
         self._logger = value
+
+
+    @property
+    def LoggingBaseClassLoggerOwningMixin_logger(self) -> Optional[LoggingBaseClass]:
+        """`LoggingBaseClassLoggerOwningMixin`-conformance required property."""
+        #TODO 2025-01-06 12:01: - [ ] IMPLEMENT
+        return None
+        # return self._logger
+    
 
         
     def __init__(self, params=None, spikes_window=None, playback_controller=None, neuron_colors=None, neuron_sort_order=None, application_name=None, should_show=True, **kwargs):
@@ -604,7 +616,7 @@ class SpikeRasterBase(UnitSortableMixin, DataSeriesToSpatialTransformingMixin, N
 
 
     def wheel_handler(self, event):
-        print(f'wheel_handler(event.angleDelta().y(): {event.angleDelta().y()})')
+        print(f'SpikeRasterBase.wheel_handler(event.angleDelta().y(): {event.angleDelta().y()})')
         # self.modify_volume(1 if event.angleDelta().y() > 0 else -1)
         # self.set_media_position(1 if event.angleDelta().y() > 0 else -1)
 

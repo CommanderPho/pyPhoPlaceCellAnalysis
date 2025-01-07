@@ -1,3 +1,4 @@
+from copy import deepcopy
 import numpy as np
 import pandas as pd
 from attrs import define, field, fields, asdict, astuple
@@ -52,10 +53,12 @@ class Render2DScrollWindowPlotMixin:
         
             self.plots
             self.ui
-
+            self.params.scroll_window_plot_downsampling_rate
+            
             self.spikes_window.total_df_start_end_times # to get the current start/end times to set the linear region to
         Creates:
             self.plots_data.all_spots # data for all spikes to be rendered on a scatter plot
+            self.plots_data.all_spots_downsampled # temporally downsampled data for all spikes to be rendered on a scatter plot
             self.ui.scroll_window_region # a pg.LinearRegionItem                        
             self.plots.preview_overview_scatter_plot # a pg.ScatterPlotItem
         
@@ -72,14 +75,20 @@ class Render2DScrollWindowPlotMixin:
         
         #############################
         ## Bottom Windowed Scroll Plot/Widget:
-
-        # ALL Spikes in the preview window:
-        curr_spike_x, curr_spike_y, curr_spike_pens, _all_scatterplot_tooltips_kwargs, self.plots_data.all_spots, curr_n = self._build_all_spikes_data_values(should_return_data_tooltips_kwargs=False) #TODO 2023-06-28 21:18: - [ ] Could use returned tooltips to set the spike hover text
+        scroll_window_plot_downsampling_rate: int = self.params.setdefault('scroll_window_plot_downsampling_rate', 100)
         
-        self.plots.preview_overview_scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=5, pen={'color': 'w', 'width': 1}, hoverable=True, )
+        # ALL Spikes in the preview window:
+        # curr_spike_x, curr_spike_y, curr_spike_pens, _all_scatterplot_tooltips_kwargs, self.plots_data.all_spots, curr_n = self._build_all_spikes_data_values(should_return_data_tooltips_kwargs=False, downsampling_rate=scroll_window_plot_downsampling_rate) #TODO 2023-06-28 21:18: - [ ] Could use returned tooltips to set the spike hover text
+        
+        curr_spike_x, _, curr_spike_pens, _all_scatterplot_tooltips_kwargs, self.plots_data.all_spots_downsampled, curr_n = self._build_all_spikes_data_values(should_return_data_tooltips_kwargs=False, downsampling_rate=scroll_window_plot_downsampling_rate) # downsampled all_spots
+        curr_spike_x, curr_spike_y, curr_spike_pens, _all_scatterplot_tooltips_kwargs, self.plots_data.all_spots, curr_n = self._build_all_spikes_data_values(should_return_data_tooltips_kwargs=False, downsampling_rate=1) ## all spots
+
+
+        self.plots.preview_overview_scatter_plot = pg.ScatterPlotItem(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=5, pen={'color': 'w', 'width': 1}, hoverable=False, )
         self.plots.preview_overview_scatter_plot.setObjectName('preview_overview_scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
         self.plots.preview_overview_scatter_plot.opts['useCache'] = True
-        self.plots.preview_overview_scatter_plot.addPoints(self.plots_data.all_spots) # , hoverable=True
+        # self.plots.preview_overview_scatter_plot.addPoints(self.plots_data.all_spots) # , hoverable=True
+        self.plots.preview_overview_scatter_plot.addPoints(self.plots_data.all_spots_downsampled)
         background_static_scroll_window_plot.addItem(self.plots.preview_overview_scatter_plot)
         
         # Add the linear region overlay:
@@ -130,6 +139,8 @@ class Render2DScrollWindowPlotMixin:
         ## THIS SHOULD FIX THE INITIAL SCROLLWINDOW ISSUE, preventing it from being outside the window it's rendered on top of, unless the active window is set wrong.
         # self.update_scroll_window_region(confirmed_valid_window_start_t, confirmed_valid_window_end_t, block_signals=False)
         self.Render2DScrollWindowPlot_on_window_update(confirmed_valid_window_start_t, confirmed_valid_window_end_t)
+        ## TODO: attach the event forwarder 2025-01-02
+        # self.ui.main_graphics_layout_widget.set_target_event_forwarding_child(self.ui.scroll_window_region) #TODO 2025-01-02 07:55: - [ ] Did not work
         
         
     def update_rasters(self):
@@ -256,7 +267,7 @@ class Render2DScrollWindowPlotMixin:
 
 
     @classmethod
-    def build_spikes_data_values_from_df(cls, spikes_df: pd.DataFrame, config_fragile_linear_neuron_IDX_map, is_spike_included=None, should_return_data_tooltips_kwargs:bool=False, **kwargs):
+    def build_spikes_data_values_from_df(cls, spikes_df: pd.DataFrame, config_fragile_linear_neuron_IDX_map, is_spike_included=None, should_return_data_tooltips_kwargs:bool=False, downsampling_rate: int = 10, **kwargs):
         """ build global spikes for entire dataframe (not just the current window) 
         
         Called by:
@@ -281,19 +292,25 @@ class Render2DScrollWindowPlotMixin:
         
         2023-12-06 `config_fragile_linear_neuron_IDX_map` comes in mostly empty except for Pens and Brushes for each state
         """
+        if (downsampling_rate is not None) and (downsampling_rate > 1):
+            active_spikes_df = deepcopy(spikes_df).iloc[::downsampling_rate]  # Take every 10th row
+        else:
+            active_spikes_df = deepcopy(spikes_df)
+            
+
         # All units at once approach:
-        active_time_variable_name = spikes_df.spikes.time_variable_name
+        active_time_variable_name = active_spikes_df.spikes.time_variable_name
         # Copy only the relevent columns so filtering is easier:
-        filtered_spikes_df = spikes_df[[active_time_variable_name, 'visualization_raster_y_location',  'visualization_raster_emphasis_state', 'fragile_linear_neuron_IDX']].copy()
+        filtered_spikes_df = active_spikes_df[[active_time_variable_name, 'visualization_raster_y_location',  'visualization_raster_emphasis_state', 'fragile_linear_neuron_IDX']].copy()
         
         spike_emphasis_states = kwargs.get('spike_emphasis_state', None)
         if spike_emphasis_states is not None:
-            assert len(spike_emphasis_states) == np.shape(spikes_df)[0], f"if specified, spike_emphasis_states must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]} and len(is_included_indicies): {len(spike_emphasis_states)}"
+            assert len(spike_emphasis_states) == np.shape(active_spikes_df)[0], f"if specified, spike_emphasis_states must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(active_spikes_df)[0]} and len(is_included_indicies): {len(spike_emphasis_states)}"
             # Can set it on the dataframe:
             # 'visualization_raster_y_location'
         
         if is_spike_included is not None:
-            assert len(is_spike_included) == np.shape(spikes_df)[0], f"if specified, is_included_indicies must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]} and len(is_included_indicies): {len(is_spike_included)}"
+            assert len(is_spike_included) == np.shape(active_spikes_df)[0], f"if specified, is_included_indicies must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(active_spikes_df)[0]} and len(is_included_indicies): {len(is_spike_included)}"
             ## filter them by the is_included_indicies:
             filtered_spikes_df = filtered_spikes_df[is_spike_included]
         
@@ -305,8 +322,8 @@ class Render2DScrollWindowPlotMixin:
         # curr_spike_data_tooltips = [f"{an_aclu}" for an_aclu in spikes_df['aclu'].to_numpy()]
         if should_return_data_tooltips_kwargs:
             # #TODO 2023-12-06 03:35: - [ ] This doesn't look like it can sort the tooltips at all, right? Or does this not matter?
-            all_scatterplot_tooltips_kwargs = cls._build_spike_data_tuples_from_spikes_df(spikes_df, generate_debug_tuples=True) # need the full spikes_df, not the filtered one
-            assert len(all_scatterplot_tooltips_kwargs['data']) == np.shape(spikes_df)[0], f"if specified, all_scatterplot_tooltips_kwargs must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]} and len((all_scatterplot_tooltips_kwargs['data']): {len(all_scatterplot_tooltips_kwargs['data'])}"
+            all_scatterplot_tooltips_kwargs = cls._build_spike_data_tuples_from_spikes_df(active_spikes_df, generate_debug_tuples=True) # need the full spikes_df, not the filtered one
+            assert len(all_scatterplot_tooltips_kwargs['data']) == np.shape(active_spikes_df)[0], f"if specified, all_scatterplot_tooltips_kwargs must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(active_spikes_df)[0]} and len((all_scatterplot_tooltips_kwargs['data']): {len(all_scatterplot_tooltips_kwargs['data'])}"
         else:
             all_scatterplot_tooltips_kwargs = None
             

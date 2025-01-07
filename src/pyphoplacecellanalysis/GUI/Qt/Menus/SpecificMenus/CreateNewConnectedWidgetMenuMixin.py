@@ -7,7 +7,7 @@ from pyphoplacecellanalysis.GUI.Qt.Menus.PhoMenuHelper import PhoMenuHelper
 from pyphoplacecellanalysis.GUI.Qt.Menus.BaseMenuProviderMixin import BaseMenuCommand
 from pyphoplacecellanalysis.GUI.Qt.Menus.BaseMenuProviderMixin import initialize_global_menu_ui_variables_if_needed
 
-from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import AddNewDecodedPosition_MatplotlibPlotCommand, CreateNewStackedDecodedEpochSlicesPlotCommand, AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import AddNewDecodedPosition_MatplotlibPlotCommand, CreateNewStackedDecodedEpochSlicesPlotCommand, AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand, AddNewTrackTemplatesDecodedEpochSlicesRows_MatplotlibPlotCommand
 
 # GuiResources_rc
 
@@ -66,20 +66,40 @@ class CreateNewConnectedWidgetMenuHelper(object):
     def try_attach_action_commands(cls, spike_raster_window, curr_active_pipeline, active_config_name, display_output):
         ## Register the actual commands for each action:
         curr_window = PhoMenuHelper.try_get_menu_window(spike_raster_window)
-        curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnected2DRaster'].triggered.connect(CreateNewPyQtGraphPlotterCommand(spike_raster_window, type_of_connected_plotter='pyqtgraph2D'))
-        curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnected3DRaster_PyQtGraph'].triggered.connect(CreateNewPyQtGraphPlotterCommand(spike_raster_window, type_of_connected_plotter='pyqtgraph'))
-        curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnected3DRaster_Vedo'].triggered.connect(CreateNewVedoPlotterCommand(spike_raster_window))
-        curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnectedDataExplorer_ipc'].triggered.connect(CreateNewDataExplorer_ipc_PlotterCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output))
-        curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnectedDataExplorer_ipspikes'].triggered.connect(CreateNewDataExplorer_ipspikes_PlotterCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output))
-        curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionAddMatplotlibPlot_DecodedPosition'].triggered.connect(AddNewDecodedPosition_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output))
+        curr_actions_dict = curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict
+
+        action_command_map = {
+            'actionNewConnected2DRaster': CreateNewPyQtGraphPlotterCommand(spike_raster_window, type_of_connected_plotter='pyqtgraph2D'),
+            'actionNewConnected3DRaster_PyQtGraph': CreateNewPyQtGraphPlotterCommand(spike_raster_window, type_of_connected_plotter='pyqtgraph'),
+            'actionNewConnected3DRaster_Vedo': CreateNewVedoPlotterCommand(spike_raster_window),
+            'actionNewConnectedDataExplorer_ipc': CreateNewDataExplorer_ipc_PlotterCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output),
+            'actionNewConnectedDataExplorer_ipspikes': CreateNewDataExplorer_ipspikes_PlotterCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output),
+            'actionAddMatplotlibPlot_DecodedPosition': AddNewDecodedPosition_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output),
+            'actionDecoded_Epoch_Slices_Laps': CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='lap', display_output=display_output), ## MUST MATCH THE VALUES IN `KnownFilterEpochs` Launches in an external window
+            'actionDecoded_Epoch_Slices_PBEs': CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='pbe', display_output=display_output), ## Launches in an external window
+            'actionDecoded_Epoch_Slices_Ripple': CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='ripple', display_output=display_output), ## Launches in an external window
+            'actionDecoded_Epoch_Slices_Replay': CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='replay', display_output=display_output) ## Launches in an external window
+        }
+        
+        for a_name, a_build_command in action_command_map.items():
+            curr_actions_dict[a_name].triggered.connect(a_build_command)
         
         
-        curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionDecoded_Epoch_Slices_Laps'].triggered.connect(CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='laps', display_output=display_output))
-        curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionDecoded_Epoch_Slices_PBEs'].triggered.connect(CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='pbe', display_output=display_output))
-        curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionDecoded_Epoch_Slices_Ripple'].triggered.connect(CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='ripple', display_output=display_output))
-        curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionDecoded_Epoch_Slices_Replay'].triggered.connect(CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='replay', display_output=display_output))
+        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnected2DRaster'].triggered.connect(CreateNewPyQtGraphPlotterCommand(spike_raster_window, type_of_connected_plotter='pyqtgraph2D', action_identifier='actionNewConnected2DRaster'))
+        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnected3DRaster_PyQtGraph'].triggered.connect(CreateNewPyQtGraphPlotterCommand(spike_raster_window, type_of_connected_plotter='pyqtgraph', action_identifier='actionNewConnected3DRaster_PyQtGraph'))
+        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnected3DRaster_Vedo'].triggered.connect(CreateNewVedoPlotterCommand(spike_raster_window, action_identifier='actionNewConnected3DRaster_Vedo'))
+        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnectedDataExplorer_ipc'].triggered.connect(CreateNewDataExplorer_ipc_PlotterCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output, action_identifier='actionNewConnectedDataExplorer_ipc'))
+        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionNewConnectedDataExplorer_ipspikes'].triggered.connect(CreateNewDataExplorer_ipspikes_PlotterCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output, action_identifier='actionNewConnectedDataExplorer_ipspikes'))
+        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionAddMatplotlibPlot_DecodedPosition'].triggered.connect(AddNewDecodedPosition_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name, display_output, action_identifier='actionAddMatplotlibPlot_DecodedPosition'))
+        
+        
+        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionDecoded_Epoch_Slices_Laps'].triggered.connect(CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='laps', display_output=display_output, action_identifier='actionDecoded_Epoch_Slices_Laps'))
+        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionDecoded_Epoch_Slices_PBEs'].triggered.connect(CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='pbe', display_output=display_output, action_identifier='actionDecoded_Epoch_Slices_PBEs'))
+        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionDecoded_Epoch_Slices_Ripple'].triggered.connect(CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='ripple', display_output=display_output, action_identifier='actionDecoded_Epoch_Slices_Ripple'))
+        # curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionDecoded_Epoch_Slices_Replay'].triggered.connect(CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='replay', display_output=display_output, action_identifier='actionDecoded_Epoch_Slices_Replay'))
         # curr_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict['actionDecoded_Epoch_Slices_Custom'].triggered.connect(CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='custom', display_output=display_output))        
 
+        # {'actionNewConnected2DRaster':'CreateNewPyQtGraphPlotterCommand', 'actionNewConnected3DRaster_PyQtGraph':'CreateNewPyQtGraphPlotterCommand', 'actionNewConnected2DRaster':'actionNewConnected2DRaster'}
             
     @classmethod
     def _build_create_new_connected_widget_menu(cls, a_main_window, debug_print=False):
@@ -168,13 +188,14 @@ class CreateNewPyQtGraphPlotterCommand(BaseMenuCommand):
     """
     A command to create a plotter as needed
     """
-    def __init__(self, spike_raster_window, type_of_connected_plotter='pyqtgraph') -> None:
-        super(CreateNewPyQtGraphPlotterCommand, self).__init__()
+    def __init__(self, spike_raster_window, type_of_connected_plotter='pyqtgraph', action_identifier: str=None) -> None:
+        super(CreateNewPyQtGraphPlotterCommand, self).__init__(action_identifier=action_identifier)
         self._spike_raster_window = spike_raster_window
         self._type_of_connected_plotter = type_of_connected_plotter # e.g. 'pyqtgraph', 'pyqtgraph2D'
         
     def execute(self, *args, **kwargs) -> None:
         print(f'menu execute(): {self}')
+        self.log_command(*args, **kwargs) # adds this command to the `menu_action_history_list` 
         test_independent_pyqtgraph_raster_widget = self._spike_raster_window.create_new_connected_widget(type_of_3d_plotter=self._type_of_connected_plotter)
         test_independent_pyqtgraph_raster_widget.show()
 
@@ -183,13 +204,14 @@ class CreateNewVedoPlotterCommand(BaseMenuCommand):
     """
     A command to create a plotter as needed
     """
-    def __init__(self, spike_raster_window) -> None:
-        super(CreateNewVedoPlotterCommand, self).__init__()
+    def __init__(self, spike_raster_window, action_identifier: str=None) -> None:
+        super(CreateNewVedoPlotterCommand, self).__init__(action_identifier=action_identifier)
         self._spike_raster_window = spike_raster_window
         
     def execute(self, *args, **kwargs) -> None:
         """ Implicitly captures spike_raster_window """
         print(f'menu execute(): {self}')
+        self.log_command(*args, **kwargs) # adds this command to the `menu_action_history_list` 
         test_independent_vedo_raster_widget = self._spike_raster_window.create_new_connected_widget(type_of_3d_plotter='vedo')
         test_independent_vedo_raster_widget.show()
         # global_connected_widgets['test_independent_vedo_raster_widget'] = test_independent_vedo_raster_widget
@@ -203,8 +225,8 @@ TODO: NOTE that I run into an issue here, as the menus can't be setup properly f
 
 """
 class CreateNewDataExplorer_ipc_PlotterCommand(BaseMenuCommand):
-    def __init__(self, spike_raster_window, curr_active_pipeline, active_config_name, display_output={}) -> None:
-        super(CreateNewDataExplorer_ipc_PlotterCommand, self).__init__()
+    def __init__(self, spike_raster_window, curr_active_pipeline, active_config_name, display_output={}, action_identifier: str=None) -> None:
+        super(CreateNewDataExplorer_ipc_PlotterCommand, self).__init__(action_identifier=action_identifier)
         self._spike_raster_window = spike_raster_window
         self._curr_active_pipeline = curr_active_pipeline
         self._active_config_name = active_config_name
@@ -212,6 +234,7 @@ class CreateNewDataExplorer_ipc_PlotterCommand(BaseMenuCommand):
         
     def execute(self, *args, **kwargs) -> None:
         print(f'menu execute(): {self}')
+        self.log_command(*args, **kwargs) # adds this command to the `menu_action_history_list` 
         pActiveTuningCurvesPlotter = None
         # display_output = {}
         self._display_output = self._display_output | self._curr_active_pipeline.display('_display_3d_interactive_tuning_curves_plotter', self._active_config_name, extant_plotter=self._display_output.get('pActiveTuningCurvesPlotter', None), panel_controls_mode='Qt') # Works now!
@@ -223,8 +246,8 @@ class CreateNewDataExplorer_ipc_PlotterCommand(BaseMenuCommand):
 
 class CreateNewDataExplorer_ipspikes_PlotterCommand(BaseMenuCommand):
     """ creates a new `ipspikesDataExplorer` 3D plotter. """
-    def __init__(self, spike_raster_window, curr_active_pipeline, active_config_name, display_output={}) -> None:
-        super(CreateNewDataExplorer_ipspikes_PlotterCommand, self).__init__()
+    def __init__(self, spike_raster_window, curr_active_pipeline, active_config_name, display_output={}, action_identifier: str=None) -> None:
+        super(CreateNewDataExplorer_ipspikes_PlotterCommand, self).__init__(action_identifier=action_identifier)
         self._spike_raster_window = spike_raster_window
         self._curr_active_pipeline = curr_active_pipeline
         self._active_config_name = active_config_name
@@ -232,6 +255,7 @@ class CreateNewDataExplorer_ipspikes_PlotterCommand(BaseMenuCommand):
         
     def execute(self, *args, **kwargs) -> None:
         print(f'menu execute(): {self}')
+        self.log_command(*args, **kwargs) # adds this command to the `menu_action_history_list` 
         pActiveSpikesBehaviorPlotter = None
         # display_output = {}
         self._display_output = self._display_output | self._curr_active_pipeline.display('_display_3d_interactive_spike_and_behavior_browser', self._active_config_name, extant_plotter=self._display_output.get('pActiveSpikesBehaviorPlotter', None)) # Works now!

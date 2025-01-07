@@ -92,7 +92,32 @@ class PosteriorExporting:
     from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
     
     
-    
+    Usage:
+        ## Exports: "2024-11-26_Lab-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(decoded_posteriors).h5"
+		print(f'save_hdf == True, so exporting posteriors to HDF file...')
+		# parent_output_path = self.collected_outputs_path.resolve()
+		save_path: Path = _subfn_build_custom_export_to_h5_path(data_identifier_str='(decoded_posteriors)', a_tbin_size=directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size, parent_output_path=self.collected_outputs_path.resolve())
+		# save_path = Path(f'output/{BATCH_DATE_TO_USE}_newest_all_decoded_epoch_posteriors.h5').resolve()
+		complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
+		_, _, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
+		custom_params_hdf_key: str = custom_suffix.strip('_') # strip leading/trailing underscores
+		# _parent_save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_decoded_posteriors_to_HDF5', custom_suffix=custom_suffix)
+		_parent_save_context: DisplaySpecifyingIdentifyingContext = deepcopy(session_context).overwriting_context(custom_suffix=custom_params_hdf_key, display_fn_name='save_decoded_posteriors_to_HDF5')
+		# _parent_save_context: DisplaySpecifyingIdentifyingContext = complete_session_context.overwriting_context(display_fn_name='save_decoded_posteriors_to_HDF5')
+		_parent_save_context.display_dict = {
+			'custom_suffix': lambda k, v: f"{v}", # just include the name
+			'display_fn_name': lambda k, v: f"{v}", # just include the name
+		}
+		out_contexts, _flat_all_HDF5_out_paths = PosteriorExporting.perform_save_all_decoded_posteriors_to_HDF5(decoder_laps_filter_epochs_decoder_result_dict=None,
+																					decoder_ripple_filter_epochs_decoder_result_dict=deepcopy(directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict),
+																					_save_context=_parent_save_context.get_raw_identifying_context(), save_path=save_path, should_overwrite_extant_file=(not allow_append_to_session_h5_file))
+
+		_flat_all_HDF5_out_paths = list(dict.fromkeys([v.as_posix() for v in _flat_all_HDF5_out_paths]).keys())
+		# _output_HDF5_paths_info_str: str = '\n'.join([f'"{file_uri_from_path(a_path)}"' for a_path in _flat_all_HDF5_out_paths])
+		_output_HDF5_paths_info_str: str = '\n'.join([f'"{a_path}"' for a_path in _flat_all_HDF5_out_paths])
+		# print(f'\t\t\tHDF5 Paths: {_flat_all_HDF5_out_paths}\n')
+		print(f'\t\t\tHDF5 Paths: {_output_HDF5_paths_info_str}\n')
+        
     """
     @classmethod
     def save_posterior_to_video(cls, a_decoder_continuously_decoded_result: DecodedFilterEpochsResult, result_name: str='a_decoder_continuously_decoded_result'):
@@ -302,6 +327,7 @@ class PosteriorExporting:
         
         return marginal_dir_tuple, marginal_track_identity_tuple, marginal_dir_point_tuple, marginal_track_identity_point_tuple, _out_save_tuples
         
+
     @function_attributes(short_name=None, tags=['export','marginal', 'pseudo2D', 'IMPORTANT'], input_requires=[], output_provides=[], uses=['save_posterior'], used_by=[], creation_date='2024-09-10 00:06', related_items=[])
     @classmethod
     def save_marginals_arrays_as_image(cls, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, parent_array_as_image_output_folder: Path, epoch_id_identifier_str: str = 'ripple', epoch_ids=None, export_all_raw_marginals_separately: bool=True, include_value_labels:bool=False, allow_override_aspect_ratio:bool=True, debug_print=False):
@@ -474,7 +500,7 @@ class PosteriorExporting:
                 
         
     @classmethod
-    @function_attributes(short_name=None, tags=['export', 'images', 'ESSENTIAL'], input_requires=[], output_provides=[], uses=['export_decoded_posteriors_as_images'], used_by=[], creation_date='2024-08-28 08:36', related_items=[])
+    @function_attributes(short_name=None, tags=['MAIN', 'export', 'images', 'ESSENTIAL'], input_requires=[], output_provides=[], uses=['export_decoded_posteriors_as_images'], used_by=[], creation_date='2024-08-28 08:36', related_items=[])
     def perform_export_all_decoded_posteriors_as_images(cls, decoder_laps_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult],
                                                          _save_context: IdentifyingContext, parent_output_folder: Path, custom_export_formats: Optional[Dict[str, HeatmapExportConfig]]=None, desired_height=None, combined_img_padding=4, combined_img_separator_color=None):
         """ Exports the decoded epoch position posteriors as raw images, also includes functionality to export merged/combined images.
@@ -578,9 +604,9 @@ class PosteriorExporting:
     # Save/Load                                                                                                            #
     # ==================================================================================================================== #
     @classmethod
-    @function_attributes(short_name=None, tags=['posterior', 'HDF5', 'output', 'save', 'export'], input_requires=[], output_provides=[], uses=['h5py'], used_by=[], creation_date='2024-08-28 02:38', related_items=['load_decoded_posteriors_from_HDF5'])
+    @function_attributes(short_name=None, tags=['posterior', 'HDF5', 'output', 'save', 'export'], input_requires=[], output_provides=[], uses=['h5py', 'SingleEpochDecodedResult', 'SingleEpochDecodedResult.to_hdf(...)'], used_by=['perform_save_all_decoded_posteriors_to_HDF5'], creation_date='2024-08-28 02:38', related_items=['load_decoded_posteriors_from_HDF5'])
     def save_decoded_posteriors_to_HDF5(cls, a_decoder_decoded_epochs_result: DecodedFilterEpochsResult, save_path:Path='decoded_epoch_posteriors.h5', allow_append:bool=False, out_context=None, debug_print=False): # decoders_dict: Dict[types.DecoderName, BasePositionDecoder], 
-        """Save the transitiion matrix info to a file
+        """Save the DecodedFilterEpochsResult info to a file
         
         _save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_transition_matricies')
         _save_path = PosteriorExporting.save_decoded_posteriors_to_HDF5(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, out_context=_save_context, save_path='output/transition_matrix_data.h5')
@@ -627,7 +653,7 @@ class PosteriorExporting:
             num_required_zero_padding: int = len(str(num_filter_epochs))
             
             for i in np.arange(num_filter_epochs):
-                active_captured_single_epoch_result: SingleEpochDecodedResult = a_decoder_decoded_epochs_result.get_result_for_epoch(active_epoch_idx=i)
+                active_captured_single_epoch_result: SingleEpochDecodedResult = a_decoder_decoded_epochs_result.get_result_for_epoch(active_epoch_idx=i) ## extracts a `SingleEpochDecodedResult`
                 epoch_data_idx_str: str = f"{i:0{num_required_zero_padding}d}"
                 # _curr_context = out_context.overwriting_context(epoch_idx=i)
                 _curr_context = out_context.overwriting_context(epoch_idx=epoch_data_idx_str)
@@ -657,7 +683,7 @@ class PosteriorExporting:
     
 
     @classmethod
-    @function_attributes(short_name=None, tags=['save', 'export', 'HDF5', 'h5'], input_requires=[], output_provides=[], uses=['save_decoded_posteriors_to_HDF5'], used_by=[], creation_date='2024-08-28 08:36', related_items=[])
+    @function_attributes(short_name=None, tags=['MAIN', 'save', 'export', 'HDF5', 'h5'], input_requires=[], output_provides=[], uses=['save_decoded_posteriors_to_HDF5'], used_by=[], creation_date='2024-08-28 08:36', related_items=['LoadedPosteriorContainer.load_batch_hdf5_exports'])
     def perform_save_all_decoded_posteriors_to_HDF5(cls, decoder_laps_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], _save_context: IdentifyingContext, save_path: Path, should_overwrite_extant_file:bool=True):
         """
         
@@ -854,13 +880,81 @@ class PosteriorExporting:
 
 
 
+
+    # @classmethod
+    # @function_attributes(short_name=None, tags=['MAIN', 'save', 'export', 'pickle', 'pkl'], input_requires=[], output_provides=[], uses=['save_decoded_posteriors_to_HDF5'], used_by=[], creation_date='2024-08-28 08:36', related_items=['LoadedPosteriorContainer.load_batch_hdf5_exports'])
+    # def perform_save_all_decoded_posteriors_to_pkl(cls, decoder_laps_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], _save_context: IdentifyingContext, save_path: Path, should_overwrite_extant_file:bool=True):
+    #     """
+        
+    #     Usage:
+        
+    #         save_path = Path('output/newest_all_decoded_epoch_posteriors.h5').resolve()
+    #         _parent_save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_decoded_posteriors_to_HDF5')
+    #         out_contexts = PosteriorExporting.perform_save_all_decoded_posteriors_to_HDF5(decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict, _save_context=_parent_save_context, save_path=save_path)
+    #         out_contexts
+
+    #     History:
+    #         Refactored from `ComputerVisionComputations` on 2024-09-30
+    #     """
+    #     from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
+    #     from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
+    #     from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
+        
+    #     _flat_all_out_paths = []
+        
+    #     def _subfn_perform_save_single_epochs(_active_filter_epochs_decoder_result_dict, a_save_context: IdentifyingContext, epochs_name: str, save_path: Path) -> Dict[types.DecoderName, IdentifyingContext]:
+    #         """ saves a single set of named epochs, like 'laps' or 'ripple' 
+    #         Captures/Updates: _flat_all_out_paths,
+        
+    #         """
+    #         _sub_out_contexts = {}
+    #         if (_active_filter_epochs_decoder_result_dict is not None):
+    #             ## Pickle Saving:
+    #             standalone_filename: str = f'{get_now_day_str()}_recomputed_inst_fr_comps_{_out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds}.pkl'
+    #             recomputed_inst_fr_comps_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_filename).resolve()
+    #             print(f'recomputed_inst_fr_comps_filepath: "{recomputed_inst_fr_comps_filepath}"')
+
+    #             try:
+    #                 saveData(recomputed_inst_fr_comps_filepath, (a_save_context, _active_filter_epochs_decoder_result_dict))
+    #                 was_write_good = True
+    #                 subfn_callback_outputs['recomputed_inst_fr_comps_filepath'] = recomputed_inst_fr_comps_filepath
+
+    #             except BaseException as e:
+    #                 exception_info = sys.exc_info()
+    #                 err = CapturedException(e, exception_info)
+    #                 print(f"ERROR: encountered exception {err} while trying to perform _out_recomputed_inst_fr_comps.save_data('{recomputed_inst_fr_comps_filepath}') for {curr_session_context}")
+    #                 recomputed_inst_fr_comps_filepath = None # set to None because it failed.
+    #                 if self.fail_on_exception:
+    #                     raise err.exc
+    #         else:
+    #             recomputed_inst_fr_comps_filepath = None
+                
+    #         return _sub_out_contexts
+
+
+    #     if save_path.exists() and should_overwrite_extant_file:
+    #         print(f'\tsave_path "{save_path}" exists and should_overwrite_extant_file==True, so removing file...')
+    #         save_path.unlink(missing_ok=False)
+    #         print(f'\t successfully removed.')
+            
+    #     out_contexts = {'laps': None, 'ripple': None}
+    #     if decoder_laps_filter_epochs_decoder_result_dict is not None:
+    #         out_contexts['laps'] = _subfn_perform_save_single_epochs(decoder_laps_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='laps', save_path=save_path)
+    #     if decoder_ripple_filter_epochs_decoder_result_dict is not None:
+    #         out_contexts['ripple'] = _subfn_perform_save_single_epochs(decoder_ripple_filter_epochs_decoder_result_dict, a_save_context=_save_context, epochs_name='ripple', save_path=save_path)
+    #     return out_contexts, _flat_all_out_paths
+
+
+
+
     # ==================================================================================================================== #
     # Other/Testing                                                                                                        #
     # ==================================================================================================================== #
 
 
     @classmethod
-    def _test_export_marginals_for_figure(cls, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], clicked_epoch: NDArray, context_specific_root_export_path: Path, epoch_specific_folder: Path, epoch_id_identifier_str='ripple', debug_print=True, allow_override_aspect_ratio:bool=True, **kwargs):
+    def _test_export_marginals_for_figure(cls, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], clicked_epoch: NDArray, context_specific_root_export_path: Path, epoch_specific_folder: Path,
+                                           epoch_id_identifier_str='ripple', debug_print=True, allow_override_aspect_ratio:bool=True, **kwargs):
         """
         
                 epoch_id_identifier_str='ripple'
@@ -970,7 +1064,7 @@ class PosteriorExporting:
 
         return out_image_save_tuple_dict, out_image_paths
 
-
+    @function_attributes(short_name=None, tags=['marginal', 'export'], input_requires=[], output_provides=[], uses=['cls._test_export_marginals_for_figure'], used_by=[], creation_date='2025-01-02 01:13', related_items=[])
     @classmethod
     def _perform_export_current_epoch_marginal_and_raster_images(cls, _out_ripple_rasters, directional_merged_decoders_result, filtered_decoder_filter_epochs_decoder_result_dict, active_session_context, root_export_path: Path, epoch_id_identifier_str='lap',
                                                                  desired_width = 2048, desired_height = 720, debug_print=False
@@ -1078,11 +1172,35 @@ class PosteriorExporting:
 
 
 
-
+@metadata_attributes(short_name=None, tags=['export', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-16 22:28', related_items=[])
 @define(slots=False)
 class LoadedPosteriorContainer:
     """ 
-    from pyphoplacecellanalysis.Pho2D.data_exporting import LoadedPosteriorContainer
+
+    Usage:    
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import H5FileAggregator
+        from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
+        from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
+        from pyphoplacecellanalysis.Pho2D.data_exporting import LoadedPosteriorContainer
+        from neuropy.utils.indexing_helpers import flatten, flatten_dict
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor
+                        
+        ## INPUTS: parsed_h5_files_df
+        decoded_posteriors_parsed_h5_files_df = parsed_h5_files_df[parsed_h5_files_df['file_type'] == 'decoded_posteriors']
+
+        print(decoded_posteriors_parsed_h5_files_df['custom_replay_name'].unique())
+        # matching_custom_replay_name_str: str = "withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]"
+        # matching_custom_replay_name_str: str = "withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2, 4, 6, 7, 9]"
+        matching_custom_replay_name_str: str = 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0'
+        decoded_posteriors_parsed_h5_files_df = decoded_posteriors_parsed_h5_files_df[decoded_posteriors_parsed_h5_files_df['custom_replay_name'] == matching_custom_replay_name_str]
+        decoded_posteriors_parsed_h5_files_df
+        decoded_posteriors_h5_files = [Path(v.as_posix()).resolve() for v in decoded_posteriors_parsed_h5_files_df['path'].to_list()]
+        # decoded_posteriors_h5_files
+        ## OUTPUTS: decoded_posteriors_h5_files
+
+        all_sessions_exported_posteriors_dict, all_sessions_exported_posteriors_data_only_dict = LoadedPosteriorContainer.load_batch_hdf5_exports(exported_posterior_data_h5_files=decoded_posteriors_h5_files)
+        ## OUTPUTS: all_sessions_exported_posteriors_dict, all_sessions_exported_posteriors_data_only_dict
+
     """
     file_path: Optional[Path] = field(default=None)
     session_key_parts: List = field(default=Factory(list))
@@ -1136,7 +1254,7 @@ class LoadedPosteriorContainer:
 
         return _obj
 
-
+    @function_attributes(short_name=None, tags=['MAIN', 'load', 'batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-17 03:06', related_items=['PosteriorExporting.perform_save_all_decoded_posteriors_to_HDF5'])
     @classmethod
     def load_batch_hdf5_exports(cls, exported_posterior_data_h5_files) -> Dict[str, "LoadedPosteriorContainer"]:
         """ 
@@ -1157,7 +1275,7 @@ class LoadedPosteriorContainer:
         #     all_cells_first_spike_time_df_loaded, global_spikes_df_loaded, global_spikes_dict_loaded, first_spikes_dict_loaded, extra_dfs_dict_loaded = a_first_spike_time_tuple ## unpack
 
 
-
+@metadata_attributes(short_name=None, tags=['export', 'posterior', 'datasource', 'plotting'], input_requires=[], output_provides=[], uses=[], used_by=['DataFrameFilter'], creation_date='2024-12-16 22:28', related_items=[])
 @define(slots=False, eq=False, repr=False)
 class PosteriorPlottingDatasource:
     """ a datasource that provides posteriors
