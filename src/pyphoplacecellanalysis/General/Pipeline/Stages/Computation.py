@@ -767,6 +767,18 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                 # self.global_computation_results = ComputedPipelineStage._build_initial_computationResult(self.sess, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
                 self.global_computation_results = ComputedPipelineStage._build_initial_global_computationResult(self, self.sess, active_computation_params)
                 assert self.global_computation_results.computation_config is not None
+                
+                # ## Add `curr_active_pipeline.global_computation_results.computation_config` as needed:
+                # if self.global_computation_results.computation_config is None:
+                #     print('global_computation_results.computation_config is None! Making new one!')
+                #     curr_global_param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters.init_from_pipeline(curr_active_pipeline=self)
+                #     self.global_computation_results.computation_config = curr_global_param_typed_parameters
+                #     print(f'\tdone. Pipeline needs resave!')
+                # else:
+                #     curr_global_param_typed_parameters: ComputationKWargParameters = self.global_computation_results.computation_config
+                    
+
+
             ## TODO: what is this about?
             previous_computation_result = self.global_computation_results
 

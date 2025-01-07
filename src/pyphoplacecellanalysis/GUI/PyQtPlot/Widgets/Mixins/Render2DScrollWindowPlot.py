@@ -53,6 +53,7 @@ class Render2DScrollWindowPlotMixin:
             self.ui
             self.params.scroll_window_plot_downsampling_rate
             
+            self.spikes_window.df
             self.spikes_window.total_df_start_end_times # to get the current start/end times to set the linear region to
             
         Creates:
@@ -140,6 +141,8 @@ class Render2DScrollWindowPlotMixin:
         self.Render2DScrollWindowPlot_on_window_update(confirmed_valid_window_start_t, confirmed_valid_window_end_t)
         ## TODO: attach the event forwarder 2025-01-02
         # self.ui.main_graphics_layout_widget.set_target_event_forwarding_child(self.ui.scroll_window_region) #TODO 2025-01-02 07:55: - [ ] Did not work
+        self.window_scrolled.emit(confirmed_valid_window_start_t, confirmed_valid_window_end_t) ## #TODO 2025-01-07 00:13: - [ ] NEW - updates
+        # self.self.rate_limited_signal_scrolled_proxy.emit(confirmed_valid_window_start_t, confirmed_valid_window_end_t)
         
 
     def update_rasters(self):
@@ -188,6 +191,7 @@ class Render2DScrollWindowPlotMixin:
     # Private/Internal Methods                                                                                             #
     # ==================================================================================================================== #
     
+    @function_attributes(short_name=None, tags=['private'], input_requires=['self.config_fragile_linear_neuron_IDX_map', 'self.spikes_window.df'], output_provides=[], uses=[], used_by=['ScrollRasterPreviewWindow_on_BuildUI'], creation_date='2025-01-07 08:05', related_items=[])
     def _build_all_spikes_data_values(self, is_included_indicies=None, **kwargs):
         """ build global spikes for entire dataframe (not just the current window) 
         
@@ -203,10 +207,11 @@ class Render2DScrollWindowPlotMixin:
         # All units at once approach:
         return Render2DScrollWindowPlotMixin.build_spikes_data_values_from_df(self.spikes_window.df, self.config_fragile_linear_neuron_IDX_map, is_spike_included=is_included_indicies, **kwargs)
         
+
+    @function_attributes(short_name=None, tags=['private'], input_requires=['self.config_fragile_linear_neuron_IDX_map', 'self.spikes_window.df'], output_provides=[], uses=[], used_by=['ScrollRasterPreviewWindow_on_BuildUI'], creation_date='2025-01-07 08:07', related_items=[])
     def _build_all_spikes_all_spots(self, is_included_indicies=None, **kwargs):
         """ build the all_spots from the global spikes for entire dataframe (not just the current window) 
         
-
         Called by:
             on_unit_sort_order_changed
             on_neuron_colors_changed
