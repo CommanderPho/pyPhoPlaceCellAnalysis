@@ -63,6 +63,24 @@ class BaseGlobalComputationParameters(BaseConfig):
         return content
     
 
+# ==================================================================================================================== #
+# Specific Computation Parameter Objects (`BaseGlobalComputationParameters` subclasses):                               #
+# ==================================================================================================================== #
+""" generated programmatically by:
+
+from neuropy.core.session.Formats.BaseDataSessionFormats import ParametersContainer
+from neuropy.core.session.Formats.SessionSpecifications import SessionConfig
+from neuropy.utils.indexing_helpers import flatten_dict
+from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
+from pyphoplacecellanalysis.General.PipelineParameterClassTemplating import GlobalComputationParametersAttrsClassTemplating
+from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters, merged_directional_placefields_Parameters, rank_order_shuffle_analysis_Parameters, directional_decoders_decode_continuous_Parameters, directional_decoders_evaluate_epochs_Parameters, directional_train_test_split_Parameters, long_short_decoding_analyses_Parameters, long_short_rate_remapping_Parameters, long_short_inst_spike_rate_groups_Parameters, wcorr_shuffle_analysis_Parameters, perform_specific_epochs_decoding_Parameters, DEP_ratemap_peaks_Parameters, ratemap_peaks_prominence2d_Parameters
+from pyphoplacecellanalysis.General.PipelineParameterClassTemplating import GlobalComputationParametersAttrsClassTemplating
+
+registered_merged_computation_function_default_kwargs_dict, code_str, nested_classes_dict, (imports_dict, imports_list, imports_string) = GlobalComputationParametersAttrsClassTemplating.main_generate_params_classes(curr_active_pipeline=curr_active_pipeline)
+print(code_str)
+
+
+"""
 
 @define(slots=False, eq=False, repr=False)
 class merged_directional_placefields_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
@@ -280,8 +298,17 @@ class ComputationKWargParameters(HDF_SerializationMixin, AttrsBasedClassHelperMi
         ## INPUTS: registered_merged_computation_function_default_kwargs_dict, params_class_type_dict
         _out_param_typed_parameters_dict = {}
         for k, v_dict in registered_merged_computation_function_default_kwargs_dict.items():
-            a_type = params_class_type_dict[k.removeprefix('_')] # KeyError: 'directional_decoders_epoch_heuristic_scoring'
-            _out_param_typed_parameters_dict[k.removeprefix('_')] = a_type(**v_dict)
+            a_type = None
+            final_key: str = k.removeprefix('_')
+            try:
+                a_type = params_class_type_dict[final_key] # KeyError: 'directional_decoders_epoch_heuristic_scoring'
+                _out_param_typed_parameters_dict[final_key] = a_type(**v_dict)
+            
+            except Exception as e:
+                print(f'k: {k}, final_key: {final_key}, v_dict: {v_dict}')
+                print(f'\ta_type: {a_type}')
+                raise
+
             # a_type = params_class_type_dict[k]
             # _out_param_typed_parameters_dict[k.removeprefix('_')] = a_type(**v_dict)
         # _out_param_typed_parameters_dict

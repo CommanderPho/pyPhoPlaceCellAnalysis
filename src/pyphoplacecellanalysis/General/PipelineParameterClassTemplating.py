@@ -105,7 +105,7 @@ class GlobalComputationParametersAttrsClassTemplating:
         return _defn_lines, _flat_fields_tuples_list, _base_variable_name_only_values_dict, _base_variable_name_only_types_dict
 
 
-    @function_attributes(short_name=None, tags=['jninja2', 'template'], input_requires=[], output_provides=[], uses=['cls._build_kwargs_class_defns'], used_by=[], creation_date='2024-10-07 12:03', related_items=[])
+    @function_attributes(short_name=None, tags=['jninja2', 'template', 'private'], input_requires=[], output_provides=[], uses=['cls._build_kwargs_class_defns'], used_by=['main_generate_params_classes'], creation_date='2024-10-07 12:03', related_items=[])
     @classmethod
     def _subfn_build_attrs_parameters_classes(cls, registered_merged_computation_function_default_kwargs_dict, params_defn_save_path=None, print_defns: bool = True, **render_kwargs):
         """ builds the parameters classes for the global computations
@@ -136,7 +136,43 @@ class GlobalComputationParametersAttrsClassTemplating:
             nested_classes_dict[k] = text_without_empty_lines
             imports_dict[k] = _param_class_name
 
+
+        # ==================================================================================================================== #
+        # Template Container Class                                                                                             #
+        # ==================================================================================================================== #
+        contained_parameter_type_names: List[str] = list(imports_dict.values())
+        # contained_parameter_type_names: List[str] = [
+        #         "merged_directional_placefields_Parameters",
+        #         "rank_order_shuffle_analysis_Parameters",
+        #         "directional_decoders_decode_continuous_Parameters",
+        #         "directional_decoders_evaluate_epochs_Parameters",
+        #         "directional_train_test_split_Parameters",
+        #         "long_short_decoding_analyses_Parameters",
+        #         "long_short_rate_remapping_Parameters",
+        #         "long_short_inst_spike_rate_groups_Parameters",
+        #         "wcorr_shuffle_analysis_Parameters",
+        #         "perform_specific_epochs_decoding_Parameters",
+        #         "DEP_ratemap_peaks_Parameters",
+        #         "ratemap_peaks_prominence2d_Parameters",
+        #     ]            
+        # Set up Jinja2 environment
+        template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
+        env = Environment(loader=FileSystemLoader(template_path))
+        attrs_container_class_defn_template = env.get_template('attrs_container_class_defn_template.py.j2')
+        attrs_container_class_defn_str: str = attrs_container_class_defn_template.render(
+            container_class_name="ComputationKWargParameters",
+            base_classes=["HDF_SerializationMixin", "AttrsBasedClassHelperMixin", "BaseGlobalComputationParameters"],
+            class_names= contained_parameter_type_names,
+            container_class_docstring="The base class for computation parameter types."
+        )
+        attrs_container_class_defn_str = '\n'.join(line for line in attrs_container_class_defn_str.split('\n') if line.strip())
+        print(f'attrs_container_class_defn_str\n{attrs_container_class_defn_str}\n\n')
+
+        
         code_str: str = '\n\n'.join(list(nested_classes_dict.values())) # add comment above code
+        ## add in `attrs_container_class_defn_str`
+        code_str = code_str + '\n\n' + attrs_container_class_defn_str + '\n\n'
+
         if print_defns:
             print(code_str)
 
@@ -170,7 +206,8 @@ class GlobalComputationParametersAttrsClassTemplating:
         registered_merged_computation_function_default_kwargs_dict = cls.main_extract_params_default_values(curr_active_pipeline=curr_active_pipeline)
 
         code_str, nested_classes_dict, imports_dict = cls._subfn_build_attrs_parameters_classes(registered_merged_computation_function_default_kwargs_dict=registered_merged_computation_function_default_kwargs_dict, 
-                                                                                                                params_defn_save_path=None, should_build_hdf_class=True, print_defns=print_defns)
+                                                                                                                params_defn_save_path=None, should_build_hdf_class=True, print_defns=print_defns,
+                                                                                                                additional_bases=["BaseGlobalComputationParameters"])
         imports_list = list(imports_dict.keys())
         imports_string: str = 'import ' + ', '.join(imports_list)
         if print_defns:

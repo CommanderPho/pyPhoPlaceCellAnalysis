@@ -1,8 +1,9 @@
 @define(slots=False, eq=False, repr=False)
-{% if should_build_hdf_class|default('False') %}
-class {{ class_name }}(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
-{% else %}
-class {{ class_name }}(object):
+{% set base_classes = ["HDF_SerializationMixin", "AttrsBasedClassHelperMixin"] if should_build_hdf_class|default('False') else ["object"] %}
+{% if additional_bases|default([]) %}
+{% set base_classes = base_classes + additional_bases %}
+{% endif %}
+class {{ class_name }}({{ base_classes | join(', ') }}):
 {% endif %}
     """ Docstring for {{ class_name }}. 
     """
