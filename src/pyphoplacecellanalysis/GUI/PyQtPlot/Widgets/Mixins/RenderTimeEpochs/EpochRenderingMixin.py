@@ -193,7 +193,8 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
         
     """
 
-
+    sigOnIntervalEnteredWindow = QtCore.Signal(object) # pyqtSignal(object)
+    sigOnIntervalExitedindow = QtCore.Signal(object)
     sigRenderedIntervalsListChanged = QtCore.Signal(object) # signal emitted whenever the list of rendered intervals changed (add/remove)
 
 

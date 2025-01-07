@@ -128,8 +128,12 @@ class PyqtgraphTimeSynchronizedWidget(PlottingBackendSpecifyingMixin, TimeSynchr
 
     def _buildGraphics(self):
         """ called by self.buildUI() which usually is not overriden. """
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.CustomGraphicsLayoutWidget import CustomViewBox, CustomGraphicsLayoutWidget
+
         ## More Involved Mode:
-        self.ui.root_graphics_layout_widget = pg.GraphicsLayoutWidget()
+        # self.ui.root_graphics_layout_widget = pg.GraphicsLayoutWidget()
+        self.ui.root_graphics_layout_widget = CustomGraphicsLayoutWidget()
+
         # self.ui.root_view = self.ui.root_graphics_layout_widget.addViewBox()
         ## lock the aspect ratio so pixels are always square
         # self.ui.root_view.setAspectLocked(True)
@@ -140,7 +144,12 @@ class PyqtgraphTimeSynchronizedWidget(PlottingBackendSpecifyingMixin, TimeSynchr
         # self.ui.root_view.addItem(self.ui.imv)
         # self.ui.root_view.setRange(QtCore.QRectF(*self.params.image_bounds_extent))
 
-        self.ui.root_plot = self.ui.root_graphics_layout_widget.addPlot(row=0, col=0, title=None) # , name=f'PositionDecoder'
+        self.ui.root_plot_viewBox = None
+        self.ui.root_plot_viewBox = CustomViewBox()
+        self.ui.root_plot_viewBox.setObjectName('RootPlotCustomViewBox')
+        
+        # self.ui.root_plot = self.ui.root_graphics_layout_widget.addPlot(row=0, col=0, title=None) # , name=f'PositionDecoder'
+        self.ui.root_plot = self.ui.root_graphics_layout_widget.addPlot(row=0, col=0, title=None, viewBox=self.ui.root_plot_viewBox)
         self.ui.root_plot.setObjectName('RootPlot')
         # self.ui.root_plot.addItem(self.ui.imv, defaultPadding=0.0)  # add ImageItem to PlotItem
         ## TODO: add item here

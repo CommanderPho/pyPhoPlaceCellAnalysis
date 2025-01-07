@@ -242,7 +242,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # self.ui.splitter.setStretchFactor(0, 5) # have the top widget by 3x the height as the bottom widget
         # self.ui.splitter.setStretchFactor(1, 1) # have the top widget by 3x the height as the bottom widget        
         
-        
         self.params = VisualizationParameters(self.applicationName, _menu_action_history_list=[])
         self.params.type_of_3d_plotter = type_of_3d_plotter
         self.params._menu_action_history_list = []
@@ -1487,7 +1486,10 @@ if __name__ == "__main__":
 
     # args = parser.parse_args()
     
-    pkl_path = Path('W:/Data/KDIBA/gor01/one/2006-6-09_1-22-43/loadedSessPickle.pkl')
+    # pkl_path = Path('W:/Data/KDIBA/gor01/one/2006-6-09_1-22-43/loadedSessPickle.pkl')
+    # pkl_path = Path('W:/Data/KDIBA/vvp01/one/2006-4-09_17-29-30/loadedSessPickle.pkl')
+    # pkl_path = Path('W:/Data/KDIBA/vvp01/one/2006-4-09_17-29-30/loadedSessPickle.pkl')
+    pkl_path = Path('W:/Data/KDIBA/vvp01/two/2006-4-10_12-58-3/loadedSessPickle.pkl')
     Assert.path_exists(pkl_path)
 
     app = QtWidgets.QApplication(sys.argv)

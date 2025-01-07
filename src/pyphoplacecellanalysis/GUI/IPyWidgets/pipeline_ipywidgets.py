@@ -1,4 +1,6 @@
 import sys
+from enum import Enum
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 import ipywidgets as widgets
 from IPython.display import display
 import matplotlib
@@ -24,6 +26,7 @@ from pyphocorehelpers.gui.Jupyter.simple_widgets import fullwidth_path_widget
 
 
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme # used in perform_pipeline_save
+
 
 # AbstractDataFileDialog
 
@@ -93,9 +96,56 @@ def try_save_pickle_as(original_file_path, file_confirmed_callback):
     return
 
 
+@metadata_attributes(short_name=None, tags=['enum', 'phases'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-06 22:56', related_items=[])
+class CustomProcessingPhases(Enum):
+    """ These phases keep track of groups of computations to run.
 
-class PipelineJupyterHelpers:
+    from pyphoplacecellanalysis.GUI.IPyWidgets.pipeline_ipywidgets import PipelineJupyterHelpers, CustomProcessingPhases
+
+
+    """
+    clean_run = "clean_run"
+    continued_run = "continued_run"
+    final_run = "final_run"
     
+    def get_run_configuration(self) -> Dict:
+        ## Different run configurations:
+        _out_run_config = {}
+        if self.value == CustomProcessingPhases.clean_run.value:
+            clean_run = dict(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, should_force_reload_all=True, should_freeze_pipeline_updates=False)
+            _out_run_config = clean_run
+        elif self.value == CustomProcessingPhases.continued_run.value:
+            continued_run = dict(saving_mode=PipelineSavingScheme.SKIP_SAVING, should_force_reload_all=False, should_freeze_pipeline_updates=False)
+            _out_run_config = continued_run
+        elif self.value == CustomProcessingPhases.final_run.value:
+            final_run = dict(saving_mode=PipelineSavingScheme.SKIP_SAVING, should_force_reload_all=False, should_freeze_pipeline_updates=False) # use export_session_h5_file_completion_function instead of enable_hdf5_output=True
+            _out_run_config = final_run
+        else: 
+            raise NotImplementedError
+        
+        return _out_run_config
+    
+
+@metadata_attributes(short_name=None, tags=['jupyter'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-06 22:56', related_items=['CustomProcessingPhases'])
+class PipelineJupyterHelpers:
+    """ 
+
+    Usage:    
+        from pyphocorehelpers.gui.Jupyter.ipython_widget_helpers import EnumSelectorWidgets
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme # used in perform_pipeline_save
+        from pyphoplacecellanalysis.GUI.IPyWidgets.pipeline_ipywidgets import PipelineJupyterHelpers, CustomProcessingPhases
+
+        def update_global_variable(var_name, value):
+            globals()[var_name] = value
+            
+        saving_mode = PipelineSavingScheme.SKIP_SAVING
+        force_reload = False
+        selector = PipelineJupyterHelpers._build_pipeline_custom_processing_mode_selector_widget(debug_print=True, update_global_variable_fn=update_global_variable)
+        print(f'force_reload: {force_reload}, saving_mode: {saving_mode}')
+        force_reload
+        saving_mode
+
+    """
 
     @classmethod
     def perform_pipeline_save(cls, curr_active_pipeline):
@@ -149,6 +199,165 @@ class PipelineJupyterHelpers:
 
         return widgets.VBox([saving_mode_dropdown, force_reload_checkbox])
                 
+
+
+    @classmethod
+    def _build_pipeline_custom_processing_mode_selector_widget(cls, update_global_variable_fn=None, active_post_on_value_change_fn=None, enable_full_view: bool = True, debug_print=False):
+        """ Renders an interactive jupyter widget control to select the current pipeline mode:
+
+        Usage:        
+            from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme # used in perform_pipeline_save
+            from pyphoplacecellanalysis.GUI.IPyWidgets.pipeline_ipywidgets import PipelineJupyterHelpers, CustomProcessingPhases
+
+            def update_global_variable(var_name, value):
+                globals()[var_name] = value
+                
+            selector = PipelineJupyterHelpers._build_pipeline_custom_processing_mode_selector_widget(update_global_variable_fn=update_global_variable, debug_print=False, enable_full_view=True)
+
+
+        """
+        from pyphocorehelpers.gui.Jupyter.ipython_widget_helpers import EnumSelectorWidgets
+        
+        if update_global_variable_fn is None:
+            def update_global_variable(var_name, value):
+                if debug_print:
+                    print(f"update_global_variable(var_name: '{var_name}', value: {value})") # for `create_enum_selector`
+                globals()[var_name] = value
+                if debug_print:
+                    post_val = globals()[var_name]
+                    print(f'\tglobals()[var_name]): {post_val}')
+            update_global_variable_fn = update_global_variable
+            
+        assert update_global_variable_fn is not None
+
+        # target_enum_class = Color
+        # target_enum_class = PipelineSavingScheme
+        target_enum_class = CustomProcessingPhases
+
+        # Create and display the selector
+        # selector = EnumSelectorWidgets.create_enum_selector(target_enum_class, defer_display=True)
+        selector = EnumSelectorWidgets.create_enum_toggle_buttons(target_enum_class, defer_display=True)
+        
+        if enable_full_view:       
+             
+            output_label = widgets.Label(value=f"Empty")
+            
+            if active_post_on_value_change_fn is None:
+                def post_on_value_change_fn(new_val):
+                    """ 
+                    # Read if possible:
+                    saving_mode = PipelineSavingScheme.SKIP_SAVING
+                    force_reload = False
+
+                    # 
+                    # # Force write:
+                    # saving_mode = PipelineSavingScheme.TEMP_THEN_OVERWRITE
+                    # saving_mode = PipelineSavingScheme.OVERWRITE_IN_PLACE
+                    # force_reload = True
+
+                    ## TODO: if loading is not possible, we need to change the `saving_mode` so that the new results are properly saved.
+
+                    """
+                    new_run_config = new_val.get_run_configuration()
+                    # if debug_print:
+                    #     print(f"Selected: {new_val}") # for `create_enum_selector`
+                    #     print(new_run_config)
+                    force_reload: bool = new_run_config['should_force_reload_all']
+                    saving_mode: PipelineSavingScheme = new_run_config['saving_mode']                                
+                    # force_reload = globals()['force_reload']
+                    # saving_mode = globals()['saving_mode']
+                    output_label.value = f'force_reload: {force_reload}, saving_mode: {saving_mode}'
+                ## END def post_on_value_change_fn(new_val)...
+
+                active_post_on_value_change_fn = post_on_value_change_fn
+
+            # output_view = widgets.Output()
+            # widgets.interactive_output(
+            # widgets.widget_output
+            
+            # selector = PipelineJupyterHelpers._build_pipeline_custom_processing_mode_selector_widget(update_global_variable_fn=update_global_variable, post_on_value_change_fn=post_on_value_change_fn, debug_print=False)
+            vbox = widgets.VBox([selector, output_label])
+            display(vbox)
+        else:
+            display(selector)
+        
+        # Access selected value
+        def on_value_change(change):
+            """ 
+            # Read if possible:
+            saving_mode = PipelineSavingScheme.SKIP_SAVING
+            force_reload = False
+
+            # 
+            # # Force write:
+            # saving_mode = PipelineSavingScheme.TEMP_THEN_OVERWRITE
+            # saving_mode = PipelineSavingScheme.OVERWRITE_IN_PLACE
+            # force_reload = True
+
+            ## TODO: if loading is not possible, we need to change the `saving_mode` so that the new results are properly saved.
+
+            """
+            # new_val = change['new']
+            new_val = target_enum_class[change['new']] #
+            new_run_config = new_val.get_run_configuration()
+            if debug_print:
+                print(f"Selected: {new_val}") # for `create_enum_selector`
+                print(new_run_config)
+            
+            # should_force_reload_all: bool = new_run_config['should_force_reload_all']
+            # saving_mode: PipelineSavingScheme = new_run_config['saving_mode']
+            
+            # Update the global variable
+            update_global_variable_fn('force_reload', new_run_config['should_force_reload_all'])
+            update_global_variable_fn('saving_mode', new_run_config['saving_mode'])
+
+            if active_post_on_value_change_fn is not None:
+                active_post_on_value_change_fn(new_val)
+                
+        ## END def on_value_change(change)...	
+
+        selector.observe(on_value_change, names='value')
+        
+        # if enable_full_view:       
+             
+        #     output_label = widgets.Label(value=f"Empty")
+            
+        #     def post_on_value_change_fn(new_val):
+        #         """ 
+        #         # Read if possible:
+        #         saving_mode = PipelineSavingScheme.SKIP_SAVING
+        #         force_reload = False
+
+        #         # 
+        #         # # Force write:
+        #         # saving_mode = PipelineSavingScheme.TEMP_THEN_OVERWRITE
+        #         # saving_mode = PipelineSavingScheme.OVERWRITE_IN_PLACE
+        #         # force_reload = True
+
+        #         ## TODO: if loading is not possible, we need to change the `saving_mode` so that the new results are properly saved.
+
+        #         """
+        #         new_run_config = new_val.get_run_configuration()
+        #         # if debug_print:
+        #         #     print(f"Selected: {new_val}") # for `create_enum_selector`
+        #         #     print(new_run_config)
+        #         force_reload: bool = new_run_config['should_force_reload_all']
+        #         saving_mode: PipelineSavingScheme = new_run_config['saving_mode']                                
+        #         # force_reload = globals()['force_reload']
+        #         # saving_mode = globals()['saving_mode']
+        #         output_label.value = f'force_reload: {force_reload}, saving_mode: {saving_mode}'
+                
+
+        #     # output_view = widgets.Output()
+        #     # widgets.interactive_output(
+        #     # widgets.widget_output
+            
+        #     # selector = PipelineJupyterHelpers._build_pipeline_custom_processing_mode_selector_widget(update_global_variable_fn=update_global_variable, post_on_value_change_fn=post_on_value_change_fn, debug_print=False)
+        #     vbox = widgets.VBox([selector, output_label])
+        #     return vbox
+        # else:
+        #     return selector
+        return selector
 
 
 def interactive_pipeline_files(curr_active_pipeline, defer_display:bool=False) -> JupyterButtonRowWidget:

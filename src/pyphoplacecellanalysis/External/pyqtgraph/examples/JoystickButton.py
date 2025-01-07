@@ -42,5 +42,22 @@ timer = QtCore.QTimer()
 timer.timeout.connect(update)
 timer.start(30)
     
+
+
+x = 0
+y = 0
+def update():
+    global x, y, l1, l2, jb
+    dx, dy = jb.getState()
+    x += dx * 1e-3
+    y += dy * 1e-3
+    l1.setValue(x)
+    l2.setValue(y)
+timer = QtCore.QTimer()
+timer.timeout.connect(update)
+timer.start(30)
+
+
+
 if __name__ == '__main__':
     pg.exec()
