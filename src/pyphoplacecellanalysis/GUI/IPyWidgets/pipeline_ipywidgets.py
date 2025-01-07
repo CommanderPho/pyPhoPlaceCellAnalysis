@@ -1,4 +1,6 @@
 import sys
+from enum import Enum
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 import ipywidgets as widgets
 from IPython.display import display
 import matplotlib
@@ -24,6 +26,7 @@ from pyphocorehelpers.gui.Jupyter.simple_widgets import fullwidth_path_widget
 
 
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme # used in perform_pipeline_save
+
 
 # AbstractDataFileDialog
 
@@ -93,9 +96,111 @@ def try_save_pickle_as(original_file_path, file_confirmed_callback):
     return
 
 
+@metadata_attributes(short_name=None, tags=['enum', 'phases'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-06 22:56', related_items=[])
+class CustomProcessingPhases(Enum):
+    """ These phases keep track of groups of computations to run.
 
-class PipelineJupyterHelpers:
     
+    from pyphoplacecellanalysis.GUI.IPyWidgets.pipeline_ipywidgets import PipelineJupyterHelpers, CustomProcessingPhases
+
+
+    """
+    clean_run = "clean_run"
+    continued_run = "continued_run"
+    final_run = "final_run"
+    
+    def get_run_configuration(self, custom_user_completion_function_template_code=None, extra_extended_computations_include_includelist: Optional[List]=None):
+        ## Different run configurations:
+
+        phase1_extended_computations_include_includelist=['lap_direction_determination', 'pf_computation', 
+                                                'pfdt_computation', 'firing_rate_trends',
+            # 'pf_dt_sequential_surprise',
+            'extended_stats',
+            'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding',
+            # 'ratemap_peaks_prominence2d',
+            'long_short_inst_spike_rate_groups',
+            'long_short_endcap_analysis',
+            # 'spike_burst_detection',
+            'split_to_directional_laps',
+            'merged_directional_placefields',
+            # 'rank_order_shuffle_analysis',
+            # 'directional_train_test_split',
+            # 'directional_decoders_decode_continuous',
+            # 'directional_decoders_evaluate_epochs',
+            # 'directional_decoders_epoch_heuristic_scoring',
+        ]
+
+        phase2_extended_computations_include_includelist=['lap_direction_determination', 'pf_computation', 
+                                                'pfdt_computation', 'firing_rate_trends',
+            # 'pf_dt_sequential_surprise',
+            'extended_stats',
+            'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding',
+            # 'ratemap_peaks_prominence2d',
+            'long_short_inst_spike_rate_groups',
+            'long_short_endcap_analysis',
+            # 'spike_burst_detection',
+            'split_to_directional_laps',
+            'merged_directional_placefields',
+            'rank_order_shuffle_analysis',
+            # 'directional_train_test_split',
+            'directional_decoders_decode_continuous',
+            'directional_decoders_evaluate_epochs',
+            'directional_decoders_epoch_heuristic_scoring',
+        ]
+
+        phase3_extended_computations_include_includelist=['lap_direction_determination', 'pf_computation', 
+                                                'pfdt_computation', 'firing_rate_trends',
+            'pf_dt_sequential_surprise',  # commented out 2024-11-05
+            'extended_stats',
+            'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', 
+            'ratemap_peaks_prominence2d', # commented out 2024-11-05
+            'long_short_inst_spike_rate_groups',
+            'long_short_endcap_analysis',
+            # 'spike_burst_detection',
+            'split_to_directional_laps',
+            'merged_directional_placefields',
+            'rank_order_shuffle_analysis',
+            'directional_train_test_split',
+            'directional_decoders_decode_continuous',
+            'directional_decoders_evaluate_epochs',
+            'directional_decoders_epoch_heuristic_scoring',
+            'extended_pf_peak_information',
+            'perform_wcorr_shuffle_analysis',
+        ]
+
+        _out_run_config = {}
+        if self.value == CustomProcessingPhases.clean_run.value:
+            clean_run = dict(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, should_force_reload_all=True, should_freeze_pipeline_updates=False, extended_computations_include_includelist=phase1_extended_computations_include_includelist, batch_session_completion_handler_kwargs=dict(enable_hdf5_output=False), should_perform_figure_generation_to_file=False, custom_user_completion_function_template_code=custom_user_completion_function_template_code)
+            _out_run_config = clean_run
+        elif self.value == CustomProcessingPhases.continued_run.value:
+            continued_run = dict(saving_mode=PipelineSavingScheme.SKIP_SAVING, should_force_reload_all=False, should_freeze_pipeline_updates=False, extended_computations_include_includelist=phase2_extended_computations_include_includelist, batch_session_completion_handler_kwargs=dict(enable_hdf5_output=False), should_perform_figure_generation_to_file=False, custom_user_completion_function_template_code=custom_user_completion_function_template_code)
+            _out_run_config = continued_run
+        elif self.value == CustomProcessingPhases.final_run.value:
+            # final_run = dict(should_force_reload_all=False, should_freeze_pipeline_updates=False, extended_computations_include_includelist=phase3_extended_computations_include_includelist, batch_session_completion_handler_kwargs=dict(enable_hdf5_output=True), should_perform_figure_generation_to_file=False, custom_user_completion_function_template_code=custom_user_completion_function_template_code)
+            final_run = dict(saving_mode=PipelineSavingScheme.SKIP_SAVING, should_force_reload_all=False, should_freeze_pipeline_updates=False, extended_computations_include_includelist=phase3_extended_computations_include_includelist, batch_session_completion_handler_kwargs=dict(enable_hdf5_output=False), should_perform_figure_generation_to_file=False, custom_user_completion_function_template_code=custom_user_completion_function_template_code) # use export_session_h5_file_completion_function instead of enable_hdf5_output=True
+            _out_run_config = final_run
+        else: 
+            raise NotImplementedError
+        
+        if extra_extended_computations_include_includelist is not None:
+            ## includes the user-provided extra run functions to the list: `extra_extended_computations_include_includelist`
+            for a_fn_name in extra_extended_computations_include_includelist:
+                if (a_fn_name not in _out_run_config['extended_computations_include_includelist']):
+                    print(f'adding extra_extended_computations_include_includelist function: "{a_fn_name}" to the `extended_computations_include_includelist`.')
+                    _out_run_config['extended_computations_include_includelist'].append(a_fn_name)
+                else:
+                    print(f'extra_extended_computations_include_includelist function: "{a_fn_name}" was already present in the default `extended_computations_include_includelist`. It will not be duplicated.')
+        
+        return _out_run_config
+    
+
+@metadata_attributes(short_name=None, tags=['jupyter'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-06 22:56', related_items=['CustomProcessingPhases'])
+class PipelineJupyterHelpers:
+    """ 
+    
+    from pyphoplacecellanalysis.GUI.IPyWidgets.pipeline_ipywidgets import PipelineJupyterHelpers, CustomProcessingPhases
+    
+    """
 
     @classmethod
     def perform_pipeline_save(cls, curr_active_pipeline):
@@ -149,6 +254,57 @@ class PipelineJupyterHelpers:
 
         return widgets.VBox([saving_mode_dropdown, force_reload_checkbox])
                 
+
+
+    @classmethod
+    def _build_pipeline_custom_processing_mode_selector_widget(cls, debug_print=False):
+        """ 
+        """
+        from pyphocorehelpers.gui.Jupyter.ipython_widget_helpers import EnumSelectorWidgets
+        
+        def update_global_variable(var_name, value):
+            globals()[var_name] = value
+        
+        # target_enum_class = Color
+        # target_enum_class = PipelineSavingScheme
+        target_enum_class = CustomProcessingPhases
+
+        # Create and display the selector
+        selector = EnumSelectorWidgets.create_enum_selector(target_enum_class)
+
+        # Access selected value
+        def on_value_change(change):
+            """ 
+            # Read if possible:
+            saving_mode = PipelineSavingScheme.SKIP_SAVING
+            force_reload = False
+
+            # 
+            # # Force write:
+            # saving_mode = PipelineSavingScheme.TEMP_THEN_OVERWRITE
+            # saving_mode = PipelineSavingScheme.OVERWRITE_IN_PLACE
+            # force_reload = True
+
+            ## TODO: if loading is not possible, we need to change the `saving_mode` so that the new results are properly saved.
+
+            """
+            new_val = change['new']
+            new_run_config = new_val.get_run_configuration()
+            if debug_print:
+                print(f"Selected: {new_val}") # for `create_enum_selector`
+                print(new_run_config)
+            
+            # should_force_reload_all: bool = new_run_config['should_force_reload_all']
+            # saving_mode: PipelineSavingScheme = new_run_config['saving_mode']
+            
+            # Update the global variable
+            update_global_variable('force_reload', new_run_config['should_force_reload_all'])
+            update_global_variable('saving_mode', new_run_config['saving_mode'])
+        ## END def on_value_change(change)...	
+
+        selector.observe(on_value_change, names='value')
+        # return selector
+
 
 
 def interactive_pipeline_files(curr_active_pipeline, defer_display:bool=False) -> JupyterButtonRowWidget:
