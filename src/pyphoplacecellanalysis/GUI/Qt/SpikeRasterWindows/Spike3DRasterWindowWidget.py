@@ -1481,7 +1481,10 @@ if __name__ == "__main__":
 
     # args = parser.parse_args()
     
-    pkl_path = Path('W:/Data/KDIBA/gor01/one/2006-6-09_1-22-43/loadedSessPickle.pkl')
+    # pkl_path = Path('W:/Data/KDIBA/gor01/one/2006-6-09_1-22-43/loadedSessPickle.pkl')
+    # pkl_path = Path('W:/Data/KDIBA/vvp01/one/2006-4-09_17-29-30/loadedSessPickle.pkl')
+    # pkl_path = Path('W:/Data/KDIBA/vvp01/one/2006-4-09_17-29-30/loadedSessPickle.pkl')
+    pkl_path = Path('W:/Data/KDIBA/vvp01/two/2006-4-10_12-58-3/loadedSessPickle.pkl')
     Assert.path_exists(pkl_path)
 
     app = QtWidgets.QApplication(sys.argv)
