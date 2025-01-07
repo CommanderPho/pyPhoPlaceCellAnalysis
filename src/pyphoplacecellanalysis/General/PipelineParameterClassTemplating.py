@@ -166,9 +166,8 @@ class GlobalComputationParametersAttrsClassTemplating:
             container_class_docstring="The base class for computation parameter types."
         )
         attrs_container_class_defn_str = '\n'.join(line for line in attrs_container_class_defn_str.split('\n') if line.strip())
-        print(f'attrs_container_class_defn_str\n{attrs_container_class_defn_str}\n\n')
+        # print(f'attrs_container_class_defn_str\n{attrs_container_class_defn_str}\n\n')
 
-        
         code_str: str = '\n\n'.join(list(nested_classes_dict.values())) # add comment above code
         ## add in `attrs_container_class_defn_str`
         code_str = code_str + '\n\n' + attrs_container_class_defn_str + '\n\n'
