@@ -152,7 +152,8 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         _obj.active_configs = DynamicParameters() # active_config corresponding to each filtered session/epoch
         _obj.computation_results = DynamicParameters() # computation_results is a DynamicParameters with keys of type IdentifyingContext and values of type ComputationResult
 
-        _obj.global_computation_results = ComputedPipelineStage._build_initial_computationResult(_obj.sess, None) # proper type setup
+        # _obj.global_computation_results = ComputedPipelineStage._build_initial_computationResult(_obj.sess, None) # proper type setup
+        _obj.global_computation_results = ComputedPipelineStage._build_initial_global_computationResult(curr_active_pipeline=_obj, active_session=_obj.sess, computation_config=None) # proper type setup
 
         _obj.registered_computation_function_dict = OrderedDict()
         _obj.registered_global_computation_function_dict = OrderedDict()
@@ -754,15 +755,18 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             if (self.global_computation_results is None) or (not isinstance(self.global_computation_results, ComputationResult)):
                 print(f'global_computation_results is None. Building initial global_computation_results...')
                 self.global_computation_results = None # clear existing results
-                self.global_computation_results = ComputedPipelineStage._build_initial_computationResult(self.sess, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
-                
+                # self.global_computation_results = ComputedPipelineStage._build_initial_computationResult(self.sess, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
+                self.global_computation_results = ComputedPipelineStage._build_initial_global_computationResult(self, self.sess, active_computation_params)
+                assert self.global_computation_results.computation_config is not None
 
         if contains_any_global_functions:
             # global computation functions:
             if (self.global_computation_results is None) or (not isinstance(self.global_computation_results, ComputationResult)):
                 print(f'global_computation_results is None or not a `ComputationResult` object. Building initial global_computation_results...') #TODO 2024-01-10 15:12: - [ ] Check that `self.global_computation_results.keys()` are empty
                 self.global_computation_results = None # clear existing results
-                self.global_computation_results = ComputedPipelineStage._build_initial_computationResult(self.sess, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
+                # self.global_computation_results = ComputedPipelineStage._build_initial_computationResult(self.sess, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
+                self.global_computation_results = ComputedPipelineStage._build_initial_global_computationResult(self, self.sess, active_computation_params)
+                assert self.global_computation_results.computation_config is not None
             ## TODO: what is this about?
             previous_computation_result = self.global_computation_results
 
@@ -845,6 +849,36 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         output_result = ComputationResult(active_session, computation_config, computed_data=DynamicParameters(), accumulated_errors=DynamicParameters(), computation_times=DynamicParameters()) # Note that this active_session should be correctly filtered
         
         return output_result
+    
+
+    @function_attributes(short_name=None, tags=['computationResult'], input_requires=[], output_provides=[], uses=[], used_by=['cls.continue_computations_if_needed', 'perform_specific_computation', 'perform_action_for_all_contexts'], creation_date='2024-10-07 15:12', related_items=[])
+    @classmethod
+    def _build_initial_global_computationResult(cls, curr_active_pipeline, active_session, computation_config) -> ComputationResult:
+        """Conceptually, a single computation consists of a specific active_session and a specific computation_config object
+        Args:
+            active_session (DataSession): this is the filtered data session
+            computation_config (PlacefieldComputationParameters): [description]
+
+        Returns:
+            [type]: [description]
+        """
+        from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters # merged_directional_placefields_Parameters, rank_order_shuffle_analysis_Parameters, directional_decoders_decode_continuous_Parameters, directional_decoders_evaluate_epochs_Parameters, directional_train_test_split_Parameters, long_short_decoding_analyses_Parameters, long_short_rate_remapping_Parameters, long_short_inst_spike_rate_groups_Parameters, wcorr_shuffle_analysis_Parameters, _perform_specific_epochs_decoding_Parameters, _DEP_ratemap_peaks_Parameters, ratemap_peaks_prominence2d_Parameters
+
+        output_result = ComputationResult(active_session, computation_config, computed_data=DynamicParameters(), accumulated_errors=DynamicParameters(), computation_times=DynamicParameters()) # Note that this active_session should be correctly filtered
+        ## Add `curr_active_pipeline.global_computation_results.computation_config` as needed:
+        if output_result.computation_config is None:
+            print('._build_initial_global_computationResult(...): global_computation_results.computation_config is None! Making new one!')
+            # curr_global_param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters.init_from_pipeline(curr_active_pipeline=curr_active_pipeline)
+            # output_result.computation_config = curr_global_param_typed_parameters
+            output_result.update_config_from_pipeline(curr_active_pipeline=curr_active_pipeline)
+            print(f'\tdone. Pipeline needs resave!')
+        else:
+            # curr_global_param_typed_parameters: ComputationKWargParameters = output_result.computation_config
+            pass
+        
+        return output_result
+    
+
 
     @function_attributes(short_name=None, tags=['compute', 'main'], input_requires=[], output_provides=[],
                           uses=[], used_by=['perform_registered_computations_single_context', 'rerun_failed_computations_single_context', 'run_specific_computations_single_context'], creation_date='2024-10-07 15:08', related_items=[])
