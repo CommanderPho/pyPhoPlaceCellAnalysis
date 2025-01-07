@@ -456,9 +456,18 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         # curr_plot_row = 1
         if self.Includes2DActiveWindowScatter:
             ## Add these active window only plots to the active_window_container_layout
-            self.plots.main_plot_widget = self.ui.active_window_container_layout.addPlot(row=1, col=0, rowspan=self.params.main_graphics_plot_widget_rowspan, colspan=1)
+            # (self.plots.main_plot_widget, self.plots.main_plot_widget_viewbox) = CustomGraphicsLayoutWidget.build_PlotWithCustomViewbox()
+            # (self.plots.main_plot_widget, self.plots.main_plot_widget_viewbox) = self.ui.main_graphics_layout_widget.build_PlotWithCustomViewbox()
+            # self.ui.active_window_container_layout.addItem(self.plots.main_plot_widget, row=1, col=0, rowspan=self.params.main_graphics_plot_widget_rowspan, colspan=1)
+            
+            self.plots.main_plot_widget = self.ui.active_window_container_layout.addPlot(row=1, col=0, rowspan=self.params.main_graphics_plot_widget_rowspan, colspan=1)            
             # self.plots.main_plot_widget = self.ui.main_graphics_layout_widget.addPlot(col=0, rowspan=self.params.main_graphics_plot_widget_rowspan, colspan=1) # , name='main_plot_widget'
+            
+            # (self.plots.main_plot_widget, self.plots.main_plot_widget_viewbox) = self.ui.main_graphics_layout_widget.addPlotWithCustomViewbox(row=2, col=0, rowspan=1, colspan=1)
+
             self.plots.main_plot_widget.setObjectName('main_plot_widget') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
+            # self.plots.main_plot_widget_viewbox.setObjectName('main_plot_widget_viewbox') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
+
             self.plots.main_plot_widget.setMinimumHeight(40.0) # used to be 500.0 and took up too much room
 
             # curr_plot_row += (1 * self.params.main_graphics_plot_widget_rowspan)
@@ -494,10 +503,14 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
 
         
         # From Render2DScrollWindowPlotMixin:
-        # self.plots.background_static_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=curr_plot_row, col=0, rowspan=self.params.main_graphics_plot_widget_rowspan, colspan=1) 
+        # self.plots.background_static_scroll_window_plot_viewbox = CustomViewBox()
+        # self.plots.background_static_scroll_window_plot_viewbox = self.ui.main_graphics_layout_widget.addViewBox(row=2, col=0, rowspan=1, colspan=1)
+        # self.plots.background_static_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=curr_plot_row, col=0, rowspan=self.params.main_graphics_plot_widget_rowspan, colspan=1) ## OLD
         self.plots.background_static_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=2, col=0, rowspan=1, colspan=1) # rowspan=self.params.main_graphics_plot_widget_rowspan
+        # self.plots.background_static_scroll_window_plot = self.ui.main_graphics_layout_widget.addPlot(row=2, col=0, rowspan=1, colspan=1, viewBox=self.plots.background_static_scroll_window_plot_viewbox)  ## OLD
+        # (self.plots.background_static_scroll_window_plot, self.plots.background_static_scroll_window_plot_viewbox) = self.ui.main_graphics_layout_widget.addPlotWithCustomViewbox(row=2, col=0, rowspan=1, colspan=1)
         self.plots.background_static_scroll_window_plot.setObjectName('background_static_scroll_window_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend  AND drastically slows down the plotting
-
+        # self.plots.background_static_scroll_window_plot_viewbox.setObjectName('background_static_scroll_window_plot_viewbox')
         # print(f'main_plot_widget.objectName(): {main_plot_widget.objectName()}')
 
         self.plots.background_static_scroll_window_plot = self.ScrollRasterPreviewWindow_on_BuildUI(self.plots.background_static_scroll_window_plot)

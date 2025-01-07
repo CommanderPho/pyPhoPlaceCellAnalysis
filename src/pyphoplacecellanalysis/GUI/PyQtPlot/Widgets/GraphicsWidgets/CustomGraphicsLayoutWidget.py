@@ -23,12 +23,12 @@ class CustomGraphicsLayoutWidget(DraggableGraphicsWidgetMixin, pg.GraphicsLayout
         self.target_event_handler_child = child
 
 
-    def addPlot(self, *args, **kwargs):
-        if 'viewBox' not in kwargs:
-            kwargs['viewBox'] = CustomViewBox()
-        return super().addPlot(*args, **kwargs)
+    # def addPlot(self, *args, **kwargs):
+    #     if 'viewBox' not in kwargs:
+    #         kwargs['viewBox'] = CustomViewBox()
+    #     assert 'viewBox' in kwargs
+    #     return super().addPlot(*args, **kwargs)
     
-
     # def addPlot(self, row=None, col=None, rowspan=1, colspan=1, **kargs):
     #     """
     #     Create a PlotItem and place it in the next available cell (or in the cell specified)
@@ -44,27 +44,100 @@ class CustomGraphicsLayoutWidget(DraggableGraphicsWidgetMixin, pg.GraphicsLayout
     #     return plot
     
 
+    # def addViewBox(self, row=None, col=None, rowspan=1, colspan=1, **kargs):
+    # # def addViewBox(self, *args, **kwargs):
+    #     """
+    #     Create a ViewBox and place it in the next available cell (or in the cell specified)
+    #     All extra keyword arguments are passed to :func:`ViewBox.__init__ <pyqtgraph.ViewBox.__init__>`
+    #     Returns the created item.
+    #     """
+    #     vb = kargs.pop('viewBox', None)
+    #     if vb is None:
+    #         vb = CustomViewBox(**kargs)
+            
+    #     # if 'viewBox' not in kwargs:
+    #     #     kwargs['viewBox'] = CustomViewBox(**kwargs)
+                    
+    #     # return super().addViewBox(*args, **kwargs)
+    
+    #     # vb = ViewBox(**kwargs)
+    #     # vb = kwargs.pop('viewBox', ViewBox(**kwargs))
+    #     # vb = kwargs.pop('viewBox', CustomViewBox(**kwargs))
+    #     self.addItem(vb, row, col, rowspan, colspan)
+    #     return vb
+    
+    @classmethod
+    def build_PlotWithCustomViewbox(cls, viewbox_kwargs=None, viewBox=None, **kargs):
+        """
+        Create a PlotItem and place it in the next available cell (or in the cell specified)
+        All extra keyword arguments are passed to :func:`PlotItem.__init__ <pyqtgraph.PlotItem.__init__>`
+        Returns the created item.
+
+        (plot_item, vb) = CustomGraphicsLayoutWidget.build_PlotWithCustomViewbox()
+        # (plot_item, vb) = CustomGraphicsLayoutWidget.build_PlotWithCustomViewbox(viewBox=vb, **kargs)
+        
+        """
+        # vb = kargs.pop('viewBox', None)
+        if viewBox is None:
+            if viewbox_kwargs is None:
+                viewbox_kwargs = {}
+            viewBox = CustomViewBox(**viewbox_kwargs)
+        plot_item = pg.PlotItem(viewBox=viewBox, **kargs)
+        return (plot_item, viewBox)
+    
+
+
+    def addPlot(self, row=None, col=None, rowspan=1, colspan=1, **kargs):
+        """
+        Create a PlotItem and place it in the next available cell (or in the cell specified)
+        All extra keyword arguments are passed to :func:`PlotItem.__init__ <pyqtgraph.PlotItem.__init__>`
+        Returns the created item.
+        """
+        vb = kargs.pop('viewBox', None)
+        # if vb is None:
+        #     vb = CustomViewBox(**kargs)
+        # plot_item = pg.PlotItem(viewBox=vb, **kargs)        
+        (plot_item, vb) = CustomGraphicsLayoutWidget.build_PlotWithCustomViewbox(viewBox=vb, **kargs)
+        self.addItem(plot_item, row, col, rowspan, colspan)
+        return plot_item
+        
     def addViewBox(self, row=None, col=None, rowspan=1, colspan=1, **kargs):
-    # def addViewBox(self, *args, **kwargs):
         """
         Create a ViewBox and place it in the next available cell (or in the cell specified)
         All extra keyword arguments are passed to :func:`ViewBox.__init__ <pyqtgraph.ViewBox.__init__>`
         Returns the created item.
         """
-        vb = kargs.pop('viewBox', None)
-        if vb is None:
-            vb = CustomViewBox(**kargs)
-            
-        # if 'viewBox' not in kwargs:
-        #     kwargs['viewBox'] = CustomViewBox(**kwargs)
-                    
-        # return super().addViewBox(*args, **kwargs)
-    
-        # vb = ViewBox(**kwargs)
-        # vb = kwargs.pop('viewBox', ViewBox(**kwargs))
-        # vb = kwargs.pop('viewBox', CustomViewBox(**kwargs))
+        vb = CustomViewBox(**kargs)
         self.addItem(vb, row, col, rowspan, colspan)
         return vb
+                
+
+    def addPlotWithCustomViewbox(self, row=None, col=None, rowspan=1, colspan=1, **kargs):
+        """
+        Create a PlotItem and place it in the next available cell (or in the cell specified)
+        All extra keyword arguments are passed to :func:`PlotItem.__init__ <pyqtgraph.PlotItem.__init__>`
+        Returns the created item.
+        """
+        vb = kargs.pop('viewBox', None)
+        # if vb is None:
+        #     vb = CustomViewBox()
+        # plot_item = pg.PlotItem(viewBox=vb, **kargs)
+        (plot_item, vb) = CustomGraphicsLayoutWidget.build_PlotWithCustomViewbox(viewBox=vb, **kargs)
+        self.addItem(plot_item, row, col, rowspan, colspan)
+        return (plot_item, vb)
+    
+
+    # def addLayout(self, row=None, col=None, rowspan=1, colspan=1, **kargs):
+    #     """
+    #     Create an empty GraphicsLayout and place it in the next available cell (or in the cell specified)
+    #     All extra keyword arguments are passed to :func:`GraphicsLayout.__init__ <pyqtgraph.GraphicsLayout.__init__>`
+    #     Returns the created item.
+    #     """
+    #     layout = pg.GraphicsLayout(**kargs)
+    #     self.addItem(layout, row, col, rowspan, colspan)
+    #     return layout
+    
+
     
     # ==================================================================================================================== #
     # Events                                                                                                               #
