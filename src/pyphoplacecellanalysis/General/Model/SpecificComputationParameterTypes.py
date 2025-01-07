@@ -17,6 +17,13 @@ Generated programmatically from `pyphoplacecellanalysis.General.PipelineParamete
 
 """
 
+""" 
+
+same_thresh_fraction_of_track: float=0.05, max_ignore_bins:float=2, max_jump_distance_cm: float=60.0, use_bin_units_instead_of_realworld:bool=False
+
+
+"""
+
 class BaseGlobalComputationParameters(BaseConfig):
     """ Base class
     """
@@ -87,10 +94,27 @@ class directional_decoders_decode_continuous_Parameters(HDF_SerializationMixin, 
     """ Docstring for directional_decoders_decode_continuous_Parameters. 
     """
     time_bin_size: Optional[float] = serialized_attribute_field(default=None)
+    should_disable_cache: bool = serialized_attribute_field(default=False)
+    
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
+
+
+@define(slots=False, eq=False, repr=False)
+class directional_decoders_epoch_heuristic_scoring_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
+    """ Docstring for directional_decoders_epoch_heuristic_scoring_Parameters. 
+    """
+    same_thresh_fraction_of_track: float = serialized_attribute_field(default=0.05)
+    max_ignore_bins: int = serialized_attribute_field(default=2)
+    max_jump_distance_cm: float = serialized_attribute_field(default=60.0)
+    use_bin_units_instead_of_realworld: bool = serialized_attribute_field(default=False)
+    # HDFMixin Conformances ______________________________________________________________________________________________ #
+    def to_hdf(self, file_path, key: str, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path"""
+        super().to_hdf(file_path, key=key, **kwargs)
+        
 
 @define(slots=False, eq=False, repr=False)
 class directional_decoders_evaluate_epochs_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
@@ -195,7 +219,7 @@ class ratemap_peaks_prominence2d_Parameters(HDF_SerializationMixin, AttrsBasedCl
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
-        
+
 
 
 @define(slots=False)
@@ -209,6 +233,7 @@ class ComputationKWargParameters(HDF_SerializationMixin, AttrsBasedClassHelperMi
     merged_directional_placefields: merged_directional_placefields_Parameters = serialized_field(default=Factory(merged_directional_placefields_Parameters))
     rank_order_shuffle_analysis: rank_order_shuffle_analysis_Parameters = serialized_field(default=Factory(rank_order_shuffle_analysis_Parameters))
     directional_decoders_decode_continuous: directional_decoders_decode_continuous_Parameters = serialized_field(default=Factory(directional_decoders_decode_continuous_Parameters))
+    directional_decoders_epoch_heuristic_scoring: directional_decoders_epoch_heuristic_scoring_Parameters = serialized_field(default=Factory(directional_decoders_epoch_heuristic_scoring_Parameters))
     directional_decoders_evaluate_epochs: directional_decoders_evaluate_epochs_Parameters = serialized_field(default=Factory(directional_decoders_evaluate_epochs_Parameters))
     directional_train_test_split: directional_train_test_split_Parameters = serialized_field(default=Factory(directional_train_test_split_Parameters))
     long_short_decoding_analyses: long_short_decoding_analyses_Parameters = serialized_field(default=Factory(long_short_decoding_analyses_Parameters))
@@ -255,7 +280,7 @@ class ComputationKWargParameters(HDF_SerializationMixin, AttrsBasedClassHelperMi
         ## INPUTS: registered_merged_computation_function_default_kwargs_dict, params_class_type_dict
         _out_param_typed_parameters_dict = {}
         for k, v_dict in registered_merged_computation_function_default_kwargs_dict.items():
-            a_type = params_class_type_dict[k.removeprefix('_')]
+            a_type = params_class_type_dict[k.removeprefix('_')] # KeyError: 'directional_decoders_epoch_heuristic_scoring'
             _out_param_typed_parameters_dict[k.removeprefix('_')] = a_type(**v_dict)
             # a_type = params_class_type_dict[k]
             # _out_param_typed_parameters_dict[k.removeprefix('_')] = a_type(**v_dict)
