@@ -1,9 +1,9 @@
 import sys
 import numpy as np
 
-from qtpy import QtCore, QtWidgets
 from pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterLeftSidebarControlBarBase import Ui_leftSideToolbarWidget # Generated file from .ui
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
+from qtpy import QtCore, QtWidgets
 
 def trap_exc_during_debug(*args):
     # when app raises uncaught exception, print info

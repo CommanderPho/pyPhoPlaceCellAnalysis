@@ -223,7 +223,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             type_of_3d_plotter (str, optional): specifies which type of 3D plotter to build. Must be {'pyqtgraph', 'vedo', None}. Defaults to 'pyqtgraph'.
             parent (_type_, optional): _description_. Defaults to None.
         """
-        super().__init__(parent=parent) # Call the inherited classes __init__ method
+        QtWidgets.QWidget.__init__(self, parent=parent) # note kwargs (`self=self`), as in `QtWidgets.QWidget.__init__(self=self, parent=parent)` results in `TypeError: descriptor '__init__' of 'sip.simplewrapper' object needs an argument`
         self.ui = Ui_RootWidget()
         self.ui.setupUi(self) # builds the design from the .ui onto this widget.
         
