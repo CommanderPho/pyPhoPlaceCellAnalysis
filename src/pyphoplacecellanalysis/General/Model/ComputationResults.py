@@ -141,6 +141,21 @@ class ComputationResult(SimpleFieldSizesReprMixin, HDF_SerializationMixin, Attrs
         print(f'DEPRICATION WARNING: workaround to allow subscripting ComputationResult objects. Will be depricated. key: {key}')
         return getattr(self, key)
 
+    @classmethod
+    def init_config_from_pipeline(cls, curr_active_pipeline):
+        """ builds a new computation config (the parameters) from the pipeline """
+        from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters
+        
+        curr_global_param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters.init_from_pipeline(curr_active_pipeline=curr_active_pipeline)
+        return curr_global_param_typed_parameters
+        
+    def update_config_from_pipeline(self, curr_active_pipeline):
+        """ updates the config from the pipeline """
+        from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters
+        
+        curr_global_param_typed_parameters: ComputationKWargParameters = ComputationResult.init_config_from_pipeline(curr_active_pipeline=curr_active_pipeline)
+        self.computation_config = curr_global_param_typed_parameters
+        
 
 class VersionedResultMixin:
     """ Implementors keep track of the version of the class by which they are instantiated.
