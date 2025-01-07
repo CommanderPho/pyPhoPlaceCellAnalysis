@@ -67,7 +67,9 @@ class CustomViewBox(pg.ViewBox):
         kwds['enableMenu'] = False
         pg.ViewBox.__init__(self, *args, **kwds)
         self.setMouseMode(self.RectMode)
+        self._last_drag_start_point = None
         
+
     ## reimplement right-click to zoom out
     def mouseClickEvent(self, ev):
         # if ev.button() == QtCore.Qt.MouseButton.RightButton:
@@ -83,6 +85,8 @@ class CustomViewBox(pg.ViewBox):
     ## reimplement mouseDragEvent to disable continuous axis zoom
     def mouseDragEvent(self, ev, axis=None):
         print(f'.mouseDragEvent(ev: {ev}, axis={axis})')
+        # ev.accept()
+
         if (ev.button() == QtCore.Qt.MouseButton.RightButton): # (axis is not None) and
             ev.accept()
             # ev.ignore()
@@ -91,8 +95,30 @@ class CustomViewBox(pg.ViewBox):
             # Emit a signal or directly update the slider here
             new_start_point = self.mapSceneToView(ev.pos()) # PyQt5.QtCore.QPointF
             new_start_t = new_start_point.x()
-            print(f'new_start_t: {new_start_t}')
-            self.sigLeftDrag.emit(new_start_t)
+            # print(f'new_start_t: {new_start_t}')
+            
+            print(f'\tself._last_drag_start_point: {self._last_drag_start_point}')
+            if ev.isStart():
+                print(f'ev.isStart(): new_start_t: {new_start_t}')
+                # bdp = ev.buttonDownPos()
+                self._last_drag_start_point = new_start_t
+                
+            # if not (self._last_drag_start_point is not None):
+            #     return
+            
+            if ev.isFinish():
+                print(f'ev.isFinish(): new_start_t: {new_start_t}, self._last_drag_start_point: {self._last_drag_start_point}')
+                # self.sigRegionChangeFinished.emit(self)
+                self._last_drag_start_point = None
+            else:
+                assert self._last_drag_start_point is not None
+                curr_step_change: float = new_start_t - self._last_drag_start_point
+                print(f'curr_step_change: {curr_step_change}')
+                if curr_step_change > 0.0:
+                    # self.sigRegionChanged.emit(self)
+                    self.sigLeftDrag.emit(curr_step_change)
+                    
+            # self.sigLeftDrag.emit(new_start_t)
             ev.accept()
         else:
             # pg.ViewBox.mouseDragEvent(self, ev, axis=axis)            
