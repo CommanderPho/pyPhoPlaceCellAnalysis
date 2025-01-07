@@ -23,6 +23,49 @@ class CustomGraphicsLayoutWidget(DraggableGraphicsWidgetMixin, pg.GraphicsLayout
         self.target_event_handler_child = child
 
 
+    def addPlot(self, *args, **kwargs):
+        if 'viewBox' not in kwargs:
+            kwargs['viewBox'] = CustomViewBox()
+        return super().addPlot(*args, **kwargs)
+    
+
+    # def addPlot(self, row=None, col=None, rowspan=1, colspan=1, **kargs):
+    #     """
+    #     Create a PlotItem and place it in the next available cell (or in the cell specified)
+    #     All extra keyword arguments are passed to :func:`PlotItem.__init__ <pyqtgraph.PlotItem.__init__>`
+    #     Returns the created item.
+    #     """
+    #     # plot = PlotItem(**kargs)
+    #     vb = kargs.pop('viewBox', None)
+    #     if vb is None:
+    #         vb = CustomViewBox(**kargs)
+            
+    #     self.addItem(plot, row, col, rowspan, colspan)
+    #     return plot
+    
+
+    def addViewBox(self, row=None, col=None, rowspan=1, colspan=1, **kargs):
+    # def addViewBox(self, *args, **kwargs):
+        """
+        Create a ViewBox and place it in the next available cell (or in the cell specified)
+        All extra keyword arguments are passed to :func:`ViewBox.__init__ <pyqtgraph.ViewBox.__init__>`
+        Returns the created item.
+        """
+        vb = kargs.pop('viewBox', None)
+        if vb is None:
+            vb = CustomViewBox(**kargs)
+            
+        # if 'viewBox' not in kwargs:
+        #     kwargs['viewBox'] = CustomViewBox(**kwargs)
+                    
+        # return super().addViewBox(*args, **kwargs)
+    
+        # vb = ViewBox(**kwargs)
+        # vb = kwargs.pop('viewBox', ViewBox(**kwargs))
+        # vb = kwargs.pop('viewBox', CustomViewBox(**kwargs))
+        self.addItem(vb, row, col, rowspan, colspan)
+        return vb
+    
     # ==================================================================================================================== #
     # Events                                                                                                               #
     # ==================================================================================================================== #

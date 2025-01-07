@@ -77,7 +77,7 @@ epoch_controls = [self.ui.frame_Epoch, self.ui.btnJumpToPrevious, self.ui.comboA
 
 jump_to_destination_controls = [self.ui.frame_JumpToDestination, self.ui.spinBoxJumpDestination, self.ui.btnJumpToDestination]
 
-move_controls = [self.ui.btnSkipLeft, self.ui.btnLeft, self.ui.spinBoxFrameJumpMultiplier, self.ui.btnRight, self.ui.btnSkipRight, self.ui.horizontalSpacer_3]
+move_controls = [self.ui.btnSkipLeft, self.ui.btnLeft, self.ui.spinBoxFrameJumpMultiplier, self.ui.btnRight, self.ui.btnSkipRight, self.ui.btnJoystickMove, self.ui.horizontalSpacer_3]
 
 debug_log_controls = [self.ui.txtLogLine, self.ui.btnToggleExternalLogWindow]
 
@@ -113,6 +113,9 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
 
     series_clear_all_pressed = QtCore.pyqtSignal()
     series_add_pressed = QtCore.pyqtSignal()
+
+    sig_joystick_delta_occured = QtCore.pyqtSignal(float, float) # dx, dy
+
 
     def __init__(self, parent=None):
         # super().__init__(parent=parent) # Call the inherited classes __init__ method
@@ -211,8 +214,23 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         self.ui.connections['btnToggleExternalLogWindow_pressed'] = self.ui.btnToggleExternalLogWindow.pressed.connect(self.toggle_log_window)
 
         # Help/Utility Controls and Buttons __________________________________________________________________________________ #
-        self.ui.btnHelp.pressed.connect(self.on_help_button_pressed)
+        self.ui.connections['btnHelp_pressed'] = self.ui.btnHelp.pressed.connect(self.on_help_button_pressed)
         
+        # pg.JoystickButton
+        self.ui.connections['btnJoystickMove_sigStateChanged'] = self.ui.btnJoystickMove.sigStateChanged.connect(self.on_joystick_delta_state_changed)
+        
+
+    def on_joystick_delta_state_changed(self, joystick_ctrl, new_state):
+        print(f"on_joystick_delta_state_changed(joystick_ctrl: {joystick_ctrl} new_state: {new_state})")
+        # new_state = joystick_ctrl.getState()
+        dx, dy = new_state
+        print(f'\tdx: {dx}, dy: {dy}')
+        if ((abs(dx) > 0) or (abs(dy) > 0)):
+            self.sig_joystick_delta_occured.emit(dx, dy)
+        
+        # x += dx * 1e-3
+        # y += dy * 1e-3
+
 
 
     @function_attributes(short_name=None, tags=['format', 'button'], input_requires=[], output_provides=[], uses=[], used_by=['_format_button_reversed', '_format_button_toggle_log_window'], creation_date='2025-01-06 08:39', related_items=[])

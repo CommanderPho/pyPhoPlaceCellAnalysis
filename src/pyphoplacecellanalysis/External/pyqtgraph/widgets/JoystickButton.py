@@ -5,6 +5,12 @@ from ..Qt import QtCore, QtGui, QtWidgets, mkQApp
 __all__ = ['JoystickButton']
 
 class JoystickButton(QtWidgets.QPushButton):
+    """ 
+    
+    pyphoplacecellanalysis.External.pyqtgraph.widgets.JoystickButton.JoystickButton
+    
+    
+    """
     sigStateChanged = QtCore.Signal(object, object)  ## self, state
     
     def __init__(self, parent=None):
