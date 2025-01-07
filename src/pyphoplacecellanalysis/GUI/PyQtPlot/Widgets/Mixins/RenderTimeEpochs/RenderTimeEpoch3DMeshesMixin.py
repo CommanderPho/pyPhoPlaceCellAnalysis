@@ -69,6 +69,8 @@ class RenderTimeEpoch3DMeshesMixin(EpochRenderingMixin):
 
     
     """
+    # sigOnIntervalEnteredWindow = QtCore.Signal(object) # pyqtSignal(object)
+    # sigOnIntervalExitedindow = QtCore.Signal(object)
     
     #############################################################################
     ################## EpochRenderingMixin Required Conformances
