@@ -1204,12 +1204,12 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
 
 
-    @QtCore.Slot(object)
+    @pyqtExceptionPrintingSlot(object)
     def on_visible_event_intervals_added(self, added_rows):
         print(f'Spike3DRasterWindowWidget.on_visible_event_intervals_added(added_rows: {added_rows})')
         self.bottom_playback_control_bar_logger.add_log_line(f'visible_event_intervals_added(added_rows: {added_rows})')
         
-    @QtCore.Slot(object)
+    @pyqtExceptionPrintingSlot(object)
     def on_visible_event_intervals_removed(self, removed_rows):
         print(f'Spike3DRasterWindowWidget.visible_event_intervals_removed(removed_rows: {removed_rows})')
         self.bottom_playback_control_bar_logger.add_log_line(f'visible_event_intervals_removed(removed_rows: {removed_rows})')
