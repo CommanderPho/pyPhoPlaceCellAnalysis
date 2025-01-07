@@ -1,8 +1,14 @@
+from enum import Enum
 from typing import Callable
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore, QtGui, QtWidgets
 from dataclasses import dataclass
 
+class DragUpdateAction(Enum):
+    TRANSLATE = 'translate'
+    ALIGN_START = 'align_start'
+    ALIGN_FULL = 'align_full'
+    
 
 @dataclass
 class MouseInteractionCriteria(object):
@@ -19,7 +25,7 @@ class DraggableGraphicsWidgetMixin:
         self.custom_mouse_click_criteria_fn
         self.movable
         
-    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.DraggableGraphicsWidgetMixin import MouseInteractionCriteria, DraggableGraphicsWidgetMixin
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.DraggableGraphicsWidgetMixin import MouseInteractionCriteria, DraggableGraphicsWidgetMixin, DragUpdateAction
 
     """
     
