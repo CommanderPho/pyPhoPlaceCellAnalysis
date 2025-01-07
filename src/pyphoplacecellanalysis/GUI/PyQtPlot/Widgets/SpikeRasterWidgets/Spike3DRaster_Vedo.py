@@ -26,7 +26,7 @@ from pyphocorehelpers.gui.Vedo.vedo_helpers import VedoHelpers # for vedo_get_ca
 from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial
 from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import debug_print_axes_locations
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.SpikeRasterBase import SpikeRasterBase
-
+from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 from pyphoplacecellanalysis.GUI.Vedo.VedoMeshManipulatable import VedoPlotterHelpers
 from pyphoplacecellanalysis.GUI.Vedo.Vedo3DStatic import StaticVedo_3DRasterHelper
 
@@ -747,7 +747,7 @@ class Spike3DRaster_Vedo(VedoSpecificTimeCurvesMixin, SpikeRasterBase):
         self.timer_tick_counter += 1
         
 
-    @QtCore.pyqtSlot()
+    @pyqtExceptionPrintingSlot()
     def on_adjust_temporal_spatial_mapping(self):
         """ called when the spatio-temporal mapping property is changed.
         
@@ -768,7 +768,7 @@ class Spike3DRaster_Vedo(VedoSpecificTimeCurvesMixin, SpikeRasterBase):
     def onKeypress(self, evt):
         printc("You have pressed key:", evt.keyPressed, c='b')
 
-    @QtCore.pyqtSlot()
+    @pyqtExceptionPrintingSlot()
     def onClick(self):
         printc("..calling onClick")
         self.ui.plt.actors[0].color('red').rotateZ(40)
@@ -859,13 +859,13 @@ class Spike3DRaster_Vedo(VedoSpecificTimeCurvesMixin, SpikeRasterBase):
             self._update_plots()
             
     
-    @QtCore.pyqtSlot(object)
+    @pyqtExceptionPrintingSlot(object)
     def on_unit_sort_order_changed(self, new_sort_order):
         print(f'unit_sort_order_changed_signal(new_sort_order: {new_sort_order})')        
         self.update(sort_changed=True, colors_changed=False)
         
 
-    @QtCore.pyqtSlot(object)
+    @pyqtExceptionPrintingSlot(object)
     def on_neuron_colors_changed(self, neuron_id_color_update_dict):
         """ Called when the neuron colors have finished changing (changed) to update the rendered elements.
         """

@@ -19,6 +19,7 @@ from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHel
 from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeRenderingBaseMixin, SpikesDataframeOwningMixin
 
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 
 from pyphoplacecellanalysis.General.Model.SpikesDataframeWindow import SpikesDataframeWindow, SpikesWindowOwningMixin
 from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial, DataSeriesToSpatialTransformingMixin
@@ -454,7 +455,7 @@ class SpikeRasterBase(LoggingBaseClassLoggerOwningMixin, UnitSortableMixin, Data
         self.on_neuron_colors_changed(updated_color_dict)
 
     
-    @QtCore.pyqtSlot(object)
+    @pyqtExceptionPrintingSlot(object)
     def on_neuron_colors_changed(self, neuron_id_color_update_dict):
         """ Called when the neuron colors have finished changing (changed) to update the rendered elements.
         """
@@ -559,7 +560,7 @@ class SpikeRasterBase(LoggingBaseClassLoggerOwningMixin, UnitSortableMixin, Data
 
 
 
-    # @QtCore.pyqtSlot()
+    # @pyqtExceptionPrintingSlot()
     def onClose(self):
         ## TODO: this seems to get called excessively, at least for Spike3DRaster. It happens even when accessing invalid properties and stuff. Not sure what's up, something is broken.
         print(f'onClose()')
@@ -624,7 +625,7 @@ class SpikeRasterBase(LoggingBaseClassLoggerOwningMixin, UnitSortableMixin, Data
 
 
 
-    @QtCore.pyqtSlot()
+    @pyqtExceptionPrintingSlot()
     def on_spikes_df_changed(self):
         """ changes:
             self.fragile_linear_neuron_IDXs
@@ -633,14 +634,14 @@ class SpikeRasterBase(LoggingBaseClassLoggerOwningMixin, UnitSortableMixin, Data
         if self.enable_debug_print:
             print(f'SpikeRasterBase.on_spikes_df_changed()')
         
-    @QtCore.pyqtSlot(float, float, float)
+    @pyqtExceptionPrintingSlot(float, float, float)
     def on_window_duration_changed(self, start_t, end_t, duration):
         """ changes self.half_render_window_duration """
         if self.enable_debug_print:
             print(f'SpikeRasterBase.on_window_duration_changed(start_t: {start_t}, end_t: {end_t}, duration: {duration})')
 
 
-    @QtCore.pyqtSlot(float, float)
+    @pyqtExceptionPrintingSlot(float, float)
     def on_window_changed(self, start_t, end_t):
         # called when the window is updated
         if self.enable_debug_print:
@@ -653,13 +654,13 @@ class SpikeRasterBase(LoggingBaseClassLoggerOwningMixin, UnitSortableMixin, Data
         
         
     
-    @QtCore.pyqtSlot(float, float, float, object)
+    @pyqtExceptionPrintingSlot(float, float, float, object)
     def on_windowed_data_window_duration_changed(self, start_t, end_t, duration, updated_data_value):
         """ changes self.half_render_window_duration """
         if self.enable_debug_print:
             print(f'SpikeRasterBase.on_windowed_data_window_duration_changed(start_t: {start_t}, end_t: {end_t}, duration: {duration}, updated_data_value: ...)')
 
-    @QtCore.pyqtSlot(float, float, object)
+    @pyqtExceptionPrintingSlot(float, float, object)
     def on_windowed_data_window_changed(self, start_t, end_t, updated_data_value):
         # called when the window is updated
         if self.enable_debug_print:

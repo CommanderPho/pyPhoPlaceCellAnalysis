@@ -18,6 +18,9 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
+
+
 # For Dynamic Plot Widget Adding
 # from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
 # from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DynamicDockDisplayAreaContentMixin
@@ -230,7 +233,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         self.unit_sort_order_changed_signal.connect(self.on_unit_sort_order_changed)
 
         self.EpochRenderingMixin_on_init()
-        
+
         if self.enable_show_on_init:
             self.show()
             
@@ -620,7 +623,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         self.TimeCurvesViewMixin_on_window_update() # Don't think this does much here
         
     
-    @QtCore.pyqtSlot()
+    @pyqtExceptionPrintingSlot()
     def on_adjust_temporal_spatial_mapping(self):
         """ called when the spatio-temporal mapping property is changed.
         
@@ -654,13 +657,13 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         self.TimeCurvesViewMixin_on_window_update() # Don't think this does much here
         
 
-    @QtCore.pyqtSlot(object)
+    @pyqtExceptionPrintingSlot(object)
     def update_zoomed_plot_rate_limited(self, evt):
         min_t, max_t = evt ## using signal proxy turns original arguments into a tuple
         self.update_zoomed_plot(min_t, max_t)
 
 
-    @QtCore.pyqtSlot(float, float)
+    @pyqtExceptionPrintingSlot(float, float)
     def update_zoomed_plot(self, min_t, max_t):
         """ update the zoomed plot, the spikes_window, and update the dependent curves
         
@@ -690,7 +693,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         
         
         
-    @QtCore.pyqtSlot(float, float)
+    @pyqtExceptionPrintingSlot(float, float)
     def update_scroll_window_region(self, new_start, new_end, block_signals: bool=True):
         """ called to update the interactive scrolling window control
         
@@ -728,7 +731,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
 
         
     # unit_sort_order_changed_signal
-    @QtCore.pyqtSlot(object)
+    @pyqtExceptionPrintingSlot(object)
     def on_unit_sort_order_changed(self, new_sort_order):
         ## TODO: copied from Spike3DRaster but untested
         print(f'unit_sort_order_changed_signal(new_sort_order: {new_sort_order})')        
@@ -736,7 +739,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         print('\t done.')
 
 
-    @QtCore.pyqtSlot(object)
+    @pyqtExceptionPrintingSlot(object)
     def on_neuron_colors_changed(self, neuron_id_color_update_dict):
         """ Called when the neuron colors have finished changing (changed) to update the rendered elements.
         
