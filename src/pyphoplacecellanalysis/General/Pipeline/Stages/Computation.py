@@ -863,9 +863,9 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         return output_result
     
 
-    @function_attributes(short_name=None, tags=['computationResult'], input_requires=[], output_provides=[], uses=[], used_by=['cls.continue_computations_if_needed', 'perform_specific_computation', 'perform_action_for_all_contexts'], creation_date='2024-10-07 15:12', related_items=[])
+    @function_attributes(short_name=None, tags=['computationResult'], input_requires=[], output_provides=[], uses=[], used_by=['build_initial_global_computationResult', 'cls.continue_computations_if_needed', 'perform_specific_computation', 'perform_action_for_all_contexts'], creation_date='2024-10-07 15:12', related_items=[])
     @classmethod
-    def _build_initial_global_computationResult(cls, curr_active_pipeline, active_session, computation_config) -> ComputationResult:
+    def _build_initial_global_computationResult(cls, curr_active_pipeline, active_session, computation_config=None) -> ComputationResult:
         """Conceptually, a single computation consists of a specific active_session and a specific computation_config object
         Args:
             active_session (DataSession): this is the filtered data session
@@ -876,7 +876,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         """
         from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters # merged_directional_placefields_Parameters, rank_order_shuffle_analysis_Parameters, directional_decoders_decode_continuous_Parameters, directional_decoders_evaluate_epochs_Parameters, directional_train_test_split_Parameters, long_short_decoding_analyses_Parameters, long_short_rate_remapping_Parameters, long_short_inst_spike_rate_groups_Parameters, wcorr_shuffle_analysis_Parameters, _perform_specific_epochs_decoding_Parameters, _DEP_ratemap_peaks_Parameters, ratemap_peaks_prominence2d_Parameters
 
-        output_result = ComputationResult(active_session, computation_config, computed_data=DynamicParameters(), accumulated_errors=DynamicParameters(), computation_times=DynamicParameters()) # Note that this active_session should be correctly filtered
+        output_result = ComputationResult(active_session, computation_config=computation_config, computed_data=DynamicParameters(), accumulated_errors=DynamicParameters(), computation_times=DynamicParameters()) # Note that this active_session should be correctly filtered
         ## Add `curr_active_pipeline.global_computation_results.computation_config` as needed:
         if output_result.computation_config is None:
             print('._build_initial_global_computationResult(...): global_computation_results.computation_config is None! Making new one!')
@@ -890,6 +890,25 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         
         return output_result
     
+
+    @function_attributes(short_name=None, tags=['computationResult', 'global', 'instance', 'USEFUL'], input_requires=[], output_provides=[], uses=['cls._build_initial_global_computationResult'], used_by=[], creation_date='2025-01-07 12:13', related_items=[])
+    def build_initial_global_computationResult(self, computation_config=None) -> ComputationResult:
+        """Conceptually, a single computation consists of a specific active_session and a specific computation_config object
+        Args:
+            active_session (DataSession): this is the filtered data session
+            computation_config (PlacefieldComputationParameters): [description]
+
+        Returns:
+            [type]: [description]
+        """
+        if computation_config is None:
+            from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters # merged_directional_placefields_Parameters, rank_order_shuffle_analysis_Parameters, directional_decoders_decode_continuous_Parameters, directional_decoders_evaluate_epochs_Parameters, directional_train_test_split_Parameters, long_short_decoding_analyses_Parameters, long_short_rate_remapping_Parameters, long_short_inst_spike_rate_groups_Parameters, wcorr_shuffle_analysis_Parameters, _perform_specific_epochs_decoding_Parameters, _DEP_ratemap_peaks_Parameters, ratemap_peaks_prominence2d_Parameters
+
+            curr_global_param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters.init_from_pipeline(curr_active_pipeline=self)
+            computation_config = curr_global_param_typed_parameters
+            
+        return self._build_initial_global_computationResult(curr_active_pipeline=self, active_session=self.sess, computation_config=computation_config)
+
 
 
     @function_attributes(short_name=None, tags=['compute', 'main'], input_requires=[], output_provides=[],
@@ -1955,6 +1974,8 @@ class PipelineWithComputedPipelineStageMixin:
     def get_all_parameters(self) -> Dict:
         """ gets all user-parameters from the pipeline
         
+        Actually updates `self.global_computation_results.computation_config`
+        
         """
         from neuropy.core.parameters import ParametersContainer
         from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
@@ -2246,6 +2267,26 @@ class PipelineWithComputedPipelineStageMixin:
         """
         return self.stage.find_first_and_last_valid_position_times()
         
+
+    @function_attributes(short_name=None, tags=['computationResult', 'global', 'instance', 'USEFUL'], input_requires=[], output_provides=[], uses=['cls._build_initial_global_computationResult'], used_by=[], creation_date='2025-01-07 12:13', related_items=[])
+    def build_initial_global_computationResult(self) -> ComputationResult:
+        """Conceptually, a single computation consists of a specific active_session and a specific computation_config object
+        Args:
+            active_session (DataSession): this is the filtered data session
+            computation_config (PlacefieldComputationParameters): [description]
+
+        Returns:
+            [type]: [description]
+        """
+        from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters # merged_directional_placefields_Parameters, rank_order_shuffle_analysis_Parameters, directional_decoders_decode_continuous_Parameters, directional_decoders_evaluate_epochs_Parameters, directional_train_test_split_Parameters, long_short_decoding_analyses_Parameters, long_short_rate_remapping_Parameters, long_short_inst_spike_rate_groups_Parameters, wcorr_shuffle_analysis_Parameters, _perform_specific_epochs_decoding_Parameters, _DEP_ratemap_peaks_Parameters, ratemap_peaks_prominence2d_Parameters
+
+        curr_global_param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters.init_from_pipeline(curr_active_pipeline=self)
+        
+        return self.stage.build_initial_global_computationResult(computation_config=curr_global_param_typed_parameters)
+    
+
+
+
 
     # @function_attributes(short_name=None, tags=['UNFINSHED', 'context', 'custom', 'parameters'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-31 19:46', related_items=[])
     # def get_complete_session_context_description_str(self, BATCH_DATE_TO_USE: Optional[str]=None):
