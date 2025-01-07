@@ -100,7 +100,6 @@ def try_save_pickle_as(original_file_path, file_confirmed_callback):
 class CustomProcessingPhases(Enum):
     """ These phases keep track of groups of computations to run.
 
-    
     from pyphoplacecellanalysis.GUI.IPyWidgets.pipeline_ipywidgets import PipelineJupyterHelpers, CustomProcessingPhases
 
 
@@ -109,87 +108,20 @@ class CustomProcessingPhases(Enum):
     continued_run = "continued_run"
     final_run = "final_run"
     
-    def get_run_configuration(self, custom_user_completion_function_template_code=None, extra_extended_computations_include_includelist: Optional[List]=None):
+    def get_run_configuration(self) -> Dict:
         ## Different run configurations:
-
-        phase1_extended_computations_include_includelist=['lap_direction_determination', 'pf_computation', 
-                                                'pfdt_computation', 'firing_rate_trends',
-            # 'pf_dt_sequential_surprise',
-            'extended_stats',
-            'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding',
-            # 'ratemap_peaks_prominence2d',
-            'long_short_inst_spike_rate_groups',
-            'long_short_endcap_analysis',
-            # 'spike_burst_detection',
-            'split_to_directional_laps',
-            'merged_directional_placefields',
-            # 'rank_order_shuffle_analysis',
-            # 'directional_train_test_split',
-            # 'directional_decoders_decode_continuous',
-            # 'directional_decoders_evaluate_epochs',
-            # 'directional_decoders_epoch_heuristic_scoring',
-        ]
-
-        phase2_extended_computations_include_includelist=['lap_direction_determination', 'pf_computation', 
-                                                'pfdt_computation', 'firing_rate_trends',
-            # 'pf_dt_sequential_surprise',
-            'extended_stats',
-            'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding',
-            # 'ratemap_peaks_prominence2d',
-            'long_short_inst_spike_rate_groups',
-            'long_short_endcap_analysis',
-            # 'spike_burst_detection',
-            'split_to_directional_laps',
-            'merged_directional_placefields',
-            'rank_order_shuffle_analysis',
-            # 'directional_train_test_split',
-            'directional_decoders_decode_continuous',
-            'directional_decoders_evaluate_epochs',
-            'directional_decoders_epoch_heuristic_scoring',
-        ]
-
-        phase3_extended_computations_include_includelist=['lap_direction_determination', 'pf_computation', 
-                                                'pfdt_computation', 'firing_rate_trends',
-            'pf_dt_sequential_surprise',  # commented out 2024-11-05
-            'extended_stats',
-            'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', 
-            'ratemap_peaks_prominence2d', # commented out 2024-11-05
-            'long_short_inst_spike_rate_groups',
-            'long_short_endcap_analysis',
-            # 'spike_burst_detection',
-            'split_to_directional_laps',
-            'merged_directional_placefields',
-            'rank_order_shuffle_analysis',
-            'directional_train_test_split',
-            'directional_decoders_decode_continuous',
-            'directional_decoders_evaluate_epochs',
-            'directional_decoders_epoch_heuristic_scoring',
-            'extended_pf_peak_information',
-            'perform_wcorr_shuffle_analysis',
-        ]
-
         _out_run_config = {}
         if self.value == CustomProcessingPhases.clean_run.value:
-            clean_run = dict(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, should_force_reload_all=True, should_freeze_pipeline_updates=False, extended_computations_include_includelist=phase1_extended_computations_include_includelist, batch_session_completion_handler_kwargs=dict(enable_hdf5_output=False), should_perform_figure_generation_to_file=False, custom_user_completion_function_template_code=custom_user_completion_function_template_code)
+            clean_run = dict(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, should_force_reload_all=True, should_freeze_pipeline_updates=False)
             _out_run_config = clean_run
         elif self.value == CustomProcessingPhases.continued_run.value:
-            continued_run = dict(saving_mode=PipelineSavingScheme.SKIP_SAVING, should_force_reload_all=False, should_freeze_pipeline_updates=False, extended_computations_include_includelist=phase2_extended_computations_include_includelist, batch_session_completion_handler_kwargs=dict(enable_hdf5_output=False), should_perform_figure_generation_to_file=False, custom_user_completion_function_template_code=custom_user_completion_function_template_code)
+            continued_run = dict(saving_mode=PipelineSavingScheme.SKIP_SAVING, should_force_reload_all=False, should_freeze_pipeline_updates=False)
             _out_run_config = continued_run
         elif self.value == CustomProcessingPhases.final_run.value:
-            # final_run = dict(should_force_reload_all=False, should_freeze_pipeline_updates=False, extended_computations_include_includelist=phase3_extended_computations_include_includelist, batch_session_completion_handler_kwargs=dict(enable_hdf5_output=True), should_perform_figure_generation_to_file=False, custom_user_completion_function_template_code=custom_user_completion_function_template_code)
-            final_run = dict(saving_mode=PipelineSavingScheme.SKIP_SAVING, should_force_reload_all=False, should_freeze_pipeline_updates=False, extended_computations_include_includelist=phase3_extended_computations_include_includelist, batch_session_completion_handler_kwargs=dict(enable_hdf5_output=False), should_perform_figure_generation_to_file=False, custom_user_completion_function_template_code=custom_user_completion_function_template_code) # use export_session_h5_file_completion_function instead of enable_hdf5_output=True
+            final_run = dict(saving_mode=PipelineSavingScheme.SKIP_SAVING, should_force_reload_all=False, should_freeze_pipeline_updates=False) # use export_session_h5_file_completion_function instead of enable_hdf5_output=True
             _out_run_config = final_run
         else: 
             raise NotImplementedError
-        
-        if extra_extended_computations_include_includelist is not None:
-            ## includes the user-provided extra run functions to the list: `extra_extended_computations_include_includelist`
-            for a_fn_name in extra_extended_computations_include_includelist:
-                if (a_fn_name not in _out_run_config['extended_computations_include_includelist']):
-                    print(f'adding extra_extended_computations_include_includelist function: "{a_fn_name}" to the `extended_computations_include_includelist`.')
-                    _out_run_config['extended_computations_include_includelist'].append(a_fn_name)
-                else:
-                    print(f'extra_extended_computations_include_includelist function: "{a_fn_name}" was already present in the default `extended_computations_include_includelist`. It will not be duplicated.')
         
         return _out_run_config
     
