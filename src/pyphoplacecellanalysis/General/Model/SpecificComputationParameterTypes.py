@@ -27,6 +27,8 @@ same_thresh_fraction_of_track: float=0.05, max_ignore_bins:float=2, max_jump_dis
 class BaseGlobalComputationParameters(BaseConfig):
     """ Base class
     """
+    
+
 
     def __repr__(self):
         """ 2024-01-11 - Renders only the fields and their sizes  """
@@ -62,6 +64,59 @@ class BaseGlobalComputationParameters(BaseConfig):
         # return f"{type(self).__name__}({content}\n)"
         return content
     
+
+    # ==================================================================================================================== #
+    # Serialization/Deserialization                                                                                        #
+    # ==================================================================================================================== #
+
+    @classmethod
+    def from_state(cls, state):
+        """ Rebuilds an instance using the latest class definition and updates state. """
+        obj = cls.__new__(cls)  # Create a new instance without calling __init__
+        obj.__setstate__(state)
+        return obj
+
+
+    # def _post_load_update(self):
+    #     """ Validates and updates child fields. """
+    #     # directional_decoders_decode_continuous_Parameters
+
+    #     for field_name, field_value in self.__dict__.items():
+    #         if isinstance(field_value, DynamicParameters):
+    #             # Validate and update field value
+    #             if not hasattr(field_value, 'should_disable_cache'):
+    #                 print(f"Updating {field_name} to match current definition.")
+    #                 field_value.should_disable_cache = False  # Default value or any appropriate fix
+
+
+
+    def __setstate__(self, state):
+        """
+        #TODO 2025-01-07 14:06: - [ ] UNFINISHED - needs to handle missing fields like 'should_disable_cache' added to one of the params types
+            => these result in an `AttributeError: 'directional_decoders_decode_continuous_Parameters' object has no attribute 'should_disable_cache' when trying to pickle again after unpickling (`to_dict(...)`)
+        
+         Restore instance attributes and update child fields if needed. """
+        # Handle legacy format
+
+        # loaded_keys = list(state.keys())
+        
+        ## update with what we have:
+        self.__dict__.update(state)
+            
+        # Update missing attributes based on the current class definition
+        for attr_name, attr_field in self.__class__.__attrs_attrs__:  # Access current class attributes
+            if attr_name not in self.__dict__:
+                # Use the default factory if available, otherwise set the default value
+                if attr_field.default is not None:
+                    self.__dict__[attr_name] = attr_field.default
+                elif attr_field.factory is not None:
+                    self.__dict__[attr_name] = attr_field.factory()
+                    
+        
+        # # Ensure child fields are updated
+        # self._post_load_update()
+        return self.__class__.from_state(state=self.__dict__)
+        
 
 # ==================================================================================================================== #
 # Specific Computation Parameter Objects (`BaseGlobalComputationParameters` subclasses):                               #

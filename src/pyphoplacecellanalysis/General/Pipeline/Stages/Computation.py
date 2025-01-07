@@ -1697,7 +1697,7 @@ class PipelineWithComputedPipelineStageMixin:
                 global_computation_results_pickle_path = self.get_output_path().joinpath(override_global_pickle_filename).resolve() 
 
         print(f'global_computation_results_pickle_path: {global_computation_results_pickle_path}')
-        saveData(global_computation_results_pickle_path, (self.global_computation_results.to_dict()))
+        saveData(global_computation_results_pickle_path, (self.global_computation_results.to_dict())) # AttributeError: 'directional_decoders_decode_continuous_Parameters' object has no attribute 'should_disable_cache'
         return global_computation_results_pickle_path
 
 
