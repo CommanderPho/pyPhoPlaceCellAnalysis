@@ -153,7 +153,9 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         _obj.computation_results = DynamicParameters() # computation_results is a DynamicParameters with keys of type IdentifyingContext and values of type ComputationResult
 
         # _obj.global_computation_results = ComputedPipelineStage._build_initial_computationResult(_obj.sess, None) # proper type setup
-        _obj.global_computation_results = ComputedPipelineStage._build_initial_global_computationResult(curr_active_pipeline=_obj, active_session=_obj.sess, computation_config=None) # proper type setup
+        # _obj.global_computation_results = ComputedPipelineStage._build_initial_global_computationResult(curr_active_pipeline=_obj, active_session=_obj.sess, computation_config=None) # proper type setup
+        _obj.global_computation_results = _obj.build_initial_global_computationResult(computation_config=None)
+        
 
         _obj.registered_computation_function_dict = OrderedDict()
         _obj.registered_global_computation_function_dict = OrderedDict()
@@ -756,7 +758,8 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                 print(f'global_computation_results is None. Building initial global_computation_results...')
                 self.global_computation_results = None # clear existing results
                 # self.global_computation_results = ComputedPipelineStage._build_initial_computationResult(self.sess, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
-                self.global_computation_results = ComputedPipelineStage._build_initial_global_computationResult(self, self.sess, active_computation_params)
+                # self.global_computation_results = ComputedPipelineStage._build_initial_global_computationResult(self, self.sess, active_computation_params)
+                self.global_computation_results = self.build_initial_global_computationResult(active_computation_params)
                 assert self.global_computation_results.computation_config is not None
 
         if contains_any_global_functions:
@@ -765,7 +768,8 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                 print(f'global_computation_results is None or not a `ComputationResult` object. Building initial global_computation_results...') #TODO 2024-01-10 15:12: - [ ] Check that `self.global_computation_results.keys()` are empty
                 self.global_computation_results = None # clear existing results
                 # self.global_computation_results = ComputedPipelineStage._build_initial_computationResult(self.sess, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
-                self.global_computation_results = ComputedPipelineStage._build_initial_global_computationResult(self, self.sess, active_computation_params)
+                # self.global_computation_results = ComputedPipelineStage._build_initial_global_computationResult(self, self.sess, active_computation_params)
+                self.global_computation_results = self.build_initial_global_computationResult(active_computation_params)
                 assert self.global_computation_results.computation_config is not None
                 
                 # ## Add `curr_active_pipeline.global_computation_results.computation_config` as needed:
@@ -1971,7 +1975,7 @@ class PipelineWithComputedPipelineStageMixin:
         return sucessfully_updated_keys, successfully_loaded_keys, failed_loaded_keys, found_split_paths
     
     @function_attributes(short_name=None, tags=['parameters', 'computaton'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-23 06:29', related_items=[])
-    def get_all_parameters(self) -> Dict:
+    def get_all_parameters(self, allow_update_global_computation_config:bool=True) -> Dict:
         """ gets all user-parameters from the pipeline
         
         Actually updates `self.global_computation_results.computation_config`
@@ -1986,10 +1990,11 @@ class PipelineWithComputedPipelineStageMixin:
 
         ## Add `curr_active_pipeline.global_computation_results.computation_config` as needed:
         if self.global_computation_results.computation_config is None:
-            print('global_computation_results.computation_config is None! Making new one!')
             curr_global_param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters.init_from_pipeline(curr_active_pipeline=self)
-            self.global_computation_results.computation_config = curr_global_param_typed_parameters
-            print(f'\tdone. Pipeline needs resave!')
+            if allow_update_global_computation_config:
+                print('global_computation_results.computation_config is None! Making new one!')
+                self.global_computation_results.computation_config = curr_global_param_typed_parameters
+                print(f'\tdone. Pipeline needs resave!')
         else:
             curr_global_param_typed_parameters: ComputationKWargParameters = self.global_computation_results.computation_config
             
