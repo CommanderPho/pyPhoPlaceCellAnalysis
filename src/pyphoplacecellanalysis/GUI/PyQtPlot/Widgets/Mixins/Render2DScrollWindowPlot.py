@@ -40,8 +40,6 @@ class Render2DScrollWindowPlotMixin:
     window_scrolled = QtCore.pyqtSignal(float, float) # signal is emitted on updating the 2D sliding window, where the first argument is the new start value and the 2nd is the new end value
     
     
-
-    # def ScrollRasterPreviewWindow_on_BuildUI(self, graphics_layout_widget: pg.GraphicsLayoutWidget=None, layout_row=0, layout_col=0):
     def ScrollRasterPreviewWindow_on_BuildUI(self, background_static_scroll_window_plot):
         """ Note that this doesn't need to update because the background is static (it shows all time) 
         
@@ -56,6 +54,7 @@ class Render2DScrollWindowPlotMixin:
             self.params.scroll_window_plot_downsampling_rate
             
             self.spikes_window.total_df_start_end_times # to get the current start/end times to set the linear region to
+            
         Creates:
             self.plots_data.all_spots # data for all spikes to be rendered on a scatter plot
             self.plots_data.all_spots_downsampled # temporally downsampled data for all spikes to be rendered on a scatter plot

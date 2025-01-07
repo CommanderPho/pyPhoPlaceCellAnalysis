@@ -84,6 +84,11 @@ debug_log_controls = [self.ui.txtLogLine, self.ui.btnToggleExternalLogWindow]
 standalone_extra_controls = [self.ui.btnHelp]
 
 
+# Joystick/Move controls _____________________________________________________________________________________________ #
+self.ui.btnJoystickMove
+.on_joystick_delta_state_changed
+.sig_joystick_delta_occured (float, float)
+
 
 """
 ## Define the .ui file path
