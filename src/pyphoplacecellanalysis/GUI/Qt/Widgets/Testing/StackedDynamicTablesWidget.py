@@ -15,6 +15,77 @@ from pyphocorehelpers.gui.Qt.pandas_model import SimplePandasModel # , GroupedHe
 from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.NestedDockAreaWidget import NestedDockAreaWidget
 from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
 
+from PyQt5.QtWidgets import QApplication, QMainWindow, QTableView, QMenu, QAction, QVBoxLayout, QWidget
+from PyQt5.QtCore import QAbstractTableModel, Qt
+
+# class TableModel(QAbstractTableModel):
+#     def __init__(self, data, headers):
+#         super().__init__()
+#         self._data = data
+#         self._headers = headers
+
+#     def rowCount(self, parent=None):
+#         return len(self._data)
+
+#     def columnCount(self, parent=None):
+#         return len(self._headers)
+
+#     def data(self, index, role=Qt.DisplayRole):
+#         if role == Qt.DisplayRole:
+#             return self._data[index.row()][index.column()]
+#         return None
+
+#     def headerData(self, section, orientation, role):
+#         if role == Qt.DisplayRole and orientation == Qt.Horizontal:
+#             return self._headers[section]
+#         return None
+    
+class CustomHeaderTableView(pg.QtWidgets.QTableView):
+    """ QTableView with custom header functionality. """
+    def __init__(self, model=None):
+        super().__init__()
+        self._column_selection_menu = None
+        if model is not None:
+            self.setModel(model)
+            self.initCustomHeaders()
+
+
+    def setModel(self, model):
+        """ Override setModel to attach additional functionality when a model is set. """
+        super().setModel(model)  # Call the original implementation
+        # Custom logic after setting the model
+        if model is not None:
+            self.initCustomHeaders()
+
+    def initCustomHeaders(self):
+        """ Add custom widgets to the horizontal header. """
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        for col in range(self.model().columnCount()):
+            header_widget = pg.QtWidgets.QWidget()
+            layout = pg.QtWidgets.QVBoxLayout()
+            filter_box = pg.QtWidgets.QLineEdit()
+            filter_box.setPlaceholderText(f"Filter {self.model().headerData(col, Qt.Horizontal, Qt.DisplayRole)}")
+            filter_box.textChanged.connect(lambda text, c=col: self.applyFilter(text, c))
+            layout.addWidget(filter_box)
+            layout.setContentsMargins(0, 0, 0, 0)
+            header_widget.setLayout(layout)
+            self.setIndexWidget(self.model().index(0, col), header_widget)
+
+    def applyFilter(self, text, column):
+        """ Apply column-specific filtering based on user input. """
+        for row in range(self.model().rowCount()):
+            value = str(self.model().index(row, column).data())
+            hide_row = text not in value
+            self.setRowHidden(row, hide_row)
+            
+
+    def toggle_column(self, column, visible: bool):
+        self.setColumnHidden(column, not visible)
+        
+
+
+
 
 class TableManager:
     """ Manages a dynamically updating dict of tables, rendered as docked widgets """
@@ -83,7 +154,10 @@ class TableManager:
             self.dynamic_docked_widget_container.remove_display_dock(name)
 
     def _create_table(self, df: pd.DataFrame):
-        table = pg.QtWidgets.QTableView()
+        headers: List[str] = [str(col) for col in df.columns]
+        
+        # table = pg.QtWidgets.QTableView()
+        table = CustomHeaderTableView()
         model = self._fill_table(table, df)
         table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         table.resizeColumnsToContents()
@@ -97,6 +171,19 @@ class TableManager:
             }
         """)
         table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        ## enable menu for showing/hiding columns:
+        table.column_visibility_menu = QMenu("Columns", table)
+        table.column_actions = []
+        for i, header in enumerate(headers):
+            action = QAction(header, table, checkable=True)
+            action.setChecked(True)
+            action.triggered.connect(lambda checked, col=i: table.toggle_column(col, checked))
+            table.column_visibility_menu.addAction(action)
+            table.column_actions.append(action)
+
+        # menu_bar = self.dynamic_docked_widget_container.window().menuBar()
+        # menu_bar.addMenu(table.column_visibility_menu)
+
         return (table, model)
 
     def _update_table(self, dock_item, df: pd.DataFrame):
