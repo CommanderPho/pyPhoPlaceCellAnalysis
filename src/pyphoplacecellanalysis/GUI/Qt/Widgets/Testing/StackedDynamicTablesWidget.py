@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import QApplication, QVBoxLayout, QPushButton, QWidget
 from PyQt5.QtWidgets import QStackedWidget, QTableWidget, QTableWidgetItem
 from PyQt5.QtWidgets import QApplication, QVBoxLayout, QPushButton, QWidget, QTableWidgetItem
-from PyQt5.QtWidgets import QApplication, QVBoxLayout, QTableWidget, QTableWidgetItem, QPushButton, QWidget
+from PyQt5.QtWidgets import QApplication, QVBoxLayout, QTableWidget, QTableWidgetItem, QPushButton, QWidget, QSizePolicy
 
 
 # class TableManager:
@@ -105,6 +105,11 @@ class TableManager:
         """
         table = QTableWidget(len(data), len(data[0]) if data else 0)
         self._fill_table(table, data)
+        # Set size policy to shrink based on content
+        table.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+        table.resizeColumnsToContents()
+        table.resizeRowsToContents()        
+        table.setMaximumHeight(self._calculate_table_height(table, len(data)))
         return table
 
     def _update_table(self, table, data):
@@ -116,6 +121,23 @@ class TableManager:
         table.setRowCount(len(data))
         table.setColumnCount(len(data[0]) if data else 0)
         self._fill_table(table, data)
+        table.resizeColumnsToContents()
+        table.resizeRowsToContents()
+        table.setMaximumHeight(self._calculate_table_height(table, len(data)))
+
+
+    def _calculate_table_height(self, table, row_count):
+        """
+        Calculate the appropriate height for the table based on its content, including headers.
+        :param table: QTableWidget instance.
+        :param row_count: Number of rows in the table.
+        :return: Calculated height in pixels.
+        """
+        row_height = table.sizeHintForRow(0) if row_count > 0 else 0
+        header_height = table.horizontalHeader().height()
+        vertical_header_width = table.verticalHeader().width()
+        return row_count * row_height + header_height + vertical_header_width + 2  # 2 for borders/padding
+
 
     def _fill_table(self, table, data):
         """
@@ -128,9 +150,17 @@ class TableManager:
                 table.setItem(i, j, QTableWidgetItem(str(value)))
 
 
+import random
+
+# Helper function to generate random data
+def generate_random_data():
+    rows = random.randint(2, 10)  # Random number of rows
+    cols = random.randint(2, 6)   # Random number of columns
+    return [[random.randint(1, 100) for _ in range(cols)] for _ in range(rows)]
 
 
 if __name__ == "__main__":
+
 
     app = QApplication([])
 
@@ -150,6 +180,11 @@ if __name__ == "__main__":
         [[1, 2, 3], [4, 5, 6], [7, 8, 9]],
         [[10, 11], [12, 13]]
     ]
+    
+    # Initial random data sources
+    data_sources = [generate_random_data() for _ in range(3)]
+    
+    data_sources.insert(1, [[0, 0], [1, 1]]) ## small entry (only 2 rows)
     manager.update_tables(data_sources)
 
     # Buttons to test functionality
@@ -170,6 +205,8 @@ if __name__ == "__main__":
     layout.addWidget(add_button)
     layout.addWidget(remove_button)
 
+    window.setWindowTitle('Stacked Dynamics Tables Widget (test, Pho)')
+    
     # Show the window
     window.show()
     app.exec_()
