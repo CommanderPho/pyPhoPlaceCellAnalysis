@@ -370,6 +370,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             # self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.jump_specific_time.connect((lambda new_time: self.update_animation(new_time))))
             self.ui.bottom_bar_connections.append(self.ui.spike_raster_plt_2d.sigEmbeddedMatplotlibDockWidgetAdded.connect(lambda spike_raster_plt_2D, added_dock_item, added_widget: self.update_scrolling_event_filters())) ## not really a bottom_bar_connections, but who cares
                         
+            self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.sigToggleRightSidebarVisibility.connect(lambda is_visible: self.set_right_sidebar_visibility(is_visible)))
+            
             # ## update the jump time when it scrolls
             # self.ui.bottomPlaybackControlBarWidget.time_fractional_seconds
             

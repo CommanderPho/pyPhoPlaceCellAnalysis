@@ -81,7 +81,7 @@ move_controls = [self.ui.btnSkipLeft, self.ui.btnLeft, self.ui.spinBoxFrameJumpM
 
 debug_log_controls = [self.ui.txtLogLine, self.ui.btnToggleExternalLogWindow]
 
-standalone_extra_controls = [self.ui.btnHelp]
+standalone_extra_controls = [self.ui.btnHelp, self.ui.btnToggleRightSidebar]
 
 
 # Joystick/Move controls _____________________________________________________________________________________________ #
@@ -120,6 +120,8 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
     series_add_pressed = QtCore.pyqtSignal()
 
     sig_joystick_delta_occured = QtCore.pyqtSignal(float, float) # dx, dy
+
+    sigToggleRightSidebarVisibility = QtCore.pyqtSignal(bool)
 
 
     def __init__(self, parent=None):
@@ -224,6 +226,8 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         # pg.JoystickButton
         self.ui.connections['btnJoystickMove_sigStateChanged'] = self.ui.btnJoystickMove.sigStateChanged.connect(self.on_joystick_delta_state_changed)
         
+
+        self.ui.btnToggleRightSidebar.pressed.connect(self.on_right_sidebar_toggle_button_pressed)
 
     def on_joystick_delta_state_changed(self, joystick_ctrl, new_state):
         print(f"on_joystick_delta_state_changed(joystick_ctrl: {joystick_ctrl} new_state: {new_state})")
@@ -680,7 +684,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
             self.ui._attached_log_window.hide()
 
         self._format_button_toggle_log_window()
-
+        
     @function_attributes(short_name=None, tags=['logging'], input_requires=[], output_provides=[], uses=[], used_by=['add_log_lines'], creation_date='2025-01-06 11:26', related_items=[])
     def add_log_line(self, new_line: str, allow_split_newlines: bool = True, defer_log_changed_event:bool=False):
         """ adds an additional entry to the log """
@@ -709,7 +713,12 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
     def on_help_button_pressed(self):
         self.log_print(f'on_help_button_pressed()')
         
-
+    def on_right_sidebar_toggle_button_pressed(self):
+        print(f'on_right_sidebar_toggle_button_pressed():')
+        should_sidebar_be_visible: bool = self.ui.btnToggleRightSidebar.isChecked()
+        print(f'\tshould_sidebar_be_visible: {should_sidebar_be_visible}')
+        
+        self.sigToggleRightSidebarVisibility.emit(should_sidebar_be_visible)
 
     # ==================================================================================================================== #
     # eventFilter                                                                                                          #

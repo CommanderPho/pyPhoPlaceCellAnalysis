@@ -60,6 +60,7 @@ class SpikeRasterRightSidebarOwningMixin:
         self.right_sidebar_widget.setVisible(not is_visible) # collapses and hides the sidebar
         # self.right_sidebar_widget.setVisible(True) # shows the sidebar
 
+    @pyqtExceptionPrintingSlot(bool)
     def set_right_sidebar_visibility(self, is_visible:bool):
         self.right_sidebar_widget.setVisible(is_visible) 
 
