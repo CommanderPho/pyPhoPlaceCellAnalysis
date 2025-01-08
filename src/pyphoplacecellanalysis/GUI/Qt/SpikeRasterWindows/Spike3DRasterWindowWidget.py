@@ -1003,6 +1003,29 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, get_utility_dock_colors
         from pyphocorehelpers.gui.Qt.pandas_model import SimplePandasModel # , GroupedHeaderView #, create_tabbed_table_widget
         
+
+        def _subfn_build_table_stack(n_tables_needed: int):
+            for i, (a_dataseries_name, df) in enumerate(dataframes_dict.items()):
+                unique_table_id: str = f"VisibleIntervalTable[{a_dataseries_name}]"
+                # Create SimplePandasModel for each DataFrame
+                curr_model = SimplePandasModel(df.copy())
+                # Create and associate view with model
+                tableView = pg.QtWidgets.QTableView()
+                tableView.setModel(curr_model)
+                # view.setModel(df.to_numpy().__array_interface__) # Note: For a real model, use a QAbstractTableModel subclass. This is a placeholder.
+                tableView.setObjectName(unique_table_id)
+                tableView.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
+                
+                updated_ui_dict['tables_dict'][a_dataseries_name] = {'tableView': tableView, 'pandasDataFrameTableModel': curr_model}
+            
+        
+                # # Step 5: Add TableView to LayoutWidget
+                ctrl_layout.addWidget(tableView, row=(i+1), rowspan=1, col=1, colspan=1)
+                
+                # Adjust the column widths to fit the contents
+                tableView.resizeColumnsToContents()
+            # END for i, (a_name, df) in enumerate(dataframes_dict.items())...
+            
         ## get the updated data:
         # included_series_names=['Replays', 'Laps', 'PBEs']
         included_series_names=None
