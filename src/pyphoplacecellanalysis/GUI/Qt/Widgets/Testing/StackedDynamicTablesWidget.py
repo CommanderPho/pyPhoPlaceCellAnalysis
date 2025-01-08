@@ -17,13 +17,24 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaCo
 
 
 class TableManager:
-    """ Manages a dynamically updating dict of tables, rendered as a vertical stack of tables
-    """
-    def __init__(self, layout):
-        self.layout = layout
-        self.dock_items = {}  # Store dock items instead of separate tables/labels
+    """ Manages a dynamically updating dict of tables, rendered as docked widgets """
+    def __init__(self, parent_widget):
+        self.parent_widget = parent_widget
+        
+        # Create the dynamic docked widget container
+        self.dynamic_docked_widget_container = NestedDockAreaWidget()
+        self.dynamic_docked_widget_container.setObjectName("dynamic_docked_widget_container")
+        
+        # Create a layout for the wrapper
+        self.wrapper_layout = QVBoxLayout(parent_widget)
+        self.wrapper_layout.setSpacing(0)
+        self.wrapper_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Add the container to the wrapper layout
+        self.wrapper_layout.addWidget(self.dynamic_docked_widget_container)
+        
+        self.dock_items = {}  # Store dock items
         self.models = {}  # dict of SimplePandasModel objects
-        self.layout.setSpacing(2)
 
     def update_tables(self, data_sources: Dict[str, pd.DataFrame]):
         # Remove old dock items no longer present
@@ -32,36 +43,42 @@ class TableManager:
             if name not in data_sources:
                 to_remove.append(name)
         for name in to_remove:
-            dock_item = self.dock_items.pop(name)
-            self.layout.removeWidget(dock_item)
-            dock_item.deleteLater()
-            self.models.pop(name).deleteLater()
+            self.remove_table_dock(name)
 
         # Add or update tables
         for name, df in data_sources.items():
             if name not in self.dock_items:
-                # Create new dock item containing label and table
-                dock_item = pg.DockItem(name=name)
-                dock_layout = QVBoxLayout()
-                
-                # Add label
-                label = QLabel(name)
-                label.setStyleSheet("font-weight: bold; margin: 0px;")
-                dock_layout.addWidget(label)
-                
-                # Create and add table
-                table, model = self._create_table(df)
-                dock_layout.addWidget(table)
-                
-                dock_item.setLayout(dock_layout)
-                self.dock_items[name] = dock_item
-                self.models[name] = model
-                self.layout.addWidget(dock_item)
+                self.add_table_dock(name, df)
             else:
                 # Update existing table
-                dock_item = self.dock_items[name]
-                table = dock_item.layout().itemAt(1).widget()  # Get table widget
-                self.models[name] = self._update_table(table, df)
+                self._update_table(self.dock_items[name], df)
+
+    def add_table_dock(self, name: str, df: pd.DataFrame, dockSize=(500,100)):
+        """Creates a new docked table widget"""
+        display_config = CustomDockDisplayConfig(showCloseButton=True)
+        
+        # Create table widget
+        table, model = self._create_table(df)
+        
+        # Add to dynamic dock container
+        _, dock_item = self.dynamic_docked_widget_container.add_display_dock(
+            name, 
+            dockSize=dockSize,
+            display_config=display_config,
+            widget=table,
+            dockAddLocationOpts=['bottom']
+        )
+        
+        self.dock_items[name] = dock_item
+        self.models[name] = model
+        return dock_item
+
+    def remove_table_dock(self, name: str):
+        """Removes a docked table widget"""
+        if name in self.dock_items:
+            dock_item = self.dock_items.pop(name)
+            self.models.pop(name)
+            self.dynamic_docked_widget_container.remove_display_dock(name)
 
     def _create_table(self, df: pd.DataFrame):
         table = pg.QtWidgets.QTableView()
@@ -69,7 +86,6 @@ class TableManager:
         table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         table.resizeColumnsToContents()
         table.resizeRowsToContents()
-        table.setMaximumHeight(self._calculate_table_height(table, len(df)))
         table.setStyleSheet("""
             QHeaderView::section {
                 background-color: lightblue;
@@ -81,26 +97,17 @@ class TableManager:
         table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         return (table, model)
 
-    def _update_table(self, table, df: pd.DataFrame):
+    def _update_table(self, dock_item, df: pd.DataFrame):
+        table = dock_item.widget()
         model = self._fill_table(table, df)
         table.resizeColumnsToContents()
         table.resizeRowsToContents()
-        table.setMaximumHeight(self._calculate_table_height(table, len(df)))
         return model
-
-    def _calculate_table_height(self, table, row_count: int):
-        row_height = table.sizeHintForRow(0) if row_count > 0 else 0
-        header_height = table.horizontalHeader().height()
-        vertical_header_width = table.verticalHeader().width()
-        scrollbar_height = table.horizontalScrollBar().height()
-        # Some padding for borders or margins
-        return ((row_count + 1) * row_height) + header_height + vertical_header_width + 4 + scrollbar_height
 
     def _fill_table(self, table, df: pd.DataFrame) -> SimplePandasModel:
         curr_model = SimplePandasModel(df.copy())
         table.setModel(curr_model)
         return curr_model
-
 
 
 
@@ -122,10 +129,10 @@ if __name__ == "__main__":
 
     # Main Window
     window = QWidget()
-    layout = QVBoxLayout(window)
+    # layout = QVBoxLayout(window)
 
     # Create TableManager
-    manager = TableManager(layout)
+    manager = TableManager(window)
 
     # Initial random data sources
     data_sources = [generate_random_data() for _ in range(3)]
@@ -154,8 +161,8 @@ if __name__ == "__main__":
     add_button.clicked.connect(add_table)
     remove_button.clicked.connect(remove_table)
 
-    layout.addWidget(add_button)
-    layout.addWidget(remove_button)
+    manager.wrapper_layout.addWidget(add_button)
+    manager.wrapper_layout.addWidget(remove_button)
 
     window.setWindowTitle('Stacked Dynamics Tables Widget (test, Pho)')
     
