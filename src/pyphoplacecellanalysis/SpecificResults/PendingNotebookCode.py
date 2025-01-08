@@ -843,6 +843,8 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, debug_print=Fa
         global_flat_action_dict[a_command].trigger()
         
 
+    ## add the right sidebar
+    visible_intervals_info_widget_container, visible_intervals_ctrl_layout_widget =  spike_raster_window._perform_build_attached_visible_interval_info_widget()
 
     return all_global_menus_actionsDict, global_flat_action_dict
 
