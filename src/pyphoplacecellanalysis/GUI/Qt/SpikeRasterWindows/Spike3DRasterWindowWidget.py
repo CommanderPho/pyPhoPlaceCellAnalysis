@@ -13,7 +13,7 @@ from pyphocorehelpers.gui.Qt.qevent_lookup_helpers import QEventLookupHelpers
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 
-from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Uic_AUTOGEN_Spike3DRasterWindowBase import Ui_RootWidget # Generated file from .ui
+from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowBase import Ui_RootWidget # Generated file from .ui
 
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike3DRaster import Spike3DRaster
@@ -993,38 +993,40 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     
     @function_attributes(short_name=None, tags=['visible_intervals_info'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-07 18:53', related_items=[])
     def _perform_build_attached_visible_interval_info_widget(self):
-        """ Draws 3 tables for the active intervals
-
-        visible_intervals_info_widget_container, visible_intervals_ctrl_layout_widget =  self._perform_build_attached_visible_interval_info_widget()
-
+        """ Draws a dynamically updating stack of tables in the right sidebar showing the elements in the active intervals
+        Called to update or create the tables
         
+        Usage:
+            visible_intervals_info_widget_container, visible_intervals_ctrl_layout_widget =  self._perform_build_attached_visible_interval_info_widget()
+
         """
         print(f'spikes_raster_window._perform_build_attached_visible_interval_info_widget()')
         # from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, get_utility_dock_colors
         from pyphocorehelpers.gui.Qt.pandas_model import SimplePandasModel # , GroupedHeaderView #, create_tabbed_table_widget
-        
+        from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.StackedDynamicTablesWidget import TableManager
 
-        def _subfn_build_table_stack(n_tables_needed: int):
-            for i, (a_dataseries_name, df) in enumerate(dataframes_dict.items()):
-                unique_table_id: str = f"VisibleIntervalTable[{a_dataseries_name}]"
-                # Create SimplePandasModel for each DataFrame
-                curr_model = SimplePandasModel(df.copy())
-                # Create and associate view with model
-                tableView = pg.QtWidgets.QTableView()
-                tableView.setModel(curr_model)
-                # view.setModel(df.to_numpy().__array_interface__) # Note: For a real model, use a QAbstractTableModel subclass. This is a placeholder.
-                tableView.setObjectName(unique_table_id)
-                tableView.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
+
+        # def _subfn_build_table_stack(n_tables_needed: int):
+        #     for i, (a_dataseries_name, df) in enumerate(dataframes_dict.items()):
+        #         unique_table_id: str = f"VisibleIntervalTable[{a_dataseries_name}]"
+        #         # Create SimplePandasModel for each DataFrame
+        #         curr_model = SimplePandasModel(df.copy())
+        #         # Create and associate view with model
+        #         tableView = pg.QtWidgets.QTableView()
+        #         tableView.setModel(curr_model)
+        #         # view.setModel(df.to_numpy().__array_interface__) # Note: For a real model, use a QAbstractTableModel subclass. This is a placeholder.
+        #         tableView.setObjectName(unique_table_id)
+        #         tableView.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
                 
-                updated_ui_dict['tables_dict'][a_dataseries_name] = {'tableView': tableView, 'pandasDataFrameTableModel': curr_model}
+        #         updated_ui_dict['tables_dict'][a_dataseries_name] = {'tableView': tableView, 'pandasDataFrameTableModel': curr_model}
             
         
-                # # Step 5: Add TableView to LayoutWidget
-                ctrl_layout.addWidget(tableView, row=(i+1), rowspan=1, col=1, colspan=1)
+        #         # # Step 5: Add TableView to LayoutWidget
+        #         ctrl_layout.addWidget(tableView, row=(i+1), rowspan=1, col=1, colspan=1)
                 
-                # Adjust the column widths to fit the contents
-                tableView.resizeColumnsToContents()
-            # END for i, (a_name, df) in enumerate(dataframes_dict.items())...
+        #         # Adjust the column widths to fit the contents
+        #         tableView.resizeColumnsToContents()
+        #     # END for i, (a_name, df) in enumerate(dataframes_dict.items())...
             
         ## get the updated data:
         # included_series_names=['Replays', 'Laps', 'PBEs']
@@ -1047,66 +1049,74 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container = {} # initialize
             
             ## Render in right sidebar:
-            updated_ui_dict = {'ctrl_layout': None, 'tables_dict': {}}
+            updated_ui_dict = {'ctrl_layout': None, 'manager': None} # , 'tables_dict': {}
 
             # ctrls_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False)
             
             ctrl_layout = pg.LayoutWidget()
             updated_ui_dict['ctrl_layout'] = ctrl_layout
 
+            manager = TableManager(layout=ctrl_layout.layout) 
+            updated_ui_dict['manager'] = manager
 
-            ## INPUTS: dataframes_dict
-            models_dict = {}
-            views_dict = {}
+            manager.update_tables(dataframes_dict)
 
-            # Add tabs and corresponding views
-            for i, (a_dataseries_name, df) in enumerate(dataframes_dict.items()):
-                unique_table_id: str = f"VisibleIntervalTable[{a_dataseries_name}]"
-                # Create SimplePandasModel for each DataFrame
-                curr_model = SimplePandasModel(df.copy())
-                # models_dict[a_dataseries_name] = curr_model
+            # updated_ui_dict['tables_dict'] = manager.tables
+
+            # ## INPUTS: dataframes_dict
+            # models_dict = {}
+            # views_dict = {}
+
+            # # Add tabs and corresponding views
+            # for i, (a_dataseries_name, df) in enumerate(dataframes_dict.items()):
+            #     unique_table_id: str = f"VisibleIntervalTable[{a_dataseries_name}]"
+            #     # Create SimplePandasModel for each DataFrame
+            #     curr_model = SimplePandasModel(df.copy())
+            #     # models_dict[a_dataseries_name] = curr_model
                 
-                # Create and associate view with model
-                tableView = pg.QtWidgets.QTableView()
-                tableView.setModel(curr_model)
-                # view.setModel(df.to_numpy().__array_interface__) # Note: For a real model, use a QAbstractTableModel subclass. This is a placeholder.
-                # header = GroupedHeaderView()
-                # header = GroupedHeaderView(df) ## needs the df now to determine header layout
-                # tableView.setHorizontalHeader(header)
-                tableView.setObjectName(unique_table_id)
-                # tableView.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
+            #     # Create and associate view with model
+            #     tableView = pg.QtWidgets.QTableView()
+            #     tableView.setModel(curr_model)
+            #     # view.setModel(df.to_numpy().__array_interface__) # Note: For a real model, use a QAbstractTableModel subclass. This is a placeholder.
+            #     # header = GroupedHeaderView()
+            #     # header = GroupedHeaderView(df) ## needs the df now to determine header layout
+            #     # tableView.setHorizontalHeader(header)
+            #     tableView.setObjectName(unique_table_id)
+            #     # tableView.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
                 
-                # views_dict[a_dataseries_name] = tableView
+            #     # views_dict[a_dataseries_name] = tableView
 
-                ## update the output dicts
-                # updated_ui_dict[unique_table_id] = tableView
-                # updated_plots_data_dict[unique_table_id] = models_dict[a_name]
+            #     ## update the output dicts
+            #     # updated_ui_dict[unique_table_id] = tableView
+            #     # updated_plots_data_dict[unique_table_id] = models_dict[a_name]
 
-                # updated_ui_dict['tables_dict'][unique_table_id] = {'tableView': tableView, 'pandasDataFrameTableModel': models_dict[a_name]} ## combined entry
-                updated_ui_dict['tables_dict'][a_dataseries_name] = {'tableView': tableView, 'pandasDataFrameTableModel': curr_model}
+            #     # updated_ui_dict['tables_dict'][unique_table_id] = {'tableView': tableView, 'pandasDataFrameTableModel': models_dict[a_name]} ## combined entry
+            #     updated_ui_dict['tables_dict'][a_dataseries_name] = {'tableView': tableView, 'pandasDataFrameTableModel': curr_model}
             
-                # Add tab with view
-                # tab_widget.addTab(view, a_name)
+            #     # Add tab with view
+            #     # tab_widget.addTab(view, a_name)
 
-                # ctrl_widgets_dict['pandasDataFrameTableModel'] = pandasDataFrameTableModel
-                # ctrl_widgets_dict['tableView'] = tableView
+            #     # ctrl_widgets_dict['pandasDataFrameTableModel'] = pandasDataFrameTableModel
+            #     # ctrl_widgets_dict['tableView'] = tableView
 
-                # # Step 5: Add TableView to LayoutWidget
-                ctrl_layout.addWidget(tableView, row=(i+1), rowspan=1, col=1, colspan=1)
+            #     # # Step 5: Add TableView to LayoutWidget
+            #     ctrl_layout.addWidget(tableView, row=(i+1), rowspan=1, col=1, colspan=1)
                 
-                # Adjust the column widths to fit the contents
-                tableView.resizeColumnsToContents()
-            # END for i, (a_name, df) in enumerate(dataframes_dict.items())...
+            #     # Adjust the column widths to fit the contents
+            #     tableView.resizeColumnsToContents()
+            # # END for i, (a_name, df) in enumerate(dataframes_dict.items())...
 
-            ## OUTPUTS: updated_plots_dict, updated_plots_data_dict, updated_ui_dict
-            print(f'\t done. adding to parent')
-            # if len(updated_plots_dict) is not None:
-            #     self.ui.rightSideContainerWidget.plo.visible_intervals_info_widget_container = {k:v for k, v in updated_plots_dict.items()}
+            # ## OUTPUTS: updated_plots_dict, updated_plots_data_dict, updated_ui_dict
+            # print(f'\t done. adding to parent')
+            # # if len(updated_plots_dict) is not None:
+            # #     self.ui.rightSideContainerWidget.plo.visible_intervals_info_widget_container = {k:v for k, v in updated_plots_dict.items()}
                 
-            # if len(updated_plots_data_dict) is not None:
-            #     self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container = {k:v for k, v in updated_plots_data_dict.items()}
+            # # if len(updated_plots_data_dict) is not None:
+            # #     self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container = {k:v for k, v in updated_plots_data_dict.items()}
 
-            assert len(updated_ui_dict) is not None
+            # assert len(updated_ui_dict) is not None
+            
+
             self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container = updated_ui_dict # {k:v for k, v in updated_ui_dict.items()}
 
 
@@ -1133,18 +1143,22 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         else:
             print(f'\t does not need init, just update')
             extant_dict = self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container
-            extant_tables = extant_dict['tables_dict']
-            for a_dataseries_name, a_table_dict in extant_tables.items():
-                ## replace model
-                old_model = a_table_dict.pop('pandasDataFrameTableModel')
-                # old_df = old_model.df
+            
+            extant_manager = extant_dict['manager']
+            extant_manager.update_tables(dataframes_dict)
+            
+            # extant_tables = extant_dict['tables_dict']
+            # for a_dataseries_name, a_table_dict in extant_tables.items():
+            #     ## replace model
+            #     old_model = a_table_dict.pop('pandasDataFrameTableModel')
+            #     # old_df = old_model.df
                 
-                new_df = dataframes_dict[a_dataseries_name] 
-                a_table_dict['pandasDataFrameTableModel'] = SimplePandasModel(new_df.copy())
-                a_table_dict['tableView'].setModel(a_table_dict['pandasDataFrameTableModel'])
-                print(f'\tupdated: {a_dataseries_name}')
-                # Adjust the column widths to fit the contents
-                a_table_dict['tableView'].resizeColumnsToContents()
+            #     new_df = dataframes_dict[a_dataseries_name] 
+            #     a_table_dict['pandasDataFrameTableModel'] = SimplePandasModel(new_df.copy())
+            #     a_table_dict['tableView'].setModel(a_table_dict['pandasDataFrameTableModel'])
+            #     print(f'\tupdated: {a_dataseries_name}')
+            #     # Adjust the column widths to fit the contents
+            #     a_table_dict['tableView'].resizeColumnsToContents()
 
 
         ## show it

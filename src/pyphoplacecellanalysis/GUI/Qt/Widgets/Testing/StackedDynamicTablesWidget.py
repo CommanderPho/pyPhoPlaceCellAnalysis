@@ -1,132 +1,99 @@
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing_extensions import TypeAlias
+from nptyping import NDArray
+import pandas as pd
+
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
+
+import pyphoplacecellanalysis.External.pyqtgraph as pg
 from PyQt5.QtWidgets import QApplication, QVBoxLayout, QPushButton, QWidget
 from PyQt5.QtWidgets import QStackedWidget, QTableWidget, QTableWidgetItem
 from PyQt5.QtWidgets import QApplication, QVBoxLayout, QPushButton, QWidget, QTableWidgetItem
 from PyQt5.QtWidgets import QApplication, QVBoxLayout, QTableWidget, QTableWidgetItem, QPushButton, QWidget, QSizePolicy
 
-
-# class TableManager:
-#     def __init__(self, parent=None):
-#         # self.stacked_widget = QStackedWidget(parent)
-#         self.layout = layout
-#         self.tables = []
-#         self.data_sources = []  # Persistent data source list
-
-#     def update_tables(self):
-#         """
-#         Synchronize tables with the stored data sources.
-#         """
-#         print(f'update_tables()')
-#         while len(self.tables) > len(self.data_sources):
-#             print(f'removing...')
-#             table = self.tables.pop()
-#             self.stacked_widget.removeWidget(table)
-#             table.deleteLater()
-
-#         for i, data in enumerate(self.data_sources):
-#             print(f'{i}, {data} ...')
-#             if i >= len(self.tables):
-#                 table = self._create_table(data)
-#                 self.tables.append(table)
-#                 self.stacked_widget.addWidget(table)
-#             else:
-#                 self._update_table(self.tables[i], data)
-
-#     def add_table(self, data):
-#         """
-#         Add a new table and update the display.
-#         """
-#         self.data_sources.append(data)
-#         self.update_tables()
-
-#     def remove_table(self, index):
-#         """
-#         Remove a table by index and update the display.
-#         """
-#         print(f'remove_table(self, index: {index})')
-#         if 0 <= index < len(self.data_sources):
-#             self.data_sources.pop(index)
-#             self.update_tables()
-
-#     def _create_table(self, data):
-#         print(f'create_table(self, data: {data})')
-#         table = QTableWidget(len(data), len(data[0]) if data else 0)
-#         self._fill_table(table, data)
-#         return table
-
-#     def _update_table(self, table, data):
-#         table.setRowCount(len(data))
-#         table.setColumnCount(len(data[0]) if data else 0)
-#         self._fill_table(table, data)
-
-#     def _fill_table(self, table, data):
-#         for i, row in enumerate(data):
-#             for j, value in enumerate(row):
-#                 table.setItem(i, j, QTableWidgetItem(str(value)))
-
-#     def set_current_table(self, index):
-#         if 0 <= index < len(self.tables):
-#             self.stacked_widget.setCurrentIndex(index)
+from pyphocorehelpers.gui.Qt.pandas_model import SimplePandasModel # , GroupedHeaderView #, create_tabbed_table_widget
 
 
 class TableManager:
+    """
+        from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.StackedDynamicTablesWidget import TableManager
+    """
     def __init__(self, layout):
         """
         Initialize the TableManager with a given QVBoxLayout.
         :param layout: The QVBoxLayout to manage tables.
         """
         self.layout = layout
-        self.tables = []
+        self.tables = {}
+        self.models = {} ## dict of `SimplePandasModel` objects
 
-    def update_tables(self, data_sources):
+    def update_tables(self, data_sources: Dict[str, pd.DataFrame]):
         """
         Synchronize the displayed tables with the provided data sources.
         :param data_sources: List of 2D data arrays, each representing a table's data.
+
+        Updates:
+            self.tables[a_dataseries_name]
+            self.models[a_dataseries_name]
         """
-        # Remove extra tables
-        while len(self.tables) > len(data_sources):
-            table = self.tables.pop()
-            self.layout.removeWidget(table)
-            table.deleteLater()
+        # Remove extra tables ________________________________________________________________________________________________ #
+        # while len(self.tables) > len(data_sources):
+        for a_dataseries_name, a_table in self.tables.items():
+            if a_dataseries_name not in data_sources:
+                table = self.tables.pop(a_dataseries_name)
+                self.layout.removeWidget(table)
+                table.deleteLater()
+                model = self.models.pop(a_dataseries_name) ## remove the model
+                model.deleteLater()
+
 
         # Add or update tables
-        for i, data in enumerate(data_sources):
-            if i >= len(self.tables):
-                table = self._create_table(data)
-                self.tables.append(table)
+        # for i, data in enumerate(data_sources):
+        for i, (a_dataseries_name, df) in enumerate(data_sources.items()):
+            # if i >= len(self.tables):
+            if (a_dataseries_name not in self.tables):
+                ## need a new table and model:
+                table, model = self._create_table(df)
+                self.tables[a_dataseries_name] = table
+                self.models[a_dataseries_name] = model
+                # self.tables.append(table)
                 self.layout.addWidget(table)
             else:
-                self._update_table(self.tables[i], data)
+                ## table/model should already exist -- update them
+                self.models[a_dataseries_name] = self._update_table(self.tables[a_dataseries_name], df)
 
-    def _create_table(self, data):
+    def _create_table(self, df: pd.DataFrame):
         """
         Create a new QTableWidget based on the given data.
         :param data: 2D list of data for the table.
         :return: QTableWidget instance.
         """
-        table = QTableWidget(len(data), len(data[0]) if data else 0)
-        self._fill_table(table, data)
+        # table = QTableWidget(len(df), len(df[0]) if df else 0)
+        table = pg.QtWidgets.QTableView()
+        model = self._fill_table(table, df)
         # Set size policy to shrink based on content
         table.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         table.resizeColumnsToContents()
         table.resizeRowsToContents()        
-        table.setMaximumHeight(self._calculate_table_height(table, len(data)))
-        return table
+        table.setMaximumHeight(self._calculate_table_height(table, len(df)))
+        return (table, model)
 
-    def _update_table(self, table, data):
+    def _update_table(self, table, df: pd.DataFrame):
         """
         Update an existing QTableWidget with new data.
         :param table: QTableWidget instance.
         :param data: 2D list of data for the table.
         """
-        table.setRowCount(len(data))
-        table.setColumnCount(len(data[0]) if data else 0)
-        self._fill_table(table, data)
+        # table.setRowCount(len(df))
+        # table.setColumnCount(len(df[0]) if df else 0)
+        model = self._fill_table(table, df)
         table.resizeColumnsToContents()
         table.resizeRowsToContents()
-        table.setMaximumHeight(self._calculate_table_height(table, len(data)))
+        table.setMaximumHeight(self._calculate_table_height(table, len(df)))
 
 
-    def _calculate_table_height(self, table, row_count):
+    def _calculate_table_height(self, table, row_count: int):
         """
         Calculate the appropriate height for the table based on its content, including headers.
         :param table: QTableWidget instance.
@@ -139,15 +106,20 @@ class TableManager:
         return row_count * row_height + header_height + vertical_header_width + 2  # 2 for borders/padding
 
 
-    def _fill_table(self, table, data):
+    def _fill_table(self, table, df: pd.DataFrame) -> SimplePandasModel:
         """
         Fill a QTableWidget with data.
         :param table: QTableWidget instance.
         :param data: 2D list of data for the table.
         """
-        for i, row in enumerate(data):
-            for j, value in enumerate(row):
-                table.setItem(i, j, QTableWidgetItem(str(value)))
+        
+        curr_model = SimplePandasModel(df.copy())
+        table.setModel(curr_model)
+        # # models_dict[a_dataseries_name] = curr_model
+        # for i, row in enumerate(data):
+        #     for j, value in enumerate(row):
+        #         table.setItem(i, j, QTableWidgetItem(str(value)))
+        return curr_model
 
 
 import random
