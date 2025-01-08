@@ -985,7 +985,145 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         background_static_scroll_plot_widget = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
 
         return spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget)
+
+
+    # ==================================================================================================================== #
+    # Visible Epoch Intervals in Viewport Window Widgets                                                                   #
+    # ==================================================================================================================== #
     
+    @function_attributes(short_name=None, tags=['visible_intervals_info'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-07 18:53', related_items=[])
+    def _perform_build_attached_visible_interval_info_widget(self):
+        """ 
+
+        visible_intervals_info_widget_container, visible_intervals_ctrl_layout_widget =  self._perform_build_attached_visible_interval_info_widget()
+
+        
+        """
+        print(f'spikes_raster_window._perform_build_attached_visible_interval_info_widget()')
+        # from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, get_utility_dock_colors
+        from pyphocorehelpers.gui.Qt.pandas_model import SimplePandasModel # , GroupedHeaderView #, create_tabbed_table_widget
+        
+
+        # Standalone:
+        # neuron_widget_container = NeuronWidgetContainer(neuron_plotting_configs_dict)
+        # neuron_widget_container.show()
+
+        assert not hasattr(self.ui.rightSideContainerWidget.ui, 'visible_intervals_info_widget_container')
+        self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container = {} # initialize
+        
+        ## Render in right sidebar:
+
+        # updated_plots_dict = {}
+        # updated_plots_data_dict = {}
+        updated_ui_dict = {}
+
+        # ctrls_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False)
+        
+        ctrl_layout = pg.LayoutWidget()
+        updated_ui_dict['ctrl_layout'] = ctrl_layout
+
+        included_series_names=['Replays', 'Laps', 'PBEs']
+        dataframes_dict: Dict[str, pd.DataFrame] = self.find_event_intervals_in_active_window(included_series_names=included_series_names)
+        ## INPUTS: dataframes_dict
+        models_dict = {}
+        views_dict = {}
+
+        # Define tab names
+        
+        # Add tabs and corresponding views
+        for i, (a_name, df) in enumerate(dataframes_dict.items()):
+            unique_table_id: str = f"VisibleIntervalTable[{a_name}]"
+            # Create SimplePandasModel for each DataFrame
+            models_dict[a_name] = SimplePandasModel(df.copy())
+
+            # Create and associate view with model
+            tableView = pg.QtWidgets.QTableView()
+            tableView.setModel(models_dict[a_name])
+            # view.setModel(df.to_numpy().__array_interface__) # Note: For a real model, use a QAbstractTableModel subclass. This is a placeholder.
+            # header = GroupedHeaderView()
+            # header = GroupedHeaderView(df) ## needs the df now to determine header layout
+            # tableView.setHorizontalHeader(header)
+            tableView.setObjectName(unique_table_id)
+            # tableView.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
+            
+            views_dict[a_name] = tableView
+
+            ## update the output dicts
+            # updated_ui_dict[unique_table_id] = tableView
+            # updated_plots_data_dict[unique_table_id] = models_dict[a_name]
+
+            updated_ui_dict[unique_table_id] = {'tableView': tableView, 'pandasDataFrameTableModel': models_dict[a_name]} ## combined entry
+        
+            # Add tab with view
+            # tab_widget.addTab(view, a_name)
+
+            # ctrl_widgets_dict['pandasDataFrameTableModel'] = pandasDataFrameTableModel
+            # ctrl_widgets_dict['tableView'] = tableView
+
+            # # Step 5: Add TableView to LayoutWidget
+            ctrl_layout.addWidget(tableView, row=(i+1), rowspan=1, col=1, colspan=1)
+            
+            # Adjust the column widths to fit the contents
+            tableView.resizeColumnsToContents()
+            
+
+        ## OUTPUTS: updated_plots_dict, updated_plots_data_dict, updated_ui_dict
+        print(f'\t done. adding to parent')
+        # if len(updated_plots_dict) is not None:
+        #     self.ui.rightSideContainerWidget.plo.visible_intervals_info_widget_container = {k:v for k, v in updated_plots_dict.items()}
+            
+        # if len(updated_plots_data_dict) is not None:
+        #     self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container = {k:v for k, v in updated_plots_data_dict.items()}
+
+        if len(updated_ui_dict) is not None:
+            self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container = {k:v for k, v in updated_ui_dict.items()}
+
+        print(f'\t done.')
+        # VisibleIntervalTable
+
+        # ctrl_layout.addWidget(ctrls_widget, row=1, rowspan=1, col=1, colspan=2)
+        # ctrl_widgets_dict = dict(ctrls_widget=ctrls_widget, ctrls_widget_connection=ctrls_widget_connection)
+
+        # # Step 4: Create DataFrame and QTableView
+        # df =  selected active_selected_spikes_df # pd.DataFrame(...)  # Replace with your DataFrame
+        # model = PandasModel(df)
+        # pandasDataFrameTableModel = SimplePandasModel(active_epochs_df.copy())
+
+        # tableView = pg.QtWidgets.QTableView()
+        # tableView.setModel(pandasDataFrameTableModel)
+        # tableView.setObjectName("pandasTablePreview")
+        # # tableView.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
+
+        # ctrl_widgets_dict['pandasDataFrameTableModel'] = pandasDataFrameTableModel
+        # ctrl_widgets_dict['tableView'] = tableView
+
+        # # # Step 5: Add TableView to LayoutWidget
+        # ctrl_layout.addWidget(tableView, row=2, rowspan=1, col=1, colspan=1)
+
+        ## add reference to sidebar.ui.neuron_widget_container
+        self.right_sidebar_contents_container.addWidget(ctrl_layout) ## add the layout
+
+        ## Connect	
+        ## TODO: use `self.connection_man`?
+
+        # _connections_list = []
+        # for curr_widget in self.ui.rightSideContainerWidget.ui.neuron_widget_container.config_widgets:        
+        #     # Connect the signals to the widgets:
+        #     # curr_widget.spike_config_changed.connect(lambda are_included, spikes_config_changed_callback=ipcDataExplorer.change_unit_spikes_included, cell_id_copy=neuron_id: spikes_config_changed_callback(neuron_IDXs=None, cell_IDs=[cell_id_copy], are_included=are_included))
+        #     # # curr_widget.spike_config_changed.connect(_on_spike_config_changed)
+        #     # curr_widget.tuning_curve_display_config_changed.connect(_on_tuning_curve_display_config_changed)
+        #     _connections_list.append(curr_widget.sig_neuron_color_changed.connect(self.on_neuron_color_display_config_changed))
+
+        # self.ui.rightSideContainerWidget.ui.neuron_widget_container.rebuild_neuron_id_to_widget_map()
+        
+        # _connections_list.append(self.ui.rightSideContainerWidget.ui.neuron_widget_container.sigRevert.connect(self.update_neuron_config_widgets_from_raster))
+        
+        ## show it
+        self.ui.rightSideContainerWidget.set_right_sidebar_visibility(is_visible=True)
+        
+        return self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container, self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container['ctrl_layout']
+    
+
     
 
     # ==================================================================================================================== #
@@ -1202,7 +1340,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         """find the events/intervals that are within the currently active render window:
         Usage:
             included_series_names=['Replays', 'Laps', 'PBEs']
-            active_2d_plot.find_event_intervals_in_active_window(included_series_names=included_series_names)
+            curr_intervals_dict: Dict[str, pd.DataFrame] = active_2d_plot.find_event_intervals_in_active_window(included_series_names=included_series_names)
         """
         return self.spike_raster_plt_2d.find_event_intervals_in_active_window(included_series_names=included_series_names, debug_print=False)
 
