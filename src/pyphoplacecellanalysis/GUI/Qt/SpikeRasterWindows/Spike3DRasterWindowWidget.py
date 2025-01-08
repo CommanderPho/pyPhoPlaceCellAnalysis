@@ -1004,29 +1004,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, get_utility_dock_colors
         from pyphocorehelpers.gui.Qt.pandas_model import SimplePandasModel # , GroupedHeaderView #, create_tabbed_table_widget
         from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.StackedDynamicTablesWidget import TableManager
-
-
-        # def _subfn_build_table_stack(n_tables_needed: int):
-        #     for i, (a_dataseries_name, df) in enumerate(dataframes_dict.items()):
-        #         unique_table_id: str = f"VisibleIntervalTable[{a_dataseries_name}]"
-        #         # Create SimplePandasModel for each DataFrame
-        #         curr_model = SimplePandasModel(df.copy())
-        #         # Create and associate view with model
-        #         tableView = pg.QtWidgets.QTableView()
-        #         tableView.setModel(curr_model)
-        #         # view.setModel(df.to_numpy().__array_interface__) # Note: For a real model, use a QAbstractTableModel subclass. This is a placeholder.
-        #         tableView.setObjectName(unique_table_id)
-        #         tableView.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
-                
-        #         updated_ui_dict['tables_dict'][a_dataseries_name] = {'tableView': tableView, 'pandasDataFrameTableModel': curr_model}
-            
-        
-        #         # # Step 5: Add TableView to LayoutWidget
-        #         ctrl_layout.addWidget(tableView, row=(i+1), rowspan=1, col=1, colspan=1)
-                
-        #         # Adjust the column widths to fit the contents
-        #         tableView.resizeColumnsToContents()
-        #     # END for i, (a_name, df) in enumerate(dataframes_dict.items())...
             
         ## get the updated data:
         # included_series_names=['Replays', 'Laps', 'PBEs']
@@ -1061,64 +1038,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
             manager.update_tables(dataframes_dict)
 
-            # updated_ui_dict['tables_dict'] = manager.tables
-
-            # ## INPUTS: dataframes_dict
-            # models_dict = {}
-            # views_dict = {}
-
-            # # Add tabs and corresponding views
-            # for i, (a_dataseries_name, df) in enumerate(dataframes_dict.items()):
-            #     unique_table_id: str = f"VisibleIntervalTable[{a_dataseries_name}]"
-            #     # Create SimplePandasModel for each DataFrame
-            #     curr_model = SimplePandasModel(df.copy())
-            #     # models_dict[a_dataseries_name] = curr_model
-                
-            #     # Create and associate view with model
-            #     tableView = pg.QtWidgets.QTableView()
-            #     tableView.setModel(curr_model)
-            #     # view.setModel(df.to_numpy().__array_interface__) # Note: For a real model, use a QAbstractTableModel subclass. This is a placeholder.
-            #     # header = GroupedHeaderView()
-            #     # header = GroupedHeaderView(df) ## needs the df now to determine header layout
-            #     # tableView.setHorizontalHeader(header)
-            #     tableView.setObjectName(unique_table_id)
-            #     # tableView.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
-                
-            #     # views_dict[a_dataseries_name] = tableView
-
-            #     ## update the output dicts
-            #     # updated_ui_dict[unique_table_id] = tableView
-            #     # updated_plots_data_dict[unique_table_id] = models_dict[a_name]
-
-            #     # updated_ui_dict['tables_dict'][unique_table_id] = {'tableView': tableView, 'pandasDataFrameTableModel': models_dict[a_name]} ## combined entry
-            #     updated_ui_dict['tables_dict'][a_dataseries_name] = {'tableView': tableView, 'pandasDataFrameTableModel': curr_model}
-            
-            #     # Add tab with view
-            #     # tab_widget.addTab(view, a_name)
-
-            #     # ctrl_widgets_dict['pandasDataFrameTableModel'] = pandasDataFrameTableModel
-            #     # ctrl_widgets_dict['tableView'] = tableView
-
-            #     # # Step 5: Add TableView to LayoutWidget
-            #     ctrl_layout.addWidget(tableView, row=(i+1), rowspan=1, col=1, colspan=1)
-                
-            #     # Adjust the column widths to fit the contents
-            #     tableView.resizeColumnsToContents()
-            # # END for i, (a_name, df) in enumerate(dataframes_dict.items())...
-
-            # ## OUTPUTS: updated_plots_dict, updated_plots_data_dict, updated_ui_dict
-            # print(f'\t done. adding to parent')
-            # # if len(updated_plots_dict) is not None:
-            # #     self.ui.rightSideContainerWidget.plo.visible_intervals_info_widget_container = {k:v for k, v in updated_plots_dict.items()}
-                
-            # # if len(updated_plots_data_dict) is not None:
-            # #     self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container = {k:v for k, v in updated_plots_data_dict.items()}
-
-            # assert len(updated_ui_dict) is not None
-            
-
             self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container = updated_ui_dict # {k:v for k, v in updated_ui_dict.items()}
-
 
             print(f'\t done.')
             # VisibleIntervalTable
@@ -1128,7 +1048,11 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
             ## Connect	
             ## TODO: use `self.connection_man`?
-
+            # Rate limited version:`
+            self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container['connections'] = {'update_connection': self.connection_man.connect_drivable_to_driver(drivable=self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container['manager'], driver=self.spike_raster_plt_2d,
+                                                        custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.002, rateLimit=24, slot=self.on_update_right_sidebar_visible_interval_info_tables))),
+            }
+            # self.spike_3d_to_2d_window_connection = pg.SignalProxy(self.spike_raster_plt_2d.window_scrolled, delay=0.2, rateLimit=60, slot=self.spike_raster_plt_3d.spikes_window.update_window_start_end_rate_limited) # Limit updates to 60 Signals/Second`
             # _connections_list = []
             # for curr_widget in self.ui.rightSideContainerWidget.ui.neuron_widget_container.config_widgets:        
             #     # Connect the signals to the widgets:
@@ -1147,25 +1071,18 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             extant_manager = extant_dict['manager']
             extant_manager.update_tables(dataframes_dict)
             
-            # extant_tables = extant_dict['tables_dict']
-            # for a_dataseries_name, a_table_dict in extant_tables.items():
-            #     ## replace model
-            #     old_model = a_table_dict.pop('pandasDataFrameTableModel')
-            #     # old_df = old_model.df
-                
-            #     new_df = dataframes_dict[a_dataseries_name] 
-            #     a_table_dict['pandasDataFrameTableModel'] = SimplePandasModel(new_df.copy())
-            #     a_table_dict['tableView'].setModel(a_table_dict['pandasDataFrameTableModel'])
-            #     print(f'\tupdated: {a_dataseries_name}')
-            #     # Adjust the column widths to fit the contents
-            #     a_table_dict['tableView'].resizeColumnsToContents()
-
-
         ## show it
         self.set_right_sidebar_visibility(is_visible=True)
         
         return self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container, self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container['ctrl_layout']
     
+
+    def on_update_right_sidebar_visible_interval_info_tables(self):
+        """called to update the tables in the right sidebar with the intervals visible in the current window
+        """
+        # print(f'on_update_right_sidebar_visible_interval_info_tables()')
+        self._perform_build_attached_visible_interval_info_widget()
+        
 
     
 
