@@ -1028,15 +1028,37 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container = {} # initialize
             
             ## Render in right sidebar:
-            updated_ui_dict = {'ctrl_layout': None, 'manager': None} # , 'tables_dict': {}
+            updated_ui_dict = {'ctrl_layout': None, 'dynamic_tables_container_widget': None, 'dynamic_tables_container_VBoxLayout': None, 'bottom_spacer_widget': None, 'manager': None} # , 'tables_dict': {}
 
             # ctrls_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False)
             
-            ctrl_layout = pg.LayoutWidget()
-            updated_ui_dict['ctrl_layout'] = ctrl_layout
+            root_ctrl_layout_widget = pg.LayoutWidget() ## ROOT layout widget
+            updated_ui_dict['ctrl_layout'] = root_ctrl_layout_widget
 
-            manager = TableManager(layout=ctrl_layout.layout) 
+            # Main Tables container:
+            updated_ui_dict['dynamic_tables_container_widget'] = pg.QtWidgets.QWidget()
+            updated_ui_dict['dynamic_tables_container_widget'].setObjectName('tables_container')
+            tables_layout = pg.QtWidgets.QVBoxLayout(updated_ui_dict['dynamic_tables_container_widget'])
+            tables_layout.setObjectName('tables_container_VBoxLayout')
+            updated_ui_dict['dynamic_tables_container_VBoxLayout'] = tables_layout
+            updated_ui_dict['dynamic_tables_container_widget'].setSizePolicy(pg.QtWidgets.QSizePolicy.Expanding, pg.QtWidgets.QSizePolicy.Expanding)
+            
+
+            # manager = TableManager(layout=ctrl_layout.layout) 
+            manager = TableManager(layout=tables_layout)
             updated_ui_dict['manager'] = manager
+
+            ## add the table vertical layout:
+            root_ctrl_layout_widget.addWidget(updated_ui_dict['dynamic_tables_container_widget'], row=1, col=1)
+            # Add permanent expanding spacer at the bottom
+            # Create an empty widget and set its size policy to expanding
+            bottom_spacer_widget = pg.QtWidgets.QWidget()
+            bottom_spacer_widget.setObjectName('bottom_spacer')
+            bottom_spacer_widget.setSizePolicy(pg.QtWidgets.QSizePolicy.Expanding, pg.QtWidgets.QSizePolicy.Expanding)
+
+            updated_ui_dict['bottom_spacer_widget'] = bottom_spacer_widget # pg.QtWidgets.QSpacerItem(0, 0, pg.QtWidgets.QSizePolicy.Minimum, pg.QtWidgets.QSizePolicy.Expanding)
+            # ctrl_layout.layout.addItem(spacer, ctrl_layout.layout.rowCount(), 0, 1, 1)
+            root_ctrl_layout_widget.addWidget(updated_ui_dict['bottom_spacer_widget'], row=2, col=1)
 
             manager.update_tables(dataframes_dict)
 
@@ -1046,7 +1068,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             # VisibleIntervalTable
 
             ## add reference to sidebar.ui.neuron_widget_container
-            self.right_sidebar_contents_container.addWidget(ctrl_layout) ## add the layout
+            self.right_sidebar_contents_container.addWidget(root_ctrl_layout_widget) ## add the layout
 
             ## Connect	
             ## TODO: use `self.connection_man`?
@@ -1054,18 +1076,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container['connections'] = {'update_connection': self.connection_man.connect_drivable_to_driver(drivable=self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container['manager'], driver=self.spike_raster_plt_2d,
                                                         custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.002, rateLimit=24, slot=self.on_update_right_sidebar_visible_interval_info_tables))),
             }
-            # self.spike_3d_to_2d_window_connection = pg.SignalProxy(self.spike_raster_plt_2d.window_scrolled, delay=0.2, rateLimit=60, slot=self.spike_raster_plt_3d.spikes_window.update_window_start_end_rate_limited) # Limit updates to 60 Signals/Second`
-            # _connections_list = []
-            # for curr_widget in self.ui.rightSideContainerWidget.ui.neuron_widget_container.config_widgets:        
-            #     # Connect the signals to the widgets:
-            #     # curr_widget.spike_config_changed.connect(lambda are_included, spikes_config_changed_callback=ipcDataExplorer.change_unit_spikes_included, cell_id_copy=neuron_id: spikes_config_changed_callback(neuron_IDXs=None, cell_IDs=[cell_id_copy], are_included=are_included))
-            #     # # curr_widget.spike_config_changed.connect(_on_spike_config_changed)
-            #     # curr_widget.tuning_curve_display_config_changed.connect(_on_tuning_curve_display_config_changed)
-            #     _connections_list.append(curr_widget.sig_neuron_color_changed.connect(self.on_neuron_color_display_config_changed))
-
-            # self.ui.rightSideContainerWidget.ui.neuron_widget_container.rebuild_neuron_id_to_widget_map()
             
-            # _connections_list.append(self.ui.rightSideContainerWidget.ui.neuron_widget_container.sigRevert.connect(self.update_neuron_config_widgets_from_raster))
         else:
             print(f'\t does not need init, just update')
             extant_dict = self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container

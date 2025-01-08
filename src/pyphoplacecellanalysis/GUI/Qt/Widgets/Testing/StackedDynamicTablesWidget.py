@@ -7,16 +7,15 @@ from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
-from PyQt5.QtWidgets import QApplication, QVBoxLayout, QPushButton, QWidget
-from PyQt5.QtWidgets import QStackedWidget, QTableWidget, QTableWidgetItem
-from PyQt5.QtWidgets import QApplication, QVBoxLayout, QPushButton, QWidget, QTableWidgetItem
-from PyQt5.QtWidgets import QApplication, QVBoxLayout, QTableWidget, QTableWidgetItem, QPushButton, QWidget, QSizePolicy
+from PyQt5.QtWidgets import QApplication, QVBoxLayout, QHeaderView, QPushButton, QWidget, QSizePolicy
 
 from pyphocorehelpers.gui.Qt.pandas_model import SimplePandasModel # , GroupedHeaderView #, create_tabbed_table_widget
 
 
 class TableManager:
-    """
+    """ Manages a dynamically updating dict of tables, rendered as a vertical stack of tables
+    
+    
         from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.StackedDynamicTablesWidget import TableManager
     """
     def __init__(self, layout):
@@ -103,7 +102,7 @@ class TableManager:
         row_height = table.sizeHintForRow(0) if row_count > 0 else 0
         header_height = table.horizontalHeader().height()
         vertical_header_width = table.verticalHeader().width()
-        return row_count * row_height + header_height + vertical_header_width + 2  # 2 for borders/padding
+        return ((row_count+1) * row_height) + header_height + vertical_header_width + 4  # 4 for borders/padding
 
 
     def _fill_table(self, table, df: pd.DataFrame) -> SimplePandasModel:
