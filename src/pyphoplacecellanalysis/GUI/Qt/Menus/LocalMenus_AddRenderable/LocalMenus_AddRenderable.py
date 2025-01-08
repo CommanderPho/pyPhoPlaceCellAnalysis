@@ -25,7 +25,9 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPred
 # from ...pyPhoPlaceCellAnalysis.src.pyphoplacecellanalysis.GUI.Qt.GlobalApplicationMenus import LocalMenus_AddRenderable
 
 class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
-    """ A context menu that adds renderables such as interval rectangles and plots to SpikeRaster2D
+    """ A dummy-QMainWindow class that is defined in a .ui file (so it can be edited with QtDesigner GUI) and then only added to other windows (never shown)
+    
+    A context menu that adds renderables such as interval rectangles and plots to SpikeRaster2D
     
     Main Function: `add_renderable_context_menu`
     
@@ -56,9 +58,11 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
     
     @classmethod
     def _build_renderable_menu(cls, destination_plot, curr_active_pipeline, active_config_name):
-        """ Builds the callbacks needed and connects them to the QActions and QMenus for the specific destination_plot to be used as context menus. 
+        """ *MAIN*: Builds the callbacks needed and connects them to the QActions and QMenus for the specific destination_plot to be used as context menus. 
         sess: Session
         destination_plot: e.g. active_2d_plot, active_3d_plot
+        
+        Adds: Time Intervals/Epochs, Time Curves (pyqtgraph), Matplotlib Plots, 
         """
         # Extract sess from the more general curr_active_pipeline:
         computation_result = curr_active_pipeline.computation_results[active_config_name]
@@ -160,15 +164,16 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
 
 
     @classmethod
-    def add_renderable_context_menu(cls, active_2d_plot, curr_active_pipeline, active_config_name) -> QtWidgets.QMenu:
-        """ 
+    def add_renderable_context_menu(cls, active_2d_plot, curr_active_pipeline, active_config_name, debug_print=False) -> QtWidgets.QMenu:
+        """ Creates the context menus that display when right-clicking a SpikeRaster2D plot showing the actions: add_epochs, add_graph, etc
+        
         Usage:
             active_2d_plot = spike_raster_window.spike_raster_plt_2d 
             menuAdd_Renderable = LocalMenus_AddRenderable.add_renderable_context_menu(active_2d_plot, sess)
             
         """
         def _subFn_append_custom_menu_to_context_menu(parent_widget, additional_menu, debug_print=False):
-            """ Adds the custom menu, such as one loaded from a .ui file, to the end of the context menu
+            """ Adds the custom menu, such as one loaded from a .ui file, to the end of the *context* menu
             parent_widget: PlotItem
             additional_menu: QMenu
             
@@ -190,6 +195,9 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
             if debug_print:
                 print(f'parent_context_menus.actions: {[an_action.text() for an_action in active_parent_menu.actions()]}') # parent_context_menus.actions: ['Transforms', 'Downsample', 'Average', 'Alpha', 'Grid', 'Points']
                 
+
+        # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+        
          ## Build `partial` versions of the functions specific to each raster plotter that can be called with no arguments (capturing the destination plotter and the session
         # build_renderable_menu_to_Spike2DRaster = partial(cls.build_renderable_menu, active_2d_plot, sess) # destination_plot
         # active_2d_plot_renderable_menus = cls._build_renderable_menu(active_2d_plot, sess)
@@ -199,8 +207,9 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         menuAdd_Renderable = widget_2d_menu.ui.menuAdd_Renderable
         # programmatic_actions_dict = widget_2d_menu.programmatic_actions_dict
 
-        print(f'menuAdd_Renderable: {menuAdd_Renderable}, type(menuAdd_Renderable): {type(menuAdd_Renderable)}')
-        # print(f'menuAdd_Renderable: {menuAdd_Renderable}, type(menuAdd_Renderable): {type(menuAdd_Renderable)}')
+        if debug_print:
+            print(f'menuAdd_Renderable: {menuAdd_Renderable}, type(menuAdd_Renderable): {type(menuAdd_Renderable)}')
+            # print(f'menuAdd_Renderable: {menuAdd_Renderable}, type(menuAdd_Renderable): {type(menuAdd_Renderable)}')
 
         ## Specific to SpikeRaster2D:        
         ## Add the custom menu to the context menus of the plots in SpikeRaster2D:        

@@ -118,7 +118,7 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         return {'spike_raster_plt_2d':spike_raster_plt_2d, 'spike_raster_plt_3d_vedo':spike_raster_plt_3d_vedo, 'spike_3d_to_2d_window_connection':spike_3d_to_2d_window_connection, 'spike_raster_window': spike_raster_window}
 
 
-    @function_attributes(short_name='spike_rasters_window', tags=['display','interactive', 'primary', 'raster', '2D', 'ui', 'pyqtplot'], input_requires=[], output_provides=[], uses=['_build_additional_window_menus'], used_by=[], creation_date='2023-04-11 03:05')
+    @function_attributes(short_name='spike_rasters_window', tags=['display','interactive', 'primary', 'raster', '2D', 'ui', 'pyqtplot'], input_requires=[], output_provides=[], uses=['Spike3DRasterWindowWidget', '_build_additional_window_menus'], used_by=[], creation_date='2023-04-11 03:05')
     @staticmethod
     def _display_spike_rasters_window(computation_result, active_config, enable_saving_to_disk=False, **kwargs):
         """ Displays a Spike3DRasterWindowWidget with a configurable set of raster widgets and controls in it.
@@ -139,7 +139,7 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         neuron_sort_order=kwargs.pop('neuron_sort_order', None)
         
         included_neuron_ids = kwargs.pop('included_neuron_ids', None)
-        spikes_df = computation_result.sess.spikes_df
+        spikes_df: pd.DataFrame = computation_result.sess.spikes_df ## pulls from the session here
         if included_neuron_ids is None:
             included_neuron_ids = spikes_df.spikes.neuron_ids
 
@@ -152,14 +152,14 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         active_display_fn_identifying_ctx_string = active_display_fn_identifying_ctx.get_description(separator='|') # Get final discription string:
 
         ## It's passed a specific computation_result which has a .sess attribute that's used to determine which spikes are displayed or not.
-        spike_raster_window = Spike3DRasterWindowWidget(spikes_df, type_of_3d_plotter=type_of_3d_plotter, application_name=f'Spike Raster Window - {active_display_fn_identifying_ctx_string}', neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order)
+        spike_raster_window: Spike3DRasterWindowWidget = Spike3DRasterWindowWidget(spikes_df, type_of_3d_plotter=type_of_3d_plotter, application_name=f'Spike Raster Window - {active_display_fn_identifying_ctx_string}', neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order) ## surprisingly only needs spikes_df !!?!
         # Set Window Title Options:
         a_file_prefix = str(computation_result.sess.filePrefix.resolve())
         spike_raster_window.setWindowFilePath(a_file_prefix)
         spike_raster_window.setWindowTitle(f'Spike Raster Window - {active_config_name} - {a_file_prefix}')
         
         ## Build the additional menus:
-        output_references = _build_additional_window_menus(spike_raster_window, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx)
+        output_references = _build_additional_window_menus(spike_raster_window, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx) ## the menus on the other hand take the entire pipeline, because they might need that valuable DATA
 
         return {'spike_raster_plt_2d':spike_raster_window.spike_raster_plt_2d, 'spike_raster_plt_3d':spike_raster_window.spike_raster_plt_3d, 'spike_raster_window': spike_raster_window}
 
@@ -1476,7 +1476,7 @@ def _recover_filter_config_name_from_display_context(owning_pipeline_reference, 
     return active_config_name
 
 
-@function_attributes(short_name=None, tags=['menu', 'spike_raster', 'ui'], input_requires=[], output_provides=[], uses=[], used_by=['_build_additional_window_menus'], creation_date='2023-11-09 19:32', related_items=[])
+@function_attributes(short_name=None, tags=['menu', 'spike_raster', 'ui'], input_requires=[], output_provides=[], uses=['LocalMenus_AddRenderable'], used_by=['_build_additional_window_menus'], creation_date='2023-11-09 19:32', related_items=[])
 def _build_additional_spikeRaster2D_menus(spike_raster_plt_2d, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx):
     active_config_name: str = _recover_filter_config_name_from_display_context(owning_pipeline_reference, active_display_fn_identifying_ctx) # recover active_config_name from the context
 
@@ -1491,8 +1491,14 @@ def _build_additional_spikeRaster2D_menus(spike_raster_plt_2d, owning_pipeline_r
     return output_references
 
 
-@function_attributes(short_name=None, tags=['menu', 'spike_raster', 'gui'], input_requires=[], output_provides=[], uses=['_build_additional_spikeRaster2D_menus'], used_by=['_display_spike_rasters_window'], creation_date='2023-11-09 19:32', related_items=[])
-def _build_additional_window_menus(spike_raster_window, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx):
+@function_attributes(short_name=None, tags=['menu', 'spike_raster', 'gui', 'IMPORTANT'], input_requires=[], output_provides=[], uses=['_build_additional_spikeRaster2D_menus', 'ConnectionControlsMenuMixin', 'CreateNewConnectedWidgetMenuHelper', 'CreateLinkedWidget_MenuProvider', 'DebugMenuProviderMixin', 'DockedWidgets_MenuProvider', ], used_by=['_display_spike_rasters_window'], creation_date='2023-11-09 19:32', related_items=[])
+def _build_additional_window_menus(spike_raster_window: Spike3DRasterWindowWidget, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx):
+    """ needs the entire pipeline so that data is avilable for any of the optional display menus
+        - secondarily so it can call the pipeline's normal .display(...) functions to create new visualizations
+
+    TODO: seems like it should be a Spike3DRasterWindowWidget member property
+    
+    """
     assert owning_pipeline_reference is not None
     active_config_name: str = _recover_filter_config_name_from_display_context(owning_pipeline_reference, active_display_fn_identifying_ctx) # recover active_config_name from the context
 
