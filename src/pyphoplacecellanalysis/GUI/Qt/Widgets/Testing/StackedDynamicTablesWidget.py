@@ -55,7 +55,7 @@ class TableManager:
 
     def add_table_dock(self, name: str, df: pd.DataFrame, dockSize=(500,100)):
         """Creates a new docked table widget"""
-        display_config = CustomDockDisplayConfig(showCloseButton=True)
+        display_config = CustomDockDisplayConfig(showCloseButton=True, orientation='horizontal')
         
         # Create table widget
         table, model = self._create_table(df)

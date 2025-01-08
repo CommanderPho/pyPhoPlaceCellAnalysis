@@ -14,7 +14,31 @@ class DockDisplayConfig(object):
     corner_radius: str = field(default='2px')
     # fontSize: str = field(default='10px')
     custom_get_stylesheet_fn: Callable = field(default=None) #(self, orientation, is_dim)
-        
+    _orientation: Optional[str] = field(default=None, alias="orientation", metadata={'valid_values': [None, 'auto', 'vertical', 'horizontal']}) # alias="orientation" just refers to the initializer, it doesn't interfere with the @property
+
+    @property
+    def orientation(self) -> str:
+        """The orientation property."""
+        return (self._orientation or 'horizontal')   
+    @orientation.setter
+    def orientation(self, value):
+        self._orientation = value
+
+    @property
+    def shouldAutoOrient(self) -> bool:
+        """ Whether the dock should auto-orient based on the aspect ratioy."""
+        if self.orientation is None:
+            return True
+        else:
+            return (self.orientation == 'auto') ## only if "auto" instead of ['vertical', 'horizontal']
+    @shouldAutoOrient.setter
+    def shouldAutoOrient(self, value: bool):
+        if value:
+            self.orientation = 'auto' # only if True: change the orientation to 'auto'
+        else:
+            print(f"WARN: setting shouldAutoOrient to False does nothing, as we do not know which concrete value (['vertical', 'horizontal']) is wanted.")
+
+
     def get_colors(self, orientation, is_dim):
         """ point of customization """
         if is_dim:
@@ -87,7 +111,10 @@ class Dock(QtWidgets.QWidget, DockDrop):
         
         if display_config is None:
             print(f"WARNING: Dock.__init__(...): display_config is None... using old-mode fallback. This will be eventually depricated.")
-            display_config = DockDisplayConfig(kwargs.get('closable', False), fontSize=kwargs.get('fontSize', "10px"), corner_radius='2px')
+            display_config = DockDisplayConfig(showCloseButton=kwargs.get('closable', False), fontSize=kwargs.get('fontSize', "10px"), corner_radius='2px', orientation='horizontal')
+            if autoOrientation:
+                display_config.orientation = 'auto' # only if True: change the orientation to 'auto'
+
             # raise NotImplementedError
         else:
             # print(f"WARNING: Dock.__init__(...): display_config is set, so the explicitly passed parameters 'closable' and 'fontSize' will be ignored.")
@@ -97,8 +124,10 @@ class Dock(QtWidgets.QWidget, DockDrop):
             self.label.sigCloseClicked.connect(self.close)
         self.labelHidden = False
         self.moveLabel = True  ## If false, the dock is no longer allowed to move the label.
-        self.autoOrient = autoOrientation
-        self.orientation = 'horizontal'
+        # self.autoOrient = autoOrientation
+        # self.orientation = 'horizontal'
+        self.autoOrient = display_config.shouldAutoOrient
+        self.orientation = (display_config.orientation or 'horizontal')
         #self.label.setAlignment(QtCore.Qt.AlignmentFlag.AlignHCenter)
         self.topLayout = QtWidgets.QGridLayout()
         self.topLayout.setContentsMargins(0, 0, 0, 0)

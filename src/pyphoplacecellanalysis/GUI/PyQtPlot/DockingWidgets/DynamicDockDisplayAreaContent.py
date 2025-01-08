@@ -1,4 +1,4 @@
-from typing import Optional, Dict, List, Tuple
+from typing import Callable, Optional, Dict, List, Tuple
 from collections import OrderedDict
 from enum import Enum
 from attrs import define, field, Factory
@@ -41,13 +41,16 @@ class DockDisplayColors:
 
 
 
-
+@define(slots=False)
 class CustomDockDisplayConfig(DockDisplayConfig):
     """Holds the display and configuration options for a Dock, such as how to format its title bar (color and font), whether it's closable, etc.
 
     custom_get_colors_callback, if provided, is used to get the colors. This function must be of the form:
         get_colors(self, orientation, is_dim) -> return fg_color, bg_color, border_color
     """
+    custom_get_colors_dict: Optional[Dict] = field(default=None)
+    _custom_get_colors_callback_fn: Optional[Callable] = field(default=None, alias='custom_get_colors_callback_fn')
+
 
     @property
     def custom_get_colors_callback(self):
@@ -61,21 +64,28 @@ class CustomDockDisplayConfig(DockDisplayConfig):
     @property
     def orientation(self) -> str:
         """The orientation property."""
-        return self._orientation or 'auto'    
+        return (self._orientation or 'auto' )   
     @orientation.setter
     def orientation(self, value):
         self._orientation = value
 
-    def __init__(self, showCloseButton=True, fontSize='10px', corner_radius='2px', custom_get_colors_callback_fn=None, orientation=None, custom_get_colors_dict=None):
-        super(CustomDockDisplayConfig, self).__init__(showCloseButton=showCloseButton, fontSize=fontSize, corner_radius=corner_radius)
-        self._custom_get_colors_callback_fn = custom_get_colors_callback_fn
-        self._orientation = orientation
-        if custom_get_colors_dict is None:
-            custom_get_colors_dict = {False: DockDisplayColors(fg_color='#fff', bg_color='#66cc66', border_color='#54ba54'),
+    def __attrs_post_init__(self):
+      if self.custom_get_colors_dict is None:
+            self.custom_get_colors_dict = {False: DockDisplayColors(fg_color='#fff', bg_color='#66cc66', border_color='#54ba54'),
                 True: DockDisplayColors(fg_color='#aaa', bg_color='#44aa44', border_color='#339933'),
             }
+
+    # def __init__(self, showCloseButton=True, fontSize='10px', corner_radius='2px', custom_get_colors_callback_fn=None, orientation=None, custom_get_colors_dict=None):
+    #     super(CustomDockDisplayConfig, self).__init__(showCloseButton=showCloseButton, fontSize=fontSize, corner_radius=corner_radius)
+    #     self._custom_get_colors_callback_fn = custom_get_colors_callback_fn
+    #     self._orientation = orientation
+    #     if custom_get_colors_dict is None:
+    #         custom_get_colors_dict = {False: DockDisplayColors(fg_color='#fff', bg_color='#66cc66', border_color='#54ba54'),
+    #             True: DockDisplayColors(fg_color='#aaa', bg_color='#44aa44', border_color='#339933'),
+    #         }
                         
-        self.custom_get_colors_dict = custom_get_colors_dict
+    #     self.custom_get_colors_dict = custom_get_colors_dict
+
         
 
     def get_colors(self, orientation, is_dim):
@@ -224,29 +234,28 @@ NamedColorScheme = Enum('NamedColorScheme', 'blue green red grey')
 # NamedColorScheme['blue']  # returns <Animal.ant: 1> (string lookup)
 # NamedColorScheme.blue.name  # returns 'ant' (inverse lookup)
 
+@define(slots=False)
 class CustomCyclicColorsDockDisplayConfig(CustomDockDisplayConfig):
     """Holds the display and configuration options for a Dock, such as how to format its title bar (color and font), whether it's closable, etc.
 
     custom_get_colors_callback, if provided, is used to get the colors. This function must be of the form:
         get_colors(self, orientation, is_dim) -> return fg_color, bg_color, border_color
     """
-    @property
-    def named_color_scheme(self):
-        """The named_color_scheme property."""
-        return self._named_color_scheme
-    @named_color_scheme.setter
-    def named_color_scheme(self, value):
-        self._named_color_scheme = value
-    
-    def __init__(self, showCloseButton=True, fontSize='10px', corner_radius='2px', orientation=None, named_color_scheme=NamedColorScheme.red, custom_get_colors_callback_fn=None, custom_get_colors_dict=None):
-        super(CustomCyclicColorsDockDisplayConfig, self).__init__(showCloseButton=showCloseButton, fontSize=fontSize, corner_radius=corner_radius, orientation=orientation, custom_get_colors_callback_fn=custom_get_colors_callback_fn)
-        self._named_color_scheme = named_color_scheme
-        if custom_get_colors_dict is None:
-            # custom_get_colors_dict = {False: DockDisplayColors(fg_color='#fff', bg_color='#66cc66', border_color='#54ba54'),
-            #     True: DockDisplayColors(fg_color='#aaa', bg_color='#44aa44', border_color='#339933'),
-            # }
-            pass                        
-        self.custom_get_colors_dict = custom_get_colors_dict
+    named_color_scheme: NamedColorScheme = field(default=NamedColorScheme.red, alias='named_color_scheme')
+
+    def __attrs_post_init__(self):
+      if self.custom_get_colors_dict is None:
+            pass # don't update it here, default to None
+
+    # def __init__(self, showCloseButton=True, fontSize='10px', corner_radius='2px', orientation=None, named_color_scheme=NamedColorScheme.red, custom_get_colors_callback_fn=None, custom_get_colors_dict=None):
+    #     super(CustomCyclicColorsDockDisplayConfig, self).__init__(showCloseButton=showCloseButton, fontSize=fontSize, corner_radius=corner_radius, orientation=orientation, custom_get_colors_callback_fn=custom_get_colors_callback_fn)
+    #     self.named_color_scheme = named_color_scheme
+    #     if custom_get_colors_dict is None:
+    #         # custom_get_colors_dict = {False: DockDisplayColors(fg_color='#fff', bg_color='#66cc66', border_color='#54ba54'),
+    #         #     True: DockDisplayColors(fg_color='#aaa', bg_color='#44aa44', border_color='#339933'),
+    #         # }
+    #         pass                        
+    #     self.custom_get_colors_dict = custom_get_colors_dict
         
 
     def get_colors(self, orientation, is_dim):
@@ -269,7 +278,7 @@ class CustomCyclicColorsDockDisplayConfig(CustomDockDisplayConfig):
                 else:
                     fg_color = '#fff' # White
 
-                if self._named_color_scheme.name == NamedColorScheme.blue.name:
+                if self.named_color_scheme.name == NamedColorScheme.blue.name:
                     # Blue/Purple-based:
                     if is_dim:
                         bg_color = '#4444aa' # Dark Blue - (240°, 60, 66.66)
@@ -277,7 +286,7 @@ class CustomCyclicColorsDockDisplayConfig(CustomDockDisplayConfig):
                     else:
                         bg_color = '#6666cc' # Default Purple Color - (240°, 50, 80)
                         border_color = '#55B' # Similar Purple Color - (240°, 54.54, 73.33)
-                elif self._named_color_scheme.name == NamedColorScheme.green.name:
+                elif self.named_color_scheme.name == NamedColorScheme.green.name:
                     # Green-based:
                     if is_dim:
                         bg_color = '#44aa44' # (120°, 60%, 67%)
@@ -285,7 +294,7 @@ class CustomCyclicColorsDockDisplayConfig(CustomDockDisplayConfig):
                     else:
                         bg_color = '#66cc66' # (120°, 50, 80)
                         border_color = '#54ba54' # (120°, 55%, 73%)
-                elif self._named_color_scheme.name == NamedColorScheme.red.name:
+                elif self.named_color_scheme.name == NamedColorScheme.red.name:
                     # Red-based:
                     if is_dim:
                         bg_color = '#aa4444' # (0°, 60%, 67%)
@@ -293,7 +302,7 @@ class CustomCyclicColorsDockDisplayConfig(CustomDockDisplayConfig):
                     else:
                         bg_color = '#cc6666' # (0°, 50, 80)
                         border_color = '#ba5454' # (0°, 55%, 73%)
-                elif self._named_color_scheme.name == NamedColorScheme.grey.name:
+                elif self.named_color_scheme.name == NamedColorScheme.grey.name:
                     # Grey-based:
                     if is_dim:
                         bg_color = '#d8d8d8' 
