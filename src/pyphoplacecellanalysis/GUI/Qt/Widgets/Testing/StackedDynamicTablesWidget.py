@@ -11,55 +11,57 @@ from PyQt5.QtWidgets import QApplication, QVBoxLayout, QHeaderView, QPushButton,
 
 from pyphocorehelpers.gui.Qt.pandas_model import SimplePandasModel # , GroupedHeaderView #, create_tabbed_table_widget
 
+## For dock widget
+from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.NestedDockAreaWidget import NestedDockAreaWidget
+from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
+
 
 class TableManager:
     """ Manages a dynamically updating dict of tables, rendered as a vertical stack of tables
     """
     def __init__(self, layout):
-        """
-        Initialize the TableManager with a given QVBoxLayout.
-        :param layout: The QVBoxLayout to manage tables.
-        """
         self.layout = layout
-        self.tables = {}
-        self.labels = {}  # Store labels for each table
-        self.models = {}  # dict of `SimplePandasModel` objects
-        self.layout.setSpacing(2)  # tighter spacing between items
-        
+        self.dock_items = {}  # Store dock items instead of separate tables/labels
+        self.models = {}  # dict of SimplePandasModel objects
+        self.layout.setSpacing(2)
 
     def update_tables(self, data_sources: Dict[str, pd.DataFrame]):
-        # Remove old tables/labels no longer present
+        # Remove old dock items no longer present
         to_remove = []
-        for name in self.tables.keys():
+        for name in self.dock_items.keys():
             if name not in data_sources:
                 to_remove.append(name)
         for name in to_remove:
-            table = self.tables.pop(name)
-            self.layout.removeWidget(table)
-            table.deleteLater()
+            dock_item = self.dock_items.pop(name)
+            self.layout.removeWidget(dock_item)
+            dock_item.deleteLater()
             self.models.pop(name).deleteLater()
-            # Remove its label too
-            label = self.labels.pop(name, None)
-            if label is not None:
-                self.layout.removeWidget(label)
-                label.deleteLater()
 
         # Add or update tables
         for name, df in data_sources.items():
-            if name not in self.tables:
-                # Create and insert label above the table
+            if name not in self.dock_items:
+                # Create new dock item containing label and table
+                dock_item = pg.DockItem(name=name)
+                dock_layout = QVBoxLayout()
+                
+                # Add label
                 label = QLabel(name)
-                label.setStyleSheet("font-weight: bold; margin: 0px;")  # Customize as needed
-                self.labels[name] = label
-                self.layout.addWidget(label)
-
-                # Create table
+                label.setStyleSheet("font-weight: bold; margin: 0px;")
+                dock_layout.addWidget(label)
+                
+                # Create and add table
                 table, model = self._create_table(df)
-                self.tables[name] = table
+                dock_layout.addWidget(table)
+                
+                dock_item.setLayout(dock_layout)
+                self.dock_items[name] = dock_item
                 self.models[name] = model
-                self.layout.addWidget(table)
+                self.layout.addWidget(dock_item)
             else:
-                self.models[name] = self._update_table(self.tables[name], df)
+                # Update existing table
+                dock_item = self.dock_items[name]
+                table = dock_item.layout().itemAt(1).widget()  # Get table widget
+                self.models[name] = self._update_table(table, df)
 
     def _create_table(self, df: pd.DataFrame):
         table = pg.QtWidgets.QTableView()
@@ -101,17 +103,20 @@ class TableManager:
 
 
 
-import random
-
-# Helper function to generate random data
-def generate_random_data():
-    rows = random.randint(2, 10)  # Random number of rows
-    cols = random.randint(2, 6)   # Random number of columns
-    return [[random.randint(1, 100) for _ in range(cols)] for _ in range(rows)]
 
 
 if __name__ == "__main__":
 
+    import random
+    import pandas as pd
+
+    # Helper function to generate random data
+    def generate_random_data():
+        rows = random.randint(2, 10)  # Random number of rows
+        cols = random.randint(2, 6)   # Random number of columns
+        data = [[random.randint(1, 100) for _ in range(cols)] for _ in range(rows)]
+        columns = [f'Col_{i}' for i in range(cols)]
+        return pd.DataFrame(data, columns=columns)
 
     app = QApplication([])
 
@@ -120,33 +125,29 @@ if __name__ == "__main__":
     layout = QVBoxLayout(window)
 
     # Create TableManager
-    # manager = TableManager()
-    # layout.addWidget(manager.stacked_widget)
-    
-    # Create TableManager
     manager = TableManager(layout)
 
-    # Sample data sources
-    data_sources = [
-        [[1, 2, 3], [4, 5, 6], [7, 8, 9]],
-        [[10, 11], [12, 13]]
-    ]
-    
     # Initial random data sources
     data_sources = [generate_random_data() for _ in range(3)]
     
-    data_sources.insert(1, [[0, 0], [1, 1]]) ## small entry (only 2 rows)
-    manager.update_tables(data_sources)
+    # Insert a small dataframe
+    small_df = pd.DataFrame([[0, 0], [1, 1]], columns=['A', 'B'])
+    data_sources.insert(1, small_df)
+    
+    # Create dictionary with names for the dataframes
+    named_data_sources = {f'Table_{i}': df for i, df in enumerate(data_sources)}
+    manager.update_tables(named_data_sources)
 
     # Buttons to test functionality
     def add_table():
-        data_sources.append([[14, 15, 16], [17, 18, 19]])
-        manager.update_tables(data_sources)
+        new_df = pd.DataFrame([[14, 15, 16], [17, 18, 19]], columns=['A', 'B', 'C'])
+        named_data_sources[f'Table_{len(named_data_sources)}'] = new_df
+        manager.update_tables(named_data_sources)
 
     def remove_table():
-        if data_sources:
-            data_sources.pop()
-            manager.update_tables(data_sources)
+        if named_data_sources:
+            named_data_sources.pop(list(named_data_sources.keys())[-1])
+            manager.update_tables(named_data_sources)
 
     add_button = QPushButton("Add Table")
     remove_button = QPushButton("Remove Table")
