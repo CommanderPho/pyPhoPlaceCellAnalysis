@@ -1004,7 +1004,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         from pyphocorehelpers.gui.Qt.pandas_model import SimplePandasModel # , GroupedHeaderView #, create_tabbed_table_widget
         
         ## get the updated data:
-        included_series_names=['Replays', 'Laps', 'PBEs']
+        # included_series_names=['Replays', 'Laps', 'PBEs']
+        included_series_names=None
         dataframes_dict: Dict[str, pd.DataFrame] = self.find_event_intervals_in_active_window(included_series_names=included_series_names)
 
         ## see if widgets need to be build or can just be updated:
@@ -1039,11 +1040,12 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             for i, (a_dataseries_name, df) in enumerate(dataframes_dict.items()):
                 unique_table_id: str = f"VisibleIntervalTable[{a_dataseries_name}]"
                 # Create SimplePandasModel for each DataFrame
-                models_dict[a_dataseries_name] = SimplePandasModel(df.copy())
-
+                curr_model = SimplePandasModel(df.copy())
+                # models_dict[a_dataseries_name] = curr_model
+                
                 # Create and associate view with model
                 tableView = pg.QtWidgets.QTableView()
-                tableView.setModel(models_dict[a_dataseries_name])
+                tableView.setModel(curr_model)
                 # view.setModel(df.to_numpy().__array_interface__) # Note: For a real model, use a QAbstractTableModel subclass. This is a placeholder.
                 # header = GroupedHeaderView()
                 # header = GroupedHeaderView(df) ## needs the df now to determine header layout
@@ -1051,14 +1053,14 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
                 tableView.setObjectName(unique_table_id)
                 # tableView.setSizePolicy(pg.QtGui.QSizePolicy.Expanding, pg.QtGui.QSizePolicy.Expanding)
                 
-                views_dict[a_dataseries_name] = tableView
+                # views_dict[a_dataseries_name] = tableView
 
                 ## update the output dicts
                 # updated_ui_dict[unique_table_id] = tableView
                 # updated_plots_data_dict[unique_table_id] = models_dict[a_name]
 
                 # updated_ui_dict['tables_dict'][unique_table_id] = {'tableView': tableView, 'pandasDataFrameTableModel': models_dict[a_name]} ## combined entry
-                updated_ui_dict['tables_dict'][a_dataseries_name] = {'tableView': tableView, 'pandasDataFrameTableModel': models_dict[a_dataseries_name]}
+                updated_ui_dict['tables_dict'][a_dataseries_name] = {'tableView': tableView, 'pandasDataFrameTableModel': curr_model}
             
                 # Add tab with view
                 # tab_widget.addTab(view, a_name)
