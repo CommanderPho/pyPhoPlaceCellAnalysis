@@ -326,7 +326,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # Connect the signals:
         self.ui.bottom_bar_connections = None 
         self.ui.bottom_bar_connections = self.SpikeRasterBottomFrameControlsMixin_connectSignals(self.ui.bottomPlaybackControlBarWidget)
-        
+        self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.sig_joystick_delta_occured.connect(self.perform_slide_relative_time))
+
         self.ui.left_side_bar_connections = None
         self.ui.left_side_bar_connections = self.SpikeRasterLeftSidebarControlsMixin_connectSignals(self.ui.leftSideToolbarWidget)
 
@@ -717,6 +718,32 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.update_animation(next_start_timestamp)
         
 
+
+
+    @pyqtExceptionPrintingSlot(float, float)
+    def perform_slide_relative_time(self, dx, dy):
+        """ dx: change in x-direction of joystick, this is the only one that matters currently (maps to relative t updates
+        dy: change in y-dir of joystick
+
+        # sig_joystick_delta_occured
+        """
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.perform_slide_relative_time(self, dx: {dx}, dy: {dy})')
+        
+        # speed_adjustment_factor: float = 1e-3
+
+        speed_adjustment_factor: float = 10.0
+        desired_dt: float = (dx * speed_adjustment_factor) # map to reasonable timescale
+        
+        start_t: float = self.animation_active_time_window.timeWindow.active_window_start_time
+        next_start_timestamp: float = start_t + desired_dt
+
+        if self.enable_debug_print:
+            print(f'\tdesired_dt: {desired_dt}\n\tdx: {dx}\n\tnext_start_timestamp: {next_start_timestamp}')
+            
+        # call update animation:
+        self.update_animation(next_start_timestamp)
+        
 
 
     @pyqtExceptionPrintingSlot(str)
