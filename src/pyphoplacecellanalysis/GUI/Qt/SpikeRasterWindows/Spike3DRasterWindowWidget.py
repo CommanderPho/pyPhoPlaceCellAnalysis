@@ -1043,7 +1043,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             updated_ui_dict['dynamic_tables_container_VBoxLayout'] = tables_layout
             updated_ui_dict['dynamic_tables_container_widget'].setSizePolicy(pg.QtWidgets.QSizePolicy.Expanding, pg.QtWidgets.QSizePolicy.Expanding)
             
-
             # manager = TableManager(layout=ctrl_layout.layout) 
             manager = TableManager(layout=tables_layout)
             updated_ui_dict['manager'] = manager
@@ -1075,8 +1074,14 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             # Rate limited version:`
             self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container['connections'] = {'update_connection': self.connection_man.connect_drivable_to_driver(drivable=self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container['manager'], driver=self.spike_raster_plt_2d,
                                                         custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.002, rateLimit=24, slot=self.on_update_right_sidebar_visible_interval_info_tables))),
+                                                        'rendered_interval_list_changed': self.spike_raster_plt_2d.sigRenderedIntervalsListChanged.connect(lambda interval_list: self.on_update_right_sidebar_visible_interval_info_tables()),
+                                                        'interval_entered_window': pg.SignalProxy(self.spike_raster_plt_2d.sigOnIntervalEnteredWindow, delay=0.002, rateLimit=2, slot=(lambda _: self.on_update_right_sidebar_visible_interval_info_tables())),
+                                                        'interval_exited_window': pg.SignalProxy(self.spike_raster_plt_2d.sigOnIntervalExitedindow, delay=0.002, rateLimit=2, slot=(lambda _: self.on_update_right_sidebar_visible_interval_info_tables())),
             }
             
+            ## show it
+            self.set_right_sidebar_visibility(True)
+    
         else:
             print(f'\t does not need init, just update')
             extant_dict = self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container
@@ -1084,9 +1089,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             extant_manager = extant_dict['manager']
             extant_manager.update_tables(dataframes_dict)
             
-        ## show it
-        self.set_right_sidebar_visibility(is_visible=True)
-        
+
         return self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container, self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container['ctrl_layout']
     
 

@@ -72,10 +72,26 @@ class TableManager:
         table = pg.QtWidgets.QTableView()
         model = self._fill_table(table, df)
         # Set size policy to shrink based on content
-        table.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+        # table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.MinimumExpanding)
+        table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         table.resizeColumnsToContents()
         table.resizeRowsToContents()        
         table.setMaximumHeight(self._calculate_table_height(table, len(df)))
+        # Apply stylesheet to change header background color
+        table.setStyleSheet("""
+        QHeaderView::section {
+            background-color: lightblue;
+            color: black;  /* Optional: Change text color */
+            border: 1px solid gray;  /* Optional: Add border */
+            font-weight: bold;  /* Optional: Make text bold */
+        }
+        """)
+        # table.setStyleSheet("QHeaderView::section { background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 rgba(0, 0, 0, 255), stop:1 rgba(255, 255, 255, 255)) }")
+
+        # Optional: Resize to fit contents
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+
         return (table, model)
 
     def _update_table(self, table, df: pd.DataFrame):
@@ -102,7 +118,12 @@ class TableManager:
         row_height = table.sizeHintForRow(0) if row_count > 0 else 0
         header_height = table.horizontalHeader().height()
         vertical_header_width = table.verticalHeader().width()
-        return ((row_count+1) * row_height) + header_height + vertical_header_width + 4  # 4 for borders/padding
+        
+        # Get the heights and widths
+        vertical_scrollbar_height = table.horizontalScrollBar().height()
+        # horizontal_scrollbar_width = table.verticalScrollBar().width()
+
+        return ((row_count+1) * row_height) + header_height + vertical_header_width + 4 + vertical_scrollbar_height  # 4 for borders/padding
 
 
     def _fill_table(self, table, df: pd.DataFrame) -> SimplePandasModel:
@@ -114,10 +135,6 @@ class TableManager:
         
         curr_model = SimplePandasModel(df.copy())
         table.setModel(curr_model)
-        # # models_dict[a_dataseries_name] = curr_model
-        # for i, row in enumerate(data):
-        #     for j, value in enumerate(row):
-        #         table.setItem(i, j, QTableWidgetItem(str(value)))
         return curr_model
 
 
