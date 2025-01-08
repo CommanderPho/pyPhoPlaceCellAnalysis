@@ -673,7 +673,8 @@ class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
 
 @function_attributes(short_name=None, tags=['ESSENTIAL', 'filter', 'epoch_selection', 'spikes', 'epochs'], input_requires=[], output_provides=[], uses=[], used_by=['filter_and_update_epochs_and_spikes'], creation_date='2024-10-03 00:00', related_items=[])
 def co_filter_epochs_and_spikes(active_spikes_df: pd.DataFrame, active_epochs_df: pd.DataFrame, included_aclus: Optional[NDArray]=None, min_num_unique_aclu_inclusions: Optional[int]=None, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1, add_unique_aclus_list_column=False, drop_non_epoch_spikes=True):
-    """
+    """ #TODO 2025-01-08 11:26: - [ ] TO NUMPY?
+    
     Filters epochs and spikes to be consistent with one another based on the specified criteria, and updates the epoch IDs.
 
     Args:
@@ -726,9 +727,10 @@ def co_filter_epochs_and_spikes(active_spikes_df: pd.DataFrame, active_epochs_df
 
 
 
-@function_attributes(short_name=None, tags=['ESSENTIAL', 'filter', 'epoch_selection', 'user-annotations', 'replay'], input_requires=['filtered_sessions[*].replay'], output_provides=[], uses=['co_filter_epochs_and_spikes'], used_by=[], creation_date='2024-03-08 13:28', related_items=[])
+@function_attributes(short_name=None, tags=['ESSENTIAL', 'filter', 'epoch_selection', 'user-annotations', 'replay'], input_requires=['filtered_sessions[*].replay'], output_provides=[], uses=['co_filter_epochs_and_spikes'], used_by=['add_all_extra_epoch_columns'], creation_date='2024-03-08 13:28', related_items=[])
 def filter_and_update_epochs_and_spikes(curr_active_pipeline, global_epoch_name: str, track_templates: TrackTemplates, required_min_percentage_of_active_cells: float = 0.333333, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1):
-    """
+    """ #TODO 2025-01-08 11:26: - [ ] TO NUMPY?
+    
     Filters epochs and spikes based on the specified criteria, and updates the epoch IDs. Only seems to be for `.replay` events
 
     Args:
@@ -2515,7 +2517,7 @@ class DecoderDecodedEpochsResult(ComputedResult):
         return cls.try_add_is_epoch_boolean_column(a_df=a_df, any_good_selected_epoch_times=any_good_selected_epoch_times, new_column_name='is_valid_epoch', t_column_names=t_column_names, atol=0.01, not_found_action='skip_index', debug_print=False)
 
 
-    @function_attributes(short_name=None, tags=['columns', 'epochs', 'IMPORTANT'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-14 09:22', related_items=[])
+    @function_attributes(short_name=None, tags=['columns', 'epochs', 'IMPORTANT'], input_requires=[], output_provides=[], uses=['filter_and_update_epochs_and_spikes'], used_by=[], creation_date='2024-03-14 09:22', related_items=[])
     def add_all_extra_epoch_columns(self, curr_active_pipeline, track_templates: TrackTemplates, required_min_percentage_of_active_cells: float = 0.333333,
                                      debug_print=False, **additional_selections_context) -> None:
         """ instead of filtering by the good/user-selected ripple epochs, it adds two columns: ['is_valid_epoch', 'is_user_annotated_epoch'] so they can be later identified and filtered to `self.decoder_ripple_filter_epochs_decoder_result_dict.filter_epochs`
