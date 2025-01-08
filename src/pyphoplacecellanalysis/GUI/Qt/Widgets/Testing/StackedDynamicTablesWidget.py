@@ -41,47 +41,48 @@ from PyQt5.QtCore import QAbstractTableModel, Qt
 #         return None
     
 class CustomHeaderTableView(pg.QtWidgets.QTableView):
-    """ QTableView with custom header functionality. """
+    """ QTableView with custom header and context menu for column visibility. """
     def __init__(self, model=None):
         super().__init__()
-        self._column_selection_menu = None
+        self._column_visibility_menu = QMenu(self)
+        self.column_actions = []  # Stores actions for each column
         if model is not None:
             self.setModel(model)
             self.initCustomHeaders()
 
-
     def setModel(self, model):
         """ Override setModel to attach additional functionality when a model is set. """
-        super().setModel(model)  # Call the original implementation
-        # Custom logic after setting the model
+        super().setModel(model)
         if model is not None:
             self.initCustomHeaders()
 
     def initCustomHeaders(self):
-        """ Add custom widgets to the horizontal header. """
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        """ Add context menu functionality to the horizontal header. """
+        header = self.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.Stretch)
+        header.setContextMenuPolicy(Qt.CustomContextMenu)
+        header.customContextMenuRequested.connect(self.showColumnContextMenu)
 
+        # Initialize column actions
+        self.column_actions = []
         for col in range(self.model().columnCount()):
-            header_widget = pg.QtWidgets.QWidget()
-            layout = pg.QtWidgets.QVBoxLayout()
-            filter_box = pg.QtWidgets.QLineEdit()
-            filter_box.setPlaceholderText(f"Filter {self.model().headerData(col, Qt.Horizontal, Qt.DisplayRole)}")
-            filter_box.textChanged.connect(lambda text, c=col: self.applyFilter(text, c))
-            layout.addWidget(filter_box)
-            layout.setContentsMargins(0, 0, 0, 0)
-            header_widget.setLayout(layout)
-            self.setIndexWidget(self.model().index(0, col), header_widget)
+            action = QAction(self.model().headerData(col, Qt.Horizontal, Qt.DisplayRole), self)
+            action.setCheckable(True)
+            action.setChecked(not self.isColumnHidden(col))
+            action.triggered.connect(lambda checked, col=col: self.toggle_column(col, checked))
+            self.column_actions.append(action)
+            self._column_visibility_menu.addAction(action)
 
-    def applyFilter(self, text, column):
-        """ Apply column-specific filtering based on user input. """
-        for row in range(self.model().rowCount()):
-            value = str(self.model().index(row, column).data())
-            hide_row = text not in value
-            self.setRowHidden(row, hide_row)
-            
+    def showColumnContextMenu(self, position):
+        """ Show context menu for column visibility at the requested position. """
+        header = self.horizontalHeader()
+        global_position = header.mapToGlobal(position)
+        self._column_visibility_menu.exec_(global_position)
 
-    def toggle_column(self, column, visible: bool):
+    def toggle_column(self, column, visible):
+        """ Toggle visibility of the specified column. """
         self.setColumnHidden(column, not visible)
+
         
 
 
