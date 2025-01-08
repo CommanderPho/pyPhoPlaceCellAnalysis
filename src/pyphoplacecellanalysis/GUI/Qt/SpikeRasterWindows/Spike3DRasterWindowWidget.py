@@ -1038,14 +1038,15 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             # Main Tables container:
             updated_ui_dict['dynamic_tables_container_widget'] = pg.QtWidgets.QWidget()
             updated_ui_dict['dynamic_tables_container_widget'].setObjectName('tables_container')
-            tables_layout = pg.QtWidgets.QVBoxLayout(updated_ui_dict['dynamic_tables_container_widget'])
+            updated_ui_dict['dynamic_tables_container_widget'].setSizePolicy(pg.QtWidgets.QSizePolicy.Expanding, pg.QtWidgets.QSizePolicy.Expanding)
+
+            manager = TableManager(updated_ui_dict['dynamic_tables_container_widget'])
+            updated_ui_dict['manager'] = manager
+
+            tables_layout = manager.wrapper_layout
             tables_layout.setObjectName('tables_container_VBoxLayout')
             updated_ui_dict['dynamic_tables_container_VBoxLayout'] = tables_layout
-            updated_ui_dict['dynamic_tables_container_widget'].setSizePolicy(pg.QtWidgets.QSizePolicy.Expanding, pg.QtWidgets.QSizePolicy.Expanding)
-            
-            # manager = TableManager(layout=ctrl_layout.layout) 
-            manager = TableManager(layout=tables_layout)
-            updated_ui_dict['manager'] = manager
+
 
             ## add the table vertical layout:
             root_ctrl_layout_widget.addWidget(updated_ui_dict['dynamic_tables_container_widget'], row=1, col=1)

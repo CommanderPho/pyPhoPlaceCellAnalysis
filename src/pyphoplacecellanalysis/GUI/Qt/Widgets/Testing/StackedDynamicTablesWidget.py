@@ -59,19 +59,21 @@ class TableManager:
         
         # Create table widget
         table, model = self._create_table(df)
+
+        # No extant table widget and display_dock currently, create a new one:
+        dDisplayItem = self.dynamic_docked_widget_container.find_display_dock(identifier=name) # Dock
+        assert dDisplayItem is None
         
-        # Add to dynamic dock container
-        _, dock_item = self.dynamic_docked_widget_container.add_display_dock(
-            name, 
-            dockSize=dockSize,
-            display_config=display_config,
-            widget=table,
-            dockAddLocationOpts=['bottom']
-        )
+        # Add to dynamic dock container 
+        _, dDisplayItem = self.dynamic_docked_widget_container.add_display_dock(name, dockSize=dockSize, display_config=display_config, widget=table, dockAddLocationOpts=['bottom'], autoOrientation=False)
+
+        dDisplayItem.setOrientation('horizontal', force=True)
+        dDisplayItem.updateStyle()
+        dDisplayItem.update()
         
-        self.dock_items[name] = dock_item
+        self.dock_items[name] = dDisplayItem
         self.models[name] = model
-        return dock_item
+        return dDisplayItem
 
     def remove_table_dock(self, name: str):
         """Removes a docked table widget"""
@@ -98,7 +100,9 @@ class TableManager:
         return (table, model)
 
     def _update_table(self, dock_item, df: pd.DataFrame):
-        table = dock_item.widget()
+        dock_children_widgets = dock_item.widgets
+        assert len(dock_children_widgets) == 1, f"dock_children_widgets: {dock_children_widgets}, dock_item: {dock_item}"
+        table = dock_children_widgets[0]
         model = self._fill_table(table, df)
         table.resizeColumnsToContents()
         table.resizeRowsToContents()
