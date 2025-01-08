@@ -2,6 +2,7 @@ from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
 from nptyping import NDArray
 import pandas as pd
+from functools import partial # used in `CustomHeaderTableView`
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
@@ -40,15 +41,17 @@ from PyQt5.QtCore import QAbstractTableModel, Qt
 #             return self._headers[section]
 #         return None
     
+
+@metadata_attributes(short_name=None, tags=['epochs', 'tables', 'ui'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-08 16:40', related_items=[])
 class CustomHeaderTableView(pg.QtWidgets.QTableView):
     """ QTableView with custom header and context menu for column visibility. """
-    def __init__(self, model=None):
+    def __init__(self, model=None, visible_columns=None):
         super().__init__()
         self._column_visibility_menu = QMenu(self)
         self.column_actions = []  # Stores actions for each column
+        self.visible_columns = visible_columns  # List of visible column indices or names
         if model is not None:
             self.setModel(model)
-            self.initCustomHeaders()
 
     def setModel(self, model):
         """ Override setModel to attach additional functionality when a model is set. """
@@ -58,18 +61,34 @@ class CustomHeaderTableView(pg.QtWidgets.QTableView):
 
     def initCustomHeaders(self):
         """ Add context menu functionality to the horizontal header. """
+        # Clear existing actions to prevent duplication
+        self._column_visibility_menu.clear()
+        self.column_actions = []
+
         header = self.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Stretch)
         header.setContextMenuPolicy(Qt.CustomContextMenu)
         header.customContextMenuRequested.connect(self.showColumnContextMenu)
 
-        # Initialize column actions
-        self.column_actions = []
+        # Initialize column actions and visibility
         for col in range(self.model().columnCount()):
+            # Check if the column should be visible
+            is_visible = True
+            if self.visible_columns is not None:
+                if isinstance(self.visible_columns[0], int):  # Indices
+                    is_visible = col in self.visible_columns
+                elif isinstance(self.visible_columns[0], str):  # Column names
+                    column_name = self.model().headerData(col, Qt.Horizontal, Qt.DisplayRole)
+                    is_visible = column_name in self.visible_columns
+
+            # Apply initial visibility
+            self.setColumnHidden(col, not is_visible)
+
+            # Create context menu action
             action = QAction(self.model().headerData(col, Qt.Horizontal, Qt.DisplayRole), self)
             action.setCheckable(True)
-            action.setChecked(not self.isColumnHidden(col))
-            action.triggered.connect(lambda checked, col=col: self.toggle_column(col, checked))
+            action.setChecked(is_visible)
+            action.triggered.connect(partial(self.toggle_column, col))
             self.column_actions.append(action)
             self._column_visibility_menu.addAction(action)
 
@@ -83,11 +102,10 @@ class CustomHeaderTableView(pg.QtWidgets.QTableView):
         """ Toggle visibility of the specified column. """
         self.setColumnHidden(column, not visible)
 
-        
 
 
 
-
+@metadata_attributes(short_name=None, tags=['table', 'manager', 'ui'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-08 16:41', related_items=[])
 class TableManager:
     """ Manages a dynamically updating dict of tables, rendered as docked widgets """
     def __init__(self, parent_widget):
@@ -130,7 +148,9 @@ class TableManager:
         display_config = CustomDockDisplayConfig(showCloseButton=True, orientation='horizontal')
         
         # Create table widget
-        table, model = self._create_table(df)
+        visible_columns = ['start', 'label', 'unique_active_aclus']
+        included_visible_columns = [col for col in df.columns if col in visible_columns]
+        table, model = self._create_table(df, visible_columns=included_visible_columns)
 
         # No extant table widget and display_dock currently, create a new one:
         dDisplayItem = self.dynamic_docked_widget_container.find_display_dock(identifier=name) # Dock
@@ -154,11 +174,11 @@ class TableManager:
             self.models.pop(name)
             self.dynamic_docked_widget_container.remove_display_dock(name)
 
-    def _create_table(self, df: pd.DataFrame):
+    def _create_table(self, df: pd.DataFrame, visible_columns=None):
         headers: List[str] = [str(col) for col in df.columns]
         
         # table = pg.QtWidgets.QTableView()
-        table = CustomHeaderTableView()
+        table = CustomHeaderTableView(visible_columns=visible_columns)
         model = self._fill_table(table, df)
         table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         table.resizeColumnsToContents()
