@@ -107,8 +107,19 @@ class CustomHeaderTableView(pg.QtWidgets.QTableView):
 
 @metadata_attributes(short_name=None, tags=['table', 'manager', 'ui'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-08 16:41', related_items=[])
 class TableManager:
-    """ Manages a dynamically updating dict of tables, rendered as docked widgets """
-    def __init__(self, parent_widget):
+    """ Manages a dynamically updating dict of tables, rendered as docked widgets
+    
+    visible_columns_dict: specifies the table columns to show for a given dataseries name
+    
+    
+    """
+    def __init__(self, parent_widget, visible_columns_dict: Dict[str, List[str]]=None):
+        if visible_columns_dict is None:
+            visible_columns_dict = {} 
+
+        self.visible_columns_dict = visible_columns_dict
+
+        ## Setup the widgets:
         self.parent_widget = parent_widget
         
         # Create the dynamic docked widget container
@@ -144,11 +155,15 @@ class TableManager:
                 self._update_table(self.dock_items[name], df)
 
     def add_table_dock(self, name: str, df: pd.DataFrame, dockSize=(500,100)):
-        """Creates a new docked table widget"""
+        """Creates a new docked table widget
+
+            Uses: `self.visible_columns_dict` to try and determine what columns to display for this dataseries name
+        """
         display_config = CustomDockDisplayConfig(showCloseButton=True, orientation='horizontal')
         
         # Create table widget
-        visible_columns = ['start', 'label', 'unique_active_aclus']
+        visible_columns = self.visible_columns_dict.get(name, ['start', 'delta_aligned_start_t', 'label', 'unique_active_aclus'])
+        
         included_visible_columns = [col for col in df.columns if col in visible_columns]
         table, model = self._create_table(df, visible_columns=included_visible_columns)
 
