@@ -7,6 +7,7 @@ from matplotlib.axis import Axis
 from matplotlib.figure import Figure
 
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, NewType, TypeVar
+from neuropy.utils.indexing_helpers import find_desired_sort_indicies
 from typing_extensions import TypeAlias
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
@@ -1485,6 +1486,9 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         raise NotImplementedError
     
 
+    # ==================================================================================================================== #
+    # MARK: PyQtGraph                                                                                                      #
+    # ==================================================================================================================== #
 
     @function_attributes(short_name=None, tags=['intervals', 'tracks', 'pyqtgraph', 'specific', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 07:29', related_items=[])
     def prepare_pyqtgraph_interval_tracks(self, enable_interval_overview_track: bool = False, should_remove_all_and_re_add: bool=True, name_modifier_suffix: str='', debug_print=False):
@@ -1495,7 +1499,9 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         
         Updates:
             active_2d_plot.params.custom_interval_rendering_plots
-            
+
+
+        This should be a separate file, and there should be multiple classes of tracks (raster, instervals, etc) 
             
         """
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, CustomCyclicColorsDockDisplayConfig, NamedColorScheme
@@ -1550,6 +1556,90 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         return _interval_tracks_out_dict
 
 
+    @function_attributes(short_name=None, tags=['raster', 'tracks', 'pyqtgraph', 'specific', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-09 10:50', related_items=[])
+    def prepare_pyqtgraph_raster_track(self, should_remove_all_and_re_add: bool=True, name_modifier_suffix: str='', debug_print=False):
+        """ adds to separate pyqtgraph-backed tracks to the SpikeRaster2D plotter for rendering a 2D raster `active_2d_plot.params.custom_interval_rendering_plots` so the intervals are rendered on these new tracks in addition to any normal ones
+        
+        enable_interval_overview_track: bool: if True, renders a track to show all the intervals during the sessions (overview) in addition to the track for the intervals within the current active window
+        should_remove_all_and_re_add: bool: if True, all intervals are removed from all plots and then re-added (safer) method
+        
+        Updates:
+            active_2d_plot.params.custom_interval_rendering_plots
+
+
+        This should be a separate file, and there should be multiple classes of tracks (raster, instervals, etc) 
+            
+        """
+        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, CustomCyclicColorsDockDisplayConfig, NamedColorScheme
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import new_plot_raster_plot, NewSimpleRaster, paired_separately_sort_neurons
+        
+        _raster_tracks_out_dict = {}
+        ## Enables creating a new pyqtgraph-based track to display the intervals/epochs
+        dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=True, corner_radius=0)
+        name = f'rasters{name_modifier_suffix}'
+        time_sync_pyqtgraph_widget, raster_root_graphics_layout_widget, raster_plot_item = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(500, 120), display_config=dock_config)
+
+
+        if raster_plot_item not in self.params.custom_interval_rendering_plots:
+            self.params.custom_interval_rendering_plots.append(raster_plot_item) ## this signals that it should recieve updates for its intervals somewhere else
+        
+        # active_2d_plot.params.custom_interval_rendering_plots = [active_2d_plot.plots.background_static_scroll_window_plot, active_2d_plot.plots.main_plot_widget, raster_plot_item, intervals_overview_plot_item]
+
+        # active_2d_plot.interval_rendering_plots
+        main_plot_widget = self.plots.main_plot_widget # PlotItem
+        raster_plot_item.setXLink(main_plot_widget) # works to synchronize the main zoomed plot (current window) with the epoch_rect_separate_plot (rectangles plotter)
+        
+        ## #TODO 2024-12-31 07:20: - [ ] need to clear/re-add the epochs to make this work
+        extant_rendered_plots_lists = {k:list(v.keys()) for k, v in self.list_all_rendered_intervals(debug_print=False).items()}
+        # active_target_interval_render_plots = active_2d_plot.params.custom_interval_rendering_plots
+
+        # active_target_interval_render_plots = [v.objectName() for v in active_2d_plot.interval_rendering_plots]
+        active_target_interval_render_plots_dict = {v.objectName():v for v in self.interval_rendering_plots}
+
+        # self.unit_sort_order exists too
+        self.on_neuron_colors_changed
+
+        # self.spikes_window # SpikesDataframeWindow
+        spikes_df: pd.DataFrame = self.spikes_window.df ## all spikes ( for all time )
+        # self.spikes_df # use this instead?
+        
+        # # an_included_unsorted_neuron_ids = deepcopy(included_any_context_neuron_ids_dict[a_decoder_name])
+        an_included_unsorted_neuron_ids = deepcopy(self.neuron_ids)
+        a_sorted_neuron_ids = deepcopy(self.ordered_neuron_ids)
+
+        unit_sort_order, desired_sort_arr = find_desired_sort_indicies(an_included_unsorted_neuron_ids, a_sorted_neuron_ids)
+        # print(f'unit_sort_order: {unit_sort_order}\ndesired_sort_arr: {desired_sort_arr}')
+        # _out_data.unit_sort_orders_dict[a_decoder_name] = deepcopy(unit_sort_order)
+
+        #TODO 2025-01-09 11:32: - [ ] Ignores each cell's actual emphasis state and forces default:
+        curr_spike_emphasis_state: SpikeEmphasisState = SpikeEmphasisState.Default
+        unsorted_unit_colors_map: Dict[types.aclu_index, pg.QColor] = {aclu:v[2][curr_spike_emphasis_state].color() for aclu, v in self.params.config_items.items()} # [2] is hardcoded and the only element of the tuple used, something legacy I guess
+
+        # Get only the spikes for the shared_aclus:
+        a_spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(an_included_unsorted_neuron_ids)
+        a_spikes_df, neuron_id_to_new_IDX_map = a_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
+
+        time_sync_pyqtgraph_widget.plots.root_plot = raster_plot_item # name the plotItem "root_plot" so `new_plot_raster_plot` can reuse it
+        rasters_display_outputs_tuple = new_plot_raster_plot(a_spikes_df, an_included_unsorted_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=deepcopy(unsorted_unit_colors_map), scatter_plot_kwargs=None,
+                                                        scatter_app_name=name, defer_show=True, active_context=None,
+                                                        win=raster_root_graphics_layout_widget, plots_data=time_sync_pyqtgraph_widget.plots_data, plots=time_sync_pyqtgraph_widget.plots,
+                                                        ) # defer_show=True so we can add it manually to the track view
+
+        # an_app, a_win, a_plots, a_plots_data, an_on_update_active_epoch, an_on_update_active_scatterplot_kwargs = rasters_display_outputs_tuple
+        # raster_root_graphics_layout_widget.addWidget(a_win, row=1, col=1)
+        
+        _raster_tracks_out_dict[name] = (dock_config, time_sync_pyqtgraph_widget, raster_root_graphics_layout_widget, raster_plot_item, rasters_display_outputs_tuple)
+
+        return _raster_tracks_out_dict
+
+
+
+
+
+    # ==================================================================================================================== #
+    # Time Curves                                                                                                          #
+    # ==================================================================================================================== #
+    
 
     # Overrides for Render3DTimeCurvesBaseGridMixin, since this 2D class can't draw a 3D background grid _________________ #
     def init_3D_time_curves_baseline_grid_mesh(self):

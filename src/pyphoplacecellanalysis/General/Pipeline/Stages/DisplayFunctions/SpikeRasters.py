@@ -695,10 +695,26 @@ class NewSimpleRaster:
             return all_spots
 
 
+
+
 @function_attributes(short_name=None, tags=['raster', 'simple', 'working', 'stateless'], input_requires=[], output_provides=[], uses=['_plot_empty_raster_plot_frame', 'build_scatter_plot_kwargs', '_build_units_y_grid'], used_by=['_plot_empty_raster_plot_frame', ''], creation_date='2023-12-06 13:49', related_items=['NewSimpleRaster'])
-def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, scatter_app_name='pho_test', defer_show=False, active_context=None, **kwargs) -> tuple[Any, pg.GraphicsLayoutWidget, RenderPlots, RenderPlotsData]:
+def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, scatter_app_name='pho_test', defer_show=False, active_context=None, 
+                         win=None, plots_data=None, plots=None, **kwargs) -> tuple[Any, pg.GraphicsLayoutWidget, RenderPlots, RenderPlotsData]:
     """ This uses `NewSimpleRaster` and pyqtgraph's scatter function to render a simple raster plot. Simpler than the `SpikeRaster2D`-like implementations.
 
+    
+    If extant data passed in, updates:
+    
+        plots_data.spikes_df
+        plots_data.all_spots
+        plots_data.all_scatterplot_tooltips_kwargs
+        
+        plots.debug_header_label
+        plots.root_plot
+        plots.scatter_plot
+        plots.grid
+        
+    
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import new_plot_raster_plot
 
@@ -706,8 +722,15 @@ def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort
 
     """
     
-    # make root container for plots
-    app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name, defer_show=defer_show, active_context=active_context)
+    needs_create_new = ((win is None) or (plots_data is None) or (plots is None))
+    if needs_create_new:
+        # make root container for plots
+        app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name, defer_show=defer_show, active_context=active_context)
+    else:
+        app = kwargs.pop('app', None) # no app needed, but passthrough so it doesn't fail
+        
+
+
     if unit_sort_order is None:
         unit_sort_order = np.arange(len(included_neuron_ids))
     assert len(unit_sort_order) == len(included_neuron_ids)
@@ -730,7 +753,9 @@ def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort
     # win.nextRow()
     
     # # Actually setup the plot:
-    plots.root_plot = win.addPlot(title="Raster") # this seems to be the equivalent to an 'axes'
+    if (not hasattr(plots, 'root_plot')):
+        plots.root_plot = win.addPlot(title="Raster") # this seems to be the equivalent to an 'axes'
+    
 
     scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs)
     

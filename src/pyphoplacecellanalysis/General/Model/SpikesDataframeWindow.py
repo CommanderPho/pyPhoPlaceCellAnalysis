@@ -24,7 +24,7 @@ Separate 2D and 3D event visualization functions should be made to transform eve
 
 
 """
-@metadata_attributes(short_name=None, tags=['time'], input_requires=[], output_provides=[], uses=[], used_by=['SpikeRasterBase'], creation_date='2024-12-18 12:44', related_items=[])
+@metadata_attributes(short_name=None, tags=['time'], input_requires=[], output_provides=[], uses=[], used_by=['SpikeRasterBase'], creation_date='2023-01-01 00:00', related_items=[])
 class SpikesDataframeWindow(LiveWindowedData):
     """ a zoomable (variable sized) window into a dataframe with a time axis
     Used by Spike3DRaster
