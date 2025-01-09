@@ -699,7 +699,7 @@ class NewSimpleRaster:
 
 @function_attributes(short_name=None, tags=['raster', 'simple', 'working', 'stateless'], input_requires=[], output_provides=[], uses=['_plot_empty_raster_plot_frame', 'build_scatter_plot_kwargs', '_build_units_y_grid'], used_by=['_plot_empty_raster_plot_frame', ''], creation_date='2023-12-06 13:49', related_items=['NewSimpleRaster'])
 def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, scatter_app_name='pho_test', defer_show=False, active_context=None, 
-                         win=None, plots_data=None, plots=None, **kwargs) -> tuple[Any, pg.GraphicsLayoutWidget, RenderPlots, RenderPlotsData]:
+                         win=None, plots_data=None, plots=None, add_debug_header_label: bool=True, **kwargs) -> tuple[Any, pg.GraphicsLayoutWidget, RenderPlots, RenderPlotsData]:
     """ This uses `NewSimpleRaster` and pyqtgraph's scatter function to render a simple raster plot. Simpler than the `SpikeRaster2D`-like implementations.
 
     
@@ -709,7 +709,8 @@ def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort
         plots_data.all_spots
         plots_data.all_scatterplot_tooltips_kwargs
         
-        plots.debug_header_label
+        if add_debug_header_label:
+              plots.debug_header_label
         plots.root_plot
         plots.scatter_plot
         plots.grid
@@ -730,7 +731,6 @@ def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort
         app = kwargs.pop('app', None) # no app needed, but passthrough so it doesn't fail
         
 
-
     if unit_sort_order is None:
         unit_sort_order = np.arange(len(included_neuron_ids))
     assert len(unit_sort_order) == len(included_neuron_ids)
@@ -745,17 +745,18 @@ def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort
     plots_data.all_spots, plots_data.all_scatterplot_tooltips_kwargs = plots_data.new_sorted_raster.build_spikes_all_spots_from_df(spikes_df=plots_data.spikes_df, should_return_data_tooltips_kwargs=True, generate_debug_tuples=False)
 
     # Add header label
-    # plots.debug_header_label = pg.LabelItem(justify='right', text='debug_header_label')
-    # win.addItem(plots.debug_header_label)
-    plots.debug_header_label = win.addLabel("debug_header_label") # , row=1, colspan=4
-    win.nextRow()
-    # plots.debug_label2 = win.addLabel("Label2") # , col=1, colspan=4
-    # win.nextRow()
+    if add_debug_header_label:
+        # plots.debug_header_label = pg.LabelItem(justify='right', text='debug_header_label')
+        # win.addItem(plots.debug_header_label)
+        plots.debug_header_label = win.addLabel("debug_header_label") # , row=1, colspan=4
+        win.nextRow()
+        # plots.debug_label2 = win.addLabel("Label2") # , col=1, colspan=4
+        # win.nextRow()
     
     # # Actually setup the plot:
     if (not hasattr(plots, 'root_plot')):
         plots.root_plot = win.addPlot(title="Raster") # this seems to be the equivalent to an 'axes'
-    
+
 
     scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs)
     
@@ -778,9 +779,6 @@ def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort
     # tick_ydict = {y_pos:f"{int(aclu)}" for y_pos, aclu in zip(a_series_identity_y_values, sorted_neuron_ids)} # {0.5: '68', 1.5: '75', 2.5: '54', 3.5: '10', 4.5: '104', 5.5: '90', 6.5: '44', 7.5: '15', 8.5: '93', 9.5: '79', 10.5: '56', 11.5: '84', 12.5: '78', 13.5: '31', 14.5: '16', 15.5: '40', 16.5: '25', 17.5: '81', 18.5: '70', 19.5: '66', 20.5: '24', 21.5: '98', 22.5: '80', 23.5: '77', 24.5: '60', 25.5: '39', 26.5: '9', 27.5: '82', 28.5: '85', 29.5: '101', 30.5: '87', 31.5: '26', 32.5: '43', 33.5: '65', 34.5: '48', 35.5: '52', 36.5: '92', 37.5: '11', 38.5: '51', 39.5: '72', 40.5: '18', 41.5: '53', 42.5: '47', 43.5: '89', 44.5: '102', 45.5: '61'}
     tick_ydict = {plots_data.new_sorted_raster.neuron_y_pos[aclu]:f"{int(aclu)}" for aclu in plots_data.new_sorted_raster.neuron_IDs}
     a_left_axis.setTicks([tick_ydict.items()])
-
-    # win.nextRow()
-    # plots.debug_label3 = win.addLabel("Label3") # , col=1, colspan=4
 
     return RasterPlotSetupTuple(app, win, plots, plots_data)
 

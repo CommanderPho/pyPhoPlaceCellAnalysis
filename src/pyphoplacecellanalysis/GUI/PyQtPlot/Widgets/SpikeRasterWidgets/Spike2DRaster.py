@@ -1569,6 +1569,11 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
 
         This should be a separate file, and there should be multiple classes of tracks (raster, instervals, etc) 
             
+
+        #TODO 2025-01-09 12:04: - [ ] Needs to respond to signals:
+        self.on_neuron_colors_changed
+
+        
         """
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, CustomCyclicColorsDockDisplayConfig, NamedColorScheme
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import new_plot_raster_plot, NewSimpleRaster, paired_separately_sort_neurons
@@ -1597,7 +1602,6 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         active_target_interval_render_plots_dict = {v.objectName():v for v in self.interval_rendering_plots}
 
         # self.unit_sort_order exists too
-        self.on_neuron_colors_changed
 
         # self.spikes_window # SpikesDataframeWindow
         spikes_df: pd.DataFrame = self.spikes_window.df ## all spikes ( for all time )
