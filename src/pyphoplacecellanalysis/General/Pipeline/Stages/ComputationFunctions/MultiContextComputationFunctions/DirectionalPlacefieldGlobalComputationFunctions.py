@@ -3275,7 +3275,9 @@ class CustomDecodeEpochsResult(UnpackableMixin):
         from pyphocorehelpers.indexing_helpers import reorder_columns_relative
         
         min_number_ybins_to_consider_as_spatial: int = 6 ## prevents detecting pseudo2D y-bins (array([0, 1, 2, 3, 4])) incorrectly as spatial
+        is_2D_dim_decoder: bool = ((active_pf_2D.ybin is not None) and (len(active_pf_2D.ybin) > min_number_ybins_to_consider_as_spatial))
         
+
         _position_col_names = []
 
         all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult = deepcopy(test_all_directional_laps_decoder_result.decoder_result)
@@ -3333,8 +3335,13 @@ class CustomDecodeEpochsResult(UnpackableMixin):
         _position_col_names.extend(['x_meas', 'y_meas'])
         
         if should_include_decoded_pos_columns:
-            epochs_track_identity_marginal_df_list = [pd.concat([a_df, a_decoded_pos_df[['x_decode', 'y_decode']]], axis='columns', ignore_index=False) for a_df, a_decoded_pos_df in zip(epochs_track_identity_marginal_df_list, decoded_positions_df_list)]
-            _position_col_names.extend(['x_decode', 'y_decode'])
+            if is_2D_dim_decoder:
+                decoder_col_names = ['x_decode', 'y_decode']
+            else:
+                decoder_col_names = ['x_decode']
+                 
+            epochs_track_identity_marginal_df_list = [pd.concat([a_df, a_decoded_pos_df[decoder_col_names]], axis='columns', ignore_index=False) for a_df, a_decoded_pos_df in zip(epochs_track_identity_marginal_df_list, decoded_positions_df_list)]
+            _position_col_names.extend(decoder_col_names)
 
         # .itertuples(index=True, name='MeasuredPositionTuple')
 
@@ -3348,7 +3355,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
 
 
 
-        if (active_pf_2D.ybin is not None) and (len(active_pf_2D.ybin) > min_number_ybins_to_consider_as_spatial):
+        if is_2D_dim_decoder:
             epochs_track_identity_marginal_df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(deepcopy(epochs_track_identity_marginal_df), bin_values=(deepcopy(active_pf_2D.xbin), deepcopy(active_pf_2D.ybin)),
                                                                                                                         position_column_names = ('x_meas', 'y_meas'),  binned_column_names = ('binned_x', 'binned_y'),
                                                                                                                         force_recompute=False, debug_print=True)
@@ -3362,7 +3369,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
 
 
         if should_include_decoded_pos_columns:
-            if (active_pf_2D.ybin is not None) and (len(active_pf_2D.ybin) > min_number_ybins_to_consider_as_spatial):
+            if is_2D_dim_decoder:
                 epochs_track_identity_marginal_df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(deepcopy(epochs_track_identity_marginal_df), bin_values=(deepcopy(active_pf_2D.xbin), deepcopy(active_pf_2D.ybin)),
                                                                                                                     position_column_names = ('x_decode', 'y_decode'),  binned_column_names = ('binned_x_decode', 'binned_y_decode'),
                                                                                                                     force_recompute=False, debug_print=True)
