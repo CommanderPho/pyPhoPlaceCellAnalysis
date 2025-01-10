@@ -74,14 +74,14 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
 
      
     @function_attributes(short_name='1d_placefield_occupancy', tags=['display', 'placefields', '1D', 'occupancy', 'matplotlib'], input_requires=[], output_provides=[], uses=['PfND.plot_ratemaps_2D', 'neuropy.plotting.ratemaps.plot_ratemap_1D'], used_by=[], creation_date='2023-06-15 17:24')
-    def _display_1d_placefield_occupancy(computation_result, active_config, enable_saving_to_disk=False, active_context=None, **kwargs):
+    def _display_1d_placefield_occupancy(computation_result, active_config, enable_saving_to_disk=False, active_context=None, plot_pos_bin_axes: bool=True, **kwargs):
         """ displays placefield occupancy in a MATPLOTLIB window 
         """
         assert active_context is not None
         active_display_ctx = active_context.adding_context('display_fn', display_fn_name='plot_occupancy_1D')
         # active_display_ctx_string = active_display_ctx.get_description(separator='|')
         
-        display_outputs = computation_result.computed_data['pf1D'].plot_occupancy(active_context=active_display_ctx, **({} | kwargs))
+        display_outputs = computation_result.computed_data['pf1D'].plot_occupancy(active_context=active_display_ctx, **({'plot_pos_bin_axes': plot_pos_bin_axes} | kwargs))
         
         # plot_variable_name = ({'plot_variable': None} | kwargs)
         plot_variable_name = kwargs.get('plot_variable', enumTuningMap2DPlotVariables.OCCUPANCY).name
