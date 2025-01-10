@@ -754,7 +754,7 @@ def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort
         # win.nextRow()
     
     # # Actually setup the plot:
-    if (not hasattr(plots, 'root_plot')):
+    if (not plots.has_attr('root_plot')):
         plots.root_plot = win.addPlot(title="Raster") # this seems to be the equivalent to an 'axes'
 
 
