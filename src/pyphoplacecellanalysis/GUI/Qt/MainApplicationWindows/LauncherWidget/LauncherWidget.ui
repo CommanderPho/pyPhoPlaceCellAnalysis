@@ -305,7 +305,7 @@ QTreeWidget:item:!enabled {
               <string notr="true"/>
              </property>
              <property name="icon">
-              <iconset resource="../../../../Resources/ActionIcons.qrc">
+              <iconset>
                <normaloff>:/Render/trial_to_trial_reliability</normaloff>:/Render/trial_to_trial_reliability</iconset>
              </property>
             </item>
@@ -476,25 +476,28 @@ QTreeWidget:item:!enabled {
                  </widget>
                 </item>
                 <item row="0" column="3">
-                 <widget class="QToolButton" name="btnCopySelectedEpochs">
+                 <widget class="QToolButton" name="btnCopySelectedDisplayFunctionCode">
                   <property name="enabled">
                    <bool>true</bool>
                   </property>
                   <property name="toolTip">
-                   <string>Copy Selections</string>
+                   <string>Copy Display Function Code to Clipbaord</string>
                   </property>
                   <property name="statusTip">
                    <string>CopySelections</string>
                   </property>
                   <property name="text">
-                   <string>Copy Selections</string>
+                   <string>Copy Display Code</string>
                   </property>
                   <property name="icon">
-                   <iconset theme="edit-copy">
-                    <normaloff>../../Widgets/ThinButtonBar</normaloff>../../Widgets/ThinButtonBar</iconset>
+                   <iconset resource="../../../../Resources/ActionIcons.qrc">
+                    <normaloff>:/Graphics/Icons/graphics/Decoder.svg</normaloff>:/Graphics/Icons/graphics/Decoder.svg</iconset>
                   </property>
                   <property name="shortcut">
                    <string>Ctrl+C</string>
+                  </property>
+                  <property name="toolButtonStyle">
+                   <enum>Qt::ToolButtonTextBesideIcon</enum>
                   </property>
                  </widget>
                 </item>

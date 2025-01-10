@@ -14,7 +14,7 @@ from PyQt5.QtWidgets import QApplication, QFileSystemModel, QTreeView, QTreeWidg
 from PyQt5.QtGui import QPainter, QBrush, QPen, QColor, QFont, QIcon, QContextMenuEvent
 from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlot, QSize, QDir, QUrl, QTimer
 
-
+from pyphocorehelpers.programming_helpers import copy_to_clipboard
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore, QtGui
 from pyphoplacecellanalysis.General.Pipeline.Stages.Display import Plot, DisplayFunctionItem
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
@@ -76,6 +76,11 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         curr_fcn = curr_active_pipeline.registered_display_function_dict['_display_2d_placefield_result_plot_ratemaps_2D']
         print(str(curr_fcn.__code__.co_varnames)) # PyFunction_GetCode # ('computation_result', 'active_config', 'enable_saving_to_disk', 'kwargs', 'display_outputs', 'plot_variable_name', 'active_figure', 'active_pf_computation_params', 'session_identifier', 'fig_label', 'active_pf_2D_figures', 'should_save_to_disk')
 
+        
+        
+    self.ui.btnCopySelectedDisplayFunctionCode
+    
+    
      """
     _curr_active_pipeline_ref = None #  : Optional[Plot]
     debug_print = False
@@ -175,6 +180,7 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         self.docPanelTextBrowser.setOpenExternalLinks(False) # Disable automatic opening of external links
         self.docPanelTextBrowser.anchorClicked.connect(self.handle_link_click) # Connect the link click handler
     
+        self.ui.btnCopySelectedDisplayFunctionCode.clicked.connect(self.handle_copy_code_button_clicked)
 
     # ==================================================================================================================== #
     # Item Access Methods                                                                                                  #
@@ -320,6 +326,26 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         else:
             print(f'\t WARN: a_disp_fn_item is None for key: "{a_fcn_name}"')
             
+
+
+    def handle_copy_code_button_clicked(self, *args, **kwargs):
+        print(f'handle_copy_code_button_clicked(...)')
+        selected_items = self.treeWidget.selectedItems() # List[QTreeWidgetItem]
+        all_out_code: List[str] = []
+        for item in selected_items:
+            # print(item.text(0), "-", item.text(1))  # Print data from column 0 and column 1
+            item_data = item.data(0, 0) # ItemDataRole 
+            # print(f'\titem_data: {item_data}')
+            assert item_data is not None
+            assert isinstance(item_data, str)
+            a_fcn_name: str = item_data
+            all_out_code.append(self.build_display_function_run_code(a_fcn_name=a_fcn_name)) 
+        final_out_code: str = '\n'.join(all_out_code)
+        print(final_out_code)
+        ## copy to clipboard
+        copy_to_clipboard(code_str=final_out_code, message_print=True)
+        
+
 
     # ==================================================================================================================== #
     # Events                                                                                                               #
@@ -499,6 +525,41 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
 
         # return a_fn_handle(*args, **kwargs)
         
+
+
+    def build_display_function_run_code(self, a_fcn_name: str, include_initial_define_line=True) -> str:
+        """ btnCopySelectedDisplayFunctionCode
+        """
+        code_out: str = ""
+        if include_initial_define_line:
+            code_out = f"{code_out}_out = dict()\n"
+
+        a_fn_handle = self._perform_get_display_function_code(a_fcn_name=a_fcn_name)
+        assert a_fn_handle is not None
+        # args = []
+        # kwargs = {}
+        a_disp_fn_item: DisplayFunctionItem = self.get_display_function_item(a_fn_name=a_fcn_name)
+        assert a_disp_fn_item is not None, f"a_disp_fn_item is None! for a_fn_name='{a_fcn_name}'"
+        if a_disp_fn_item.is_global:
+            code_out = f"{code_out}_out['{a_fcn_name}'] = curr_active_pipeline.display(display_function='{a_fcn_name}', active_session_configuration_context=None) # {a_fcn_name}\n" # , *{args}, **{kwargs}
+        else:
+            # non-global, needs a context:
+            current_selected_context = self.displayContextSelectorWidget.current_selected_context
+            if current_selected_context is not None:
+                # args = list(args) ## convert to list if a tuple
+                # args.insert(0, current_selected_context)
+                code_out = f"{code_out}_out['{a_fcn_name}'] = curr_active_pipeline.display(display_function='{a_fcn_name}', active_session_configuration_context={current_selected_context.get_initialization_code_string()}) # {a_fcn_name}\n" # , *{args}, **{kwargs}
+            else:
+                return None
+            
+        return code_out
+        # return f""" 
+        #     _out = dict()
+        #     _out['{a_fcn_name}'] = curr_active_pipeline.display('{a_fcn_name}') # {a_fcn_name}
+        # """
+
+
+
 
 
 
