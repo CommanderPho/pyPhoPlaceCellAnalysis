@@ -2486,6 +2486,9 @@ class SubsequencesPartitioningResultScoringComputations:
     def _META_build_epoch_SubsequencesPartitioningResult(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, pos_bin_edges: NDArray, max_ignore_bins:int=2, same_thresh_cm: Optional[float]=6.0, same_thresh_fraction_of_track: Optional[float] = None, max_jump_distance_cm: float = 60.0) -> SubsequencesPartitioningResult:
         """ 
         partition_result: SubsequencesPartitioningResult = HeuristicReplayScoring._META_build_epoch_SubsequencesPartitioningResult(a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length, pos_bin_edges=pos_bin_edges, max_ignore_bins=max_ignore_bins, same_thresh_cm=same_thresh_cm, same_thresh_fraction_of_track=same_thresh_fraction_of_track, max_jump_distance_cm=max_jump_distance_cm)
+        
+        PERFORMANCE: this is slow, taking about 0.5sec per run
+        
         """
         ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
         a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
