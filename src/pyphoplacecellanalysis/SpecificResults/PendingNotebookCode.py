@@ -481,7 +481,7 @@ class EstimationCorrectnessPlots:
 
 
 @function_attributes(short_name=None, tags=['transition_matrix', 'position', 'decoder_id', '2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 10:05', related_items=[])
-def build_position_by_decoder_transition_matrix(p_x_given_n):
+def build_position_by_decoder_transition_matrix(p_x_given_n, debug_print=False):
     """ 
     given a decoder that gives a probability that the generating process is one of two possibilities, what methods are available to estimate the probability for a contiguous epoch made of many time bins? 
     Note: there is most certainly temporal dependence, how should I go about dealing with this?
@@ -537,10 +537,10 @@ def build_position_by_decoder_transition_matrix(p_x_given_n):
 
     # 5. Construct combined transition matrix (Kronecker product)
     A_big = np.kron(A_position, A_model)
-
-    print("A_position:", A_position)
-    print("A_model:", A_model)
-    print("A_big shape:", A_big.shape)
+    if debug_print:
+        print("A_position:", A_position)
+        print("A_model:", A_model)
+        print("A_big shape:", A_big.shape)
     return A_position, A_model, A_big
 
 
