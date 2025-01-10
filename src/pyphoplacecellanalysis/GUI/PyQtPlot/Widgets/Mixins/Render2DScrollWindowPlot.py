@@ -271,7 +271,7 @@ class Render2DScrollWindowPlotMixin:
 
 
     @classmethod
-    def build_spikes_data_values_from_df(cls, spikes_df: pd.DataFrame, config_fragile_linear_neuron_IDX_map, is_spike_included=None, should_return_data_tooltips_kwargs:bool=False, downsampling_rate: int = 10, **kwargs):
+    def build_spikes_data_values_from_df(cls, spikes_df: pd.DataFrame, config_fragile_linear_neuron_IDX_map, is_spike_included=None, should_return_data_tooltips_kwargs:bool=False, downsampling_rate: int = 1, **kwargs):
         """ build global spikes for entire dataframe (not just the current window) 
         
         Called by:

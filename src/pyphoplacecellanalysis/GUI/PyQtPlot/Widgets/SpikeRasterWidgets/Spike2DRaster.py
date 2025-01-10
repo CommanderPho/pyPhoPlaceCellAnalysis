@@ -1591,16 +1591,9 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         # active_2d_plot.params.custom_interval_rendering_plots = [active_2d_plot.plots.background_static_scroll_window_plot, active_2d_plot.plots.main_plot_widget, raster_plot_item, intervals_overview_plot_item]
 
         # active_2d_plot.interval_rendering_plots
-        main_plot_widget = self.plots.main_plot_widget # PlotItem
-        raster_plot_item.setXLink(main_plot_widget) # works to synchronize the main zoomed plot (current window) with the epoch_rect_separate_plot (rectangles plotter)
+        # main_plot_widget = self.plots.main_plot_widget # PlotItem
+        # raster_plot_item.setXLink(main_plot_widget) # works to synchronize the main zoomed plot (current window) with the epoch_rect_separate_plot (rectangles plotter)
         
-        ## #TODO 2024-12-31 07:20: - [ ] need to clear/re-add the epochs to make this work
-        extant_rendered_plots_lists = {k:list(v.keys()) for k, v in self.list_all_rendered_intervals(debug_print=False).items()}
-        # active_target_interval_render_plots = active_2d_plot.params.custom_interval_rendering_plots
-
-        # active_target_interval_render_plots = [v.objectName() for v in active_2d_plot.interval_rendering_plots]
-        active_target_interval_render_plots_dict = {v.objectName():v for v in self.interval_rendering_plots}
-
         # self.unit_sort_order exists too
 
         # self.spikes_window # SpikesDataframeWindow
@@ -1624,16 +1617,27 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         a_spikes_df, neuron_id_to_new_IDX_map = a_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs() # rebuild the fragile indicies afterwards
 
         time_sync_pyqtgraph_widget.plots.root_plot = raster_plot_item # name the plotItem "root_plot" so `new_plot_raster_plot` can reuse it
-        rasters_display_outputs_tuple = new_plot_raster_plot(a_spikes_df, an_included_unsorted_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=deepcopy(unsorted_unit_colors_map), scatter_plot_kwargs=None,
+        rasters_display_outputs_tuple = new_plot_raster_plot(a_spikes_df, an_included_unsorted_neuron_ids, unit_sort_order=unit_sort_order, unit_colors_list=deepcopy(unsorted_unit_colors_map),
                                                         scatter_app_name=name, defer_show=True, active_context=None,
                                                         win=raster_root_graphics_layout_widget, plots_data=time_sync_pyqtgraph_widget.plots_data, plots=time_sync_pyqtgraph_widget.plots,
+                                                        add_debug_header_label=False,
+                                                        scatter_plot_kwargs=dict(size=5, hoverable=False, tick_width=0.0, tick_height=1.0),
                                                         ) # defer_show=True so we can add it manually to the track view
 
         # an_app, a_win, a_plots, a_plots_data, an_on_update_active_epoch, an_on_update_active_scatterplot_kwargs = rasters_display_outputs_tuple
         # raster_root_graphics_layout_widget.addWidget(a_win, row=1, col=1)
         
         _raster_tracks_out_dict[name] = (dock_config, time_sync_pyqtgraph_widget, raster_root_graphics_layout_widget, raster_plot_item, rasters_display_outputs_tuple)
+        # Setup range for plot:
+        # earliest_t, latest_t = active_2d_plot.spikes_window.total_df_start_end_times # global
+        earliest_t, latest_t = self.spikes_window.active_time_window # current
+        raster_plot_item.setXRange(earliest_t, latest_t, padding=0)
+        neuron_y_pos = np.array(list(deepcopy(time_sync_pyqtgraph_widget.plots_data.new_sorted_raster.neuron_y_pos).values()))
+        raster_plot_item.setYRange(np.nanmin(neuron_y_pos), np.nanmax(neuron_y_pos), padding=0)
 
+        main_plot_widget = self.plots.main_plot_widget # PlotItem
+        raster_plot_item.setXLink(main_plot_widget) # works to synchronize the main zoomed plot (current window) with the epoch_rect_separate_plot (rectangles plotter)
+        
         return _raster_tracks_out_dict
 
 

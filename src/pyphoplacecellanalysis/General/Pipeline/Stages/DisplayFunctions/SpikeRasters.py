@@ -544,9 +544,9 @@ class NewSimpleRaster:
     ```
     
     """
-    neuron_IDs: NDArray = field(repr=True)
-    neuron_colors: Dict[int, QColor] = field(init=False, repr=False) # , default=Factory(dict)
-    neuron_y_pos: Dict[int, float] = field(init=False, repr=True) # , default=Factory(dict)
+    neuron_IDs: NDArray = field(repr=True, metadata={'shape':'n_aclus'})
+    neuron_colors: Dict[int, QColor] = field(init=False, repr=False, metadata={'shape':'n_aclus'}) # , default=Factory(dict)
+    neuron_y_pos: Dict[int, float] = field(init=False, repr=True, metadata={'shape':'n_aclus'}) # , default=Factory(dict)
 
     def __attrs_post_init__(self):
         self.neuron_colors = dict()
@@ -616,7 +616,7 @@ class NewSimpleRaster:
             a_spikes_df['visualization_raster_emphasis_state'] = SpikeEmphasisState.Default
         return a_spikes_df
 
-    def build_spikes_all_spots_from_df(self, spikes_df: pd.DataFrame, is_spike_included=None, should_return_data_tooltips_kwargs:bool=True, generate_debug_tuples=False, **kwargs):
+    def build_spikes_all_spots_from_df(self, spikes_df: pd.DataFrame, is_spike_included=None, should_return_data_tooltips_kwargs:bool=True, generate_debug_tuples=False, downsampling_rate: int = 1, **kwargs):
         """ builds the 'all_spots' tuples suitable for setting self.plots_data.all_spots from ALL Spikes 
             Needs to be called whenever:
                 spikes_df['visualization_raster_y_location']
@@ -625,21 +625,26 @@ class NewSimpleRaster:
             Changes.
         Removed `config_fragile_linear_neuron_IDX_map`
         """
+        if (downsampling_rate is not None) and (downsampling_rate > 1):
+            active_spikes_df = deepcopy(spikes_df).iloc[::downsampling_rate]  # Take every 10th row
+        else:
+            active_spikes_df = deepcopy(spikes_df)
+        
         # INLINEING `build_spikes_data_values_from_df`: ______________________________________________________________________ #
         # curr_spike_x, curr_spike_y, curr_spike_pens, all_scatterplot_tooltips_kwargs, all_spots, curr_n = cls.build_spikes_data_values_from_df(spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=is_spike_included, should_return_data_tooltips_kwargs=should_return_data_tooltips_kwargs, **kwargs)
         # All units at once approach:
-        active_time_variable_name = spikes_df.spikes.time_variable_name
+        active_time_variable_name = active_spikes_df.spikes.time_variable_name
         # Copy only the relevent columns so filtering is easier:
-        filtered_spikes_df = spikes_df[[active_time_variable_name, 'visualization_raster_y_location',  'visualization_raster_emphasis_state', 'aclu', 'fragile_linear_neuron_IDX']].copy()
+        filtered_spikes_df = active_spikes_df[[active_time_variable_name, 'visualization_raster_y_location',  'visualization_raster_emphasis_state', 'aclu', 'fragile_linear_neuron_IDX']].copy()
         
         spike_emphasis_states = kwargs.get('spike_emphasis_state', None)
         if spike_emphasis_states is not None:
-            assert len(spike_emphasis_states) == np.shape(spikes_df)[0], f"if specified, spike_emphasis_states must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]} and len(is_included_indicies): {len(spike_emphasis_states)}"
+            assert len(spike_emphasis_states) == np.shape(active_spikes_df)[0], f"if specified, spike_emphasis_states must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(active_spikes_df)[0]} and len(is_included_indicies): {len(spike_emphasis_states)}"
             # Can set it on the dataframe:
             # 'visualization_raster_y_location'
         
         if is_spike_included is not None:
-            assert len(is_spike_included) == np.shape(spikes_df)[0], f"if specified, is_included_indicies must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]} and len(is_included_indicies): {len(is_spike_included)}"
+            assert len(is_spike_included) == np.shape(active_spikes_df)[0], f"if specified, is_included_indicies must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(active_spikes_df)[0]} and len(is_included_indicies): {len(is_spike_included)}"
             ## filter them by the is_included_indicies:
             filtered_spikes_df = filtered_spikes_df[is_spike_included]
         
@@ -656,10 +661,10 @@ class NewSimpleRaster:
 
             if generate_debug_tuples:
                 # debug_datapoint_column_names = [spikes_df.spikes.time_variable_name, 'shank', 'cluster', 'aclu', 'qclu', 'x', 'y', 'speed', 'traj', 'lap', 'maze_relative_lap', 'maze_id', 'neuron_type', 'flat_spike_idx', 'x_loaded', 'y_loaded', 'lin_pos', 'fragile_linear_neuron_IDX', 'PBE_id', 'scISI', 'neuron_IDX', 'replay_epoch_id', 'visualization_raster_y_location', 'visualization_raster_emphasis_state']
-                debug_datapoint_column_names = [spikes_df.spikes.time_variable_name, 'aclu', 'fragile_linear_neuron_IDX', 'visualization_raster_y_location'] # a subset I'm actually interested in for debugging
+                debug_datapoint_column_names = [active_spikes_df.spikes.time_variable_name, 'aclu', 'fragile_linear_neuron_IDX', 'visualization_raster_y_location'] # a subset I'm actually interested in for debugging
                 active_datapoint_column_names = debug_datapoint_column_names # all values for the purpose of debugging
             else:
-                default_datapoint_column_names = [spikes_df.spikes.time_variable_name, 'aclu', 'fragile_linear_neuron_IDX']
+                default_datapoint_column_names = [active_spikes_df.spikes.time_variable_name, 'aclu', 'fragile_linear_neuron_IDX']
                 active_datapoint_column_names = default_datapoint_column_names
                 
             def _tip_fn(x, y, data):
@@ -672,10 +677,10 @@ class NewSimpleRaster:
                 return f"spike: (x={x:.3f}, y={y:.2f})\n{data_string}"
 
             # spikes_data = spikes_df[active_datapoint_column_names].to_records(index=False).tolist() # list of tuples
-            spikes_data = spikes_df[active_datapoint_column_names].to_dict('records') # list of dicts
+            spikes_data = active_spikes_df[active_datapoint_column_names].to_dict('records') # list of dicts
             spikes_data = [ScatterItemData(**v) for v in spikes_data] 
             all_scatterplot_tooltips_kwargs = dict(data=spikes_data, tip=_tip_fn)
-            assert len(all_scatterplot_tooltips_kwargs['data']) == np.shape(spikes_df)[0], f"if specified, all_scatterplot_tooltips_kwargs must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]} and len((all_scatterplot_tooltips_kwargs['data']): {len(all_scatterplot_tooltips_kwargs['data'])}"
+            assert len(all_scatterplot_tooltips_kwargs['data']) == np.shape(active_spikes_df)[0], f"if specified, all_scatterplot_tooltips_kwargs must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(active_spikes_df)[0]} and len((all_scatterplot_tooltips_kwargs['data']): {len(all_scatterplot_tooltips_kwargs['data'])}"
         else:
             all_scatterplot_tooltips_kwargs = None
             
@@ -758,7 +763,7 @@ def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort
         plots.root_plot = win.addPlot(title="Raster") # this seems to be the equivalent to an 'axes'
 
 
-    scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs)
+    scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs, tick_width=scatter_plot_kwargs.pop('tick_width', 0.1), tick_height=scatter_plot_kwargs.pop('tick_height', 1.0))
     
     plots.scatter_plot = pg.ScatterPlotItem(**scatter_plot_kwargs)
     plots.scatter_plot.setObjectName('scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
@@ -855,10 +860,15 @@ def _build_default_tick(tick_width: float = 0.1, tick_height: float = 1.0) -> Qt
     return vtick
 
 
-def build_scatter_plot_kwargs(scatter_plot_kwargs=None):
-    """build the default scatter plot kwargs, and merge them with the provided kwargs"""
+def build_scatter_plot_kwargs(scatter_plot_kwargs=None, tick_width: float = 1.0, tick_height: float = 1.0):
+    """build the default scatter plot kwargs, and merge them with the provided kwargs
+    
+    
+    build_scatter_plot_kwargs(scatter_plot_kwargs=dict(size=5, hoverable=False), tick_width=0.0, tick_height=1.0)
+    
+    """
     # Common Tick Label 
-    vtick = _build_default_tick(tick_width=1.0)
+    vtick = _build_default_tick(tick_width=tick_width, tick_height=tick_height)
     default_scatter_plot_kwargs = dict(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=2, pen={'color': 'w', 'width': 1}, hoverable=True)
 
     if scatter_plot_kwargs is None:
@@ -1121,7 +1131,10 @@ def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_ord
     # # Actually setup the plot:
     plots.root_plot = win.addPlot() # this seems to be the equivalent to an 'axes'
 
-    scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs)
+    # build_scatter_plot_kwargs(scatter_plot_kwargs=dict(size=5, hoverable=False), tick_width=0.0, tick_height=1.0)
+    # build_scatter_plot_kwargs(scatter_plot_kwargs=dict(size=5, hoverable=False, tick_width=0.0, tick_height=1.0))
+
+    scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs, tick_width=scatter_plot_kwargs.pop('tick_width', 0.1), tick_height=scatter_plot_kwargs.pop('tick_height', 1.0))
     
     plots.scatter_plot = pg.ScatterPlotItem(**scatter_plot_kwargs)
     plots.scatter_plot.setObjectName('scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
