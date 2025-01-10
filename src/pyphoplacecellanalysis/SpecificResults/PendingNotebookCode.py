@@ -3764,7 +3764,7 @@ def _apply_filtering_to_marginals_result_df(active_result_df: pd.DataFrame, filt
     return active_result_df
 
 ## INPUTS: decoder_ripple_filter_epochs_decoder_result_dict
-@function_attributes(short_name=None, tags=['filter', 'replay', 'IMPORTANT'], input_requires=[], output_provides=[], uses=['_apply_filtering_to_marginals_result_df'], used_by=[], creation_date='2024-04-24 18:03', related_items=[])
+@function_attributes(short_name=None, tags=['filter', 'replay', 'IMPORTANT', 'PERFORMANCE', 'SLOW'], input_requires=[], output_provides=[], uses=['_apply_filtering_to_marginals_result_df'], used_by=[], creation_date='2024-04-24 18:03', related_items=[])
 def _perform_filter_replay_epochs(curr_active_pipeline, global_epoch_name, track_templates, decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], ripple_all_epoch_bins_marginals_df: pd.DataFrame, ripple_decoding_time_bin_size: float,
             should_only_include_user_selected_epochs:bool=True, **additional_selections_context):
     """ the main replay epochs filtering function.
