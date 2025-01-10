@@ -545,7 +545,7 @@ def build_position_by_decoder_transition_matrix(p_x_given_n):
 
 
 
-def plot_blocked_transition_matrix(A_big, n_position_bins, n_decoding_models, tick_labels=('long_LR', 'long_RL', 'short_LR', 'short_RL'), should_show_marginals:bool=True):
+def plot_blocked_transition_matrix(A_big, n_position_bins, n_decoding_models, tick_labels=('long_LR', 'long_RL', 'short_LR', 'short_RL'), should_show_marginals:bool=True, extra_title_suffix:str=''):
     """ 
     
     plot_blocked_transition_matrix(A_big, n_position_bins, n_decoding_models)
@@ -555,7 +555,8 @@ def plot_blocked_transition_matrix(A_big, n_position_bins, n_decoding_models, ti
     import matplotlib.pyplot as plt
     import seaborn as sns
     import matplotlib.gridspec as gridspec
-
+    from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
+    
     if should_show_marginals:
         fig = plt.figure(figsize=(9, 9))
         gs = gridspec.GridSpec(2, 2, width_ratios=[10, 1], height_ratios=[1, 10])
@@ -600,10 +601,11 @@ def plot_blocked_transition_matrix(A_big, n_position_bins, n_decoding_models, ti
         ax_heatmap.set_yticklabels(tick_labels)
 
         plt.tight_layout()
-        plt.show()
+        title_text =  "Transition Matrix Blocks by Decoder w/ Marginals"
+        
     else:
-        plt.figure(figsize=(8,8))
-        sns.heatmap(A_big, cmap='viridis')
+        fig = plt.figure(figsize=(8,8))
+        ax_heatmap = sns.heatmap(A_big, cmap='viridis')
 
         for i in range(1, n_decoding_models):
             plt.axhline(i * n_position_bins, color='white')
@@ -618,11 +620,13 @@ def plot_blocked_transition_matrix(A_big, n_position_bins, n_decoding_models, ti
 
         plt.xticks(tick_locs, tick_labels, rotation=90)
         plt.yticks(tick_locs, tick_labels, rotation=0)
-        plt.title("Transition Matrix Blocks by Decoder")
-        plt.show()
+        title_text = "Transition Matrix Blocks by Decoder"
+        
 
-
-
+    perform_update_title_subtitle(fig=fig, ax=None, title_string=f"plot_blocked_transition_matrix()- {title_text}{extra_title_suffix}", subtitle_string=None)
+    plt.show()
+    return fig, ax_heatmap
+    
 
 # ==================================================================================================================== #
 # 2024-12-20 - Heuristicy Wisticky                                                                                     #
