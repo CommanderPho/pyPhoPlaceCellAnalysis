@@ -1,6 +1,7 @@
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
 from nptyping import NDArray
+import numpy as np
 import pandas as pd
 from functools import partial # used in `CustomHeaderTableView`
 
@@ -19,28 +20,106 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaCo
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTableView, QMenu, QAction, QVBoxLayout, QWidget
 from PyQt5.QtCore import QAbstractTableModel, Qt
 
-# class TableModel(QAbstractTableModel):
-#     def __init__(self, data, headers):
-#         super().__init__()
-#         self._data = data
-#         self._headers = headers
+_table_stylesheet: str = '''
+/* General table styling */
+QTableView {
+    background-color: #2e2e2e;   /* Background of the table */
+    color: #ffffff;             /* Text color */
+    border: 1px solid #444444;  /* Border around the table */
+    gridline-color: #555555;    /* Gridline color */
+    selection-background-color: #3c0058; /* Background of selected items */
+    selection-color: #f6d1ff;   /* Text color of selected items */
+}
 
-#     def rowCount(self, parent=None):
-#         return len(self._data)
+/* Header styling */
+QHeaderView::section {
+    background-color: #444444;  /* Background of header sections */
+    color: #ffffff;             /* Text color in the header */
+    padding: 4px;               /* Padding inside header sections */
+    border: 1px solid #555555;  /* Border for each header section */
+}
 
-#     def columnCount(self, parent=None):
-#         return len(self._headers)
+# QHeaderView::section {
+#     background-color: lightblue;
+#     color: black;
+#     border: 1px solid gray;
+#     font-weight: bold;
+# }
 
-#     def data(self, index, role=Qt.DisplayRole):
-#         if role == Qt.DisplayRole:
-#             return self._data[index.row()][index.column()]
-#         return None
+            
+/* Alternating row colors */
+QTableView::item {
+    background-color: #3a3a3a;  /* Default row background */
+}
 
-#     def headerData(self, section, orientation, role):
-#         if role == Qt.DisplayRole and orientation == Qt.Horizontal:
-#             return self._headers[section]
-#         return None
-    
+QTableView::item:alternate {
+    background-color: #414141;  /* Alternating row background */
+}
+
+/* Focused item styling */
+QTableView::item:focus {
+    background-color: #666666;  /* Background of focused item */
+    border: 1px solid #888888;  /* Border for the focused item */
+}
+
+QTableView::item:selected {
+	background-color: rgb(85, 0, 127);
+	color: rgb(227, 225, 255);
+}
+QTableView::item:selected:active {
+	background-color: rgb(85, 0, 127);
+	color: rgb(227, 225, 255);
+}
+
+
+# /* Scrollbar styling */
+# QScrollBar:vertical {
+#     background: #2e2e2e;        /* Background of the vertical scrollbar */
+#     width: 15px;                /* Width of the scrollbar */
+#     margin: 15px 0 15px 0;      /* Margins around the scrollbar */
+# }
+
+# QScrollBar::handle:vertical {
+#     background: #555555;        /* Scroll handle color */
+#     min-height: 20px;           /* Minimum height for the handle */
+# }
+
+# QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+#     background: #444444;        /* Arrow buttons background */
+#     border: 1px solid #555555;  /* Border for arrow buttons */
+# }
+
+# QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+#     background: none;           /* Space above and below the handle */
+# }
+
+# QScrollBar:horizontal {
+#     background: #2e2e2e;        /* Background of the horizontal scrollbar */
+#     height: 15px;               /* Height of the scrollbar */
+#     margin: 0 15px 0 15px;      /* Margins around the scrollbar */
+# }
+
+# QScrollBar::handle:horizontal {
+#     background: #555555;        /* Scroll handle color */
+#     min-width: 20px;            /* Minimum width for the handle */
+# }
+
+# QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+#     background: #444444;        /* Arrow buttons background */
+#     border: 1px solid #555555;  /* Border for arrow buttons */
+# }
+
+# QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+#     background: none;           /* Space left and right of the handle */
+# }
+
+/* Corner widget styling (if present) */
+QTableCornerButton::section {
+    background-color: #444444;  /* Corner button background */
+    border: 1px solid #555555;  /* Border for the corner button */
+}
+
+'''
 
 @metadata_attributes(short_name=None, tags=['epochs', 'tables', 'ui'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-08 16:40', related_items=[])
 class CustomHeaderTableView(pg.QtWidgets.QTableView):
@@ -70,11 +149,16 @@ class CustomHeaderTableView(pg.QtWidgets.QTableView):
         header.setContextMenuPolicy(Qt.CustomContextMenu)
         header.customContextMenuRequested.connect(self.showColumnContextMenu)
 
+        num_cols: int = self.model().columnCount()
+        if (self.visible_columns is None) or (len(self.visible_columns) == 0):
+            ## set default columns
+            self.visible_columns = np.arange(num_cols) ## all visible
+
         # Initialize column actions and visibility
-        for col in range(self.model().columnCount()):
+        for col in range(num_cols):
             # Check if the column should be visible
             is_visible = True
-            if self.visible_columns is not None:
+            if (self.visible_columns is not None):
                 if isinstance(self.visible_columns[0], int):  # Indices
                     is_visible = col in self.visible_columns
                 elif isinstance(self.visible_columns[0], str):  # Column names
@@ -101,9 +185,6 @@ class CustomHeaderTableView(pg.QtWidgets.QTableView):
     def toggle_column(self, column, visible):
         """ Toggle visibility of the specified column. """
         self.setColumnHidden(column, not visible)
-
-
-
 
 @metadata_attributes(short_name=None, tags=['table', 'manager', 'ui'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-08 16:41', related_items=[])
 class TableManager:
@@ -189,6 +270,32 @@ class TableManager:
             self.models.pop(name)
             self.dynamic_docked_widget_container.remove_display_dock(name)
 
+    def find_table(self, name: str):
+        """ returns all related components for a table
+        
+        table, dDisplayItem, model = manager.find_table(name='Table_3')
+        """
+        dDisplayItem = self.dynamic_docked_widget_container.find_display_dock(identifier=name) # Dock
+        dock_children_widgets = dDisplayItem.widgets
+        assert len(dock_children_widgets) == 1, f"dock_children_widgets: {dock_children_widgets}, dock_item: {dDisplayItem}"
+        table = dock_children_widgets[0]
+        model = self.models[name]
+        return table, dDisplayItem, model
+
+    def highlight_row(self, name: str, row_index: int):
+        # row_index = 2  # Row to highlight (0-based index)
+        table, dDisplayItem, model = self.find_table(name=name)
+        table.selectRow(row_index)
+
+    def scroll_to_row(self, name: str, row_index: int):
+        # row_index = 4  # Row to scroll to (0-based index)
+        table, dDisplayItem, model = self.find_table(name=name)
+        table.scrollTo(model.index(row_index, 0), QTableView.PositionAtTop)
+
+
+    # ==================================================================================================================== #
+    # Private Methods                                                                                                      #
+    # ==================================================================================================================== #
     def _create_table(self, df: pd.DataFrame, visible_columns=None):
         headers: List[str] = [str(col) for col in df.columns]
         
@@ -196,17 +303,12 @@ class TableManager:
         table = CustomHeaderTableView(visible_columns=visible_columns)
         model = self._fill_table(table, df)
         table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        table.setSelectionBehavior(table.SelectRows)
         table.resizeColumnsToContents()
         table.resizeRowsToContents()
-        table.setStyleSheet("""
-            QHeaderView::section {
-                background-color: lightblue;
-                color: black;
-                border: 1px solid gray;
-                font-weight: bold;
-            }
-        """)
+        table.setStyleSheet(_table_stylesheet)
         table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        table.verticalHeader().hide()
         ## enable menu for showing/hiding columns:
         table.column_visibility_menu = QMenu("Columns", table)
         table.column_actions = []
@@ -238,21 +340,23 @@ class TableManager:
 
 
 
+def test_TableManager(n_tables: int = 4):
+    """ 
 
-if __name__ == "__main__":
+    from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.StackedDynamicTablesWidget import test_TableManager, CustomHeaderTableView, TableManager
 
+    """
     import random
     import pandas as pd
 
     # Helper function to generate random data
-    def generate_random_data():
-        rows = random.randint(2, 10)  # Random number of rows
+    def generate_random_data(avg_n_rows: int = 5):
+        rows = random.randint((avg_n_rows-2), (avg_n_rows+10))  # Random number of rows
         cols = random.randint(2, 6)   # Random number of columns
         data = [[random.randint(1, 100) for _ in range(cols)] for _ in range(rows)]
         columns = [f'Col_{i}' for i in range(cols)]
         return pd.DataFrame(data, columns=columns)
 
-    app = QApplication([])
 
     # Main Window
     window = QWidget()
@@ -262,7 +366,7 @@ if __name__ == "__main__":
     manager = TableManager(window)
 
     # Initial random data sources
-    data_sources = [generate_random_data() for _ in range(3)]
+    data_sources = [generate_random_data() for _ in range(n_tables-1)]
     
     # Insert a small dataframe
     small_df = pd.DataFrame([[0, 0], [1, 1]], columns=['A', 'B'])
@@ -293,8 +397,17 @@ if __name__ == "__main__":
 
     window.setWindowTitle('Stacked Dynamics Tables Widget (test, Pho)')
     
+
+    return manager, named_data_sources, (window, add_button, remove_button)
+
+if __name__ == "__main__":
+        
+    app = QApplication([])
+        
+    manager, named_data_sources, (window, add_button, remove_button) = test_TableManager()
     # Show the window
     window.show()
+
     app.exec_()
 
 
