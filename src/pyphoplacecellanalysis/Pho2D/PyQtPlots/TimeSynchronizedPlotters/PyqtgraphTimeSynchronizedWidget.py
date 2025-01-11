@@ -187,9 +187,9 @@ class PyqtgraphTimeSynchronizedWidget(PlottingBackendSpecifyingMixin, TimeSynchr
         if self.enable_debug_print:
             print(f'PyqtgraphTimeSynchronizedWidget.update(t: {t})')
     
-        # Finds the nearest previous decoded position for the time t:
-        self.last_window_index = np.searchsorted(self.time_window_centers, t, side='left') # side='left' ensures that no future values (later than 't') are ever returned
-        self.last_window_time = self.time_window_centers[self.last_window_index] # If there is no suitable index, return either 0 or N (where N is the length of `a`).
+        # # Finds the nearest previous decoded position for the time t:
+        # self.last_window_index = np.searchsorted(self.time_window_centers, t, side='left') # side='left' ensures that no future values (later than 't') are ever returned
+        # self.last_window_time = self.time_window_centers[self.last_window_index] # If there is no suitable index, return either 0 or N (where N is the length of `a`).
         # Update the plots:
         if not defer_render:
             self._update_plots()
