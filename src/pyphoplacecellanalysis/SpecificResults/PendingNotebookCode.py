@@ -799,9 +799,16 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, debug_print=Fa
     main_graphics_layout_widget: pg.GraphicsLayoutWidget = active_2d_plot.ui.main_graphics_layout_widget
     wrapper_layout: pg.QtWidgets.QVBoxLayout = active_2d_plot.ui.wrapper_layout
     main_content_splitter = active_2d_plot.ui.main_content_splitter # QSplitter
+    active_window_container_layout = active_2d_plot.ui.active_window_container_layout
     layout = active_2d_plot.ui.layout
-    main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
-    main_plot_widget.setMinimumHeight(20.0)
+    
+    has_main_raster_plot: bool = (active_2d_plot.plots.main_plot_widget is not None)
+    if has_main_raster_plot:
+        main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
+        main_plot_widget.setMinimumHeight(20.0)
+    else:
+        active_window_container_layout.setVisible(False)
+
     background_static_scroll_window_plot = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
     background_static_scroll_window_plot.setMinimumHeight(50.0)
     background_static_scroll_window_plot.setMaximumHeight(75.0)
@@ -812,9 +819,12 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, debug_print=Fa
     main_graphics_layout_widget.ci.layout.setRowStretchFactor(1, 2)  # Plot2: mid priority
     main_graphics_layout_widget.ci.layout.setRowStretchFactor(2, 3)  # Plot3: highest priority
 
-    _interval_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_interval_tracks(enable_interval_overview_track=False)
+    _interval_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_interval_tracks(enable_interval_overview_track=False, should_link_to_main_plot_widget=has_main_raster_plot)
     interval_window_dock_config, intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item = _interval_tracks_out_dict['intervals']
     # dock_config, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item = _interval_tracks_out_dict['interval_overview']
+
+    _raster_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_raster_track(name_modifier_suffix='raster_window', should_link_to_main_plot_widget=has_main_raster_plot)
+
 
     # Add Renderables ____________________________________________________________________________________________________ #
     # add_renderables_menu = active_2d_plot.ui.menus.custom_context_menus.add_renderables[0].programmatic_actions_dict
@@ -849,6 +859,10 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, debug_print=Fa
 
     ## add the right sidebar
     visible_intervals_info_widget_container, visible_intervals_ctrl_layout_widget =  spike_raster_window._perform_build_attached_visible_interval_info_widget()
+
+
+    
+
 
     return all_global_menus_actionsDict, global_flat_action_dict
 

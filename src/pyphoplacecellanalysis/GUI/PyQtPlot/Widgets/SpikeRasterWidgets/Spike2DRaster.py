@@ -456,6 +456,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
                         
         # Custom 2D raster plot:
         self.params.main_graphics_plot_widget_rowspan = 3 # how many rows the main graphics PlotItems should span
+        # self.params.setdefault('main_graphics_plot_widget_rowspan', 1) # how many rows the main graphics PlotItems should span
         
         # curr_plot_row = 1
         if self.Includes2DActiveWindowScatter:
@@ -464,10 +465,13 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             # (self.plots.main_plot_widget, self.plots.main_plot_widget_viewbox) = self.ui.main_graphics_layout_widget.build_PlotWithCustomViewbox()
             # self.ui.active_window_container_layout.addItem(self.plots.main_plot_widget, row=1, col=0, rowspan=self.params.main_graphics_plot_widget_rowspan, colspan=1)
             
+            # if not use_docked_pyqtgraph_plots:
+
             self.plots.main_plot_widget = self.ui.active_window_container_layout.addPlot(row=1, col=0, rowspan=self.params.main_graphics_plot_widget_rowspan, colspan=1)            
-            # self.plots.main_plot_widget = self.ui.main_graphics_layout_widget.addPlot(col=0, rowspan=self.params.main_graphics_plot_widget_rowspan, colspan=1) # , name='main_plot_widget'
-            
-            # (self.plots.main_plot_widget, self.plots.main_plot_widget_viewbox) = self.ui.main_graphics_layout_widget.addPlotWithCustomViewbox(row=2, col=0, rowspan=1, colspan=1)
+                # self.plots.main_plot_widget = self.ui.main_graphics_layout_widget.addPlot(col=0, rowspan=self.params.main_graphics_plot_widget_rowspan, colspan=1) # , name='main_plot_widget'
+                
+                # (self.plots.main_plot_widget, self.plots.main_plot_widget_viewbox) = self.ui.main_graphics_layout_widget.addPlotWithCustomViewbox(row=2, col=0, rowspan=1, colspan=1)
+
 
             self.plots.main_plot_widget.setObjectName('main_plot_widget') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
             # self.plots.main_plot_widget_viewbox.setObjectName('main_plot_widget_viewbox') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
@@ -564,6 +568,23 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         # Required for dynamic matplotlib figures (2022-12-23 added, not sure how it relates to above):
         self._setupUI_matplotlib_render_plots()
 
+        # custom_interval_rendering_plots = self.params.setdefault('custom_interval_rendering_plots', [self.plots.background_static_scroll_window_plot])
+        self.params.custom_interval_rendering_plots = [self.plots.background_static_scroll_window_plot]
+        if self.Includes2DActiveWindowScatter:
+            if self.plots.main_plot_widget is not None:
+                self.params.custom_interval_rendering_plots.append(self.plots.main_plot_widget)
+            
+        # if ((not self.Includes2DActiveWindowScatter) and use_docked_pyqtgraph_plots):
+        #     # use_docked_pyqtgraph_plots == True
+        #     name_modifier_suffix='raster_window'
+        #     _raster_tracks_out_dict = self.prepare_pyqtgraph_raster_track(name_modifier_suffix=name_modifier_suffix, should_link_to_main_plot_widget=False)            
+        #     _out = _raster_tracks_out_dict[f'rasters{name_modifier_suffix}']
+        #     dock_config, time_sync_pyqtgraph_widget, raster_root_graphics_layout_widget, raster_plot_item, rasters_display_outputs_tuple = _out
+        #     app, win, plots, plots_data = rasters_display_outputs_tuple
+
+        #     self.plots.main_plot_widget = raster_plot_item
+        #     self.plots.scatter_plot = plots.scatter_plot
+
         ## Add the epochs separator lines:
         _out_lines = self.add_raster_spikes_and_epochs_separator_line()
         
@@ -592,36 +613,38 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         # self.plots.main_plot_widget.setYRange(self.y[0], self.y[-1], padding=0)
         # self.plots.main_plot_widget.disableAutoRange()
         if self.Includes2DActiveWindowScatter:
-            self.plots.main_plot_widget.disableAutoRange('xy')
-            ## TODO: BUG: CONFIRMED: This is for-sure a problem. In the .ScrollRasterPreviewWindow_on_BuildUI(...) where the linear region widget (scroll_window_region) is built, those x-values are definintely timestamps and start slightly negative. This is why the widget is getting cut-off
-            """ From the first setup:
-                # Setup range for plot:
-                earliest_t, latest_t = self.spikes_window.total_df_start_end_times
-                background_static_scroll_window_plot.setXRange(earliest_t, latest_t, padding=0)
-                background_static_scroll_window_plot.setYRange(np.nanmin(curr_spike_y), np.nanmax(curr_spike_y), padding=0)
+            if self.plots.main_plot_widget is not None:
+                self.plots.main_plot_widget.disableAutoRange('xy')
+                ## TODO: BUG: CONFIRMED: This is for-sure a problem. In the .ScrollRasterPreviewWindow_on_BuildUI(...) where the linear region widget (scroll_window_region) is built, those x-values are definintely timestamps and start slightly negative. This is why the widget is getting cut-off
+                """ From the first setup:
+                    # Setup range for plot:
+                    earliest_t, latest_t = self.spikes_window.total_df_start_end_times
+                    background_static_scroll_window_plot.setXRange(earliest_t, latest_t, padding=0)
+                    background_static_scroll_window_plot.setYRange(np.nanmin(curr_spike_y), np.nanmax(curr_spike_y), padding=0)
 
-            Here it looks like I'm trying to use some sort of reletive x-coordinates (as I noted that I did in self._series_identity_lower_y_values, self._series_identity_upper_y_values?)
-            
-            OOPS, back-up, this is the main_plot_widget (that should be displaying the contents of the window above), not the same as the static background plot that displays all time.
-            """
-                    
-            # # Get updated time window
-            # updated_time_window = self.spikes_window.active_time_window # (30.0, 930.0) ## CHECKL this might actually be invalid at this timepoint, idk
-            # earliest_t, latest_t = updated_time_window
-            # resolved_start_x = np.nanmin(earliest_t, 0.0)
-            # print(f'resolved_start_x: {resolved_start_x}')
-            # resolved_end_x = (resolved_start_x+self.temporal_axis_length) # only let it go to the start_x + its appropriate length, otherwise it'll be too long?? Maybe I should actually use the window's end
-            # print(f'resolved_end_x: {resolved_end_x}')
-            # self.plots.main_plot_widget.setRange(xRange=[resolved_start_x, resolved_end_x], yRange=[self.y[0], self.y[-1]])
-            # ## NOW I THINK THIS IS JUST THE ZOOMED PLOT AND NOT THE REASON THE LINEAR SCROLL REGION is cut off
-            
-            # self.plots.main_plot_widget.setRange(xRange=[0.0, +self.temporal_axis_length], yRange=[self._series_identity_y_values[0], self._series_identity_y_values[-1]]) # After all this, I've concluded that it was indeed correct!
-            self.plots.main_plot_widget.setRange(xRange=[0.0, +self.temporal_axis_length], yRange=[min(self._series_identity_y_values), max(self._series_identity_y_values)]) # After all this, I've concluded that it was indeed correct!
-            _v_axis_item = Render2DNeuronIdentityLinesMixin.setup_custom_neuron_identity_axis(self.plots.main_plot_widget, self.n_cells)
+                Here it looks like I'm trying to use some sort of reletive x-coordinates (as I noted that I did in self._series_identity_lower_y_values, self._series_identity_upper_y_values?)
+                
+                OOPS, back-up, this is the main_plot_widget (that should be displaying the contents of the window above), not the same as the static background plot that displays all time.
+                """
+                        
+                # # Get updated time window
+                # updated_time_window = self.spikes_window.active_time_window # (30.0, 930.0) ## CHECKL this might actually be invalid at this timepoint, idk
+                # earliest_t, latest_t = updated_time_window
+                # resolved_start_x = np.nanmin(earliest_t, 0.0)
+                # print(f'resolved_start_x: {resolved_start_x}')
+                # resolved_end_x = (resolved_start_x+self.temporal_axis_length) # only let it go to the start_x + its appropriate length, otherwise it'll be too long?? Maybe I should actually use the window's end
+                # print(f'resolved_end_x: {resolved_end_x}')
+                # self.plots.main_plot_widget.setRange(xRange=[resolved_start_x, resolved_end_x], yRange=[self.y[0], self.y[-1]])
+                # ## NOW I THINK THIS IS JUST THE ZOOMED PLOT AND NOT THE REASON THE LINEAR SCROLL REGION is cut off
+                
+                # self.plots.main_plot_widget.setRange(xRange=[0.0, +self.temporal_axis_length], yRange=[self._series_identity_y_values[0], self._series_identity_y_values[-1]]) # After all this, I've concluded that it was indeed correct!
+                self.plots.main_plot_widget.setRange(xRange=[0.0, +self.temporal_axis_length], yRange=[min(self._series_identity_y_values), max(self._series_identity_y_values)]) # After all this, I've concluded that it was indeed correct!
+                _v_axis_item = Render2DNeuronIdentityLinesMixin.setup_custom_neuron_identity_axis(self.plots.main_plot_widget, self.n_cells)
     
     
         # Update 3D Curves if we have them: TODO: figure out where this goes!
         self.TimeCurvesViewMixin_on_window_update() # Don't think this does much here
+        # self.EpochRenderingMixin_on_window_update()
         
     
     @pyqtExceptionPrintingSlot()
@@ -1443,7 +1466,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
                 sync_connection = self.ui.connections.get(identifier, None)
                 if sync_connection is not None:
                     # have an existing sync connection, need to disconnect it.
-                    print('disconnecting window_scrolled for "{identifier}"')
+                    print(f'disconnecting window_scrolled for "{identifier}"')
                     self.window_scrolled.disconnect(sync_connection)
                     # print(f'WARNING: connection exists!')
                     self.ui.connections[identifier] = None
@@ -1456,7 +1479,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
                 sync_connection = self.ui.connections.get(identifier, None)
                 if sync_connection is not None:
                     # have an existing sync connection, need to disconnect it.
-                    print('disconnecting window_scrolled for "{identifier}"')
+                    print(f'disconnecting window_scrolled for "{identifier}"')
                     self.window_scrolled.disconnect(sync_connection)
                     # print(f'WARNING: connection exists!')
                     self.ui.connections[identifier] = None
@@ -1491,7 +1514,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     # ==================================================================================================================== #
 
     @function_attributes(short_name=None, tags=['intervals', 'tracks', 'pyqtgraph', 'specific', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 07:29', related_items=[])
-    def prepare_pyqtgraph_interval_tracks(self, enable_interval_overview_track: bool = False, should_remove_all_and_re_add: bool=True, name_modifier_suffix: str='', debug_print=False):
+    def prepare_pyqtgraph_interval_tracks(self, enable_interval_overview_track: bool = False, should_remove_all_and_re_add: bool=True, name_modifier_suffix: str='', should_link_to_main_plot_widget:bool=True, debug_print=False):
         """ adds to separate pyqtgraph-backed tracks to the SpikeRaster2D plotter for rendering intervals, and updates `active_2d_plot.params.custom_interval_rendering_plots` so the intervals are rendered on these new tracks in addition to any normal ones
         
         enable_interval_overview_track: bool: if True, renders a track to show all the intervals during the sessions (overview) in addition to the track for the intervals within the current active window
@@ -1516,15 +1539,16 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         interval_window_dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=True, corner_radius=0)
         name = f'intervals{name_modifier_suffix}'
         intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(500, 40), display_config=interval_window_dock_config)
-        self.params.custom_interval_rendering_plots = [self.plots.background_static_scroll_window_plot, self.plots.main_plot_widget, intervals_plot_item]
+        
+        self.params.custom_interval_rendering_plots.append(intervals_plot_item) # = [self.plots.background_static_scroll_window_plot, self.plots.main_plot_widget, intervals_plot_item]
+
+        # self.params.custom_interval_rendering_plots = [self.plots.background_static_scroll_window_plot, self.plots.main_plot_widget, intervals_plot_item]
         # active_2d_plot.params.custom_interval_rendering_plots = [active_2d_plot.plots.background_static_scroll_window_plot, active_2d_plot.plots.main_plot_widget, intervals_plot_item, intervals_overview_plot_item]
         if enable_interval_overview_track:
             self.params.custom_interval_rendering_plots.append(intervals_overview_plot_item)
             
         # active_2d_plot.interval_rendering_plots
-        main_plot_widget = self.plots.main_plot_widget # PlotItem
-        intervals_plot_item.setXLink(main_plot_widget) # works to synchronize the main zoomed plot (current window) with the epoch_rect_separate_plot (rectangles plotter)
-        
+
         _interval_tracks_out_dict[name] = (interval_window_dock_config, intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item)
 
         ## #TODO 2024-12-31 07:20: - [ ] need to clear/re-add the epochs to make this work
@@ -1552,12 +1576,30 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
                 remaining_new_plots_list = list(remaining_new_plots.values())
                 self.add_rendered_intervals(interval_datasource=a_ds, name=a_name, child_plots=remaining_new_plots_list) ## ADD only the new
             
+        if should_link_to_main_plot_widget and (self.plots.main_plot_widget is not None):
+            main_plot_widget = self.plots.main_plot_widget # PlotItem
+            intervals_plot_item.setXLink(main_plot_widget) # works to synchronize the main zoomed plot (current window) with the epoch_rect_separate_plot (rectangles plotter)
+        else:
+            ## setup the synchronization:
+            # Perform Initial (one-time) update from source -> controlled:
+            # intervals_time_sync_pyqtgraph_widget.on_window_changed(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
+            intervals_plot_item.setXRange(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, padding=0)
+            # disable active window syncing if it's enabled:
+            sync_connection = self.ui.connections.get(name, None)
+            if sync_connection is not None:
+                # have an existing sync connection, need to disconnect it.
+                print(f'disconnecting window_scrolled for "{name}"')
+                self.window_scrolled.disconnect(sync_connection)
+                    
+            # sync_connection = self.window_scrolled.connect(intervals_time_sync_pyqtgraph_widget.on_window_changed)
+            sync_connection = self.window_scrolled.connect(lambda earliest_t, latest_t: intervals_plot_item.setXRange(earliest_t, latest_t, padding=0)) ## explicitly captures `raster_plot_item`
+            self.ui.connections[name] = sync_connection # add the connection to the connections array
 
         return _interval_tracks_out_dict
 
 
     @function_attributes(short_name=None, tags=['raster', 'tracks', 'pyqtgraph', 'specific', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-09 10:50', related_items=[])
-    def prepare_pyqtgraph_raster_track(self, should_remove_all_and_re_add: bool=True, name_modifier_suffix: str='', debug_print=False):
+    def prepare_pyqtgraph_raster_track(self, name_modifier_suffix: str='', should_link_to_main_plot_widget:bool=True, debug_print=False):
         """ adds to separate pyqtgraph-backed tracks to the SpikeRaster2D plotter for rendering a 2D raster `active_2d_plot.params.custom_interval_rendering_plots` so the intervals are rendered on these new tracks in addition to any normal ones
         
         enable_interval_overview_track: bool: if True, renders a track to show all the intervals during the sessions (overview) in addition to the track for the intervals within the current active window
@@ -1584,7 +1626,6 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         name = f'rasters{name_modifier_suffix}'
         time_sync_pyqtgraph_widget, raster_root_graphics_layout_widget, raster_plot_item = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(500, 120), display_config=dock_config)
 
-
         if raster_plot_item not in self.params.custom_interval_rendering_plots:
             self.params.custom_interval_rendering_plots.append(raster_plot_item) ## this signals that it should recieve updates for its intervals somewhere else
         
@@ -1605,9 +1646,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         a_sorted_neuron_ids = deepcopy(self.ordered_neuron_ids)
 
         unit_sort_order, desired_sort_arr = find_desired_sort_indicies(an_included_unsorted_neuron_ids, a_sorted_neuron_ids)
-        # print(f'unit_sort_order: {unit_sort_order}\ndesired_sort_arr: {desired_sort_arr}')
-        # _out_data.unit_sort_orders_dict[a_decoder_name] = deepcopy(unit_sort_order)
-
+        
         #TODO 2025-01-09 11:32: - [ ] Ignores each cell's actual emphasis state and forces default:
         curr_spike_emphasis_state: SpikeEmphasisState = SpikeEmphasisState.Default
         unsorted_unit_colors_map: Dict[types.aclu_index, pg.QColor] = {aclu:v[2][curr_spike_emphasis_state].color() for aclu, v in self.params.config_items.items()} # [2] is hardcoded and the only element of the tuple used, something legacy I guess
@@ -1635,9 +1674,25 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         neuron_y_pos = np.array(list(deepcopy(time_sync_pyqtgraph_widget.plots_data.new_sorted_raster.neuron_y_pos).values()))
         raster_plot_item.setYRange(np.nanmin(neuron_y_pos), np.nanmax(neuron_y_pos), padding=0)
 
-        main_plot_widget = self.plots.main_plot_widget # PlotItem
-        raster_plot_item.setXLink(main_plot_widget) # works to synchronize the main zoomed plot (current window) with the epoch_rect_separate_plot (rectangles plotter)
-        
+        if should_link_to_main_plot_widget:
+            main_plot_widget = self.plots.main_plot_widget # PlotItem
+            raster_plot_item.setXLink(main_plot_widget) # works to synchronize the main zoomed plot (current window) with the epoch_rect_separate_plot (rectangles plotter)
+        else:
+            ## setup the synchronization:
+            # Perform Initial (one-time) update from source -> controlled:
+            # time_sync_pyqtgraph_widget.on_window_changed(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
+            # disable active window syncing if it's enabled:
+            sync_connection = self.ui.connections.get(name, None)
+            if sync_connection is not None:
+                # have an existing sync connection, need to disconnect it.
+                print(f'disconnecting window_scrolled for "{name}"')
+                self.window_scrolled.disconnect(sync_connection)
+                        
+            # sync_connection = self.window_scrolled.connect(time_sync_pyqtgraph_widget.on_window_changed)
+            sync_connection = self.window_scrolled.connect(lambda earliest_t, latest_t: raster_plot_item.setXRange(earliest_t, latest_t, padding=0)) ## explicitly captures `raster_plot_item`
+            self.ui.connections[name] = sync_connection # add the connection to the connections array
+            
+
         return _raster_tracks_out_dict
 
 

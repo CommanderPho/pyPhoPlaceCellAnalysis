@@ -213,10 +213,13 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
 
         ## Specific to SpikeRaster2D:        
         ## Add the custom menu to the context menus of the plots in SpikeRaster2D:        
-        main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
-        background_static_scroll_plot_widget = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
-        _subFn_append_custom_menu_to_context_menu(main_plot_widget, menuAdd_Renderable)
-        _subFn_append_custom_menu_to_context_menu(background_static_scroll_plot_widget, menuAdd_Renderable)
+        if menuAdd_Renderable is not None:
+            main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
+            background_static_scroll_plot_widget = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
+            if main_plot_widget is not None:
+                _subFn_append_custom_menu_to_context_menu(main_plot_widget, menuAdd_Renderable)
+            if background_static_scroll_plot_widget is not None:
+                _subFn_append_custom_menu_to_context_menu(background_static_scroll_plot_widget, menuAdd_Renderable)
         
         # Add the reference to the context menus to owner, so it isn't released:
         ## TODO: currently replaces the dict entry, which we might want to use for other menus
