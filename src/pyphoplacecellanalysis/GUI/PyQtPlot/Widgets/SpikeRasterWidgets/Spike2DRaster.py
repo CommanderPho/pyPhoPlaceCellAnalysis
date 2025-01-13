@@ -1623,7 +1623,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         _raster_tracks_out_dict = {}
         ## Enables creating a new pyqtgraph-based track to display the intervals/epochs
         dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=True, corner_radius=0)
-        name = f'rasters{name_modifier_suffix}'
+        name = f'rasters[{name_modifier_suffix}]'
         time_sync_pyqtgraph_widget, raster_root_graphics_layout_widget, raster_plot_item = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(500, 120), display_config=dock_config)
 
         if raster_plot_item not in self.params.custom_interval_rendering_plots:
