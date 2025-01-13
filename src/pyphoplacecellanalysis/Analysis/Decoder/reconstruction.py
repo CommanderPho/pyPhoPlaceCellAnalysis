@@ -1528,6 +1528,10 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         spkcount = spkcount[0]
         nbins = nbins[0]
         time_bin_container = time_bin_containers_list[0] # neuropy.utils.mixins.binning_helpers.BinningContainer
+        # original_time_bin_container = deepcopy(self.time_binning_container) ## compared to this, we lose the last time_bin (which is partial)
+        # is_time_bin_included_in_new = np.isin(original_time_bin_container.centers, time_bin_container.centers) ## see which of the original time bins vanished in the new `time_bin_container`
+        ## drop previous values for compatibility
+        
         
         most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = self.decode(spkcount, time_bin_size=decoding_time_bin_size, output_flat_versions=output_flat_versions, debug_print=debug_print)
         curr_unit_marginal_x, curr_unit_marginal_y = self.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
@@ -2274,11 +2278,28 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         TODO 2023-05-16 - CHECK - CORRECTNESS - Figure out correct indexing and whether it returns binned data for edges or counts.
         
         """
+        original_time_bin_container = deepcopy(self.time_binning_container) ## compared to this, we lose the last time_bin (which is partial)
+        
+        
         with WrappingMessagePrinter(f'compute_all final_p_x_given_n called. Computing windows...', begin_line_ending='... ', finished_message='compute_all completed.', enable_print=(debug_print or self.debug_print)):
             ## Single sweep decoding:
 
             ## 2022-09-23 - Epochs-style encoding (that works):
             self.time_binning_container, self.p_x_given_n, self.most_likely_positions, curr_unit_marginal_x, curr_unit_marginal_y, flat_outputs_container = self.hyper_perform_decode(self.spikes_df, decoding_time_bin_size=self.time_bin_size, output_flat_versions=True, debug_print=(debug_print or self.debug_print)) ## this is where it's getting messed up
+            num_extra_bins_in_old: int = original_time_bin_container.num_bins - self.time_binning_container.num_bins
+            # np.isin(original_time_bin_container.centers, self.time_binning_container.centers)
+            # is_time_bin_included_in_new = np.isin(original_time_bin_container.centers, self.time_binning_container.centers) ## see which of the original time bins vanished in the new `time_bin_container`
+            ## drop previous values for compatibility
+            if num_extra_bins_in_old > 0:
+                ## UPDATES: self.is_non_firing_time_bin, self.unit_specific_time_binned_spike_counts
+                ## find how many time bins to be dropped:
+                # is_time_bin_included_in_new = np.array([np.isin(v, self.time_binning_container.centers) for v in original_time_bin_container.centers])
+                old_time_bins_to_remove = original_time_bin_container.centers[-num_extra_bins_in_old:]
+                assert np.all(np.logical_not([np.isin(v, self.time_binning_container.centers) for v in old_time_bins_to_remove]))
+                self.unit_specific_time_binned_spike_counts = self.unit_specific_time_binned_spike_counts[:, :-num_extra_bins_in_old]
+                self.total_spike_counts_per_window = self.total_spike_counts_per_window[:-num_extra_bins_in_old]
+                
+
             self.marginal = DynamicContainer(x=curr_unit_marginal_x, y=curr_unit_marginal_y)
             assert isinstance(self.time_binning_container, BinningContainer) # Should be neuropy.utils.mixins.binning_helpers.BinningContainer
             self.compute_corrected_positions() ## this seems to fail for pf1D
@@ -2313,7 +2334,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         ## Find the bins that don't have any spikes in them:
         # zero_bin_indicies = np.where(self.total_spike_counts_per_window == 0)[0]
         # is_non_firing_bin = self.is_non_firing_time_bin
-        assert (len(self.is_non_firing_time_bin) == self.num_time_windows), f"len(self.is_non_firing_time_bin): {len(self.is_non_firing_time_bin)}, self.num_time_windows: {self.num_time_windows}"
+        assert (len(self.is_non_firing_time_bin) == self.num_time_windows), f"len(self.is_non_firing_time_bin): {len(self.is_non_firing_time_bin)}, self.num_time_windows: {self.num_time_windows}" # 2025-01-13 17:43 Added constraint because this is supposed to be correct
         is_non_firing_bin = np.where(self.is_non_firing_time_bin)[0] # TEMP: do this to get around the indexing issue. TODO: IndexError: boolean index did not match indexed array along dimension 0; dimension is 11880 but corresponding boolean dimension is 11881
         self.revised_most_likely_positions = self.perform_compute_forward_filled_positions(self.most_likely_positions, is_non_firing_bin=is_non_firing_bin)
         

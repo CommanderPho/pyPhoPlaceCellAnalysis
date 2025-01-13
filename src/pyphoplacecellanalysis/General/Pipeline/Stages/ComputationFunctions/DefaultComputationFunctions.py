@@ -67,7 +67,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         ## filtered_spikes_df version:
         computation_result.computed_data['pf1D_Decoder'] = BayesianPlacemapPositionDecoder(time_bin_size=placefield_computation_config.time_bin_size, pf=computation_result.computed_data['pf1D'], spikes_df=computation_result.computed_data['pf1D'].filtered_spikes_df.copy(), debug_print=False)
         assert (len(computation_result.computed_data['pf1D_Decoder'].is_non_firing_time_bin) == computation_result.computed_data['pf1D_Decoder'].num_time_windows), f"len(self.is_non_firing_time_bin): {len(computation_result.computed_data['pf1D_Decoder'].is_non_firing_time_bin)}, self.num_time_windows: {computation_result.computed_data['pf1D_Decoder'].num_time_windows}"
-        computation_result.computed_data['pf1D_Decoder'].compute_all() #
+        computation_result.computed_data['pf1D_Decoder'].compute_all() # this is what breaks it
 
         if ('pf2D' in computation_result.computed_data) and (computation_result.computed_data.get('pf2D', None) is not None):
             computation_result.computed_data['pf2D_Decoder'] = BayesianPlacemapPositionDecoder(time_bin_size=placefield_computation_config.time_bin_size, pf=computation_result.computed_data['pf2D'], spikes_df=computation_result.computed_data['pf2D'].filtered_spikes_df.copy(), debug_print=False)
