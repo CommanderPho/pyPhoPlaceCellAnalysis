@@ -1384,8 +1384,10 @@ class PipelineWithComputedPipelineStageMixin:
         """
         if not skip_reload_computation_fcns:
             self.reload_default_computation_functions()
-        assert required_local_keys is None, f"required_local_keys: {required_local_keys} but these are not currently supported!"
-        return SpecificComputationValidator.find_immediate_requirements(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), required_global_keys=required_global_keys)
+        # assert required_local_keys is None, f"required_local_keys: {required_local_keys} but these are not currently supported!"
+        if (required_local_keys is None):
+            required_local_keys = [] ## empty list
+        return SpecificComputationValidator.find_immediate_requirements(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), required_global_keys=required_global_keys, required_local_keys=required_local_keys)
 
 
     @function_attributes(short_name=None, tags=['requirements'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-13 09:17', related_items=[])
@@ -1412,42 +1414,54 @@ class PipelineWithComputedPipelineStageMixin:
         if not skip_reload_computation_fcns:
             self.reload_default_computation_functions()
         
-        assert (required_local_keys is None), f"required_local_keys: {required_local_keys} but these are not currently supported!"
-        
+        # assert (required_local_keys is None), f"required_local_keys: {required_local_keys} but these are not currently supported!"
+        if required_local_keys is None:
+            required_local_keys = []
+            
         ## INPUTS: debug_print, remaining_required_global_result_keys
         remaining_required_global_result_keys = set(required_global_keys) ## convert to a set to ensure uniqueness
+        remaining_required_local_result_keys = set(required_local_keys) ## convert to a set to ensure uniqueness
+
         upstream_required_validators = {}
         
         ## first iteration:
-        _curr_remaining_comp_specifiers_dict, _curr_required_validators, _curr_required_global_keys = self.find_immediate_requirements(required_global_keys=list(remaining_required_global_result_keys))
+        _curr_remaining_comp_specifiers_dict, _curr_required_validators, (_curr_required_global_keys, _curr_required_local_keys) = self.find_immediate_requirements(required_global_keys=list(remaining_required_global_result_keys), required_local_keys=list(remaining_required_local_result_keys))
         if debug_print:
             print(f"_curr_required_global_keys: {_curr_required_global_keys}")
+            print(f"_curr_required_local_keys: {_curr_required_local_keys}")
         remaining_required_global_result_keys = remaining_required_global_result_keys.union(_curr_required_global_keys)
+        remaining_required_local_result_keys = remaining_required_local_result_keys.union(_curr_required_local_keys)
         upstream_required_validators.update(_curr_required_validators)
         if debug_print:
             print(f"remaining_required_global_result_keys: {remaining_required_global_result_keys}")
+            print(f"remaining_required_local_result_keys: {remaining_required_local_result_keys}")
         ## OUTPUTS: remaining_required_global_result_keys, upstream_required_validators
 
         max_num_iterations: int = 5
         curr_iter: int = 0
         _prev_provided_global_keys = set([]) ## empty set
-
-        while (curr_iter < max_num_iterations) and (remaining_required_global_result_keys != _prev_provided_global_keys):
+        _prev_provided_local_keys = set([]) ## empty set
+        
+        while (curr_iter < max_num_iterations) and (remaining_required_global_result_keys != _prev_provided_global_keys) and (remaining_required_local_result_keys != _prev_provided_local_keys):
             _prev_provided_global_keys = remaining_required_global_result_keys
-            _curr_remaining_comp_specifiers_dict, _curr_required_validators, _curr_required_global_keys = self.find_immediate_requirements(required_global_keys=list(remaining_required_global_result_keys))
+            _prev_provided_local_keys = remaining_required_local_result_keys
+            
+            _curr_remaining_comp_specifiers_dict, _curr_required_validators, (_curr_required_global_keys, _curr_required_local_keys) = self.find_immediate_requirements(required_global_keys=list(remaining_required_global_result_keys), required_local_keys=list(remaining_required_local_result_keys))
             if debug_print:
-                print(f"curr_iter: {curr_iter}/{max_num_iterations}: _curr_required_global_keys: {_curr_required_global_keys}")
+                print(f"curr_iter: {curr_iter}/{max_num_iterations}: _curr_required_global_keys: {_curr_required_global_keys}, _curr_required_local_keys: {_curr_required_local_keys}")
             remaining_required_global_result_keys = remaining_required_global_result_keys.union(_curr_required_global_keys)
+            remaining_required_local_result_keys = remaining_required_local_result_keys.union(_curr_required_local_keys)
             upstream_required_validators.update(_curr_required_validators)
             if debug_print:
                 print(f"remaining_required_global_result_keys: {remaining_required_global_result_keys}")
+                print(f"remaining_required_local_result_keys: {remaining_required_local_result_keys}")
             curr_iter += 1
             
 
         ## END while...
         required_global_keys = list(remaining_required_global_result_keys) ## convert to a list
-        
-        return upstream_required_validators, required_global_keys
+        required_local_keys = list(remaining_required_local_result_keys) ## convert to a list
+        return upstream_required_validators, (required_global_keys, required_local_keys)
 
 
 
@@ -2071,6 +2085,121 @@ class PipelineWithComputedPipelineStageMixin:
 
         return sucessfully_updated_keys, successfully_loaded_keys, failed_loaded_keys, found_split_paths
     
+
+    # ==================================================================================================================== #
+    # Split Save General                                                                                                   #
+    # ==================================================================================================================== #
+    @function_attributes(short_name=None, tags=['save', 'pickle', 'split'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-11 08:11', related_items=['load_split_pickled_global_computation_results'])
+    def save_split_custom_results(self, override_global_pickle_path: Optional[Path]=None, override_global_pickle_filename:Optional[str]=None,
+                                              include_includelist=None, continue_after_pickling_errors: bool=True, debug_print:bool=True):
+        """Save out the `global_computation_results` which are not currently saved with the pipeline
+
+        Reciprocal:
+            load_pickled_global_computation_results
+
+        Usage:
+            split_save_folder, split_save_paths, split_save_output_types, failed_keys = curr_active_pipeline.save_split_global_computation_results(debug_print=True)
+            
+        #TODO 2023-11-22 18:54: - [ ] One major issue is that the types are lost upon reloading, so I think we'll need to save them somewhere. They can be fixed post-hoc like:
+        # Update result with correct type:
+        curr_active_pipeline.global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(**curr_active_pipeline.global_computation_results.computed_data['RankOrder'])
+
+        """
+        from pyphocorehelpers.print_helpers import print_filesystem_file_size, print_object_memory_usage
+        
+
+        ## Case 1. `override_global_pickle_path` is provided:
+        if override_global_pickle_path is not None:
+            ## override_global_pickle_path is provided:
+            if not isinstance(override_global_pickle_path, Path):
+                override_global_pickle_path = Path(override_global_pickle_path).resolve()
+            # Case 1a: `override_global_pickle_path` is a complete file path
+            if not override_global_pickle_path.is_dir():
+                # a full filepath, just use that directly
+                global_computation_results_pickle_path = override_global_pickle_path.resolve()
+            else:
+                # default case, assumed to be a directory and we'll use the normal filename.
+                active_global_pickle_filename: str = (override_global_pickle_filename or self.global_computation_results_pickle_path or "global_computation_results.pkl")
+                global_computation_results_pickle_path = override_global_pickle_path.joinpath(active_global_pickle_filename).resolve()
+
+        else:
+            # No override path provided
+            if override_global_pickle_filename is None:
+                # no filename provided either, use default global pickle path:
+                global_computation_results_pickle_path = self.global_computation_results_pickle_path
+            else:
+                # Otherwise use default output path but specified override_global_pickle_filename:
+                global_computation_results_pickle_path = self.get_output_path().joinpath(override_global_pickle_filename).resolve() 
+
+        if debug_print:
+            print(f'global_computation_results_pickle_path: {global_computation_results_pickle_path}')
+        
+        ## In split save, we save each result separately in a folder
+        split_save_folder_name: str = f'{global_computation_results_pickle_path.stem}_split'
+        split_save_folder: Path = global_computation_results_pickle_path.parent.joinpath(split_save_folder_name).resolve()
+        if debug_print:
+            print(f'split_save_folder: {split_save_folder}')
+        # make if doesn't exist
+        split_save_folder.mkdir(exist_ok=True)
+        
+        if include_includelist is None:
+            ## include all keys if none are specified
+            include_includelist = list(self.global_computation_results.computed_data.keys())
+
+        ## only saves out the `global_computation_results` data:
+        global_computed_data = self.global_computation_results.computed_data
+        split_save_paths = {}
+        split_save_output_types = {}
+        failed_keys = []
+        skipped_keys = []
+        for k, v in global_computed_data.items():
+            if k in include_includelist:
+                curr_split_result_pickle_path = split_save_folder.joinpath(f'Split_{k}.pkl').resolve()
+                if debug_print:
+                    print(f'k: {k} -- size_MB: {print_object_memory_usage(v, enable_print=False)}')
+                    print(f'\tcurr_split_result_pickle_path: {curr_split_result_pickle_path}')
+                was_save_success = False
+                curr_item_type = type(v)
+                try:
+                    ## try get as dict                
+                    v_dict = v.__dict__ #__getstate__()
+                    # saveData(curr_split_result_pickle_path, (v_dict))
+                    saveData(curr_split_result_pickle_path, (v_dict, str(curr_item_type.__module__), str(curr_item_type.__name__)))    
+                    was_save_success = True
+                except KeyError as e:
+                    print(f'\t{k} encountered {e} while trying to save {k}. Skipping')
+                    pass
+                except PicklingError as e:
+                    if not continue_after_pickling_errors:
+                        raise
+                    else:
+                        print(f'\t{k} encountered {e} while trying to save {k}. Skipping')
+                        pass
+                    
+                if was_save_success:
+                    split_save_paths[k] = curr_split_result_pickle_path
+                    split_save_output_types[k] = curr_item_type
+                    if debug_print:
+                        print(f'\tfile_size_MB: {print_filesystem_file_size(curr_split_result_pickle_path, enable_print=False)} MB')
+                else:
+                    failed_keys.append(k)
+            else:
+                if debug_print:
+                    print(f'\tskipping key "{k}" because it is not included in include_includelist: {include_includelist}')
+                skipped_keys.append(k)
+                
+        if len(failed_keys) > 0:
+            print(f'WARNING: failed_keys: {failed_keys} did not save for global results! They HAVE NOT BEEN SAVED!')
+            
+
+        return split_save_folder, split_save_paths, split_save_output_types, failed_keys
+
+
+
+
+    # ==================================================================================================================== #
+    # Parameters                                                                                                           #
+    # ==================================================================================================================== #
     @function_attributes(short_name=None, tags=['parameters', 'computaton'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-23 06:29', related_items=[])
     def get_all_parameters(self, allow_update_global_computation_config:bool=True) -> Dict:
         """ gets all user-parameters from the pipeline
@@ -2078,6 +2207,7 @@ class PipelineWithComputedPipelineStageMixin:
         Actually updates `self.global_computation_results.computation_config`
         
         """
+        from benedict import benedict
         from neuropy.core.parameters import ParametersContainer
         from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
         from pyphoplacecellanalysis.General.PipelineParameterClassTemplating import GlobalComputationParametersAttrsClassTemplating
@@ -2126,7 +2256,7 @@ class PipelineWithComputedPipelineStageMixin:
         #  '_DEP_ratemap_peaks': {'peak_score_inclusion_percent_threshold': 0.25},
         #  'ratemap_peaks_prominence2d': {'step': 0.01, 'peak_height_multiplier_probe_levels': (0.5, 0.9), 'minimum_included_peak_height': 0.2, 'uniform_blur_size': 3, 'gaussian_blur_sigma': 3}}
 
-        return _master_params_dict
+        return benedict(_master_params_dict)
 
         # ## OUTPUTS: param_typed_parameters
         # return {

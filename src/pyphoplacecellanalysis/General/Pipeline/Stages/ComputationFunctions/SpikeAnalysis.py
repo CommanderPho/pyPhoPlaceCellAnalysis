@@ -265,7 +265,10 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
     _computationPrecidence = 4
     _is_global = False
 
-    @function_attributes(short_name='spike_burst_detection', tags=['spikes','burst'], input_requires=[], output_provides=[], uses=['safe_pandas_get_group','pybursts.kleinberg'], used_by=[], creation_date='2023-09-12 17:27', related_items=[],
+    @function_attributes(short_name='spike_burst_detection', tags=['spikes','burst'],
+                         input_requires=["computation_result.sess.spikes_df", "computation_result.sess.position"],
+                         output_provides=["computation_result.computation_config['spike_analysis']", "computation_result.computed_data['burst_detection']"],
+                         uses=['safe_pandas_get_group','pybursts.kleinberg'], used_by=[], creation_date='2023-09-12 17:27', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['burst_detection'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['burst_detection']['burst_intervals']), is_global=False)
     def _perform_spike_burst_detection_computation(computation_result: ComputationResult, debug_print=False):
         """ Computes periods when the cells are firing in bursts in a hierarchical manner
@@ -376,7 +379,9 @@ class SpikeAnalysisComputations(AllFunctionEnumeratingMixin, metaclass=Computati
     
     
 
-    @function_attributes(short_name='firing_rate_trends', tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-31 00:00', related_items=[],
+    @function_attributes(short_name='firing_rate_trends', tags=[''],
+                         input_requires=["computation_result.sess.spikes_df", "computation_result.computed_data['pf2D']"], output_provides=["computation_result.computed_data['firing_rate_trends']"],
+                         uses=[], used_by=[], creation_date='2023-08-31 00:00', related_items=[],
                          validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['firing_rate_trends'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['firing_rate_trends']['pf_included_spikes_only']), is_global=False)
     def _perform_firing_rate_trends_computation(computation_result: ComputationResult, debug_print=False):
         """ Computes trends and time-courses of each neuron's firing rate. 

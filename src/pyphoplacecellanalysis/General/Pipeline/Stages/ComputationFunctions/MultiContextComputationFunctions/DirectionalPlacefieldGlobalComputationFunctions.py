@@ -1101,6 +1101,12 @@ class DirectionalLapsHelpers:
 
         #TODO 2023-11-10 21:00: - [ ] Convert above "LR/RL" notation to new "LR/RL" versions:
 
+        
+        Uses:
+        
+            curr_active_pipeline.computation_results[an_epoch_name].computed_data.get('pf1D_Decoder', None)
+        
+        
         """
 
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names() # ('maze1_any', 'maze2_any', 'maze_any')
@@ -5564,7 +5570,9 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
     _computationPrecidence = 1000
     _is_global = True
 
-    @function_attributes(short_name='split_to_directional_laps', tags=['directional_pf', 'laps', 'epoch', 'session', 'pf1D', 'pf2D'], input_requires=[], output_provides=[], uses=['_perform_PBE_stats'], used_by=[], creation_date='2023-10-25 09:33', related_items=[],
+    @function_attributes(short_name='split_to_directional_laps', tags=['directional_pf', 'laps', 'epoch', 'session', 'pf1D', 'pf2D'],
+                          input_requires=["computation_results[an_epoch_name]['pf1D_Decoder']"], output_provides=[],
+                          uses=['DirectionalLapsHelpers.build_global_directional_result_from_natural_epochs'], used_by=[], creation_date='2023-10-25 09:33', related_items=[],
         provides_global_keys=['DirectionalLaps'],
         validate_computation_test=validate_has_directional_laps, is_global=True)
     def _split_to_directional_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False):
@@ -5589,7 +5597,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             print(f'WARN: _split_to_directional_laps(...): include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
 
         # Set the global result:
-        global_computation_results.computed_data['DirectionalLaps'] = DirectionalLapsHelpers.build_global_directional_result_from_natural_epochs(owning_pipeline_reference)
+        global_computation_results.computed_data['DirectionalLaps'] = DirectionalLapsHelpers.build_global_directional_result_from_natural_epochs(owning_pipeline_reference) # Uses `curr_active_pipeline.computation_results[an_epoch_name].computed_data.get('pf1D_Decoder', None)`
 
         ## NOTE: Needs to call `owning_pipeline_reference.prepare_for_display()` before display functions can be used with new directional results
 
@@ -5604,7 +5612,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
 
     @function_attributes(short_name='merged_directional_placefields', tags=['directional_pf', 'laps', 'epoch', 'replay', 'session', 'pf1D', 'pf2D'],
-                       input_requires=['filtered_sessions[global_epoch_name].replay', 'global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz', 'global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values'], output_provides=[], uses=['PfND.build_merged_directional_placefields'], used_by=[], creation_date='2023-10-25 09:33', related_items=['DirectionalPseudo2DDecodersResult'],
+                       input_requires=['filtered_sessions[global_epoch_name].replay', 'global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz', 'global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values'], output_provides=[],
+                       uses=['PfND.build_merged_directional_placefields'], used_by=[], creation_date='2023-10-25 09:33', related_items=['DirectionalPseudo2DDecodersResult'],
         requires_global_keys=['DirectionalLaps'], provides_global_keys=['DirectionalMergedDecoders'],
         validate_computation_test=validate_has_directional_merged_placefields, is_global=True)
     def _build_merged_directional_placefields(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False,

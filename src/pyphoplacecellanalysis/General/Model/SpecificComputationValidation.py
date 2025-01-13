@@ -188,6 +188,14 @@ class SpecificComputationValidator:
         if not self.has_results_spec:
             return False
         return np.any(np.isin(global_keys, (self.results_specification.provides_global_keys or [])))
+    
+
+    def is_requirement_for_local_keys(self, local_keys: List[str]) -> bool:
+        """ requirements: checks if either short_name or computation_name is contained in the name_list provided. """        
+        if not self.has_results_spec:
+            return False
+        return np.any(np.isin(local_keys, (self.results_specification.provides_local_keys or [])))
+    
 
 
 
@@ -510,11 +518,11 @@ class SpecificComputationValidator:
     # Requirements/Upstream                                                                                                #
     # ==================================================================================================================== #
     @classmethod
-    def find_immediate_requirements(cls, remaining_comp_specifiers_dict: Dict[str, "SpecificComputationValidator"], required_global_keys: List[str], debug_print=False):
+    def find_immediate_requirements(cls, remaining_comp_specifiers_dict: Dict[str, "SpecificComputationValidator"], required_global_keys: List[str], required_local_keys: Optional[List[str]]=None, debug_print=False):
         """ Finds the validators that are directly required for one of the validators in `remaining_comp_specifiers_dict`
         Usage:
 
-        remaining_comp_specifiers_dict, required_validators, required_global_keys = SpecificComputationValidator.find_immediate_requirements(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict, required_global_keys=required_global_keys)
+        remaining_comp_specifiers_dict, required_validators, (required_global_keys, required_local_keys) = SpecificComputationValidator.find_immediate_requirements(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict, required_global_keys=required_global_keys)
         required_global_keys
 
         """
@@ -522,17 +530,26 @@ class SpecificComputationValidator:
         for a_name, a_validator in remaining_comp_specifiers_dict.items():
             if a_validator.is_requirement_for_global_keys(required_global_keys):
                 required_validators[a_name] = a_validator
+            if (required_local_keys is not None) and a_validator.is_requirement_for_local_keys(required_local_keys):
+                if a_name not in required_validators:
+                    required_validators[a_name] = a_validator
+                
+
 
         for a_name, a_found_validator in required_validators.items():
             new_required_global_keys = a_found_validator.results_specification.requires_global_keys
             required_global_keys.extend(new_required_global_keys)
+            
+            new_required_local_keys = a_found_validator.results_specification.requires_local_keys
+            required_local_keys.extend(new_required_local_keys)
+
             remaining_comp_specifiers_dict.pop(a_name) # remove initial now that it's been resolved
 
         remaining_comp_specifiers_dict = {k:v for k,v in remaining_comp_specifiers_dict.items() if k not in required_validators}
 
         if debug_print:
             print(f'len(remaining_comp_specifiers_dict): {len(remaining_comp_specifiers_dict)}, required_validators: {required_validators}')
-        return remaining_comp_specifiers_dict, required_validators, required_global_keys
+        return remaining_comp_specifiers_dict, required_validators, (required_global_keys, required_local_keys)
 
 
 
