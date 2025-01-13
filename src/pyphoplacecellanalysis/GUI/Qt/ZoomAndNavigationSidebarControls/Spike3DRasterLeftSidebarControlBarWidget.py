@@ -15,12 +15,34 @@ sys.excepthook = trap_exc_during_debug
 
 
 class Spike3DRasterLeftSidebarControlBar(QtWidgets.QWidget):
-    """ A controls bar with buttons loaded from a Qt .ui file. """
+    """ A controls bar with buttons loaded from a Qt .ui file. 
+    
+    self.ui.lblCrosshairTraceStaticLabel
+    self.ui.lblCrosshairTraceValue
+    
+    """
     
     animation_time_step_changed = QtCore.Signal(float) # returns bool indicating whether is_playing
     temporal_zoom_factor_changed = QtCore.Signal(float)
     render_window_duration_changed = QtCore.Signal(float)
         
+
+
+    @property
+    def crosshair_trace_time(self) -> float:
+        """The crosshair_trace_time property."""
+        return self._crosshair_trace_time
+    @crosshair_trace_time.setter
+    def crosshair_trace_time(self, value: float):
+        if value is not None:
+            self.ui.lblCrosshairTraceValue.setText(f"{value}")
+            self.ui.lblCrosshairTraceStaticLabel.setVisible(True)
+            self.ui.lblCrosshairTraceValue.setVisible(True)
+        else:
+            ## Hide it
+            self.ui.lblCrosshairTraceStaticLabel.setVisible(False)
+            self.ui.lblCrosshairTraceValue.setVisible(False)
+
     def __init__(self, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self.ui = Ui_leftSideToolbarWidget()
@@ -40,6 +62,9 @@ class Spike3DRasterLeftSidebarControlBar(QtWidgets.QWidget):
         self.ui.spinAnimationTimeStep.sigValueChanged.connect(self.animation_time_step_valueChanged)
         self.ui.spinTemporalZoomFactor.sigValueChanged.connect(self.temporal_zoom_factor_valueChanged)
         self.ui.spinRenderWindowDuration.sigValueChanged.connect(self.render_window_duration_valueChanged)
+        
+        self.ui.lblCrosshairTraceStaticLabel.setVisible(False)
+        self.ui.lblCrosshairTraceValue.setVisible(False)
              
  
     @pyqtExceptionPrintingSlot(object)
