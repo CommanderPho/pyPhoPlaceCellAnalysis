@@ -163,6 +163,7 @@ class CustomGraphicsLayoutWidget(DraggableGraphicsWidgetMixin, pg.GraphicsLayout
             super().mouseClickEvent(ev)     
 
     def hoverEvent(self, ev):
+        print(f'CustomGraphicsLayoutWidget.hoverEvent(ev: {ev}')
         if self.target_event_handler_child:
             # Forward the event to the child
             self.target_event_handler_child.hoverEvent(ev)
@@ -196,7 +197,7 @@ class CustomViewBox(pg.ViewBox):
         #     ## this mode enables right-mouse clicks to reset the plot range
         #     self.autoRange()     
         if self._debug_print:      
-            print(f'.mouseClickEvent(ev: {ev})')
+            print(f'CustomViewBox.mouseClickEvent(ev: {ev})')
         # Custom logic
         ev.accept()  # or ev.ignore() if you want default handling
         # Optionally call super() if desired:
@@ -206,7 +207,7 @@ class CustomViewBox(pg.ViewBox):
     ## reimplement mouseDragEvent to disable continuous axis zoom
     def mouseDragEvent(self, ev, axis=None):
         if self._debug_print:      
-            print(f'.mouseDragEvent(ev: {ev}, axis={axis})')
+            print(f'CustomViewBox.mouseDragEvent(ev: {ev}, axis={axis})')
         # ev.accept()
 
         if (ev.button() == QtCore.Qt.MouseButton.RightButton): # (axis is not None) and
@@ -220,7 +221,7 @@ class CustomViewBox(pg.ViewBox):
             # print(f'new_start_t: {new_start_t}')
             
             if self._debug_print:      
-                print(f'\tself._last_drag_start_point: {self._last_drag_start_point}')
+                print(f'\tCustomViewBox._last_drag_start_point: {self._last_drag_start_point}')
             if ev.isStart():
                 if self._debug_print:      
                     print(f'ev.isStart(): new_start_t: {new_start_t}')
@@ -252,6 +253,24 @@ class CustomViewBox(pg.ViewBox):
                 
             # self.sigLeftDrag.emit(new_start_t)
             ev.accept()
+            
+        elif (ev.button() == QtCore.Qt.MouseButton.MiddleButton): # (axis is not None) and
+            if ev.isStart():
+                self.setCursor(QtCore.Qt.ClosedHandCursor)  # Change cursor to indicate panning
+                self._drag_start_pos = self.mapSceneToView(ev.buttonDownPos())
+            elif ev.isFinish():
+                self.setCursor(QtCore.Qt.ArrowCursor)  # Restore cursor after panning
+            else:
+                # Calculate the panning delta for the x-axis only
+                current_pos = self.mapSceneToView(ev.pos())
+                delta_x = current_pos.x() - self._drag_start_pos.x()  # Only use x-delta
+                self._drag_start_pos.setX(current_pos.x())  # Update x start position
+
+                # Adjust the view range for the x-axis only
+                self.translateBy(x=-delta_x, y=0)  # Lock y-axis by setting y delta to 0
+
+            ev.accept()
+
         else:
             # pg.ViewBox.mouseDragEvent(self, ev, axis=axis)            
             # Custom dragging logic
