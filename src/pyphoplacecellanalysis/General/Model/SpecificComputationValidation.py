@@ -183,6 +183,14 @@ class SpecificComputationValidator:
         return np.any(np.isin(provided_global_keys, (self.results_specification.requires_global_keys or [])))
 
 
+    def is_requirement_for_global_keys(self, global_keys: List[str]) -> bool:
+        """ requirements: checks if either short_name or computation_name is contained in the name_list provided. """        
+        if not self.has_results_spec:
+            return False
+        return np.any(np.isin(global_keys, (self.results_specification.provides_global_keys or [])))
+
+
+
 
     # Main Operation Functions ___________________________________________________________________________________________ #
     def try_validate_is_computation_valid(self, curr_active_pipeline, **kwargs) -> bool:
@@ -417,7 +425,10 @@ class SpecificComputationValidator:
 
     @classmethod
     def find_immediate_dependencies(cls, remaining_comp_specifiers_dict: Dict[str, "SpecificComputationValidator"], provided_global_keys: List[str], debug_print=False):
-        """
+        """ Finds the validators that depend directly on one of the validators in `remaining_comp_specifiers_dict`
+        
+        Updates: remaining_comp_specifiers_dict, provided_global_keys
+        
         Usage:
 
         remaining_comp_specifiers_dict, dependent_validators, provided_global_keys = SpecificComputationValidator.find_immediate_dependencies(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict, provided_global_keys=provided_global_keys)
@@ -426,16 +437,13 @@ class SpecificComputationValidator:
         """
         dependent_validators = {}
         for a_name, a_validator in remaining_comp_specifiers_dict.items():
-            # set(provided_global_keys)
-            # set(a_validator.results_specification.requires_global_keys)
             if a_validator.is_dependency_in_required_global_keys(provided_global_keys):
                 dependent_validators[a_name] = a_validator
-            # (provided_global_keys == (a_validator.results_specification.requires_global_keys or []))
 
         for a_name, a_found_validator in dependent_validators.items():
-            new_provided_global_keys = a_found_validator.results_specification.provides_global_keys
+            new_provided_global_keys = a_found_validator.results_specification.provides_global_keys ## find the keys that the requirement provides
             provided_global_keys.extend(new_provided_global_keys)
-            remaining_comp_specifiers_dict.pop(a_name) # remove
+            remaining_comp_specifiers_dict.pop(a_name) # remove from the remaining list
 
         remaining_comp_specifiers_dict = {k:v for k,v in remaining_comp_specifiers_dict.items() if k not in dependent_validators}
 
@@ -497,7 +505,36 @@ class SpecificComputationValidator:
         else:
             return found_matching_validators
     
-        
+
+    # ==================================================================================================================== #
+    # Requirements/Upstream                                                                                                #
+    # ==================================================================================================================== #
+    @classmethod
+    def find_immediate_requirements(cls, remaining_comp_specifiers_dict: Dict[str, "SpecificComputationValidator"], required_global_keys: List[str], debug_print=False):
+        """ Finds the validators that are directly required for one of the validators in `remaining_comp_specifiers_dict`
+        Usage:
+
+        remaining_comp_specifiers_dict, required_validators, required_global_keys = SpecificComputationValidator.find_immediate_requirements(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict, required_global_keys=required_global_keys)
+        required_global_keys
+
+        """
+        required_validators = {}
+        for a_name, a_validator in remaining_comp_specifiers_dict.items():
+            if a_validator.is_requirement_for_global_keys(required_global_keys):
+                required_validators[a_name] = a_validator
+
+        for a_name, a_found_validator in required_validators.items():
+            new_required_global_keys = a_found_validator.results_specification.requires_global_keys
+            required_global_keys.extend(new_required_global_keys)
+            remaining_comp_specifiers_dict.pop(a_name) # remove initial now that it's been resolved
+
+        remaining_comp_specifiers_dict = {k:v for k,v in remaining_comp_specifiers_dict.items() if k not in required_validators}
+
+        if debug_print:
+            print(f'len(remaining_comp_specifiers_dict): {len(remaining_comp_specifiers_dict)}, required_validators: {required_validators}')
+        return remaining_comp_specifiers_dict, required_validators, required_global_keys
+
+
 
         
 
