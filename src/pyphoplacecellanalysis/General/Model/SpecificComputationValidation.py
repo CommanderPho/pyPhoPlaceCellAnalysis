@@ -495,19 +495,22 @@ class SpecificComputationValidator:
         """ returns a list of computed properties that the specified functions provide. 
         
         Usage:
-            provided_global_keys = SpecificComputationValidator.find_provided_result_keys(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict,
+            provided_global_keys, provided_local_keys = SpecificComputationValidator.find_provided_result_keys(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict,
                                                                                                 probe_fn_names=['perform_wcorr_shuffle_analysis',  'merged_directional_placefields', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring'],
                                                                                                 )
             provided_global_keys # ['DirectionalMergedDecoders', 'DirectionalDecodersEpochsEvaluations', 'SequenceBased']
 
         """
         provided_global_keys = []
+        provided_local_keys = []
+        
         for a_name, a_validator in remaining_comp_specifiers_dict.items():
             for a_probe_fn_name in probe_fn_names:
                 if a_validator.does_name_match(a_probe_fn_name):
                     provided_global_keys.extend(a_validator.results_specification.provides_global_keys) # Get each validator's provided keys:
+                    provided_local_keys.extend(a_validator.results_specification.provides_local_keys)
                     
-        return provided_global_keys
+        return (provided_global_keys, provided_local_keys)
     
 
     @classmethod

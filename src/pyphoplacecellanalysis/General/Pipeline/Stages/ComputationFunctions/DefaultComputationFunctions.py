@@ -48,7 +48,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
     @function_attributes(short_name='position_decoding', tags=['decoding', 'position'],
                           input_requires=["computation_result.computation_config.pf_params.time_bin_size", "computation_result.computed_data['pf1D']", "computation_result.computed_data['pf2D']"], output_provides=["computation_result.computed_data['pf1D_Decoder']", "computation_result.computed_data['pf2D_Decoder']"], uses=['BayesianPlacemapPositionDecoder'], used_by=[], creation_date='2023-09-12 17:30', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf1D_Decoder'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['pf2D_Decoder']), is_global=False)
-    def _perform_position_decoding_computation(computation_result: ComputationResult, active_config, override_decoding_time_bin_size: Optional[float]=None, **kwargs):
+    def _perform_position_decoding_computation(computation_result: ComputationResult, override_decoding_time_bin_size: Optional[float]=None, **kwargs):
         """ Builds the 1D & 2D Placefield Decoder 
         
             ## - [ ] TODO: IMPORTANT!! POTENTIAL_BUG: Should this passed-in spikes_df actually be the filtered spikes_df that was used to compute the placefields in PfND? That would be `prev_output_result.computed_data['pf2D'].filtered_spikes_df`

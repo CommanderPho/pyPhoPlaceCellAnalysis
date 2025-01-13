@@ -1349,9 +1349,9 @@ class PipelineWithComputedPipelineStageMixin:
     def find_provided_result_keys(self, probe_fn_names: List[str]) -> List[str]:
         """ returns a list of computed properties that the specified functions provide. 
         
-        provided_global_keys = curr_active_pipeline.find_provided_result_keys(probe_fn_names=['perform_wcorr_shuffle_analysis',  'merged_directional_placefields', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring'])
+        (provided_global_keys, provided_local_keys) = curr_active_pipeline.find_provided_result_keys(probe_fn_names=['perform_wcorr_shuffle_analysis',  'merged_directional_placefields', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring'])
         provided_global_keys
-
+        provided_local_keys
         """
         self.reload_default_computation_functions()
         return SpecificComputationValidator.find_provided_result_keys(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), probe_fn_names=probe_fn_names)
