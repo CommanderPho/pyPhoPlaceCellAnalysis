@@ -1274,13 +1274,14 @@ class PipelineWithComputedPipelineStageMixin:
     # ==================================================================================================================== #
     # Dependency Parsing/Determination                                                                                     #
     # ==================================================================================================================== #
-    def find_matching_validators(self, probe_fn_names: List[str], debug_print=False):
+    def find_matching_validators(self, probe_fn_names: List[str], skip_reload_computation_fcns: bool = False, debug_print=False):
         """
         Usage:
             remaining_comp_specifiers_dict, found_matching_validators, provided_global_keys = curr_active_pipeline.find_matching_validators(probe_fn_names=['long_short_decoding_analyses','long_short_fr_indicies_analyses'])
             provided_global_keys
         """
-        self.reload_default_computation_functions()
+        if not skip_reload_computation_fcns:
+            self.reload_default_computation_functions()
         return SpecificComputationValidator.find_matching_validators(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), probe_fn_names=probe_fn_names)
 
     def find_immediate_dependencies(self, provided_global_keys: List[str], skip_reload_computation_fcns: bool = False, debug_print=False):
@@ -1296,7 +1297,7 @@ class PipelineWithComputedPipelineStageMixin:
         return SpecificComputationValidator.find_immediate_dependencies(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), provided_global_keys=provided_global_keys)
 
 
-    def find_downstream_dependencies(self, provided_local_keys: List[str]=None, provided_global_keys: List[str]=None, debug_print=False):
+    def find_downstream_dependencies(self, provided_local_keys: List[str]=None, provided_global_keys: List[str]=None, skip_reload_computation_fcns: bool = False, debug_print=False):
         """
         Usage:
 
@@ -1305,8 +1306,9 @@ class PipelineWithComputedPipelineStageMixin:
 
         """
         from neuropy.utils.indexing_helpers import flatten
-        
-        self.reload_default_computation_functions()
+        if skip_reload_computation_fcns:
+            self.reload_default_computation_functions()
+            
         _comp_specifiers_dict: Dict[str, SpecificComputationValidator] = self.get_merged_computation_function_validators()
         validators = deepcopy(_comp_specifiers_dict) # { ... }  # Your validators here
         dependent_validators = {}
@@ -1358,6 +1360,95 @@ class PipelineWithComputedPipelineStageMixin:
         """
         self.reload_default_computation_functions()
         return SpecificComputationValidator.find_validators_providing_results(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), probe_provided_result_keys=probe_provided_result_keys, return_flat_list=return_flat_list)
+
+
+    @function_attributes(short_name=None, tags=['requirements'], input_requires=[], output_provides=[], uses=['SpecificComputationValidator.find_immediate_requirements'], used_by=['find_upstream_requirements'], creation_date='2025-01-13 09:16', related_items=[])
+    def find_immediate_requirements(self, required_global_keys: List[str], required_local_keys: Optional[List[str]] = None, skip_reload_computation_fcns: bool = False, debug_print=False):
+        """
+        Identifies the immediate requirements for the given global or local keys.
+        
+        Parameters:
+            required_global_keys (List[str]): The global keys for which requirements are checked.
+            required_local_keys (List[str]): The local keys for which requirements are checked (optional).
+            debug_print (bool): If True, enables debug prints for detailed output.
+            
+        Returns:
+            Dict[str, SpecificComputationValidator]: Validators that have the provided keys as their requirements.
+            
+            
+        Usage:
+        
+            _curr_remaining_comp_specifiers_dict, _curr_required_validators, _curr_required_global_keys = curr_active_pipeline.find_immediate_requirements(required_global_keys=list(remaining_required_global_result_keys))
+            print(f"_curr_required_global_keys: {_curr_required_global_keys}")
+
+        """
+        if not skip_reload_computation_fcns:
+            self.reload_default_computation_functions()
+        assert required_local_keys is None, f"required_local_keys: {required_local_keys} but these are not currently supported!"
+        return SpecificComputationValidator.find_immediate_requirements(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), required_global_keys=required_global_keys)
+
+
+    @function_attributes(short_name=None, tags=['requirements'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-13 09:17', related_items=[])
+    def find_upstream_requirements(self, required_global_keys: List[str], required_local_keys: Optional[List[str]] = None, skip_reload_computation_fcns: bool = False, debug_print=False):
+        """
+        Identifies all upstream requirements recursively for the given global keys.
+        
+        Parameters:
+            required_global_keys (List[str]): The global keys for which upstream requirements are traced.
+            debug_print (bool): If True, enables debug prints for detailed output.
+            
+        Returns:
+            Tuple[Dict[str, SpecificComputationValidator], List[str]]: 
+                - Validators involved in fulfilling the requirements.
+                - Global keys that these validators provide.
+                
+                
+        Usage:
+        
+            upstream_required_validators, required_global_keys = curr_active_pipeline.find_upstream_requirements(required_global_keys=['DirectionalDecodersDecoded'])
+            required_global_keys # ['DirectionalLaps', 'DirectionalMergedDecoders', 'DirectionalDecodersDecoded']
+
+        """
+        if not skip_reload_computation_fcns:
+            self.reload_default_computation_functions()
+        
+        assert (required_local_keys is None), f"required_local_keys: {required_local_keys} but these are not currently supported!"
+        
+        ## INPUTS: debug_print, remaining_required_global_result_keys
+        remaining_required_global_result_keys = set(required_global_keys) ## convert to a set to ensure uniqueness
+        upstream_required_validators = {}
+        
+        ## first iteration:
+        _curr_remaining_comp_specifiers_dict, _curr_required_validators, _curr_required_global_keys = self.find_immediate_requirements(required_global_keys=list(remaining_required_global_result_keys))
+        if debug_print:
+            print(f"_curr_required_global_keys: {_curr_required_global_keys}")
+        remaining_required_global_result_keys = remaining_required_global_result_keys.union(_curr_required_global_keys)
+        upstream_required_validators.update(_curr_required_validators)
+        if debug_print:
+            print(f"remaining_required_global_result_keys: {remaining_required_global_result_keys}")
+        ## OUTPUTS: remaining_required_global_result_keys, upstream_required_validators
+
+        max_num_iterations: int = 5
+        curr_iter: int = 0
+        _prev_provided_global_keys = set([]) ## empty set
+
+        while (curr_iter < max_num_iterations) and (remaining_required_global_result_keys != _prev_provided_global_keys):
+            _prev_provided_global_keys = remaining_required_global_result_keys
+            _curr_remaining_comp_specifiers_dict, _curr_required_validators, _curr_required_global_keys = self.find_immediate_requirements(required_global_keys=list(remaining_required_global_result_keys))
+            if debug_print:
+                print(f"curr_iter: {curr_iter}/{max_num_iterations}: _curr_required_global_keys: {_curr_required_global_keys}")
+            remaining_required_global_result_keys = remaining_required_global_result_keys.union(_curr_required_global_keys)
+            upstream_required_validators.update(_curr_required_validators)
+            if debug_print:
+                print(f"remaining_required_global_result_keys: {remaining_required_global_result_keys}")
+            curr_iter += 1
+            
+
+        ## END while...
+        required_global_keys = list(remaining_required_global_result_keys) ## convert to a list
+        
+        return upstream_required_validators, required_global_keys
+
 
 
     @function_attributes(short_name=None, tags=['parameters', 'update'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 18:45', related_items=[])
