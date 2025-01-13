@@ -27,6 +27,11 @@ class Spike3DRasterLeftSidebarControlBar(QtWidgets.QWidget):
     render_window_duration_changed = QtCore.Signal(float)
         
 
+    @property
+    def lblCrosshairTraceValue(self):
+        """The lblCrosshairTraceValue property."""
+        return self.ui.lblCrosshairTraceValue
+
 
     @property
     def crosshair_trace_time(self) -> float:

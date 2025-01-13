@@ -114,18 +114,18 @@ class PyqtgraphTimeSynchronizedWidget(PlottingBackendSpecifyingMixin, TimeSynchr
         # self.params = VisualizationParameters(self.applicationName)
         
 
-        # Add a trace region (initially hidden)
-        self.trace_region = pg.LinearRegionItem(movable=True, brush=(0, 0, 255, 50))
-        self.trace_region.setZValue(10)  # Ensure it appears above the plot
-        self.trace_region.hide()  # Initially hide the trace region
-        self.plot_widget.addItem(self.trace_region)
+        # # Add a trace region (initially hidden)
+        # self.trace_region = pg.LinearRegionItem(movable=True, brush=(0, 0, 255, 50))
+        # self.trace_region.setZValue(10)  # Ensure it appears above the plot
+        # self.trace_region.hide()  # Initially hide the trace region
+        # self.plot_widget.addItem(self.trace_region)
 
-        # Override the PlotWidget's mouse events
-        self.plot_widget.scene().sigMouseClicked.connect(self.mouse_clicked)
-        self.plot_widget.scene().sigMouseMoved.connect(self.mouse_moved)
-        self.plot_widget.scene().sigMouseReleased.connect(self.mouse_released)
-        self.dragging = False
-        self.start_pos = None
+        # # Override the PlotWidget's mouse events
+        # self.plot_widget.scene().sigMouseClicked.connect(self.mouse_clicked)
+        # self.plot_widget.scene().sigMouseMoved.connect(self.mouse_moved)
+        # self.plot_widget.scene().sigMouseReleased.connect(self.mouse_released)
+        # self.dragging = False
+        # self.start_pos = None
                 
 
         # self.params.shared_axis_order = 'row-major'
@@ -137,7 +137,8 @@ class PyqtgraphTimeSynchronizedWidget(PlottingBackendSpecifyingMixin, TimeSynchr
         # self.params.cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
         # self.params.image_margins = 0.0
         # self.params.image_bounds_extent, self.params.x_range, self.params.y_range = pyqtplot_build_image_bounds_extent(self.active_one_step_decoder.xbin, self.active_one_step_decoder.ybin, margin=self.params.image_margins, debug_print=self.enable_debug_print)
-        
+        pass
+
 
     def _buildGraphics(self):
         """ called by self.buildUI() which usually is not overriden. """
@@ -252,29 +253,29 @@ class PyqtgraphTimeSynchronizedWidget(PlottingBackendSpecifyingMixin, TimeSynchr
             
 
 
-    def mouse_clicked(self, event):
-        # Only handle middle mouse button
-        if event.button() == 2:  # Middle mouse button
-            pos = self.plot_widget.plotItem.vb.mapSceneToView(event.scenePos())
-            self.start_pos = pos.x()
-            self.dragging = True
-            self.trace_region.hide()  # Reset trace region visibility
-            event.accept()
+    # def mouse_clicked(self, event):
+    #     # Only handle middle mouse button
+    #     if event.button() == 2:  # Middle mouse button
+    #         pos = self.plot_widget.plotItem.vb.mapSceneToView(event.scenePos())
+    #         self.start_pos = pos.x()
+    #         self.dragging = True
+    #         self.trace_region.hide()  # Reset trace region visibility
+    #         event.accept()
 
-    def mouse_moved(self, event):
-        if self.dragging and self.start_pos is not None:
-            # Update the trace region during dragging
-            current_pos = self.plot_widget.plotItem.vb.mapSceneToView(event)
-            x_end = current_pos.x()
-            self.trace_region.setRegion([min(self.start_pos, x_end), max(self.start_pos, x_end)])
-            self.trace_region.show()  # Show the trace region as it's being defined
+    # def mouse_moved(self, event):
+    #     if self.dragging and self.start_pos is not None:
+    #         # Update the trace region during dragging
+    #         current_pos = self.plot_widget.plotItem.vb.mapSceneToView(event)
+    #         x_end = current_pos.x()
+    #         self.trace_region.setRegion([min(self.start_pos, x_end), max(self.start_pos, x_end)])
+    #         self.trace_region.show()  # Show the trace region as it's being defined
 
-    def mouse_released(self, event):
-        # Finalize the trace region definition
-        if event.button() == 2 and self.dragging:
-            self.dragging = False
-            self.start_pos = None
-            print(f"Trace region set to: {self.trace_region.getRegion()}")
+    # def mouse_released(self, event):
+    #     # Finalize the trace region definition
+    #     if event.button() == 2 and self.dragging:
+    #         self.dragging = False
+    #         self.start_pos = None
+    #         print(f"Trace region set to: {self.trace_region.getRegion()}")
             
 
 
