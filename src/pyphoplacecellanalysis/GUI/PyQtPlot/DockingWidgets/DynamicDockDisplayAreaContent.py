@@ -50,7 +50,7 @@ class CustomDockDisplayConfig(DockDisplayConfig):
     """
     custom_get_colors_dict: Optional[Dict] = field(default=None)
     _custom_get_colors_callback_fn: Optional[Callable] = field(default=None, alias='custom_get_colors_callback_fn')
-
+    dock_group_names: List[str] = field(default=Factory(list), metadata={'desc': 'a list of conceptual "groups" that the dock specified by this config belongs to. Allows closing, moving, etc multiple docks at a time.'})
 
     @property
     def custom_get_colors_callback(self):
