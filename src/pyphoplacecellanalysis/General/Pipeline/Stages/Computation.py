@@ -1284,26 +1284,27 @@ class PipelineWithComputedPipelineStageMixin:
             self.reload_default_computation_functions()
         return SpecificComputationValidator.find_matching_validators(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), probe_fn_names=probe_fn_names)
 
-    def find_immediate_dependencies(self, provided_global_keys: List[str], skip_reload_computation_fcns: bool = False, debug_print=False):
+    @function_attributes(short_name=None, tags=['dependencies'], input_requires=[], output_provides=[], uses=[], used_by=['self.find_downstream_dependencies'], creation_date='2025-01-13 12:32', related_items=[])
+    def find_immediate_dependencies(self, provided_global_keys: List[str], provided_local_keys: Optional[List[str]] = None, skip_reload_computation_fcns: bool = False, debug_print=False):
         """
         Usage:
 
-        remaining_comp_specifiers_dict, dependent_validators, provided_global_keys = SpecificComputationValidator.find_immediate_dependencies(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict, provided_global_keys=provided_global_keys)
+        remaining_comp_specifiers_dict, dependent_validators, (provided_global_keys, provided_local_keys)  = SpecificComputationValidator.find_immediate_dependencies(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict, provided_global_keys=provided_global_keys, provided_local_keys=provided_local_keys)
         provided_global_keys
 
         """
         if not skip_reload_computation_fcns:
             self.reload_default_computation_functions()
-        return SpecificComputationValidator.find_immediate_dependencies(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), provided_global_keys=provided_global_keys)
+        return SpecificComputationValidator.find_immediate_dependencies(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), provided_global_keys=provided_global_keys, provided_local_keys=provided_local_keys)
 
-
+    @function_attributes(short_name=None, tags=['dependencies', 'downstream'], input_requires=[], output_provides=[], uses=['self.find_immediate_dependencies'], used_by=[], creation_date='2025-01-13 12:32', related_items=[])
     def find_downstream_dependencies(self, provided_local_keys: List[str]=None, provided_global_keys: List[str]=None, skip_reload_computation_fcns: bool = False, debug_print=False):
         """
         Usage:
 
-        remaining_comp_specifiers_dict, dependent_validators, provided_global_keys = SpecificComputationValidator.find_immediate_dependencies(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict, provided_global_keys=provided_global_keys)
+        dependent_validators, (provided_global_keys, provided_local_keys) = curr_active_pipeline.find_downstream_dependencies(provided_global_keys=provided_global_keys)
         provided_global_keys
-
+        provided_local_keys
         """
         from neuropy.utils.indexing_helpers import flatten
         if skip_reload_computation_fcns:
@@ -1324,20 +1325,25 @@ class PipelineWithComputedPipelineStageMixin:
 
         # dependent_validators_names = [k for k, v in dependent_validators.items()]
         provided_global_keys = list(set(flatten([v.provides_global_keys for v in dependent_validators.values()]))) # ['DirectionalMergedDecoders', 'DirectionalDecodersEpochsEvaluations', 'TrainTestSplit', 'TrialByTrialActivity']
+        provided_local_keys = list(set(flatten([v.provides_local_keys for v in dependent_validators.values()])))
+        
         ## OUTPUT: dependent_validators_provides, dependent_validators
 
         ## loop until no changes
         max_num_iterations: int = 5
         curr_iter: int = 0
         _prev_provided_global_keys = []
-        while ((curr_iter < max_num_iterations) and (provided_global_keys != _prev_provided_global_keys)):
-            _prev_provided_global_keys = provided_global_keys    
-            curr_order_remaining_comp_specifiers_dict, curr_order_dependent_validators, curr_order_provided_global_keys = self.find_immediate_dependencies(provided_global_keys=provided_global_keys, skip_reload_computation_fcns=True, debug_print=debug_print)
+        _prev_provided_local_keys = []
+        while ((curr_iter < max_num_iterations) and ((provided_global_keys != _prev_provided_global_keys) or (provided_local_keys != _prev_provided_local_keys))):
+            _prev_provided_global_keys = provided_global_keys
+            _prev_provided_local_keys = provided_local_keys
+            curr_order_remaining_comp_specifiers_dict, curr_order_dependent_validators, (curr_order_provided_global_keys, curr_order_provided_local_keys) = self.find_immediate_dependencies(provided_global_keys=provided_global_keys, provided_local_keys=provided_local_keys, skip_reload_computation_fcns=True, debug_print=debug_print)
             dependent_validators.update(curr_order_dependent_validators)
             provided_global_keys = list(set(provided_global_keys + curr_order_provided_global_keys))
+            provided_local_keys = list(set(provided_local_keys + curr_order_provided_local_keys))
             curr_iter = curr_iter + 1
 
-        return dependent_validators, provided_global_keys
+        return dependent_validators, (provided_global_keys, provided_local_keys)
 
 
     def find_provided_result_keys(self, probe_fn_names: List[str]) -> List[str]:
@@ -1442,7 +1448,7 @@ class PipelineWithComputedPipelineStageMixin:
         _prev_provided_global_keys = set([]) ## empty set
         _prev_provided_local_keys = set([]) ## empty set
         
-        while (curr_iter < max_num_iterations) and (remaining_required_global_result_keys != _prev_provided_global_keys) and (remaining_required_local_result_keys != _prev_provided_local_keys):
+        while (curr_iter < max_num_iterations) and ((remaining_required_global_result_keys != _prev_provided_global_keys) or (remaining_required_local_result_keys != _prev_provided_local_keys)):
             _prev_provided_global_keys = remaining_required_global_result_keys
             _prev_provided_local_keys = remaining_required_local_result_keys
             

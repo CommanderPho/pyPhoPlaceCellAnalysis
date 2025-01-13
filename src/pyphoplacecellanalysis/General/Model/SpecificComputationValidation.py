@@ -119,6 +119,21 @@ class SpecificComputationValidator:
         if not self.has_results_spec:
             return []
         return (self.results_specification.requires_global_keys) 
+    
+
+    @property
+    def provides_local_keys(self) -> List[str]:
+        if not self.has_results_spec:
+            return []
+        return (self.results_specification.provides_local_keys) 
+
+
+    @property
+    def requires_local_keys(self) -> List[str]:
+        if not self.has_results_spec:
+            return []
+        return (self.results_specification.requires_local_keys) 
+    
 
 
     @classmethod
@@ -181,6 +196,13 @@ class SpecificComputationValidator:
         if not self.has_results_spec:
             return False
         return np.any(np.isin(provided_global_keys, (self.results_specification.requires_global_keys or [])))
+
+    def is_dependency_in_required_local_keys(self, provided_local_keys: List[str]) -> bool:
+        """ checks if either short_name or computation_name is contained in the name_list provided. """        
+        if not self.has_results_spec:
+            return False
+        return np.any(np.isin(provided_local_keys, (self.results_specification.requires_local_keys or [])))
+
 
 
     def is_requirement_for_global_keys(self, global_keys: List[str]) -> bool:
@@ -432,14 +454,14 @@ class SpecificComputationValidator:
         return remaining_comp_specifiers_dict, found_matching_validators, provided_global_keys
 
     @classmethod
-    def find_immediate_dependencies(cls, remaining_comp_specifiers_dict: Dict[str, "SpecificComputationValidator"], provided_global_keys: List[str], debug_print=False):
+    def find_immediate_dependencies(cls, remaining_comp_specifiers_dict: Dict[str, "SpecificComputationValidator"], provided_global_keys: List[str], provided_local_keys: List[str], debug_print=False):
         """ Finds the validators that depend directly on one of the validators in `remaining_comp_specifiers_dict`
         
         Updates: remaining_comp_specifiers_dict, provided_global_keys
         
         Usage:
 
-        remaining_comp_specifiers_dict, dependent_validators, provided_global_keys = SpecificComputationValidator.find_immediate_dependencies(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict, provided_global_keys=provided_global_keys)
+        remaining_comp_specifiers_dict, dependent_validators, (provided_global_keys, provided_local_keys) = SpecificComputationValidator.find_immediate_dependencies(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict, provided_global_keys=provided_global_keys)
         provided_global_keys
 
         """
@@ -448,16 +470,25 @@ class SpecificComputationValidator:
             if a_validator.is_dependency_in_required_global_keys(provided_global_keys):
                 dependent_validators[a_name] = a_validator
 
+            if provided_local_keys is not None:
+                if a_validator.is_dependency_in_required_local_keys(provided_local_keys):
+                    if a_name not in dependent_validators: ## add only if not already added
+                        dependent_validators[a_name] = a_validator
+                
         for a_name, a_found_validator in dependent_validators.items():
             new_provided_global_keys = a_found_validator.results_specification.provides_global_keys ## find the keys that the requirement provides
             provided_global_keys.extend(new_provided_global_keys)
+            
+            if provided_local_keys is not None:
+                new_provided_local_keys = a_found_validator.results_specification.provides_local_keys ## find the keys that the requirement provides
+                provided_local_keys.extend(new_provided_local_keys)
             remaining_comp_specifiers_dict.pop(a_name) # remove from the remaining list
 
         remaining_comp_specifiers_dict = {k:v for k,v in remaining_comp_specifiers_dict.items() if k not in dependent_validators}
 
         if debug_print:
             print(f'len(remaining_comp_specifiers_dict): {len(remaining_comp_specifiers_dict)}, dependent_validators: {dependent_validators}')
-        return remaining_comp_specifiers_dict, dependent_validators, provided_global_keys
+        return remaining_comp_specifiers_dict, dependent_validators, (provided_global_keys, provided_local_keys)
 
     @classmethod
     def find_provided_result_keys(cls, remaining_comp_specifiers_dict: Dict[str, "SpecificComputationValidator"], probe_fn_names: List[str]) -> List[str]:
@@ -480,7 +511,7 @@ class SpecificComputationValidator:
     
 
     @classmethod
-    def find_validators_providing_results(cls, remaining_comp_specifiers_dict: Dict[str, "SpecificComputationValidator"], probe_provided_result_keys: List[str], return_flat_list:bool=True) -> List[str]:
+    def find_validators_providing_results(cls, remaining_comp_specifiers_dict: Dict[str, "SpecificComputationValidator"], probe_provided_result_keys: List[str], return_flat_list:bool=True, include_local_computation_fns:bool=True) -> List[str]:
         """ returns a list of computed properties that the specified functions provide. 
         
         Usage:
@@ -497,8 +528,17 @@ class SpecificComputationValidator:
 
         for a_name, a_validator in remaining_comp_specifiers_dict.items():
             for a_probe_result_name in probe_provided_result_keys:
-                if a_probe_result_name in (a_validator.provides_global_keys or []):
-                    ## this validator matches
+                was_validator_found: bool = False
+                if include_local_computation_fns:
+                    if a_probe_result_name in (a_validator.provides_local_keys or []):
+                        was_validator_found = True # found in local fns
+
+                if not was_validator_found:
+                    if a_probe_result_name in (a_validator.provides_global_keys or []):
+                        was_validator_found = True # found in global fns
+
+                if was_validator_found:
+                    ## this validator matches (either global or local if local is allowed):
                     if return_flat_list:
                         # found_matching_validators[a_probe_result_name] = a_validator
                         found_matching_validators_list.append(a_validator)
