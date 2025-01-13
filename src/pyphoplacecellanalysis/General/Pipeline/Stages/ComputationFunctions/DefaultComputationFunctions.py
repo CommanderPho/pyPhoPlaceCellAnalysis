@@ -66,6 +66,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             
         ## filtered_spikes_df version:
         computation_result.computed_data['pf1D_Decoder'] = BayesianPlacemapPositionDecoder(time_bin_size=placefield_computation_config.time_bin_size, pf=computation_result.computed_data['pf1D'], spikes_df=computation_result.computed_data['pf1D'].filtered_spikes_df.copy(), debug_print=False)
+        assert (len(computation_result.computed_data['pf1D_Decoder'].is_non_firing_time_bin) == computation_result.computed_data['pf1D_Decoder'].num_time_windows), f"len(self.is_non_firing_time_bin): {len(computation_result.computed_data['pf1D_Decoder'].is_non_firing_time_bin)}, self.num_time_windows: {computation_result.computed_data['pf1D_Decoder'].num_time_windows}"
         computation_result.computed_data['pf1D_Decoder'].compute_all() #
 
         if ('pf2D' in computation_result.computed_data) and (computation_result.computed_data.get('pf2D', None) is not None):
@@ -271,12 +272,13 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
                 """ duplicates spikes_df and builds a new pseudo-spikes_df for building second-order placefields/decoder """
                 active_second_order_spikes_df = deepcopy(spikes_df)
                 # TODO: figure it out instead of hacking -- Currently just dropping the last time bin because something is off 
-                invalid_timestamp = np.nanmax(active_second_order_spikes_df['binned_time'].astype(int).to_numpy()) # 11881
-                active_second_order_spikes_df = active_second_order_spikes_df[active_second_order_spikes_df['binned_time'].astype(int) < invalid_timestamp] # drop the last time-bin as a workaround
+                # invalid_timestamp = np.nanmax(active_second_order_spikes_df['binned_time'].astype(int).to_numpy()) # 11881
+                # active_second_order_spikes_df = active_second_order_spikes_df[active_second_order_spikes_df['binned_time'].astype(int) < invalid_timestamp] # drop the last time-bin as a workaround
                 # backup measured columns because they will be replaced by the new values:
                 active_second_order_spikes_df['x_measured'] = active_second_order_spikes_df['x'].copy()
                 active_second_order_spikes_df['y_measured'] = active_second_order_spikes_df['y'].copy()
-                spike_binned_time_idx = (active_second_order_spikes_df['binned_time'].astype(int)-1) # subtract one to get to a zero-based index
+                # spike_binned_time_idx = (active_second_order_spikes_df['binned_time'].astype(int)-1) # subtract one to get to a zero-based index
+                spike_binned_time_idx = active_second_order_spikes_df['binned_time'].astype(int) # already a zero-based index
                 # replace the x and y measured positions with the most-likely decoded ones for the next round of decoding
                 active_second_order_spikes_df['x'] = active_one_step_decoder.most_likely_positions[spike_binned_time_idx.to_numpy(),0] # x-pos
                 active_second_order_spikes_df['y'] = active_one_step_decoder.most_likely_positions[spike_binned_time_idx.to_numpy(),1] # y-pos

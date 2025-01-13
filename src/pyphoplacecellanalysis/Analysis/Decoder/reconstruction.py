@@ -97,7 +97,7 @@ class ZhangReconstructionImplementation:
     def compute_unit_specific_bin_specific_spike_counts(spikes_df, time_bin_indicies, debug_print=False):
         """ 
         spikes_df: a dataframe with at least the ['aclu','binned_time'] columns
-        time_bin_indicies: np.ndarray of indicies that will be used for the produced output dataframe of the binned spike counts for each unit. (e.g. time_bin_indicies = time_window_edges_binning_info.bin_indicies[1:]).
+        time_bin_indicies: np.ndarray of indicies that will be used for the produced output dataframe of the binned spike counts for each unit. (e.g. time_bin_indicies = time_window_edges_binning_info.bin_indicies[:-1]).
         
         TODO 2023-05-16 - CHECK - CORRECTNESS - Figure out correct indexing and whether it returns binned data for edges or counts.
         
@@ -141,7 +141,8 @@ class ZhangReconstructionImplementation:
 
         """
         time_window_edges, time_window_edges_binning_info, spikes_df = ZhangReconstructionImplementation.compute_time_bins(spikes_df, max_time_bin_size=max_time_bin_size, debug_print=debug_print) # importantly adds 'binned_time' column to spikes_df
-        unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, time_window_edges_binning_info.bin_indicies[1:], debug_print=debug_print)
+        # unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, time_window_edges_binning_info.bin_indicies[1:], debug_print=debug_print)
+        unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, time_window_edges_binning_info.bin_indicies[:-1], debug_print=debug_print) # 2025-01-13 16:14 replaced [1:] with [:-1]
         return unit_specific_binned_spike_counts, time_window_edges, time_window_edges_binning_info
 
     @classmethod
@@ -207,21 +208,32 @@ class ZhangReconstructionImplementation:
         TODO 2023-05-16 - CHECK - CORRECTNESS - Figure out correct indexing and whether it returns binned data for edges or counts.
         
         """
-        if time_window_edges is None or time_window_edges_binning_info is None:
+        if (time_window_edges is None) or (time_window_edges_binning_info is None):
             # build time_window_edges/time_window_edges_binning_info AND adds 'binned_time' column to spikes_df. # NOTE: the added 'binned_time' column is 1-indexed, which may explain why we use `time_window_edges_binning_info.bin_indicies[1:]` down below
             time_window_edges, time_window_edges_binning_info, spikes_df = ZhangReconstructionImplementation.compute_time_bins(spikes_df, max_time_bin_size=time_bin_size, debug_print=debug_print)
         else:
             # already have time bins (time_window_edges/time_window_edges_binning_info) so just add 'binned_time' column to spikes_df if needed:
+            assert (time_window_edges_binning_info.num_bins == len(time_window_edges)), f"time_window_edges_binning_info.num_bins: {time_window_edges_binning_info.num_bins}, len(time_window_edges): {len(time_window_edges)}"
             if 'binned_time' not in spikes_df.columns:
                 # we must have the 'binned_time' column in spikes_df, so add it if needed
                 spikes_df = spikes_df.spikes.add_binned_time_column(time_window_edges, time_window_edges_binning_info, debug_print=debug_print)
         
         # either way to compute the unit_specific_binned_spike_counts:
-        unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, time_window_edges_binning_info.bin_indicies[1:], debug_print=debug_print) # requires 'binned_time' in spikes_df. TODO 2023-05-16 - ERROR: isn't getting centers. time_window_edges_binning_info.bin_indicies[1:]
+        active_indicies = time_window_edges_binning_info.bin_indicies[:-1]
+        assert np.nanmax(spikes_df['binned_time'].to_numpy()) <= np.nanmax(active_indicies), f"np.nanmax(spikes_df['binned_time'].to_numpy()): {np.nanmax(spikes_df['binned_time'].to_numpy())}, np.nanmax(active_indicies): {np.nanmax(active_indicies)}"
+        # unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, time_window_edges_binning_info.bin_indicies[1:], debug_print=debug_print) # requires 'binned_time' in spikes_df. TODO 2023-05-16 - ERROR: isn't getting centers. time_window_edges_binning_info.bin_indicies[1:]
+        unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, active_indicies, debug_print=debug_print) ## removed `time_window_edges_binning_info.bin_indicies[1:]` on 2025-01-13 16:05 
+        # unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, time_window_edges_binning_info.bin_indicies, debug_print=debug_print) # ValueError: Shape of passed values is (11816, 80), indices imply (11817, 80)
+        
         unit_specific_binned_spike_counts = unit_specific_binned_spike_counts.T # Want the outputs to have each time window as a column, with a single time window giving a column vector for each neuron
+        
+        assert len(active_indicies) == np.shape(unit_specific_binned_spike_counts.to_numpy())[1], f"len(active_indicies): {len(active_indicies)}, np.shape(unit_specific_binned_spike_counts.to_numpy())[1]: {np.shape(unit_specific_binned_spike_counts.to_numpy())[1]}"
+        
         if debug_print:
             print(f'unit_specific_binned_spike_counts.to_numpy(): {np.shape(unit_specific_binned_spike_counts.to_numpy())}') # (85841, 40)
         return unit_specific_binned_spike_counts.to_numpy(), time_window_edges, time_window_edges_binning_info
+
+
 
     @classmethod
     def _validate_time_binned_spike_counts(cls, time_binning_container, unit_specific_binned_spike_counts):
@@ -2266,7 +2278,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
             ## Single sweep decoding:
 
             ## 2022-09-23 - Epochs-style encoding (that works):
-            self.time_binning_container, self.p_x_given_n, self.most_likely_positions, curr_unit_marginal_x, curr_unit_marginal_y, flat_outputs_container = self.hyper_perform_decode(self.spikes_df, decoding_time_bin_size=self.time_bin_size, output_flat_versions=True, debug_print=(debug_print or self.debug_print))
+            self.time_binning_container, self.p_x_given_n, self.most_likely_positions, curr_unit_marginal_x, curr_unit_marginal_y, flat_outputs_container = self.hyper_perform_decode(self.spikes_df, decoding_time_bin_size=self.time_bin_size, output_flat_versions=True, debug_print=(debug_print or self.debug_print)) ## this is where it's getting messed up
             self.marginal = DynamicContainer(x=curr_unit_marginal_x, y=curr_unit_marginal_y)
             assert isinstance(self.time_binning_container, BinningContainer) # Should be neuropy.utils.mixins.binning_helpers.BinningContainer
             self.compute_corrected_positions() ## this seems to fail for pf1D
@@ -2301,7 +2313,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         ## Find the bins that don't have any spikes in them:
         # zero_bin_indicies = np.where(self.total_spike_counts_per_window == 0)[0]
         # is_non_firing_bin = self.is_non_firing_time_bin
-        
+        assert (len(self.is_non_firing_time_bin) == self.num_time_windows), f"len(self.is_non_firing_time_bin): {len(self.is_non_firing_time_bin)}, self.num_time_windows: {self.num_time_windows}"
         is_non_firing_bin = np.where(self.is_non_firing_time_bin)[0] # TEMP: do this to get around the indexing issue. TODO: IndexError: boolean index did not match indexed array along dimension 0; dimension is 11880 but corresponding boolean dimension is 11881
         self.revised_most_likely_positions = self.perform_compute_forward_filled_positions(self.most_likely_positions, is_non_firing_bin=is_non_firing_bin)
         
