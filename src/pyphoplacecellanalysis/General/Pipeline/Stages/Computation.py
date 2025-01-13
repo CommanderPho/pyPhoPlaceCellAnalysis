@@ -1808,6 +1808,9 @@ class PipelineWithComputedPipelineStageMixin:
         curr_active_pipeline.global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(**curr_active_pipeline.global_computation_results.computed_data['RankOrder'])
 
         """
+        from pyphocorehelpers.print_helpers import print_filesystem_file_size, print_object_memory_usage
+        
+
         ## Case 1. `override_global_pickle_path` is provided:
         if override_global_pickle_path is not None:
             ## override_global_pickle_path is provided:
@@ -1847,16 +1850,17 @@ class PipelineWithComputedPipelineStageMixin:
             include_includelist = list(self.global_computation_results.computed_data.keys())
 
         ## only saves out the `global_computation_results` data:
-        computed_data = self.global_computation_results.computed_data
+        global_computed_data = self.global_computation_results.computed_data
         split_save_paths = {}
         split_save_output_types = {}
         failed_keys = []
         skipped_keys = []
-        for k, v in computed_data.items():
+        for k, v in global_computed_data.items():
             if k in include_includelist:
                 curr_split_result_pickle_path = split_save_folder.joinpath(f'Split_{k}.pkl').resolve()
                 if debug_print:
-                    print(f'curr_split_result_pickle_path: {curr_split_result_pickle_path}')
+                    print(f'k: {k} -- size_MB: {print_object_memory_usage(v, enable_print=False)}')
+                    print(f'\tcurr_split_result_pickle_path: {curr_split_result_pickle_path}')
                 was_save_success = False
                 curr_item_type = type(v)
                 try:
@@ -1866,23 +1870,25 @@ class PipelineWithComputedPipelineStageMixin:
                     saveData(curr_split_result_pickle_path, (v_dict, str(curr_item_type.__module__), str(curr_item_type.__name__)))    
                     was_save_success = True
                 except KeyError as e:
-                    print(f'{k} encountered {e} while trying to save {k}. Skipping')
+                    print(f'\t{k} encountered {e} while trying to save {k}. Skipping')
                     pass
                 except PicklingError as e:
                     if not continue_after_pickling_errors:
                         raise
                     else:
-                        print(f'{k} encountered {e} while trying to save {k}. Skipping')
+                        print(f'\t{k} encountered {e} while trying to save {k}. Skipping')
                         pass
                     
                 if was_save_success:
                     split_save_paths[k] = curr_split_result_pickle_path
                     split_save_output_types[k] = curr_item_type
+                    if debug_print:
+                        print(f'\tfile_size_MB: {print_filesystem_file_size(curr_split_result_pickle_path, enable_print=False)} MB')
                 else:
                     failed_keys.append(k)
             else:
                 if debug_print:
-                    print(f'skipping key "{k}" because it is not included in include_includelist: {include_includelist}')
+                    print(f'\tskipping key "{k}" because it is not included in include_includelist: {include_includelist}')
                 skipped_keys.append(k)
                 
         if len(failed_keys) > 0:
