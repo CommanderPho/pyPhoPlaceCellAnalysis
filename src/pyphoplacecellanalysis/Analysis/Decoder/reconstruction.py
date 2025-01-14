@@ -1423,7 +1423,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         return self._perform_decoding_specific_epochs(active_decoder=self, filter_epochs_decoder_result=filter_epochs_decoder_result, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
     
 
-	# ==================================================================================================================== #
+    # ==================================================================================================================== #
     # Non-Modifying Methods:                                                                                               #
     # ==================================================================================================================== #
     @function_attributes(short_name='decode', tags=['decode', 'pure'], input_requires=[], output_provides=[], creation_date='2023-03-23 19:10',
@@ -2319,6 +2319,8 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         # np.shape(self.most_likely_position_flat_indicies) # (85841,)
         # np.shape(self.most_likely_position_indicies) # (2, 85841)
 
+
+    @function_attributes(short_name=None, tags=['BROKEN', 'PROBLEM'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-14 13:03', related_items=[])
     def compute_corrected_positions(self):
         """ computes the revised most likely positions by taking into account the time-bins that had zero spikes and extrapolating position from the prior successfully decoded time bin
         
