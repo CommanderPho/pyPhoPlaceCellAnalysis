@@ -1391,9 +1391,8 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             # dockAddLocationOpts = ['bottom'] #no previous dock for this filter, so use absolute positioning
             
             if display_config is None:
-                display_config = FigureWidgetDockDisplayConfig(showCloseButton=True, showCollapseButton=True, showGroupButton=True)
+                display_config = FigureWidgetDockDisplayConfig(showCloseButton=True, showCollapseButton=False, showGroupButton=False)
                 
-
             should_hide_title: bool = getattr(display_config, 'hideTitleBar', False)
             
             _, dDisplayItem = self.ui.dynamic_docked_widget_container.add_display_dock(name, dockSize=dockSize, display_config=display_config,
