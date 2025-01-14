@@ -90,7 +90,7 @@ def _plot_helper_setup_gridlines(ax, bin_edges, bin_centers):
     ax.yaxis.grid(True, which='minor', color = 'grey', linestyle = '--', linewidth = 0.25)
 
 
-@function_attributes(short_name=None, tags=['plotting_fn', 'display_fn', 'pf1D'], input_requires=[], output_provides=[], uses=['plot_single_cell_1D_placecell_validation'], used_by=['DefaultDisplayFunctions._display_1d_placefield_validations'], creation_date='2023-12-07 13:58', related_items=[])
+@function_attributes(short_name=None, tags=['plotting_fn', 'display_fn', 'pf1D', 'tabbed_figure'], input_requires=[], output_provides=[], uses=['plot_single_cell_1D_placecell_validation', 'MplMultiTab'], used_by=['DefaultDisplayFunctions._display_1d_placefield_validations'], creation_date='2023-12-07 13:58', related_items=[])
 def plot_1d_placecell_validations(active_placefields1D, plotting_config, should_save=False, modifier_string='', save_mode='separate_files', plot_kwargs=None):
     """ Uses plot_single_cell_1D_placecell_validation(...) to plot a series of plots, one for each potential placecell, that allows you to see how the spiking corresponds to the animal's position/lap and how that contributes to the computed placemap
     
@@ -113,7 +113,7 @@ def plot_1d_placecell_validations(active_placefields1D, plotting_config, should_
 
     # Tabbed Matplotlib Figure Mode:
     # ui = MplMultiTab2D()
-    ui = MplMultiTab()
+    ui = MplMultiTab(title='plot_1d_placecell_validations')
 
     for i in np.arange(n_cells):
         curr_cell_id = active_placefields1D.cell_ids[i]
