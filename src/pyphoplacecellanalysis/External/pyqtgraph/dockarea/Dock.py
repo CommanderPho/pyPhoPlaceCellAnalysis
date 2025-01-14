@@ -101,6 +101,19 @@ class Dock(QtWidgets.QWidget, DockDrop):
     sigStretchChanged = QtCore.Signal()
     sigClosed = QtCore.Signal(object)
 
+
+    @property
+    def config(self) -> Optional[DockDisplayConfig]:
+        """The config property."""
+        if self.label is None:
+            return None
+        return self.label.config
+    @config.setter
+    def config(self, value: Optional[DockDisplayConfig]):
+        assert self.label is not None
+        self.label.config = value
+
+
     def __init__(self, name, area=None, size=(10, 10), widget=None, hideTitle=False, autoOrientation=True, display_config:Optional[DockDisplayConfig]=None, **kwargs): # , closable=False, fontSize="12px"
         QtWidgets.QWidget.__init__(self)
         DockDrop.__init__(self)
