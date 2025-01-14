@@ -3,6 +3,8 @@ import time
 from typing import Tuple, List, Dict, Optional
 import sys
 from indexed import IndexedOrderedDict
+from attrs import define, field, Factory # used for `FigureWidgetDockDisplayConfig`
+
 from matplotlib.axis import Axis
 from matplotlib.figure import Figure
 
@@ -48,7 +50,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.TimeCurves.RenderTimeCur
 from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import debug_print_QRect, debug_print_axes_locations, debug_print_temporal_info
 from pyphoplacecellanalysis.General.Mixins.SpikesRenderingBaseMixin import SpikeEmphasisState # required for the different emphasis states in ._build_cell_configs()
 
-from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig 
+from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, DockDisplayColors 
 from pyphoplacecellanalysis.GUI.Qt.Menus.PhoMenuHelper import PhoMenuHelper
 
 from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum
@@ -1389,7 +1391,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             # dockAddLocationOpts = ['bottom'] #no previous dock for this filter, so use absolute positioning
             
             if display_config is None:
-                display_config = FigureWidgetDockDisplayConfig(showCloseButton=True)
+                display_config = FigureWidgetDockDisplayConfig(showCloseButton=True, showCollapseButton=True, showGroupButton=True)
             
             _, dDisplayItem = self.ui.dynamic_docked_widget_container.add_display_dock(name, dockSize=dockSize, display_config=display_config,
                                                                                     widget=self.ui.matplotlib_view_widgets[name], dockAddLocationOpts=dockAddLocationOpts, autoOrientation=False)

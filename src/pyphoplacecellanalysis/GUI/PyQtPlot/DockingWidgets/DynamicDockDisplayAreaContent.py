@@ -2,10 +2,13 @@ from typing import Callable, Optional, Dict, List, Tuple
 from collections import OrderedDict
 from enum import Enum
 from attrs import define, field, Factory
+import numpy as np
 
 # import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 
 from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock, DockDisplayConfig
 from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
@@ -401,6 +404,20 @@ class DynamicDockDisplayAreaContentMixin:
         return all_collected_widgets
     
 
+    def get_flat_dock_identifiers_list(self, debug_print=False) -> List[str]:
+        """ extracts the 'dock' property that is the contents of each added dock item from the self.dynamic_display_dict and returns it as a flat list """
+        all_collected_dock_items_identifiers = []
+        for an_id, an_item in self.dynamic_display_dict.items():
+            if debug_print:
+                print(f'an_id: {an_id}, an_item: {an_item}')
+            for a_sub_id, a_sub_item in an_item.items():
+                if debug_print:
+                    print(f'\ta_sub_id: {a_sub_id}, a_sub_item: {a_sub_item}')
+                a_dock_item = a_sub_item.get('dock', None)
+                all_collected_dock_items_identifiers.append(a_dock_item.name())
+        return all_collected_dock_items_identifiers
+    
+
     def get_dockGroup_dock_dict(self, debug_print=False) -> Dict[str, List[Dock]]:
         """ extracts the 'widget' property that is the contents of each added dock item from the self.dynamic_display_dict and returns it as a flat list """
         flat_dockitems_list = self.get_flat_dockitems_list()
@@ -531,7 +548,7 @@ class DynamicDockDisplayAreaContentMixin:
         """ returns the first found Dock with the specified title equal to the identifier , or None if it doesn't exist. """
         curr_display_dock_items = self.displayDockArea.findChildren(Dock) # find all dock-type children
         for a_dock_item in curr_display_dock_items:
-            if a_dock_item.title() == identifier:
+            if ((a_dock_item.title() == identifier) or (a_dock_item.name() == identifier)):
                 return a_dock_item #found the correct item, return it
         return None # if never found, return None        
         # dock_item_titles = [a_dock_item.title() for a_dock_item in curr_display_dock_items]
@@ -584,7 +601,7 @@ class DynamicDockDisplayAreaContentMixin:
                     print(f'WARNING: identifier: {identifier} not found in dynamic_display_dict.keys(): {list(self.dynamic_display_dict.keys())}')
                 except Exception as e:
                     # Unhandled exception
-                    raise e
+                    raise
                 
             else:
                 # group was found and valid but already empty prior to remove:
@@ -623,7 +640,58 @@ class DynamicDockDisplayAreaContentMixin:
         test_dock_planning_widget.action_create_new_dock.connect(self.perform_create_new_relative_dock) 
         
         return test_dock_planning_widget, dDisplayItem
+
+    @function_attributes(short_name=None, tags=['docks', 'nested', 'wrapping'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-14 03:41', related_items=[])        
+    def build_wrapping_nested_dock_area(self, flat_group_dockitems_list, dock_group_name: str = 'ContinuousDecode_ - t_bin_size: 0.025'):
+        """ 
+        Builds a wrapping dock area containing several pre-existing dock items
         
+        Usage:
+        
+            grouped_dock_items_dict = active_2d_plot.ui.dynamic_docked_widget_container.get_dockGroup_dock_dict()
+            dock_group_name: str = 'ContinuousDecode_ - t_bin_size: 0.05'
+            flat_group_dockitems_list = grouped_dock_items_dict[dock_group_name]
+            dDisplayItem, nested_dynamic_docked_widget_container = build_wrapping_nested_dock_area(flat_group_dockitems_list, dock_group_name=dock_group_name)
+            nested_dock_items[dock_group_name] = dDisplayItem
+            nested_dynamic_docked_widget_container_widgets[dock_group_name] = nested_dynamic_docked_widget_container
+
+        """
+        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DockDisplayColors, CustomDockDisplayConfig
+        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.NestedDockAreaWidget import NestedDockAreaWidget
+
+        num_child_docks: int = len(flat_group_dockitems_list)
+        total_height: float = np.sum([a_dock.height() for a_dock in flat_group_dockitems_list])
+
+        name=f'GROUP[{dock_group_name}]'
+        dockSize=(500, total_height)
+        dockAddLocationOpts=['bottom']
+
+        display_config = CustomDockDisplayConfig(showCloseButton=True, showCollapseButton=True, showGroupButton=True, orientation='horizontal')
+        ## Add the container to hold dynamic matplotlib plot widgets:
+        nested_dynamic_docked_widget_container = NestedDockAreaWidget()
+        nested_dynamic_docked_widget_container.setObjectName("nested_dynamic_docked_widget_container")
+        nested_dynamic_docked_widget_container.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred)
+        nested_dynamic_docked_widget_container.setMinimumHeight(total_height)
+        nested_dynamic_docked_widget_container.setContentsMargins(0, 0, 0, 0)
+        _, dDisplayItem = self.add_display_dock(name, dockSize=dockSize, display_config=display_config, widget=nested_dynamic_docked_widget_container, dockAddLocationOpts=dockAddLocationOpts, autoOrientation=False)
+        dDisplayItem.setOrientation('horizontal', force=True)
+        dDisplayItem.updateStyle()
+        dDisplayItem.update()
+
+        ## Setup children:
+        for a_dock in flat_group_dockitems_list:
+            a_dock_identifier: str = a_dock.name()
+            ## format nested child docks:
+            a_dock.config.showCloseButton = False
+            a_dock.config.showCollapseButton = False
+            a_dock.config.showGroupButton = False
+            a_dock.config.corner_radius='0px'
+            a_dock.updateStyle()
+            nested_dynamic_docked_widget_container.displayDockArea.addDock(dock=a_dock) ## move the dock items as children to the new container
+            
+        return dDisplayItem, nested_dynamic_docked_widget_container
+
+
     @pyqtExceptionPrintingSlot(object, str)
     def perform_create_new_relative_dock(self, calling_widget, relative_position_string):
         """ NOTE: captures win """
