@@ -32,7 +32,9 @@ class PyqtgraphTimeSynchronizedWidget(PlottingBackendSpecifyingMixin, TimeSynchr
     windowName = 'PyqtgraphTimeSynchronizedWidgetWindow'
     
     enable_debug_print = True
-        
+    
+    sigCrosshairsUpdated = QtCore.Signal(object, str)
+
     @classmethod
     def get_plot_backing_type(cls) -> PlottingBackendType:
         """PlottingBackendSpecifyingMixin conformance: Implementor should return either [PlottingBackendType.Matplotlib, PlottingBackendType.PyQtGraph]."""
@@ -288,7 +290,84 @@ class PyqtgraphTimeSynchronizedWidget(PlottingBackendSpecifyingMixin, TimeSynchr
     def getRootPlotItem(self) -> pg.PlotItem:
         return self.ui.root_plot
     
+    # ==================================================================================================================== #
+    # Misc Functionality                                                                                                   #
+    # ==================================================================================================================== #
+    def add_crosshairs(self, plot_item, name, matrix=None, xbins=None, ybins=None, enable_y_trace:bool=False):
+        """ adds crosshairs that allow the user to hover a bin and have the label dynamically display the bin (x, y) and value."""
+        vLine = pg.InfiniteLine(angle=90, movable=False)
+        self.plots[name]['crosshairs_vLine'] = vLine        
+        plot_item.addItem(vLine, ignoreBounds=True)
+        
+        if enable_y_trace:
+            hLine = pg.InfiniteLine(angle=0, movable=False)
+            self.plots[name]['crosshairs_hLine'] = hLine
+            plot_item.addItem(hLine, ignoreBounds=True)
     
+        vb = plot_item.vb
+        should_force_discrete_to_bins: bool = self.params.get('crosshairs_discrete', True)
+
+        def mouseMoved(evt):
+            pos = evt[0]  ## using signal proxy turns original arguments into a tuple
+            if plot_item.sceneBoundingRect().contains(pos):
+                mousePoint = vb.mapSceneToView(pos)
+
+                if should_force_discrete_to_bins:
+                    x_point = float(int(round(mousePoint.x())))
+                    if enable_y_trace:
+                        y_point = float(int(round(mousePoint.y())))
+
+                    x_point = x_point + 0.5 # Snap point to center. Does not affect indexing because it truncates
+                    if enable_y_trace:
+                        y_point = y_point + 0.5 
+                else:
+                    x_point = mousePoint.x()
+                    if enable_y_trace:
+                        y_point = mousePoint.y()
+                
+                # Note that int(...) truncates towards zero (floor effect)
+                index_x = int(x_point)
+                if enable_y_trace:
+                    index_y = int(y_point)
+                
+
+                # Getting Value (Z-level from Matrix) ________________________________________________________________________________ #
+                if matrix is not None:
+                    matrix_shape = np.shape(matrix)
+                    # is_valid_x_index = (index_x > 0 and index_x < matrix_shape[0])
+                    # is_valid_y_index = (index_y > 0 and index_y < matrix_shape[1])
+                    is_valid_x_index = (index_x >= 0 and index_x < matrix_shape[0])
+                    if enable_y_trace:
+                        is_valid_y_index = (index_y >= 0 and index_y < matrix_shape[1])
+                    
+                    if is_valid_x_index and is_valid_y_index:
+                        if should_force_discrete_to_bins:
+                            if (xbins is not None) and (ybins is not None):
+                                # Display special xbins/ybins if we have em
+                                bin_x = xbins[index_x]
+                                if enable_y_trace:
+                                    bin_y = ybins[index_y]
+                                value_str = "<span style='font-size: 12pt'>(x[%d]=%0.3f, y[%d]=%0.3f), <span style='color: green'>value=%0.3f</span>" % (index_x, bin_x, index_y, bin_y, matrix[index_x][index_y])
+                            else:
+                                value_str = "<span style='font-size: 12pt'>(x=%d, y=%d), <span style='color: green'>value=%0.3f</span>" % (index_x, index_y, matrix[index_x][index_y])
+
+                            print(f'value_str: {value_str}')
+                            # self.ui.mainLabel.setText(value_str)
+                        else:
+                            value_str = "<span style='font-size: 12pt'>(x=%0.1f, y=%0.1f), <span style='color: green'>value=%0.3f</span>" % (index_x, index_y, matrix[index_x][index_y])
+                            print(f'value_str: {value_str}')
+                            # self.ui.mainLabel.setText("<span style='font-size: 12pt'>(x=%0.1f, y=%0.1f), <span style='color: green'>value=%0.3f</span>" % (index_x, index_y, matrix[index_x][index_y]))
+                ## END if matrix is not None ...
+                
+                ## Move the lines:
+                vLine.setPos(x_point)
+                if enable_y_trace:
+                    hLine.setPos(y_point)
+
+                ## emit the signal:
+                self.sigCrosshairsUpdated.emit(self, name)
+                
+        self.ui.connections[name] = pg.SignalProxy(plot_item.scene().sigMouseMoved, rateLimit=60, slot=mouseMoved)
 
     
 

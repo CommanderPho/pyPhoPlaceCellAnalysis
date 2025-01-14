@@ -861,10 +861,21 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, debug_print=Fa
     visible_intervals_info_widget_container, visible_intervals_ctrl_layout_widget =  spike_raster_window._perform_build_attached_visible_interval_info_widget()
 
 
+    ## Dock all Grouped results from `'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView'`
+    ## INPUTS: active_2d_plot
+    grouped_dock_items_dict = active_2d_plot.ui.dynamic_docked_widget_container.get_dockGroup_dock_dict()
+    nested_dock_items = {}
+    nested_dynamic_docked_widget_container_widgets = {}
+    for dock_group_name, flat_group_dockitems_list in grouped_dock_items_dict.items():
+        dDisplayItem, nested_dynamic_docked_widget_container = active_2d_plot.ui.dynamic_docked_widget_container.build_wrapping_nested_dock_area(flat_group_dockitems_list, dock_group_name=dock_group_name)
+        nested_dock_items[dock_group_name] = dDisplayItem
+        nested_dynamic_docked_widget_container_widgets[dock_group_name] = nested_dynamic_docked_widget_container
+
+    ## OUTPUTS: nested_dock_items, nested_dynamic_docked_widget_container_widgets
     
 
 
-    return all_global_menus_actionsDict, global_flat_action_dict
+    return all_global_menus_actionsDict, global_flat_action_dict # , (_raster_tracks_out_dict, _raster_tracks_out_dict, _raster_tracks_out_dict)
 
 
 # ==================================================================================================================== #
