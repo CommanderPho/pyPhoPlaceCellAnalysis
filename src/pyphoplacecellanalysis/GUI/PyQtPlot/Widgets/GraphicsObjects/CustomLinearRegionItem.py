@@ -60,7 +60,9 @@ class CustomLinearRegionItem(DraggableGraphicsWidgetMixin, LinearRegionItem):
     
             
     """
-    
+    # sigHoverEvent = QtCore.Signal(object)
+    sigClicked = QtCore.Signal(object, object)
+    sigRemoveRequested = QtCore.Signal(object)
 
     def __init__(self, values=(0, 1), orientation='vertical', brush=None, pen=None, hoverBrush=None, hoverPen=None, movable=True, bounds=None, span=(0, 1), swapMode='sort', clipItem=None,
                  regionAreaMouseInteractionCriteria: MouseInteractionCriteria=None, endLinesMouseInteractionCriteria: MouseInteractionCriteria=None, custom_bound_data=None):
@@ -115,7 +117,7 @@ class CustomLinearRegionItem(DraggableGraphicsWidgetMixin, LinearRegionItem):
             # Original/Default Conditions
             regionAreaMouseInteractionCriteria = MouseInteractionCriteria(drag=lambda an_evt: (an_evt.button() == QtCore.Qt.MouseButton.LeftButton),
                                                                         hover=lambda an_evt: (an_evt.acceptDrags(QtCore.Qt.MouseButton.LeftButton)),
-                                                                        click=lambda an_evt: (an_evt.button() == QtCore.Qt.MouseButton.RightButton)
+                                                                        click=lambda an_evt: (an_evt.button() == QtCore.Qt.MouseButton.RightButton) ## allow right-clicking
             )
             
             # Actually override drag:
@@ -292,6 +294,16 @@ class CustomLinearRegionItem(DraggableGraphicsWidgetMixin, LinearRegionItem):
             self.moving = False
             self.sigRegionChanged.emit(self)
             self.sigRegionChangeFinished.emit(self)
+        # if ev.button() == QtCore.Qt.MouseButton.RightButton and self.contextMenuEnabled():
+        if click_criteria_fn(ev) and self.contextMenuEnabled():
+            self.raiseContextMenu(ev)
+            ev.accept()
+        elif self.acceptedMouseButtons() & ev.button():
+            ev.accept()
+            self.sigClicked.emit(self, ev)
+        else:
+            ev.ignore()
+            
 
     def hoverEvent(self, ev):
         hover_criteria_fn = self.custom_mouse_hover_criteria_fn

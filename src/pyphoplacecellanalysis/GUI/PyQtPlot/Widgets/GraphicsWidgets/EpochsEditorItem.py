@@ -52,6 +52,7 @@ class EpochsEditor:
     pos_df: pd.DataFrame = field(repr=False) # disables super excessive dataframe printing
     curr_laps_df: pd.DataFrame = field()
     on_epoch_region_updated_callback: Optional[Callable] = field()
+    on_epoch_region_selection_toggled_callback: Optional[Callable] = field()
 
     plots: RenderPlots = field(init=False)
     changed_laps_df: pd.DataFrame = field(init=False)
@@ -90,10 +91,21 @@ class EpochsEditor:
             # curr_laps_df.loc[(curr_laps_df['lap_dir'] > 0), 'lap_color'] = DisplayColorsEnum.Laps.LR
             # curr_laps_df.loc[(curr_laps_df['lap_dir'] > 0), 'lap_accent_color'] = '#c4ff26de'
 
+
+        ## add the 'is_included' column
+        if 'is_included' not in curr_laps_df.columns:
+            curr_laps_df['is_included'] = True ## all are included by default
+
+        # curr_laps_df['lap_color'] = DisplayColorsEnum.Laps.RL
+        # curr_laps_df['lap_accent_color'] = '#6227ffde'
+        
+        # curr_laps_df.loc[(curr_laps_df['is_included']), 'lap_color'] = DisplayColorsEnum.Laps.LR
+        # curr_laps_df.loc[(curr_laps_df['is_included']), 'lap_color'] = DisplayColorsEnum.Laps.LR
+
         return curr_laps_df
 
     @classmethod
-    def perform_plot_laps_diagnoser(cls, pos_df: pd.DataFrame, curr_laps_df: pd.DataFrame, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None):
+    def perform_plot_laps_diagnoser(cls, pos_df: pd.DataFrame, curr_laps_df: pd.DataFrame, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None, on_epoch_region_selection_toggled_callback=None):
         """
             from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.EpochsEditorItem import perform_plot_laps_diagnoser
             plots_obj = EpochsEditor.perform_plot_laps_diagnoser(pos_df, curr_laps_df, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=_on_epoch_region_updated)
@@ -185,6 +197,10 @@ class EpochsEditor:
                 if on_epoch_region_updated_callback is not None:
                     epoch_linear_region.sigRegionChangeFinished.connect(on_epoch_region_updated_callback)
                 
+                if on_epoch_region_selection_toggled_callback is not None:
+                    epoch_linear_region.sigClicked.connect(on_epoch_region_selection_toggled_callback)
+            
+
         
         plots = RenderPlots('lap_debugger_plot', win=win,
             sub_layouts=sub_layouts, viewboxes=viewboxes, position_plots=position_plots,
@@ -195,7 +211,7 @@ class EpochsEditor:
 
 
     @classmethod
-    def init_laps_diagnoser(cls, pos_df: pd.DataFrame, curr_laps_df: pd.DataFrame, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None):
+    def init_laps_diagnoser(cls, pos_df: pd.DataFrame, curr_laps_df: pd.DataFrame, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None, on_epoch_region_selection_toggled_callback=None):
         """ 
 
         Usage:
@@ -213,15 +229,15 @@ class EpochsEditor:
             epochs_editor = EpochsEditor.init_laps_diagnoser(pos_df, curr_laps_df, include_velocity=True, include_accel=False)
         """
         curr_laps_df = cls.add_visualization_columns(curr_laps_df=curr_laps_df)
-        _obj = cls(pos_df=pos_df, curr_laps_df=curr_laps_df, on_epoch_region_updated_callback=on_epoch_region_updated_callback)
+        _obj = cls(pos_df=pos_df, curr_laps_df=curr_laps_df, on_epoch_region_updated_callback=on_epoch_region_updated_callback, on_epoch_region_selection_toggled_callback=on_epoch_region_selection_toggled_callback)
         _obj.changed_laps_df = _obj.curr_laps_df.iloc[:0,:].copy() # should be in attrs_post_init
-        _obj.plots = cls.perform_plot_laps_diagnoser(pos_df, curr_laps_df, include_velocity=include_velocity, include_accel=include_accel, on_epoch_region_updated_callback=_obj.on_epoch_region_updated)
+        _obj.plots = cls.perform_plot_laps_diagnoser(pos_df, curr_laps_df, include_velocity=include_velocity, include_accel=include_accel, on_epoch_region_updated_callback=_obj.on_epoch_region_updated, on_epoch_region_selection_toggled_callback=_obj.on_epoch_region_selection_toggled)
         return _obj
 
 
 
     @classmethod
-    def init_from_session(cls, sess, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None):
+    def init_from_session(cls, sess, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None, on_epoch_region_selection_toggled_callback=None):
         """ initialize from a session object. Does not modify the session. """
         # pos_df = sess.compute_position_laps() # ensures the laps are computed if they need to be:
         position_obj = copy.deepcopy(sess.position)
@@ -231,15 +247,13 @@ class EpochsEditor:
         # Drop rows with missing data in columns: 't', 'velocity_x_smooth' and 2 other columns. This occurs from smoothing
         pos_df = pos_df.dropna(subset=['t', 'x_smooth', 'velocity_x_smooth', 'acceleration_x_smooth']).reset_index(drop=True)
         curr_laps_df = sess.laps.to_dataframe()
-
-        return cls.init_laps_diagnoser(pos_df=pos_df, curr_laps_df=curr_laps_df, include_velocity=include_velocity, include_accel=include_accel, on_epoch_region_updated_callback=on_epoch_region_updated_callback)
+        return cls.init_laps_diagnoser(pos_df=pos_df, curr_laps_df=curr_laps_df, include_velocity=include_velocity, include_accel=include_accel, on_epoch_region_updated_callback=on_epoch_region_updated_callback, on_epoch_region_selection_toggled_callback=on_epoch_region_selection_toggled_callback)
     
-
 
 
     # @QtCore.pyqtSlot(object)
     def on_epoch_region_updated(self, epoch_region_item):
-        print(f'epoch_region_item: {epoch_region_item}, epoch_region_item.custom_bound_data: {epoch_region_item.custom_bound_data}')
+        print(f'.on_epoch_region_updated(...): epoch_region_item: {epoch_region_item}, epoch_region_item.custom_bound_data: {epoch_region_item.custom_bound_data}')
         epoch_index = epoch_region_item.custom_bound_data
         
         prev_start, prev_stop = self.curr_laps_df.loc[epoch_index].start, self.curr_laps_df.loc[epoch_index].stop
@@ -250,7 +264,7 @@ class EpochsEditor:
         stop_changed = np.logical_not(np.isclose(prev_stop, new_stop))
         either_changed = stop_changed or start_changed
         if either_changed:
-            print(f'either_changed! change_delta: {change_delta}')
+            print(f'\teither_changed! change_delta: {change_delta}')
             self.changed_laps_df.loc[epoch_index, :] = self.curr_laps_df.loc[epoch_index] # copy the existing row
             self.changed_laps_df.loc[epoch_index, 'start'] =  new_start
             self.changed_laps_df.loc[epoch_index, 'stop'] =  new_stop
@@ -258,6 +272,55 @@ class EpochsEditor:
 
         if self.on_epoch_region_updated_callback is not None:
             self.on_epoch_region_updated_callback(epoch_region_item) # pass through the change
+            
+
+
+    def on_epoch_region_selection_toggled(self, epoch_region_item):
+        print(f'.on_epoch_region_selection_toggled(...): epoch_region_item: {epoch_region_item}, epoch_region_item.custom_bound_data: {epoch_region_item.custom_bound_data}')
+        epoch_index = epoch_region_item.custom_bound_data       
+        print(f'\tepoch_index: {epoch_index}')
+         
+        # prev_start, prev_stop = self.curr_laps_df.loc[epoch_index].start, self.curr_laps_df.loc[epoch_index].stop
+        # # curr_laps_df.loc[epoch_index]
+        # new_start, new_stop = epoch_region_item.getRegion()
+        # change_delta = ((prev_start- new_start), (prev_stop-new_stop))
+        # start_changed = np.logical_not(np.isclose(prev_start, new_start))
+        # stop_changed = np.logical_not(np.isclose(prev_stop, new_stop))
+        # either_changed = stop_changed or start_changed
+        # if either_changed:
+        #     print(f'\teither_changed! change_delta: {change_delta}')
+        #     self.changed_laps_df.loc[epoch_index, :] = self.curr_laps_df.loc[epoch_index] # copy the existing row
+        #     self.changed_laps_df.loc[epoch_index, 'start'] =  new_start
+        #     self.changed_laps_df.loc[epoch_index, 'stop'] =  new_stop
+        #     self.changed_laps_df.loc[epoch_index, 'duration'] =  (new_stop - new_start)
+
+        ## Toggle the current item
+        if 'is_included' not in self.curr_laps_df.columns:
+            self.curr_laps_df['is_included'] = True
+
+        ## toggle the current item:
+        self.curr_laps_df.loc[epoch_index, 'is_included'] = (not self.curr_laps_df.loc[epoch_index, 'is_included']) ## toggle
+        print(f"\tself.curr_laps_df.loc[epoch_index, 'is_included']: {self.curr_laps_df.loc[epoch_index, 'is_included']}")
+
+        # if ('lap_color' not in curr_laps_df.columns) or ('lap_accent_color' not in curr_laps_df.columns):
+        #     curr_laps_df['lap_color'] = DisplayColorsEnum.Laps.RL
+        #     curr_laps_df['lap_accent_color'] = '#6227ffde'
+
+        #     # lap_direction_df_key: str = 'lap_dir'
+        #     lap_direction_df_key: str = 'is_LR_dir'
+        #     assert lap_direction_df_key in curr_laps_df.columns, f"lap_direction_df_key ({lap_direction_df_key}) missing from curr_laps_df.columns: {list(curr_laps_df.columns)}"
+        #     curr_laps_df.loc[(curr_laps_df['is_LR_dir']), 'lap_color'] = DisplayColorsEnum.Laps.LR
+        #     curr_laps_df.loc[(curr_laps_df['is_LR_dir']), 'lap_accent_color'] = '#c4ff26de'
+
+        #     # assert 'lap_dir' in curr_laps_df.columns, f"'lap_dir' missing from curr_laps_df.columns: {list(curr_laps_df.columns)}"
+        #     # curr_laps_df.loc[(curr_laps_df['lap_dir'] > 0), 'lap_color'] = DisplayColorsEnum.Laps.LR
+        #     # curr_laps_df.loc[(curr_laps_df['lap_dir'] > 0), 'lap_accent_color'] = '#c4ff26de'
+            
+
+        if self.on_epoch_region_selection_toggled_callback is not None:
+            self.on_epoch_region_selection_toggled_callback(epoch_region_item) # pass through the change
+            
+
 
     def get_user_labeled_epochs_df(self) -> pd.DataFrame:
         """ returns the complete epochs_df with user-labeled changes. returns all epochs, not just the ones modified. """
@@ -266,7 +329,7 @@ class EpochsEditor:
         user_labeled_laps_df.loc[self.changed_laps_df.index, :] = self.changed_laps_df
         user_labeled_laps_df['duration'] = user_labeled_laps_df['stop'] - user_labeled_laps_df['start']
         # Select columns: 'lap_dir', 'start' and 4 other columns
-        user_labeled_laps_df = user_labeled_laps_df.loc[:, ['lap_dir', 'start', 'stop', 'lap_id', 'label', 'duration']]
+        user_labeled_laps_df = user_labeled_laps_df.loc[:, ['lap_dir', 'start', 'stop', 'lap_id', 'label', 'duration', 'is_LR_dir']]
         return user_labeled_laps_df
     
 
