@@ -4,6 +4,7 @@ import sys
 from copy import deepcopy
 from datetime import datetime, timedelta
 import typing
+
 from typing import Any, Callable, Optional, Dict, List, Tuple, Union
 from warnings import warn
 import numpy as np
@@ -717,7 +718,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
 
     @function_attributes(short_name=None, tags=['computation', 'specific'], input_requires=[], output_provides=[], uses=['run_specific_computations_single_context', 'cls._build_initial_computationResult'], used_by=[], creation_date='2023-07-21 18:21', related_items=[])
-    def perform_specific_computation(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_includelist=None, computation_kwargs_list=None, fail_on_exception:bool=False, debug_print=False, progress_logger_callback=None):
+    def perform_specific_computation(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_includelist=None, computation_kwargs_list=None, fail_on_exception:bool=False, debug_print=False, progress_logger_callback=None, enable_parallel: bool=False):
         """ perform a specific computation (specified in computation_functions_name_includelist) in a minimally destructive manner using the previously recomputed results:
         Ideally would already have access to the:
         - Previous computation result
@@ -757,8 +758,6 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             if (self.global_computation_results is None) or (not isinstance(self.global_computation_results, ComputationResult)):
                 print(f'global_computation_results is None. Building initial global_computation_results...')
                 self.global_computation_results = None # clear existing results
-                # self.global_computation_results = ComputedPipelineStage._build_initial_computationResult(self.sess, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
-                # self.global_computation_results = ComputedPipelineStage._build_initial_global_computationResult(self, self.sess, active_computation_params)
                 self.global_computation_results = self.build_initial_global_computationResult(active_computation_params)
                 assert self.global_computation_results.computation_config is not None
 
@@ -766,9 +765,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             # global computation functions:
             if (self.global_computation_results is None) or (not isinstance(self.global_computation_results, ComputationResult)):
                 print(f'global_computation_results is None or not a `ComputationResult` object. Building initial global_computation_results...') #TODO 2024-01-10 15:12: - [ ] Check that `self.global_computation_results.keys()` are empty
-                self.global_computation_results = None # clear existing results
-                # self.global_computation_results = ComputedPipelineStage._build_initial_computationResult(self.sess, active_computation_params) # returns a computation result. This stores the computation config used to compute it.
-                # self.global_computation_results = ComputedPipelineStage._build_initial_global_computationResult(self, self.sess, active_computation_params)
+                self.global_computation_results = None # clear existing results\
                 self.global_computation_results = self.build_initial_global_computationResult(active_computation_params)
                 assert self.global_computation_results.computation_config is not None
                 
@@ -793,21 +790,49 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             self.global_computation_results = self.run_specific_computations_single_context(global_kwargs, computation_functions_name_includelist=computation_functions_name_includelist, computation_kwargs_list=computation_kwargs_list, are_global=True, fail_on_exception=fail_on_exception, debug_print=debug_print, progress_logger_callback=progress_logger_callback) # was there a reason I didn't pass `computation_kwargs_list` to the global version?
         else:
             # Non-global functions:
-            for a_select_config_name, a_filtered_session in self.filtered_sessions.items():  ## #TODO 2025-01-13 20:05: - [ ] Embarassingly parallel as all filtered sessions are independent. Should be able to compute in parallell.         
-                if a_select_config_name in enabled_filter_names:
-                    print(f'===>|> for filtered_session with filter named "{a_select_config_name}": Performing run_specific_computations_single_context(..., computation_functions_name_includelist={computation_functions_name_includelist})...')
-                    if active_computation_params is None:
-                        curr_active_computation_params = self.active_configs[a_select_config_name].computation_config # get the previously set computation configs
-                    else:
-                        # set/update the computation configs:
-                        curr_active_computation_params = active_computation_params 
-                        self.active_configs[a_select_config_name].computation_config = curr_active_computation_params #TODO: if more than one computation config is passed in, the active_config should be duplicated for each computation config.
+            if not enable_parallel:
+                ## enable_parallel == False
+                for a_select_config_name, a_filtered_session in self.filtered_sessions.items():
+                    if a_select_config_name in enabled_filter_names:
+                        print(f'===>|> for filtered_session with filter named "{a_select_config_name}": Performing run_specific_computations_single_context(..., computation_functions_name_includelist={computation_functions_name_includelist})...')
+                        if active_computation_params is None:
+                            curr_active_computation_params = self.active_configs[a_select_config_name].computation_config
+                        else:
+                            curr_active_computation_params = active_computation_params
+                            self.active_configs[a_select_config_name].computation_config = curr_active_computation_params
+                        previous_computation_result = self.computation_results[a_select_config_name]
+                        self.computation_results[a_select_config_name] = self.run_specific_computations_single_context(previous_computation_result, computation_functions_name_includelist=computation_functions_name_includelist, computation_kwargs_list=computation_kwargs_list, are_global=False, fail_on_exception=fail_on_exception, debug_print=debug_print, progress_logger_callback=progress_logger_callback)
+            else:
+                ## enable_parallel == True
+                import concurrent.futures ## used for optional paralell computations in `perform_specific_computation`
+                print("Running non-global computations in parallel...")
 
-                    ## Here is an issue, we need to get the appropriate computation result depending on whether it's global or not 
-                    previous_computation_result = self.computation_results[a_select_config_name]
-                    self.computation_results[a_select_config_name] = self.run_specific_computations_single_context(previous_computation_result, computation_functions_name_includelist=computation_functions_name_includelist, computation_kwargs_list=computation_kwargs_list, are_global=False, fail_on_exception=fail_on_exception, debug_print=debug_print, progress_logger_callback=progress_logger_callback)
-        
-        ## IMPLEMENTATION FAULT: the global computations/results should not be ran within the filter/config loop. It applies to all config names and should be ran last. Also don't allow mixing local/global functions.
+                def _compute_for_one_session(a_select_config_name: str, active_computation_params, previous_result, config_computation_config, computation_functions_name_includelist, computation_kwargs_list, fail_on_exception, debug_print):
+                    if active_computation_params is not None: config_computation_config = active_computation_params
+                    updated_result = self.run_specific_computations_single_context(previous_result, computation_functions_name_includelist=computation_functions_name_includelist, computation_kwargs_list=computation_kwargs_list, are_global=False, fail_on_exception=fail_on_exception, debug_print=debug_print, progress_logger_callback=progress_logger_callback)
+                    return (a_select_config_name, updated_result, config_computation_config)
+
+                futures = {}
+                with concurrent.futures.ProcessPoolExecutor() as executor:
+                    for a_select_config_name, a_filtered_session in self.filtered_sessions.items():
+                        if a_select_config_name in enabled_filter_names:
+                            previous_result = self.computation_results[a_select_config_name]
+                            config_computation_config = self.active_configs[a_select_config_name].computation_config
+                            future = executor.submit(_compute_for_one_session, a_select_config_name, active_computation_params, previous_result, config_computation_config, computation_functions_name_includelist, computation_kwargs_list, fail_on_exception, debug_print)
+                            futures[future] = a_select_config_name
+
+                    for future in concurrent.futures.as_completed(futures):
+                        a_select_config_name = futures[future]
+                        try:
+                            (name, updated_result, updated_config) = future.result()
+                            self.computation_results[name] = updated_result
+                            if active_computation_params is not None: self.active_configs[name].computation_config = updated_config
+                        except Exception as e:
+                            print(f"Exception for filter {a_select_config_name}: {e}")
+                            if fail_on_exception:
+                                raise
+        return
+
 
 
     ## Computation Helpers: 
