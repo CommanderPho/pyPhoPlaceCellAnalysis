@@ -44,6 +44,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 from pyphocorehelpers.exception_helpers import CapturedException, ExceptionPrintingContext # used in _execute_computation_functions for error handling
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.assertion_helpers import Assert
 
 
 class EvaluationActions(Enum):
@@ -1939,6 +1940,34 @@ class PipelineWithComputedPipelineStageMixin:
         if len(failed_keys) > 0:
             print(f'WARNING: failed_keys: {failed_keys} did not save for global results! They HAVE NOT BEEN SAVED!')
         return split_save_folder, split_save_paths, split_save_output_types, failed_keys
+
+
+    @function_attributes(short_name=None, tags=['fixup', 'deserialization', 'filesystem', 'post-load', 'cross-platform'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-14 09:41', related_items=[])
+    def post_load_fixup_sess_basedirs(self, updated_session_basepath: Path):
+        """ after loading from pickle from another computer, fixes up the session's basepaths so they actually exist.
+        
+        Updates:
+            self.sess.config.basepath
+            self.filtered_sessions[an_epoch_name].config.basepath
+            
+        """
+        did_fixup_any_missing_basepath: bool = False
+        Assert.path_exists(updated_session_basepath)
+        is_missing_basepath = (not self.sess.basepath.exists())
+        if is_missing_basepath:
+            self.sess.config.basepath = deepcopy(updated_session_basepath)
+            did_fixup_any_missing_basepath = True
+            
+        for a_name, a_sess in self.filtered_sessions.items():
+            is_missing_basepath = (not a_sess.basepath.exists())
+            if is_missing_basepath:
+                print(f"sess[{a_name}] is missing basepath: {a_sess.basepath}. updating.")
+                a_sess.config.basepath = deepcopy(updated_session_basepath)
+                did_fixup_any_missing_basepath = True
+        ## END for a_name, a_se...
+        
+        return did_fixup_any_missing_basepath               
+
 
     
     def load_pickled_global_computation_results(self, override_global_computation_results_pickle_path=None, allow_overwrite_existing:bool=False, allow_overwrite_existing_allow_keys: Optional[List[str]]=None, debug_print=True):
