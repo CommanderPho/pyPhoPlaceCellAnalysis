@@ -793,7 +793,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             self.global_computation_results = self.run_specific_computations_single_context(global_kwargs, computation_functions_name_includelist=computation_functions_name_includelist, computation_kwargs_list=computation_kwargs_list, are_global=True, fail_on_exception=fail_on_exception, debug_print=debug_print, progress_logger_callback=progress_logger_callback) # was there a reason I didn't pass `computation_kwargs_list` to the global version?
         else:
             # Non-global functions:
-            for a_select_config_name, a_filtered_session in self.filtered_sessions.items():                
+            for a_select_config_name, a_filtered_session in self.filtered_sessions.items():  ## #TODO 2025-01-13 20:05: - [ ] Embarassingly parallel as all filtered sessions are independent. Should be able to compute in parallell.         
                 if a_select_config_name in enabled_filter_names:
                     print(f'===>|> for filtered_session with filter named "{a_select_config_name}": Performing run_specific_computations_single_context(..., computation_functions_name_includelist={computation_functions_name_includelist})...')
                     if active_computation_params is None:
