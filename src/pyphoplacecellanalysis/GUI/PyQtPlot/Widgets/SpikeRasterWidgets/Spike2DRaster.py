@@ -1216,7 +1216,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         """
         use_docked_pyqtgraph_plots: bool = self.params.use_docked_pyqtgraph_plots
         if use_docked_pyqtgraph_plots:
-            a_time_sync_pyqtgraph_widget, root_graphics_layout_widget, plot_item = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(500,50))
+            a_time_sync_pyqtgraph_widget, root_graphics_layout_widget, plot_item, dDisplayItem = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(500,50))
             target_graphics_layout_widget = root_graphics_layout_widget
         else:
             # main_graphics_layout_widget = self.ui.main_graphics_layout_widget # GraphicsLayoutWidget
@@ -1353,7 +1353,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     
 
     @function_attributes(short_name=None, tags=['pyqtgraph_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget', 'pyqtgraph', 'docked_widget'], input_requires=[], output_provides=[], uses=['PyqtgraphTimeSynchronizedWidget'], used_by=[], creation_date='2024-12-31 03:35', related_items=['add_new_matplotlib_render_plot_widget'])
-    def add_new_embedded_pyqtgraph_render_plot_widget(self, name='pyqtgraph_view_widget', dockSize=(500,50), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None) -> Tuple[PyqtgraphTimeSynchronizedWidget, Any, Any]:
+    def add_new_embedded_pyqtgraph_render_plot_widget(self, name='pyqtgraph_view_widget', dockSize=(500,50), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None) -> Tuple[PyqtgraphTimeSynchronizedWidget, Any, Any, Any]:
         """ creates a new dynamic PyqtgraphTimeSynchronizedWidget, a container widget that holds a matplotlib figure, and adds it as a row to the main layout
         
         based off of `add_new_matplotlib_render_plot_widget`, but to support embedded pyqtgraph plots instead of matplotlib plots
@@ -1392,9 +1392,12 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             
             if display_config is None:
                 display_config = FigureWidgetDockDisplayConfig(showCloseButton=True, showCollapseButton=True, showGroupButton=True)
+                
+
+            should_hide_title: bool = getattr(display_config, 'hideTitleBar', False)
             
             _, dDisplayItem = self.ui.dynamic_docked_widget_container.add_display_dock(name, dockSize=dockSize, display_config=display_config,
-                                                                                    widget=self.ui.matplotlib_view_widgets[name], dockAddLocationOpts=dockAddLocationOpts, autoOrientation=False)
+                                                                                    widget=self.ui.matplotlib_view_widgets[name], dockAddLocationOpts=dockAddLocationOpts, autoOrientation=False, hideTitle=should_hide_title)
             dDisplayItem.setOrientation('horizontal', force=True)
             dDisplayItem.updateStyle()
             dDisplayItem.update()
@@ -1413,9 +1416,40 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             root_graphics_layout_widget = self.ui.matplotlib_view_widgets[name].getRootGraphicsLayoutWidget()
             plot_item = self.ui.matplotlib_view_widgets[name].getRootPlotItem()
             
-
         # self.sync_matplotlib_render_plot_widget()
-        return self.ui.matplotlib_view_widgets[name], root_graphics_layout_widget, plot_item
+        return self.ui.matplotlib_view_widgets[name], root_graphics_layout_widget, plot_item, dDisplayItem
+    
+
+    def _perform_remove_embedded_pyqtgraph_render_plot_widget(self, name='pyqtgraph_view_widget') -> Tuple[PyqtgraphTimeSynchronizedWidget, Any, Any]:
+        """ creates a new dynamic PyqtgraphTimeSynchronizedWidget, a container widget that holds a matplotlib figure, and adds it as a row to the main layout
+        
+        based off of `add_new_matplotlib_render_plot_widget`, but to support embedded pyqtgraph plots instead of matplotlib plots
+        
+        emit an event so the parent can call `self.update_scrolling_event_filters()` to add the new item
+        
+        Usage:
+        
+            a_time_sync_pyqtgraph_widget, root_graphics_layout_widget, plot_item = self.add_new_embedded_pyqtgraph_render_plot_widget(name='test_pyqtgraph_view_widget', dockSize=(500,50))
+
+            ## TODO: remove any connections first!
+             
+        """
+        dDisplayItem = self.ui.dynamic_docked_widget_container.find_display_dock(identifier=name) # Dock
+        if dDisplayItem is None:
+            raise ValueError(f'display item "{name}" does not exist!')
+        else:
+            # Already had the widget
+            print(f'removing the pyqtgraph view widget and its display dock for identifier: "{name}".')
+            extant_widget = self.ui.matplotlib_view_widgets.pop(name) ## remove from `self.ui.matplotlib_view_widgets`
+            root_graphics_layout_widget = extant_widget.getRootGraphicsLayoutWidget()
+            plot_item = extant_widget.getRootPlotItem()
+            ## remove here
+            extant_widget.deleteLater()
+            self.ui.dynamic_docked_widget_container.remove_display_dock(identifer=name)    
+            # self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name])
+            print(f'\tremoved.')
+
+        
     
 
 
@@ -1450,6 +1484,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             ## Remove the widget itself:
             # self.ui.dynamic_docked_widget_container
             self.ui.layout.removeWidget(active_matplotlib_view_widget) # Remove the matplotlib widget
+            active_matplotlib_view_widget.deleteLater()
             active_matplotlib_view_widget = None # Set the matplotlib_view_widget to None ## TODO: this doesn't actually remove it from the UI container does it?
             ## remove from the dictionary
             del self.ui.matplotlib_view_widgets[identifier]
@@ -1533,14 +1568,14 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
 
         _interval_tracks_out_dict = {}
         if enable_interval_overview_track:
-            dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=True, corner_radius=0)
+            dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=False, corner_radius='0px', hideTitleBar=True)
             name = f'interval_overview{name_modifier_suffix}'
-            intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(500, 60), display_config=dock_config)
+            intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item, intervals_overview_dock = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(500, 60), display_config=dock_config)
             _interval_tracks_out_dict[name] = (dock_config, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item)
         ## Enables creating a new pyqtgraph-based track to display the intervals/epochs
-        interval_window_dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=True, corner_radius=0)
+        interval_window_dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=False, corner_radius='0px', hideTitleBar=True)
         name = f'intervals{name_modifier_suffix}'
-        intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(500, 40), display_config=interval_window_dock_config)
+        intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item, intervals_dock = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(500, 40), display_config=interval_window_dock_config)
         
         self.params.custom_interval_rendering_plots.append(intervals_plot_item) # = [self.plots.background_static_scroll_window_plot, self.plots.main_plot_widget, intervals_plot_item]
 
@@ -1624,9 +1659,9 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         
         _raster_tracks_out_dict = {}
         ## Enables creating a new pyqtgraph-based track to display the intervals/epochs
-        dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=True, corner_radius=0)
+        dock_config = CustomCyclicColorsDockDisplayConfig(named_color_scheme=NamedColorScheme.grey, showCloseButton=True, showCollapseButton=False, showGroupButton=False, corner_radius="0px", hideTitleBar=True)
         name = f'rasters[{name_modifier_suffix}]'
-        time_sync_pyqtgraph_widget, raster_root_graphics_layout_widget, raster_plot_item = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(500, 120), display_config=dock_config)
+        time_sync_pyqtgraph_widget, raster_root_graphics_layout_widget, raster_plot_item, raster_dock = self.add_new_embedded_pyqtgraph_render_plot_widget(name=name, dockSize=(500, 120), display_config=dock_config)
 
         if raster_plot_item not in self.params.custom_interval_rendering_plots:
             self.params.custom_interval_rendering_plots.append(raster_plot_item) ## this signals that it should recieve updates for its intervals somewhere else
@@ -1699,6 +1734,23 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
 
 
 
+
+    @function_attributes(short_name=None, tags=['UNFINISHED', 'DOCKs', 'tracks', 'dock'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-14 03:43', related_items=[])
+    def perform_remove_dockgroup(self, flat_group_dockitems_list):
+        # a_widget_to_remove = {}
+        a_dock_to_remove = {}
+        for a_dock in flat_group_dockitems_list:
+            a_dock_identifier: str = a_dock.name()
+            print(f'a_dock_identifier: "{a_dock_identifier}"')
+            self.remove_matplotlib_render_plot_widget(identifier=a_dock_identifier)
+            # active_2d_plot._perform_remove_embedded_pyqtgraph_render_plot_widget(name=a_dock_identifier)
+            
+            # for a_child_widget in a_dock.widgets:
+            #     a_widget_to_remove[a_dock_identifier] = a_child_widget
+            #     a_child_widget.deleteLater()
+            a_dock_to_remove[a_dock_identifier] = a_dock
+            a_dock.close()
+        return a_dock_to_remove
 
 
     # ==================================================================================================================== #
@@ -1890,10 +1942,10 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         debug_print_axes_locations(self)
 
 
+
+@define(slots=False)
 class FigureWidgetDockDisplayConfig(CustomDockDisplayConfig):
     """docstring for FigureWidgetDockDisplayConfig."""
-    def __init__(self, showCloseButton=True, fontSize='10px', corner_radius='3px'):
-        super(FigureWidgetDockDisplayConfig, self).__init__(showCloseButton=showCloseButton, fontSize=fontSize, corner_radius=corner_radius)
 
     def get_colors(self, orientation, is_dim):
         # Common to all:
@@ -1912,7 +1964,13 @@ class FigureWidgetDockDisplayConfig(CustomDockDisplayConfig):
  
         return fg_color, bg_color, border_color
     
-    
+    def __attrs_post_init__(self):
+      self.fontSize = '10px'
+      self.corner_radius = '3px'
+      if self.custom_get_colors_dict is None:
+            self.custom_get_colors_dict = {False: DockDisplayColors(fg_color='#fff', bg_color='#cc6666', border_color='#ba5454'),
+                True: DockDisplayColors(fg_color='#aaa', bg_color='#aa4444', border_color='#993232'),
+            }
     
 # Start Qt event loop unless running in interactive mode.
 # if __name__ == '__main__':

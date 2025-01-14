@@ -655,6 +655,20 @@ class DynamicDockDisplayAreaContentMixin:
             nested_dock_items[dock_group_name] = dDisplayItem
             nested_dynamic_docked_widget_container_widgets[dock_group_name] = nested_dynamic_docked_widget_container
 
+            
+        Example with nesting all dock groups:
+        
+            ## INPUTS: active_2d_plot
+            grouped_dock_items_dict = active_2d_plot.ui.dynamic_docked_widget_container.get_dockGroup_dock_dict()
+            nested_dock_items = {}
+            nested_dynamic_docked_widget_container_widgets = {}
+            for dock_group_name, flat_group_dockitems_list in grouped_dock_items_dict.items():
+                dDisplayItem, nested_dynamic_docked_widget_container = active_2d_plot.ui.dynamic_docked_widget_container.build_wrapping_nested_dock_area(flat_group_dockitems_list, dock_group_name=dock_group_name)
+                nested_dock_items[dock_group_name] = dDisplayItem
+                nested_dynamic_docked_widget_container_widgets[dock_group_name] = nested_dynamic_docked_widget_container
+
+            ## OUTPUTS: nested_dock_items, nested_dynamic_docked_widget_container_widgets
+
         """
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DockDisplayColors, CustomDockDisplayConfig
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.NestedDockAreaWidget import NestedDockAreaWidget
@@ -666,7 +680,11 @@ class DynamicDockDisplayAreaContentMixin:
         dockSize=(500, total_height)
         dockAddLocationOpts=['bottom']
 
-        display_config = CustomDockDisplayConfig(showCloseButton=True, showCollapseButton=True, showGroupButton=True, orientation='horizontal')
+        display_config = CustomDockDisplayConfig(showCloseButton=True, showCollapseButton=True, showGroupButton=True, orientation='horizontal', corner_radius='0px', fontSize='15px',
+                                                custom_get_colors_dict = {False: DockDisplayColors(fg_color='#5bf', bg_color='#0d001a', border_color='#5467ba'),
+                                                                          True: DockDisplayColors(fg_color='#aaa', bg_color='#35265f', border_color='#423399'),
+            })
+        
         ## Add the container to hold dynamic matplotlib plot widgets:
         nested_dynamic_docked_widget_container = NestedDockAreaWidget()
         nested_dynamic_docked_widget_container.setObjectName("nested_dynamic_docked_widget_container")
