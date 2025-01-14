@@ -400,6 +400,30 @@ class DynamicDockDisplayAreaContentMixin:
                 
         return all_collected_widgets
     
+
+    def get_dockGroup_dock_dict(self, debug_print=False) -> Dict[str, List[Dock]]:
+        """ extracts the 'widget' property that is the contents of each added dock item from the self.dynamic_display_dict and returns it as a flat list """
+        flat_dockitems_list = self.get_flat_dockitems_list()
+        grouped_dock_items_dict: Dict[str, List[Dock]] = {}
+        # ungrouped_dock_items_list: List[Dock] = []
+        for a_dock in flat_dockitems_list:
+            ## have a dock
+            if len(a_dock.config.dock_group_names) == 0:
+                ## ungrouped items
+                # grouped_dock_items_dict.append(a_dock)
+                pass
+            else:
+                for a_group_name in a_dock.config.dock_group_names: # a dock can belong to multiple groups
+                    if a_group_name not in grouped_dock_items_dict:
+                        grouped_dock_items_dict[a_group_name] = [] ## initialize to empty list
+                    grouped_dock_items_dict[a_group_name].append(a_dock) ## add the dock to the group
+                
+        return grouped_dock_items_dict
+
+    
+
+
+    
     def add_display_dock(self, identifier=None, widget=None, dockSize=(300,200), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None, **kwargs):
         """ adds a dynamic display dock with an appropriate widget of type 'viewContentsType' to the dock area container on the main window. 
 
