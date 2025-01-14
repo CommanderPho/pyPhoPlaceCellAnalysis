@@ -761,6 +761,20 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                 self.global_computation_results = None # clear existing results
                 self.global_computation_results = self.build_initial_global_computationResult(active_computation_params)
                 assert self.global_computation_results.computation_config is not None
+            ## Add `curr_active_pipeline.global_computation_results.computation_config` as needed:
+            if self.global_computation_results.computation_config is None:
+                print('\tglobal_computation_results.computation_config is None! Making new one!')
+                if active_computation_params is not None:
+                    print(f'WARNING: does this overwrite the custom computation_params with the pipeline defaults???\n\tactive_computation_params: {active_computation_params}')
+                    self.global_computation_results.computation_config = deepcopy(active_computation_params)
+                else:
+                    #     active_computation_params
+                    # curr_global_param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters.init_from_pipeline(curr_active_pipeline=curr_active_pipeline)
+                    # output_result.computation_config = curr_global_param_typed_parameters
+                    self.global_computation_results.update_config_from_pipeline(curr_active_pipeline=curr_active_pipeline)
+
+                print(f'\t\tdone. Pipeline needs resave!')
+
 
         if contains_any_global_functions:
             # global computation functions:
@@ -769,7 +783,17 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                 self.global_computation_results = None # clear existing results\
                 self.global_computation_results = self.build_initial_global_computationResult(active_computation_params)
                 assert self.global_computation_results.computation_config is not None
-                
+            ## Add `curr_active_pipeline.global_computation_results.computation_config` as needed:
+            if self.global_computation_results.computation_config is None:
+                print('\tglobal_computation_results.computation_config is None! Making new one!')
+                if active_computation_params is not None:
+                    print(f'WARNING: does this overwrite the custom computation_params with the pipeline defaults???\n\tactive_computation_params: {active_computation_params}')
+                    self.global_computation_results.computation_config = deepcopy(active_computation_params)
+                else:
+                    self.global_computation_results.update_config_from_pipeline(curr_active_pipeline=curr_active_pipeline)
+
+                print(f'\t\tdone. Pipeline needs resave!')
+
                 # ## Add `curr_active_pipeline.global_computation_results.computation_config` as needed:
                 # if self.global_computation_results.computation_config is None:
                 #     print('global_computation_results.computation_config is None! Making new one!')
