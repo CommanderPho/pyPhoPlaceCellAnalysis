@@ -48,6 +48,86 @@ from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
+
+# ==================================================================================================================== #
+# 2025-01-13 - Lap Overriding/qclu filtering                                                                           #
+# ==================================================================================================================== #
+from neuropy.core.user_annotations import UserAnnotationsManager
+
+
+@function_attributes(short_name=None, tags=['laps', 'update', 'session', 'TODO', 'UNFINISHED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-13 15:45', related_items=[])
+def override_laps(curr_active_pipeline, override_laps_df: pd.DataFrame, debug_print=False):
+    """ 
+    overrides the laps
+    
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import override_laps
+
+        override_laps_df: Optional[pd.DataFrame] = UserAnnotationsManager.get_hardcoded_laps_override_dict().get(curr_active_pipeline.get_session_context(), None)
+        if override_laps_df is not None:
+            print(f'overriding laps....')
+            display(override_laps_df)
+            override_laps(curr_active_pipeline, override_laps_df=override_laps_df)
+
+
+
+    """
+    from neuropy.core.laps import Laps
+
+    t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+
+    ## Load the custom laps
+    if debug_print:
+        print(f'override_laps_df: {override_laps_df}')
+    if 'lap_id' not in override_laps_df:
+        override_laps_df['lap_id'] = override_laps_df.index.astype('int') ## set lap_id from the index
+    else:
+        override_laps_df[['lap_id']] = override_laps_df[['lap_id']].astype('int')
+
+    # Either way, ensure that the lap_dir is an 'int' column.
+    override_laps_df['lap_dir'] = override_laps_df['lap_dir'].astype('int')
+    # override_laps_df['lap_dir'] = override_laps_df['lap_dir'].astype('int')
+    # override_laps_df['is_LR_dir'] = (override_laps_df['lap_dir'] < 1.0)
+
+    if 'label' not in override_laps_df:
+        override_laps_df['label'] = override_laps_df['lap_id'].astype('str') # add the string "label" column
+    else:
+        override_laps_df['label'] = override_laps_df['label'].astype('str')
+        
+    # curr_laps_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=curr_laps_df, global_session=global_session, replace_existing=True)
+
+    override_laps_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=override_laps_df, global_session=curr_active_pipeline.sess, replace_existing=True)
+    override_laps_df = Laps._update_dataframe_computed_vars(laps_df=override_laps_df, t_start=t_start, t_delta=t_delta, t_end=t_end, global_session=curr_active_pipeline.sess, replace_existing=False)
+    override_laps_obj = Laps(laps=override_laps_df, metadata=None).filter_to_valid()
+    ## OUTPUTS: override_laps_obj
+
+    curr_active_pipeline.sess.laps = deepcopy(override_laps_obj)
+
+    # curr_active_pipeline.sess.laps_df = override_laps_df
+    curr_active_pipeline.sess.compute_position_laps()
+
+    # curr_active_pipeline.sess = curr_active_pipeline.sess
+    # a_pf1D_dt.replacing_computation_epochs(epochs=override_laps_df)
+
+    for a_filtered_context_name, a_filtered_context in curr_active_pipeline.filtered_contexts.items():
+        ## current session
+        a_filtered_epoch = curr_active_pipeline.filtered_epochs[a_filtered_context_name]
+        filtered_sess = curr_active_pipeline.filtered_sessions[a_filtered_context_name]
+        if debug_print:
+            print(f'a_filtered_context_name: {a_filtered_context_name}, a_filtered_context: {a_filtered_context}')
+            display(a_filtered_context)
+        # override_laps_obj.filter_to_valid()
+        a_filtered_override_laps_obj: Laps = deepcopy(override_laps_obj).time_slice(t_start=filtered_sess.t_start, t_stop=filtered_sess.t_stop)
+        # a_filtered_context.lap_dir
+        filtered_sess.laps = deepcopy(a_filtered_override_laps_obj)
+        filtered_sess.compute_position_laps()
+        if debug_print:
+            print(f'\tupdated.')
+        
+
+
+
 # ==================================================================================================================== #
 # @ 2025-01-01 - Better Aggregation of Probabilities across bins                                                       #
 # ==================================================================================================================== #
@@ -770,7 +850,7 @@ def classify_pos_bins(x: NDArray):
 # 2024-12-18 Heuristic Evaluation in the continuous timeline                                                           #
 # ==================================================================================================================== #
 @function_attributes(short_name=None, tags=['2024-12-18', 'ACTIVE', 'gui', 'debugging', 'continuous'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 19:29', related_items=[])
-def _setup_spike_raster_window_for_debugging(spike_raster_window, debug_print=False):
+def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_raster_window_track:bool=False, debug_print=False):
     """ 
     ['AddMatplotlibPlot.DecodedPosition', 'AddMatplotlibPlot.Custom',
      'AddTimeCurves.Position', 'AddTimeCurves.Velocity', 'AddTimeCurves.Random', 'AddTimeCurves.RelativeEntropySurprise', 'AddTimeCurves.Custom',
@@ -815,15 +895,17 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, debug_print=Fa
     # background_static_scroll_window_plot.setFixedHeight(50.0)
     
     # Set stretch factors to control priority
-    main_graphics_layout_widget.ci.layout.setRowStretchFactor(0, 1)  # Plot1: lowest priority
+    main_graphics_layout_widget.ci.layout.setRowStretchFactor(0, 3)  # Plot1: lowest priority
     main_graphics_layout_widget.ci.layout.setRowStretchFactor(1, 2)  # Plot2: mid priority
-    main_graphics_layout_widget.ci.layout.setRowStretchFactor(2, 3)  # Plot3: highest priority
+    main_graphics_layout_widget.ci.layout.setRowStretchFactor(2, 2)  # Plot3: highest priority
+    main_graphics_layout_widget.ci.layout.setRowStretchFactor(3, 2)  # Plot3: highest priority
 
     _interval_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_interval_tracks(enable_interval_overview_track=False, should_link_to_main_plot_widget=has_main_raster_plot)
     interval_window_dock_config, intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item = _interval_tracks_out_dict['intervals']
     # dock_config, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item = _interval_tracks_out_dict['interval_overview']
 
-    _raster_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_raster_track(name_modifier_suffix='raster_window', should_link_to_main_plot_widget=has_main_raster_plot)
+    if wants_docked_raster_window_track:
+        _raster_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_raster_track(name_modifier_suffix='raster_window', should_link_to_main_plot_widget=has_main_raster_plot)
 
 
     # Add Renderables ____________________________________________________________________________________________________ #
