@@ -12,6 +12,7 @@ class DockDisplayConfig(object):
     showCloseButton: bool = field(default=True)
     showCollapseButton: bool = field(default=False)
     showGroupButton: bool = field(default=False)
+    hideTitleBar: bool = field(default=False)
     fontSize: str = field(default='10px')
     corner_radius: str = field(default='2px')
     # fontSize: str = field(default='10px')
