@@ -771,7 +771,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                     #     active_computation_params
                     # curr_global_param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters.init_from_pipeline(curr_active_pipeline=curr_active_pipeline)
                     # output_result.computation_config = curr_global_param_typed_parameters
-                    self.global_computation_results.update_config_from_pipeline(curr_active_pipeline=curr_active_pipeline)
+                    self.global_computation_results.update_config_from_pipeline(curr_active_pipeline=self) ## NOTE: self is not a curr_active_pipeline, it's a ComputedPipelineStage
 
                 print(f'\t\tdone. Pipeline needs resave!')
 
@@ -790,7 +790,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                     print(f'WARNING: does this overwrite the custom computation_params with the pipeline defaults???\n\tactive_computation_params: {active_computation_params}')
                     self.global_computation_results.computation_config = deepcopy(active_computation_params)
                 else:
-                    self.global_computation_results.update_config_from_pipeline(curr_active_pipeline=curr_active_pipeline)
+                    self.global_computation_results.update_config_from_pipeline(curr_active_pipeline=self)
 
                 print(f'\t\tdone. Pipeline needs resave!')
 
