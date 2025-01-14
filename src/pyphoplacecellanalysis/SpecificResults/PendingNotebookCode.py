@@ -51,7 +51,7 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 # ==================================================================================================================== #
 # @ 2025-01-01 - Better Aggregation of Probabilities across bins                                                       #
 # ==================================================================================================================== #
-@metadata_attributes(short_name=None, tags=['aggregation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 00:00', related_items=[])
+@metadata_attributes(short_name=None, tags=['aggregation', 'UNFINSHED', 'integration', 'confidence'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 00:00', related_items=[])
 class TimeBinAggregation:
     """ Methods of aggregating over many time bins
     
