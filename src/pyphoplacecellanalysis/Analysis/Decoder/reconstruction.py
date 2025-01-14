@@ -2300,6 +2300,10 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
                 self.total_spike_counts_per_window = self.total_spike_counts_per_window[:-num_extra_bins_in_old]
                 
 
+
+            # self._setup_time_bin_spike_counts_N_i(debug_print=True) # updates: self.time_binning_container, self.unit_specific_time_binned_spike_counts, self.total_spike_counts_per_window
+            # self.unit_specific_time_binned_spike_counts
+
             self.marginal = DynamicContainer(x=curr_unit_marginal_x, y=curr_unit_marginal_y)
             assert isinstance(self.time_binning_container, BinningContainer) # Should be neuropy.utils.mixins.binning_helpers.BinningContainer
             self.compute_corrected_positions() ## this seems to fail for pf1D
