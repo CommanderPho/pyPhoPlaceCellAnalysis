@@ -141,8 +141,9 @@ class ZhangReconstructionImplementation:
 
         """
         time_window_edges, time_window_edges_binning_info, spikes_df = ZhangReconstructionImplementation.compute_time_bins(spikes_df, max_time_bin_size=max_time_bin_size, debug_print=debug_print) # importantly adds 'binned_time' column to spikes_df
-        # unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, time_window_edges_binning_info.bin_indicies[1:], debug_print=debug_print)
-        unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, time_window_edges_binning_info.bin_indicies[:-1], debug_print=debug_print) # 2025-01-13 16:14 replaced [1:] with [:-1]
+        # active_indicies = time_window_edges_binning_info.bin_indicies[1:] # pre-2025-01-13 Old way that led to losing a time bin
+        active_indicies = time_window_edges_binning_info.bin_indicies[:-1] # 2025-01-14 New way that supposedly uses correct indexing
+        unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, active_indicies, debug_print=debug_print) # 2025-01-13 16:14 replaced [1:] with [:-1]
         return unit_specific_binned_spike_counts, time_window_edges, time_window_edges_binning_info
 
     @classmethod
@@ -219,7 +220,8 @@ class ZhangReconstructionImplementation:
                 spikes_df = spikes_df.spikes.add_binned_time_column(time_window_edges, time_window_edges_binning_info, debug_print=debug_print)
         
         # either way to compute the unit_specific_binned_spike_counts:
-        active_indicies = time_window_edges_binning_info.bin_indicies[:-1]
+        # active_indicies = time_window_edges_binning_info.bin_indicies[1:] # pre-2025-01-13 Old way that led to losing a time bin
+        active_indicies = time_window_edges_binning_info.bin_indicies[:-1] # 2025-01-14 New way that supposedly uses correct indexing
         assert np.nanmax(spikes_df['binned_time'].to_numpy()) <= np.nanmax(active_indicies), f"np.nanmax(spikes_df['binned_time'].to_numpy()): {np.nanmax(spikes_df['binned_time'].to_numpy())}, np.nanmax(active_indicies): {np.nanmax(active_indicies)}"
         # unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, time_window_edges_binning_info.bin_indicies[1:], debug_print=debug_print) # requires 'binned_time' in spikes_df. TODO 2023-05-16 - ERROR: isn't getting centers. time_window_edges_binning_info.bin_indicies[1:]
         unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, active_indicies, debug_print=debug_print) ## removed `time_window_edges_binning_info.bin_indicies[1:]` on 2025-01-13 16:05 
@@ -339,7 +341,7 @@ class ZhangReconstructionImplementation:
                 # _temp = (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (np.exp(-tau * cell_ratemap)) 
                 # cell_prob = cell_prob * _temp
 
-                cell_prob *= (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (np.exp(-tau * cell_ratemap)) # product equal using *=
+                cell_prob *= (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (np.exp(-tau * cell_ratemap)) # product equal using *= ## #TODO 2025-01-14 18:35: - [ ] numpy.core._exceptions._ArrayMemoryError: Unable to allocate 2.09 GiB for an array with shape (15124, 18557) and data type float64
 
                 # cell_prob.shape (nFlatPositionBins, nTimeBins)
             else:
@@ -2355,12 +2357,18 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         # is_non_firing_bin = self.is_non_firing_time_bin
         # assert (len(self.is_non_firing_time_bin) == self.num_time_windows), f"len(self.is_non_firing_time_bin): {len(self.is_non_firing_time_bin)}, self.num_time_windows: {self.num_time_windows}" # 2025-01-13 17:43 Added constraint because this is supposed to be correct
         
-        if (len(self.is_non_firing_time_bin) != self.num_time_windows):
-            ## time windows aren't correct after computing for some reason, call `self._setup_time_bin_spike_counts_N_i()` to recompute them
-            print(f'WARN: f"len(self.is_non_firing_time_bin): {len(self.is_non_firing_time_bin)}, self.num_time_windows: {self.num_time_windows}", trying to recompute them....')
-            self._setup_time_bin_spike_counts_N_i(debug_print=False) # updates: self.time_binning_container, self.unit_specific_time_binned_spike_counts, self.total_spike_counts_per_window        
+        should_use_safe_time_binning: bool = False
+        if should_use_safe_time_binning:
+            if (len(self.is_non_firing_time_bin) != self.num_time_windows):
+                ## time windows aren't correct after computing for some reason, call `self._setup_time_bin_spike_counts_N_i()` to recompute them
+                print(f'WARN: f"len(self.is_non_firing_time_bin): {len(self.is_non_firing_time_bin)}, self.num_time_windows: {self.num_time_windows}", trying to recompute them....')
+                self._setup_time_bin_spike_counts_N_i(debug_print=False) # updates: self.time_binning_container, self.unit_specific_time_binned_spike_counts, self.total_spike_counts_per_window        
 
-        assert (len(self.is_non_firing_time_bin) == self.num_time_windows), f"len(self.is_non_firing_time_bin): {len(self.is_non_firing_time_bin)}, self.num_time_windows: {self.num_time_windows}" # 2025-01-13 17:43 Added constraint because this is supposed to be correct        
+            assert (len(self.is_non_firing_time_bin) == self.num_time_windows), f"len(self.is_non_firing_time_bin): {len(self.is_non_firing_time_bin)}, self.num_time_windows: {self.num_time_windows}" # 2025-01-13 17:43 Added constraint because this is supposed to be correct        
+        else:
+            print(f'WARN: not using safe time binning!')
+            
+
         is_non_firing_bin = np.where(self.is_non_firing_time_bin)[0] # TEMP: do this to get around the indexing issue. TODO: IndexError: boolean index did not match indexed array along dimension 0; dimension is 11880 but corresponding boolean dimension is 11881
         self.revised_most_likely_positions = self.perform_compute_forward_filled_positions(self.most_likely_positions, is_non_firing_bin=is_non_firing_bin)
         
