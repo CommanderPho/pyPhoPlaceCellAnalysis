@@ -49,6 +49,64 @@ from pyphocorehelpers.DataStructure.general_parameter_containers import Visualiz
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 
+
+# ==================================================================================================================== #
+# 2025-01-15 Plotting Decoding Performance on Track                                                                    #
+# ==================================================================================================================== #
+
+from neuropy.utils.mixins.time_slicing import TimePointEventAccessor
+from neuropy.core.position import PositionAccessor
+from neuropy.core.flattened_spiketrains import SpikesAccessor
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
+from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
+from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors
+
+
+def _perform_plot_track(fig, ax_list, all_directional_continuously_decoded_dict, track_templates, enable_flat_line_drawing: bool = False, debug_print = False):
+    """ 
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _perform_plot_track
+    
+    """
+    kwargs = {}
+    decoded_pos_line_kwargs = dict(lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, animated=False)
+    # lw=1.0, color='#00ff7f99', alpha=0.6
+    # two_step_options_dict = { 'color':'#00ff7f99', 'face_color':'#55ff0099', 'edge_color':'#00aa0099' }
+
+    decoder_color_dict: Dict[types.DecoderName, str] = DecoderIdentityColors.build_decoder_color_dict()
+    # pos_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
+
+    # Plot the measured position X:
+    _, ax = plot_1D_most_likely_position_comparsions(pos_df, variable_name='x', time_window_centers=None, xbin=None, posterior=None, active_most_likely_positions_1D=None, ax=ax_list[0],
+                                                      enable_flat_line_drawing=enable_flat_line_drawing, debug_print=debug_print, **kwargs)
+    # ax = ax_list[0]
+    ax.clear() ## clear any existing artists just to be sure
+    _out_artists = {}
+    # curr_active_pipeline.global_computation_results.t
+    for a_decoder_name, a_decoder in track_templates.get_decoders_dict().items():
+        a_continuously_decoded_result = all_directional_continuously_decoded_dict[a_decoder_name]
+        a_decoder_color = decoder_color_dict[a_decoder_name]
+        
+        assert len(a_continuously_decoded_result.p_x_given_n_list) == 1
+        p_x_given_n = a_continuously_decoded_result.p_x_given_n_list[0]
+        # p_x_given_n = a_continuously_decoded_result.p_x_given_n_list[0]['p_x_given_n']
+        time_bin_containers = a_continuously_decoded_result.time_bin_containers[0]
+        time_window_centers = time_bin_containers.centers
+        # p_x_given_n.shape # (62, 4, 209389)
+        a_marginal_x = a_continuously_decoded_result.marginal_x_list[0]
+        # active_time_window_variable = a_decoder.active_time_window_centers
+        active_time_window_variable = time_window_centers
+        active_most_likely_positions_x = a_marginal_x['most_likely_positions_1D'] # a_decoder.most_likely_positions[:,0].T
+
+        # marker_style: 'circle', marker_size:0.25
+        _out_artists[a_decoder_name] = ax.plot(active_time_window_variable, active_most_likely_positions_x, **(decoded_pos_line_kwargs | dict(color=a_decoder_color)), label=f'Most-likely {a_decoder_name}') # (Num windows x 2)    
+
+    ## OUTPUT: _out_artists
+    return _out_artists
+    
+
+
+
 # ==================================================================================================================== #
 # 2025-01-13 - Lap Overriding/qclu filtering                                                                           #
 # ==================================================================================================================== #
@@ -3475,6 +3533,7 @@ from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult, _check_result_laps_epochs_df_performance
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import CompleteDecodedContextCorrectness
 
+@function_attributes(short_name=None, tags=['ground-truth', 'laps', 'performance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-15 14:00', related_items=[])
 def add_groundtruth_information(curr_active_pipeline, a_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult):
     """    takes 'laps_df' and 'result_laps_epochs_df' to add the ground_truth and the decoded posteriors:
 
