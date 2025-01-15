@@ -1,6 +1,8 @@
 from copy import deepcopy
 from enum import Enum
-from typing import Dict, List, Optional # for PlacefieldOverlapMetricMode
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+import pyphoplacecellanalysis.General.type_aliases as types
+
 from attrs import define, field, Factory
 from pathlib import Path
 import numpy as np
@@ -279,6 +281,82 @@ class LongShortDisplayConfigManager:
 long_short_display_config_manager = LongShortDisplayConfigManager()
 
 
+class DecoderIdentityColors:
+    """ colors for each of the 4 decoders
+    
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors
+    
+    decoder_color_dict: Dict[types.DecoderName, str] = DecoderIdentityColors.build_decoder_color_dict()
+    
+    """
+    @classmethod
+    def build_decoder_color_dict(cls, wants_hex_str: bool = True) -> Dict[types.DecoderName, str]:
+        """ builds the unique decoder identity colors in a consistent way
+        
+        {'long_LR': '#0099ff42', 'long_RL': '#7a00ff42', 'short_LR': '#f5161659', 'short_RL': '#e3f51659'}
+
+        captures: long_short_display_config_manager
+        
+        Usage:
+        
+            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors
+    
+            decoder_color_dict: Dict[types.DecoderName, str] = DecoderIdentityColors.build_decoder_color_dict()
+    
+    
+        """
+        from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter
+        # additional_cmap_names = dict(zip(TrackTemplates.get_decoder_names(), ['red', 'purple', 'green', 'orange'])) # {'long_LR': 'red', 'long_RL': 'purple', 'short_LR': 'green', 'short_RL': 'orange'}
+        long_epoch_config = long_short_display_config_manager.long_epoch_config.as_pyqtgraph_kwargs()
+        short_epoch_config = long_short_display_config_manager.short_epoch_config.as_pyqtgraph_kwargs()
+
+        color_dict = {'long_LR': long_epoch_config['brush'].color(), 'long_RL': apply_LR_to_RL_adjustment(long_epoch_config['brush'].color()),
+                        'short_LR': short_epoch_config['brush'].color(), 'short_RL': apply_LR_to_RL_adjustment(short_epoch_config['brush'].color())}
+        if wants_hex_str:
+            return {k: ColorFormatConverter.qColor_to_hexstring(v) for k, v in color_dict.items()}
+        else:
+            return color_dict
+        
+
+    @classmethod
+    def build_decoder_color_track_dir_tuple_dict(cls) -> Dict[types.DecoderName, Tuple[str, str]]:
+        """ builds the unique decoder identity colors in a consistent way
+        
+        {'long_LR': ('#0b0049', '#aadd21'),
+        'long_RL': ('#0b0049', '#5522de'),
+        'short_LR': ('#490000', '#aadd21'),
+        'short_RL': ('#490000', '#5522de'),
+        'long': ('#0b0049', None),
+        'short': ('#490000', None),
+        'LR': (None, '#aadd21'),
+        'RL': (None, '#5522de')}
+        
+        captures: long_short_display_config_manager, DisplayColorsEnum
+        
+        Usage:
+            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors
+            
+            all_colors_dict: Dict[types.DecoderName, Tuple[str, str]] = DecoderIdentityColors.build_decoder_color_track_dir_tuple_dict()
+            active_color_dict = {k:all_colors_dict[k] for k in y_bin_labels}
+
+        
+        """
+        long_epoch_config = long_short_display_config_manager.long_epoch_config #.as_pyqtgraph_kwargs()
+        short_epoch_config = long_short_display_config_manager.short_epoch_config #.as_pyqtgraph_kwargs()
+
+        Long_color = long_epoch_config.mpl_color
+        Short_color = short_epoch_config.mpl_color
+
+        RL_color = DisplayColorsEnum.Laps.RL #.get_RL_dock_colors(None, is_dim=False)
+        LR_color = DisplayColorsEnum.Laps.LR # get_LR_dock_colors(None, is_dim=False)
+
+        return {'long_LR':(Long_color, LR_color), 'long_RL':(Long_color, RL_color),
+            'short_LR':(Short_color, LR_color), 'short_RL':(Short_color, RL_color), 'long': (Long_color, None), 'short': (Short_color, None), 'LR': (None, LR_color), 'RL': (None, RL_color)}
+
+
+        
+
+        
 
 class PlottingHelpers:
     """ 
@@ -423,20 +501,8 @@ class PlottingHelpers:
         
         n_ybins: int = len(y_bin_labels)
         
-        long_epoch_config = long_short_display_config_manager.long_epoch_config #.as_pyqtgraph_kwargs()
-        short_epoch_config = long_short_display_config_manager.short_epoch_config #.as_pyqtgraph_kwargs()
-
-        Long_color = long_epoch_config.mpl_color
-        Short_color = short_epoch_config.mpl_color
-
-        RL_color = DisplayColorsEnum.Laps.RL #.get_RL_dock_colors(None, is_dim=False)
-        LR_color = DisplayColorsEnum.Laps.LR # get_LR_dock_colors(None, is_dim=False)
-
-        
-        all_colors_dict = {'long_LR':(Long_color, LR_color), 'long_RL':(Long_color, RL_color),
-            'short_LR':(Short_color, LR_color), 'short_RL':(Short_color, RL_color), 'long': (Long_color, None), 'short': (Short_color, None), 'LR': (None, LR_color), 'RL': (None, RL_color)}
-
-
+        all_colors_dict: Dict[types.DecoderName, Tuple[str, str]] = DecoderIdentityColors.build_decoder_color_track_dir_tuple_dict()
+    
         active_color_dict = {k:all_colors_dict[k] for k in y_bin_labels}
 
 

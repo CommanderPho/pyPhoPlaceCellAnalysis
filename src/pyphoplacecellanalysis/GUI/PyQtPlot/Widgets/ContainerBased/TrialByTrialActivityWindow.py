@@ -350,7 +350,7 @@ class TrialByTrialActivityWindow:
 
         """
         from neuropy.utils.matplotlib_helpers import _determine_best_placefield_2D_layout, _scale_current_placefield_to_acceptable_range, _build_neuron_identity_label # for display_all_pf_2D_pyqtgraph_binned_image_rendering
-        from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager, long_short_display_config_manager, apply_LR_to_RL_adjustment
+        from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors, long_short_display_config_manager, apply_LR_to_RL_adjustment
         from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter, debug_print_color, build_adjusted_color
         from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
@@ -371,18 +371,15 @@ class TrialByTrialActivityWindow:
         active_z_scored_tuning_map_matrix = active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix # shape (n_epochs, n_neurons, n_pos_bins),
         print(f'np.shape(active_z_scored_tuning_map_matrix): {np.shape(active_z_scored_tuning_map_matrix)}')
 
-        # additional_cmap_names = dict(zip(TrackTemplates.get_decoder_names(), ['red', 'purple', 'green', 'orange'])) # {'long_LR': 'red', 'long_RL': 'purple', 'short_LR': 'green', 'short_RL': 'orange'}
-        long_epoch_config = long_short_display_config_manager.long_epoch_config.as_pyqtgraph_kwargs()
-        short_epoch_config = long_short_display_config_manager.short_epoch_config.as_pyqtgraph_kwargs()
-
-        color_dict = {'long_LR': long_epoch_config['brush'].color(), 'long_RL': apply_LR_to_RL_adjustment(long_epoch_config['brush'].color()),
-                        'short_LR': short_epoch_config['brush'].color(), 'short_RL': apply_LR_to_RL_adjustment(short_epoch_config['brush'].color())}
-        additional_cmap_names = {k: ColorFormatConverter.qColor_to_hexstring(v) for k, v in color_dict.items()}
+        color_dict: Dict[types.DecoderName, pg.QtGui.QColor] = DecoderIdentityColors.build_decoder_color_dict(wants_hex_str=False)
+        additional_cmap_names: Dict[types.DecoderName, str] = {k: ColorFormatConverter.qColor_to_hexstring(v) for k, v in color_dict.items()}
 
         ## new
         # additional_cmap_names = {'long_LR': 'royalblue', 'long_RL': 'blue',
         #                 'short_LR': 'crimson', 'short_RL': 'red'}
         
+        # additional_cmap_names = {'long_LR': '#0099ff', 'long_RL': '#7a00ff', 'short_LR': '#f51616', 'short_RL': '#e3f516'}
+
         additional_cmap_names = {'long_LR': '#4169E1', 'long_RL': '#607B00',
                         'short_LR': '#DC143C', 'short_RL': '#990099'}
         # additional_cmap_names = {k: ColorFormatConverter.qColor_to_hexstring(v) for k, v in color_dict.items()}
