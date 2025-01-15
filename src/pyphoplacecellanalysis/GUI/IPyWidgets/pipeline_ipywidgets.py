@@ -1,5 +1,6 @@
 import sys
 from enum import Enum
+from pyphocorehelpers.DataStructure.enum_helpers import OrderedEnum
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from attrs import define, field, Factory
 
@@ -98,17 +99,29 @@ def try_save_pickle_as(original_file_path, file_confirmed_callback):
     return
 
 
+
 @metadata_attributes(short_name=None, tags=['enum', 'phases'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-06 22:56', related_items=[])
-class CustomProcessingPhases(Enum):
+class CustomProcessingPhases(OrderedEnum):
     """ These phases keep track of groups of computations to run.
 
     from pyphoplacecellanalysis.GUI.IPyWidgets.pipeline_ipywidgets import PipelineJupyterHelpers, CustomProcessingPhases
 
+    CustomProcessingPhases.clean_run
+    CustomProcessingPhases.continued_run
+    CustomProcessingPhases.final_run
+    
+    selector.value
+
 
     """
-    clean_run = "clean_run"
-    continued_run = "continued_run"
-    final_run = "final_run"
+    # Enum members with an additional `_order` attribute for ordering
+    clean_run = ("clean_run", 0)
+    continued_run = ("continued_run", 1)
+    final_run = ("final_run", 2)
+
+    def __init__(self, value, order):
+        self._value_ = value
+        self._order = order
     
     def get_run_configuration(self) -> Dict:
         ## Different run configurations:
