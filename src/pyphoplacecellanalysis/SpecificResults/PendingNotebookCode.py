@@ -62,28 +62,101 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaste
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors
 
-
-def _perform_plot_track(fig, ax_list, all_directional_continuously_decoded_dict, track_templates, enable_flat_line_drawing: bool = False, debug_print = False):
-    """ 
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _perform_plot_track
+@function_attributes(short_name=None, tags=['decoder', 'matplotlib', 'plot', 'track', 'performance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-15 17:44', related_items=[])
+def _perform_plot_multi_decoder_meas_pred_position_track(curr_active_pipeline, fig, ax_list, enable_flat_line_drawing: bool = False, debug_print = False): # , pos_df: pd.DataFrame, laps_df: pd.DataFrame
+    """ Plots a new matplotlib-based track that displays the measured and decoded position (for all four decoders) on the same axes. The "correct" (ground-truth) decoder is highlighted (higher opacity and thicker line) compared to the wrong decoders' estimates.
     
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
+        from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _perform_plot_multi_decoder_meas_pred_position_track
+
+        ## Build the new dock track:
+        dock_identifier: str = 'Continuous Decoding Performance'
+        ts_widget, fig, ax_list = active_2d_plot.add_new_matplotlib_render_plot_widget(name=dock_identifier)
+        ## Get the needed data:
+        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+        all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+        continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
+        previously_decoded_keys: List[float] = list(continuously_decoded_result_cache_dict.keys()) # [0.03333]
+        print(F'previously_decoded time_bin_sizes: {previously_decoded_keys}')
+
+        time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
+        print(f'time_bin_size: {time_bin_size}')
+        continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.most_recent_continuously_decoded_dict
+        all_directional_continuously_decoded_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {k:v for k, v in (continuously_decoded_dict or {}).items() if k in TrackTemplates.get_decoder_names()} ## what is plotted in the `f'{a_decoder_name}_ContinuousDecode'` rows by `AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand`
+        ## OUT: all_directional_continuously_decoded_dict
+        ## Draw the position meas/decoded on the plot widget
+        ## INPUT: fig, ax_list, all_directional_continuously_decoded_dict, track_templates
+
+        _out_artists =  _perform_plot_multi_decoder_meas_pred_position_track(curr_active_pipeline, fig, ax_list, all_directional_continuously_decoded_dict, track_templates, enable_flat_line_drawing=True)
+
+
+        ## sync up the widgets
+        active_2d_plot.sync_matplotlib_render_plot_widget(dock_identifier, sync_mode=SynchronizedPlotMode.TO_WINDOW)
+
     """
+    
+    ## Get the needed data:
+    
+    ## get from parameters:
+    minimum_inclusion_fr_Hz: float = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
+    included_qclu_values: List[int] = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
+
+    directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+    track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+    print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
+    print(f'included_qclu_values: {included_qclu_values}')
+
+    directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+    all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+    continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
+    previously_decoded_keys: List[float] = list(continuously_decoded_result_cache_dict.keys()) # [0.03333]
+    if debug_print:
+        print(F'previously_decoded time_bin_sizes: {previously_decoded_keys}')
+
+    time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
+    print(f'time_bin_size: {time_bin_size}')
+    continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.most_recent_continuously_decoded_dict
+    all_directional_continuously_decoded_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {k:v for k, v in (continuously_decoded_dict or {}).items() if k in TrackTemplates.get_decoder_names()} ## what is plotted in the `f'{a_decoder_name}_ContinuousDecode'` rows by `AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand`
+    ## OUT: all_directional_continuously_decoded_dict
+
+    ## INPUT: fig, ax_list, all_directional_continuously_decoded_dict, track_templates
+
+
+    ## Laps
+    global_laps_obj: Laps = deepcopy(curr_active_pipeline.sess.laps)
+    t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+    laps_df = global_laps_obj.adding_true_decoder_identifier(t_start, t_delta, t_end) ## ensures ['maze_id', 'lap_dir', 'is_LR_dir', 'truth_decoder_name']
+    ## Positions:
+    pos_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position).to_dataframe().position.adding_lap_info(laps_df=laps_df, inplace=False)
+    pos_df = pos_df.time_point_event.adding_true_decoder_identifier(t_start=t_start, t_delta=t_delta, t_end=t_end) ## ensures ['maze_id', 'is_LR_dir']
+    # pos_df = pos_df.position.add_binned_time_column(time_window_edges=time_bin_containers.edges, time_window_edges_binning_info=time_bin_containers.edge_info) # 'binned_time' refers to which time bins these are
+    
+    ## OUTPUTS: laps_df, pos_df
+
+
+    ## Draw the position meas/decoded on the plot widget
     kwargs = {}
-    decoded_pos_line_kwargs = dict(lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, animated=False)
+    # decoded_pos_line_kwargs = dict(lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, animated=False)
     # lw=1.0, color='#00ff7f99', alpha=0.6
     # two_step_options_dict = { 'color':'#00ff7f99', 'face_color':'#55ff0099', 'edge_color':'#00aa0099' }
+    inactive_decoded_pos_line_kwargs = dict(lw=0.3, alpha=0.2, marker='.', markersize=2, animated=False)
+    active_decoded_pos_line_kwargs = dict(lw=1.0, alpha=0.8, marker='+', markersize=6, animated=False)
 
     decoder_color_dict: Dict[types.DecoderName, str] = DecoderIdentityColors.build_decoder_color_dict()
     # pos_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
 
-    # Plot the measured position X:
-    _, ax = plot_1D_most_likely_position_comparsions(pos_df, variable_name='x', time_window_centers=None, xbin=None, posterior=None, active_most_likely_positions_1D=None, ax=ax_list[0],
-                                                      enable_flat_line_drawing=enable_flat_line_drawing, debug_print=debug_print, **kwargs)
     # ax = ax_list[0]
-    ax.clear() ## clear any existing artists just to be sure
+    ax_list[0].clear() ## clear any existing artists just to be sure
+    _out_data = {}
+    _out_data_plot_kwargs = {}
     _out_artists = {}
     # curr_active_pipeline.global_computation_results.t
-    for a_decoder_name, a_decoder in track_templates.get_decoders_dict().items():
+    for i, (a_decoder_name, a_decoder) in enumerate(track_templates.get_decoders_dict().items()):
+        is_first_iteration: bool = (i == 0)
         a_continuously_decoded_result = all_directional_continuously_decoded_dict[a_decoder_name]
         a_decoder_color = decoder_color_dict[a_decoder_name]
         
@@ -97,9 +170,34 @@ def _perform_plot_track(fig, ax_list, all_directional_continuously_decoded_dict,
         # active_time_window_variable = a_decoder.active_time_window_centers
         active_time_window_variable = time_window_centers
         active_most_likely_positions_x = a_marginal_x['most_likely_positions_1D'] # a_decoder.most_likely_positions[:,0].T
+        
 
-        # marker_style: 'circle', marker_size:0.25
-        _out_artists[a_decoder_name] = ax.plot(active_time_window_variable, active_most_likely_positions_x, **(decoded_pos_line_kwargs | dict(color=a_decoder_color)), label=f'Most-likely {a_decoder_name}') # (Num windows x 2)    
+        ## Plot general laps only on the first iteration. Needs: pos_df
+        if is_first_iteration:
+            pos_df = pos_df.position.add_binned_time_column(time_window_edges=time_bin_containers.edges, time_window_edges_binning_info=time_bin_containers.edge_info) # 'binned_time' refers to which time bins these are
+            # Plot the measured position X:
+            _, ax = plot_1D_most_likely_position_comparsions(pos_df, variable_name='x', time_window_centers=None, xbin=None, posterior=None, active_most_likely_positions_1D=None, ax=ax_list[0],
+                                                            enable_flat_line_drawing=enable_flat_line_drawing, debug_print=debug_print, **kwargs)
+        ## END if is_first_iteration...
+
+        _out_data[a_decoder_name] = pd.DataFrame({'t': time_window_centers, 'x': active_most_likely_positions_x, 'binned_time': np.arange(len(time_window_centers))})
+        _out_data[a_decoder_name] = _out_data[a_decoder_name].position.adding_lap_info(laps_df=laps_df, inplace=False)
+        _out_data[a_decoder_name] = _out_data[a_decoder_name].time_point_event.adding_true_decoder_identifier(t_start=t_start, t_delta=t_delta, t_end=t_end) ## ensures ['maze_id', 'is_LR_dir']
+        _out_data[a_decoder_name]['is_active_decoder_time'] = (_out_data[a_decoder_name]['truth_decoder_name'].fillna('', inplace=False) == a_decoder_name)
+
+        # is_active_decoder_time = (_out_data[a_decoder_name]['truth_decoder_name'] == a_decoder_name)
+        active_decoder_time_points = _out_data[a_decoder_name][_out_data[a_decoder_name]['truth_decoder_name'] == a_decoder_name]['t'].to_numpy()
+        active_decoder_most_likely_positions_x = _out_data[a_decoder_name][_out_data[a_decoder_name]['truth_decoder_name'] == a_decoder_name]['x'].to_numpy()
+        active_decoder_inactive_time_points = _out_data[a_decoder_name][_out_data[a_decoder_name]['truth_decoder_name'] != a_decoder_name]['t'].to_numpy()
+        active_decoder_inactive_most_likely_positions_x = _out_data[a_decoder_name][_out_data[a_decoder_name]['truth_decoder_name'] != a_decoder_name]['x'].to_numpy()
+        ## could fill y with np.nan instead of getting shorter?
+        # _out_data_plot_kwargs[a_decoder_name] = (dict(x=active_decoder_time_points, y=active_decoder_most_likely_positions_x, color=a_decoder_color, **active_decoded_pos_line_kwargs), dict(x=active_decoder_inactive_time_points, y=active_decoder_inactive_most_likely_positions_x, color=a_decoder_color, **inactive_decoded_pos_line_kwargs))
+
+        _out_data_plot_kwargs[a_decoder_name] = dict(active=dict(x=active_decoder_time_points, y=active_decoder_most_likely_positions_x, color=a_decoder_color, **active_decoded_pos_line_kwargs), inactive=dict(x=active_decoder_inactive_time_points, y=active_decoder_inactive_most_likely_positions_x, color=a_decoder_color, **inactive_decoded_pos_line_kwargs))
+        _out_artists[a_decoder_name] = {}
+        for a_plot_name, a_plot_kwargs in _out_data_plot_kwargs[a_decoder_name].items():
+            # _out_artists[a_decoder_name][a_plot_name] = ax.plot(**a_plot_kwargs, label=f'Most-likely {a_decoder_name} ({a_plot_name})') # (Num windows x 2)    
+            _out_artists[a_decoder_name][a_plot_name] = ax.plot(a_plot_kwargs.pop('x'), a_plot_kwargs.pop('y'), **a_plot_kwargs, label=f'Most-likely {a_decoder_name} ({a_plot_name})')
 
     ## OUTPUT: _out_artists
     return _out_artists
