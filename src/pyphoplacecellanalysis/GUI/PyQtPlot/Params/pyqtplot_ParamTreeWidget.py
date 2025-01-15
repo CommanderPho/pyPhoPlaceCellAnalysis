@@ -86,4 +86,5 @@ def plot_paramTreeWidget(title='PhoParamTreeApp'):
 
 
 if __name__ == '__main__':
+    _out = plot_paramTreeWidget()
     pg.exec()
