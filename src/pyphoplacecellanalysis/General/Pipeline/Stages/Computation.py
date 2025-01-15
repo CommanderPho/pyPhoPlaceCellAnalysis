@@ -1065,9 +1065,9 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             #     previous_computation_result.accumulated_errors[k] = v
             if len(accumulated_errors or {}) > 0:
                 if progress_logger_callback is not None:
-                    progress_logger_callback(f'WARNING: there were {len(accumulated_errors)} that occurred during computation. Check these out by looking at computation_result.accumulated_errors.')
+                    progress_logger_callback(f'WARNING: there were {len(accumulated_errors)} errors that occurred during computation. Check these out by looking at computation_result.accumulated_errors.')
                     
-                warn(f'WARNING: there were {len(accumulated_errors)} that occurred during computation. Check these out by looking at computation_result.accumulated_errors.')
+                warn(f'WARNING: there were {len(accumulated_errors)} errors that occurred during computation. Check these out by looking at computation_result.accumulated_errors.')
                 error_desc_str = f'{len(accumulated_errors or {})} errors.'
             else:
                 error_desc_str = f'no errors!'
