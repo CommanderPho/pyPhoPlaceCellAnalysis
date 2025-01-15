@@ -141,8 +141,8 @@ class ZhangReconstructionImplementation:
 
         """
         time_window_edges, time_window_edges_binning_info, spikes_df = ZhangReconstructionImplementation.compute_time_bins(spikes_df, max_time_bin_size=max_time_bin_size, debug_print=debug_print) # importantly adds 'binned_time' column to spikes_df
-        # active_indicies = time_window_edges_binning_info.bin_indicies[1:] # pre-2025-01-13 Old way that led to losing a time bin
-        active_indicies = time_window_edges_binning_info.bin_indicies[:-1] # 2025-01-14 New way that supposedly uses correct indexing
+        active_indicies = time_window_edges_binning_info.bin_indicies[1:] # pre-2025-01-13 Old way that led to losing a time bin
+        # active_indicies = time_window_edges_binning_info.bin_indicies[:-1] # 2025-01-14 New way that supposedly uses correct indexing
         unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, active_indicies, debug_print=debug_print) # 2025-01-13 16:14 replaced [1:] with [:-1]
         return unit_specific_binned_spike_counts, time_window_edges, time_window_edges_binning_info
 
@@ -220,8 +220,8 @@ class ZhangReconstructionImplementation:
                 spikes_df = spikes_df.spikes.add_binned_time_column(time_window_edges, time_window_edges_binning_info, debug_print=debug_print)
         
         # either way to compute the unit_specific_binned_spike_counts:
-        # active_indicies = time_window_edges_binning_info.bin_indicies[1:] # pre-2025-01-13 Old way that led to losing a time bin
-        active_indicies = time_window_edges_binning_info.bin_indicies[:-1] # 2025-01-14 New way that supposedly uses correct indexing
+        active_indicies = time_window_edges_binning_info.bin_indicies[1:] # pre-2025-01-13 Old way that led to losing a time bin
+        # active_indicies = time_window_edges_binning_info.bin_indicies[:-1] # 2025-01-14 New way that supposedly uses correct indexing
         assert np.nanmax(spikes_df['binned_time'].to_numpy()) <= np.nanmax(active_indicies), f"np.nanmax(spikes_df['binned_time'].to_numpy()): {np.nanmax(spikes_df['binned_time'].to_numpy())}, np.nanmax(active_indicies): {np.nanmax(active_indicies)}"
         # unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, time_window_edges_binning_info.bin_indicies[1:], debug_print=debug_print) # requires 'binned_time' in spikes_df. TODO 2023-05-16 - ERROR: isn't getting centers. time_window_edges_binning_info.bin_indicies[1:]
         unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, active_indicies, debug_print=debug_print) ## removed `time_window_edges_binning_info.bin_indicies[1:]` on 2025-01-13 16:05 
@@ -2280,7 +2280,10 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         TODO 2023-05-16 - CHECK - CORRECTNESS - Figure out correct indexing and whether it returns binned data for edges or counts.
         
         """
-        original_time_bin_container = deepcopy(self.time_binning_container) ## compared to this, we lose the last time_bin (which is partial)
+        should_use_safe_time_binning: bool = False
+        
+        if should_use_safe_time_binning:
+            original_time_bin_container = deepcopy(self.time_binning_container) ## compared to this, we lose the last time_bin (which is partial)
         
         
         with WrappingMessagePrinter(f'compute_all final_p_x_given_n called. Computing windows...', begin_line_ending='... ', finished_message='compute_all completed.', enable_print=(debug_print or self.debug_print)):
@@ -2288,21 +2291,20 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
 
             ## 2022-09-23 - Epochs-style encoding (that works):
             self.time_binning_container, self.p_x_given_n, self.most_likely_positions, curr_unit_marginal_x, curr_unit_marginal_y, flat_outputs_container = self.hyper_perform_decode(self.spikes_df, decoding_time_bin_size=self.time_bin_size, output_flat_versions=True, debug_print=(debug_print or self.debug_print)) ## this is where it's getting messed up
-            num_extra_bins_in_old: int = original_time_bin_container.num_bins - self.time_binning_container.num_bins
-            # np.isin(original_time_bin_container.centers, self.time_binning_container.centers)
-            # is_time_bin_included_in_new = np.isin(original_time_bin_container.centers, self.time_binning_container.centers) ## see which of the original time bins vanished in the new `time_bin_container`
-            ## drop previous values for compatibility
-            if num_extra_bins_in_old > 0:
-                ## UPDATES: self.is_non_firing_time_bin, self.unit_specific_time_binned_spike_counts
-                ## find how many time bins to be dropped:
-                # is_time_bin_included_in_new = np.array([np.isin(v, self.time_binning_container.centers) for v in original_time_bin_container.centers])
-                old_time_bins_to_remove = original_time_bin_container.centers[-num_extra_bins_in_old:]
-                assert np.all(np.logical_not([np.isin(v, self.time_binning_container.centers) for v in old_time_bins_to_remove]))
-                self.unit_specific_time_binned_spike_counts = self.unit_specific_time_binned_spike_counts[:, :-num_extra_bins_in_old]
-                self.total_spike_counts_per_window = self.total_spike_counts_per_window[:-num_extra_bins_in_old]
-                
-
-
+            if should_use_safe_time_binning:
+                num_extra_bins_in_old: int = original_time_bin_container.num_bins - self.time_binning_container.num_bins
+                # np.isin(original_time_bin_container.centers, self.time_binning_container.centers)
+                # is_time_bin_included_in_new = np.isin(original_time_bin_container.centers, self.time_binning_container.centers) ## see which of the original time bins vanished in the new `time_bin_container`
+                ## drop previous values for compatibility
+                if num_extra_bins_in_old > 0:
+                    ## UPDATES: self.is_non_firing_time_bin, self.unit_specific_time_binned_spike_counts
+                    ## find how many time bins to be dropped:
+                    # is_time_bin_included_in_new = np.array([np.isin(v, self.time_binning_container.centers) for v in original_time_bin_container.centers])
+                    old_time_bins_to_remove = original_time_bin_container.centers[-num_extra_bins_in_old:]
+                    assert np.all(np.logical_not([np.isin(v, self.time_binning_container.centers) for v in old_time_bins_to_remove]))
+                    self.unit_specific_time_binned_spike_counts = self.unit_specific_time_binned_spike_counts[:, :-num_extra_bins_in_old]
+                    self.total_spike_counts_per_window = self.total_spike_counts_per_window[:-num_extra_bins_in_old]
+                    
             # self._setup_time_bin_spike_counts_N_i(debug_print=True) # updates: self.time_binning_container, self.unit_specific_time_binned_spike_counts, self.total_spike_counts_per_window
             # self.unit_specific_time_binned_spike_counts
 
@@ -2367,7 +2369,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
             assert (len(self.is_non_firing_time_bin) == self.num_time_windows), f"len(self.is_non_firing_time_bin): {len(self.is_non_firing_time_bin)}, self.num_time_windows: {self.num_time_windows}" # 2025-01-13 17:43 Added constraint because this is supposed to be correct        
         else:
             print(f'WARN: not using safe time binning!')
-            
+
 
         is_non_firing_bin = np.where(self.is_non_firing_time_bin)[0] # TEMP: do this to get around the indexing issue. TODO: IndexError: boolean index did not match indexed array along dimension 0; dimension is 11880 but corresponding boolean dimension is 11881
         self.revised_most_likely_positions = self.perform_compute_forward_filled_positions(self.most_likely_positions, is_non_firing_bin=is_non_firing_bin)
