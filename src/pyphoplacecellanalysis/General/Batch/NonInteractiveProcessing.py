@@ -592,32 +592,32 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
 	# Plot long|short firing rate index:
 	try:
 		_out = curr_active_pipeline.display('_display_short_long_firing_rate_index_comparison', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): _display_short_long_firing_rate_index_comparison failed with error: {e}\n skipping.')
 	
 	try:
 		_out = curr_active_pipeline.display('_display_long_short_expected_v_observed_firing_rate', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): _prepare_plot_expected_vs_observed failed with error: {e}\n skipping.')
 	
 	try:
 		_out = curr_active_pipeline.display('_display_grid_bin_bounds_validation', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): _display_grid_bin_bounds_validation failed with error: {e}\n skipping.')
 		
 	try:
 		_out = curr_active_pipeline.display('_display_running_and_replay_speeds_over_time', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): _display_running_and_replay_speeds_over_time failed with error: {e}\n skipping.')
 		
 	try:
 		_out = curr_active_pipeline.display('_display_long_short_laps', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure) # batch_extended_programmatic_figures(...): _display_long_short_laps failed with error: plot_position_curves_figure() got an unexpected keyword argument 'active_config_name'
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): _display_long_short_laps failed with error: {e}\n skipping.')
 		
 	try:
 		_out = curr_active_pipeline.display('_display_long_and_short_firing_rate_replays_v_laps', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): _display_long_and_short_firing_rate_replays_v_laps failed with error: {e}\n skipping.')
 				
 	try:
@@ -628,14 +628,14 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
 								   long_kwargs={'sortby': sort_idx, 'single_cell_pfmap_processing_fn': long_single_cell_pfmap_processing_fn},
 								   short_kwargs={'sortby': sort_idx, 'single_cell_pfmap_processing_fn': short_single_cell_pfmap_processing_fn, 'curve_hatch_style': {'hatch':'///', 'edgecolor':'k'}},
 								   save_figure=save_figure) # defer_render=True, 
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): _display_long_short_pf1D_comparison failed with error: {e}\n skipping.')
 
 	
 	try:
 		_out = curr_active_pipeline.display('_display_directional_merged_pf_decoded_stacked_epoch_slices', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure, is_dark_mode=False)
 		print(f'`directional_decoded_stacked_epoch_slices` completed. \n\t_out_paths: {_out}\n\n')
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): "_display_directional_merged_pf_decoded_stacked_epoch_slices" failed with error: {e}\n skipping.')
 
 
@@ -644,7 +644,7 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
 		try:
 			#TODO 2023-07-06 14:46: - [ ] This is quite slow - can I do defer_render=True?
 			_out = curr_active_pipeline.display('_display_long_and_short_stacked_epoch_slices', curr_active_pipeline.get_session_context(), defer_render=False, save_figure=save_figure)
-		except BaseException as e:
+		except Exception as e:
 			print(f'batch_extended_programmatic_figures(...): _prepare_plot_long_and_short_epochs failed with error: {e}\n skipping.')
 		
 	## Exports the video of the surprise:
@@ -664,7 +664,7 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
 
 		video_output_parent_path = export_active_relative_entropy_results_videos(active_relative_entropy_results, active_context=curr_active_pipeline.get_session_context())
 
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): export_active_relative_entropy_results_videos failed with error: {e}\n skipping.')
 
 
@@ -678,14 +678,14 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
 		## all cells:
 		fig_1c_figures_all_dict = BatchPhoJonathanFiguresHelper.run(curr_active_pipeline, neuron_replay_stats_df, included_unit_neuron_IDs=None, n_max_page_rows=20, write_vector_format=False, write_png=True, show_only_refined_cells=False, disable_top_row=True)
 	
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): BatchPhoJonathanFiguresHelper.run(...) failed for all cells. failed with error: {e}\n skipping.')
 		
 
 	# _display_directional_merged_pf_decoded_epochs_marginals ________________________________________________________________________________ #
 	try:
 		_out = curr_active_pipeline.display('_display_directional_merged_pf_decoded_epochs_marginals', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): "_display_directional_merged_pf_decoded_epochs_marginals" failed with error: {e}\n skipping.')
 
 
@@ -693,19 +693,19 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
 	# _display_rank_order_z_stats_results ________________________________________________________________________________ #
 	try:
 		_out = curr_active_pipeline.display('_display_rank_order_z_stats_results', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): "_display_rank_order_z_stats_results" failed with error: {e}\n skipping.')
 
 
 	try:
 		_out = curr_active_pipeline.display('_display_directional_track_remapping_diagram', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure, is_dark_mode=False)
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): "_display_directional_track_remapping_diagram" failed with error: {e}\n skipping.')
 
 
 	try:
 		_out = curr_active_pipeline.display('_display_trial_to_trial_reliability', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure, is_dark_mode=False)
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): "_display_trial_to_trial_reliability" failed with error: {e}\n skipping.')
 
 
@@ -734,7 +734,7 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
 					**_curr_interaction_mode_kwargs, # interactive mode
 					skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, save_figure=save_figure)
 		
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): "_display_directional_merged_pf_decoded_epochs" failed with error: {e}\n skipping.')
 
 
@@ -1010,41 +1010,52 @@ class BatchPhoJonathanFiguresHelper:
 # ==================================================================================================================== #
 @function_attributes(short_name=None, tags=['active', 'batch', 'public', 'neptune', 'figures', 'output'], input_requires=[], output_provides=[],
 					  uses=['batch_programmatic_figures', 'batch_extended_programmatic_figures'], used_by=[], creation_date='2023-06-12 14:23', related_items=[])
-def batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=None):
+def batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=None, debug_print: bool = False):
 	""" 2023-05-25 - Performs all the batch plotting commands. 
+
+	Note: takes ~20 minutes to plot all figures and generates MANY new figure windows with an interactive backend
+	NEPTUNE NOTE: Always uses the "PhoDibaLongShortUpdated" neptue project
+		
+	Usage:
+		from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_perform_all_plots
+
+		_out = batch_perform_all_plots(curr_active_pipeline, debug_print=True)
+
 	
-	from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_perform_all_plots
-	Always uses the "PhoDibaLongShortUpdated" neptue project
-
+	
 	"""
-	try:
-		from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import Neptuner
+	if enable_neptune:
+		try:
+			from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import Neptuner
 
-		if neptuner is None:
-			neptuner = Neptuner.init_with_pipeline(curr_active_pipeline)
+			if neptuner is None:
+				neptuner = Neptuner.init_with_pipeline(curr_active_pipeline)
 
-	except BaseException as e:
-		print(f'in `batch_perform_all_plots(...)`: Neptuner.init_with_pipeline(curr_active_pipeline)(...) failed with exception: {e}. Continuing but disabling neptune.')
-		enable_neptune = False
-		print(f'\t since neptune setup failed, neptune will be disabled going forward.')
+		except Exception as e:
+			print(f'in `batch_perform_all_plots(...)`: Neptuner.init_with_pipeline(curr_active_pipeline)(...) failed with exception: {e}. Continuing but disabling neptune.')
+			enable_neptune = False
+			print(f'\t since neptune setup failed, neptune will be disabled going forward.')
+			neptuner = None
+	else:
 		neptuner = None
-		 
+
+
 	curr_active_pipeline.reload_default_display_functions()
 	try:
-		active_identifying_session_ctx, active_out_figures_dict = batch_programmatic_figures(curr_active_pipeline)
-	except BaseException as e:
+		active_identifying_session_ctx, active_out_figures_dict = batch_programmatic_figures(curr_active_pipeline, debug_print=debug_print)
+	except Exception as e:
 		print(f'in `batch_perform_all_plots(...)`: batch_programmatic_figures(...) failed with exception: {e}. Continuing.')
 	
 	try:
-		batch_extended_programmatic_figures(curr_active_pipeline=curr_active_pipeline)
-	except BaseException as e:
+		batch_extended_programmatic_figures(curr_active_pipeline=curr_active_pipeline, debug_print=debug_print)
+	except Exception as e:
 		print(f'in `batch_perform_all_plots(...)`: batch_extended_programmatic_figures(...) failed with exception: {e}. Continuing.')
 	
 	if enable_neptune:
 		try:
-			succeeded_fig_paths, failed_fig_paths = neptuner.upload_figures(curr_active_pipeline)
+			succeeded_fig_paths, failed_fig_paths = neptuner.upload_figures(curr_active_pipeline, debug_print=debug_print)
 			# neptune_output_figures(curr_active_pipeline)
-		except BaseException as e:
+		except Exception as e:
 			print(f'in `batch_perform_all_plots(...)`: neptune_output_figures(...) failed with exception: {e}. Continuing.')
 		finally:
 			neptuner.stop()
