@@ -34,7 +34,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData # us
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode
 from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import SpecificComputationValidator
-
+import pyphoplacecellanalysis.General.type_aliases as types
 
 import pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions
 # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions import ComputationFunctionRegistryHolder # should include ComputationFunctionRegistryHolder and all specifics
@@ -355,13 +355,30 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
     
     def rerun_failed_computations_single_context(self, previous_computation_result, fail_on_exception:bool=False, debug_print=False):
         """ retries the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result
-        TODO: doesn't yet work with global functions due to relying on self.registered_computation_function_dict
+        [X] 2025-01-15 07:25: SOLVED: doesn't yet work with global functions due to relying on self.registered_computation_function_dict
+        
          """
         active_computation_errors = previous_computation_result.accumulated_errors
+        
+        computation_functions_name_includelist = [failed_computation_fn.__name__ for failed_computation_fn, error in active_computation_errors.items()]
+        
+        # search_mode=FunctionsSearchMode.ANY
+        # potentially_updated_failed_functions = self.find_registered_computation_functions(computation_functions_name_includelist, search_mode=search_mode, names_list_is_excludelist=False)
+
+        if len(computation_functions_name_includelist) > 0:
+            potentially_updated_failed_local_functions = self.find_registered_computation_functions(computation_functions_name_includelist, search_mode=FunctionsSearchMode.NON_GLOBAL_ONLY, names_list_is_excludelist=False)
+            if len(potentially_updated_failed_local_functions) > 0:
+                previous_computation_result = ComputedPipelineStage._execute_computation_functions(potentially_updated_failed_local_functions, previous_computation_result=previous_computation_result, are_global=False, fail_on_exception=fail_on_exception, debug_print=debug_print)
+        
+            potentially_updated_failed_global_functions = self.find_registered_computation_functions(computation_functions_name_includelist, search_mode=FunctionsSearchMode.GLOBAL_ONLY, names_list_is_excludelist=False)
+            if len(potentially_updated_failed_global_functions) > 0:
+                previous_computation_result = ComputedPipelineStage._execute_computation_functions(potentially_updated_failed_global_functions, previous_computation_result=previous_computation_result, are_global=True, fail_on_exception=fail_on_exception, debug_print=debug_print)
+        ## END if len(computation_functions_name_includelist) > 0...
+        return previous_computation_result
         # Get potentially updated references to all computation functions that had failed in the previous run of the pipeline:
-        potentially_updated_failed_functions = [self.registered_computation_function_dict[failed_computation_fn.__name__] for failed_computation_fn, error in active_computation_errors.items()]
+        # potentially_updated_failed_functions = [self.registered_computation_function_dict[failed_computation_fn.__name__] for failed_computation_fn, error in active_computation_errors.items()]
         # Perform the computations:
-        return ComputedPipelineStage._execute_computation_functions(potentially_updated_failed_functions, previous_computation_result=previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)
+        # return ComputedPipelineStage._execute_computation_functions(potentially_updated_failed_functions, previous_computation_result=previous_computation_result, are_global=are_global, fail_on_exception=fail_on_exception, debug_print=debug_print)
 
     @function_attributes(short_name=None, tags=['computation', 'specific'], input_requires=[], output_provides=[], uses=['ComputedPipelineStage._execute_computation_functions'], used_by=[], creation_date='2023-07-21 18:25', related_items=[])
     def run_specific_computations_single_context(self, previous_computation_result, computation_functions_name_includelist, computation_kwargs_list=None, fail_on_exception:bool=False, progress_logger_callback=None, are_global:bool=False, debug_print=False):
@@ -544,7 +561,8 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
 
 
-    def get_failed_computations(self, enabled_filter_names=None):
+
+    def get_failed_computations(self, enabled_filter_names=None) -> Dict[str, Dict[str, CapturedException]]: #types.FilterContextName, Dict[types.ComputationFunctionName: CapturedException]]:
         """ gets a dictionary of the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result
         
         """
@@ -563,6 +581,31 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                     for failed_computation_fn, error in active_computation_errors.items():
                         a_failed_fn_name: str = failed_computation_fn.__name__
                         all_accumulated_errors[a_select_config_name][a_failed_fn_name] = error
+
+        return all_accumulated_errors
+    
+
+    def clear_all_failed_computations(self, enabled_filter_names=None) -> Dict[str, Dict[str, CapturedException]]: #types.FilterContextName, Dict[types.ComputationFunctionName: CapturedException]]:
+        """ clears all accumulated errors from all computations, and returns a dictionary of the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result
+        
+        """
+        if enabled_filter_names is None:
+            enabled_filter_names = list(self.filtered_sessions.keys()) # all filters if specific enabled names aren't specified
+        all_accumulated_errors = {}
+        for a_select_config_name, a_filtered_session in self.filtered_sessions.items():                
+            if a_select_config_name in enabled_filter_names:
+                # print(f'Performing rerun_failed_computations_single_context on filtered_session with filter named "{a_select_config_name}"...')
+                previous_computation_result = self.computation_results[a_select_config_name]
+                # curr_active_pipeline.computation_results[a_select_config_name] = curr_active_pipeline.rerun_failed_computations_single_context(previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)    
+                active_computation_errors = previous_computation_result.accumulated_errors
+                if len(active_computation_errors) > 0:
+                    # all_accumulated_errors[a_select_config_name] = active_computation_errors
+                    all_accumulated_errors[a_select_config_name] = {}
+                    for failed_computation_fn, error in active_computation_errors.items():
+                        a_failed_fn_name: str = failed_computation_fn.__name__
+                        all_accumulated_errors[a_select_config_name][a_failed_fn_name] = error
+                    ## Clear the accumulated errors when done
+                    previous_computation_result.accumulated_errors.clear() # = DynamicParameters({})
 
         return all_accumulated_errors
 
@@ -1626,10 +1669,18 @@ class PipelineWithComputedPipelineStageMixin:
             # computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=computation_functions_name_excludelist, fail_on_exception=fail_on_exception, progress_logger_callback=(lambda x: self.logger.info(x)), debug_print=debug_print)
 
 
-    def rerun_failed_computations(self, previous_computation_result, fail_on_exception:bool=False, debug_print=False):
-        """ retries the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result """
+    # def rerun_failed_computations(self, previous_computation_result, fail_on_exception:bool=False, debug_print=False):
+    #     """ retries the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result """
+    #     # return self.stage.perform_action_for_all_contexts(EvaluationActions.EVALUATE_COMPUTATIONS, ... # TODO: refactor to use new layout
+    #     return self.stage.rerun_failed_computations(previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)
+    
+
+    def rerun_failed_computations(self, enabled_filter_names=None, fail_on_exception:bool=False, debug_print=False, **kwargs):
+        """ retries the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result
+        TODO: Parallelization opportunity
+        """
         # return self.stage.perform_action_for_all_contexts(EvaluationActions.EVALUATE_COMPUTATIONS, ... # TODO: refactor to use new layout
-        return self.stage.rerun_failed_computations(previous_computation_result, fail_on_exception=fail_on_exception, debug_print=debug_print)
+        return self.stage.rerun_failed_computations(enabled_filter_names=enabled_filter_names, fail_on_exception=fail_on_exception, debug_print=debug_print, **kwargs)
     
 
     def perform_specific_computation(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_includelist=None, computation_kwargs_list=None, fail_on_exception:bool=False, debug_print=False):
@@ -2659,3 +2710,16 @@ class PipelineWithComputedPipelineStageMixin:
         
     # 	# return active_context, session_ctxt_key, CURR_BATCH_OUTPUT_PREFIX, additional_session_context
     
+    @function_attributes(short_name=None, tags=['accumulated_errors', 'PASSTHROUGH_TO_STAGE', 'failed_computations'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-15 06:36', related_items=[])
+    def get_failed_computations(self, enabled_filter_names=None, **kwargs) -> Dict[str, Dict[str, CapturedException]]: #types.FilterContextName, Dict[types.ComputationFunctionName: CapturedException]]:
+        """ gets a dictionary of the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result
+        PASSTHROUGH
+        """
+        return self.stage.get_failed_computations(enabled_filter_names=enabled_filter_names, **kwargs)
+
+
+    def clear_all_failed_computations(self, enabled_filter_names=None, **kwargs) -> Dict[str, Dict[str, CapturedException]]: #types.FilterContextName, Dict[types.ComputationFunctionName: CapturedException]]:
+        """ clears all accumulated errors from all computations, and returns a dictionary of the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result
+        PASSTHROUGH
+        """
+        return self.stage.clear_all_failed_computations(enabled_filter_names=enabled_filter_names, **kwargs)
