@@ -20,6 +20,9 @@ e.g. Dict[types.FilterContextName, Dict[types.ComputationFunctionName: CapturedE
 	aclu_index: TypeAlias = int # an integer index that is an aclu
 	DecoderName = NewType('DecoderName', str)
 """
+FilterContextName: TypeAlias = str # a string identifier of a specific filtering context -- 'maze1_odd', 'maze2_odd', 'maze_odd' -- used in `.get_failed_computations(...)`
+ComputationFunctionName: TypeAlias = str # a string identifier of a computation function -- can be either the long or short name -- '_split_to_directional_laps' -- used in `.get_failed_computations(...)`
 
-FilterContextName = NewType('FilterContextName', str) # 'maze1_odd', 'maze2_odd', 'maze_odd' -- used in `.get_failed_computations(...)`
-ComputationFunctionName = NewType('ComputationFunctionName', str) # '_split_to_directional_laps' -- used in `.get_failed_computations(...)`
+
+# FilterContextName = NewType('FilterContextName', str) 
+# ComputationFunctionName = NewType('ComputationFunctionName', str) 

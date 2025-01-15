@@ -543,7 +543,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
 
 
-    def get_failed_computations(self, enabled_filter_names=None) -> Dict[types.FilterContextName, Dict[types.ComputationFunctionName: CapturedException]]:
+    def get_failed_computations(self, enabled_filter_names=None) -> Dict[str, Dict[str, CapturedException]]: #types.FilterContextName, Dict[types.ComputationFunctionName: CapturedException]]:
         """ gets a dictionary of the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result
         
         """
@@ -2350,7 +2350,7 @@ class PipelineWithComputedPipelineStageMixin:
     # 	# return active_context, session_ctxt_key, CURR_BATCH_OUTPUT_PREFIX, additional_session_context
     
     @function_attributes(short_name=None, tags=['accumulated_errors', 'PASSTHROUGH_TO_STAGE', 'failed_computations'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-15 06:36', related_items=[])
-    def get_failed_computations(self, enabled_filter_names=None, **kwargs) -> Dict[types.FilterContextName, Dict[types.ComputationFunctionName: CapturedException]]:
+    def get_failed_computations(self, enabled_filter_names=None, **kwargs) -> Dict[str, Dict[str, CapturedException]]: #types.FilterContextName, Dict[types.ComputationFunctionName: CapturedException]]:
         """ gets a dictionary of the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result
         PASSTHROUGH
         """
