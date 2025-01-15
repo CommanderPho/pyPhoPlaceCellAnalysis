@@ -33,7 +33,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData # us
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode
 from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import SpecificComputationValidator
-
+import pyphoplacecellanalysis.General.type_aliases as types
 
 import pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions
 # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions import ComputationFunctionRegistryHolder # should include ComputationFunctionRegistryHolder and all specifics
@@ -542,7 +542,8 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
 
 
-    def get_failed_computations(self, enabled_filter_names=None):
+
+    def get_failed_computations(self, enabled_filter_names=None) -> Dict[types.FilterContextName, Dict[types.ComputationFunctionName: CapturedException]]:
         """ gets a dictionary of the computation functions that previously failed and resulted in accumulated_errors in the previous_computation_result
         
         """
