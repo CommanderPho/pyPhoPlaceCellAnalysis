@@ -688,6 +688,8 @@ def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, axs=N
     Usage:
         fig, axs = plot_most_likely_position_comparsions(pho_custom_decoder, sess.position.to_dataframe())
     """
+    from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
+    
     # xmin, xmax, ymin, ymax, tmin, tmax = compute_data_extent(position_df['x'].to_numpy(), position_df['y'].to_numpy(), position_df['t'].to_numpy())
     
     with plt.ion():
@@ -738,8 +740,9 @@ def plot_most_likely_position_comparsions(pho_custom_decoder, position_df, axs=N
                                                     enable_flat_line_drawing=enable_flat_line_drawing, debug_print=debug_print, **kwargs)    
         if created_new_figure:
             # Only update if we created a new figure:
-            fig.suptitle(f'Decoded Position data component comparison')
-            
+            title_text: str = f'Decoded Position data component comparison'
+            perform_update_title_subtitle(fig=fig, ax=axs[0], title_string=title_text, subtitle_string=None) # ax.axs[0] - doesn't matter which axis is passed because we don't set a subtitle
+    
         return fig, axs
 
 
