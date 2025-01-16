@@ -2154,100 +2154,102 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
 # Utility/Helpers                                                                                                      #
 # ==================================================================================================================== #
 
-# @function_attributes(short_name=None, tags=['UNFINISHED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
-# def reload_exported_kdiba_session_position_info_mat_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
-# 	""" 
-# 	from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import reload_exported_kdiba_session_position_info_mat_completion_function
+@function_attributes(short_name=None, tags=['UNFINISHED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
+def reload_exported_kdiba_session_position_info_mat_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
+	""" 
+	from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import reload_exported_kdiba_session_position_info_mat_completion_function
 	
-# 	Results can be extracted from batch output by 
+	Results can be extracted from batch output by 
 	
-# 	# Extracts the callback results 'determine_session_t_delta_completion_function':
-# 	extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('determine_session_t_delta_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
+	# Extracts the callback results 'determine_session_t_delta_completion_function':
+	extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('determine_session_t_delta_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
 
-# 	['basepath', 'session_spec', 'session_name', 'session_context', 'format_name', 'preprocessing_parameters', 'absolute_start_timestamp', 'position_sampling_rate_Hz', 'microseconds_to_seconds_conversion_factor', 'pix2cm', 'x_midpoint', 'loaded_track_limits', 'is_resolved', 'resolved_required_filespecs_dict', 'resolved_optional_filespecs_dict', 'x_unit_midpoint', 'first_valid_pos_time', 'last_valid_pos_time']
+	['basepath', 'session_spec', 'session_name', 'session_context', 'format_name', 'preprocessing_parameters', 'absolute_start_timestamp', 'position_sampling_rate_Hz', 'microseconds_to_seconds_conversion_factor', 'pix2cm', 'x_midpoint', 'loaded_track_limits', 'is_resolved', 'resolved_required_filespecs_dict', 'resolved_optional_filespecs_dict', 'x_unit_midpoint', 'first_valid_pos_time', 'last_valid_pos_time']
 
-# 	"""
-# 	from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder
-# 	from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDibaOldDataSessionFormatRegisteredClass
-# 	from neuropy.core.session.Formats.SessionSpecifications import SessionConfig
+	"""
+	from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder
+	from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDibaOldDataSessionFormatRegisteredClass
+	from neuropy.core.session.Formats.SessionSpecifications import SessionConfig
 
-# 	print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-# 	print(f'reload_exported_kdiba_session_position_info_mat_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
-# 	active_data_mode_name: str = curr_active_pipeline.session_data_type
-# 	active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
-# 	active_data_mode_registered_class = active_data_session_types_registered_classes_dict[active_data_mode_name]
-# 	# active_data_mode_type_properties = known_data_session_type_properties_dict[active_data_mode_name]
-
-
-# 	def _update_loaded_track_limits(a_session):
-# 		""" captures: curr_active_pipeline
-# 		"""
-# 		sess_config: SessionConfig = SessionConfig(**deepcopy(a_session.config.__getstate__()))
-# 		a_session.config = sess_config
-# 		_bak_loaded_track_limits = deepcopy(a_session.config.loaded_track_limits)
-# 		## Apply fn
-# 		a_session = active_data_mode_registered_class._default_kdiba_exported_load_position_info_mat(basepath=curr_active_pipeline.sess.basepath, session_name=curr_active_pipeline.session_name, session=a_session)
-# 		_new_loaded_track_limits = deepcopy(a_session.config.loaded_track_limits)
-# 		# did_change: bool = ((_bak_loaded_track_limits is None) or (_new_loaded_track_limits != _bak_loaded_track_limits))
-# 		did_change: bool = ((_bak_loaded_track_limits is None) or np.any((np.array(_new_loaded_track_limits) != np.array(_bak_loaded_track_limits))))
-# 		return did_change, a_session
-
-# 	## Check if they changed
-# 	did_change: bool = False
-
-# 	## Do main session:
-# 	a_session = deepcopy(curr_active_pipeline.sess)
-# 	new_did_change, a_session = _update_loaded_track_limits(a_session=a_session)
-# 	curr_active_pipeline.stage.sess = a_session ## apply the session
-# 	did_change = did_change | new_did_change
-# 	print(f'curr_active_pipeline.sess changed its track limits!')
-# 	# curr_active_pipeline.sess.config = a_session.config # apply the config only...
-
-# 	# --------------------- Do for filtered sessions as well --------------------- #
-
-# 	# did_change = did_change or np.any(ensure_dataframe(_backup_session_configs['sess']).to_numpy() != ensure_dataframe(new_replay_epochs).to_numpy())
-
-# 	_new_sessions = {}
-
-# 	# curr_active_pipeline.sess.replay = deepcopy(new_replay_epochs)
-# 	for k, a_filtered_session in curr_active_pipeline.filtered_sessions.items():
-# 		## backup original values:
-# 		# _backup_session_replay_epochs[k] = deepcopy(a_filtered_session.config.preprocessing_parameters.epoch_estimation_parameters.replays)
-# 		# _backup_session_configs[k] = deepcopy(a_filtered_session.replay)
+	print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+	print(f'reload_exported_kdiba_session_position_info_mat_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+	active_data_mode_name: str = curr_active_pipeline.session_data_type
+	active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
+	active_data_mode_registered_class = active_data_session_types_registered_classes_dict[active_data_mode_name]
+	# active_data_mode_type_properties = known_data_session_type_properties_dict[active_data_mode_name]
 
 
-# 		a_filtered_session = deepcopy(a_filtered_session)
-# 		# sess_config: SessionConfig = SessionConfig(**deepcopy(a_filtered_session.config.__getstate__()))
-# 		# a_filtered_session.config = sess_config
-# 		# _new_sessions[k] = active_data_mode_registered_class._default_kdiba_exported_load_position_info_mat(basepath=curr_active_pipeline.sess.basepath, session_name=curr_active_pipeline.session_name, session=a_filtered_session)
-# 		new_did_change, a_filtered_session = _update_loaded_track_limits(a_session=a_filtered_session)
-# 		if new_did_change:
-# 			print(f'\tfiltered_session[{k}] changed!')
-# 		did_change = did_change | new_did_change
+	def _update_loaded_track_limits(a_session):
+		""" captures: curr_active_pipeline
+		"""
+		sess_config: SessionConfig = SessionConfig(**deepcopy(a_session.config.__getstate__()))
+		a_session.config = sess_config
+		_bak_loaded_track_limits = deepcopy(a_session.config.loaded_track_limits)
+		## Apply fn
+		a_session = active_data_mode_registered_class._default_kdiba_exported_load_position_info_mat(basepath=curr_active_pipeline.sess.basepath, session_name=curr_active_pipeline.session_name, session=a_session)
+		_new_loaded_track_limits = deepcopy(a_session.config.loaded_track_limits)
+		# did_change: bool = ((_bak_loaded_track_limits is None) or (_new_loaded_track_limits != _bak_loaded_track_limits))
+		did_change: bool = ((_bak_loaded_track_limits is None) or np.any((np.array(_new_loaded_track_limits) != np.array(_bak_loaded_track_limits))))
+		return did_change, a_session
+
+	## Check if they changed
+	did_change: bool = False
+
+	## Do main session:
+	a_session = deepcopy(curr_active_pipeline.sess)
+	new_did_change, a_session = _update_loaded_track_limits(a_session=a_session)
+	curr_active_pipeline.stage.sess = a_session ## apply the session
+	did_change = did_change | new_did_change
+	print(f'curr_active_pipeline.sess changed its track limits!')
+	# curr_active_pipeline.sess.config = a_session.config # apply the config only...
+
+	# --------------------- Do for filtered sessions as well --------------------- #
+
+	# did_change = did_change or np.any(ensure_dataframe(_backup_session_configs['sess']).to_numpy() != ensure_dataframe(new_replay_epochs).to_numpy())
+
+	_new_sessions = {}
+
+	# curr_active_pipeline.sess.replay = deepcopy(new_replay_epochs)
+	for k, a_filtered_session in curr_active_pipeline.filtered_sessions.items():
+		## backup original values:
+		# _backup_session_replay_epochs[k] = deepcopy(a_filtered_session.config.preprocessing_parameters.epoch_estimation_parameters.replays)
+		# _backup_session_configs[k] = deepcopy(a_filtered_session.replay)
+
+
+		a_filtered_session = deepcopy(a_filtered_session)
+		# sess_config: SessionConfig = SessionConfig(**deepcopy(a_filtered_session.config.__getstate__()))
+		# a_filtered_session.config = sess_config
+		# _new_sessions[k] = active_data_mode_registered_class._default_kdiba_exported_load_position_info_mat(basepath=curr_active_pipeline.sess.basepath, session_name=curr_active_pipeline.session_name, session=a_filtered_session)
+		new_did_change, a_filtered_session = _update_loaded_track_limits(a_session=a_filtered_session)
+		if new_did_change:
+			print(f'\tfiltered_session[{k}] changed!')
+		did_change = did_change | new_did_change
 		
 
-# 	for k, a_filtered_session in _new_sessions.items():
-# 		curr_active_pipeline.filtered_sessions[k] = a_filtered_session
+	for k, a_filtered_session in _new_sessions.items():
+		curr_active_pipeline.filtered_sessions[k] = a_filtered_session
 
 
 
-# 	loaded_track_limits = a_session.config.loaded_track_limits
+	loaded_track_limits = a_session.config.loaded_track_limits
 	
-# 	a_config_dict = a_session.config.to_dict()
+	a_config_dict = a_session.config.to_dict()
 
-# 	t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
-# 	print(f'\t{curr_session_basedir}:\tloaded_track_limits: {loaded_track_limits}, a_config_dict: {a_config_dict}')  # , t_end: {t_end}
+	t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+	print(f'\t{curr_session_basedir}:\tloaded_track_limits: {loaded_track_limits}, a_config_dict: {a_config_dict}')  # , t_end: {t_end}
 	
-# 	callback_outputs = {
-# 	 'loaded_track_limits': loaded_track_limits, 'a_config_dict':a_config_dict, #'t_end': t_end   
-# 	}
-# 	across_session_results_extended_dict['position_info_mat_reload_completion_function'] = callback_outputs
+	callback_outputs = {
+	 'loaded_track_limits': loaded_track_limits, 'a_config_dict':a_config_dict, #'t_end': t_end   
+	}
+	across_session_results_extended_dict['position_info_mat_reload_completion_function'] = callback_outputs
 	
-# 	# print(f'>>\t done with {curr_session_context}')
-# 	print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-# 	print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+	# print(f'>>\t done with {curr_session_context}')
+	print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+	print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
 
-# 	return across_session_results_extended_dict
+	return across_session_results_extended_dict
+
+
 
 
 @function_attributes(short_name=None, tags=['hdf5', 'h5'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])

@@ -930,7 +930,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         return subset
     
 
-    @function_attributes(short_name=None, tags=['validate', 'time_bins'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-07 16:35', related_items=[])
+    @function_attributes(short_name=None, tags=['validate', 'time_bins', 'debug'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-07 16:35', related_items=[])
     def validate_time_bins(self):
         """validates a `DecodedFilterEpochsResult` object -- ensuring that all lists are of consistent sizes and that within the lists all the time bins have the correct properties
         """
@@ -1910,7 +1910,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         zero_bin_indicies.shape # (9307,)
         self.most_likely_positions.shape # (11880, 2)
         
-        # NaN out the position bins that were determined without any spikes
+        # NaN out the position bins that were determined to contain 0 spikes
         # Forward fill the now NaN positions with the last good value (for the both axes)
         
         """
@@ -2324,7 +2324,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         # np.shape(self.most_likely_position_indicies) # (2, 85841)
 
 
-    @function_attributes(short_name=None, tags=['BROKEN', 'PROBLEM'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-14 13:03', related_items=[])
+    @function_attributes(short_name=None, tags=['BROKEN', 'PROBLEM'], input_requires=['.total_spike_counts_per_window', '.most_likely_positions'], output_provides=[], uses=['._setup_time_bin_spike_counts_N_i'], used_by=[], creation_date='2025-01-14 13:03', related_items=[])
     def compute_corrected_positions(self):
         """ computes the revised most likely positions by taking into account the time-bins that had zero spikes and extrapolating position from the prior successfully decoded time bin
         
@@ -2339,7 +2339,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
 
 
         TODO: CRITICAL: CORRECTNESS: 2022-02-25: This was said not to be working for 1D somewhere else in the code, but I don't know if it's working or not. It doesn't seem to be.
-
+            2025-01-16 04:08 - Indeed, I'm getting errors in the 1D case and it might be the cause of repeatedly bad decoded positions at the end caps
         
         Just recompute `self.is_non_firing_time_bin` --> self.total_spike_counts_per_window
         
