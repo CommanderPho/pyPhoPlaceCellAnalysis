@@ -59,11 +59,12 @@ from neuropy.core.position import PositionAccessor
 from neuropy.core.flattened_spiketrains import SpikesAccessor
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors
 
 @function_attributes(short_name=None, tags=['decoder', 'matplotlib', 'plot', 'track', 'performance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-15 17:44', related_items=[])
-def _perform_plot_multi_decoder_meas_pred_position_track(curr_active_pipeline, fig, ax_list, enable_flat_line_drawing: bool = False, debug_print = False): # , pos_df: pd.DataFrame, laps_df: pd.DataFrame
+def _perform_plot_multi_decoder_meas_pred_position_track(curr_active_pipeline, fig, ax_list, desired_time_bin_size: Optional[float]=None, enable_flat_line_drawing: bool = False, debug_print = False): # , pos_df: pd.DataFrame, laps_df: pd.DataFrame
     """ Plots a new matplotlib-based track that displays the measured and decoded position (for all four decoders) on the same axes. The "correct" (ground-truth) decoder is highlighted (higher opacity and thicker line) compared to the wrong decoders' estimates.
     
     Usage:
@@ -72,6 +73,13 @@ def _perform_plot_multi_decoder_meas_pred_position_track(curr_active_pipeline, f
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
         from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _perform_plot_multi_decoder_meas_pred_position_track
+
+        ## Compute continuous first        
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': 0.025}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': 0.050}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': 0.075}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': 0.100}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': 0.250}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
 
         ## Build the new dock track:
         dock_identifier: str = 'Continuous Decoding Performance'
@@ -98,6 +106,8 @@ def _perform_plot_multi_decoder_meas_pred_position_track(curr_active_pipeline, f
         active_2d_plot.sync_matplotlib_render_plot_widget(dock_identifier, sync_mode=SynchronizedPlotMode.TO_WINDOW)
 
     """
+    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
     
     ## Get the needed data:
     
@@ -111,20 +121,31 @@ def _perform_plot_multi_decoder_meas_pred_position_track(curr_active_pipeline, f
     print(f'included_qclu_values: {included_qclu_values}')
 
     directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
-    all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
-    continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
-    previously_decoded_keys: List[float] = list(continuously_decoded_result_cache_dict.keys()) # [0.03333]
+    # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+    previously_decoded_keys: List[float] = list(directional_decoders_decode_result.continuously_decoded_result_cache_dict.keys()) # [0.03333]
     if debug_print:
         print(F'previously_decoded time_bin_sizes: {previously_decoded_keys}')
 
-    time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
+    if desired_time_bin_size is None:
+        time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
+        continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.most_recent_continuously_decoded_dict
+    else:
+        if desired_time_bin_size not in previously_decoded_keys:
+            print(f'desired_time_bin_size: {desired_time_bin_size} is missing from previously decoded continuous cache. Must recompute.')
+            curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': desired_time_bin_size}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+            directional_decoders_decode_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'] ## update the result
+            print(f'\tcalculation complete.')
+            
+        time_bin_size: float =  desired_time_bin_size
+        continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.continuously_decoded_result_cache_dict[time_bin_size]
+        
+
     print(f'time_bin_size: {time_bin_size}')
-    continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.most_recent_continuously_decoded_dict
+    # continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.most_recent_continuously_decoded_dict
     all_directional_continuously_decoded_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {k:v for k, v in (continuously_decoded_dict or {}).items() if k in TrackTemplates.get_decoder_names()} ## what is plotted in the `f'{a_decoder_name}_ContinuousDecode'` rows by `AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand`
     ## OUT: all_directional_continuously_decoded_dict
 
     ## INPUT: fig, ax_list, all_directional_continuously_decoded_dict, track_templates
-
 
     ## Laps
     global_laps_obj: Laps = deepcopy(curr_active_pipeline.sess.laps)
