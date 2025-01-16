@@ -372,7 +372,7 @@ class PipelineJupyterHelpers:
         #     return vbox
         # else:
         #     return selector
-        return selector
+        return selector, on_value_change
 
 
 def interactive_pipeline_files(curr_active_pipeline, defer_display:bool=False) -> JupyterButtonRowWidget:
