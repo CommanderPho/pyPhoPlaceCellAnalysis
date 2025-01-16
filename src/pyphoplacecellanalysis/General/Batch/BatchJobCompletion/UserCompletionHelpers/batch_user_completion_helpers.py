@@ -2182,7 +2182,11 @@ def reload_exported_kdiba_session_position_info_mat_completion_function(self, gl
 	def _update_loaded_track_limits(a_session):
 		""" captures: curr_active_pipeline
 		"""
-		sess_config: SessionConfig = SessionConfig(**deepcopy(a_session.config.__getstate__()))
+		# sess_config: SessionConfig = SessionConfig(**deepcopy(a_session.config.__getstate__()))
+		sess_config: SessionConfig = deepcopy(a_session.config)
+		sess_config
+
+		# 'first_valid_pos_time'
 		a_session.config = sess_config
 		_bak_loaded_track_limits = deepcopy(a_session.config.loaded_track_limits)
 		## Apply fn
