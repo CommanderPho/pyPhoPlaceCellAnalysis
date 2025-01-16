@@ -372,7 +372,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         
             potentially_updated_failed_global_functions = self.find_registered_computation_functions(computation_functions_name_includelist, search_mode=FunctionsSearchMode.GLOBAL_ONLY, names_list_is_excludelist=False)
             if len(potentially_updated_failed_global_functions) > 0:
-                previous_computation_result = ComputedPipelineStage._execute_computation_functions(potentially_updated_failed_global_functions, previous_computation_result=previous_computation_result, are_global=True, fail_on_exception=fail_on_exception, debug_print=debug_print)
+                previous_computation_result = ComputedPipelineStage._execute_computation_functions(potentially_updated_failed_global_functions, previous_computation_result=previous_computation_result, are_global=True, fail_on_exception=fail_on_exception, debug_print=debug_print) # passing the wrong stuff
         ## END if len(computation_functions_name_includelist) > 0...
         return previous_computation_result
         # Get potentially updated references to all computation functions that had failed in the previous run of the pipeline:
@@ -1012,7 +1012,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                           uses=[], used_by=['perform_registered_computations_single_context', 'rerun_failed_computations_single_context', 'run_specific_computations_single_context'], creation_date='2024-10-07 15:08', related_items=[])
     @staticmethod
     def _execute_computation_functions(active_computation_functions, previous_computation_result=None, computation_kwargs_list=None, fail_on_exception:bool = False, progress_logger_callback=None, are_global:bool=False, debug_print=False) -> ComputationResult:
-        """ actually performs the provided computations in active_computation_functions """
+        """ actually performs the provided computations in active_computation_functions """ # computation_kwargs_list=: [{}]
         if computation_kwargs_list is None:
             computation_kwargs_list = [{} for _ in active_computation_functions]
         assert len(computation_kwargs_list) == len(active_computation_functions)
@@ -1028,7 +1028,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
 
             if are_global:
-                assert isinstance(previous_computation_result, (dict, DynamicParameters)), 'ERROR: previous_computation_result must be a dict or DynamicParameters object when are_global=True'
+                assert isinstance(previous_computation_result, (dict, DynamicParameters)), f'ERROR: previous_computation_result must be a dict or DynamicParameters object when are_global=True but it is of type {type(previous_computation_result)}' # AssertionError: ERROR: previous_computation_result must be a dict or DynamicParameters object when are_global=True, comming back as a <class 'pyphoplacecellanalysis.General.Model.ComputationResults.ComputationResult'>
                 # global_kwargs = dict(owning_pipeline_reference=self, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False)
                 previous_computation_result = list(previous_computation_result.values()) # get the list of values since the global computation functions expects positional arguments
                 # Wrap the active functions in the wrapper that extracts their arguments:
