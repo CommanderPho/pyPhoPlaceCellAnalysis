@@ -1905,9 +1905,16 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
             corr_df = corr_df.where(pd.notnull(corr_df), np.nan)
             ## Join the correlations result into the active_epochs_df:
             active_epochs_df = Epoch(active_epochs_df).to_dataframe()
-            active_epochs_df = active_epochs_df.drop(columns=corr_column_names, errors='ignore', inplace=False) # drop existing columns so they can be replaced
-            active_epochs_df = active_epochs_df.join(corr_df)
-            active_epochs_df[best_decoder_index_col_name] = active_epochs_df[corr_column_names].fillna(0.0).abs().apply(lambda row: np.argmax(row.values), axis=1) # Computes the highest-valued decoder for this score. Note `.abs()` is important here to consider both directions.
+            
+            if len(corr_df) > 0:
+                ## non-empty corr_df:
+                active_epochs_df = active_epochs_df.drop(columns=corr_column_names, errors='ignore', inplace=False) # drop existing columns so they can be replaced
+                active_epochs_df = active_epochs_df.join(corr_df)
+                active_epochs_df[best_decoder_index_col_name] = active_epochs_df[corr_column_names].fillna(0.0).abs().apply(lambda row: np.argmax(row.values), axis=1) # Computes the highest-valued decoder for this score. Note `.abs()` is important here to consider both directions.'
+            else:
+                print(f'WARN: corr_df is empty in compute_simple_spike_time_v_pf_peak_x_by_epoch(....). Continuing without adding best_decoder_index_col_name: {best_decoder_index_col_name} or corr_column_names: {corr_column_names}.')
+
+
             if isinstance(an_epochs_result.filter_epochs, pd.DataFrame):
                 an_epochs_result.filter_epochs = active_epochs_df
             else:
@@ -1920,6 +1927,8 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         """ Computes one type of epoch (laps, ripple) for all four decoders
         epoch_label_column_name = 'label'
 
+        #TODO 2025-01-16 10:14: - [ ] This is returning and empty dataframe for some reason.
+        
         """
         from pyphocorehelpers.indexing_helpers import partition_df # used by _compute_simple_spike_time_v_pf_peak_x_by_epoch
         from scipy.stats import pearsonr # used by _compute_simple_spike_time_v_pf_peak_x_by_epoch
