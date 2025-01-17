@@ -2400,6 +2400,8 @@ class PipelineWithComputedPipelineStageMixin:
         #     'param_typed_parameters': param_typed_parameters,
         # }
 
+
+    @function_attributes(short_name=None, tags=['parameters', 'update'], input_requires=[], output_provides=[], uses=[], used_by=['batch_load_session', 'try_init_from_saved_pickle_or_reload_if_needed'], creation_date='2025-01-16 15:05', related_items=[])
     def update_parameters(self, override_parameters_flat_keypaths_dict: Dict[str, Any]=None) -> None:
         """ updates any of the user-parameters by keypaths for the pipeline
         
@@ -2432,7 +2434,7 @@ class PipelineWithComputedPipelineStageMixin:
                 self.global_computation_results.computation_config = curr_global_param_typed_parameters
                 # return self.global_computation_results.computation_config # return the updated parameters
             else:
-                print(f'too early to set the computation_config override_parameters, not yet at the computation stage!!')
+                print(f'WARN: PipelineWithComputedPipelineStageMixin.update_parameters(...): too early to set the computation_config override_parameters, not yet at the computation stage!!')
                 pass
 
 
