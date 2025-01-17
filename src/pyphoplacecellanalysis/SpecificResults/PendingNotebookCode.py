@@ -50,6 +50,108 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 
 
+@function_attributes(short_name=None, tags=['save', 'split'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-17 16:14', related_items=[])
+def perform_split_save_dictlike_result(split_save_folder: Path, active_computed_data, include_includelist=None, continue_after_pickling_errors: bool=True, debug_print:bool=True):
+    """ Custom saves any dict-like object
+    
+
+    split_folder = curr_active_pipeline.get_output_path().joinpath('split')
+    split_folder.mkdir(exist_ok=True)
+
+    ['loaded_data', '']
+
+    # active_computed_data = self.global_computation_results.computed_data
+    # include_includelist = list(self.global_computation_results.computed_data.keys())
+    # split_save_folder_name: str = f'{global_computation_results_pickle_path.stem}_split'
+    # split_save_folder: Path = global_computation_results_pickle_path.parent.joinpath(split_save_folder_name).resolve()
+
+
+    # ==================================================================================================================== #
+    # 'computation_results' (local computations)                                                                           #
+    # ==================================================================================================================== #
+    # split_computation_results_dir = split_folder.joinpath('computation_results')
+    # split_computation_results_dir.mkdir(exist_ok=True)
+    # split_save_folder, split_save_paths, split_save_output_types, failed_keys = perform_split_save_dictlike_result(split_save_folder=split_computation_results_dir, active_computed_data=curr_active_pipeline.computation_results)
+
+
+    # ==================================================================================================================== #
+    # 'filtered_sessions'                                                                                                  #
+    # ==================================================================================================================== #
+    # split_filtered_sessions_dir = split_folder.joinpath('filtered_sessions')
+    # split_filtered_sessions_dir.mkdir(exist_ok=True)
+    # split_save_folder, split_save_paths, split_save_output_types, failed_keys = perform_split_save_dictlike_result(split_save_folder=split_filtered_sessions_dir, active_computed_data=curr_active_pipeline.filtered_sessions)
+
+
+    # ==================================================================================================================== #
+    # 'global_computation_results' (global computations)                                                                   #
+    # ==================================================================================================================== #
+    split_global_computation_results_dir = split_folder.joinpath('global_computation_results')
+    split_global_computation_results_dir.mkdir(exist_ok=True)
+    split_save_folder, split_save_paths, split_save_output_types, failed_keys = perform_split_save_dictlike_result(split_save_folder=split_global_computation_results_dir, active_computed_data=curr_active_pipeline.global_computation_results.computed_data) # .__dict__
+
+
+    """
+    from pyphocorehelpers.print_helpers import print_filesystem_file_size, print_object_memory_usage
+    from pickle import PicklingError
+    from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData # used for `save_global_computation_results`
+    from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
+
+    ## In split save, we save each result separately in a folder
+    if debug_print:
+        print(f'split_save_folder: {split_save_folder}')
+    # make if doesn't exist
+    split_save_folder.mkdir(exist_ok=True)
+
+    if include_includelist is None:
+        ## include all keys if none are specified
+        include_includelist = list(active_computed_data.keys()) ## all keys by default
+    
+    split_save_paths = {}
+    split_save_output_types = {}
+    failed_keys = []
+    skipped_keys = []
+    for k, v in active_computed_data.items():
+        if k in include_includelist:
+            curr_split_result_pickle_path = split_save_folder.joinpath(f'Split_{k}.pkl').resolve()
+            if debug_print:
+                print(f'k: {k} -- size_MB: {print_object_memory_usage(v, enable_print=False)}')
+                print(f'\tcurr_split_result_pickle_path: {curr_split_result_pickle_path}')
+            was_save_success = False
+            curr_item_type = type(v)
+            try:
+                ## try get as dict                
+                v_dict = v.__dict__ #__getstate__()
+                # saveData(curr_split_result_pickle_path, (v_dict))
+                saveData(curr_split_result_pickle_path, (v_dict, str(curr_item_type.__module__), str(curr_item_type.__name__)))    
+                was_save_success = True
+            except KeyError as e:
+                print(f'\t{k} encountered {e} while trying to save {k}. Skipping')
+                pass
+            except PicklingError as e:
+                if not continue_after_pickling_errors:
+                    raise
+                else:
+                    print(f'\t{k} encountered {e} while trying to save {k}. Skipping')
+                    pass
+                
+            if was_save_success:
+                split_save_paths[k] = curr_split_result_pickle_path
+                split_save_output_types[k] = curr_item_type
+                if debug_print:
+                    print(f'\tfile_size_MB: {print_filesystem_file_size(curr_split_result_pickle_path, enable_print=False)} MB')
+            else:
+                failed_keys.append(k)
+        else:
+            if debug_print:
+                print(f'\tskipping key "{k}" because it is not included in include_includelist: {include_includelist}')
+            skipped_keys.append(k)
+            
+    if len(failed_keys) > 0:
+        print(f'WARNING: failed_keys: {failed_keys} did not save for global results! They HAVE NOT BEEN SAVED!')
+    return split_save_folder, split_save_paths, split_save_output_types, failed_keys
+
+
+
 # ==================================================================================================================== #
 # 2025-01-15 Plotting Decoding Performance on Track                                                                    #
 # ==================================================================================================================== #
