@@ -1766,6 +1766,10 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
         # reuse_axs_tuple=(ax_long_pf_1D, ax_long_pf_1D) # plot only on long axis
         (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=reuse_axs_tuple, single_figure=True)
 
+
+
+    - [ ] Placefields Should be sorted by long track peak by default
+
     """
     from pyphoplacecellanalysis.Pho2D.track_shape_drawing import add_vertical_track_bounds_lines, add_track_shapes
     
