@@ -1,6 +1,9 @@
 import sys
 from enum import Enum
+from pyphocorehelpers.DataStructure.enum_helpers import OrderedEnum
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from attrs import define, field, Factory
+
 import ipywidgets as widgets
 from IPython.display import display
 import matplotlib
@@ -10,10 +13,10 @@ from pathlib import Path
 # from silx.gui.dialog.ImageFileDialog import ImageFileDialog
 # import silx.io
 
+import pandas as pd
 from pyphocorehelpers.gui.Jupyter.JupyterButtonRowWidget import build_fn_bound_buttons, JupyterButtonRowWidget, JupyterButtonColumnWidget
 from pyphocorehelpers.Filesystem.open_in_system_file_manager import reveal_in_system_file_manager
 from pyphocorehelpers.Filesystem.path_helpers import open_file_with_system_default
-
 
 from pyphocorehelpers.exception_helpers import CapturedException
 from pyphocorehelpers.programming_helpers import metadata_attributes
@@ -22,7 +25,7 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui, QtCore, QtWidgets
 # from pyphoplacecellanalysis.External.pyqtgraph.parametertree.parameterTypes.file import popupFilePicker
 from pyphoplacecellanalysis.External.pyqtgraph.widgets.FileDialog import FileDialog
-from pyphocorehelpers.gui.Jupyter.simple_widgets import fullwidth_path_widget
+from pyphocorehelpers.gui.Jupyter.simple_widgets import fullwidth_path_widget, create_file_browser
 
 
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme # used in perform_pipeline_save
@@ -96,17 +99,29 @@ def try_save_pickle_as(original_file_path, file_confirmed_callback):
     return
 
 
+
 @metadata_attributes(short_name=None, tags=['enum', 'phases'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-06 22:56', related_items=[])
-class CustomProcessingPhases(Enum):
+class CustomProcessingPhases(OrderedEnum):
     """ These phases keep track of groups of computations to run.
 
     from pyphoplacecellanalysis.GUI.IPyWidgets.pipeline_ipywidgets import PipelineJupyterHelpers, CustomProcessingPhases
 
+    CustomProcessingPhases.clean_run
+    CustomProcessingPhases.continued_run
+    CustomProcessingPhases.final_run
+    
+    selector.value
+
 
     """
-    clean_run = "clean_run"
-    continued_run = "continued_run"
-    final_run = "final_run"
+    # Enum members with an additional `_order` attribute for ordering
+    clean_run = ("clean_run", 0)
+    continued_run = ("continued_run", 1)
+    final_run = ("final_run", 2)
+
+    def __init__(self, value, order):
+        self._value_ = value
+        self._order = order
     
     def get_run_configuration(self) -> Dict:
         ## Different run configurations:
@@ -357,7 +372,7 @@ class PipelineJupyterHelpers:
         #     return vbox
         # else:
         #     return selector
-        return selector
+        return selector, on_value_change
 
 
 def interactive_pipeline_files(curr_active_pipeline, defer_display:bool=False) -> JupyterButtonRowWidget:
@@ -451,6 +466,97 @@ def interactive_pipeline_files(curr_active_pipeline, defer_display:bool=False) -
 
 
 
+@define(slots=False)
+class PipelinePickleFileSelectorWidget:
+    """ Allows the user to interactively choose between multiple pickles in the session directory to load
+    
+    
+    Usage:
+    
+    from pyphoplacecellanalysis.GUI.IPyWidgets.pipeline_ipywidgets import PipelinePickleFileSelectorWidget
+    widget = PipelinePickleFileSelectorWidget(directory=basedir)
+
+    # Display the widget
+    widget.local_file_browser_widget.servable()
+    widget.global_file_browser_widget.servable()
+
+    # OUTPUTS: widget, widget.active_local_pkl, widget.active_global_pkl
+
+    """
+    directory: Path = field()
+    selected_local_pkl_files: List[Path] = field(default=Factory(list))
+    selected_global_pkl_files: List[Path] = field(default=Factory(list))
+    
+    local_file_browser_widget = field(init=False)
+    global_file_browser_widget = field(init=False)
+    debug_print: bool = field(default=False)
+    
+    @property
+    def active_local_pkl(self) -> Optional[Path]:
+        """The active_local_pkl property."""
+        if len(self.selected_local_pkl_files) < 1:
+            return None
+        else:
+            return Path(self.selected_local_pkl_files[0])
+        
+    @property
+    def active_global_pkl(self) -> Optional[Path]:
+        """The active_local_pkl property."""
+        if len(self.selected_global_pkl_files) < 1:
+            return None
+        else:
+            return Path(self.selected_global_pkl_files[0])
+
+
+    def try_extract_custom_suffix(self) -> Optional[str]:
+        """ uses the local pkl first 
+        
+        custom_suffix: str = widget.try_extract_custom_suffix()
+        
+        """
+        if self.active_local_pkl is None:
+            return None
+        else:
+            proposed_load_pkl_path = self.active_local_pkl.resolve()
+            ## infer the `custom_suffix`
+            basename: str = proposed_load_pkl_path.stem # 'loadedSessPickle_withNormalComputedReplays-qclu_[1, 2]-frateThresh_5.0'
+            # custom_suffix
+            pickle_basename_part: str = 'loadedSessPickle' 
+            custom_suffix: str = basename.removeprefix(pickle_basename_part).removesuffix(pickle_basename_part) # '_withNormalComputedReplays-qclu_[1, 2]-frateThresh_5.0'
+            if self.debug_print:
+                print(f'custom_suffix: "{custom_suffix}"')
+            return custom_suffix
+    
+
+    def on_selected_local_sess_pkl_files_changed(self, selected_df: pd.DataFrame):
+        """ captures: file_table, on_selected_files_changed
+        """
+        if self.debug_print:
+            print(f"on_selected_local_sess_pkl_files_changed(selected_df: {selected_df})")
+        full_paths = selected_df['File Path'].to_list()
+        if self.debug_print:
+            print(f'\tfull_paths: {full_paths}')
+        self.selected_local_pkl_files = full_paths
+        
+    def on_selected_global_computation_result_pkl_files_changed(self, selected_df: pd.DataFrame):
+        """ captures: file_table, on_selected_files_changed
+        """
+        if self.debug_print:
+            print(f"on_selected_global_computation_result_pkl_files_changed(selected_df: {selected_df})")
+        full_paths = selected_df['File Path'].to_list()
+        if self.debug_print:
+            print(f'\tfull_paths: {full_paths}')
+        self.selected_global_pkl_files = full_paths
+
+    def __attrs_post_init__(self):
+        # Create the file browser widget
+        # file_browser_widget = create_file_browser(directory, patterns, page_size=10, widget_height=400, on_selected_files_changed_fn=on_selected_files_changed)
+        self.local_file_browser_widget = create_file_browser(self.directory, ['*loadedSessPickle*.pkl'], page_size=10, widget_height=400, selectable=1, on_selected_files_changed_fn=self.on_selected_local_sess_pkl_files_changed)
+        self.global_file_browser_widget = create_file_browser(self.directory, ['output/*.pkl'], page_size=10, widget_height=400, selectable=1, on_selected_files_changed_fn=self.on_selected_global_computation_result_pkl_files_changed)
+
+
+
+
 
 @function_attributes(short_name=None, tags=['ipywidgets', 'ipython', 'jupyterwidgets', 'interactive'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-09-26 12:01', related_items=[])
 def interactive_pipeline_widget(curr_active_pipeline):
@@ -512,4 +618,4 @@ def interactive_pipeline_widget(curr_active_pipeline):
     # _out_widget = widgets.VBox([_session_path_widget, _button_executor.root_widget])
     _out_widget = widgets.VBox([_session_path_widget, _button_executor.root_widget, updating_button_executor.root_widget, figure_display_toggle_button])
 
-    return _out_widget        
+    return _out_widget
