@@ -5481,53 +5481,61 @@ def _compute_all_df_score_metrics(directional_merged_decoders_result: "Direction
                                                                                                                                                                                                                 suppress_exceptions=suppress_exceptions)
     
     ## Simple Pearson Correlation
+
     assert spikes_df is not None
     (laps_simple_pf_pearson_merged_df, ripple_simple_pf_pearson_merged_df), corr_column_names = directional_merged_decoders_result.compute_simple_spike_time_v_pf_peak_x_by_epoch(track_templates=track_templates, spikes_df=deepcopy(spikes_df))
     ## OUTPUTS: (laps_simple_pf_pearson_merged_df, ripple_simple_pf_pearson_merged_df), corr_column_names
-    ## Computes the highest-valued decoder for this score:
-    best_decoder_index_col_name: str = 'best_decoder_index'
-    laps_simple_pf_pearson_merged_df[best_decoder_index_col_name] = laps_simple_pf_pearson_merged_df[corr_column_names].abs().apply(lambda row: np.argmax(row.values), axis=1)
-    ripple_simple_pf_pearson_merged_df[best_decoder_index_col_name] = ripple_simple_pf_pearson_merged_df[corr_column_names].abs().apply(lambda row: np.argmax(row.values), axis=1)
+    try:
+        ## Computes the highest-valued decoder for this score:
+        best_decoder_index_col_name: str = 'best_decoder_index'
+        laps_simple_pf_pearson_merged_df[best_decoder_index_col_name] = laps_simple_pf_pearson_merged_df[corr_column_names].abs().apply(lambda row: np.argmax(row.values), axis=1)
+        ripple_simple_pf_pearson_merged_df[best_decoder_index_col_name] = ripple_simple_pf_pearson_merged_df[corr_column_names].abs().apply(lambda row: np.argmax(row.values), axis=1)
 
-    ## Get the 1D decoder probabilities explicitly and add them as columns to the dfs, and finally merge in the results:
-    laps_simple_pf_pearson_merged_df: pd.DataFrame = _compute_nonmarginalized_decoder_prob(deepcopy(directional_merged_decoders_result.laps_all_epoch_bins_marginals_df)).join(laps_simple_pf_pearson_merged_df)
-    ripple_simple_pf_pearson_merged_df: pd.DataFrame = _compute_nonmarginalized_decoder_prob(deepcopy(directional_merged_decoders_result.ripple_all_epoch_bins_marginals_df)).join(ripple_simple_pf_pearson_merged_df)
-    
-    ## Extract the individual decoder probability into the .active_epochs
-    per_decoder_df_column_name = 'pearsonr'
-    # for a_name, a_decoder in track_templates.get_decoders_dict().items():
-    for a_name, a_simple_pf_column_name in zip(track_templates.get_decoder_names(), corr_column_names):
-        ## Build a single-column dataframe containing only the appropriate column for this decoder
-        _a_laps_metric_df: pd.DataFrame = pd.DataFrame({per_decoder_df_column_name: laps_simple_pf_pearson_merged_df[a_simple_pf_column_name].to_numpy()})
-
-
-        ripple_additional_column_names = ['ripple_start_t'] # ['ripple_idx', 'ripple_start_t']
-        a_ripple_additional_columns = {k:ripple_simple_pf_pearson_merged_df[k].to_numpy() for k in ripple_additional_column_names}
-        _a_ripple_metric_df: pd.DataFrame = pd.DataFrame({per_decoder_df_column_name: ripple_simple_pf_pearson_merged_df[a_simple_pf_column_name].to_numpy(), **a_ripple_additional_columns})     
-        _a_ripple_metric_df = _a_ripple_metric_df.rename(columns={'ripple_start_t': 'start'})
+        ## Get the 1D decoder probabilities explicitly and add them as columns to the dfs, and finally merge in the results:
+        laps_simple_pf_pearson_merged_df: pd.DataFrame = _compute_nonmarginalized_decoder_prob(deepcopy(directional_merged_decoders_result.laps_all_epoch_bins_marginals_df)).join(laps_simple_pf_pearson_merged_df)
+        ripple_simple_pf_pearson_merged_df: pd.DataFrame = _compute_nonmarginalized_decoder_prob(deepcopy(directional_merged_decoders_result.ripple_all_epoch_bins_marginals_df)).join(ripple_simple_pf_pearson_merged_df)
         
-        with ExceptionPrintingContext(suppress=suppress_exceptions): # this is causing horrible silent failures   
-            decoder_laps_filter_epochs_decoder_result_dict[a_name] = _update_decoder_result_active_filter_epoch_columns(a_result_obj=decoder_laps_filter_epochs_decoder_result_dict[a_name], a_score_result_df=_a_laps_metric_df, columns=[per_decoder_df_column_name])
+        ## Extract the individual decoder probability into the .active_epochs
+        per_decoder_df_column_name = 'pearsonr'
+        # for a_name, a_decoder in track_templates.get_decoders_dict().items():
+        for a_name, a_simple_pf_column_name in zip(track_templates.get_decoder_names(), corr_column_names):
+            ## Build a single-column dataframe containing only the appropriate column for this decoder
+            _a_laps_metric_df: pd.DataFrame = pd.DataFrame({per_decoder_df_column_name: laps_simple_pf_pearson_merged_df[a_simple_pf_column_name].to_numpy()})
 
-        with ExceptionPrintingContext(suppress=suppress_exceptions):
-            decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _update_decoder_result_active_filter_epoch_columns(a_result_obj=decoder_ripple_filter_epochs_decoder_result_dict[a_name], a_score_result_df=_a_ripple_metric_df, columns=[per_decoder_df_column_name], index_column_names=['start'])
+            ripple_additional_column_names = ['ripple_start_t'] # ['ripple_idx', 'ripple_start_t']
+            a_ripple_additional_columns = {k:ripple_simple_pf_pearson_merged_df[k].to_numpy() for k in ripple_additional_column_names}
+            _a_ripple_metric_df: pd.DataFrame = pd.DataFrame({per_decoder_df_column_name: ripple_simple_pf_pearson_merged_df[a_simple_pf_column_name].to_numpy(), **a_ripple_additional_columns})     
+            _a_ripple_metric_df = _a_ripple_metric_df.rename(columns={'ripple_start_t': 'start'})
+            
+            with ExceptionPrintingContext(suppress=suppress_exceptions): # this is causing horrible silent failures   
+                decoder_laps_filter_epochs_decoder_result_dict[a_name] = _update_decoder_result_active_filter_epoch_columns(a_result_obj=decoder_laps_filter_epochs_decoder_result_dict[a_name], a_score_result_df=_a_laps_metric_df, columns=[per_decoder_df_column_name])
 
+            with ExceptionPrintingContext(suppress=suppress_exceptions):
+                decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _update_decoder_result_active_filter_epoch_columns(a_result_obj=decoder_ripple_filter_epochs_decoder_result_dict[a_name], a_score_result_df=_a_ripple_metric_df, columns=[per_decoder_df_column_name], index_column_names=['start'])
+    except KeyError as e:
+        print(f"_compute_all_df_score_metrics(...): failed to get '*_pf_peak_x_pearsonr' columns, 'best_decoder_index' and other pearson related stats wont be calculated. Err: {e}")
+        pass
+    
 
     # TEST AGREEMENTS ____________________________________________________________________________________________________ #
 
     ## count up the number that the RadonTransform and the most-likely direction agree
     print(f'Performance: WCorr:\n\tLaps:')
-    laps_wcorr_stats = DecoderDecodedEpochsResult.compute_matching_best_indicies(laps_weighted_corr_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
+    with ExceptionPrintingContext(suppress=suppress_exceptions):
+        laps_wcorr_stats = DecoderDecodedEpochsResult.compute_matching_best_indicies(laps_weighted_corr_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
     # agreeing_rows_ratio, (agreeing_rows_count, num_total_epochs) = laps_radon_stats
     print(f'Performance: Ripple: WCorr')
-    ripple_wcorr_stats = DecoderDecodedEpochsResult.compute_matching_best_indicies(ripple_weighted_corr_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
+    with ExceptionPrintingContext(suppress=suppress_exceptions):
+        ripple_wcorr_stats = DecoderDecodedEpochsResult.compute_matching_best_indicies(ripple_weighted_corr_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
 
     # Test agreement:
     print(f'Performance: Simple PF PearsonR:\n\tLaps:')
-    laps_simple_pf_pearson_stats = DecoderDecodedEpochsResult.compute_matching_best_indicies(laps_simple_pf_pearson_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
+    with ExceptionPrintingContext(suppress=suppress_exceptions):
+        laps_simple_pf_pearson_stats = DecoderDecodedEpochsResult.compute_matching_best_indicies(laps_simple_pf_pearson_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
     print(f'Performance: Ripple: Simple PF PearsonR')
-    ripple_simple_pf_pearsonr_stats = DecoderDecodedEpochsResult.compute_matching_best_indicies(ripple_simple_pf_pearson_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
-
+    with ExceptionPrintingContext(suppress=suppress_exceptions):
+        ripple_simple_pf_pearsonr_stats = DecoderDecodedEpochsResult.compute_matching_best_indicies(ripple_simple_pf_pearson_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
+    
     ## OUTPUTS: laps_simple_pf_pearson_merged_df, ripple_simple_pf_pearson_merged_df
 
     ## OUTPUTS: decoder_laps_radon_transform_df_dict, decoder_ripple_radon_transform_df_dict, decoder_laps_radon_transform_extras_dict, decoder_ripple_radon_transform_df_dict, decoder_laps_weighted_corr_df_dict, decoder_ripple_weighted_corr_df_dict
