@@ -258,11 +258,27 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         # self.app = pg.mkQApp("Spike2DRaster")
         self.app = pg.mkQApp(self.applicationName)
         
+
+        # Config        
+        """ Adds required params to self.params:
+            spike_start_z (default -10.0): the z-offset of the start of the spikes
+            spike_end_z (default -6.0): the z-offset of the end of the spikes
+            center_mode (allowed: ['starting_at_zero', 'zero_centered']), (default 'zero_centered'): I believe how everything is layed out relative to the origin
+            bin_position_mode (allowed: ['bin_center', 'left_edges']), (default 'left_edges'): specifies how the bins are positioned??
+            
+            axes_walls_z_height (default 20.0): the z-height of the axes plane box that frames the data
+            axes_planes_floor_fixed_y_spacing (default 10.0): the spacing of grid lines along the y-axis that subdivide the floor axes plane (blue z-plane)
+        
+        """
+        self.params.setdefault('useOpenGL', True)
+        self.params.setdefault('enableExperimental', True)
+
         # Configure pyqtgraph config:
         try:
             import OpenGL
-            pg.setConfigOption('useOpenGL', True)
-            pg.setConfigOption('enableExperimental', True)
+            # pg.setConfigOption('useOpenGL', True)
+            pg.setConfigOption('useOpenGL', self.params.useOpenGL)
+            pg.setConfigOption('enableExperimental', self.params.enableExperimental)
         except Exception as e:
             self.logger.error(f"Enabling OpenGL failed with {e}. Will result in slow rendering. Try installing PyOpenGL.")
             print(f"Enabling OpenGL failed with {e}. Will result in slow rendering. Try installing PyOpenGL.")

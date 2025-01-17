@@ -166,18 +166,7 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpoch3DMeshesMix
         # self.app = pg.mkQApp("Spike3DRaster")
         self.app = pg.mkQApp(self.applicationName)
         
-        # Configure pyqtgraph config:
-        try:
-            import OpenGL
-            pg.setConfigOption('useOpenGL', True)
-            pg.setConfigOption('enableExperimental', True)
-        except Exception as e:
-            print(f"Enabling OpenGL failed with {e}. Will result in slow rendering. Try installing PyOpenGL.")
-            
-        pg.setConfigOptions(antialias = True)
-        pg.setConfigOption('background', "#1B1B1B")
-        pg.setConfigOption('foreground', "#727272")
-    
+
         # Config        
         """ Adds required params to self.params:
             spike_start_z (default -10.0): the z-offset of the start of the spikes
@@ -189,6 +178,9 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpoch3DMeshesMix
             axes_planes_floor_fixed_y_spacing (default 10.0): the spacing of grid lines along the y-axis that subdivide the floor axes plane (blue z-plane)
         
         """
+        self.params.setdefault('useOpenGL', True)
+        self.params.setdefault('enableExperimental', True)
+
         self.params.setdefault('spike_start_z', -10.0)
         self.params.setdefault('spike_end_z', -6.0)
         self.params.setdefault('center_mode', 'zero_centered')
@@ -203,6 +195,20 @@ class Spike3DRaster(PyQtGraphSpecificTimeCurvesMixin, RenderTimeEpoch3DMeshesMix
         self.enable_debug_print = False
         self.enable_debug_widgets = False # Default: False, If True displays a white wireframe sphere at the origin and some helper x,y,z axes arrows to see the coordinate system.
         
+
+        # Configure pyqtgraph config:
+        try:
+            import OpenGL
+            pg.setConfigOption('useOpenGL', self.params.useOpenGL)
+            pg.setConfigOption('enableExperimental', self.params.enableExperimental)
+        except Exception as e:
+            print(f"Enabling OpenGL failed with {e}. Will result in slow rendering. Try installing PyOpenGL.")
+            
+        pg.setConfigOptions(antialias = True)
+        pg.setConfigOption('background', "#1B1B1B")
+        pg.setConfigOption('foreground', "#727272")
+    
+
         # Determine the y-values corresponding to the series identity
         self._series_identity_y_values = None
         self.update_series_identity_y_values()
