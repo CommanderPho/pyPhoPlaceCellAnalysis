@@ -1017,8 +1017,8 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decod
 import numpy as np
 from neuropy.analyses.decoders import radon_transform, old_radon_transform
 
-# _allow_parallel_run_general:bool = True
-_allow_parallel_run_general:bool = False
+_allow_parallel_run_general:bool = True
+# _allow_parallel_run_general:bool = False
 
 
 def old_score_posterior(posterior, n_jobs:int=8):
