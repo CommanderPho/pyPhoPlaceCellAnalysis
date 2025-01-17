@@ -529,6 +529,11 @@ class SpecificComputationValidator:
         else:
             found_matching_validators = {}
 
+        if isinstance(probe_provided_result_keys, str):
+            probe_provided_result_keys = [probe_provided_result_keys] ## just a single item, turn it into a single item list
+
+        assert isinstance(probe_provided_result_keys, (list, tuple)), f" it must be a list! type(probe_provided_result_keys): {type(probe_provided_result_keys)}"
+
         for a_name, a_validator in remaining_comp_specifiers_dict.items():
             for a_probe_result_name in probe_provided_result_keys:
                 was_validator_found: bool = False

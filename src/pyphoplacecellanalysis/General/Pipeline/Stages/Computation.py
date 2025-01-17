@@ -1375,7 +1375,13 @@ class PipelineWithComputedPipelineStageMixin:
         """
         if not skip_reload_computation_fcns:
             self.reload_default_computation_functions()
-        return SpecificComputationValidator.find_matching_validators(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), probe_fn_names=probe_fn_names)
+
+        if isinstance(probe_fn_names, str):
+            probe_fn_names = [probe_fn_names] ## just a single item, turn it into a single item list
+
+        remaining_comp_specifiers_dict, found_matching_validators, provided_global_keys = SpecificComputationValidator.find_matching_validators(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), probe_fn_names=probe_fn_names)
+        return (remaining_comp_specifiers_dict, found_matching_validators, provided_global_keys)
+
 
     @function_attributes(short_name=None, tags=['dependencies'], input_requires=[], output_provides=[], uses=[], used_by=['self.find_downstream_dependencies'], creation_date='2025-01-13 12:32', related_items=[])
     def find_immediate_dependencies(self, provided_global_keys: List[str], provided_local_keys: Optional[List[str]] = None, skip_reload_computation_fcns: bool = False, debug_print=False):
@@ -1564,6 +1570,9 @@ class PipelineWithComputedPipelineStageMixin:
 
 
 
+    # ==================================================================================================================== #
+    # Parameters                                                                                                           #
+    # ==================================================================================================================== #
     @function_attributes(short_name=None, tags=['parameters', 'update'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 18:45', related_items=[])
     def apply_changed_parameters(self, minimum_inclusion_fr_Hz=5.0, included_qclu_values = [1, 2, 4, 9], is_dry_run: bool=True):
         """ Applies the changed parameters to the pipeline and recomputes as needed.
