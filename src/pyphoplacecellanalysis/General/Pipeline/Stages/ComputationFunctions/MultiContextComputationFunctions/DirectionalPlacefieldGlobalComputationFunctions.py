@@ -5521,21 +5521,23 @@ def _compute_all_df_score_metrics(directional_merged_decoders_result: "Direction
 
     ## count up the number that the RadonTransform and the most-likely direction agree
     print(f'Performance: WCorr:\n\tLaps:')
-    with ExceptionPrintingContext(suppress=suppress_exceptions):
+    with ExceptionPrintingContext(suppress=True):
         laps_wcorr_stats = DecoderDecodedEpochsResult.compute_matching_best_indicies(laps_weighted_corr_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
     # agreeing_rows_ratio, (agreeing_rows_count, num_total_epochs) = laps_radon_stats
     print(f'Performance: Ripple: WCorr')
-    with ExceptionPrintingContext(suppress=suppress_exceptions):
+    with ExceptionPrintingContext(suppress=True):
         ripple_wcorr_stats = DecoderDecodedEpochsResult.compute_matching_best_indicies(ripple_weighted_corr_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
 
     # Test agreement:
     print(f'Performance: Simple PF PearsonR:\n\tLaps:')
-    with ExceptionPrintingContext(suppress=suppress_exceptions):
+    with ExceptionPrintingContext(suppress=True):
         laps_simple_pf_pearson_stats = DecoderDecodedEpochsResult.compute_matching_best_indicies(laps_simple_pf_pearson_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
     print(f'Performance: Ripple: Simple PF PearsonR')
-    with ExceptionPrintingContext(suppress=suppress_exceptions):
+    with ExceptionPrintingContext(suppress=True):
         ripple_simple_pf_pearsonr_stats = DecoderDecodedEpochsResult.compute_matching_best_indicies(ripple_simple_pf_pearson_merged_df, index_column_name='most_likely_decoder_index', second_index_column_name='best_decoder_index', enable_print=True)
     
+
+
     ## OUTPUTS: laps_simple_pf_pearson_merged_df, ripple_simple_pf_pearson_merged_df
 
     ## OUTPUTS: decoder_laps_radon_transform_df_dict, decoder_ripple_radon_transform_df_dict, decoder_laps_radon_transform_extras_dict, decoder_ripple_radon_transform_df_dict, decoder_laps_weighted_corr_df_dict, decoder_ripple_weighted_corr_df_dict
