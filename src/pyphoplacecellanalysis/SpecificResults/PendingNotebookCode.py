@@ -49,6 +49,240 @@ from pyphocorehelpers.DataStructure.general_parameter_containers import Visualiz
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 
+# ==================================================================================================================== #
+# 2025-01-17 - Load/Compute Local and Global Computations                                                              #
+# ==================================================================================================================== #
+import sys
+from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline # get_neuron_identities
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot
+from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_load_session, batch_extended_computations, batch_evaluate_required_computations, batch_extended_programmatic_figures
+from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme # used in perform_pipeline_save
+from pyphoplacecellanalysis.GUI.IPyWidgets.pipeline_ipywidgets import PipelineJupyterHelpers, CustomProcessingPhases
+from pyphocorehelpers.Filesystem.path_helpers import set_posix_windows
+from pyphocorehelpers.assertion_helpers import Assert
+from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
+
+@function_attributes(short_name=None, tags=['UNFINISHED', 'UNUSED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-17 20:34', related_items=['PipelinePickleFileSelectorWidget', 'on_load_global'])
+def on_load_local(active_session_pickle_file_widget, global_data_root_parent_path, active_data_mode_name, basedir, saving_mode, force_reload):
+    """ Loads custom pipeline pickles that were saved out via `custom_save_filepaths['pipeline_pkl'] = curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, active_pickle_filename=custom_save_filenames['pipeline_pkl'])`
+
+        # INPUTS: global_data_root_parent_path, active_data_mode_name, basedir, saving_mode, force_reload, custom_save_filenames
+        custom_suffix: str = '_withNewKamranExportedReplays'
+
+        custom_suffix: str = '_withNewComputedReplays'
+        custom_suffix: str = '_withNewComputedReplays-qclu_[1, 2]-frateThresh_5.0'
+
+        custom_save_filenames = {
+            'pipeline_pkl':f'loadedSessPickle{custom_suffix}.pkl',
+            'global_computation_pkl':f"global_computation_results{custom_suffix}.pkl",
+            'pipeline_h5':f'pipeline{custom_suffix}.h5',
+        }
+        print(f'custom_save_filenames: {custom_save_filenames}')
+        custom_save_filepaths = {k:v for k, v in custom_save_filenames.items()}
+
+        # ==================================================================================================================== #
+        # PIPELINE LOADING                                                                                                     #
+        # ==================================================================================================================== #
+        # load the custom saved outputs
+        active_pickle_filename = custom_save_filenames['pipeline_pkl'] # 'loadedSessPickle_withParameters.pkl'
+        print(f'active_pickle_filename: "{active_pickle_filename}"')
+        # assert active_pickle_filename.exists()
+        active_session_h5_filename = custom_save_filenames['pipeline_h5'] # 'pipeline_withParameters.h5'
+        print(f'active_session_h5_filename: "{active_session_h5_filename}"')
+
+        ==================================================================================================================== #
+        Load Pipeline                                                                                                        #
+        ==================================================================================================================== #
+        # DO NOT allow recompute if the file doesn't exist!!
+        Computing loaded session pickle file results : "W:/Data/KDIBA/gor01/two/2006-6-07_16-40-19/loadedSessPickle_withNewComputedReplays.pkl"... done.
+        Failure loading W:\Data\KDIBA\gor01\two\2006-6-07_16-40-19\loadedSessPickle_withNewComputedReplays.pkl.
+        proposed_load_pkl_path = basedir.joinpath(active_pickle_filename).resolve()
+
+
+
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import on_load_local, on_load_global
+
+        curr_active_pipeline, custom_suffix, proposed_load_pkl_path = on_load_local(active_session_pickle_file_widget)
+
+    """
+    ## INPUTS: widget.active_global_pkl, widget.active_global_pkl
+    # from pyphocorehelpers.Filesystem.path_helpers import set_posix_windows
+    from pyphoplacecellanalysis.General.Batch.runBatch import BatchSessionCompletionHandler # for `post_compute_validate(...
+
+
+
+    proposed_load_pkl_path = active_session_pickle_file_widget.active_local_pkl.resolve()
+    Assert.path_exists(proposed_load_pkl_path)
+    proposed_load_pkl_path
+
+    custom_suffix: str = active_session_pickle_file_widget.try_extract_custom_suffix()
+    print(f'custom_suffix: "{custom_suffix}"')
+
+    ## OUTPUTS: custom_suffix, proposed_load_pkl_path, (override_global_computation_results_pickle_path, skip_global_load)
+
+    
+    ## INPUTS: proposed_load_pkl_path
+    assert proposed_load_pkl_path.exists(), f"for a saved custom the file must exist!"
+
+    epoch_name_includelist=None
+    active_computation_functions_name_includelist=['lap_direction_determination', 'pf_computation','firing_rate_trends', 'position_decoding']
+
+    with set_posix_windows():
+        curr_active_pipeline: NeuropyPipeline = batch_load_session(global_data_root_parent_path, active_data_mode_name, basedir, epoch_name_includelist=epoch_name_includelist,
+                                                computation_functions_name_includelist=active_computation_functions_name_includelist,
+                                                saving_mode=saving_mode, force_reload=force_reload,
+                                                skip_extended_batch_computations=True, debug_print=False, fail_on_exception=True, active_pickle_filename=proposed_load_pkl_path) # , active_pickle_filename = 'loadedSessPickle_withParameters.pkl'
+
+    ## Post Compute Validate 2023-05-16:
+    was_updated = BatchSessionCompletionHandler.post_compute_validate(curr_active_pipeline) ## TODO: need to potentially re-save if was_updated. This will fail because constained versions not ran yet.
+    if was_updated:
+        print(f'was_updated: {was_updated}')
+        try:
+            if saving_mode == PipelineSavingScheme.SKIP_SAVING:
+                print(f'WARNING: PipelineSavingScheme.SKIP_SAVING but need to save post_compute_validate changes!!')
+            else:
+                curr_active_pipeline.save_pipeline(saving_mode=saving_mode)
+        except Exception as e:
+            ## TODO: catch/log saving error and indicate that it isn't saved.
+            exception_info = sys.exc_info()
+            e = CapturedException(e, exception_info)
+            print(f'ERROR RE-SAVING PIPELINE after update. error: {e}')
+
+    print(f'Pipeline loaded from custom pickle!!')
+    ## OUTPUT: curr_active_pipeline
+
+    return curr_active_pipeline, custom_suffix, proposed_load_pkl_path
+
+
+@function_attributes(short_name=None, tags=[['UNFINISHED', 'UNUSED'], 'load', 'global'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-17 17:04', related_items=['PipelinePickleFileSelectorWidget', 'on_load_local'])
+def on_load_global(active_session_pickle_file_widget, curr_active_pipeline, basedir, extended_computations_include_includelist: List[str], force_recompute_override_computations_includelist: List[str]=[], skip_global_load: bool = True, force_reload: bool = False, override_global_computation_results_pickle_path: Path=None):
+    """ 
+
+    curr_active_pipeline = on_load_global(active_session_pickle_file_widget, curr_active_pipeline, extended_computations_include_includelist: List[str], skip_global_load: bool = True, force_reload: bool = False, override_global_computation_results_pickle_path: Path=None)
+
+
+    """
+    # ==================================================================================================================== #
+    # Global computations loading:                                                                                            #
+    # ==================================================================================================================== #
+    # Loads saved global computations that were saved out via: `custom_save_filepaths['global_computation_pkl'] = curr_active_pipeline.save_global_computation_results(override_global_pickle_filename=custom_save_filenames['global_computation_pkl'])`
+    ## INPUTS: custom_save_filenames
+    ## INPUTS: curr_active_pipeline, override_global_computation_results_pickle_path, extended_computations_include_includelist
+
+
+    if active_session_pickle_file_widget.active_global_pkl is None:
+        skip_global_load: bool = True
+        override_global_computation_results_pickle_path = None
+    else:
+        skip_global_load: bool = False
+        override_global_computation_results_pickle_path = active_session_pickle_file_widget.active_global_pkl.resolve()
+        Assert.path_exists(override_global_computation_results_pickle_path)
+        override_global_computation_results_pickle_path
+
+
+    # override_global_computation_results_pickle_path = None
+    # override_global_computation_results_pickle_path = custom_save_filenames['global_computation_pkl']
+    print(f'override_global_computation_results_pickle_path: "{override_global_computation_results_pickle_path}"')
+
+    # Pre-load ___________________________________________________________________________________________________________ #
+    force_recompute_global = force_reload
+    needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                        force_recompute=force_recompute_global, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+    print(f'Pre-load global computations: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
+    # valid_computed_results_output_list
+
+    # Try Unpickling Global Computations to update pipeline ______________________________________________________________ #
+    if (not force_reload) and (not skip_global_load): # not just force_reload, needs to recompute whenever the computation fails.
+        try:
+            # INPUTS: override_global_computation_results_pickle_path
+            with set_posix_windows():
+                sucessfully_updated_keys, successfully_loaded_keys = curr_active_pipeline.load_pickled_global_computation_results(override_global_computation_results_pickle_path=override_global_computation_results_pickle_path,
+                                                                                                allow_overwrite_existing=True, allow_overwrite_existing_allow_keys=extended_computations_include_includelist, ) # is new
+                print(f'sucessfully_updated_keys: {sucessfully_updated_keys}\nsuccessfully_loaded_keys: {successfully_loaded_keys}')
+                did_any_paths_change: bool = curr_active_pipeline.post_load_fixup_sess_basedirs(updated_session_basepath=deepcopy(basedir)) ## use INPUT: basedir
+                
+        except FileNotFoundError as e:
+            exception_info = sys.exc_info()
+            e = CapturedException(e, exception_info)
+            print(f'cannot load global results because pickle file does not exist! Maybe it has never been created? {e}')
+        except Exception as e:
+            exception_info = sys.exc_info()
+            e = CapturedException(e, exception_info)
+            print(f'Unhandled exception: cannot load global results: {e}')
+            raise
+
+    # Post-Load __________________________________________________________________________________________________________ #
+    force_recompute_global = force_reload
+    needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                        force_recompute=force_recompute_global, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+    print(f'Post-load global computations: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
+
+    ## fixup missing paths
+    # self.basepath: WindowsPath('/nfs/turbo/umms-kdiba/KDIBA/gor01/one/2006-6-09_1-22-43')
+
+    ## INPUTS: basedir
+    did_any_paths_change: bool = curr_active_pipeline.post_load_fixup_sess_basedirs(updated_session_basepath=deepcopy(basedir)) ## use INPUT: basedir
+
+    # Compute ____________________________________________________________________________________________________________ #
+    curr_active_pipeline.reload_default_computation_functions()
+    force_recompute_global = force_reload
+    # force_recompute_global = True
+    newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                        force_recompute=force_recompute_global, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+    if (len(newly_computed_values) > 0):
+        print(f'newly_computed_values: {newly_computed_values}.')
+        if (saving_mode.value != 'skip_saving'):
+            print(f'Saving global results...')
+            try:
+                # curr_active_pipeline.global_computation_results.persist_time = datetime.now()
+                # Try to write out the global computation function results:
+                curr_active_pipeline.save_global_computation_results()
+            except Exception as e:
+                exception_info = sys.exc_info()
+                e = CapturedException(e, exception_info)
+                print(f'\n\n!!WARNING!!: saving the global results threw the exception: {e}')
+                print(f'\tthe global results are currently unsaved! proceed with caution and save as soon as you can!\n\n\n')
+        else:
+            print(f'\n\n!!WARNING!!: changes to global results have been made but they will not be saved since saving_mode.value == "skip_saving"')
+            print(f'\tthe global results are currently unsaved! proceed with caution and save as soon as you can!\n\n\n')
+    else:
+        print(f'no changes in global results.')
+
+    # Post-compute _______________________________________________________________________________________________________ #
+    # Post-hoc verification that the computations worked and that the validators reflect that. The list should be empty now.
+    needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                        force_recompute=False, force_recompute_override_computations_includelist=[], debug_print=True)
+    print(f'Post-compute validation: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
+
+
+    # Post-Load __________________________________________________________________________________________________________ #
+    force_recompute_global = force_reload
+    needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                        force_recompute=force_recompute_global, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+    print(f'Post-load global computations: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
+
+    return curr_active_pipeline
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ==================================================================================================================== #
+# Older                                                                                                                #
+# ==================================================================================================================== #
 
 @function_attributes(short_name=None, tags=['save', 'split'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-17 16:14', related_items=[])
 def perform_split_save_dictlike_result(split_save_folder: Path, active_computed_data, include_includelist=None, continue_after_pickling_errors: bool=True, debug_print:bool=True):
