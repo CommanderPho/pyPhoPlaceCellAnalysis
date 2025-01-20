@@ -39,6 +39,8 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 		""" Renders a single figure that shows the 1D linearized position from several different sources to ensure sufficient overlap. Useful for validating that the grid_bin_bounds are chosen reasonably.
 
 		"""
+		from pyphoplacecellanalysis.Pho2D.track_shape_drawing import NotableTrackPositions, perform_add_1D_track_bounds_lines
+
 		assert owning_pipeline_reference is not None
 		long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
 		long_grid_bin_bounds, short_grid_bin_bounds, global_grid_bin_bounds = [owning_pipeline_reference.computation_results[a_name].computation_config['pf_params'].grid_bin_bounds for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
@@ -69,8 +71,11 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 
 		grid_bin_bounds = curr_config.computation_config.pf_params.grid_bin_bounds # ((37.0773897438341, 250.69004399129707), (137.925447118083, 145.16448776601297))
 		# curr_config.computation_config.pf_params.grid_bin # (3.793023081021702, 1.607897707662558)
-		loaded_track_limits = curr_config.active_session_config.loaded_track_limits
+		# loaded_track_limits = curr_config.active_session_config.loaded_track_limits
 		x_midpoint = curr_config.active_session_config.x_midpoint # 143.88489208633095
+
+		(long_notable_x_platform_positions, short_notable_x_platform_positions), (long_notable_y_platform_positions, short_notable_y_platform_positions) = NotableTrackPositions.init_notable_track_points_from_session_config(owning_pipeline_reference.sess.config)
+		long_track_line_collection, short_track_line_collection = perform_add_1D_track_bounds_lines(long_notable_x_platform_positions=tuple(long_notable_x_platform_positions), short_notable_x_platform_positions=tuple(short_notable_x_platform_positions), ax=ax, is_vertical=False)
 
 		## horizontal lines:
 		midpoint_line_collection = ax.hlines(x_midpoint, label='x_midpoint', xmin=ax.get_xbound()[0], xmax=ax.get_xbound()[1], colors='#0000FFAA', linewidths=1.0, linestyles='dashed', zorder=-98) # matplotlib.collections.LineCollection midpoint_line_collection
@@ -83,7 +88,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 		else:
 			saved_figure_paths = []
 
-		graphics_output_dict = MatplotlibRenderPlots(name='_display_grid_bin_bounds_validation', figures=(fig,), axes=(ax,), plot_data={'midpoint_line_collection': midpoint_line_collection, 'grid_bin_bounds_line_collection': grid_bin_bounds_line_collection}, context=final_context, saved_figures=[])
+		graphics_output_dict = MatplotlibRenderPlots(name='_display_grid_bin_bounds_validation', figures=(fig,), axes=(ax,), plot_data={'midpoint_line_collection': midpoint_line_collection, 'grid_bin_bounds_line_collection': grid_bin_bounds_line_collection, 'long_track_line_collection': long_track_line_collection, 'short_track_line_collection': short_track_line_collection}, context=final_context, saved_figures=[])
 		return graphics_output_dict
  
 
