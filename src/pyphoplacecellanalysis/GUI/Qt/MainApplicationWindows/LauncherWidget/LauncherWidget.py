@@ -132,11 +132,17 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
 
 
     # __init__ fcn _______________________________________________________________________________________________________ #
-    def __init__(self, debug_print=False, parent=None):
+    def __init__(self, debug_print=False, should_use_nice_display_names: bool = True, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self.ui = uic.loadUi(uiFile, self) # Load the .ui file
         self._curr_active_pipeline_ref = None
         self.debug_print = debug_print
+        self.should_use_nice_display_names = should_use_nice_display_names
+        if should_use_nice_display_names:
+            self.best_display_name_to_function_name_map = {}
+        else:
+            self.best_display_name_to_function_name_map = None
+
         # self._displayContextSelectorWidget = None
         # self.ui.displayContextSelectorWidget = None
 
@@ -190,7 +196,11 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         return {a_fn_name:DisplayFunctionItem.init_from_fn_object(a_fn, icon_path=icon_table.get(a_fn_name, None)) for a_fn_name, a_fn in self.curr_active_pipeline.registered_display_function_dict.items()}
 
     def get_display_function_item(self, a_fn_name: str) -> Optional[DisplayFunctionItem]:
-        return self.get_display_function_items().get(a_fn_name, None)
+        if self.should_use_nice_display_names:
+            an_active_fn_name: str = self.best_display_name_to_function_name_map.get(a_fn_name, a_fn_name)
+            return self.get_display_function_items().get(an_active_fn_name, None)
+        else:
+            return self.get_display_function_items().get(a_fn_name, None)
     
     def update_local_display_items_are_enabled(self):
         """ sets the local display items as disabled if no context is selected. 
@@ -208,10 +218,13 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         """ rebuilds the entire tree using the items provided by `self.get_display_function_items()`
         
         """
+        if self.should_use_nice_display_names:
+            self.best_display_name_to_function_name_map = {}
+
         self.ui.displayFunctionTreeItem_global_fns = None
         self.ui.displayFunctionTreeItem_non_global_fns = None
         
-        should_use_nice_display_names: bool = False # currently broken
+         # currently broken
 
         # Add root item
         displayFunctionTreeItem = QtWidgets.QTreeWidgetItem(["Display Functions"])
@@ -239,8 +252,9 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
             #     active_name = a_fcn_name
 
             # active_name: str = a_disp_fn_item.name
-            if should_use_nice_display_names:
+            if self.should_use_nice_display_names:
                 active_name: str = a_disp_fn_item.best_display_name
+                self.best_display_name_to_function_name_map[a_disp_fn_item.best_display_name] = a_disp_fn_item.name # function name
             else:
                 active_name: str = a_disp_fn_item.name # function name
 
@@ -255,8 +269,8 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
             active_tooltip_text = (a_disp_fn_item.docs or "No tooltip")
             childDisplayFunctionTreeItem.setToolTip(0, active_tooltip_text)
             childDisplayFunctionTreeItem.setData(0, QtCore.Qt.UserRole, a_fcn_name) # "Child 1 custom data"
-            # childDisplayFunctionTreeItem.setData(0, QtCore.Qt.UserRole, a_disp_fn_item) # "Child 1 custom data"
             childDisplayFunctionTreeItem.setData(1, QtCore.Qt.UserRole, a_disp_fn_item.is_global)
+            childDisplayFunctionTreeItem.setData(2, QtCore.Qt.UserRole, a_disp_fn_item.name)
 
             if (a_disp_fn_item.icon_path is not None) and (len(a_disp_fn_item.icon_path) > 0):
                 # has valid iconpath
@@ -286,8 +300,9 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         self._curr_active_pipeline_ref = curr_active_pipeline
         curr_active_pipeline.reload_default_display_functions()
         
-        self.displayContextSelectorWidget.build_for_pipeline(curr_active_pipeline)
-        self._rebuild_tree()
+        self.displayContextSelectorWidget.build_for_pipeline(curr_active_pipeline) ## update the context list
+        self._rebuild_tree() ## call self._rebuild_tree()
+
         
         
     # Handle link click
@@ -355,6 +370,7 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         if self.debug_print:
             print(f"Item single-clicked: {item}, column: {column}\n\t", item.text(column))
         item_data = item.data(column, 0) # ItemDataRole 
+        # item_data = item.data(column, 2)
         if self.debug_print:
             print(f'\titem_data: {item_data}')
         assert item_data is not None, f"item_Data is None"
@@ -370,8 +386,8 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
             print(f"Item double-clicked: {item}, column: {column}\n\t", item.text(column))
         # print(f'\titem.data: {item.data}')
         # raise NotImplementedError
-        # item_data = item.data(column, 0) # ItemDataRole 
         item_data = item.data(column, 0) # ItemDataRole 
+        # item_data = item.data(column, 2)
         if self.debug_print:
             print(f'\titem_data: {item_data}')
         assert item_data is not None, f"item_Data is None"
@@ -386,6 +402,7 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         if self.debug_print:
             print(f"Item hovered: {item}, column: {column}\n\t", item.text(column))
         item_data = item.data(column, 0) # ItemDataRole 
+        # item_data = item.data(column, 2)
         if self.debug_print:
             print(f'\titem_data: {item_data}')
         assert item_data is not None
@@ -400,6 +417,7 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         if self.debug_print:
             print(f"on_tree_item_selection_changed: {item}, column: {column}\n\t", item.text(column))
         item_data = item.data(column, 0) # ItemDataRole 
+        # item_data = item.data(column, 2)
         if self.debug_print:
             print(f'\titem_data: {item_data}')
         assert item_data is not None
