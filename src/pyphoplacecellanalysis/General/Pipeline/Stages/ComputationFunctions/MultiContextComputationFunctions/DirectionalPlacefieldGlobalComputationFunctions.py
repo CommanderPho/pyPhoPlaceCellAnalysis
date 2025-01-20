@@ -5901,7 +5901,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             print(f'\thad_existing_DirectionalDecodersDecoded_result == True. Using existing result and updating.')
             ## Try to get the existing results to reuse:
             all_directional_pf1D_Decoder_dict = directional_decoders_decode_result.pf1D_Decoder_dict
-            pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
+            pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder # pseudo2D_decoder: missing .spikes_df (is None)
             spikes_df = directional_decoders_decode_result.spikes_df
             continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
             previously_decoded_keys: List[float] = list(continuously_decoded_result_cache_dict.keys()) # [0.03333]
