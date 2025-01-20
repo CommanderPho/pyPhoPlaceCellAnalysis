@@ -53,8 +53,6 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 		combined_pos_df.loc[short_pos_df.index, 'short_pos_df'] = short_pos_df.lin_pos
 		combined_pos_df.loc[global_pos_df.index, 'global_lin_pos'] = global_pos_df.lin_pos
 
-		# ['long_lin_pos', 'short_pos_df', 'global_lin_pos']
-		# combined_pos_df
 		title = 'grid_bin_bounds validation across epochs'
 		
 		# Plot it:
@@ -66,14 +64,29 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 		
 		final_context = owning_pipeline_reference.sess.get_context().adding_context('display_fn', display_fn_name='_display_grid_bin_bounds_validation')
 		
+		## Add grid_bin_bounds, track limits, and midpoint lines:
+		curr_config = owning_pipeline_reference.active_configs['maze_any']
+
+		grid_bin_bounds = curr_config.computation_config.pf_params.grid_bin_bounds # ((37.0773897438341, 250.69004399129707), (137.925447118083, 145.16448776601297))
+		# curr_config.computation_config.pf_params.grid_bin # (3.793023081021702, 1.607897707662558)
+		loaded_track_limits = curr_config.active_session_config.loaded_track_limits
+		x_midpoint = curr_config.active_session_config.x_midpoint # 143.88489208633095
+
+		## horizontal lines:
+		midpoint_line_collection = ax.hlines(x_midpoint, label='x_midpoint', xmin=ax.get_xbound()[0], xmax=ax.get_xbound()[1], colors='#0000FFAA', linewidths=1.0, linestyles='dashed', zorder=-98) # matplotlib.collections.LineCollection midpoint_line_collection
+		((grid_bin_bounds_x0, grid_bin_bounds_x1), (grid_bin_bounds_y0, grid_bin_bounds_y1)) = grid_bin_bounds
+
+		grid_bin_bounds_line_collection = ax.hlines([grid_bin_bounds_x0, grid_bin_bounds_x1], label='grid_bin_bounds', xmin=ax.get_xbound()[0], xmax=ax.get_xbound()[1], colors='#20202e', linewidths=2.0, linestyles='solid', zorder=-98) # grid_bin_bounds_line_collection
+
 		if save_figure:
 			saved_figure_paths = owning_pipeline_reference.output_figure(final_context, fig)
 		else:
 			saved_figure_paths = []
 
-		graphics_output_dict = MatplotlibRenderPlots(name='_display_grid_bin_bounds_validation', figures=(fig,), axes=(ax,), plot_data={}, context=final_context, saved_figures=[])
+		graphics_output_dict = MatplotlibRenderPlots(name='_display_grid_bin_bounds_validation', figures=(fig,), axes=(ax,), plot_data={'midpoint_line_collection': midpoint_line_collection, 'grid_bin_bounds_line_collection': grid_bin_bounds_line_collection}, context=final_context, saved_figures=[])
 		return graphics_output_dict
  
+
 	@function_attributes(short_name='context_nested_docks', tags=['display','docks','pyqtgraph', 'interactive'], is_global=True, input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-11 03:14')
 	def _display_context_nested_docks(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, **kwargs):
 		""" Create `master_dock_win` - centralized plot output window to collect individual figures/controls in (2022-08-18)
