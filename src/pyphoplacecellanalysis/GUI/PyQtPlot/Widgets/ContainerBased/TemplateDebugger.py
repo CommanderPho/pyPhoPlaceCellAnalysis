@@ -12,7 +12,6 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphocorehelpers.print_helpers import strip_type_str_to_classname
-
 from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
@@ -132,7 +131,7 @@ def build_pf1D_heatmap_with_labels_and_peaks(pf1D_decoder, visible_aclus, plot_i
 
 
 
-@define(slots=False, repr=False, eq=False)
+@define(slots=False, eq=False)
 class BaseTemplateDebuggingMixin:
     """ TemplateDebugger displays a 1D heatmap colored by cell for the tuning curves of PfND.
     

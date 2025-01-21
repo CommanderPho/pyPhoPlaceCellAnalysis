@@ -52,22 +52,193 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 # ==================================================================================================================== #
 # 2025-01-21 - Bin-by-bin decoding examples                                                                            #
 # ==================================================================================================================== #
+from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
+from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+from pyphocorehelpers.print_helpers import strip_type_str_to_classname
+from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
-from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import easy_independent_decoding
 
-@define(slots=False, eq=False)
+# @define(slots=False, eq=False)
 class BinByBinDecodingDebugger:
-    """ handles displaying the process of debugging decoding for each time bin """
-    time_bin_size: float = 0.500 # 500ms
-    spikes_df: pd.DataFrame = field()
-    global_laps_epochs_df: pd.DataFrame = field()
-    
+    """ handles displaying the process of debugging decoding for each time bin
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BinByBinDecodingDebugger
 
-    def plot_bin_by_bin_decoding_example():
-        """ 
+    """
+    plots: RenderPlots = field(repr=keys_only_repr)
+    plots_data: RenderPlotsData = field(repr=keys_only_repr)
+    ui: PhoUIContainer = field(repr=keys_only_repr)
+    params: VisualizationParameters = field(repr=keys_only_repr)
+
+    # time_bin_size: float = field(default=0.500) # 500ms
+    # spikes_df: pd.DataFrame = field()
+    # global_laps_epochs_df: pd.DataFrame = field()
+    @classmethod
+    def build_spike_counts_and_decoder_outputs(cls, track_templates, global_laps_epochs_df, spikes_df, a_decoder_name='long_LR', time_bin_size=0.500, debug_print=False):
+        """
+
+        """
+        ## Get a specific decoder
+        a_decoder_name: types.DecoderName = 'long_LR'
+        a_decoder_idx: int = track_templates.get_decoder_names().index(a_decoder_name)
+        a_decoder = deepcopy(track_templates.long_LR_decoder)
+
+        neuron_IDs = deepcopy(a_decoder.neuron_IDs)
+        spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(neuron_IDs)
+        unique_units = np.unique(spikes_df['aclu'])
+        _out_decoded_time_bin_edges = {}
+        _out_decoded_unit_specific_time_binned_spike_counts = {}
+        _out_decoded_active_unit_lists = {}
+        _out_decoded_active_p_x_given_n = {}
+        _out_decoded_active_plots_data: Dict[str, RenderPlotsData]  = {}
+
+        for a_row in global_laps_epochs_df.itertuples():
+            t_start = a_row.start
+            t_end = a_row.stop
+            time_bin_edges = np.arange(t_start, (t_end + time_bin_size), time_bin_size)
+            n_time_bins = len(time_bin_edges) - 1
+            assert n_time_bins > 0
+            _out_decoded_time_bin_edges[a_row.lap_id] = time_bin_edges
+            unit_specific_time_binned_spike_counts = np.array([
+                np.histogram(spikes_df.loc[spikes_df['aclu'] == unit, 't_rel_seconds'], bins=time_bin_edges)[0]
+                for unit in unique_units
+            ])
+            all_lap_active_units_list = []
+            active_units_list = []
+            for a_time_bin_idx in np.arange(n_time_bins):
+                unit_spike_counts = np.squeeze(unit_specific_time_binned_spike_counts[:, a_time_bin_idx])
+                normalized_unit_spike_counts = (unit_spike_counts / np.sum(unit_spike_counts))
+                active_unit_idxs = np.where(unit_spike_counts > 0)[0]
+                active_units = neuron_IDs[active_unit_idxs]
+                active_aclu_spike_counts_dict = dict(zip(active_units, unit_spike_counts[active_unit_idxs]))
+                active_units_list.append(active_aclu_spike_counts_dict)
+                all_lap_active_units_list.extend(active_units)
+
+            _out_decoded_active_unit_lists[a_row.lap_id] = active_units_list
+            _out_decoded_unit_specific_time_binned_spike_counts[a_row.lap_id] = unit_specific_time_binned_spike_counts
+
+            # all_lap_active_units_list = np.unique(list(Set(all_lap_active_units_list)))
+            all_lap_active_units_list = np.unique(all_lap_active_units_list)
+            if debug_print:
+                print(f'all_lap_active_units_list: {all_lap_active_units_list}')
+            lap_specific_spikes_df = deepcopy(spikes_df).spikes.time_sliced(t_start=t_start, t_stop=t_end).spikes.sliced_by_neuron_id(all_lap_active_units_list)
+
+
+            _decoded_pos_outputs = a_decoder.decode(unit_specific_time_binned_spike_counts=unit_specific_time_binned_spike_counts, time_bin_size=time_bin_size, output_flat_versions=True, debug_print=False)
+            _out_decoded_active_p_x_given_n[a_row.lap_id] = _decoded_pos_outputs
+            _out_decoded_active_plots_data[a_row.lap_id] = RenderPlotsData(name=f'lap[{a_row.lap_id}]', spikes_df=lap_specific_spikes_df, active_aclus=all_lap_active_units_list)
+
+
+        return (_out_decoded_time_bin_edges, _out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists, _out_decoded_active_p_x_given_n, _out_decoded_active_plots_data)
+
+
+    @classmethod
+    def build_time_binned_decoder_debug_plots(cls, a_decoder, a_lap_id, _out_decoded_time_bin_edges, _out_decoded_active_p_x_given_n, _out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists, _out_decoded_active_plots_data, debug_print=False):
+        import numpy as np
+        import pyqtgraph as pg
+        from copy import deepcopy
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import pyqtplot_build_image_bounds_extent
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import BaseTemplateDebuggingMixin
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import new_plot_raster_plot, NewSimpleRaster
+
+        def _simply_plot_posterior_in_pyqtgraph_plotitem(curr_plot, image, xbin_edges, ybin_edges):
+            pg.setConfigOptions(imageAxisOrder='row-major')
+            pg.setConfigOptions(antialias=True)
+            cmap = pg.colormap.get('jet','matplotlib')
+            image_bounds_extent, x_range, y_range = pyqtplot_build_image_bounds_extent(xbin_edges, ybin_edges, margin=0.0, debug_print=debug_print)
+            curr_plot.hideButtons()
+            img_item = pg.ImageItem(image=image, levels=(0,1))
+            curr_plot.addItem(img_item, defaultPadding=0.0)
+            img_item.setImage(image, rect=image_bounds_extent, autoLevels=False)
+            img_item.setLookupTable(cmap.getLookupTable(nPts=256), update=False)
+            curr_plot.setRange(xRange=x_range, yRange=y_range, padding=0.0, update=False, disableAutoRange=True)
+            curr_plot.setLimits(xMin=x_range[0], xMax=x_range[-1], yMin=y_range[0], yMax=y_range[-1])
+            return img_item
+
+        time_bin_edges = _out_decoded_time_bin_edges[a_lap_id]
+        n_epoch_time_bins = len(time_bin_edges) - 1
+        print(f'a_lap_id: {a_lap_id}, n_epoch_time_bins: {n_epoch_time_bins}')
+
+        win = pg.GraphicsLayoutWidget()
+        plots = []
+        out_pf1D_decoder_template_objects = []
+        _out_decoded_active_plots = {}
+
+        plots_data = _out_decoded_active_plots_data[a_lap_id]
+        plots_container = RenderPlots(name=a_lap_id, root_plot=None) # [a_lap_id]
+
+        # Epoch Active Spikes, takes up a row _______________________________________________________________ #
+        spanning_spikes_raster_plot = win.addPlot(title="spikes_raster Plot", row=0, rowspan=1, col=0, colspan=n_epoch_time_bins)
+        spanning_spikes_raster_plot.setTitle("spikes_raster Plot")
+        plots_container.root_plot = spanning_spikes_raster_plot
+        app, raster_win, plots_container, plots_data = new_plot_raster_plot(plots_data.spikes_df, plots_data.active_aclus, scatter_plot_kwargs=None, win=spanning_spikes_raster_plot, plots_data=plots_data, plots=plots_container,
+                                                            scatter_app_name=f'lap_specific_spike_raster', defer_show=True, active_context=None, add_debug_header_label=False)
+
+
+
+        _out_decoded_active_plots[a_lap_id] = plots_container
+        win.nextRow()
+
+
+
+        # Decoded Epoch Posterior (bin-by-bin), takes up a row _______________________________________________________________ #
+        spanning_posterior_plot = win.addPlot(title="P_x_given_n Plot", row=1, rowspan=1, col=0, colspan=n_epoch_time_bins)
+        spanning_posterior_plot.setTitle("P_x_given_n Plot - Covers Entire Width")
+
+        most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = _out_decoded_active_p_x_given_n[a_lap_id]
+        flat_p_x_given_n = deepcopy(p_x_given_n)
+        _simply_plot_posterior_in_pyqtgraph_plotitem(
+            curr_plot=spanning_posterior_plot,
+            image=flat_p_x_given_n,
+            xbin_edges=np.arange(n_epoch_time_bins+1),
+            ybin_edges=deepcopy(a_decoder.xbin)
+        )
+
+        win.nextRow()
+
+
+        # Bin-by-bin active spike templates/pf1D fields ______________________________________________________________________ #
+        active_bin_unit_specific_time_binned_spike_counts = _out_decoded_unit_specific_time_binned_spike_counts[a_lap_id]
+        active_lap_active_aclu_spike_counts_list = _out_decoded_active_unit_lists[a_lap_id]
+
+        for a_time_bin_idx in np.arange(n_epoch_time_bins):
+            active_bin_active_aclu_spike_counts_dict = active_lap_active_aclu_spike_counts_list[a_time_bin_idx]
+            active_bin_active_aclu_spike_count_values = np.array(list(active_bin_active_aclu_spike_counts_dict.values()))
+            active_bin_active_aclu_bin_normalized_spike_count_values = active_bin_active_aclu_spike_count_values / np.sum(
+                active_bin_active_aclu_spike_count_values)
+
+            aclu_override_alpha_weights = 0.8 + (0.2 * active_bin_active_aclu_bin_normalized_spike_count_values)
+            active_bin_aclus = np.array(list(active_bin_active_aclu_spike_counts_dict.keys()))
+            active_solo_override_num_spikes_weights = dict(zip(active_bin_aclus, active_bin_active_aclu_bin_normalized_spike_count_values))
+            active_aclu_override_alpha_weights_dict = dict(zip(active_bin_aclus, aclu_override_alpha_weights))
+
+            print(f'a_time_bin_idx: {a_time_bin_idx}/{n_epoch_time_bins} - active_bin_aclus: {active_bin_aclus}')
+
+            plot = win.addPlot(title=f"Plot {a_time_bin_idx+1}", row=2, rowspan=1, col=a_time_bin_idx, colspan=1)
+            plot.getViewBox().setBorder(color=(200, 200, 200), width=1)
+            spanning_posterior_plot.showGrid(x=True, y=True)
+            x_axis = spanning_posterior_plot.getAxis('bottom')
+            x_axis.setTickSpacing(major=5, minor=1)
+
+            plots.append(plot)
+            _obj = BaseTemplateDebuggingMixin.init_from_decoder(a_decoder=a_decoder, win=plot)
+            _obj.update_base_decoder_debugger_data(
+                included_neuron_ids=active_bin_aclus,
+                solo_override_alpha_weights=active_aclu_override_alpha_weights_dict,
+                solo_override_num_spikes_weights=active_solo_override_num_spikes_weights
+            )
+            out_pf1D_decoder_template_objects.append(_obj)
+
+        win.nextRow()
+        win.show()
+        return win, out_pf1D_decoder_template_objects, (_out_decoded_active_plots, _out_decoded_active_plots_data)
+
+
+    @classmethod
+    def plot_bin_by_bin_decoding_example(cls):
+        """
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_bin_by_bin_decoding_example
-        
+
         """
         ## INPUTS: time_bin_size
         time_bin_size: float = 0.500 # 500ms
@@ -93,33 +264,33 @@ class BinByBinDecodingDebugger:
 
         for a_row in global_laps_epochs_df.itertuples():
             t_start = a_row.start
-            t_end = a_row.stop    
+            t_end = a_row.stop
             time_bin_edges: NDArray = np.arange(t_start, (t_end + time_bin_size), time_bin_size)
             n_time_bins: int = len(time_bin_edges)-1
             assert n_time_bins > 0
             _out_decoded_time_bin_edges[a_row.lap_id] = time_bin_edges
             # print(f'a_row: {a_row.lap_dir}')
-            
+
             unit_specific_time_binned_spike_counts: NDArray = np.array([
                 np.histogram(spikes_df.loc[spikes_df['aclu'] == unit, 't_rel_seconds'], bins=time_bin_edges)[0]
                 for unit in unique_units
             ])
             active_units_list = []
             for a_time_bin_idx in np.arange(n_time_bins):
-                unit_spike_counts = np.squeeze(unit_specific_time_binned_spike_counts[:, a_time_bin_idx]) 
+                unit_spike_counts = np.squeeze(unit_specific_time_binned_spike_counts[:, a_time_bin_idx])
                 active_unit_idxs = np.where(unit_spike_counts > 0)[0]
                 active_units = neuron_IDs[active_unit_idxs]
                 active_aclu_spike_counts_dict = dict(zip(active_units, unit_spike_counts[active_unit_idxs]))
                 # active_units_list.append(active_units)
                 active_units_list.append(active_aclu_spike_counts_dict)
             # end for a_time_bin_idx in np.arange(n_time_bins)...
-            _out_decoded_active_unit_lists[a_row.lap_id] = active_units_list        
+            _out_decoded_active_unit_lists[a_row.lap_id] = active_units_list
 
             _out_decoded_unit_specific_time_binned_spike_counts[a_row.lap_id] = unit_specific_time_binned_spike_counts
             ## OUTPUT: time_bin_edges, unit_specific_time_binned_spike_counts
             _decoded_pos_outputs = long_LR_decoder.decode(unit_specific_time_binned_spike_counts=unit_specific_time_binned_spike_counts, time_bin_size=time_bin_size, output_flat_versions=True, debug_print=False)
             _out_decoded_active_p_x_given_n[a_row.lap_id] = _decoded_pos_outputs
-            
+
     ## OUTPUTS: _out_decoded_time_bin_edges, _out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists, _out_decoded_active_p_x_given_n
 
 
@@ -149,7 +320,7 @@ def easy_independent_decoding(long_LR_decoder: BasePositionDecoder, spikes_df: p
         np.histogram(spikes_df.loc[spikes_df['aclu'] == unit, 't_rel_seconds'], bins=time_bin_edges)[0]
         for unit in unique_units
     ])
-    
+
     ## OUTPUT: time_bin_edges, unit_specific_time_binned_spike_counts
     _decoded_pos_outputs = long_LR_decoder.decode(unit_specific_time_binned_spike_counts=unit_specific_time_binned_spike_counts, time_bin_size=time_bin_size, output_flat_versions=True, debug_print=True)
     # _decoded_pos_outputs = all_directional_pf1D_Decoder.decode(unit_specific_time_binned_spike_counts=unit_specific_time_binned_spike_counts, time_bin_size=0.020, output_flat_versions=True, debug_print=True)
@@ -230,7 +401,7 @@ def on_load_local(active_session_pickle_file_widget, global_data_root_parent_pat
 
     ## OUTPUTS: custom_suffix, proposed_load_pkl_path, (override_global_computation_results_pickle_path, skip_global_load)
 
-    
+
     ## INPUTS: proposed_load_pkl_path
     assert proposed_load_pkl_path.exists(), f"for a saved custom the file must exist!"
 
@@ -266,7 +437,7 @@ def on_load_local(active_session_pickle_file_widget, global_data_root_parent_pat
 
 @function_attributes(short_name=None, tags=[['UNFINISHED', 'UNUSED'], 'load', 'global'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-17 17:04', related_items=['PipelinePickleFileSelectorWidget', 'on_load_local'])
 def on_load_global(active_session_pickle_file_widget, curr_active_pipeline, basedir, extended_computations_include_includelist: List[str], force_recompute_override_computations_includelist: List[str]=[], skip_global_load: bool = True, force_reload: bool = False, override_global_computation_results_pickle_path: Path=None):
-    """ 
+    """
 
     curr_active_pipeline = on_load_global(active_session_pickle_file_widget, curr_active_pipeline, extended_computations_include_includelist: List[str], skip_global_load: bool = True, force_reload: bool = False, override_global_computation_results_pickle_path: Path=None)
 
@@ -310,7 +481,7 @@ def on_load_global(active_session_pickle_file_widget, curr_active_pipeline, base
                                                                                                 allow_overwrite_existing=True, allow_overwrite_existing_allow_keys=extended_computations_include_includelist, ) # is new
                 print(f'sucessfully_updated_keys: {sucessfully_updated_keys}\nsuccessfully_loaded_keys: {successfully_loaded_keys}')
                 did_any_paths_change: bool = curr_active_pipeline.post_load_fixup_sess_basedirs(updated_session_basepath=deepcopy(basedir)) ## use INPUT: basedir
-                
+
         except FileNotFoundError as e:
             exception_info = sys.exc_info()
             e = CapturedException(e, exception_info)
@@ -394,7 +565,7 @@ def on_load_global(active_session_pickle_file_widget, curr_active_pipeline, base
 @function_attributes(short_name=None, tags=['save', 'split'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-17 16:14', related_items=[])
 def perform_split_save_dictlike_result(split_save_folder: Path, active_computed_data, include_includelist=None, continue_after_pickling_errors: bool=True, debug_print:bool=True):
     """ Custom saves any dict-like object
-    
+
 
     split_folder = curr_active_pipeline.get_output_path().joinpath('split')
     split_folder.mkdir(exist_ok=True)
@@ -446,7 +617,7 @@ def perform_split_save_dictlike_result(split_save_folder: Path, active_computed_
     if include_includelist is None:
         ## include all keys if none are specified
         include_includelist = list(active_computed_data.keys()) ## all keys by default
-    
+
     split_save_paths = {}
     split_save_output_types = {}
     failed_keys = []
@@ -460,10 +631,10 @@ def perform_split_save_dictlike_result(split_save_folder: Path, active_computed_
             was_save_success = False
             curr_item_type = type(v)
             try:
-                ## try get as dict                
+                ## try get as dict
                 v_dict = v.__dict__ #__getstate__()
                 # saveData(curr_split_result_pickle_path, (v_dict))
-                saveData(curr_split_result_pickle_path, (v_dict, str(curr_item_type.__module__), str(curr_item_type.__name__)))    
+                saveData(curr_split_result_pickle_path, (v_dict, str(curr_item_type.__module__), str(curr_item_type.__name__)))
                 was_save_success = True
             except KeyError as e:
                 print(f'\t{k} encountered {e} while trying to save {k}. Skipping')
@@ -474,7 +645,7 @@ def perform_split_save_dictlike_result(split_save_folder: Path, active_computed_
                 else:
                     print(f'\t{k} encountered {e} while trying to save {k}. Skipping')
                     pass
-                
+
             if was_save_success:
                 split_save_paths[k] = curr_split_result_pickle_path
                 split_save_output_types[k] = curr_item_type
@@ -486,7 +657,7 @@ def perform_split_save_dictlike_result(split_save_folder: Path, active_computed_
             if debug_print:
                 print(f'\tskipping key "{k}" because it is not included in include_includelist: {include_includelist}')
             skipped_keys.append(k)
-            
+
     if len(failed_keys) > 0:
         print(f'WARNING: failed_keys: {failed_keys} did not save for global results! They HAVE NOT BEEN SAVED!')
     return split_save_folder, split_save_paths, split_save_output_types, failed_keys
@@ -509,7 +680,7 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 @function_attributes(short_name=None, tags=['decoder', 'matplotlib', 'plot', 'track', 'performance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-15 17:44', related_items=[])
 def _perform_plot_multi_decoder_meas_pred_position_track(curr_active_pipeline, fig, ax_list, desired_time_bin_size: Optional[float]=None, enable_flat_line_drawing: bool = False, debug_print = False): # , pos_df: pd.DataFrame, laps_df: pd.DataFrame
     """ Plots a new matplotlib-based track that displays the measured and decoded position (for all four decoders) on the same axes. The "correct" (ground-truth) decoder is highlighted (higher opacity and thicker line) compared to the wrong decoders' estimates.
-    
+
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
@@ -517,7 +688,7 @@ def _perform_plot_multi_decoder_meas_pred_position_track(curr_active_pipeline, f
         from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _perform_plot_multi_decoder_meas_pred_position_track
 
-        ## Compute continuous first        
+        ## Compute continuous first
         curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': 0.025}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
         curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': 0.050}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
         curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': 0.075}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
@@ -551,9 +722,9 @@ def _perform_plot_multi_decoder_meas_pred_position_track(curr_active_pipeline, f
     """
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
-    
+
     ## Get the needed data:
-    
+
     ## get from parameters:
     minimum_inclusion_fr_Hz: float = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
     included_qclu_values: List[int] = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
@@ -578,10 +749,10 @@ def _perform_plot_multi_decoder_meas_pred_position_track(curr_active_pipeline, f
             curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': desired_time_bin_size}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
             directional_decoders_decode_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'] ## update the result
             print(f'\tcalculation complete.')
-            
+
         time_bin_size: float =  desired_time_bin_size
         continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.continuously_decoded_result_cache_dict[time_bin_size]
-        
+
 
     print(f'time_bin_size: {time_bin_size}')
     # continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.most_recent_continuously_decoded_dict
@@ -598,7 +769,7 @@ def _perform_plot_multi_decoder_meas_pred_position_track(curr_active_pipeline, f
     pos_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position).to_dataframe().position.adding_lap_info(laps_df=laps_df, inplace=False)
     pos_df = pos_df.time_point_event.adding_true_decoder_identifier(t_start=t_start, t_delta=t_delta, t_end=t_end) ## ensures ['maze_id', 'is_LR_dir']
     # pos_df = pos_df.position.add_binned_time_column(time_window_edges=time_bin_containers.edges, time_window_edges_binning_info=time_bin_containers.edge_info) # 'binned_time' refers to which time bins these are
-    
+
     ## OUTPUTS: laps_df, pos_df
 
 
@@ -623,7 +794,7 @@ def _perform_plot_multi_decoder_meas_pred_position_track(curr_active_pipeline, f
         is_first_iteration: bool = (i == 0)
         a_continuously_decoded_result = all_directional_continuously_decoded_dict[a_decoder_name]
         a_decoder_color = decoder_color_dict[a_decoder_name]
-        
+
         assert len(a_continuously_decoded_result.p_x_given_n_list) == 1
         p_x_given_n = a_continuously_decoded_result.p_x_given_n_list[0]
         # p_x_given_n = a_continuously_decoded_result.p_x_given_n_list[0]['p_x_given_n']
@@ -634,7 +805,7 @@ def _perform_plot_multi_decoder_meas_pred_position_track(curr_active_pipeline, f
         # active_time_window_variable = a_decoder.active_time_window_centers
         active_time_window_variable = time_window_centers
         active_most_likely_positions_x = a_marginal_x['most_likely_positions_1D'] # a_decoder.most_likely_positions[:,0].T
-        
+
 
         ## Plot general laps only on the first iteration. Needs: pos_df
         if is_first_iteration:
@@ -660,12 +831,12 @@ def _perform_plot_multi_decoder_meas_pred_position_track(curr_active_pipeline, f
         _out_data_plot_kwargs[a_decoder_name] = dict(active=dict(x=active_decoder_time_points, y=active_decoder_most_likely_positions_x, color=a_decoder_color, **active_decoded_pos_line_kwargs), inactive=dict(x=active_decoder_inactive_time_points, y=active_decoder_inactive_most_likely_positions_x, color=a_decoder_color, **inactive_decoded_pos_line_kwargs))
         _out_artists[a_decoder_name] = {}
         for a_plot_name, a_plot_kwargs in _out_data_plot_kwargs[a_decoder_name].items():
-            # _out_artists[a_decoder_name][a_plot_name] = ax.plot(**a_plot_kwargs, label=f'Most-likely {a_decoder_name} ({a_plot_name})') # (Num windows x 2)    
+            # _out_artists[a_decoder_name][a_plot_name] = ax.plot(**a_plot_kwargs, label=f'Most-likely {a_decoder_name} ({a_plot_name})') # (Num windows x 2)
             _out_artists[a_decoder_name][a_plot_name] = ax.plot(a_plot_kwargs.pop('x'), a_plot_kwargs.pop('y'), **a_plot_kwargs, label=f'Most-likely {a_decoder_name} ({a_plot_name})')
 
     ## OUTPUT: _out_artists
     return _out_artists
-    
+
 
 
 
@@ -677,9 +848,9 @@ from neuropy.core.user_annotations import UserAnnotationsManager
 
 @function_attributes(short_name=None, tags=['laps', 'update', 'session', 'TODO', 'UNFINISHED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-13 15:45', related_items=[])
 def override_laps(curr_active_pipeline, override_laps_df: pd.DataFrame, debug_print=False):
-    """ 
+    """
     overrides the laps
-    
+
     Usage:
 
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import override_laps
@@ -714,7 +885,7 @@ def override_laps(curr_active_pipeline, override_laps_df: pd.DataFrame, debug_pr
         override_laps_df['label'] = override_laps_df['lap_id'].astype('str') # add the string "label" column
     else:
         override_laps_df['label'] = override_laps_df['label'].astype('str')
-        
+
     # curr_laps_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=curr_laps_df, global_session=global_session, replace_existing=True)
 
     override_laps_df = Laps._compute_lap_dir_from_smoothed_velocity(laps_df=override_laps_df, global_session=curr_active_pipeline.sess, replace_existing=True)
@@ -744,7 +915,7 @@ def override_laps(curr_active_pipeline, override_laps_df: pd.DataFrame, debug_pr
         filtered_sess.compute_position_laps()
         if debug_print:
             print(f'\tupdated.')
-        
+
 
 
 
@@ -754,26 +925,26 @@ def override_laps(curr_active_pipeline, override_laps_df: pd.DataFrame, debug_pr
 @metadata_attributes(short_name=None, tags=['aggregation', 'UNFINSHED', 'integration', 'confidence'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 00:00', related_items=[])
 class TimeBinAggregation:
     """ Methods of aggregating over many time bins
-    
+
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import TimeBinAggregation, ParticleFilter
-    
-    
+
+
     """
     @function_attributes(short_name=None, tags=['NDArray', 'streak', 'sequence', 'probability', 'likelihood'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 14:00', related_items=[])
     @classmethod
     def compute_epoch_p_long_with_streaks(cls, p_long: List[float], min_probability_threshold: float = 0.5) -> float:
         """ Prior to `compute_streak_weighted_p_long` version, which operates on dataframes
-        
-        
+
+
         Computes the overall P_Long for an epoch, giving higher weight to uninterrupted streaks.
-        
+
         Args:
             p_long (List[float]): Probabilities of being in the "Long" state for each time bin.
             threshold (float): Minimum probability to consider a bin as part of a streak. Default is 0.5.
 
         Returns:
             float: The overall P_Long for the epoch.
-            
+
         Usage:
             # Example usage
             p_long = a_lap_df[a_var_name].to_numpy() # [0.8, 0.7, 0.2, 0.9, 0.95, 0.3, 0.85, 0.87, 0.86]
@@ -784,7 +955,7 @@ class TimeBinAggregation:
         """
         streaks = []
         current_streak = []
-        
+
         # Identify streaks
         for i, prob in enumerate(p_long):
             if prob >= min_probability_threshold:
@@ -795,14 +966,14 @@ class TimeBinAggregation:
                     current_streak = []
         if current_streak:  # Add the last streak if it ends at the last bin
             streaks.append(current_streak)
-        
+
         # Assign weights based on streak length (linearly)
         weights = [0] * len(p_long)
         for streak in streaks:
             streak_length = len(streak)
             for idx in streak:
                 weights[idx] = streak_length
-        
+
         # Compute weighted average
         weighted_sum = np.sum(w * p for w, p in zip(weights, p_long))
         total_weight = np.sum(weights)
@@ -815,19 +986,19 @@ class TimeBinAggregation:
     def compute_streak_weighted_p_long(cls, df: pd.DataFrame, column: str, threshold: float = 0.5) -> float:
         """
         Computes the streak-weighted P_Long for a given DataFrame, giving higher weight to longer sequences of adjacent bins.
-        
+
         Args:
             df (pd.DataFrame): Input DataFrame containing the P_Long column.
             column (str): The column name for P_Long.
             threshold (float): Minimum probability to consider a bin as part of a streak. Default is 0.5.
-        
+
         Returns:
             float: The streak-weighted P_Long for the DataFrame.
         """
         p_long = df[column].values
         streaks = []
         current_streak = []
-        
+
         # Identify streaks
         for i, prob in enumerate(p_long):
             if prob >= threshold:
@@ -838,14 +1009,14 @@ class TimeBinAggregation:
                     current_streak = []
         if current_streak:  # Add the last streak if it ends at the last bin
             streaks.append(current_streak)
-        
+
         # Assign weights based on streak length
         weights = [0] * len(p_long)
         for streak in streaks:
             streak_length = len(streak)
             for idx in streak:
                 weights[idx] = streak_length
-        
+
         # Compute weighted average
         weighted_sum = sum(w * p for w, p in zip(weights, p_long))
         total_weight = sum(weights)
@@ -856,12 +1027,12 @@ class TimeBinAggregation:
     def peak_rolling_avg(cls, df: pd.DataFrame, column: str, window: int=3, *args, **kwargs) -> float:
         """
         Computes the streak-weighted P_Long for a given DataFrame, giving higher weight to longer sequences of adjacent bins.
-        
+
         Args:
             df (pd.DataFrame): Input DataFrame containing the P_Long column.
             column (str): The column name for P_Long.
             threshold (float): Minimum probability to consider a bin as part of a streak. Default is 0.5.
-        
+
         Returns:
             float: The streak-weighted P_Long for the DataFrame.
         """
@@ -870,9 +1041,9 @@ class TimeBinAggregation:
 @metadata_attributes(short_name=None, tags=['UNUSED', 'ChatGPT', 'aggregation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 00:00', related_items=['TimeBinAggregation'])
 class ParticleFilter:
     """ Example: Generated by ChatGPT, does something about aggregating time bins
-    
+
         ## TEST
-        
+
         # Example usage
         def state_transition_func(particles):
             # Example state transition function: simple linear motion.
@@ -883,7 +1054,7 @@ class ParticleFilter:
             return state
 
 
-            
+
         num_particles = 1000
         state_dim = 1
         process_noise = 1.0
@@ -903,7 +1074,7 @@ class ParticleFilter:
             estimated_state = pf.estimate()
             print(f"Estimated State: {estimated_state}")
 
-            
+
     """
     def __init__(self, num_particles: int, state_dim: int, process_noise: float, measurement_noise: float):
         """
@@ -974,7 +1145,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 @metadata_attributes(short_name=None, tags=['validation', 'plot', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-02 09:10', related_items=[])
 class EstimationCorrectnessPlots:
     """ Compares ground truth to the decoded positions during laps
-    
+
     EstimationCorrectnessPlots.plot_estimation_correctness_vertical_stack(
         _out_subset_decode_dfs_dict, 'binned_x_meas', 'estimation_correctness_track_ID'
     )
@@ -990,12 +1161,12 @@ class EstimationCorrectnessPlots:
         """
         Plots a bar plot with error bars for the mean and variability of a metric across bins,
         overlayed with a swarm-like plot showing raw data points, ensuring proper alignment.
-        
+
         Args:
             epochs_df (pd.DataFrame): DataFrame containing the data.
             x_col (str): Column name for the x-axis (binned variable).
             y_col (str): Column name for the y-axis (metric to visualize).
-            
+
         Usage:
             # Example usage
             EstimationCorrectnessPlots.plot_estimation_correctness_with_raw_data(epochs_track_identity_marginal_df, 'binned_x_meas', 'estimation_correctness_track_ID')
@@ -1040,12 +1211,12 @@ class EstimationCorrectnessPlots:
         """
         Plots a vertical stack of estimation correctness across multiple time bin sizes.
         Each time bin size is rendered in a separate subplot with consistent y-limits [0, 1].
-        
+
         Args:
             epochs_dict (dict): Dictionary where keys are time bin sizes and values are DataFrames containing the data.
             x_col (str): Column name for the x-axis (binned variable).
             y_col (str): Column name for the y-axis (metric to visualize).
-            
+
         Usage:
             # Example usage
             plot_estimation_correctness_vertical_stack(
@@ -1114,12 +1285,12 @@ class EstimationCorrectnessPlots:
         """
         Plots a vertical stack of bean plots for estimation correctness across multiple time bin sizes.
         Each time bin size is rendered in a separate subplot with consistent y-limits [0, 1].
-        
+
         Args:
             epochs_dict (dict): Dictionary where keys are time bin sizes and values are DataFrames containing the data.
             x_col (str): Column name for the x-axis (binned variable).
             y_col (str): Column name for the y-axis (metric to visualize).
-            
+
         Usage:
             # Example usage
             plot_estimation_correctness_bean_plot(
@@ -1182,18 +1353,18 @@ class EstimationCorrectnessPlots:
 
 @function_attributes(short_name=None, tags=['transition_matrix', 'position', 'decoder_id', '2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 10:05', related_items=[])
 def build_position_by_decoder_transition_matrix(p_x_given_n, debug_print=False):
-    """ 
-    given a decoder that gives a probability that the generating process is one of two possibilities, what methods are available to estimate the probability for a contiguous epoch made of many time bins? 
+    """
+    given a decoder that gives a probability that the generating process is one of two possibilities, what methods are available to estimate the probability for a contiguous epoch made of many time bins?
     Note: there is most certainly temporal dependence, how should I go about dealing with this?
-    
+
     Usage:
-    
+
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_position_by_decoder_transition_matrix, plot_blocked_transition_matrix
-    
+
         ## INPUTS: p_x_given_n
         n_position_bins, n_decoding_models, n_time_bins = p_x_given_n.shape
         A_position, A_model, A_big = build_position_by_decoder_transition_matrix(p_x_given_n)
-        
+
         ## Plotting:
         import matplotlib.pyplot as plt; import seaborn as sns
 
@@ -1202,8 +1373,8 @@ def build_position_by_decoder_transition_matrix(p_x_given_n, debug_print=False):
         plt.figure(figsize=(8,6)); sns.heatmap(A_model, cmap='viridis'); plt.title("Transition Matrix A_model"); plt.show()
 
         plot_blocked_transition_matrix(A_big, n_position_bins, n_decoding_models)
-        
-        
+
+
     """
     # Assume p_x_given_n is already loaded with shape (57, 4, 29951).
     # We'll demonstrate by generating random data:
@@ -1217,7 +1388,7 @@ def build_position_by_decoder_transition_matrix(p_x_given_n, debug_print=False):
 
     # 2. Determine the most likely position for each time bin (conditional on chosen model)
     best_position_each_bin = np.array([
-        p_x_given_n[:, best_model_each_bin[t], t].argmax() 
+        p_x_given_n[:, best_model_each_bin[t], t].argmax()
         for t in range(n_time_bins)
     ])
 
@@ -1246,21 +1417,21 @@ def build_position_by_decoder_transition_matrix(p_x_given_n, debug_print=False):
 
 
 def plot_blocked_transition_matrix(A_big, n_position_bins, n_decoding_models, tick_labels=('long_LR', 'long_RL', 'short_LR', 'short_RL'), should_show_marginals:bool=True, extra_title_suffix:str=''):
-    """ 
-    
+    """
+
     plot_blocked_transition_matrix(A_big, n_position_bins, n_decoding_models)
-    
-    
+
+
     """
     import matplotlib.pyplot as plt
     import seaborn as sns
     import matplotlib.gridspec as gridspec
     from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
-    
+
     if should_show_marginals:
         fig = plt.figure(figsize=(9, 9))
         gs = gridspec.GridSpec(2, 2, width_ratios=[10, 1], height_ratios=[1, 10])
-        
+
         ax_heatmap = fig.add_subplot(gs[1, 0])
         ax_row_sums = fig.add_subplot(gs[1, 1], sharey=ax_heatmap)
         ax_col_sums = fig.add_subplot(gs[0, 0], sharex=ax_heatmap)
@@ -1302,7 +1473,7 @@ def plot_blocked_transition_matrix(A_big, n_position_bins, n_decoding_models, ti
 
         plt.tight_layout()
         title_text =  "Transition Matrix Blocks by Decoder w/ Marginals"
-        
+
     else:
         fig = plt.figure(figsize=(8,8))
         ax_heatmap = sns.heatmap(A_big, cmap='viridis')
@@ -1321,12 +1492,12 @@ def plot_blocked_transition_matrix(A_big, n_position_bins, n_decoding_models, ti
         plt.xticks(tick_locs, tick_labels, rotation=90)
         plt.yticks(tick_locs, tick_labels, rotation=0)
         title_text = "Transition Matrix Blocks by Decoder"
-        
+
 
     perform_update_title_subtitle(fig=fig, ax=None, title_string=f"plot_blocked_transition_matrix()- {title_text}{extra_title_suffix}", subtitle_string=None)
     plt.show()
     return fig, ax_heatmap
-    
+
 
 # ==================================================================================================================== #
 # 2024-12-20 - Heuristicy Wisticky                                                                                     #
@@ -1347,7 +1518,7 @@ class InteractivePlot:
     """ 2024-12-23 - Add bin selection to a matplotlib plot to allow selecting the desired main sequence position bins for heuristic analysis
 
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import InteractivePlot
-    
+
     _out = subsequence_partitioning_result.plot_time_bins_multiple()
     # Pass the existing ax to the InteractivePlot
     interactive_plot = InteractivePlot(_out.axes)
@@ -1364,7 +1535,7 @@ class InteractivePlot:
     # @property
     # def n_diff_bins(self) -> int:
     #     return len(self.first_order_diff_lst)
-    
+
     @property
     def selected_indicies(self) -> List[int]:
         return np.unique(list(self.selected_bins.keys())).tolist()
@@ -1376,10 +1547,10 @@ class InteractivePlot:
         self.selected_bins = {}
         self.crosshair = self.ax.axvline(x=0, color='r', linestyle='--')
         self.rects = []
-        
+
         self.cid_motion = self.fig.canvas.mpl_connect('motion_notify_event', self.on_mouse_move)
         self.cid_click = self.fig.canvas.mpl_connect('button_press_event', self.on_mouse_click)
-        
+
     def on_mouse_move(self, event):
         if event.inaxes == self.ax:
             self.crosshair.set_xdata(event.xdata)
@@ -1412,7 +1583,7 @@ class InteractivePlot:
         fig = ax.figure
         fig.canvas.draw_idle()
         return rect
-        
+
 
 
 
@@ -1420,9 +1591,9 @@ class InteractivePlot:
 def classify_pos_bins(x: NDArray):
     """	classifies the pos_bin_edges as being either endcaps/on the main straightaway, stc and returns a dataframe
 
-    Usage:	
+    Usage:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import classify_pos_bins
-    
+
         pos_bin_edges = deepcopy(track_templates.get_decoders_dict()['long_LR'].xbin_centers)
         pos_classification_df = classify_pos_bins(x=pos_bin_edges)
         pos_classification_df
@@ -1471,22 +1642,22 @@ def classify_pos_bins(x: NDArray):
 # ==================================================================================================================== #
 @function_attributes(short_name=None, tags=['2024-12-18', 'ACTIVE', 'gui', 'debugging', 'continuous'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 19:29', related_items=[])
 def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_raster_window_track:bool=False, debug_print=False):
-    """ 
+    """
     ['AddMatplotlibPlot.DecodedPosition', 'AddMatplotlibPlot.Custom',
      'AddTimeCurves.Position', 'AddTimeCurves.Velocity', 'AddTimeCurves.Random', 'AddTimeCurves.RelativeEntropySurprise', 'AddTimeCurves.Custom',
      'AddTimeIntervals.Laps', 'AddTimeIntervals.PBEs', 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.Ripples', 'AddTimeIntervals.Replays', 'AddTimeIntervals.Bursts', 'AddTimeIntervals.Custom',
      'CreateNewConnectedWidget.NewConnected2DRaster', 'CreateNewConnectedWidget.NewConnected3DRaster.PyQtGraph', 'CreateNewConnectedWidget.NewConnected3DRaster.Vedo', 'CreateNewConnectedWidget.NewConnectedDataExplorer.ipc', 'CreateNewConnectedWidget.NewConnectedDataExplorer.ipspikes', 'CreateNewConnectedWidget.AddMatplotlibPlot.DecodedPosition', 'CreateNewConnectedWidget.Decoded_Epoch_Slices.Laps', 'CreateNewConnectedWidget.Decoded_Epoch_Slices.PBEs', 'CreateNewConnectedWidget.Decoded_Epoch_Slices.Ripple', 'CreateNewConnectedWidget.Decoded_Epoch_Slices.Replay', 'CreateNewConnectedWidget.Decoded_Epoch_Slices.Custom', 'CreateNewConnectedWidget.MenuCreateNewConnectedWidget', 'CreateNewConnectedWidget.MenuCreateNewConnectedDecodedEpochSlices',
      'Debug.MenuDebug', 'Debug.MenuDebugMenuActiveDrivers', 'Debug.MenuDebugMenuActiveDrivables', 'Debug.MenuDebugMenuActiveConnections',
-    
+
      'DockedWidgets.NewDockedMatplotlibView', 'DockedWidgets.NewDockedContextNested', 'DockedWidgets.LongShortDecodedEpochsDockedMatplotlibView', 'DockedWidgets.DirectionalDecodedEpochsDockedMatplotlibView', 'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView', 'DockedWidgets.ContinuousPseudo2DDecodedMarginalsDockedMatplotlibView', 'DockedWidgets.NewDockedCustom', 'DockedWidgets.AddDockedWidget']
      ['AddMatplotlibPlot.DecodedPosition', 'AddMatplotlibPlot.Custom', 'AddTimeCurves.Position', 'AddTimeCurves.Velocity', 'AddTimeCurves.Random', 'AddTimeCurves.RelativeEntropySurprise', 'AddTimeCurves.Custom', 'AddTimeIntervals.Laps', 'AddTimeIntervals.PBEs', 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.Ripples', 'AddTimeIntervals.Replays', 'AddTimeIntervals.Bursts', 'AddTimeIntervals.Custom', 'CreateNewConnectedWidget.NewConnected2DRaster', 'CreateNewConnectedWidget.NewConnected3DRaster.PyQtGraph', 'CreateNewConnectedWidget.NewConnected3DRaster.Vedo', 'CreateNewConnectedWidget.NewConnectedDataExplorer.ipc', 'CreateNewConnectedWidget.NewConnectedDataExplorer.ipspikes', 'CreateNewConnectedWidget.AddMatplotlibPlot.DecodedPosition', 'CreateNewConnectedWidget.Decoded_Epoch_Slices.Laps', 'CreateNewConnectedWidget.Decoded_Epoch_Slices.PBEs', 'CreateNewConnectedWidget.Decoded_Epoch_Slices.Ripple', 'CreateNewConnectedWidget.Decoded_Epoch_Slices.Replay', 'CreateNewConnectedWidget.Decoded_Epoch_Slices.Custom', 'CreateNewConnectedWidget.MenuCreateNewConnectedWidget', 'CreateNewConnectedWidget.MenuCreateNewConnectedDecodedEpochSlices', 'Debug.MenuDebug', 'Debug.MenuDebugMenuActiveDrivers', 'Debug.MenuDebugMenuActiveDrivables', 'Debug.MenuDebugMenuActiveConnections', 'DockedWidgets.NewDockedMatplotlibView', 'DockedWidgets.LongShortDecodedEpochsDockedMatplotlibView', 'DockedWidgets.TrackTemplatesDecodedEpochsDockedMatplotlibView', 'DockedWidgets.DirectionalDecodedEpochsDockedMatplotlibView', 'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView', 'DockedWidgets.ContinuousPseudo2DDecodedMarginalsDockedMatplotlibView', 'DockedWidgets.NewDockedCustom', 'DockedWidgets.MenuDockedWidgets', 'DockedWidgets.AddDockedWidget'
      uSAGE:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _setup_spike_raster_window_for_debugging
-        
+
         all_global_menus_actionsDict, global_flat_action_dict = _setup_spike_raster_window_for_debugging(spike_raster_window)
-     
+
     """
-    omit_menu_item_names = ['Debug.MenuDebug', 'DockedWidgets.MenuDockedWidgets', ] # maybe , 'CreateNewConnectedWidget.MenuCreateNewConnectedWidget'    
+    omit_menu_item_names = ['Debug.MenuDebug', 'DockedWidgets.MenuDockedWidgets', ] # maybe , 'CreateNewConnectedWidget.MenuCreateNewConnectedWidget'
     all_global_menus_actionsDict, global_flat_action_dict = spike_raster_window.build_all_menus_actions_dict()
     if debug_print:
         print(list(global_flat_action_dict.keys()))
@@ -1494,14 +1665,14 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
 
     ## extract the components so the `background_static_scroll_window_plot` scroll bar is the right size:
     active_2d_plot = spike_raster_window.spike_raster_plt_2d
-    preview_overview_scatter_plot: pg.ScatterPlotItem  = active_2d_plot.plots.preview_overview_scatter_plot # ScatterPlotItem 
+    preview_overview_scatter_plot: pg.ScatterPlotItem  = active_2d_plot.plots.preview_overview_scatter_plot # ScatterPlotItem
     # preview_overview_scatter_plot.setDownsampling(auto=True, method='subsample', dsRate=10)
     main_graphics_layout_widget: pg.GraphicsLayoutWidget = active_2d_plot.ui.main_graphics_layout_widget
     wrapper_layout: pg.QtWidgets.QVBoxLayout = active_2d_plot.ui.wrapper_layout
     main_content_splitter = active_2d_plot.ui.main_content_splitter # QSplitter
     active_window_container_layout = active_2d_plot.ui.active_window_container_layout
     layout = active_2d_plot.ui.layout
-    
+
     has_main_raster_plot: bool = (active_2d_plot.plots.main_plot_widget is not None)
     if has_main_raster_plot:
         main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
@@ -1513,7 +1684,7 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
     background_static_scroll_window_plot.setMinimumHeight(50.0)
     background_static_scroll_window_plot.setMaximumHeight(75.0)
     # background_static_scroll_window_plot.setFixedHeight(50.0)
-    
+
     # Set stretch factors to control priority
     main_graphics_layout_widget.ci.layout.setRowStretchFactor(0, 3)  # Plot1: lowest priority
     main_graphics_layout_widget.ci.layout.setRowStretchFactor(1, 2)  # Plot2: mid priority
@@ -1530,12 +1701,12 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
 
     # Add Renderables ____________________________________________________________________________________________________ #
     # add_renderables_menu = active_2d_plot.ui.menus.custom_context_menus.add_renderables[0].programmatic_actions_dict
-    menu_commands = ['AddTimeIntervals.Replays', 'AddTimeIntervals.Laps', 'AddTimeIntervals.SessionEpochs'] # , 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.PBEs', 'AddTimeIntervals.Ripples', 
+    menu_commands = ['AddTimeIntervals.Replays', 'AddTimeIntervals.Laps', 'AddTimeIntervals.SessionEpochs'] # , 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.PBEs', 'AddTimeIntervals.Ripples',
     for a_command in menu_commands:
         assert a_command in global_flat_action_dict, f"a_command: '{a_command}' is not present in global_flat_action_dict: {list(global_flat_action_dict.keys())}"
         # add_renderables_menu[a_command].trigger()
         global_flat_action_dict[a_command].trigger()
-        
+
     # active_2d_plot.activeMenuReference
     # active_2d_plot.ui.menus # .global_window_menus.docked_widgets.actions_dict
 
@@ -1551,13 +1722,13 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
         # 'DockedWidgets.TrackTemplatesDecodedEpochsDockedMatplotlibView',
         'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView',
         #  'DockedWidgets.ContinuousPseudo2DDecodedMarginalsDockedMatplotlibView',
-        
+
     ]
     # menu_commands = ['actionPseudo2DDecodedEpochsDockedMatplotlibView', 'actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'] # , 'AddTimeIntervals.SessionEpochs'
     for a_command in menu_commands:
         # all_global_menus_actionsDict[a_command].trigger()
         global_flat_action_dict[a_command].trigger()
-        
+
 
     ## add the right sidebar
     visible_intervals_info_widget_container, visible_intervals_ctrl_layout_widget =  spike_raster_window._perform_build_attached_visible_interval_info_widget()
@@ -1574,7 +1745,7 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
         nested_dynamic_docked_widget_container_widgets[dock_group_name] = nested_dynamic_docked_widget_container
 
     ## OUTPUTS: nested_dock_items, nested_dynamic_docked_widget_container_widgets
-    
+
 
 
     return all_global_menus_actionsDict, global_flat_action_dict # , (_raster_tracks_out_dict, _raster_tracks_out_dict, _raster_tracks_out_dict)
@@ -1586,10 +1757,10 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
 @function_attributes(short_name=None, tags=['heuristic_filter', 'heuristic', 'plotting'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-17 09:51', related_items=[])
 def _plot_heuristic_evaluation_epochs(curr_active_pipeline, track_templates, filtered_decoder_filter_epochs_decoder_result_dict, ripple_merged_complete_epoch_stats_df: pd.DataFrame):
     """ Plots two GUI Windows: one with the high-heuristic-score epochs, and the other with the lows
-    
-    
+
+
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _plot_heuristic_evaluation_epochs
-    
+
     app, (high_heuristic_paginated_multi_decoder_decoded_epochs_window, high_heuristic_pagination_controller_dict), (low_heuristic_paginated_multi_decoder_decoded_epochs_window, low_heuristic_pagination_controller_dict) = _plot_heuristic_evaluation_epochs(curr_active_pipeline, track_templates, filtered_decoder_filter_epochs_decoder_result_dict, ripple_merged_complete_epoch_stats_df=ripple_merged_complete_epoch_stats_df)
 
     """
@@ -1608,7 +1779,7 @@ def _plot_heuristic_evaluation_epochs(curr_active_pipeline, track_templates, fil
     # active_cmap = FixedCustomColormaps.get_custom_black_with_low_values_dropped_cmap(low_value_cutoff=0.05)
     # active_cmap = ColormapHelpers.create_colormap_transparent_below_value(active_cmap, low_value_cuttoff=0.1)
     active_cmap = FixedCustomColormaps.get_custom_greyscale_with_low_values_dropped_cmap(low_value_cutoff=0.05, full_opacity_threshold=0.4)
-    
+
     ## filter by 'is_valid_epoch' first:
     ripple_merged_complete_epoch_stats_df = ripple_merged_complete_epoch_stats_df[ripple_merged_complete_epoch_stats_df['is_valid_epoch']] ## 136, 71 included requiring both
 
@@ -1637,15 +1808,15 @@ def _plot_heuristic_evaluation_epochs(curr_active_pipeline, track_templates, fil
 
     ## OUTPUTS: all_filter_epochs_df, all_filter_epochs_df
     ## OUTPUTS: included_filter_epoch_times_to_all_epoch_index_arr
-    common_data_overlay_included_columns=['P_decoder', #'ratio_jump_valid_bins', 
+    common_data_overlay_included_columns=['P_decoder', #'ratio_jump_valid_bins',
                     #    'wcorr',
     #'avg_jump_cm', 'max_jump_cm',
         'mseq_len', 'mseq_len_ignoring_intrusions', 'mseq_tcov', 'mseq_tdist', # , 'mseq_len_ratio_ignoring_intrusions_and_repeats', 'mseq_len_ignoring_intrusions_and_repeats'
     ]
-    
+
     common_params_kwargs={'enable_per_epoch_action_buttons': False,
-            'skip_plotting_most_likely_positions': True, 'skip_plotting_measured_positions': True, 
-            'enable_decoded_most_likely_position_curve': False, 
+            'skip_plotting_most_likely_positions': True, 'skip_plotting_measured_positions': True,
+            'enable_decoded_most_likely_position_curve': False,
             'enable_decoded_sequence_and_heuristics_curve': True, 'show_pre_merged_debug_sequences': True,
                 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': True, 'enable_weighted_corr_data_provider_modify_axes_rect': False,
             # 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False,
@@ -1661,7 +1832,7 @@ def _plot_heuristic_evaluation_epochs(curr_active_pipeline, track_templates, fil
             'should_suppress_callback_exceptions': False,
             # 'build_fn': 'insets_view',
             'track_length_cm_dict': deepcopy(track_templates.get_track_length_dict()),
-            'posterior_heatmap_imshow_kwargs': dict(cmap=active_cmap), # , vmin=0.1, vmax=1.0   
+            'posterior_heatmap_imshow_kwargs': dict(cmap=active_cmap), # , vmin=0.1, vmax=1.0
     }
 
     app, high_heuristic_paginated_multi_decoder_decoded_epochs_window, high_heuristic_pagination_controller_dict = PhoPaginatedMultiDecoderDecodedEpochsWindow.init_from_track_templates(curr_active_pipeline, track_templates,
@@ -1676,16 +1847,16 @@ def _plot_heuristic_evaluation_epochs(curr_active_pipeline, track_templates, fil
         params_kwargs=common_params_kwargs)
     high_heuristic_paginated_multi_decoder_decoded_epochs_window.add_data_overlays(included_columns=common_data_overlay_included_columns, defer_refresh=False)
     high_heuristic_paginated_multi_decoder_decoded_epochs_window.setWindowTitle('High-Heuristic Score DecodedEpochs Only')
-    
+
 
     app, low_heuristic_paginated_multi_decoder_decoded_epochs_window, low_heuristic_pagination_controller_dict = PhoPaginatedMultiDecoderDecodedEpochsWindow.init_from_track_templates(curr_active_pipeline, track_templates,
         decoder_decoded_epochs_result_dict=low_heuristic_only_filtered_decoder_filter_epochs_decoder_result_dict, epochs_name='ripple', title='Low-Heuristic Score Ripples Only', ## RIPPLE
         included_epoch_indicies=None, ## NO FILTERING
         debug_print=False,
         params_kwargs=common_params_kwargs)
-    low_heuristic_paginated_multi_decoder_decoded_epochs_window.add_data_overlays(included_columns=common_data_overlay_included_columns, defer_refresh=False)    
+    low_heuristic_paginated_multi_decoder_decoded_epochs_window.add_data_overlays(included_columns=common_data_overlay_included_columns, defer_refresh=False)
     low_heuristic_paginated_multi_decoder_decoded_epochs_window.setWindowTitle('LOW-Heuristic Score DecodedEpochs Only')
-    
+
     return app, (high_heuristic_paginated_multi_decoder_decoded_epochs_window, high_heuristic_pagination_controller_dict), (low_heuristic_paginated_multi_decoder_decoded_epochs_window, low_heuristic_pagination_controller_dict)
 
 
@@ -1705,7 +1876,7 @@ class SerializationHelperBaseClass:
     @classmethod
     def save(cls, *args, **kwargs):
         raise NotImplementedError(f'Implementors must override')
-        
+
     @classmethod
     def load(cls, load_path: Path):
         raise NotImplementedError(f'Implementors must override')
@@ -1799,17 +1970,17 @@ class SerializationHelper_CustomDecodingResults(SerializationHelperBaseClass):
         # {'ripple_decoding_time_bin_size':ripple_decoding_time_bin_size, 'laps_decoding_time_bin_size':laps_decoding_time_bin_size, 'decoder_laps_filter_epochs_decoder_result_dict':decoder_laps_filter_epochs_decoder_result_dict, 'decoder_ripple_filter_epochs_decoder_result_dict':decoder_ripple_filter_epochs_decoder_result_dict, 'decoder_laps_radon_transform_df_dict':decoder_laps_radon_transform_df_dict, 'decoder_ripple_radon_transform_df_dict':decoder_ripple_radon_transform_df_dict}
 
         return directional_decoders_epochs_decode_result, xbin, xbin_centers
-    
+
 
 
 class SerializationHelper_AllCustomDecodingResults(SerializationHelperBaseClass):
-    """ 
-    
+    """
+
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import SerializationHelper_AllCustomDecodingResults, SerializationHelper_CustomDecodingResults
     load_path = Path("W:/Data/KDIBA/gor01/one/2006-6-09_1-22-43/output/2024-11-25_AllCustomDecodingResults.pkl")
     track_templates, directional_decoders_epochs_decode_result, xbin, xbin_centers =  SerializationHelper_AllCustomDecodingResults.load(load_path=load_path)
     pos_bin_size = directional_decoders_epochs_decode_result.pos_bin_size
-    
+
     """
     @function_attributes(short_name=None, tags=['save', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-25 12:58', related_items=[])
     @classmethod
@@ -1817,7 +1988,7 @@ class SerializationHelper_AllCustomDecodingResults(SerializationHelperBaseClass)
                                     #    a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult],
                                     save_path: Path, **kwargs):
         """ Used for "2024-08-01 - Heuristic Analysis.ipynb"
-        
+
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
         xbin = deepcopy(track_templates.long_LR_decoder.xbin)
@@ -1856,7 +2027,7 @@ class SerializationHelper_AllCustomDecodingResults(SerializationHelperBaseClass)
         print(f"xbin_centers: {xbin_centers}")
 
         loaded_dict = base_loaded_dict['directional_decoders_epochs_decode_result']
-        
+
         track_templates = base_loaded_dict['track_templates']
 
         ## UNPACK HERE:
@@ -1891,7 +2062,7 @@ import neuropy.utils.type_aliases as types
 # DecoderName = NewType('DecoderName', str)
 
 def add_time_indicator_lines(active_figures_dict, later_lap_appearing_aclus_times_dict: Dict[types.aclu_index, Dict[str, float]], time_point_formatting_kwargs_dict=None, defer_draw: bool=False):
-    """ 
+    """
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import add_time_indicator_lines
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import CellsFirstSpikeTimes
         from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
@@ -1921,7 +2092,7 @@ def add_time_indicator_lines(active_figures_dict, later_lap_appearing_aclus_time
     if time_point_formatting_kwargs_dict is None:
         time_point_formatting_kwargs_dict = {'lap': dict(color='orange', alpha=0.8), 'PBE': dict(color='purple', alpha=0.8)}
 
-    # 
+    #
     # _out_dict = {}
     modified_figures_dict = {}
 
@@ -1950,12 +2121,12 @@ def add_time_indicator_lines(active_figures_dict, later_lap_appearing_aclus_time
                 # Draw vertical line
                 lap_first_spike_lines[name]['vline'] = ax.axvline(x=time_point, linewidth=1, **common_formatting_kwargs)
                 lap_first_spike_lines[name]['triangle_marker'] = ax.plot(time_point, ylims[-1]-10, marker='v', markersize=10, **common_formatting_kwargs)  # 'v' for downward triangle
-                
+
             ax.set_ybound(*ylims)
             # if not defer_render:
             #     fig = ax.get_figure().get_figure() # For SubFigure
             #     fig.canvas.draw()
-                            
+
 
             # _out_dict[aclu] = lap_first_spike_lines
             container.plot_data['first_spike_indicator_lines'][aclu] = lap_first_spike_lines
@@ -1997,7 +2168,7 @@ class ADFResult:
     @classmethod
     def from_tuple(cls, result_tuple):
         return cls(*result_tuple)
-    
+
     def print_summary(self):
         """Prints the ADF test results and interpretation."""
         # Print the results
@@ -2006,7 +2177,7 @@ class ADFResult:
         print('Critical Values:')
         for key, value in self.critical_values.items():
             print(f'\t{key}: {value:.3f}')
-        
+
         # Interpretation
         adf_critical_value_5perc = self.critical_values['5%']
         if (self.adf_statistic < adf_critical_value_5perc) or (self.pvalue < 0.05):
@@ -2037,7 +2208,7 @@ class KPSSResult:
         print('Critical Values:')
         for key, value in self.critical_values.items():
             print(f'\t{key}: {value:.3f}')
-        
+
         # Interpretation
         kpss_critical_value_5perc = float(self.critical_values['5%'])
         if (self.kpss_statistic < kpss_critical_value_5perc) and (self.pvalue > 0.05):
@@ -2059,19 +2230,19 @@ def perform_timeseries_stationarity_tests(time_series) -> Tuple[ADFResult, KPSSR
     """
     # Augmented Dickey-Fuller (ADF) Test
     adf_result_tuple = adfuller(time_series) # (-3.5758600257897317, 0.0062396609756376, 35, 144596, {'1%': -3.4303952254287307, '5%': -2.86155998899889, '10%': -2.5667806394328094}, -681134.6488980348)
-    adf_result = ADFResult.from_tuple(adf_result_tuple) 
-    
+    adf_result = ADFResult.from_tuple(adf_result_tuple)
+
     # Print ADF results
     adf_result.print_summary()
     print('\n')  # Add space between tests
-    
+
     # Kwiatkowski-Phillips-Schmidt-Shin (KPSS) Test
     kpss_result_tuple = kpss(time_series, regression='c')
     kpss_result = KPSSResult.from_tuple(kpss_result_tuple)
-    
+
     # Print KPSS results
     kpss_result.print_summary()
-    
+
     return adf_result, kpss_result
 
 
@@ -2106,17 +2277,17 @@ def try_perform_move(src_file, target_file, is_dryrun: bool, allow_overwrite_exi
 
 @function_attributes(short_name=None, tags=['move', 'pickle', 'filesystem', 'GL'], input_requires=[], output_provides=[], uses=['try_perform_move'], used_by=[], creation_date='2024-11-04 19:41', related_items=[])
 def try_move_pickle_files_on_GL(good_session_concrete_folders, session_basedirs_dict, computation_script_paths, excluded_session_keys=None, is_dryrun: bool=True, debug_print: bool=False, allow_overwrite_existing: bool=False):
-    """ 
+    """
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import try_move_pickle_files_on_GL
-    
-    
+
+
     copy_dict, moved_dict, (all_found_pipeline_pkl_files_dict, all_found_global_pkl_files_dict, all_found_pipeline_h5_files_dict) = try_move_pickle_files_on_GL(good_session_concrete_folders, session_basedirs_dict, computation_script_paths,
              is_dryrun: bool=True, debug_print: bool=False)
-    
+
     """
     ## INPUTS: good_session_concrete_folders, session_basedirs_dict, computation_script_paths
     # session_basedirs_dict: Dict[IdentifyingContext, Path] = {a_session_folder.context:a_session_folder.path for a_session_folder in good_session_concrete_folders}
-    
+
     # is_dryrun: bool = False
     assert len(good_session_concrete_folders) == len(session_basedirs_dict)
     assert len(good_session_concrete_folders) == len(computation_script_paths)
@@ -2125,7 +2296,7 @@ def try_move_pickle_files_on_GL(good_session_concrete_folders, session_basedirs_
 
     if excluded_session_keys is None:
         excluded_session_keys = []
-        
+
 
     # excluded_session_keys = ['kdiba_pin01_one_fet11-01_12-58-54', 'kdiba_gor01_one_2006-6-08_14-26-15', 'kdiba_gor01_two_2006-6-07_16-40-19']
     excluded_session_contexts = [IdentifyingContext(**dict(zip(IdentifyingContext._get_session_context_keys(), v.split('_', maxsplit=3)))) for v in excluded_session_keys]
@@ -2149,7 +2320,7 @@ def try_move_pickle_files_on_GL(good_session_concrete_folders, session_basedirs_
                 print(f'skipping excluded session: {a_good_session_concrete_folder.context}')
         else:
             all_found_global_pkl_files_dict[a_session_basedir] = list(a_script_folder.glob('global_computation_results*.pkl'))
-            
+
             for a_global_file in all_found_global_pkl_files_dict[a_session_basedir]:
                 ## iterate through the found global files:
                 target_file = a_good_session_concrete_folder.global_computation_result_pickle.with_name(a_global_file.name)
@@ -2208,10 +2379,10 @@ def test_plotRaw_v_time(active_pf1D, cellind, speed_thresh=False, spikes_color=N
 
     Usage:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import test_plotRaw_v_time
-        
-        
+
+
         _restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
-    
+
         active_config = deepcopy(curr_active_pipeline.active_configs[global_epoch_name])
         active_pf1D = deepcopy(global_pf1D)
 
@@ -2237,7 +2408,7 @@ def test_plotRaw_v_time(active_pf1D, cellind, speed_thresh=False, spikes_color=N
         # print(f'spikes_color: {spikes_color_RGB}')
         should_plot_bins_grid = kwargs.get('should_plot_bins_grid', False)
 
-        should_include_trajectory = kwargs.get('should_include_trajectory', True) # whether the plot should include 
+        should_include_trajectory = kwargs.get('should_include_trajectory', True) # whether the plot should include
         should_include_labels = kwargs.get('should_include_labels', True) # whether the plot should include text labels, like the title, axes labels, etc
         should_include_plotRaw_v_time_spikes = kwargs.get('should_include_spikes', True) # whether the plot should include plotRaw_v_time-spikes, should be set to False to plot completely with the new all spikes mode
         use_filtered_positions: bool = kwargs.pop('use_filtered_positions', False)
@@ -2270,14 +2441,14 @@ def test_plotRaw_v_time(active_pf1D, cellind, speed_thresh=False, spikes_color=N
                                         ax_activity_v_time=ax_activity_v_time, ax_pf_tuning_curve=ax_pf_tuning_curve, pf_tuning_curve_ax_position='right')
         _out
 
-        
+
     # active_pf1D: ['spk_pos', 'spk_t', 'ndim', 'cell_ids', 'speed_thresh', 'position', '', '']
 
     """
     from scipy.signal import savgol_filter
     from neuropy.plotting.figure import pretty_plot
     from neuropy.utils.misc import is_iterable
-    
+
     if ax is None:
         fig, ax = plt.subplots(active_pf1D.ndim, 1, sharex=True)
         fig.set_size_inches([23, 9.7])
@@ -2287,7 +2458,7 @@ def test_plotRaw_v_time(active_pf1D, cellind, speed_thresh=False, spikes_color=N
 
     # plot trajectories
     pos_df = active_pf1D.position.to_dataframe()
-    
+
     # self.x, self.y contain filtered positions, pos_df's columns contain all positions.
     if not use_pandas_plotting: # don't need to worry about 't' for pandas plotting, we'll just use the one in the dataframe.
         if use_filtered_positions:
@@ -2331,13 +2502,13 @@ def test_plotRaw_v_time(active_pf1D, cellind, speed_thresh=False, spikes_color=N
     def normal_line(t_val: float, x_val: float, slope_normal: float, delta: float=0.5):
         """
         Computes points on the normal line at t_val.
-        
+
         Parameters:
         - t_val: The time at which the normal is computed.
         - x_val: The position at t_val.
         - slope_normal: The slope of the normal line at t_val.
         - delta: The range around t_val to plot the normal line.
-        
+
         Returns:
         - t_normal: Array of t values for the normal line.
         - y_normal: Array of y values for the normal line.
@@ -2345,10 +2516,10 @@ def test_plotRaw_v_time(active_pf1D, cellind, speed_thresh=False, spikes_color=N
         """
         t_min: float = (t_val - delta)
         t_max: float = (t_val + delta)
-        
+
         # t_normal = np.array([t_val, t_val])
         # t_normal = np.linspace(t_min, t_max, 10)
-        
+
         if np.isinf(slope_normal):
             # Normal line is vertical
             t_normal = np.array([t_val, t_val])
@@ -2375,7 +2546,7 @@ def test_plotRaw_v_time(active_pf1D, cellind, speed_thresh=False, spikes_color=N
     x = deepcopy(pos)
     t_delta: float = (t[1] - t[0])
     override_t_delta: float = kwargs.get('override_t_delta', t_delta)
-    
+
     x_smooth = savgol_filter(pos, window_length=window_length, polyorder=polyorder)
     dx_dt = savgol_filter(x, window_length=window_length, polyorder=polyorder, deriv=1, delta=override_t_delta)
     # dx_dt = np.gradient(x_smooth, t)  # Approximate derivative
@@ -2386,14 +2557,14 @@ def test_plotRaw_v_time(active_pf1D, cellind, speed_thresh=False, spikes_color=N
     normal_ys = []
     normal_slopes = []
     normal_is_vertical = []
-    
+
     for i, (t_val, x_val, slope_tangent) in enumerate(zip(t, x_smooth, dx_dt)):
         # Avoid division by zero; handle zero slope separately
         if np.isclose(slope_tangent, 0.0, atol=1e-3):
             slope_normal = 0  # Horizontal normal line
         else:
             slope_normal = -1 / slope_tangent
-        
+
         normal_slopes.append(slope_normal)
         t_normal, y_normal, is_vertical = normal_line(t_val, x_val, slope_normal, delta=override_t_delta)
         normal_ts.append((t_normal[0], t_normal[-1],)) # first and last value
@@ -2424,15 +2595,15 @@ def test_plotRaw_v_time(active_pf1D, cellind, speed_thresh=False, spikes_color=N
             # spk_tangents = np.interp(spk_t_, slope_tangents, slope_tangents)
             spk_t = spk_t_[cellind]
             # spk_pos_ = spk_pos_[cellind]
-            
+
             spk_normals_tmin = np.interp(spk_t, normal_df['t'].values, normal_df['t_min'].values)
             spk_normals_tmax = np.interp(spk_t, normal_df['t'].values, normal_df['t_max'].values)
             spk_normals_slope = np.interp(spk_t, normal_df['t'].values, normal_df['slope_normal'].values)
             spk_normals_ymin = np.interp(spk_t, normal_df['t'].values, normal_df['y_min'].values)
             spk_normals_ymax = np.interp(spk_t, normal_df['t'].values, normal_df['y_max'].values)
-            
+
             # spk_tangents = np.interp(spk_t_, slope_tangents, slope_tangents)
-            
+
             #TODO 2024-11-04 17:39: - [ ] Finish
 
             if spike_plot_kwargs is None:
@@ -2472,7 +2643,7 @@ def test_plotRaw_v_time(active_pf1D, cellind, speed_thresh=False, spikes_color=N
             # Alternatively, you can set a fixed value
             spike_plot_kwargs.setdefault('color', spikes_color_RGBA)
             spike_plot_kwargs.setdefault('linewidth', spike_plot_kwargs.get('linewidth', 1))  # Default line width
-            
+
             delta_y = []
             for a_ax, pos_label in zip(ax, variable_array):
                 y_min, y_max = a_ax.get_ylim()
@@ -2481,7 +2652,7 @@ def test_plotRaw_v_time(active_pf1D, cellind, speed_thresh=False, spikes_color=N
                 print(f'a_delta_y: {a_delta_y}')
                 # a_delta_y = 0.5  # 1% of y-axis range
                 delta_y.append(a_delta_y)
-                
+
             print(f'delta_y: {delta_y}')
             # Plot spikes for each dimension
             for dim, (a_ax, a_delta_y) in enumerate(zip(ax, delta_y)):
@@ -2501,7 +2672,7 @@ def test_plotRaw_v_time(active_pf1D, cellind, speed_thresh=False, spikes_color=N
                     # if is_vertical:
                     # 	plt.vlines(t_normal[0], y_normal[0], y_normal[1], colors='red', linestyles='--', linewidth=1)
                     # plt.plot(t_normal, y_normal, color='red', linestyle='--', linewidth=1)
-                    
+
                     a_ax.plot([(tspike-a_delta_y), (tspike+a_delta_y)], [ymin, ymax], color='#ff00009b', linestyle='solid', linewidth=2, label='Normal Line' if i == 0 else "")  # Label only the first line to avoid duplicate legends
                     # a_ax.plot([tmin, tmax], [ymin, ymax], color='red', linestyle='--', linewidth=1, label='Normal Line' if i == 0 else "")  # Label only the first line to avoid duplicate legends
                     # a_ax.vlines(spk_t, ymin, ymax, **spike_plot_kwargs)
@@ -2539,20 +2710,20 @@ from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManage
 @define(slots=False, eq=False, repr=False)
 class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
     """ First spike times
-    
-    
+
+
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import CellsFirstSpikeTimes
-    
+
     all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict), hdf5_out_path = CellsFirstSpikeTimes.compute_cell_first_firings(curr_active_pipeline, hdf_save_parent_path=collected_outputs_path)
     all_cells_first_spike_time_df
 
     """
     global_spikes_df: pd.DataFrame = field()
     all_cells_first_spike_time_df: pd.DataFrame = field()
-    
+
     global_spikes_dict: Dict[str, pd.DataFrame] = field()
     first_spikes_dict: Dict[str, pd.DataFrame] = field()
-    
+
     global_position_df: pd.DataFrame = field()
     hdf5_out_path: Optional[Path] = field()
 
@@ -2574,9 +2745,9 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
 
     @classmethod
     def init_from_pipeline(cls, curr_active_pipeline, hdf_save_parent_path: Path=None, should_include_only_spikes_after_initial_laps=False) -> "CellsFirstSpikeTimes":
-        """ 
+        """
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import CellsFirstSpikeTimes
-        
+
         _obj: CellsFirstSpikeTimes = CellsFirstSpikeTimes.init_from_pipeline(curr_active_pipeline=curr_active_pipeline)
         """
         all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict), global_position_df, hdf5_out_path = CellsFirstSpikeTimes.compute_cell_first_firings(curr_active_pipeline, hdf_save_parent_path=hdf_save_parent_path, should_include_only_spikes_after_initial_laps=should_include_only_spikes_after_initial_laps)
@@ -2591,12 +2762,12 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
 
     @classmethod
     def init_from_batch_hdf5_exports(cls, first_spike_activity_data_h5_files: List[Union[str, Path]]) -> "CellsFirstSpikeTimes":
-        """ 
-        
+        """
+
         """
         all_sessions_global_spikes_df, all_sessions_first_spike_combined_df, exact_category_counts, (all_sessions_global_spikes_dict, all_sessions_first_spikes_dict, all_sessions_extra_dfs_dict_dict) = cls.load_batch_hdf5_exports(first_spike_activity_data_h5_files=first_spike_activity_data_h5_files)
         global_position_df = all_sessions_extra_dfs_dict_dict.get('global_position_df', None)
-        
+
         _obj: CellsFirstSpikeTimes = CellsFirstSpikeTimes(global_spikes_df=deepcopy(all_sessions_global_spikes_df), all_cells_first_spike_time_df=deepcopy(all_sessions_first_spike_combined_df),
                                                             global_spikes_dict=deepcopy(all_sessions_global_spikes_dict), first_spikes_dict=deepcopy(all_sessions_first_spikes_dict), hdf5_out_path=None, global_position_df=global_position_df)
         return _obj
@@ -2604,20 +2775,20 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
 
 
     def add_session_info(self, t_delta_dict):
-        """ post-hoc after loading 
+        """ post-hoc after loading
         """
         for k, v in self.first_spikes_dict.items():
             if 'session_name' in v.columns:
                 v['session_t_delta'] = v.session_name.map(lambda x: t_delta_dict.get(IdentifyingContext.try_init_from_session_key(session_str=x, separator='-').get_description(separator='_'), {}).get('t_delta', None))
             else:
                 print(f'k: {k}')
-                
+
         for k, v in self.global_spikes_dict.items():
             if 'session_name' in v.columns:
                 v['session_t_delta'] = v.session_name.map(lambda x: t_delta_dict.get(IdentifyingContext.try_init_from_session_key(session_str=x, separator='-').get_description(separator='_'), {}).get('t_delta', None))
             else:
                 print(f'k: {k}')
-                
+
         self.all_cells_first_spike_time_df['session_t_delta'] = self.all_cells_first_spike_time_df.session_name.map(lambda x: t_delta_dict.get(IdentifyingContext.try_init_from_session_key(session_str=x, separator='-').get_description(separator='_'), {}).get('t_delta', None))
         self.global_spikes_df['session_t_delta'] = self.global_spikes_df.session_name.map(lambda x: t_delta_dict.get(IdentifyingContext.try_init_from_session_key(session_str=x, separator='-').get_description(separator='_'), {}).get('t_delta', None))
 
@@ -2627,14 +2798,14 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
     def post_init_cleanup(self):
         """ orders the columns """
         ordered_column_names = ['neuron_uid', 'format_name', 'animal', 'exper_name', 'session_name', 'aclu', 'session_uid']
-        
+
         for k, v in self.first_spikes_dict.items():
             self.first_spikes_dict[k] = reorder_columns_relative(v, column_names=ordered_column_names, # , 'session_datetime'
                                             relative_mode='start')
-                
+
         for k, v in self.global_spikes_dict.items():
             self.global_spikes_dict[k] = reorder_columns_relative(v, column_names=ordered_column_names, # , 'session_datetime'
-                                            relative_mode='start')       
+                                            relative_mode='start')
 
         self.global_spikes_df = reorder_columns_relative(self.global_spikes_df, column_names=ordered_column_names, # , 'session_datetime'
                                             relative_mode='start')
@@ -2644,7 +2815,7 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
 
         ## add 'session_t_delta'?
         ## add 'session_datetime'?
-                
+
 
 
     # @function_attributes(short_name=None, tags=['first-spike', 'cell-analysis'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-01 13:59', related_items=[])
@@ -2654,16 +2825,16 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
                 column_name: str = 'neuron_uid'
             else:
                 column_name: str = 'aclu'
-                
+
             earliest_spike_df = spikes_df.groupby([column_name]).agg(t_rel_seconds_idxmin=('t_rel_seconds', 'idxmin'), t_rel_seconds_min=('t_rel_seconds', 'min')).reset_index() # 't_rel_seconds_idxmin', 't_rel_seconds_min'
-            # first_aclu_spike_records_df: pd.DataFrame = spikes_df[np.isin(spikes_df['t_rel_seconds'], earliest_spike_df['t_rel_seconds_min'].values)]           
+            # first_aclu_spike_records_df: pd.DataFrame = spikes_df[np.isin(spikes_df['t_rel_seconds'], earliest_spike_df['t_rel_seconds_min'].values)]
             # Select rows using the indices of the minimal t_rel_seconds
             first_aclu_spike_records_df: pd.DataFrame = spikes_df.loc[earliest_spike_df['t_rel_seconds_idxmin']] ## ChatGPT claimed correct
             # 2024-11-08 17:10 I don't get why these differ. It makes zero sense to me.
 
 
             return first_aclu_spike_records_df
-        
+
     @classmethod
     def _subfn_build_first_spike_dataframe(cls, first_spikes_dict):
         """
@@ -2678,7 +2849,7 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         - pd.DataFrame: A dataframe with 'aclu', first spike times per category, and the earliest spike category.
         """
         from neuropy.utils.indexing_helpers import union_of_arrays
-        
+
         # Step 1: Prepare list of dataframes with first spike times per category
         category_column_inclusion_dict = dict(zip(list(first_spikes_dict.keys()), [['aclu', 't_rel_seconds']]*len(first_spikes_dict))) ## as a minimum each category includes ['t_rel_seconds']
         ## extra columns used to prevent duplication
@@ -2688,11 +2859,11 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
                                               }
         for category, extra_columns in category_column_extra_columns_dict.items():
             category_column_inclusion_dict[category] = category_column_inclusion_dict[category] + extra_columns
-            
+
 
         any_df_aclus = union_of_arrays([df['aclu'].unique() for category, df in first_spikes_dict.items()])
         n_unique_aclus: int = len(any_df_aclus)
-        
+
         dfs = []
         for category, df in first_spikes_dict.items():
             ## each incoming df is a first_spikes_df, so it only has one spike from eahc aclu
@@ -2706,11 +2877,11 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
             else:
                 extra_columns_rename_dict = {} # empty, don't rename
             df_grouped.rename(columns={'t_rel_seconds': f'first_spike_{category}', **extra_columns_rename_dict}, inplace=True) ## rename each 't_rel_seconds' to a unique column name
-            
+
             assert set(df_grouped['aclu'].unique()) == set(any_df_aclus), f"set(any_df_aclus): {set(any_df_aclus)}, set(df_grouped['aclu'].unique()): {set(df_grouped['aclu'].unique())}"
-            
+
             dfs.append(df_grouped)
-        
+
         assert np.all([np.shape(a_df)[0] == n_unique_aclus for a_df in dfs]), f"every df must have the same alus (all of them)!  {[np.shape(a_df) == n_unique_aclus for a_df in dfs]}"
         # Step 2: Merge all dataframes on 'aclu'
         df_final = reduce(lambda left, right: pd.merge(left, right, on='aclu', how='outer'), dfs)
@@ -2718,7 +2889,7 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         # Step 3: Determine earliest spike category (excluding 'any')
         # Get the list of columns containing first spike times, excluding 'any'
         spike_time_columns = [col for col in df_final.columns if col.startswith('first_spike_') and col != 'first_spike_any']
-        
+
         # Function to get the earliest spike category for each row
         def get_earliest_category(row):
             # Extract spike times, excluding 'any'
@@ -2733,13 +2904,13 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
             earliest_categories = [col.replace('first_spike_', '') for col in min_spike_columns]
             # Join categories if there's a tie
             return ', '.join(earliest_categories)
-        
+
         # Apply the function to determine the earliest spike category
         df_final['earliest_spike_category'] = df_final.apply(get_earliest_category, axis=1)
-        
+
         # Optionally, add the earliest spike time (excluding 'any')
         df_final['earliest_spike_time'] = df_final[spike_time_columns].min(axis=1)
-        
+
         return df_final
 
     @classmethod
@@ -2776,17 +2947,17 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
 
     @classmethod
     def perform_compute_cell_first_firings(cls, global_spikes_df: pd.DataFrame):
-        """ 
+        """
         requires a spikes_df with session columns
-        
-        Usage:        
+
+        Usage:
             global_spikes_df: pd.DataFrame = deepcopy(get_proper_global_spikes_df(curr_active_pipeline)).drop(columns=['neuron_type'], inplace=False) ## already has columns ['lap', 'maze_id', 'PBE_id'
             global_spikes_df = global_spikes_df.neuron_identity.make_neuron_indexed_df_global(curr_active_pipeline.get_session_context(), add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
             # Perform the computations ___________________________________________________________________________________________ #
             all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict) = cls.perform_compute_cell_first_firings(global_spikes_df=global_spikes_df)
             ## add the sess properties to the output df:
-            all_cells_first_spike_time_df = all_cells_first_spike_time_df.neuron_identity.make_neuron_indexed_df_global(curr_active_pipeline.get_session_context(), add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True) 
-            
+            all_cells_first_spike_time_df = all_cells_first_spike_time_df.neuron_identity.make_neuron_indexed_df_global(curr_active_pipeline.get_session_context(), add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
+
         """
         # ==================================================================================================================== #
         # Separate Theta/Ripple/etc dfs                                                                                        #
@@ -2797,7 +2968,7 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         global_spikes_theta_df = deepcopy(global_spikes_df[global_spikes_df['is_theta'] == True])
         global_spikes_ripple_df = deepcopy(global_spikes_df[global_spikes_df['is_ripple'] == True])
         global_spikes_neither_df = deepcopy(global_spikes_df[np.logical_and((global_spikes_df['is_ripple'] != True), (global_spikes_df['is_theta'] != True))])
-        
+
         # find first spikes of the PBE and lap periods:
         global_spikes_PBE_df = deepcopy(global_spikes_df)[global_spikes_df['PBE_id'] > -1]
         global_spikes_laps_df = deepcopy(global_spikes_df)[global_spikes_df['lap'] > -1]
@@ -2806,10 +2977,10 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         global_spikes_dict = {'any': global_spikes_df, 'theta': global_spikes_theta_df, 'ripple': global_spikes_ripple_df, 'neither': global_spikes_neither_df,
                               'PBE': global_spikes_PBE_df, 'lap': global_spikes_laps_df,
                               }
-        
-        first_spikes_dict = {k:cls._subfn_get_first_spikes(v) for k, v in global_spikes_dict.items()} 
-        # partition_df(global_spikes_df, 'is_theta')    
-        
+
+        first_spikes_dict = {k:cls._subfn_get_first_spikes(v) for k, v in global_spikes_dict.items()}
+        # partition_df(global_spikes_df, 'is_theta')
+
         # first_aclu_spike_records_df: pd.DataFrame = first_spikes_dict['any']
 
         # neuron_ids = {k:v.aclu.unique() for k, v in global_spikes_dict.items()}
@@ -2821,10 +2992,10 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         # first_aclu_spike_records_df['is_ripple']
         all_cells_first_spike_time_df: pd.DataFrame = cls._subfn_build_first_spike_dataframe(first_spikes_dict)
         # all_cells_first_spike_time_df = all_cells_first_spike_time_df.neuron_identity.make_neuron_indexed_df_global(curr_active_pipeline.get_session_context(), add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True) ## why isn't it already neuron-indexed?
-        
+
         ## extra computations:
         all_cells_first_spike_time_df['theta_to_ripple_lead_lag_diff'] = (all_cells_first_spike_time_df['first_spike_ripple'] - all_cells_first_spike_time_df['first_spike_theta']) ## if theta came first, diff should be positive
-        
+
         assert len(all_cells_first_spike_time_df) == len(all_cells_first_spike_time_df['aclu'].unique()), f"end result must have one entry for every unique aclu"
 
         return all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict)
@@ -2832,24 +3003,24 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
 
     @classmethod
     def compute_cell_first_firings(cls, curr_active_pipeline, hdf_save_parent_path: Path=None, should_include_only_spikes_after_initial_laps:bool=False): # , save_hdf: bool=True
-        """ 
+        """
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_cell_first_firings
-        
+
         all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict) = compute_cell_first_firings(curr_active_pipeline)
         all_cells_first_spike_time_df
-        
+
         global_spikes_df: pd.DataFrame = deepcopy(get_proper_global_spikes_df(curr_active_pipeline)).drop(columns=['neuron_type'], inplace=False).neuron_identity.make_neuron_indexed_df_global(curr_active_pipeline.get_session_context(), add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
-        
-        Actual INPUTS: global_spikes_df: pd.DataFrame, 
-        
-        
-        ## only for saving to .h5 
-        
-        
-        from pipeline uses: curr_active_pipeline.get_custom_pipeline_filenames_from_parameters(), 
+
+        Actual INPUTS: global_spikes_df: pd.DataFrame,
+
+
+        ## only for saving to .h5
+
+
+        from pipeline uses: curr_active_pipeline.get_custom_pipeline_filenames_from_parameters(),
         curr_active_pipeline.get_session_context()
-        
-        
+
+
         """
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
         # _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
@@ -2861,13 +3032,13 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         # running_epochs = ensure_dataframe(deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps.as_epoch_obj()))
         # pbe_epochs = ensure_dataframe(deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].pbe)) ## less selective than replay, which has cell participation and other requirements
         # all_epoch = ensure_dataframe(deepcopy(global_session.epochs))
-        
-    
+
+
         a_session_context = curr_active_pipeline.get_session_context() # IdentifyingContext.try_init_from_session_key(session_str=a_session_uid, separator='|')
         session_uid: str = a_session_context.get_description(separator="|", include_property_names=False)
         last_valid_pos_time = UserAnnotationsManager.get_hardcoded_specific_session_override_dict().get(a_session_context, {}).get('track_end_t', np.nan)
         first_valid_pos_time = UserAnnotationsManager.get_hardcoded_specific_session_override_dict().get(a_session_context, {}).get('track_start_t', np.nan)
-    
+
         ## global_position_df
         global_position_df = deepcopy(curr_active_pipeline.sess.position.df)
         global_position_df = global_position_df.position.time_sliced(first_valid_pos_time, last_valid_pos_time)
@@ -2876,12 +3047,12 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         # global_spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].spikes_df).drop(columns=['neuron_type'], inplace=False) ## already has columns ['lap', 'maze_id', 'PBE_id'
         global_spikes_df: pd.DataFrame = deepcopy(get_proper_global_spikes_df(curr_active_pipeline)).drop(columns=['neuron_type'], inplace=False) ## already has columns ['lap', 'maze_id', 'PBE_id'
         global_spikes_df = deepcopy(global_spikes_df).spikes.time_sliced(first_valid_pos_time, last_valid_pos_time)
-        
+
         if should_include_only_spikes_after_initial_laps:
             initial_laps_end_time: float = global_spikes_df[global_spikes_df['lap'] == 2]['t_rel_seconds'].max() # last spike in lap id=1 - 41.661858989158645
             global_spikes_df = deepcopy(global_spikes_df).spikes.time_sliced(initial_laps_end_time, last_valid_pos_time) # trim to be after the first lap post_initial_lap_global_spikes_df
             global_position_df = global_position_df.position.time_sliced(initial_laps_end_time, last_valid_pos_time)
-            
+
 
         global_spikes_df = global_spikes_df.neuron_identity.make_neuron_indexed_df_global(a_session_context, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
         global_position_df['session_uid'] = session_uid  # Provide an appropriate session identifier here
@@ -2900,9 +3071,9 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
             print(f'hdf5_out_path: {hdf5_out_path}')
             # Save the data to an HDF5 file
             cls.save_data_to_hdf5(all_cells_first_spike_time_df, global_spikes_df, global_spikes_dict, first_spikes_dict, filename=hdf5_out_path, global_position_df=global_position_df) # Path(r'K:\scratch\collected_outputs\kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]_first_spike_activity_data.h5')
-        else: 
+        else:
             hdf5_out_path = None
-            
+
         return all_cells_first_spike_time_df, global_spikes_df, (global_spikes_dict, first_spikes_dict), global_position_df, hdf5_out_path
 
 
@@ -2911,22 +3082,22 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
     def sliced_by_neuron_id(self, included_neuron_ids, key_name='aclu') -> pd.DataFrame:
         """ gets the slice of spikes with the specified `included_neuron_ids` """
         assert included_neuron_ids is not None
-        test_obj = deepcopy(self)    
+        test_obj = deepcopy(self)
 
         for k, v in test_obj.first_spikes_dict.items():
             test_obj.first_spikes_dict[k] = v[v[key_name].isin(included_neuron_ids)].reset_index(drop=True)
         for k, v in test_obj.global_spikes_dict.items():
             # test_obj.global_spikes_dict[k] = v.spikes.sliced_by_neuron_id(included_neuron_ids=included_neuron_ids)
             test_obj.global_spikes_dict[k] = v[v[key_name].isin(included_neuron_ids)].reset_index(drop=True)
-            
+
         # test_obj.global_spikes_df = test_obj.global_spikes_df.spikes.sliced_by_neuron_id(included_neuron_ids=included_neuron_ids)
         test_obj.global_spikes_df = test_obj.global_spikes_df[test_obj.global_spikes_df[key_name].isin(included_neuron_ids)].reset_index(drop=True)
-        
+
         # test_obj.all_cells_first_spike_time_df = test_obj.all_cells_first_spike_time_df.spikes.sliced_by_neuron_id(included_neuron_ids=included_neuron_ids)
         test_obj.all_cells_first_spike_time_df = test_obj.all_cells_first_spike_time_df[test_obj.all_cells_first_spike_time_df[key_name].isin(included_neuron_ids)].reset_index(drop=True)
 
         return test_obj # self._obj[self._obj['aclu'].isin(included_neuron_ids)] ## restrict to only the shared aclus for both short and long
-        
+
 
 
     # ==================================================================================================================== #
@@ -2934,7 +3105,7 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
     # ==================================================================================================================== #
 
     def save_to_hdf5(self, hdf_save_path: Path):
-        """ Save to .h5 or CSV 
+        """ Save to .h5 or CSV
         """
         print(f'hdf_save_path: {hdf_save_path}')
         # Save the data to an HDF5 file
@@ -2946,10 +3117,10 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         except Exception as e:
             raise
 
-        if not did_save_successfully: 
+        if not did_save_successfully:
             self.hdf5_out_path = None
         return did_save_successfully
-    
+
 
     @classmethod
     def save_data_to_hdf5(cls, all_cells_first_spike_time_df, global_spikes_df, global_spikes_dict, first_spikes_dict, filename='output_file.h5', **kwargs_extra_dfs):
@@ -2967,18 +3138,18 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
             # Save the main DataFrames
             store.put('all_cells_first_spike_time_df', all_cells_first_spike_time_df)
             store.put('global_spikes_df', global_spikes_df)
-            
+
             # Save the global_spikes_dict
             for key, df in global_spikes_dict.items():
                 store.put(f'global_spikes_dict/{key}', df)
-            
+
             # Save the first_spikes_dict
             for key, df in first_spikes_dict.items():
                 store.put(f'first_spikes_dict/{key}', df)
-                
+
             for key, df in kwargs_extra_dfs.items():
                 store.put(f'extra_dfs/{key}', df)
-        
+
         print(f"Data successfully saved to {filename}")
 
     @classmethod
@@ -2994,9 +3165,9 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         - global_spikes_df (pd.DataFrame)
         - global_spikes_dict (dict)
         - first_spikes_dict (dict)
-        
+
         Usage:
-        
+
             from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import CellsFirstSpikeTimes
             hdf_load_path = Path('K:/scratch/collected_outputs/kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]_first_spike_activity_data.h5').resolve()
             Assert.path_exists(hdf_load_path)
@@ -3009,18 +3180,18 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
             # Load the main DataFrames
             all_cells_first_spike_time_df = store['all_cells_first_spike_time_df']
             global_spikes_df = store['global_spikes_df']
-            
+
             # Initialize dictionaries
             global_spikes_dict = {}
             first_spikes_dict = {}
             extra_dfs_dict = {}
-             
+
             # Load keys for global_spikes_dict
             global_spikes_keys = [key.split('/')[-1] for key in store.keys() if key.startswith('/global_spikes_dict/')]
             for key in global_spikes_keys:
                 df = store[f'global_spikes_dict/{key}']
                 global_spikes_dict[key] = df
-            
+
             # Load keys for first_spikes_dict
             first_spikes_keys = [key.split('/')[-1] for key in store.keys() if key.startswith('/first_spikes_dict/')]
             for key in first_spikes_keys:
@@ -3032,18 +3203,18 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
             for key in extra_dfs_keys:
                 df = store[f'extra_dfs/{key}']
                 extra_dfs_dict[key] = df
-                
-        
+
+
         print(f"Data successfully loaded from {filename}")
         return all_cells_first_spike_time_df, global_spikes_df, global_spikes_dict, first_spikes_dict, extra_dfs_dict
-    
+
 
     @classmethod
     def load_batch_hdf5_exports(cls, first_spike_activity_data_h5_files):
-        """ 
-        
+        """
+
         all_sessions_global_spikes_df, all_sessions_first_spike_combined_df, exact_category_counts = CellsFirstSpikeTimes.load_batch_hdf5_exports(first_spike_activity_data_h5_files=first_spike_activity_data_h5_files)
-        
+
         """
         first_spike_activity_data_h5_files = [Path(v).resolve() for v in first_spike_activity_data_h5_files] ## should parse who name and stuff... but we don't.
         all_sessions_first_spike_activity_tuples: List[Tuple] = [CellsFirstSpikeTimes.load_data_from_hdf5(filename=hdf_load_path) for hdf_load_path in first_spike_activity_data_h5_files] ## need to export those globally unique identifiers for each aclu within a session
@@ -3053,7 +3224,7 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         # for i, an_all_cells_first_spike_time_df in enumerate(all_sessions_all_cells_first_spike_time_df_loaded):
         total_counts = []
         all_sessions_global_spikes_df = []
-        
+
         all_sessions_global_spikes_dict = {}
         all_sessions_first_spikes_dict = {}
         all_sessions_extra_dfs_dict_dict = {}
@@ -3068,19 +3239,19 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
             # session_parts = session_key.split('-', maxsplit=3)
             # assert len(session_parts) == 4, f"session_parts: {session_parts}"
             # format_name, animal, exper_name, session_name = session_parts
-            # reconstructed_session_context = IdentifyingContext(format_name=format_name, animal=animal, exper_name=exper_name, session_name=session_name)    
+            # reconstructed_session_context = IdentifyingContext(format_name=format_name, animal=animal, exper_name=exper_name, session_name=session_name)
             # # print(f'reconstructed_session_context: {reconstructed_session_context}')
             # ## seems wrong: reconstructed_session_context
 
             # all_cells_first_spike_time_df_loaded = all_cells_first_spike_time_df_loaded.neuron_identity.make_neuron_indexed_df_global(reconstructed_session_context, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
             # global_spikes_df_loaded = global_spikes_df_loaded.neuron_identity.make_neuron_indexed_df_global(reconstructed_session_context, add_expanded_session_context_keys=True, add_extended_aclu_identity_columns=True)
-            
+
             # all_cells_first_spike_time_df_loaded['path'] = a_path.as_posix()
-            # all_cells_first_spike_time_df_loaded['session_key'] = session_key	 
+            # all_cells_first_spike_time_df_loaded['session_key'] = session_key
             # all_cells_first_spike_time_df_loaded['params_key'] = params_key
             total_counts.append(all_cells_first_spike_time_df_loaded)
             all_sessions_global_spikes_df.append(global_spikes_df_loaded)
-            
+
             for k, v in global_spikes_dict_loaded.items():
                 if k not in all_sessions_global_spikes_dict:
                     all_sessions_global_spikes_dict[k] = []
@@ -3103,7 +3274,7 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
                 # if 'session_uid' not in v.columns:
                 #     v['session_uid'] = reconstructed_session_context.get_description(separator="|")
                 all_sessions_extra_dfs_dict_dict[k].append(v) # append to this df name
-                
+
 
             # first_spikes_dict_loaded
             # all_cells_first_spike_time_df_loaded
@@ -3120,7 +3291,7 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         # for extra_dataframe_name, extra_dataframe_df_list in all_sessions_extra_dfs_dict_dict.items():
 
         # all_sessions_extra_dfs_dict_dict = {extra_dataframe_name:{k:pd.concat(v, axis='index') for k, v in extra_dataframe_df_list.items()} for extra_dataframe_name, extra_dataframe_df_list in all_sessions_extra_dfs_dict_dict.items()}
-        all_sessions_extra_dfs_dict_dict = {extra_dataframe_name:pd.concat(extra_dataframe_df_list, axis='index') for extra_dataframe_name, extra_dataframe_df_list in all_sessions_extra_dfs_dict_dict.items()}        
+        all_sessions_extra_dfs_dict_dict = {extra_dataframe_name:pd.concat(extra_dataframe_df_list, axis='index') for extra_dataframe_name, extra_dataframe_df_list in all_sessions_extra_dfs_dict_dict.items()}
 
         all_sessions_first_spike_combined_df: pd.DataFrame = pd.concat(total_counts, axis='index')
         # all_sessions_first_spike_combined_df
@@ -3166,13 +3337,13 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
                 lap.csv
 
         Usage:
-        
+
             from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import CellsFirstSpikeTimes
             CellsFirstSpikeTimes.save_data_to_csvs(
-                all_cells_first_spike_time_df, 
-                global_spikes_df, 
-                global_spikes_dict, 
-                first_spikes_dict, 
+                all_cells_first_spike_time_df,
+                global_spikes_df,
+                global_spikes_dict,
+                first_spikes_dict,
                 output_dir=Path('path/to/output_directory')
             )
         """
@@ -3224,7 +3395,7 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         - bool: True if all files were saved successfully, False otherwise.
 
         Usage:
-        
+
             _obj: CellsFirstSpikeTimes = CellsFirstSpikeTimes.init_from_pipeline(curr_active_pipeline=curr_active_pipeline)
             _obj.save_to_csvs(output_dir=Path('path/to/output_directory'))
         """
@@ -3242,7 +3413,7 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         except Exception as e:
             print(f"An error occurred while saving CSV files: {e}")
             return False
-        
+
 
     # ==================================================================================================================== #
     # Plotting and Visualization                                                                                           #
@@ -3250,22 +3421,22 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
     @function_attributes(short_name=None, tags=['matplotlib', 'scatter', 'spikes', 'position', 'time'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-05 13:23', related_items=[])
     def plot_first_spike_scatter_figure(self, aclu_to_color_map=None):
         """ plots a scatterplot showing the first spike for each cell during PBEs vs. Laps
-        
-        
+
+
         # global_session.config.plotting_config
         active_config = deepcopy(curr_active_pipeline.active_configs[global_epoch_name])
         active_pf1D = deepcopy(global_pf1D)
         aclu_to_color_map = {v.cell_uid:v.color.tolist() for v in active_config.plotting_config.pf_neuron_identities}
         fig, ax = cells_first_spike_times.plot_first_spike_scatter_figure(aclu_to_color_map=aclu_to_color_map)
-        
+
         """
         ## INPUTS: active_config
         # type(active_config.plotting_config.pf_colormap)
-        
+
         self.all_cells_first_spike_time_df['color'] = self.all_cells_first_spike_time_df['aclu'].map(lambda x: aclu_to_color_map.get(x, [1.0, 1.0, 0.0, 1.0]))
         column_names = ['first_spike_any', 'first_spike_theta', 'first_spike_lap', 'first_spike_PBE']
         interpolated_position_column_names = []
-        for a_col in column_names:	
+        for a_col in column_names:
             ## interpolate positions for each of these spike times
             self.all_cells_first_spike_time_df[f'interp_pos_{a_col}'] = np.interp(self.all_cells_first_spike_time_df[a_col], self.global_position_df.t, self.global_position_df.x)
             interpolated_position_column_names.append(f'interp_pos_{a_col}')
@@ -3298,10 +3469,10 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
     @function_attributes(short_name=None, tags=['pyqtgraph', 'raster', 'spikes'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-05 13:23', related_items=[])
     def plot_first_lap_spike_relative_first_PBE_spike_scatter_figure(self, defer_show = False):
         """ plots a raster plot showing the first spike for each PBE for each cell (rows) relative to the first lap spike (t=0)
-        
+
         test_obj: CellsFirstSpikeTimes = CellsFirstSpikeTimes.init_from_batch_hdf5_exports(first_spike_activity_data_h5_files=first_spike_activity_data_h5_files)
         app, win, plots, plots_data = test_obj.plot_first_lap_spike_relative_first_PBE_spike_scatter_figure()
-        
+
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import new_plot_raster_plot, NewSimpleRaster
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.CustomInfiniteLine import CustomInfiniteLine
@@ -3349,7 +3520,7 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
         v_line = CustomInfiniteLine(pos=0.0, angle=90, pen=pg.mkPen('r', width=2), label='first lap spike')
         root_plot.addItem(v_line)
         plots['v_line'] = v_line
-        
+
         ## Set Labels
         # plots['root_plot'].set_xlabel('First PBE spike relative to first lap spike (t=0)')
         # plots['root_plot'].set_ylabel('Cell')
@@ -3360,10 +3531,10 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
 
 
         return app, win, plots, plots_data
-    
+
     def plot_PhoJonathan_plots_with_time_indicator_lines(self, curr_active_pipeline, included_neuron_ids=None, write_vector_format=False, write_png=True, override_fig_man: Optional[FileOutputManager]=None, time_point_formatting_kwargs_dict=None, n_max_page_rows=1, defer_draw: bool=False):
         """
-        
+
         """
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import add_time_indicator_lines
         from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
@@ -3394,20 +3565,20 @@ class CellsFirstSpikeTimes(SimpleFieldSizesReprMixin):
             print(f'perfomring save...')
             saved_file_paths = BatchPhoJonathanFiguresHelper._perform_save_batch_plotted_figures(curr_active_pipeline, active_out_figure_container_dict=modified_figure_container_dict, write_vector_format=write_vector_format, write_png=write_png, override_fig_man=override_fig_man, progress_print=True, debug_print=False)
             print(f'\tsaved_file_paths: {saved_file_paths}')
-            
+
         return modified_figure_container_dict
 
-            
+
 # ==================================================================================================================== #
 # 2024-10-09 - Building Custom Individual time_bin decoded posteriors                                                  #
 # ==================================================================================================================== #
 
 @function_attributes(short_name=None, tags=['individual_time_bin', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-09 09:27', related_items=[])
 def _perform_build_individual_time_bin_decoded_posteriors_df(curr_active_pipeline, track_templates, all_directional_laps_filter_epochs_decoder_result, transfer_column_names_list: Optional[List[str]]=None):
-    """ 
+    """
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _perform_build_individual_time_bin_decoded_posteriors_df
     filtered_laps_time_bin_marginals_df = _perform_build_individual_time_bin_decoded_posteriors_df(curr_active_pipeline, track_templates=track_templates, all_directional_laps_filter_epochs_decoder_result=all_directional_laps_filter_epochs_decoder_result)
-    
+
     """
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import co_filter_epochs_and_spikes
@@ -3442,7 +3613,7 @@ def _perform_build_individual_time_bin_decoded_posteriors_df(curr_active_pipelin
 # appearing_or_disappearing_aclus, appearing_stability_df, appearing_aclus, disappearing_stability_df, disappearing_aclus
 @function_attributes(short_name=None, tags=['performance'], input_requires=[], output_provides=[], uses=['_do_train_test_split_decode_and_evaluate'], used_by=[], creation_date='2024-10-08 00:00', related_items=[])
 def _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline, included_neuron_IDs, active_laps_decoding_time_bin_size: float = 0.25, force_recompute_directional_train_test_split_result: bool = False, debug_print=False):
-    """ runs for a specific subset of cells 
+    """ runs for a specific subset of cells
     """
     # Inputs: all_directional_pf1D_Decoder, alt_directional_merged_decoders_result
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestSplitResult, TrainTestLapsSplitting, CustomDecodeEpochsResult, decoder_name, epoch_split_key, get_proper_global_spikes_df, DirectionalPseudo2DDecodersResult
@@ -3456,7 +3627,7 @@ def _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline, i
     # global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
 
     directional_train_test_split_result: TrainTestSplitResult = curr_active_pipeline.global_computation_results.computed_data.get('TrainTestSplit', None)
-    
+
     if (directional_train_test_split_result is None) or force_recompute_directional_train_test_split_result:
         ## recompute
         if debug_print:
@@ -3476,9 +3647,9 @@ def _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline, i
     # train_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = directional_train_test_split_result.train_epochs_dict
     # train_lap_specific_pf1D_Decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = directional_train_test_split_result.train_lap_specific_pf1D_Decoder_dict
     # OUTPUTS: train_test_split_laps_df_dict
-    
+
     # MAIN _______________________________________________________________________________________________________________ #
-    
+
     complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, test_all_directional_decoder_result, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results = _do_train_test_split_decode_and_evaluate(curr_active_pipeline=curr_active_pipeline, active_laps_decoding_time_bin_size=active_laps_decoding_time_bin_size,
                                                                                                                                                                                                                                                   included_neuron_IDs=included_neuron_IDs,
                                                                                                                                                                                                                                                   force_recompute_directional_train_test_split_result=force_recompute_directional_train_test_split_result, compute_separate_decoder_results=True, debug_print=debug_print)
@@ -3497,32 +3668,32 @@ def _perform_run_rigorous_decoder_performance_assessment(curr_active_pipeline, i
     #     a_test_epochs_df['test_train_epoch_type'] = 'test'
     #     _remerged_laps_dfs_dict[a_decoder_name] = pd.concat([a_train_epochs_df, a_test_epochs_df], axis='index')
     #     _remerged_laps_dfs_dict[a_decoder_name] = _add_extra_epochs_df_columns(epochs_df=_remerged_laps_dfs_dict[a_decoder_name])
-        
+
     ## INPUTS: test_all_directional_decoder_result, all_directional_pf1D_Decoder
     # epochs_bin_by_bin_performance_analysis_df = test_all_directional_decoder_result.get_lap_bin_by_bin_performance_analysis_df(active_pf_2D=deepcopy(all_directional_pf1D_Decoder), debug_print=debug_print) # active_pf_2D: used for binning position columns # active_pf_2D: used for binning position columns
     # epochs_bin_by_bin_performance_analysis_df: pd.DataFrame = test_all_directional_decoder_result.epochs_bin_by_bin_performance_analysis_df
     # _out_subset_decode_dict[active_laps_decoding_time_bin_size] = epochs_track_identity_marginal_df
     # epochs_bin_by_bin_performance_analysis_df['shuffle_idx'] = int(i)
 
-    return (complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, test_all_directional_decoder_result, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results) 
+    return (complete_decoded_context_correctness_tuple, laps_marginals_df, all_directional_pf1D_Decoder, all_test_epochs_df, test_all_directional_decoder_result, all_directional_laps_filter_epochs_decoder_result, _out_separate_decoder_results)
 
 
 @function_attributes(short_name=None, tags=['long_short', 'firing_rate'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-17 05:22', related_items=['determine_neuron_exclusivity_from_firing_rate'])
 def compute_all_cells_long_short_firing_rate_df(global_spikes_df: pd.DataFrame):
     """ computes the firing rates for all cells (not just placecells or excitatory cells) for the long and short track periods, and then their differences
     These firing rates are not spatially binned because they aren't just place cells.
-    
+
     columns: ['LS_diff_firing_rate_Hz']: will be positive for Short-preferring cells and negative for Long-preferring ones.
-    
+
     Usage:
-    
+
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_all_cells_long_short_firing_rate_df
 
         df_combined = compute_all_cells_long_short_firing_rate_df(global_spikes_df=global_spikes_df)
         df_combined
 
         print(list(df_combined.columns)) # ['long_num_spikes_count', 'short_num_spikes_count', 'global_num_spikes_count', 'long_firing_rate_Hz', 'short_firing_rate_Hz', 'global_firing_rate_Hz', 'LS_diff_firing_rate_Hz', 'firing_rate_percent_diff']
-        
+
     """
     ## Needs to consider not only place cells but interneurons as well
     # global_all_spikes_counts # 73 rows
@@ -3548,14 +3719,14 @@ def compute_all_cells_long_short_firing_rate_df(global_spikes_df: pd.DataFrame):
         spike_times = a_df['t_rel_seconds'].values
         end_t = np.nanmax(spike_times)
         start_t = np.nanmin(spike_times)
-        duration_t: float = end_t - start_t    
+        duration_t: float = end_t - start_t
         return duration_t, (start_t, end_t)
 
 
     partitioned_dfs = dict(zip(*partition_df(global_spikes_df, partitionColumn='maze_id'))) # non-maze is also an option, right?
     long_all_spikes_df: pd.DataFrame = partitioned_dfs[1]
     short_all_spikes_df: pd.DataFrame = partitioned_dfs[2]
-    
+
     ## sum total number of spikes over the entire duration
     # Performed 1 aggregation grouped on column: 'aclu'
     long_all_spikes_count_df = long_all_spikes_df.groupby(['aclu']).agg(num_spikes_count=('t_rel_seconds', 'count')).reset_index()[['aclu', 'num_spikes_count']].set_index('aclu')
@@ -3565,7 +3736,7 @@ def compute_all_cells_long_short_firing_rate_df(global_spikes_df: pd.DataFrame):
     ## TODO: exclude replay periods
 
     ## OUTPUTS: long_all_spikes_count_df, short_all_spikes_count_df
-        
+
     long_duration_t, _long_start_end_tuple = _add_firing_rates_from_computed_durations(long_all_spikes_df)
     long_all_spikes_count_df['firing_rate_Hz'] = long_all_spikes_count_df['num_spikes_count'] / long_duration_t
 
@@ -3573,7 +3744,7 @@ def compute_all_cells_long_short_firing_rate_df(global_spikes_df: pd.DataFrame):
     short_all_spikes_count_df['firing_rate_Hz'] = short_all_spikes_count_df['num_spikes_count'] / short_duration_t
 
     global_duration_t: float = long_duration_t + short_duration_t
-    
+
     ## OUTPUTS: long_all_spikes_count_df, short_all_spikes_count_df
 
     # long_all_spikes_count_df
@@ -3597,32 +3768,32 @@ def compute_all_cells_long_short_firing_rate_df(global_spikes_df: pd.DataFrame):
     # df_combined = reorder_columns_relative(df_combined, column_names=['long_firing_rate_Hz', 'short_firing_rate_Hz'], relative_mode='end')
 
     df_combined = reorder_columns_relative(df_combined, column_names=['long_num_spikes_count', 'short_num_spikes_count', 'long_firing_rate_Hz', 'short_firing_rate_Hz'], relative_mode='end')
-    
+
     # ['long_firing_rate_Hz', 'short_firing_rate_Hz', 'long_num_spikes_count', 'short_num_spikes_count', 'LS_diff_firing_rate_Hz', 'firing_rate_percent_diff']
-        
+
     ## Compare the differnece between the two periods
     df_combined['LS_diff_firing_rate_Hz'] = df_combined['long_firing_rate_Hz'] - df_combined['short_firing_rate_Hz']
-    
+
     # Calculate the percent difference in firing rate
     df_combined["firing_rate_percent_diff"] = (df_combined['LS_diff_firing_rate_Hz'] / df_combined["long_firing_rate_Hz"]) * 100
 
     df_combined['global_num_spikes_count'] = df_combined['long_num_spikes_count'] + df_combined['short_num_spikes_count']
     df_combined['global_firing_rate_Hz'] = df_combined['global_num_spikes_count'] / global_duration_t
-    
+
     df_combined = reorder_columns_relative(df_combined, column_names=['long_num_spikes_count', 'short_num_spikes_count', 'global_num_spikes_count', 'long_firing_rate_Hz', 'short_firing_rate_Hz', 'global_firing_rate_Hz'], relative_mode='start')\
-        
-        
+
+
     # df_combined["long_num_spikes_percent"] = (df_combined['long_num_spikes_count'] / df_combined["global_num_spikes_count"]) * 100
     # df_combined["short_num_spikes_percent"] = (df_combined['short_num_spikes_count'] / df_combined["global_num_spikes_count"]) * 100
-    
+
     # df_combined["firing_rate_percent_diff"] = (df_combined['LS_diff_firing_rate_Hz'] / df_combined["long_firing_rate_Hz"]) * 100
-    
-    
+
+
     return df_combined
 
 @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-08 10:37', related_items=['compute_all_cells_long_short_firing_rate_df'])
 def determine_neuron_exclusivity_from_firing_rate(df_combined: pd.DataFrame, firing_rate_required_diff_Hz: float = 1.0, maximum_opposite_period_firing_rate_Hz: float = 1.0):
-    """ 
+    """
     firing_rate_required_diff_Hz: float = 1.0 # minimum difference required for a cell to be considered Long- or Short-"preferring"
     maximum_opposite_period_firing_rate_Hz: float = 1.0 # maximum allowed firing rate in the opposite period to be considered exclusive
 
@@ -3631,7 +3802,7 @@ def determine_neuron_exclusivity_from_firing_rate(df_combined: pd.DataFrame, fir
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_all_cells_long_short_firing_rate_df, determine_neuron_exclusivity_from_firing_rate
 
         df_combined = compute_all_cells_long_short_firing_rate_df(global_spikes_df=global_spikes_df)
-        (LpC_df, SpC_df, LxC_df, SxC_df), (LpC_aclus, SpC_aclus, LxC_aclus, SxC_aclus) = determine_neuron_exclusivity_from_firing_rate(df_combined=df_combined, firing_rate_required_diff_Hz=firing_rate_required_diff_Hz, 
+        (LpC_df, SpC_df, LxC_df, SxC_df), (LpC_aclus, SpC_aclus, LxC_aclus, SxC_aclus) = determine_neuron_exclusivity_from_firing_rate(df_combined=df_combined, firing_rate_required_diff_Hz=firing_rate_required_diff_Hz,
                                                                                                                                maximum_opposite_period_firing_rate_Hz=maximum_opposite_period_firing_rate_Hz)
 
         ## Extract the aclus
@@ -3674,7 +3845,7 @@ def determine_neuron_exclusivity_from_firing_rate(df_combined: pd.DataFrame, fir
 
     print(f'LxC_aclus: {LxC_aclus}')
     print(f'SxC_aclus: {SxC_aclus}')
-    
+
     ## OUTPUTS: LpC_df, SpC_df, LxC_df, SxC_df
 
     ## OUTPUTS: LpC_aclus, SpC_aclus, LxC_aclus, SxC_aclus
@@ -3697,13 +3868,13 @@ ImageNameStr = NewType('ImageNameStr', str) # like '2006-6-07_11-26-53/kdiba_gor
 class ProgrammaticDisplayFunctionTestingFolderImageLoading:
     """ Loads image from the folder
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import ProgrammaticDisplayFunctionTestingFolderImageLoading
-    
+
     """
 
     @function_attributes(short_name=None, tags=['ProgrammaticDisplayFunctionTesting', 'parse', 'filesystem'], input_requires=[], output_provides=[], uses=[], used_by=['parse_ProgrammaticDisplayFunctionTesting_image_folder'], creation_date='2024-10-04 12:21', related_items=[])
     @classmethod
     def parse_image_path(cls, programmatic_display_function_testing_path: Path, file_path: Path, debug_print=False) -> Tuple[IdentifyingContext, str, datetime]:
-        """ Parses `"C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting"` 
+        """ Parses `"C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting"`
         "C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/EXTERNAL/Screenshots/ProgrammaticDisplayFunctionTesting/2023-04-11/kdiba/gor01/one/2006-6-09_1-22-43/kdiba_gor01_one_2006-6-09_1-22-43_batch_plot_test_long_only_[45].png"
         Write a function that parses the following path structure: "./2023-04-11/kdiba/gor01/one/2006-6-09_1-22-43/kdiba_gor01_one_2006-6-09_1-22-43_batch_plot_test_long_only_[45].png"
         Into the following variable names: `/image_export_day_date/format_name/animal/exper_name/session_name/image_name`
@@ -3718,14 +3889,14 @@ class ProgrammaticDisplayFunctionTestingFolderImageLoading:
         parts = test_relative_image_path.parts
         if debug_print:
             print(f'parts: {parts}')
-        
+
         if len(parts) < 6:
             raise ValueError(f'parsed path should have at least 6 parts, but this one only has: {len(parts)}.\nparts: {parts}')
-        
+
         if len(parts) > 6:
             joined_final_part: str = '/'.join(parts[5:]) # return anything after that back into a str
             parts = parts[:5] + (joined_final_part, )
-            
+
         Assert.len_equals(parts, 6)
 
         # Assign the variables from the path components
@@ -3739,7 +3910,7 @@ class ProgrammaticDisplayFunctionTestingFolderImageLoading:
         session_context = IdentifyingContext(format_name=format_name, animal=animal, exper_name=exper_name, session_name=session_name)
         # Parse image_export_day_date as a date (YYYY-mm-dd)
         image_export_day_date: datetime = datetime.strptime(image_export_day_date, "%Y-%m-%d")
-        
+
         # return image_export_day_date, format_name, animal, exper_name, session_name, image_name
         return session_context, image_name, image_export_day_date, file_path
 
@@ -3810,7 +3981,7 @@ class ProgrammaticDisplayFunctionTestingFolderImageLoading:
         for ctx, a_ctx_df in partition_df_dict(programmatic_display_function_outputs_df, partitionColumn='context').items():
             _final_out_dict_dict[ctx] = {}
             for an_img_name, an_img_df in partition_df_dict(a_ctx_df, partitionColumn='image_name').items():
-                # _final_out_dict_dict[ctx][an_img_name] = list(zip(an_img_df['export_date'].values, an_img_df['file_path'].values)) #partition_df_dict(an_img_df, partitionColumn='image_name') 
+                # _final_out_dict_dict[ctx][an_img_name] = list(zip(an_img_df['export_date'].values, an_img_df['file_path'].values)) #partition_df_dict(an_img_df, partitionColumn='image_name')
                 _final_out_dict_dict[ctx][an_img_name] = {datetime.strptime(k, "%Y-%m-%d"):Path(v).resolve() for k, v in dict(zip(an_img_df['export_date'].values, an_img_df['file_path'].values)).items() if v.endswith('.png')}
 
         """
@@ -3823,7 +3994,7 @@ class ProgrammaticDisplayFunctionTestingFolderImageLoading:
         ## INPUTS: _final_out_dict_dict: Dict[ContextDescStr, Dict[ImageNameStr, Dict[datetime, Path]]]
         context_tabs_dict = {curr_context_desc_str:build_context_images_navigator_widget(curr_context_images_dict, curr_context_desc_str=curr_context_desc_str, max_num_widget_debug=2) for curr_context_desc_str, curr_context_images_dict in list(_final_out_dict_dict.items())}
         sidebar = ContextSidebar(context_tabs_dict)
-        
+
 
         return sidebar, context_tabs_dict, _final_out_dict_dict
 
@@ -3846,7 +4017,7 @@ def apply_colormap(image: np.ndarray, color: tuple) -> np.ndarray:
 @function_attributes(short_name=None, tags=['image'], input_requires=[], output_provides=[], uses=['apply_colormap'], used_by=[], creation_date='2024-08-21 00:00', related_items=[])
 def blend_images(images: list, cmap=None) -> np.ndarray:
     """ Tries to pre-combine images to produce an output image of the same size
-    
+
     # 'coolwarm'
     images = [a_seq_mat.todense().T for i, a_seq_mat in enumerate(sequence_frames_sparse)]
     blended_image = blend_images(images)
@@ -3863,7 +4034,7 @@ def blend_images(images: list, cmap=None) -> np.ndarray:
         # Non-colormap mode:
         # Ensure images are in the same shape
         combined_image = np.zeros_like(images[0], dtype=np.float32)
-        
+
         for img in images:
             combined_image += img.astype(np.float32)
 
@@ -3872,13 +4043,13 @@ def blend_images(images: list, cmap=None) -> np.ndarray:
         # Define a colormap (blue to red)
         cmap = plt.get_cmap(cmap)
         norm = Normalize(vmin=0, vmax=(len(images) - 1))
-        
+
         combined_image = np.zeros((*images[0].shape, 3), dtype=np.float32)
-        
+
         for i, img in enumerate(images):
             color = cmap(norm(i))[:3]  # Get RGB color from colormap
             colored_image = apply_colormap(img, color)
-            combined_image += colored_image    
+            combined_image += colored_image
 
     combined_image = np.clip(combined_image, 0, 255)  # Ensure pixel values are within valid range
     return combined_image.astype(np.uint8)
@@ -3886,7 +4057,7 @@ def blend_images(images: list, cmap=None) -> np.ndarray:
 
 def visualize_multiple_image_items(images: list, threshold=1e-3) -> None:
     """ Sample multiple pg.ImageItems overlayed on one another
-    
+
     # Example usage:
     image1 = np.random.rand(100, 100) * 100  # Example image 1
     image2 = np.random.rand(100, 100) * 100  # Example image 2
@@ -3902,7 +4073,7 @@ def visualize_multiple_image_items(images: list, threshold=1e-3) -> None:
     win = pg.GraphicsLayoutWidget(show=True)
     view = win.addViewBox()
     view.setAspectLocked(True)
-    
+
     for img in images:
         if threshold is not None:
             # Create a masked array, masking values below the threshold
@@ -3919,8 +4090,8 @@ def visualize_multiple_image_items(images: list, threshold=1e-3) -> None:
 # 2024-08-16 - Image Processing Techniques                                                                             #
 # ==================================================================================================================== #
 def plot_grad_quiver(sobel_x, sobel_y, downsample_step=1):
-    """ 
-    
+    """
+
     # Compute the magnitude of the gradient
     gradient_magnitude = np.hypot(sobel_x, sobel_y)
     gradient_direction = np.arctan2(sobel_y, sobel_x)
@@ -3934,7 +4105,7 @@ def plot_grad_quiver(sobel_x, sobel_y, downsample_step=1):
     Y, X = np.meshgrid(np.arange(gradient_magnitude.shape[0]), np.arange(gradient_magnitude.shape[1]), indexing='ij')
 
     # Downsample the arrow plot for better visualization (optional)
-    
+
     X_downsampled = X[::downsample_step, ::downsample_step]
     Y_downsampled = Y[::downsample_step, ::downsample_step]
     sobel_x_downsampled = sobel_x[::downsample_step, ::downsample_step]
@@ -3943,12 +4114,12 @@ def plot_grad_quiver(sobel_x, sobel_y, downsample_step=1):
     # Plotting the gradient magnitude and arrows representing the direction
     fig = plt.figure(figsize=(10, 10))
     plt.imshow(gradient_magnitude, cmap='gray', origin='lower')
-    plt.quiver(X_downsampled, Y_downsampled, sobel_x_downsampled, sobel_y_downsampled, 
+    plt.quiver(X_downsampled, Y_downsampled, sobel_x_downsampled, sobel_y_downsampled,
             color='red', angles='xy', scale_units='xy') # , scale=5, width=0.01
     plt.title('Gradient Magnitude with Direction Arrows')
     plt.axis('off')
     plt.show()
-    
+
     return fig
 
 
@@ -4003,7 +4174,7 @@ def _add_cell_remapping_category(neuron_replay_stats_df, loaded_track_limits: Di
                                                             loaded_track_limits = {'long_xlim': np.array([59.0774, 228.69]), 'short_xlim': np.array([94.0156, 193.757]), 'long_ylim': np.array([138.164, 146.12]), 'short_ylim': np.array([138.021, 146.263])},
         )
         neuron_replay_stats_df
-    
+
     """
     # `loaded_track_limits` = deepcopy(owning_pipeline_reference.sess.config.loaded_track_limits) # {'long_xlim': array([59.0774, 228.69]), 'short_xlim': array([94.0156, 193.757]), 'long_ylim': array([138.164, 146.12]), 'short_ylim': array([138.021, 146.263])}
     # x_midpoint: float = owning_pipeline_reference.sess.config.x_midpoint
@@ -4035,12 +4206,12 @@ def _add_cell_remapping_category(neuron_replay_stats_df, loaded_track_limits: Di
     # min_significant_remapping_x_distance: float = 40.0 # from long->short track
 
     # Extract the peaks of the long placefields to find ones that have peaks outside the boundaries
-    long_pf_peaks = neuron_replay_stats_df[neuron_replay_stats_df['has_long_pf']]['long_pf_peak_x'] - occupancy_midpoint # this shift of `occupancy_midpoint` is to center the midpoint of the track at 0. 
+    long_pf_peaks = neuron_replay_stats_df[neuron_replay_stats_df['has_long_pf']]['long_pf_peak_x'] - occupancy_midpoint # this shift of `occupancy_midpoint` is to center the midpoint of the track at 0.
     is_left_cap = (long_pf_peaks < left_cap_x_bound)
     is_right_cap = (long_pf_peaks > right_cap_x_bound)
     # is_either_cap =  np.logical_or(is_left_cap, is_right_cap)
 
-    # Adds ['is_long_peak_left_cap', 'is_long_peak_right_cap', 'is_long_peak_either_cap'] columns: 
+    # Adds ['is_long_peak_left_cap', 'is_long_peak_right_cap', 'is_long_peak_either_cap'] columns:
     neuron_replay_stats_df['is_long_peak_left_cap'] = False
     neuron_replay_stats_df['is_long_peak_right_cap'] = False
     neuron_replay_stats_df.loc[is_left_cap.index, 'is_long_peak_left_cap'] = is_left_cap # True
@@ -4073,7 +4244,7 @@ def _add_cell_remapping_category(neuron_replay_stats_df, loaded_track_limits: Di
     significant_distant_remapping_endcap_cells_df: pd.DataFrame = non_disappearing_endcap_cells_df[non_disappearing_endcap_cells_df['has_significant_distance_remapping'] == True] ## why only endcap cells?
     minorly_changed_endcap_cells_df: pd.DataFrame = non_disappearing_endcap_cells_df[non_disappearing_endcap_cells_df['has_significant_distance_remapping'] == False]
     # significant_distant_remapping_endcap_aclus = non_disappearing_endcap_cells_df[non_disappearing_endcap_cells_df['has_significant_distance_remapping']].index # Int64Index([3, 5, 7, 11, 14, 38, 41, 53, 57, 61, 62, 75, 78, 79, 82, 83, 85, 95, 98, 100, 102], dtype='int64')
-    
+
     return neuron_replay_stats_df, (non_disappearing_endcap_cells_df, disappearing_endcap_cells_df, minorly_changed_endcap_cells_df, significant_distant_remapping_endcap_cells_df,)
 
 
@@ -4111,7 +4282,7 @@ def add_groundtruth_information(curr_active_pipeline, a_directional_merged_decod
     from neuropy.core import Laps
 
     ## Inputs: a_directional_merged_decoders_result, laps_df
-    
+
     ## Get the most likely direction/track from the decoded posteriors:
     laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir = a_directional_merged_decoders_result.laps_directional_marginals_tuple
     laps_track_identity_marginals, laps_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = a_directional_merged_decoders_result.laps_track_identity_marginals_tuple
@@ -4125,7 +4296,7 @@ def add_groundtruth_information(curr_active_pipeline, a_directional_merged_decod
     laps_obj: Laps = curr_active_pipeline.sess.laps
     laps_df = laps_obj.to_dataframe()
     laps_df: pd.DataFrame = Laps._update_dataframe_computed_vars(laps_df=laps_df, t_start=t_start, t_delta=t_delta, t_end=t_end, global_session=curr_active_pipeline.sess) # NOTE: .sess is used because global_session is missing the last two laps
-    
+
     ## 2024-01-17 - Updates the `a_directional_merged_decoders_result.laps_epochs_df` with both the ground-truth values and the decoded predictions
     result_laps_epochs_df['maze_id'] = laps_df['maze_id'].to_numpy()[np.isin(laps_df['lap_id'], result_laps_epochs_df['lap_id'])] # this works despite the different size because of the index matching
     ## add the 'is_LR_dir' groud-truth column in:
@@ -4146,7 +4317,7 @@ def add_groundtruth_information(curr_active_pipeline, a_directional_merged_decod
 def _perform_variable_time_bin_lap_groud_truth_performance_testing(owning_pipeline_reference,
                                                                     desired_laps_decoding_time_bin_size: float = 0.5, desired_ripple_decoding_time_bin_size: Optional[float] = None, use_single_time_bin_per_epoch: bool=False,
                                                                     included_neuron_ids: Optional[NDArray]=None) -> Tuple[DirectionalPseudo2DDecodersResult, pd.DataFrame, CompleteDecodedContextCorrectness]:
-    """ 2024-01-17 - Pending refactor from ReviewOfWork_2024-01-17.ipynb 
+    """ 2024-01-17 - Pending refactor from ReviewOfWork_2024-01-17.ipynb
 
     Makes a copy of the 'DirectionalMergedDecoders' result and does the complete process of re-calculation for the provided time bin sizes. Finally computes the statistics about correctly computed contexts from the laps.
 
@@ -4158,8 +4329,8 @@ def _perform_variable_time_bin_lap_groud_truth_performance_testing(owning_pipeli
 
         ## Filtering with included_neuron_ids:
         a_directional_merged_decoders_result, result_laps_epochs_df, complete_decoded_context_correctness_tuple = _perform_variable_time_bin_lap_groud_truth_performance_testing(curr_active_pipeline, desired_laps_decoding_time_bin_size=1.5, included_neuron_ids=included_neuron_ids)
-        
-    
+
+
     """
     from neuropy.utils.indexing_helpers import paired_incremental_sorting, union_of_arrays, intersection_of_arrays, find_desired_sort_indicies
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import PfND
@@ -4178,7 +4349,7 @@ def _perform_variable_time_bin_lap_groud_truth_performance_testing(owning_pipeli
 
         restricted_all_directional_pf1D = PfND.build_merged_directional_placefields(restricted_all_directional_decoder_pf1D_dict, debug_print=False)
         restricted_all_directional_pf1D_Decoder = BasePositionDecoder(restricted_all_directional_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
-        
+
         # included_neuron_ids = intersection_of_arrays(alt_directional_merged_decoders_result.all_directional_pf1D_Decoder.neuron_IDs, included_neuron_ids)
         # is_aclu_included_list = np.isin(alt_directional_merged_decoders_result.all_directional_pf1D_Decoder.pf.ratemap.neuron_ids, included_neuron_ids)
         # included_aclus = np.array(alt_directional_merged_decoders_result.all_directional_pf1D_Decoder.pf.ratemap.neuron_ids)[is_aclu_included_list
@@ -4192,7 +4363,7 @@ def _perform_variable_time_bin_lap_groud_truth_performance_testing(owning_pipeli
         # alt_directional_merged_decoders_result.all_directional_pf1D_Decoder.pf.ratemap = modified_decoder_pf_ratemap
 
         # alt_directional_merged_decoders_result.all_directional_pf1D_Decoder = alt_directional_merged_decoders_result.all_directional_pf1D_Decoder.get_by_id(included_neuron_ids, defer_compute_all=True)
-        
+
     all_directional_pf1D_Decoder = alt_directional_merged_decoders_result.all_directional_pf1D_Decoder
 
     # Modifies alt_directional_merged_decoders_result, a copy of the original result, with new timebins
@@ -4201,14 +4372,14 @@ def _perform_variable_time_bin_lap_groud_truth_performance_testing(owning_pipeli
 
     if use_single_time_bin_per_epoch:
         print(f'WARNING: use_single_time_bin_per_epoch=True so time bin sizes will be ignored.')
-        
+
     ## Decode Laps:
     global_any_laps_epochs_obj = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs) # global_epoch_name='maze_any' (? same as global_epoch_name?)
     min_possible_laps_time_bin_size: float = find_minimum_time_bin_duration(global_any_laps_epochs_obj.to_dataframe()['duration'].to_numpy())
     laps_decoding_time_bin_size: float = min(desired_laps_decoding_time_bin_size, min_possible_laps_time_bin_size) # 10ms # 0.002
     if use_single_time_bin_per_epoch:
         laps_decoding_time_bin_size = None
-    
+
     alt_directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result = all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df), filter_epochs=global_any_laps_epochs_obj, decoding_time_bin_size=laps_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=False)
 
     ## Decode Ripples:
@@ -4219,7 +4390,7 @@ def _perform_variable_time_bin_lap_groud_truth_performance_testing(owning_pipeli
         if use_single_time_bin_per_epoch:
             ripple_decoding_time_bin_size = None
         alt_directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result = all_directional_pf1D_Decoder.decode_specific_epochs(deepcopy(owning_pipeline_reference.sess.spikes_df), global_replays, decoding_time_bin_size=ripple_decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch)
-        
+
     ## Post Compute Validations:
     alt_directional_merged_decoders_result.perform_compute_marginals()
 
@@ -4241,7 +4412,7 @@ def _perform_variable_time_bin_lap_groud_truth_performance_testing(owning_pipeli
 def perform_sweep_lap_groud_truth_performance_testing(curr_active_pipeline, included_neuron_ids_list: List[NDArray], desired_laps_decoding_time_bin_size:float=1.5):
     """ Sweeps through each `included_neuron_ids` in the provided `included_neuron_ids_list` and calls `_perform_variable_time_bin_lap_groud_truth_performance_testing(...)` to get its laps ground-truth performance.
     Can be used to assess the contributes of each set of cells (exclusive, rate-remapping, etc) to the discrimination decoding performance.
-    
+
     Usage:
 
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import perform_sweep_lap_groud_truth_performance_testing
@@ -4249,7 +4420,7 @@ def perform_sweep_lap_groud_truth_performance_testing(curr_active_pipeline, incl
         desired_laps_decoding_time_bin_size: float = 1.0
         included_neuron_ids_list = [short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset]
 
-        _output_tuples_list = perform_sweep_lap_groud_truth_performance_testing(curr_active_pipeline, 
+        _output_tuples_list = perform_sweep_lap_groud_truth_performance_testing(curr_active_pipeline,
                                                                                 included_neuron_ids_list=included_neuron_ids_list,
                                                                                 desired_laps_decoding_time_bin_size=desired_laps_decoding_time_bin_size)
 
@@ -4257,8 +4428,8 @@ def perform_sweep_lap_groud_truth_performance_testing(curr_active_pipeline, incl
                                 columns=("track_ID_correct", "dir_correct", "complete_correct"))
         percent_laps_correctness_df
 
-                                                                        
-    
+
+
     Does not modifiy the curr_active_pipeline (pure)
 
 
@@ -4312,10 +4483,10 @@ from neuropy.core.epoch import ensure_dataframe, find_data_indicies_from_epoch_t
 
 @function_attributes(short_name=None, tags=['filtering'], input_requires=[], output_provides=[], uses=[], used_by=['_perform_filter_replay_epochs'], creation_date='2024-04-25 06:38', related_items=[])
 def _apply_filtering_to_marginals_result_df(active_result_df: pd.DataFrame, filtered_epochs_df: pd.DataFrame, filtered_decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult]):
-    """ after filtering the epochs (for user selections, validity, etc) apply the same filtering to a results df. 
+    """ after filtering the epochs (for user selections, validity, etc) apply the same filtering to a results df.
 
     Applied to `filtered_decoder_filter_epochs_decoder_result_dict` to build a dataframe
-    
+
     """
     ## INPUTS: active_result_df, filtered_epochs_df
 
@@ -4360,7 +4531,7 @@ def _apply_filtering_to_marginals_result_df(active_result_df: pd.DataFrame, filt
 def _perform_filter_replay_epochs(curr_active_pipeline, global_epoch_name, track_templates, decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], ripple_all_epoch_bins_marginals_df: pd.DataFrame, ripple_decoding_time_bin_size: float,
             should_only_include_user_selected_epochs:bool=True, **additional_selections_context):
     """ the main replay epochs filtering function.
-    
+
     if should_only_include_user_selected_epochs is True, it only includes user selected (annotated) ripples
 
 
@@ -4395,7 +4566,7 @@ def _perform_filter_replay_epochs(curr_active_pipeline, global_epoch_name, track
 
     if should_only_include_user_selected_epochs:
         filtered_epochs_df = filtered_epochs_df.epochs.matching_epoch_times_slice(any_good_selected_epoch_times)
-    
+
     ## OUT: filtered_decoder_filter_epochs_decoder_result_dict, filtered_epochs_df
 
     # `ripple_all_epoch_bins_marginals_df`
@@ -4473,7 +4644,7 @@ def register_type_display(func_to_register, type_to_register):
         return func_to_register(*args, **kwargs)
 
     function_name: str = func_to_register.__name__ # get the name of the function to be added as the property
-    setattr(type_to_register, function_name, wrapper) # set the function as a method with the same name as the decorated function on objects of the class.	
+    setattr(type_to_register, function_name, wrapper) # set the function as a method with the same name as the decorated function on objects of the class.
     return wrapper
 
 
@@ -4490,13 +4661,13 @@ from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
 
 @function_attributes(short_name=None, tags=['plot', 'heatmap', 'peak'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-08 00:00', related_items=[])
 def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, point_dict=None, ax_dict=None, extra_decoder_values_dict=None, tuning_curves_dict=None, include_tuning_curves=False):
-    """ 2024-02-06 - Plots the four position-binned-activity maps (for each directional decoding epoch) as a 4x4 subplot grid using matplotlib. 
+    """ 2024-02-06 - Plots the four position-binned-activity maps (for each directional decoding epoch) as a 4x4 subplot grid using matplotlib.
 
     """
     from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap
     if tuning_curves_dict is None:
         assert include_tuning_curves == False
-    
+
     # figure_kwargs = dict(layout="tight")
     figure_kwargs = dict(layout="none")
 
@@ -4545,9 +4716,9 @@ def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, poin
             # tuning curves mode:
             assert len(ax_dict) == 8
             assert list(ax_dict.keys()) == ["ax_long_LR_curve", "ax_long_RL_curve", "ax_long_LR", "ax_long_RL", "ax_short_LR", "ax_short_RL", "ax_short_LR_curve", "ax_short_RL_curve"]
-        
 
-    
+
+
     # Get the colormap to use and set the bad color
     cmap = mpl.colormaps.get_cmap('viridis')  # viridis is the default colormap for imshow
     cmap.set_bad(color='black')
@@ -4569,14 +4740,14 @@ def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, poin
 
     # ['long_LR', 'long_RL', 'short_LR', 'short_RL']
 
-    
+
     for k, v in curr_aclu_z_scored_tuning_map_matrix_dict.items():
         # is_first_item = (k == list(curr_aclu_z_scored_tuning_map_matrix_dict.keys())[0])
         is_last_item = (k == list(curr_aclu_z_scored_tuning_map_matrix_dict.keys())[-1])
-        
+
         curr_ax = ax_dict[data_to_ax_mapping[k]]
         curr_ax.clear()
-        
+
         # hist_data = np.random.randn(1_500)
         # xbin_centers = np.arange(len(hist_data))+0.5
         # ax_dict["ax_LONG_pf_tuning_curve"] = plot_placefield_tuning_curve(xbin_centers, (-1.0 * curr_cell_normalized_tuning_curve), ax_dict["ax_LONG_pf_tuning_curve"], is_horizontal=True)
@@ -4585,7 +4756,7 @@ def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, poin
         epoch_indicies = np.arange(n_epochs)
 
         # Posterior distribution heatmaps at each point.
-        xmin, xmax, ymin, ymax = (xbin[0], xbin[-1], epoch_indicies[0], epoch_indicies[-1])           
+        xmin, xmax, ymin, ymax = (xbin[0], xbin[-1], epoch_indicies[0], epoch_indicies[-1])
         imshow_kwargs['extent'] = (xmin, xmax, ymin, ymax)
 
         # plot heatmap:
@@ -4613,9 +4784,9 @@ def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, poin
                 fig, curr_curve_ax, im = visualize_heatmap(tuning_curve.copy(), ax=curr_curve_ax, title=f'{k}', defer_show=True, **imshow_kwargs) # defer_show so it doesn't produce a separate figure for each!
                 curr_curve_ax.set_xlim((xmin, xmax))
                 curr_curve_ax.set_ylim((0, 1))
-                
+
             point_ax = curr_curve_ax # draw the lines on the tuning curve axis
-            
+
         else:
             point_ax = ax
 
@@ -4623,7 +4794,7 @@ def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, poin
             if k in point_dict:
                 # have points to plot
                 point_ax.vlines(point_dict[k], ymin=ymin, ymax=ymax, colors='r', label=f'{k}_peak')
-                
+
 
     # fig.tight_layout()
     # NOTE: these layout changes don't seem to take effect until the window containing the figure is resized.
@@ -4642,8 +4813,8 @@ def plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin, poin
 # INPUTS: directional_active_lap_pf_results_dicts, test_aclu: int = 26, xbin_centers, decoder_aclu_peak_location_df_merged
 
 def plot_single_heatmap_set_with_points(directional_active_lap_pf_results_dicts, xbin_centers, xbin, decoder_aclu_peak_location_df_merged: pd.DataFrame, aclu: int = 26, **kwargs):
-    """ 2024-02-06 - Plot all four decoders for a single aclu, with overlayed red lines for the detected peaks. 
-    
+    """ 2024-02-06 - Plot all four decoders for a single aclu, with overlayed red lines for the detected peaks.
+
     plot_single_heatmap_set_with_points
 
     plot_cell_position_binned_activity_over_time
@@ -4657,26 +4828,26 @@ def plot_single_heatmap_set_with_points(directional_active_lap_pf_results_dicts,
         # decoders_tuning_curves_dict
         xbin_centers = deepcopy(active_pf_dt.xbin_centers)
         xbin = deepcopy(active_pf_dt.xbin)
-        fig, ax_dict = plot_single_heatmap_set_with_points(directional_active_lap_pf_results_dicts, xbin_centers, xbin, extra_decoder_values_dict=extra_decoder_values_dict, aclu=4, 
+        fig, ax_dict = plot_single_heatmap_set_with_points(directional_active_lap_pf_results_dicts, xbin_centers, xbin, extra_decoder_values_dict=extra_decoder_values_dict, aclu=4,
                                                         decoders_tuning_curves_dict=decoders_tuning_curves_dict, decoder_aclu_peak_location_df_merged=decoder_aclu_peak_location_df_merged,
                                                             active_context=curr_active_pipeline.build_display_context_for_session('single_heatmap_set_with_points'))
-                                                            
+
     """
     from neuropy.utils.result_context import IdentifyingContext
 
     ## TEst: Look at a single aclu value
     # test_aclu: int = 26
     # test_aclu: int = 28
-    
+
     active_context: IdentifyingContext = kwargs.get('active_context', IdentifyingContext())
     active_context = active_context.overwriting_context(aclu=aclu)
 
     decoders_tuning_curves_dict = kwargs.get('decoders_tuning_curves_dict', None)
-    
+
     matching_aclu_df = decoder_aclu_peak_location_df_merged[decoder_aclu_peak_location_df_merged.aclu == aclu].copy()
     assert len(matching_aclu_df) > 0, f"matching_aclu_df: {matching_aclu_df} for aclu == {aclu}"
     new_peaks_dict: Dict = list(matching_aclu_df.itertuples(index=False))[0]._asdict() # {'aclu': 28, 'long_LR_peak': 185.29063638457257, 'long_RL_peak': nan, 'short_LR_peak': 176.75276643746625, 'short_RL_peak': nan, 'LR_peak_diff': 8.537869947106316, 'RL_peak_diff': nan}
-        
+
     # long_LR_name, long_RL_name, short_LR_name, short_RL_name
     curr_aclu_z_scored_tuning_map_matrix_dict = {}
     curr_aclu_mean_epoch_peak_location_dict = {}
@@ -4707,7 +4878,7 @@ def plot_single_heatmap_set_with_points(directional_active_lap_pf_results_dicts,
         curr_aclu_tuning_curves_dict = {name:v.get(aclu, None) for name, v in decoders_tuning_curves_dict.items()}
     else:
         curr_aclu_tuning_curves_dict = None
-                
+
     # point_value = curr_aclu_median_peak_location_dict
     point_value = curr_aclu_extracted_decoder_peak_locations_dict
     fig, ax_dict = plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin=xbin, point_dict=point_value, tuning_curves_dict=curr_aclu_tuning_curves_dict, include_tuning_curves=True)
@@ -4715,7 +4886,7 @@ def plot_single_heatmap_set_with_points(directional_active_lap_pf_results_dicts,
     perform_update_title_subtitle(fig=fig, ax=None, title_string=f"Position-Binned Activity per Lap - aclu {aclu}", subtitle_string=None, active_context=active_context, use_flexitext_titles=True)
 
     # fig, ax_dict = plot_peak_heatmap_test(curr_aclu_z_scored_tuning_map_matrix_dict, xbin=xbin, point_dict=curr_aclu_extracted_decoder_peak_locations_dict) # , defer_show=True
-    
+
     # fig.show()
     return fig, ax_dict
 
