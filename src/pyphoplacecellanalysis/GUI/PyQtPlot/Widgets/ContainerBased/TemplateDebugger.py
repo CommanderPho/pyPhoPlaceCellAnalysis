@@ -254,7 +254,8 @@ class BaseTemplateDebuggingMixin:
         """ Builds UI """
         _out_data = cls._subfn_rebuild_sort_idxs(decoder, _out_data, included_any_context_neuron_ids)
 
-        title_str = f'pf1D_heatmap'
+        # title_str = f'pf1D_heatmap'
+        title_str = _out_params.get('title_str', f'pf1D_heatmap')
         curr_curves = _out_data.sorted_pf_tuning_curves
         curr_pf_peak_locations = _out_data.sorted_pf_peak_locations
         
@@ -380,7 +381,7 @@ class BaseTemplateDebuggingMixin:
 
 
     @classmethod
-    def init_from_decoder(cls, a_decoder: BasePositionDecoder, included_all_neuron_ids=None, win=None, plot_item=None, solo_override_alpha_weights=None, **kwargs):
+    def init_from_decoder(cls, a_decoder: BasePositionDecoder, included_all_neuron_ids=None, win=None, plot_item=None, solo_override_alpha_weights=None, title_str: str='test', **kwargs):
         fignum = kwargs.pop('fignum', None)
         if fignum is not None:
             print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
@@ -405,7 +406,7 @@ class BaseTemplateDebuggingMixin:
         _out_plots = RenderPlots(name=figure_name, pf1D_heatmaps=None)
         _out_params = VisualizationParameters(name=figure_name, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, use_shared_aclus_only_templates=use_shared_aclus_only_templates,
                                              debug_print=debug_print, debug_draw=debug_draw, included_any_context_neuron_ids=included_all_neuron_ids,
-                                             solo_emphasized_aclus=None, solo_override_alpha_weights=solo_override_alpha_weights, **kwargs)
+                                             solo_emphasized_aclus=None, solo_override_alpha_weights=solo_override_alpha_weights, title_str=title_str, **kwargs)
 
 
         if ((win is None) and (plot_item is None)):

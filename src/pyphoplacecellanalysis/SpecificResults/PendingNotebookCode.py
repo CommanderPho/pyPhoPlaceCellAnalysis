@@ -52,6 +52,9 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 # ==================================================================================================================== #
 # 2025-01-21 - Bin-by-bin decoding examples                                                                            #
 # ==================================================================================================================== #
+import numpy as np
+import pyqtgraph as pg
+from copy import deepcopy
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphocorehelpers.print_helpers import strip_type_str_to_classname
@@ -133,9 +136,8 @@ class BinByBinDecodingDebugger:
 
     @classmethod
     def build_time_binned_decoder_debug_plots(cls, a_decoder, a_lap_id, _out_decoded_time_bin_edges, _out_decoded_active_p_x_given_n, _out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists, _out_decoded_active_plots_data, debug_print=False):
-        import numpy as np
-        import pyqtgraph as pg
-        from copy import deepcopy
+        """ builds the plots 
+        """
         from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import pyqtplot_build_image_bounds_extent
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import BaseTemplateDebuggingMixin
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import new_plot_raster_plot, NewSimpleRaster
@@ -156,7 +158,8 @@ class BinByBinDecodingDebugger:
 
         time_bin_edges = _out_decoded_time_bin_edges[a_lap_id]
         n_epoch_time_bins = len(time_bin_edges) - 1
-        print(f'a_lap_id: {a_lap_id}, n_epoch_time_bins: {n_epoch_time_bins}')
+        if debug_print:
+            print(f'a_lap_id: {a_lap_id}, n_epoch_time_bins: {n_epoch_time_bins}')
 
         win = pg.GraphicsLayoutWidget()
         plots = []
@@ -178,11 +181,9 @@ class BinByBinDecodingDebugger:
         _out_decoded_active_plots[a_lap_id] = plots_container
         win.nextRow()
 
-
-
         # Decoded Epoch Posterior (bin-by-bin), takes up a row _______________________________________________________________ #
         spanning_posterior_plot = win.addPlot(title="P_x_given_n Plot", row=1, rowspan=1, col=0, colspan=n_epoch_time_bins)
-        spanning_posterior_plot.setTitle("P_x_given_n Plot - Covers Entire Width")
+        spanning_posterior_plot.setTitle("P_x_given_n Plot - Decoded over lap")
 
         most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = _out_decoded_active_p_x_given_n[a_lap_id]
         flat_p_x_given_n = deepcopy(p_x_given_n)
@@ -192,9 +193,7 @@ class BinByBinDecodingDebugger:
             xbin_edges=np.arange(n_epoch_time_bins+1),
             ybin_edges=deepcopy(a_decoder.xbin)
         )
-
         win.nextRow()
-
 
         # Bin-by-bin active spike templates/pf1D fields ______________________________________________________________________ #
         active_bin_unit_specific_time_binned_spike_counts = _out_decoded_unit_specific_time_binned_spike_counts[a_lap_id]
@@ -210,8 +209,8 @@ class BinByBinDecodingDebugger:
             active_bin_aclus = np.array(list(active_bin_active_aclu_spike_counts_dict.keys()))
             active_solo_override_num_spikes_weights = dict(zip(active_bin_aclus, active_bin_active_aclu_bin_normalized_spike_count_values))
             active_aclu_override_alpha_weights_dict = dict(zip(active_bin_aclus, aclu_override_alpha_weights))
-
-            print(f'a_time_bin_idx: {a_time_bin_idx}/{n_epoch_time_bins} - active_bin_aclus: {active_bin_aclus}')
+            if debug_print:
+                print(f'a_time_bin_idx: {a_time_bin_idx}/{n_epoch_time_bins} - active_bin_aclus: {active_bin_aclus}')
 
             plot = win.addPlot(title=f"Plot {a_time_bin_idx+1}", row=2, rowspan=1, col=a_time_bin_idx, colspan=1)
             plot.getViewBox().setBorder(color=(200, 200, 200), width=1)
@@ -220,7 +219,7 @@ class BinByBinDecodingDebugger:
             x_axis.setTickSpacing(major=5, minor=1)
 
             plots.append(plot)
-            _obj = BaseTemplateDebuggingMixin.init_from_decoder(a_decoder=a_decoder, win=plot)
+            _obj = BaseTemplateDebuggingMixin.init_from_decoder(a_decoder=a_decoder, win=plot, title_str=f't={a_time_bin_idx}')
             _obj.update_base_decoder_debugger_data(
                 included_neuron_ids=active_bin_aclus,
                 solo_override_alpha_weights=active_aclu_override_alpha_weights_dict,
