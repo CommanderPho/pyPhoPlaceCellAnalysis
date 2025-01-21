@@ -74,7 +74,7 @@ class RankOrderRastersDebugger:
     # Examples ___________________________________________________________________________________________________________ #
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
 
-    _out = RankOrderRastersDebugger.init_rank_order_debugger(global_spikes_df, active_epochs_dfe, track_templates, RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict)
+    _out = RankOrderRastersDebugger.init_rank_order_debugger(global_spikes_df, active_epochs_df, track_templates, RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict)
 
     # Example 1 __________________________________________________________________________________________________________ #
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
