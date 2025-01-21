@@ -49,6 +49,79 @@ from pyphocorehelpers.DataStructure.general_parameter_containers import Visualiz
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 
+# ==================================================================================================================== #
+# 2025-01-21 - Bin-by-bin decoding examples                                                                            #
+# ==================================================================================================================== #
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
+from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import easy_independent_decoding
+
+@define(slots=False, eq=False)
+class BinByBinDecodingDebugger:
+    """ handles displaying the process of debugging decoding for each time bin """
+    time_bin_size: float = 0.500 # 500ms
+    spikes_df: pd.DataFrame = field()
+    global_laps_epochs_df: pd.DataFrame = field()
+    
+
+    def plot_bin_by_bin_decoding_example():
+        """ 
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_bin_by_bin_decoding_example
+        
+        """
+        ## INPUTS: time_bin_size
+        time_bin_size: float = 0.500 # 500ms
+
+        ## any (generic) directionald decoder
+        # neuron_IDs = deepcopy(track_templates.any_decoder_neuron_IDs) # array([  2,   5,   8,  10,  14,  15,  23,  24,  25,  26,  31,  32,  33,  41,  49,  50,  51,  55,  58,  64,  69,  70,  73,  74,  75,  76,  78,  82,  83,  85,  86,  90,  92,  93,  96, 109])
+
+        ## Get a specific decoder
+        a_decoder_name: types.DecoderName = 'long_LR'
+        a_decoder_idx: int = track_templates.get_decoder_names().index(a_decoder_name)
+        a_decoder = deepcopy(track_templates.long_LR_decoder)
+
+
+        neuron_IDs = deepcopy(a_decoder.neuron_IDs)
+
+        spikes_df: pd.DataFrame = deepcopy(spikes_df).spikes.sliced_by_neuron_id(neuron_IDs) ## filter everything down
+        unique_units = np.unique(spikes_df['aclu']) # sorted
+
+        _out_decoded_time_bin_edges = {}
+        _out_decoded_unit_specific_time_binned_spike_counts = {}
+        _out_decoded_active_unit_lists = {}
+        _out_decoded_active_p_x_given_n = {}
+
+        for a_row in global_laps_epochs_df.itertuples():
+            t_start = a_row.start
+            t_end = a_row.stop    
+            time_bin_edges: NDArray = np.arange(t_start, (t_end + time_bin_size), time_bin_size)
+            n_time_bins: int = len(time_bin_edges)-1
+            assert n_time_bins > 0
+            _out_decoded_time_bin_edges[a_row.lap_id] = time_bin_edges
+            # print(f'a_row: {a_row.lap_dir}')
+            
+            unit_specific_time_binned_spike_counts: NDArray = np.array([
+                np.histogram(spikes_df.loc[spikes_df['aclu'] == unit, 't_rel_seconds'], bins=time_bin_edges)[0]
+                for unit in unique_units
+            ])
+            active_units_list = []
+            for a_time_bin_idx in np.arange(n_time_bins):
+                unit_spike_counts = np.squeeze(unit_specific_time_binned_spike_counts[:, a_time_bin_idx]) 
+                active_unit_idxs = np.where(unit_spike_counts > 0)[0]
+                active_units = neuron_IDs[active_unit_idxs]
+                active_aclu_spike_counts_dict = dict(zip(active_units, unit_spike_counts[active_unit_idxs]))
+                # active_units_list.append(active_units)
+                active_units_list.append(active_aclu_spike_counts_dict)
+            # end for a_time_bin_idx in np.arange(n_time_bins)...
+            _out_decoded_active_unit_lists[a_row.lap_id] = active_units_list        
+
+            _out_decoded_unit_specific_time_binned_spike_counts[a_row.lap_id] = unit_specific_time_binned_spike_counts
+            ## OUTPUT: time_bin_edges, unit_specific_time_binned_spike_counts
+            _decoded_pos_outputs = long_LR_decoder.decode(unit_specific_time_binned_spike_counts=unit_specific_time_binned_spike_counts, time_bin_size=time_bin_size, output_flat_versions=True, debug_print=False)
+            _out_decoded_active_p_x_given_n[a_row.lap_id] = _decoded_pos_outputs
+            
+    ## OUTPUTS: _out_decoded_time_bin_edges, _out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists, _out_decoded_active_p_x_given_n
+
 
 # ==================================================================================================================== #
 # 2025-01-20 - Easy Decoding                                                                                           #
