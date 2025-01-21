@@ -635,6 +635,24 @@ class TemplateDebugger:
             custom_solo_emphasized_aclus = _out_params.get('solo_emphasized_aclus', None)
             custom_solo_visible_aclus = _out_params.get('solo_visible_aclus', None)
 
+            n_total_cells: int = len(curr_pf_peak_locations)
+            print(f'n_total_cells: {n_total_cells}')
+            if (custom_solo_visible_aclus is None):
+                n_visible_cells: int = n_total_cells ## all cells visible
+                line_height: float = 1.0
+            else:
+                # all_aclus = list(a_decoder_color_map.keys())
+                # included_visible_aclus = [aclu for aclu in all_aclus if aclu in (custom_solo_emphasized_aclus or [])]
+                # included_visible_aclus = [aclu for aclu in _out_data.included_any_context_neuron_ids if aclu in custom_solo_emphasized_aclus]
+                # n_visible_cells: int = len(included_visible_aclus)
+                print(f'custom_solo_visible_aclus: {custom_solo_visible_aclus}')
+                # n_visible_cells: int = np.shape(curr_data)[0]
+                n_visible_cells: int = len(np.unique(custom_solo_visible_aclus))
+                print(f'n_visible_cells: {n_visible_cells}')
+                # line_height: float = (1.0/float(n_total_cells)) * float(n_visible_cells)
+                line_height: float = float(n_total_cells)/float(n_visible_cells)
+                print(f'line_height: {line_height}')
+
             visible_cell_i = 0
             for cell_i, (aclu, a_color_vector) in enumerate(a_decoder_color_map.items()):
                 ## Apply emphasis/demphasis:
@@ -673,7 +691,8 @@ class TemplateDebugger:
                     x_offset = curr_pf_peak_locations[cell_i]
                     # y_offset = float(cell_i)
                     y_offset = float(visible_cell_i) 
-                    line_height = 1.0
+                    ## INPUTS: line_height
+                    
                     line = QtGui.QGraphicsLineItem(x_offset, y_offset, x_offset, (y_offset + line_height)) # (xstart, ystart, xend, yend)
                     # line.setPen(pg.mkPen('white', width=2))  # Set color and width of the line
                     line.setPen(pg.mkPen(build_adjusted_color(pg.mkColor(a_color_vector), value_scale=value_scale_multiplier, saturation_scale=saturation_scale), width=2))  # Set color and width of the line
