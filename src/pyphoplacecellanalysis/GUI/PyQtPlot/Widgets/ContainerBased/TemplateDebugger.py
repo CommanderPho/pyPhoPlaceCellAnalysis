@@ -136,8 +136,55 @@ def build_pf1D_heatmap_with_labels_and_peaks(pf1D_decoder, visible_aclus, plot_i
 class BaseTemplateDebuggingMixin:
     """ TemplateDebugger displays a 1D heatmap colored by cell for the tuning curves of PfND.
     
-    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import BaseTemplateDebuggingMixin
-    
+    Usage:
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import BaseTemplateDebuggingMixin, build_pf1D_heatmap_with_labels_and_peaks, TrackTemplates
+
+        a_lap_id: int = 1
+        # time_bin_edges = _out_decoded_unit_specific_time_binned_spike_counts[a_lap_id]
+        time_bin_edges = _out_decoded_time_bin_edges[a_lap_id]
+        n_epoch_time_bins: int = len(time_bin_edges) - 1
+        print(f'a_lap_id: {a_lap_id}, n_epoch_time_bins: {n_epoch_time_bins}')
+
+        ## INPUTS: a_lap_id, an_img_extents, _out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists
+        # Create a main GraphicsLayoutWidget
+        win = pg.GraphicsLayoutWidget()
+
+        # Store plot references
+        plots = []
+        out_pf1D_decoder_template_objects = []
+
+
+        ## Get data
+        active_bin_unit_specific_time_binned_spike_counts = _out_decoded_unit_specific_time_binned_spike_counts[a_lap_id]
+        active_lap_active_aclu_spike_counts_list = _out_decoded_active_unit_lists[a_lap_id]
+        active_lap_decoded_pos_outputs = _out_decoded_active_p_x_given_n[a_lap_id]
+        # Add PlotItems to the layout horizontally
+        # Add n_epoch_time_bins plots to the first row
+        for a_time_bin_idx in np.arange(n_epoch_time_bins):
+            active_bin_active_aclu_spike_counts_dict = active_lap_active_aclu_spike_counts_list[a_time_bin_idx]
+            active_bin_active_aclu_spike_count_values = np.array(list(active_bin_active_aclu_spike_counts_dict.values()))
+            active_bin_active_aclu_bin_normalized_spike_count_values = active_bin_active_aclu_spike_count_values / np.sum(active_bin_active_aclu_spike_count_values) # relative number of spikes ... todo.. prioritizes high-firing
+            
+            active_bin_aclus = np.array(list(active_bin_active_aclu_spike_counts_dict.keys()))
+            print(f'a_time_bin_idx: {a_time_bin_idx}/{n_epoch_time_bins} - active_bin_aclus: {active_bin_aclus}')
+            ## build the plot:
+            plot = win.addPlot(title=f"Plot {a_time_bin_idx+1}")
+            plots.append(plot)  # Store the reference
+            # curr_img, out_colors_heatmap_image_matrix = build_pf1D_heatmap_with_labels_and_peaks(pf1D_decoder=a_decoder, visible_aclus=active_bin_aclus, plot_item=plot, img_extents_rect=an_img_extents, a_decoder_aclu_to_color_map=a_decoder_aclu_to_color_map)
+            # _obj = BaseTemplateDebuggingMixin.init_from_decoder(a_decoder=a_decoder, win=win)
+            _obj = BaseTemplateDebuggingMixin.init_from_decoder(a_decoder=a_decoder, win=plot)
+            _obj.update_base_decoder_debugger_data(included_neuron_ids=active_bin_aclus)
+            out_pf1D_decoder_template_objects.append(_obj)  # Store the reference
+            
+            active_bin_active_aclu_bin_normalized_spike_count_values
+            
+
+            if a_time_bin_idx < (n_epoch_time_bins - 1):
+                win.nextColumn()  # Move to the next column for horizontal layout
+                
+
+        # Show the layout
+        win.show()
     
     """
     plots: RenderPlots = field(repr=keys_only_repr)
@@ -181,26 +228,6 @@ class BaseTemplateDebuggingMixin:
         # Get the peak locations for the tuning curves:
         sorted_pf_peak_location_list = [a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses[np.array(list(a_sort_helper_neuron_id_to_IDX_dict.values()))] for a_decoder, a_sort_helper_neuron_id_to_IDX_dict in zip(dummy_decoders_dict.values(), sort_helper_neuron_id_to_sort_IDX_dicts)]
         img_extents_dict = {a_decoder_name:[a_decoder.pf.ratemap.xbin[0], 0, (a_decoder.pf.ratemap.xbin[-1]-a_decoder.pf.ratemap.xbin[0]), (float(len(sorted_neuron_IDs_lists[i]))-0.0)] for i, (a_decoder_name, a_decoder) in enumerate(dummy_decoders_dict.items()) } # these extents are  (x, y, w, h)
-        
-
-        # sortable_values = deepcopy(decoder.pf.peak_tuning_curve_center_of_masses)
-        # sorted_indices = np.argsort(sortable_values)
-        # sorted_neuron_IDs = included_any_context_neuron_ids[sorted_indices]
-        
-        # # Get colors for sorted neurons
-        # sort_helper_neuron_id_to_neuron_colors = {aclu: decoder.get_color_for_aclu(aclu) for aclu in sorted_neuron_IDs}
-        # sort_helper_neuron_id_to_sort_IDX = {aclu: i for i, aclu in enumerate(sorted_neuron_IDs)}
-
-        # sorted_pf_tuning_curves = decoder.pf.ratemap.pdf_normalized_tuning_curves[sorted_indices, :]
-        # sorted_pf_peak_locations = decoder.pf.ratemap.peak_tuning_curve_center_of_masses[sorted_indices]
-
-        # img_extents = [decoder.pf.ratemap.xbin[0], 0, 
-        #               (decoder.pf.ratemap.xbin[-1]-decoder.pf.ratemap.xbin[0]), 
-        #               float(len(sorted_neuron_IDs))]
-        
-
-        # sortable_values = deepcopy(decoder.pf.peak_tuning_curve_center_of_masses)
-        # sorted_indices = np.argsort(sortable_values)
         sorted_neuron_IDs = sorted_neuron_IDs_lists[0]
         
         # Get colors for sorted neurons
@@ -232,7 +259,10 @@ class BaseTemplateDebuggingMixin:
         curr_curves = _out_data.sorted_pf_tuning_curves
         curr_pf_peak_locations = _out_data.sorted_pf_peak_locations
         
-        _out_plots.pf1D_heatmap = visualize_heatmap_pyqtgraph(curr_curves, title=title_str, show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True)
+        extant_win = _out_ui.get('win', None)
+        # extant_plot_item = _out_ui.get('plot_item', None)
+        
+        _out_plots.pf1D_heatmap = visualize_heatmap_pyqtgraph(curr_curves, title=title_str, show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=extant_win, defer_show=True)
 
         curr_win, curr_img = _out_plots.pf1D_heatmap
         if _out_params.debug_draw:
@@ -317,21 +347,18 @@ class BaseTemplateDebuggingMixin:
 
             heatmap_base_color = pg.mkColor(a_color_vector)
             row_data = _out_data.sorted_pf_tuning_curves[cell_i, :]
-            out_colors_row = DataSeriesColorHelpers.qColorsList_to_NDarray(
-                [build_adjusted_color(heatmap_base_color, 
-                                    value_scale=(v * value_scale_multiplier),
-                                    saturation_scale=saturation_scale) for v in row_data],
-                is_255_array=False).T
+            out_colors_row = DataSeriesColorHelpers.qColorsList_to_NDarray([build_adjusted_color(heatmap_base_color, value_scale=(v * value_scale_multiplier), saturation_scale=saturation_scale) for v in row_data], is_255_array=False).T
             _temp_curr_out_colors_heatmap_image.append(out_colors_row)
 
-            if self.params.enable_pf_peak_indicator_lines:
-                x_offset = _out_data.sorted_pf_peak_locations[cell_i]
-                y_offset = float(cell_i)
-                line = QtGui.QGraphicsLineItem(x_offset, y_offset, x_offset, (y_offset + 1.0))
-                line.setPen(pg.mkPen(build_adjusted_color(pg.mkColor(a_color_vector), value_scale=value_scale_multiplier, saturation_scale=saturation_scale), width=2))
-                curr_win.addItem(line)
-                self.ui.order_location_lines[aclu] = line
-
+            # pf_peak_indicator_lines ____________________________________________________________________________________________ #
+            x_offset = _out_data.sorted_pf_peak_locations[cell_i]
+            y_offset = float(cell_i)
+            line = QtGui.QGraphicsLineItem(x_offset, y_offset, x_offset, (y_offset + 1.0))
+            line.setPen(pg.mkPen(build_adjusted_color(pg.mkColor(a_color_vector), value_scale=value_scale_multiplier, saturation_scale=saturation_scale), width=2))
+            curr_win.addItem(line)
+            self.ui.order_location_lines[aclu] = line
+        # END for cell_i, aclu in enumerate(_out_data.sorted_neuron_IDs)...
+        
         out_colors_heatmap_image_matrix = np.stack(_temp_curr_out_colors_heatmap_image, axis=0)
         out_colors_heatmap_image_matrix = np.clip(out_colors_heatmap_image_matrix, 0, 1)
 
@@ -343,7 +370,7 @@ class BaseTemplateDebuggingMixin:
 
 
     @classmethod
-    def init_from_decoder(cls, a_decoder: BasePositionDecoder, included_all_neuron_ids=None, **kwargs):
+    def init_from_decoder(cls, a_decoder: BasePositionDecoder, included_all_neuron_ids=None, win=None, plot_item=None, **kwargs):
         fignum = kwargs.pop('fignum', None)
         if fignum is not None:
             print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
@@ -355,6 +382,10 @@ class BaseTemplateDebuggingMixin:
         enable_cell_colored_heatmap_rows: bool = kwargs.pop('enable_cell_colored_heatmap_rows', True)
         use_shared_aclus_only_templates: bool = kwargs.pop('use_shared_aclus_only_templates', False)
         
+
+        # plot_item = kwargs.pop('plot_item', None)
+        
+        
         if included_all_neuron_ids is None:
             included_all_neuron_ids = deepcopy(a_decoder.neuron_IDs) ## all neuron_IDs in the decoder
 
@@ -365,19 +396,25 @@ class BaseTemplateDebuggingMixin:
         _out_params = VisualizationParameters(name=figure_name, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, use_shared_aclus_only_templates=use_shared_aclus_only_templates,
                                              debug_print=debug_print, debug_draw=debug_draw, included_any_context_neuron_ids=included_all_neuron_ids,
                                              solo_emphasized_aclus=None, **kwargs)
-                
-        # build the window with the dock widget in it:
-        root_dockAreaWindow, app = DockAreaWrapper.build_default_dockAreaWindow(title=f'Pho BaseTemplateDebuggingMixin Debugger: {figure_name}', defer_show=False)
-        icon = try_get_icon(icon_path=":/Icons/Icons/visualizations/template_1D_debugger.ico")
-        if icon is not None:
-            root_dockAreaWindow.setWindowIcon(icon)
-        # icon_path=":/Icons/Icons/visualizations/template_1D_debugger.ico"
-        # root_dockAreaWindow.setWindowIcon(pg.QtGui.QIcon(icon_path))
 
-        _out_ui = PhoUIContainer(name=figure_name, app=app, root_dockAreaWindow=root_dockAreaWindow, text_items_dict=None, order_location_lines_dict=None, dock_widgets=None, dock_configs=None, on_update_callback=None)
+
+        if ((win is None) and (plot_item is None)):
+            # build the window with the dock widget in it:
+            root_dockAreaWindow, app = DockAreaWrapper.build_default_dockAreaWindow(title=f'Pho BaseTemplateDebuggingMixin Debugger: {figure_name}', defer_show=False)
+            icon = try_get_icon(icon_path=":/Icons/Icons/visualizations/template_1D_debugger.ico")
+            if icon is not None:
+                root_dockAreaWindow.setWindowIcon(icon)
+            # icon_path=":/Icons/Icons/visualizations/template_1D_debugger.ico"
+            # root_dockAreaWindow.setWindowIcon(pg.QtGui.QIcon(icon_path))
+            root_dockAreaWindow.resize(900, 700)
+            _out_ui = PhoUIContainer(name=figure_name, app=app, root_dockAreaWindow=root_dockAreaWindow, win=root_dockAreaWindow, plot_item=None, text_items_dict=None, order_location_lines_dict=None, dock_widgets=None, dock_configs=None, on_update_callback=None)
+
+        else:
+            # extant plot item already
+            app = pg.mkQApp()
+            _out_ui = PhoUIContainer(name=figure_name, app=app, root_dockAreaWindow=None, win=win, plot_item=plot_item, text_items_dict=None, order_location_lines_dict=None, dock_widgets=None, dock_configs=None, on_update_callback=None)
+
         
-        root_dockAreaWindow.resize(900, 700)
-
         ## Initialize Class here:
         _obj = cls(plots=_out_plots, plots_data=_out_data, ui=_out_ui, params=_out_params)
 
