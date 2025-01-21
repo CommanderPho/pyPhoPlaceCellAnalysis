@@ -76,10 +76,11 @@ class BinByBinDecodingDebugger:
     @classmethod
     def build_spike_counts_and_decoder_outputs(cls, track_templates, global_laps_epochs_df, spikes_df, a_decoder_name='long_LR', time_bin_size=0.500, debug_print=False):
         """
-
+            a_decoder_name: types.DecoderName = 'long_LR'
+            
         """
         ## Get a specific decoder
-        a_decoder_name: types.DecoderName = 'long_LR'
+        
         a_decoder_idx: int = track_templates.get_decoder_names().index(a_decoder_name)
         a_decoder = deepcopy(track_templates.long_LR_decoder)
 
@@ -127,7 +128,6 @@ class BinByBinDecodingDebugger:
             _decoded_pos_outputs = a_decoder.decode(unit_specific_time_binned_spike_counts=unit_specific_time_binned_spike_counts, time_bin_size=time_bin_size, output_flat_versions=True, debug_print=False)
             _out_decoded_active_p_x_given_n[a_row.lap_id] = _decoded_pos_outputs
             _out_decoded_active_plots_data[a_row.lap_id] = RenderPlotsData(name=f'lap[{a_row.lap_id}]', spikes_df=lap_specific_spikes_df, active_aclus=all_lap_active_units_list)
-
 
         return (_out_decoded_time_bin_edges, _out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists, _out_decoded_active_p_x_given_n, _out_decoded_active_plots_data)
 
