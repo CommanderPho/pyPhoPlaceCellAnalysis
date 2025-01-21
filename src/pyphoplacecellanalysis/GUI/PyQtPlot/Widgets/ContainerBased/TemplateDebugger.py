@@ -635,6 +635,7 @@ class TemplateDebugger:
             custom_solo_emphasized_aclus = _out_params.get('solo_emphasized_aclus', None)
             custom_solo_visible_aclus = _out_params.get('solo_visible_aclus', None)
 
+            visible_cell_i = 0
             for cell_i, (aclu, a_color_vector) in enumerate(a_decoder_color_map.items()):
                 ## Apply emphasis/demphasis:
                 
@@ -657,7 +658,8 @@ class TemplateDebugger:
 
                 # Create a new text item:
                 text = SelectableTextItem(f"{int(aclu)}", color=build_adjusted_color(pg.mkColor(a_color_vector), value_scale=value_scale_multiplier, saturation_scale=saturation_scale), anchor=(1,0))
-                text.setPos(-1.0, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
+                # text.setPos(-1.0, (cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
+                text.setPos(-1.0, (visible_cell_i+1)) # the + 1 is because the rows are seemingly 1-indexed?
                 curr_win.addItem(text)
                 _out_ui.text_items_dict[a_decoder_name][aclu] = text # add the TextItem to the map
 
@@ -669,7 +671,8 @@ class TemplateDebugger:
                 # Add vertical lines
                 if _out_params.enable_pf_peak_indicator_lines:
                     x_offset = curr_pf_peak_locations[cell_i]
-                    y_offset = float(cell_i) 
+                    # y_offset = float(cell_i)
+                    y_offset = float(visible_cell_i) 
                     line_height = 1.0
                     line = QtGui.QGraphicsLineItem(x_offset, y_offset, x_offset, (y_offset + line_height)) # (xstart, ystart, xend, yend)
                     # line.setPen(pg.mkPen('white', width=2))  # Set color and width of the line
@@ -679,7 +682,10 @@ class TemplateDebugger:
                     # # Old update-based way:
                     # line = _out_ui.order_location_lines_dict[a_decoder_name][aclu] # QtGui.QGraphicsLineItem(x_offset, y_offset, x_offset, line_height)
                     # line.setLine(x_offset, y_offset, x_offset, (y_offset + line_height)) # (xstart, ystart, xend, yend)
-
+                    
+                ## END if _out_params.enable_pf_peak_indicator_lines...
+                visible_cell_i += 1
+                
             # end `for cell_i, (aclu, a_color_vector)`
 
             ## Build the colored heatmap:
