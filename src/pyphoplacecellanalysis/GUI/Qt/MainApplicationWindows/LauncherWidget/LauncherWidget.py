@@ -299,7 +299,9 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
     def build_for_pipeline(self, curr_active_pipeline):
         self._curr_active_pipeline_ref = curr_active_pipeline
         curr_active_pipeline.reload_default_display_functions()
-        
+        ## update window title/etc
+        session_id_str: str = self._curr_active_pipeline_ref.get_complete_session_identifier_string()
+        self.setWindowTitle(f'Spike3D Launcher: {session_id_str}')
         self.displayContextSelectorWidget.build_for_pipeline(curr_active_pipeline) ## update the context list
         self._rebuild_tree() ## call self._rebuild_tree()
 

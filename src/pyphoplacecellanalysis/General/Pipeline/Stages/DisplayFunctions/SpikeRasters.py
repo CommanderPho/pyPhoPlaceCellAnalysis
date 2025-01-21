@@ -762,7 +762,9 @@ def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort
     if (not plots.has_attr('root_plot')):
         plots.root_plot = win.addPlot(title="Raster") # this seems to be the equivalent to an 'axes'
 
-
+    if scatter_plot_kwargs is None:
+        scatter_plot_kwargs = {} ## make them empty at least
+        
     scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs, tick_width=scatter_plot_kwargs.pop('tick_width', 0.1), tick_height=scatter_plot_kwargs.pop('tick_height', 1.0))
     
     plots.scatter_plot = pg.ScatterPlotItem(**scatter_plot_kwargs)
