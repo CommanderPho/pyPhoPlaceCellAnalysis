@@ -530,14 +530,14 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         a_disp_fn_item = self.get_display_function_item(a_fn_name=a_fcn_name)
         assert a_disp_fn_item is not None, f"a_disp_fn_item is None! for a_fn_name='{a_fcn_name}'"
         if a_disp_fn_item.is_global:
-            return self.curr_active_pipeline.display(display_function=a_fcn_name, active_session_configuration_context=None, *args, **kwargs)
+            return self.curr_active_pipeline.display(display_function=a_disp_fn_item.name, active_session_configuration_context=None, *args, **kwargs)
         else:
             # non-global, needs a context:
             current_selected_context = self.displayContextSelectorWidget.current_selected_context
             if current_selected_context is not None:
                 # args = list(args) ## convert to list if a tuple
                 # args.insert(0, current_selected_context)
-                return self.curr_active_pipeline.display(display_function=a_fcn_name, active_session_configuration_context=current_selected_context, *args, **kwargs)
+                return self.curr_active_pipeline.display(display_function=a_disp_fn_item.name, active_session_configuration_context=current_selected_context, *args, **kwargs)
             else:
                 return None
 
@@ -559,14 +559,14 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         a_disp_fn_item: DisplayFunctionItem = self.get_display_function_item(a_fn_name=a_fcn_name)
         assert a_disp_fn_item is not None, f"a_disp_fn_item is None! for a_fn_name='{a_fcn_name}'"
         if a_disp_fn_item.is_global:
-            code_out = f"{code_out}_out['{a_fcn_name}'] = curr_active_pipeline.display(display_function='{a_fcn_name}', active_session_configuration_context=None) # {a_fcn_name}\n" # , *{args}, **{kwargs}
+            code_out = f"{code_out}_out['{a_disp_fn_item.name}'] = curr_active_pipeline.display(display_function='{a_disp_fn_item.name}', active_session_configuration_context=None) # {a_disp_fn_item.name}\n" # , *{args}, **{kwargs}
         else:
             # non-global, needs a context:
             current_selected_context = self.displayContextSelectorWidget.current_selected_context
             if current_selected_context is not None:
                 # args = list(args) ## convert to list if a tuple
                 # args.insert(0, current_selected_context)
-                code_out = f"{code_out}_out['{a_fcn_name}'] = curr_active_pipeline.display(display_function='{a_fcn_name}', active_session_configuration_context={current_selected_context.get_initialization_code_string()}) # {a_fcn_name}\n" # , *{args}, **{kwargs}
+                code_out = f"{code_out}_out['{a_disp_fn_item.name}'] = curr_active_pipeline.display(display_function='{a_disp_fn_item.name}', active_session_configuration_context={current_selected_context.get_initialization_code_string()}) # {a_disp_fn_item.name}\n" # , *{args}, **{kwargs}
             else:
                 return None
             
