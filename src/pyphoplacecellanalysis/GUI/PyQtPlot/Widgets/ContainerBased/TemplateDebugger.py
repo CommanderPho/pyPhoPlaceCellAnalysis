@@ -307,7 +307,7 @@ class BaseTemplateDebuggingMixin:
 
     def buildUI_base_decoder_debugger_data(self):
         """Calls `_subfn_buildUI_directional_template_debugger_data` to build the UI"""
-        self.plots_data, self.plots, self.ui = self._subfn_buildUI_base_decoder_debugger_data(self.params.included_any_context_neuron_ids, self.params.debug_print, self.params.enable_cell_colored_heatmap_rows, self.plots_data, self.plots, self.ui, self.params, self.decoder)
+        self.plots_data, self.plots, self.ui = self._subfn_buildUI_base_decoder_debugger_data(included_any_context_neuron_ids=self.params.included_any_context_neuron_ids, debug_print=self.params.debug_print, enable_cell_colored_heatmap_rows=self.params.enable_cell_colored_heatmap_rows, _out_data=self.plots_data, _out_plots=self.plots, _out_ui=self.ui, _out_params=self.params, decoder=self.decoder)
 
 
     def update_base_decoder_debugger_data(self, included_neuron_ids, solo_emphasized_aclus: Optional[List]=None, solo_override_num_spikes_weights: Optional[Dict]=None, solo_override_alpha_weights: Optional[Dict]=None):
