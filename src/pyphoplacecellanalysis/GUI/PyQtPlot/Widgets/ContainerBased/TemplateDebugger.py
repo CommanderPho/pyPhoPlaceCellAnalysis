@@ -650,7 +650,8 @@ class TemplateDebugger:
                 n_visible_cells: int = len(np.unique(custom_solo_visible_aclus))
                 print(f'n_visible_cells: {n_visible_cells}')
                 # line_height: float = (1.0/float(n_total_cells)) * float(n_visible_cells)
-                line_height: float = float(n_total_cells)/float(n_visible_cells)
+                # line_height: float = float(n_total_cells)/float(n_visible_cells)
+                line_height: float = 1.0
                 print(f'line_height: {line_height}')
 
             visible_cell_i = 0
@@ -714,9 +715,16 @@ class TemplateDebugger:
             if enable_cell_colored_heatmap_rows:
                 curr_img.updateImage(out_colors_heatmap_image_matrix) #, xvals=curr_xbins, use the color image only if `enable_cell_colored_heatmap_rows==True`
             _out_data['out_colors_heatmap_image_matrix_dicts'][a_decoder_name] = out_colors_heatmap_image_matrix
-            
-            # Set the extent to map pixels to x-locations
-            curr_img.setRect(_out_data.active_pfs_img_extents_dict[a_decoder_name])
+
+            # Set the extent to map pixels to x-locations        
+            if (n_visible_cells < n_total_cells):
+                ## some cells hidden
+                _modified_visible_rect = deepcopy(_out_data.active_pfs_img_extents_dict[a_decoder_name])
+                _modified_visible_rect[-1] = float(n_visible_cells)
+                curr_img.setRect(_modified_visible_rect)                
+            else:
+                ## normal visibility:
+                curr_img.setRect(_out_data.active_pfs_img_extents_dict[a_decoder_name])
             
         # end `for i, (a_decoder_name, a_decoder)`
 
