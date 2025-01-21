@@ -633,6 +633,7 @@ class TemplateDebugger:
             _out_ui.order_location_lines_dict[a_decoder_name] = {} # clear the dictionary
             
             custom_solo_emphasized_aclus = _out_params.get('solo_emphasized_aclus', None)
+            custom_solo_visible_aclus = _out_params.get('solo_visible_aclus', None)
 
             for cell_i, (aclu, a_color_vector) in enumerate(a_decoder_color_map.items()):
                 ## Apply emphasis/demphasis:
@@ -647,6 +648,12 @@ class TemplateDebugger:
                         ## demphasize
                         saturation_scale = 0.02
                         value_scale_multiplier = 0.1
+
+                if custom_solo_visible_aclus is not None:
+                    ## apply custom visibility here
+                    if aclu not in custom_solo_visible_aclus:
+                        ## hide
+                        continue
 
                 # Create a new text item:
                 text = SelectableTextItem(f"{int(aclu)}", color=build_adjusted_color(pg.mkColor(a_color_vector), value_scale=value_scale_multiplier, saturation_scale=saturation_scale), anchor=(1,0))
@@ -696,9 +703,10 @@ class TemplateDebugger:
         self.plots_data, self.plots, self.ui = self._subfn_buildUI_directional_template_debugger_data(self.params.included_any_context_neuron_ids, self.params.use_incremental_sorting, self.params.debug_print, self.params.enable_cell_colored_heatmap_rows, self.plots_data, self.plots, self.ui, _out_params=self.params, decoders_dict=self.decoders_dict)
 
     @function_attributes(short_name=None, tags=['update'], input_requires=[], output_provides=[], uses=['_subfn_update_directional_template_debugger_data'], used_by=[], creation_date='2024-10-21 19:21', related_items=[])
-    def update_directional_template_debugger_data(self, included_neuron_ids, solo_emphasized_aclus: Optional[List]=None):
+    def update_directional_template_debugger_data(self, included_neuron_ids, solo_emphasized_aclus: Optional[List]=None, solo_visible_aclus: Optional[List]=None):
         """Calls `_subfn_update_directional_template_debugger_data` to build the UI and then updates the member variables."""
         self.params.solo_emphasized_aclus = solo_emphasized_aclus ## reset emphasis on update
+        self.params.solo_visible_aclus = solo_visible_aclus ## reset visibility on update
         self.plots_data, self.plots, self.ui = self._subfn_update_directional_template_debugger_data(included_neuron_ids, self.params.use_incremental_sorting, self.params.debug_print, self.params.enable_cell_colored_heatmap_rows, self.plots_data, self.plots, self.ui, _out_params=self.params, decoders_dict=self.decoders_dict)
 
 
@@ -715,6 +723,14 @@ class TemplateDebugger:
         """ resets the emphasis to normal (no special emphasis/demphasis) """
         self.update_cell_emphasis(solo_emphasized_aclus=None)
 
+
+    def update_cell_visibility(self, solo_visible_aclus: List):
+        """ updates the display of each cell to only include the `solo_visible_aclus` as visible, completely hiding all the others. """
+        self.update_directional_template_debugger_data(included_neuron_ids=self.params.included_any_context_neuron_ids, solo_visible_aclus=solo_visible_aclus)
+
+    def reset_cell_visibility(self):
+        """ resets the emphasis to normal (no special emphasis/demphasis) """
+        self.update_cell_visibility(solo_visible_aclus=None)
 
 
 # ==================================================================================================================== #
