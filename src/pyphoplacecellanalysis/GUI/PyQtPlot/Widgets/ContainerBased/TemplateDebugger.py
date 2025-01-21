@@ -150,7 +150,7 @@ class BaseTemplateDebuggingMixin:
         return self.ui.order_location_lines
 
     @classmethod
-    def _subfn_rebuild_sort_idxs(cls, decoder, _out_data: RenderPlotsData, use_incremental_sorting: bool, included_any_context_neuron_ids: NDArray) -> RenderPlotsData:
+    def _subfn_rebuild_sort_idxs(cls, decoder, _out_data: RenderPlotsData, included_any_context_neuron_ids: NDArray) -> RenderPlotsData:
         """ Updates RenderPlotsData """
         sortable_values = deepcopy(decoder.pf.peak_tuning_curve_center_of_masses)
         sorted_indices = np.argsort(sortable_values)
@@ -177,9 +177,9 @@ class BaseTemplateDebuggingMixin:
         return _out_data
 
     @classmethod
-    def _subfn_buildUI_directional_template_debugger_data(cls, included_any_context_neuron_ids, use_incremental_sorting: bool, debug_print: bool, enable_cell_colored_heatmap_rows: bool, _out_data: RenderPlotsData, _out_plots: RenderPlots, _out_ui: PhoUIContainer, _out_params: VisualizationParameters, decoder, line_height: float = 1.0):
+    def _subfn_buildUI_base_decoder_debugger_data(cls, included_any_context_neuron_ids, debug_print: bool, enable_cell_colored_heatmap_rows: bool, _out_data: RenderPlotsData, _out_plots: RenderPlots, _out_ui: PhoUIContainer, _out_params: VisualizationParameters, decoder, line_height: float = 1.0):
         """ Builds UI """
-        _out_data = cls._subfn_rebuild_sort_idxs(decoder, _out_data, use_incremental_sorting, included_any_context_neuron_ids)
+        _out_data = cls._subfn_rebuild_sort_idxs(decoder, _out_data, included_any_context_neuron_ids)
 
         title_str = f'pf1D_heatmap'
         curr_curves = _out_data.sorted_pf_tuning_curves
@@ -228,25 +228,16 @@ class BaseTemplateDebuggingMixin:
 
         return _out_data, _out_plots, _out_ui
 
-    def buildUI_directional_template_debugger_data(self):
+    def buildUI_base_decoder_debugger_data(self):
         """Calls `_subfn_buildUI_directional_template_debugger_data` to build the UI"""
-        self.plots_data, self.plots, self.ui = self._subfn_buildUI_directional_template_debugger_data(
-            self.params.included_any_context_neuron_ids, 
-            self.params.use_incremental_sorting,
-            self.params.debug_print,
-            self.params.enable_cell_colored_heatmap_rows,
-            self.plots_data,
-            self.plots,
-            self.ui,
-            self.params,
-            self.decoder
-        )
+        self.plots_data, self.plots, self.ui = self._subfn_buildUI_base_decoder_debugger_data(self.params.included_any_context_neuron_ids, self.params.debug_print, self.params.enable_cell_colored_heatmap_rows, self.plots_data, self.plots, self.ui, self.params, self.decoder)
 
-    def update_directional_template_debugger_data(self, included_neuron_ids, solo_emphasized_aclus: Optional[List]=None):
+
+    def update_base_decoder_debugger_data(self, included_neuron_ids, solo_emphasized_aclus: Optional[List]=None):
         """Updates the visualization with new neuron selections"""
         self.params.solo_emphasized_aclus = solo_emphasized_aclus
         
-        _out_data = self._subfn_rebuild_sort_idxs(self.decoder, self.plots_data, self.params.use_incremental_sorting, included_neuron_ids)
+        _out_data = self._subfn_rebuild_sort_idxs(self.decoder, self.plots_data, included_neuron_ids)
         
         curr_win, curr_img = self.plots.pf1D_heatmap
         
@@ -271,11 +262,7 @@ class BaseTemplateDebuggingMixin:
                 value_scale_multiplier = 0.1
 
             a_color_vector = _out_data.sort_helper_neuron_id_to_neuron_colors[aclu]
-            text = SelectableTextItem(f"{int(aclu)}", 
-                                    color=build_adjusted_color(pg.mkColor(a_color_vector), 
-                                                            value_scale=value_scale_multiplier,
-                                                            saturation_scale=saturation_scale),
-                                    anchor=(1,0))
+            text = SelectableTextItem(f"{int(aclu)}", color=build_adjusted_color(pg.mkColor(a_color_vector), value_scale=value_scale_multiplier, saturation_scale=saturation_scale), anchor=(1,0))
             text.setPos(-1.0, (cell_i+1))
             curr_win.addItem(text)
             self.ui.text_items[aclu] = text
@@ -293,10 +280,7 @@ class BaseTemplateDebuggingMixin:
                 x_offset = _out_data.sorted_pf_peak_locations[cell_i]
                 y_offset = float(cell_i)
                 line = QtGui.QGraphicsLineItem(x_offset, y_offset, x_offset, (y_offset + 1.0))
-                line.setPen(pg.mkPen(build_adjusted_color(pg.mkColor(a_color_vector),
-                                                        value_scale=value_scale_multiplier,
-                                                        saturation_scale=saturation_scale),
-                                    width=2))
+                line.setPen(pg.mkPen(build_adjusted_color(pg.mkColor(a_color_vector), value_scale=value_scale_multiplier, saturation_scale=saturation_scale), width=2))
                 curr_win.addItem(line)
                 self.ui.order_location_lines[aclu] = line
 
