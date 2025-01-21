@@ -51,6 +51,8 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import 
 from pyphoplacecellanalysis.External.pyqtgraph_extensions.PlotWidget.CustomPlotWidget import CustomPlotWidget
 from pyphoplacecellanalysis.External.pyqtgraph_extensions.graphicsItems.SelectableTextItem import SelectableTextItem
 
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
+
 __all__ = ['TemplateDebugger']
 
 
@@ -133,6 +135,10 @@ def build_pf1D_heatmap_with_labels_and_peaks(pf1D_decoder, visible_aclus, plot_i
 @define(slots=False, repr=False, eq=False)
 class BaseTemplateDebuggingMixin:
     """ TemplateDebugger displays a 1D heatmap colored by cell for the tuning curves of PfND.
+    
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import BaseTemplateDebuggingMixin
+    
+    
     """
     plots: RenderPlots = field(repr=keys_only_repr)
     plots_data: RenderPlotsData = field(repr=keys_only_repr)
@@ -143,6 +149,15 @@ class BaseTemplateDebuggingMixin:
     def pf1D_heatmap(self) -> Tuple[pg.PlotWidget, pg.ImageItem]:
         """ The heatmap plot window and image item """
         return self.plots.pf1D_heatmap
+    
+    @property
+    def decoder(self) -> BasePositionDecoder:
+        """The decoder property."""
+        return self.plots_data.decoder
+    @decoder.setter
+    def decoder(self, value: BasePositionDecoder):
+        assert self.plots_data is not None
+        self.plots_data.decoder = value
 
     @property
     def order_location_lines(self) -> Dict[types.aclu_index, pg.TextItem]:
@@ -150,23 +165,55 @@ class BaseTemplateDebuggingMixin:
         return self.ui.order_location_lines
 
     @classmethod
-    def _subfn_rebuild_sort_idxs(cls, decoder, _out_data: RenderPlotsData, included_any_context_neuron_ids: NDArray) -> RenderPlotsData:
+    def _subfn_rebuild_sort_idxs(cls, decoder: BasePositionDecoder, _out_data: RenderPlotsData, included_any_context_neuron_ids: NDArray) -> RenderPlotsData:
         """ Updates RenderPlotsData """
-        sortable_values = deepcopy(decoder.pf.peak_tuning_curve_center_of_masses)
-        sorted_indices = np.argsort(sortable_values)
-        sorted_neuron_IDs = included_any_context_neuron_ids[sorted_indices]
+        
+        # INDIVIDUAL SORTING:
+        ref_decoder_name: Optional[str] = None
+        dummy_decoder_name_key: str = 'only'
+        dummy_decoders_dict = {dummy_decoder_name_key: decoder}
+        # sortable_values_list_dict = {k:deepcopy(np.argmax(a_decoder.pf.ratemap.normalized_tuning_curves, axis=1)) for k, a_decoder in dummy_decoders_dict.items()} # tuning_curve peak location
+        sortable_values_list_dict = {k:deepcopy(a_decoder.pf.peak_tuning_curve_center_of_masses) for k, a_decoder in dummy_decoders_dict.items()} # tuning_curve CoM location
+        sorted_neuron_IDs_lists, sort_helper_neuron_id_to_neuron_colors_dicts, sort_helper_neuron_id_to_sort_IDX_dicts, (unsorted_original_neuron_IDs_lists, unsorted_neuron_IDs_lists, unsorted_sortable_values_lists, unsorted_unit_colors_map) = paired_separately_sort_neurons(dummy_decoders_dict, included_any_context_neuron_ids, sortable_values_list_dict=sortable_values_list_dict)
+    
+        ## dict-based way
+        sorted_pf_tuning_curves = [a_decoder.pf.ratemap.pdf_normalized_tuning_curves[np.array(list(a_sort_helper_neuron_id_to_IDX_dict.values())), :] for a_decoder, a_sort_helper_neuron_id_to_IDX_dict in zip(dummy_decoders_dict.values(), sort_helper_neuron_id_to_sort_IDX_dicts)]
+        # Get the peak locations for the tuning curves:
+        sorted_pf_peak_location_list = [a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses[np.array(list(a_sort_helper_neuron_id_to_IDX_dict.values()))] for a_decoder, a_sort_helper_neuron_id_to_IDX_dict in zip(dummy_decoders_dict.values(), sort_helper_neuron_id_to_sort_IDX_dicts)]
+        img_extents_dict = {a_decoder_name:[a_decoder.pf.ratemap.xbin[0], 0, (a_decoder.pf.ratemap.xbin[-1]-a_decoder.pf.ratemap.xbin[0]), (float(len(sorted_neuron_IDs_lists[i]))-0.0)] for i, (a_decoder_name, a_decoder) in enumerate(dummy_decoders_dict.items()) } # these extents are  (x, y, w, h)
+        
+
+        # sortable_values = deepcopy(decoder.pf.peak_tuning_curve_center_of_masses)
+        # sorted_indices = np.argsort(sortable_values)
+        # sorted_neuron_IDs = included_any_context_neuron_ids[sorted_indices]
+        
+        # # Get colors for sorted neurons
+        # sort_helper_neuron_id_to_neuron_colors = {aclu: decoder.get_color_for_aclu(aclu) for aclu in sorted_neuron_IDs}
+        # sort_helper_neuron_id_to_sort_IDX = {aclu: i for i, aclu in enumerate(sorted_neuron_IDs)}
+
+        # sorted_pf_tuning_curves = decoder.pf.ratemap.pdf_normalized_tuning_curves[sorted_indices, :]
+        # sorted_pf_peak_locations = decoder.pf.ratemap.peak_tuning_curve_center_of_masses[sorted_indices]
+
+        # img_extents = [decoder.pf.ratemap.xbin[0], 0, 
+        #               (decoder.pf.ratemap.xbin[-1]-decoder.pf.ratemap.xbin[0]), 
+        #               float(len(sorted_neuron_IDs))]
+        
+
+        # sortable_values = deepcopy(decoder.pf.peak_tuning_curve_center_of_masses)
+        # sorted_indices = np.argsort(sortable_values)
+        sorted_neuron_IDs = sorted_neuron_IDs_lists[0]
         
         # Get colors for sorted neurons
-        sort_helper_neuron_id_to_neuron_colors = {aclu: decoder.get_color_for_aclu(aclu) for aclu in sorted_neuron_IDs}
-        sort_helper_neuron_id_to_sort_IDX = {aclu: i for i, aclu in enumerate(sorted_neuron_IDs)}
+        sort_helper_neuron_id_to_neuron_colors = sort_helper_neuron_id_to_neuron_colors_dicts[0]
+        sort_helper_neuron_id_to_sort_IDX = sort_helper_neuron_id_to_sort_IDX_dicts[0]
 
-        sorted_pf_tuning_curves = decoder.pf.ratemap.pdf_normalized_tuning_curves[sorted_indices, :]
-        sorted_pf_peak_locations = decoder.pf.ratemap.peak_tuning_curve_center_of_masses[sorted_indices]
+        sorted_pf_tuning_curves = deepcopy(sorted_pf_tuning_curves[0])
+        sorted_pf_peak_locations = deepcopy(sorted_pf_peak_location_list[0])
 
-        img_extents = [decoder.pf.ratemap.xbin[0], 0, 
-                      (decoder.pf.ratemap.xbin[-1]-decoder.pf.ratemap.xbin[0]), 
-                      float(len(sorted_neuron_IDs))]
-
+        img_extents = img_extents_dict[dummy_decoder_name_key]
+        
+        
+        ## apply
         _out_data.sorted_neuron_IDs = sorted_neuron_IDs
         _out_data.sort_helper_neuron_id_to_neuron_colors = sort_helper_neuron_id_to_neuron_colors
         _out_data.sort_helper_neuron_id_to_sort_IDX = sort_helper_neuron_id_to_sort_IDX
@@ -177,7 +224,7 @@ class BaseTemplateDebuggingMixin:
         return _out_data
 
     @classmethod
-    def _subfn_buildUI_base_decoder_debugger_data(cls, included_any_context_neuron_ids, debug_print: bool, enable_cell_colored_heatmap_rows: bool, _out_data: RenderPlotsData, _out_plots: RenderPlots, _out_ui: PhoUIContainer, _out_params: VisualizationParameters, decoder, line_height: float = 1.0):
+    def _subfn_buildUI_base_decoder_debugger_data(cls, included_any_context_neuron_ids, debug_print: bool, enable_cell_colored_heatmap_rows: bool, _out_data: RenderPlotsData, _out_plots: RenderPlots, _out_ui: PhoUIContainer, _out_params: VisualizationParameters, decoder: BasePositionDecoder, line_height: float = 1.0):
         """ Builds UI """
         _out_data = cls._subfn_rebuild_sort_idxs(decoder, _out_data, included_any_context_neuron_ids)
 
@@ -209,14 +256,15 @@ class BaseTemplateDebuggingMixin:
             out_colors_row = DataSeriesColorHelpers.qColorsList_to_NDarray([build_adjusted_color(heatmap_base_color, value_scale=v) for v in row_data], is_255_array=False).T
             _temp_curr_out_colors_heatmap_image.append(out_colors_row)
 
-            if _out_params.enable_pf_peak_indicator_lines:
-                x_offset = curr_pf_peak_locations[cell_i]
-                y_offset = float(cell_i)
-                line = QtGui.QGraphicsLineItem(x_offset, y_offset, x_offset, (y_offset + line_height))
-                line.setPen(pg.mkPen('white', width=2))
-                curr_win.addItem(line)
-                _out_ui.order_location_lines[aclu] = line
+            # pf_peak_indicator_lines ____________________________________________________________________________________________ #
+            x_offset = curr_pf_peak_locations[cell_i]
+            y_offset = float(cell_i)
+            line = QtGui.QGraphicsLineItem(x_offset, y_offset, x_offset, (y_offset + line_height))
+            line.setPen(pg.mkPen('white', width=2))
+            curr_win.addItem(line)
+            _out_ui.order_location_lines[aclu] = line
 
+        ## END for cell_i, aclu in enumerate(_out_data.sorted_neuron_IDs)...
         out_colors_heatmap_image_matrix = np.stack(_temp_curr_out_colors_heatmap_image, axis=0)
         out_colors_heatmap_image_matrix = np.clip(out_colors_heatmap_image_matrix, 0, 1)
 
@@ -294,7 +342,49 @@ class BaseTemplateDebuggingMixin:
         curr_img.setRect(_out_data.active_pfs_img_extents)
 
 
+    @classmethod
+    def init_from_decoder(cls, a_decoder: BasePositionDecoder, included_all_neuron_ids=None, **kwargs):
+        fignum = kwargs.pop('fignum', None)
+        if fignum is not None:
+            print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
 
+        defer_render = kwargs.pop('defer_render', False)
+        debug_print: bool = kwargs.pop('debug_print', False)
+        debug_draw: bool = kwargs.pop('debug_draw', False)
+
+        enable_cell_colored_heatmap_rows: bool = kwargs.pop('enable_cell_colored_heatmap_rows', True)
+        use_shared_aclus_only_templates: bool = kwargs.pop('use_shared_aclus_only_templates', False)
+        
+        if included_all_neuron_ids is None:
+            included_all_neuron_ids = deepcopy(a_decoder.neuron_IDs) ## all neuron_IDs in the decoder
+
+
+        figure_name: str = kwargs.pop('figure_name', 'directional_laps_overview_figure')
+        _out_data = RenderPlotsData(name=figure_name, decoder=deepcopy(a_decoder), out_colors_heatmap_image_matrix_dicts={}, sorted_neuron_IDs_lists=None, sort_helper_neuron_id_to_neuron_colors_dicts=None, sort_helper_neuron_id_to_sort_IDX_dicts=None, sorted_pf_tuning_curves=None, sorted_pf_peak_location_list=None, active_pfs_img_extents_dict=None, unsorted_included_any_context_neuron_ids=None, ref_decoder_name=None)
+        _out_plots = RenderPlots(name=figure_name, pf1D_heatmaps=None)
+        _out_params = VisualizationParameters(name=figure_name, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, use_shared_aclus_only_templates=use_shared_aclus_only_templates,
+                                             debug_print=debug_print, debug_draw=debug_draw, included_any_context_neuron_ids=included_all_neuron_ids,
+                                             solo_emphasized_aclus=None, **kwargs)
+                
+        # build the window with the dock widget in it:
+        root_dockAreaWindow, app = DockAreaWrapper.build_default_dockAreaWindow(title=f'Pho BaseTemplateDebuggingMixin Debugger: {figure_name}', defer_show=False)
+        icon = try_get_icon(icon_path=":/Icons/Icons/visualizations/template_1D_debugger.ico")
+        if icon is not None:
+            root_dockAreaWindow.setWindowIcon(icon)
+        # icon_path=":/Icons/Icons/visualizations/template_1D_debugger.ico"
+        # root_dockAreaWindow.setWindowIcon(pg.QtGui.QIcon(icon_path))
+
+        _out_ui = PhoUIContainer(name=figure_name, app=app, root_dockAreaWindow=root_dockAreaWindow, text_items_dict=None, order_location_lines_dict=None, dock_widgets=None, dock_configs=None, on_update_callback=None)
+        
+        root_dockAreaWindow.resize(900, 700)
+
+        ## Initialize Class here:
+        _obj = cls(plots=_out_plots, plots_data=_out_data, ui=_out_ui, params=_out_params)
+
+        _obj.buildUI_base_decoder_debugger_data()
+        update_callback_fn = (lambda included_neuron_ids, **kwargs: _obj.update_base_decoder_debugger_data(included_neuron_ids, solo_emphasized_aclus=None, **kwargs))
+        _obj.ui.on_update_callback = update_callback_fn
+        return _obj
 
 
 
