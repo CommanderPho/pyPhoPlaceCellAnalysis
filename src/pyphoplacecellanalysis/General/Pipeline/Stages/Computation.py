@@ -2990,3 +2990,67 @@ class PipelineWithComputedPipelineStageMixin:
         PASSTHROUGH
         """
         return self.stage.clear_all_failed_computations(enabled_filter_names=enabled_filter_names, **kwargs)
+    
+
+    @function_attributes(short_name='batch_evaluate', tags=['batch', 'computation', 'passthru'], input_requires=[], output_provides=[], uses=['get_all_batch_computation_names', 'self.get_merged_computation_function_validators'], used_by=[], creation_date='2025-01-20 21:05', related_items=['pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing.batch_evaluate_required_computations'])
+    def batch_evaluate_required_computations(self, include_includelist=None, included_computation_filter_names=None, include_global_functions=False, fail_on_exception=False, progress_print=True, debug_print=False, force_recompute:bool=False, force_recompute_override_computations_includelist=None):
+        """ determines how many of the specified computations are already valid, vs. how many will need to be recomputed. 
+
+        force_recompute:bool=False
+        force_recompute_override_computations_includelist: Optional[List[str]] a list of computation function names to recompute regardless of their validator's status.
+        
+        from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_evaluate_required_computations
+
+        needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=['lap_direction_determination'], include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                            force_recompute=False, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+        needs_computation_output_dict
+        
+
+        WARNING: `force_recompute_override_computations_includelist` must be a subset of the items in `include_includelist`
+        include_includelist = ['pf_computation', 'split_to_directional_laps', 'merged_directional_placefields', 'rank_order_shuffle_analysis']
+        force_recompute_override_computations_includelist = ['pf_computation', 'split_to_directional_laps']
+        
+        The whole function is only called if  ((_comp_specifier.short_name in include_includelist) or (_comp_specifier.computation_fn_name in include_includelist)) is true.
+        
+        Usage:
+        
+            # Post-hoc verification that the computations worked and that the validators reflect that. The list should be empty now.
+            newly_computed_values = curr_active_pipeline.batch_extended_computations(include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                                force_recompute=force_recompute_global, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+
+        """
+        return self.stage.batch_evaluate_required_computations(include_includelist=include_includelist, included_computation_filter_names=included_computation_filter_names, include_global_functions=include_global_functions, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist)
+
+
+    @function_attributes(short_name='batch_extended_computations', tags=['batch', 'computation', 'evaluation', 'automated', 'session', 'compute', 'passthru'], input_requires=[], output_provides=[], uses=['get_all_batch_computation_names', 'self.get_merged_computation_function_validators'], used_by=[], creation_date='2025-01-20 21:08', related_items=['pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing.batch_extended_computations'])
+    def batch_extended_computations(self, include_includelist=None, included_computation_filter_names=None, include_global_functions=False, fail_on_exception=False, progress_print=True, debug_print=False, force_recompute:bool=False, force_recompute_override_computations_includelist=None, computation_kwargs_dict=None, dry_run:bool=False):
+        """ performs the remaining required global computations
+
+        force_recompute:bool=False
+        force_recompute_override_computations_includelist: Optional[List[str]] a list of computation function names to recompute regardless of their validator's status.
+        
+        from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations
+        batch_extended_computations(include_includelist=['merged_directional_placefields'], include_global_functions=True)
+        
+        WARNING: `force_recompute_override_computations_includelist` must be a subset of the items in `include_includelist`
+        include_includelist = ['pf_computation', 'split_to_directional_laps', 'merged_directional_placefields', 'rank_order_shuffle_analysis']
+        force_recompute_override_computations_includelist = ['pf_computation', 'split_to_directional_laps']
+        
+        The whole function is only called if  ((_comp_specifier.short_name in include_includelist) or (_comp_specifier.computation_fn_name in include_includelist)) is true.
+        
+        computation_kwargs_dict={'rank_order_shuffle_analysis':({'num_shuffles': 500, 'skip_laps': False} | dict(minimum_inclusion_fr_Hz=2.0, included_qclu_values=[1,2,4,5,6,7]))}
+
+
+        Usage:
+
+            # Post-hoc verification that the computations worked and that the validators reflect that. The list should be empty now.
+            newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                                force_recompute=force_recompute_global, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+            needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                                force_recompute=force_recompute_global, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+            print(f'Post-load global computations: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
+
+                                                            
+        """
+        return self.stage.batch_extended_computations(include_includelist=include_includelist, included_computation_filter_names=included_computation_filter_names, include_global_functions=include_global_functions, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, computation_kwargs_dict=computation_kwargs_dict, dry_run=dry_run)
+
