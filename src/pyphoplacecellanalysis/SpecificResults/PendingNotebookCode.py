@@ -123,8 +123,7 @@ class BinByBinDecodingDebugger:
             if debug_print:
                 print(f'all_lap_active_units_list: {all_lap_active_units_list}')
             lap_specific_spikes_df = deepcopy(spikes_df).spikes.time_sliced(t_start=t_start, t_stop=t_end).spikes.sliced_by_neuron_id(all_lap_active_units_list)
-
-
+            lap_specific_spikes_df, neuron_id_to_new_IDX_map = lap_specific_spikes_df.spikes.rebuild_fragile_linear_neuron_IDXs()  # rebuild the fragile indicies afterwards
             _decoded_pos_outputs = a_decoder.decode(unit_specific_time_binned_spike_counts=unit_specific_time_binned_spike_counts, time_bin_size=time_bin_size, output_flat_versions=True, debug_print=False)
             _out_decoded_active_p_x_given_n[a_row.lap_id] = _decoded_pos_outputs
             _out_decoded_active_plots_data[a_row.lap_id] = RenderPlotsData(name=f'lap[{a_row.lap_id}]', spikes_df=lap_specific_spikes_df, active_aclus=all_lap_active_units_list)
