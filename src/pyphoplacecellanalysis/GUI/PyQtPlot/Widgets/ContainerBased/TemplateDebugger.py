@@ -59,6 +59,75 @@ __all__ = ['TemplateDebugger']
 # ==================================================================================================================== #
 # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import _debug_plot_directional_template_rasters, build_selected_spikes_df, add_selected_spikes_df_points_to_scatter_plot
 
+
+def build_pf1D_heatmap_with_labels_and_peaks(pf1D_decoder, visible_aclus, plot_item, img_extents_rect, line_height=1.0, a_decoder_aclu_to_color_map: Dict=None):
+    """
+    Builds a standalone pf1D heatmap with text labels + vertical peak lines for each ACLU.
+    """
+    import numpy as np
+    import pyqtgraph as pg
+    from copy import deepcopy
+    from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import UnitColoringMode, DataSeriesColorHelpers
+    # Requires pf1D_decoder.pf.ratemap.pdf_normalized_tuning_curves, pf1D_decoder.pf.ratemap.xbin,
+    # pf1D_decoder.pf.ratemap.peak_tuning_curve_center_of_masses, and pf1D_decoder.get_color_for_aclu(aclu).
+
+    assert len(img_extents_rect) == 4, f"len(img_extents_rect): {len(img_extents_rect)} should be 4 and is of type [x, y, width, height]"
+
+    enable_cell_colored_heatmap_rows: bool = (a_decoder_aclu_to_color_map is not None)
+    
+    curr_img = pg.ImageItem()
+    plot_item.addItem(curr_img)
+
+    n_visible_cells = len(visible_aclus)
+    all_aclus = deepcopy(pf1D_decoder.neuron_IDs).tolist()
+    n_total_cells = len(all_aclus)
+
+    stacked_curves = pf1D_decoder.pf.ratemap.pdf_normalized_tuning_curves
+    xbins = pf1D_decoder.pf.ratemap.xbin
+    peak_locations = pf1D_decoder.pf.ratemap.peak_tuning_curve_center_of_masses
+
+    temp_color_rows = []
+    for cell_i, aclu in enumerate(visible_aclus):
+        aclu_idx = all_aclus.index(aclu)
+        a_color_vector = a_decoder_aclu_to_color_map[aclu]
+        # a_color_vector = pf1D_decoder.get_color_for_aclu(aclu)
+
+        # Text label:
+        text = pg.TextItem(text=str(aclu), color=pg.mkColor(a_color_vector), anchor=(1, 0))
+        text.setPos(-1.0, cell_i + 1)
+        plot_item.addItem(text)
+
+        # Build color row for heatmap:
+        base_color = pg.mkColor(a_color_vector)
+        row_data = stacked_curves[aclu_idx]
+        color_row = DataSeriesColorHelpers.qColorsList_to_NDarray(
+            [build_adjusted_color(base_color, value_scale=v) for v in row_data],
+            is_255_array=False
+        ).T
+        temp_color_rows.append(color_row)
+
+        # Vertical line:
+        x_offset = peak_locations[aclu_idx]
+        y_offset = float(cell_i)
+        line = QtGui.QGraphicsLineItem(x_offset, y_offset, x_offset, (y_offset + line_height))
+        line.setPen(pg.mkPen(base_color, width=2))
+        plot_item.addItem(line)
+
+    out_colors_heatmap_image_matrix = np.stack(temp_color_rows, axis=0)
+    out_colors_heatmap_image_matrix = np.clip(out_colors_heatmap_image_matrix, 0, 1)
+
+    if enable_cell_colored_heatmap_rows:
+        curr_img.updateImage(out_colors_heatmap_image_matrix)
+
+    mod_rect = deepcopy(img_extents_rect)
+    if n_visible_cells < n_total_cells:
+        mod_rect[-1] = float(n_visible_cells)
+    curr_img.setRect(mod_rect)
+
+    return curr_img, out_colors_heatmap_image_matrix
+
+
+
 @metadata_attributes(short_name=None, tags=['gui', 'template'], input_requires=[], output_provides=[], uses=['visualize_heatmap_pyqtgraph'], used_by=['_display_directional_template_debugger'], creation_date='2023-12-11 10:24', related_items=[])
 @define(slots=False, repr=False, eq=False)
 class TemplateDebugger:
@@ -439,13 +508,11 @@ class TemplateDebugger:
         return _out_data
 
     # 2023-11-28 - New Sorting using `paired_incremental_sort_neurons` via `paired_incremental_sorting`
-    @function_attributes(short_name=None, tags=['buildUI'], input_requires=[], output_provides=[], uses=['visualize_heatmap_pyqtgraph'], used_by=[], creation_date='2024-10-21 19:20', related_items=[])
+    @function_attributes(short_name=None, tags=['buildUI'], input_requires=[], output_provides=[], uses=['visualize_heatmap_pyqtgraph', 'cls._subfn_rebuild_sort_idxs'], used_by=[], creation_date='2024-10-21 19:20', related_items=[])
     @classmethod
-    def _subfn_buildUI_directional_template_debugger_data(cls, included_any_context_neuron_ids, use_incremental_sorting: bool, debug_print: bool, enable_cell_colored_heatmap_rows: bool, _out_data: RenderPlotsData, _out_plots: RenderPlots, _out_ui: PhoUIContainer, _out_params: VisualizationParameters, decoders_dict: Dict):
+    def _subfn_buildUI_directional_template_debugger_data(cls, included_any_context_neuron_ids, use_incremental_sorting: bool, debug_print: bool, enable_cell_colored_heatmap_rows: bool, _out_data: RenderPlotsData, _out_plots: RenderPlots, _out_ui: PhoUIContainer, _out_params: VisualizationParameters, decoders_dict: Dict, line_height: float = 1.0):
         """ Builds UI """
         print(f'._subfn_buildUI_directional_template_debugger_data(...)')
-        line_height: float = 1.0
-        
         _out_data = cls._subfn_rebuild_sort_idxs(decoders_dict, _out_data, use_incremental_sorting=use_incremental_sorting, included_any_context_neuron_ids=included_any_context_neuron_ids)
         # Unpack the updated _out_data:
         sort_helper_neuron_id_to_neuron_colors_dicts = _out_data.sort_helper_neuron_id_to_neuron_colors_dicts
@@ -494,13 +561,6 @@ class TemplateDebugger:
             a_decoder_ymin_ymax_tuple_list = [(float(cell_i), (float(cell_i) + line_height)) for cell_i, (aclu, a_color_vector) in enumerate(a_decoder_color_map.items())]
             _out_data.active_pfs_ymin_ymax_tuple_list_dict[a_decoder_name] = np.array(a_decoder_ymin_ymax_tuple_list)
             
-            # def _find_nearest_cell_idx(test_y_value: float):
-            #     """ captures: line_height, cell_i, """
-            #     y_offset = float(cell_i)
-            #     y_max = (y_offset + line_height)
-            #     is_in_curr_cell_range: bool = ((test_y_value >= y_offset) and (test_y_value < y_max))
-            #     return is_in_curr_cell_range
-        
 
             for cell_i, (aclu, a_color_vector) in enumerate(a_decoder_color_map.items()):
                 # anchor=(1,0) specifies the item's upper-right corner is what setPos specifies. We switch to right vs. left so that they are all aligned appropriately.
@@ -515,15 +575,6 @@ class TemplateDebugger:
                 out_colors_row = DataSeriesColorHelpers.qColorsList_to_NDarray([build_adjusted_color(heatmap_base_color, value_scale=v) for v in curr_data[cell_i, :]], is_255_array=False).T # (62, 4)
                 _temp_curr_out_colors_heatmap_image.append(out_colors_row)
                 
-                
-                
-                # def _find_nearest_cell_idx(test_y_value: float):
-                #     """ captures: line_height, cell_i, """
-                #     y_offset = float(cell_i)
-                #     y_max = (y_offset + line_height)
-                #     is_in_curr_cell_range: bool = ((test_y_value >= y_offset) and (test_y_value < y_max))
-                #     return is_in_curr_cell_range
-
 
                 # Add vertical lines
                 if _out_params.enable_pf_peak_indicator_lines:
@@ -577,7 +628,7 @@ class TemplateDebugger:
 
 
     @classmethod
-    def _subfn_update_directional_template_debugger_data(cls, included_neuron_ids, use_incremental_sorting: bool, debug_print: bool, enable_cell_colored_heatmap_rows: bool, _out_data: RenderPlotsData, _out_plots: RenderPlots, _out_ui: PhoUIContainer, _out_params: VisualizationParameters, decoders_dict: Dict):
+    def _subfn_update_directional_template_debugger_data(cls, included_neuron_ids: NDArray, use_incremental_sorting: bool, debug_print: bool, enable_cell_colored_heatmap_rows: bool, _out_data: RenderPlotsData, _out_plots: RenderPlots, _out_ui: PhoUIContainer, _out_params: VisualizationParameters, decoders_dict: Dict):
         """ Just updates the existing UI, doesn't build new elements.
 
         ## Needs to update:
