@@ -60,8 +60,49 @@ class EpochsEditor:
     _pos_variable_names = ('x_smooth', 'velocity_x_smooth', 'acceleration_x_smooth')
     # _pos_variable_names = ('x', 'velocity_x', 'acceleration_x')
 
-    
+    def connect_double_click_event(self):
+        print("Connecting double-click event...")
+        self.plots.viewboxes[0].scene().sigMouseClicked.connect(self.on_mouse_click)
 
+    def on_mouse_click(self, event):
+        print(f"Mouse click detected: {event}")
+        if event.double():
+            print("Double-click detected!")
+            pos = event.scenePos()
+            viewbox = self.plots.viewboxes[0]
+            if viewbox.sceneBoundingRect().contains(pos):
+                mouse_point = viewbox.mapSceneToView(pos)
+                t_start = mouse_point.x()
+                t_end = t_start + 1.0  # Default width of 1.0 units
+                new_epoch_label = f'New Epoch {len(self.curr_laps_df) + 1}'
+                new_epoch = {
+                    'start': t_start,
+                    'stop': t_end,
+                    'lap_id': len(self.curr_laps_df) + 1,
+                    'label': new_epoch_label,
+                    'lap_dir': 1,
+                    'is_LR_dir': True,
+                    'lap_color': DisplayColorsEnum.Laps.LR,
+                    'lap_accent_color': '#c4ff26de',
+                    'is_included': True
+                }
+                print(f"Adding new epoch: {new_epoch}")
+                self.curr_laps_df = self.curr_laps_df.append(new_epoch, ignore_index=True)
+                self.add_epoch_region(new_epoch)
+
+    def add_epoch_region(self, epoch):
+        print(f"Creating epoch region for: {epoch}")
+        v1 = self.plots.viewboxes[0]
+        epoch_linear_region, epoch_region_label = build_pyqtgraph_epoch_indicator_regions(
+            v1, t_start=epoch['start'], t_stop=epoch['stop'], epoch_label=epoch['label'], movable=True,
+            **dict(pen=pg.mkPen(f'{epoch["lap_color"]}d6', width=1.0), brush=pg.mkBrush(f"{epoch['lap_color']}42"),
+                   hoverBrush=pg.mkBrush(f"{epoch['lap_color']}a8"), hoverPen=pg.mkPen(epoch['lap_accent_color'], width=2.5)),
+            custom_bound_data=epoch['lap_id']
+        )
+        self.plots.lap_epoch_widgets[epoch['label']] = epoch_linear_region
+        self.plots.lap_epoch_labels[epoch['label']] = epoch_region_label
+        epoch_linear_region.sigRegionChangeFinished.connect(self.on_epoch_region_updated)
+        epoch_linear_region.sigClicked.connect(self.on_epoch_region_selection_toggled)
 
     @classmethod
     def add_visualization_columns(cls, curr_laps_df: pd.DataFrame) -> pd.DataFrame:
@@ -232,6 +273,7 @@ class EpochsEditor:
         _obj = cls(pos_df=pos_df, curr_laps_df=curr_laps_df, on_epoch_region_updated_callback=on_epoch_region_updated_callback, on_epoch_region_selection_toggled_callback=on_epoch_region_selection_toggled_callback)
         _obj.changed_laps_df = _obj.curr_laps_df.iloc[:0,:].copy() # should be in attrs_post_init
         _obj.plots = cls.perform_plot_laps_diagnoser(pos_df, curr_laps_df, include_velocity=include_velocity, include_accel=include_accel, on_epoch_region_updated_callback=_obj.on_epoch_region_updated, on_epoch_region_selection_toggled_callback=_obj.on_epoch_region_selection_toggled)
+        _obj.connect_double_click_event()  # Connect the double-click event after plots are initialized
         return _obj
 
 
@@ -435,6 +477,8 @@ if __name__ == "__main__":
     epochs_editor.plots.win.show()  # Ensure the window is shown
 
     sys.exit(app.exec_())
+    
+
 
 
 
