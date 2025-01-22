@@ -689,6 +689,17 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
     epoch_description_list: list[str] = non_serialized_field(default=Factory(list), metadata={'shape': ('n_epochs',)}) # depends on the number of epochs, one for each
     
 
+    ## Optional Helpers
+    pos_bin_edges: Optional[NDArray] = serialized_field(default=None, metadata={'desc':'the position bin edges of the decoder that was used to produce the result', 'shape': ('n_pos_bins+1')})
+
+    @property
+    def n_pos_bins(self) -> Optional[int]:
+        """The n_pos_bins property."""
+        if self.pos_bin_edges is not None:
+            return len(self.pos_bin_edges)-1
+        else:
+            return None
+
     @property
     def active_filter_epochs(self):
         """ for compatibility """
@@ -797,6 +808,25 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                 attr_reprs.append(f"{a.name}: {attr_type}")
         content = ",\n\t".join(attr_reprs)
         return f"{type(self).__name__}({content}\n)"
+
+
+    # For serialization/pickling: ________________________________________________________________________________________ #
+    def __getstate__(self):
+        # Copy the object's state from self.__dict__ which contains
+        # all our instance attributes (_mapping and _keys_at_init). Always use the dict.copy()
+        # method to avoid modifying the original state.
+        state = self.__dict__.copy()
+        # Remove the unpicklable entries.
+        # del state['file']
+        return state
+
+    def __setstate__(self, state):
+        # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        self.__dict__.update(state)
+        if 'pos_bin_edges' not in state:
+            self.__dict__.update(pos_bin_edges=None) ## default to None (for same unpickling)
+
+
 
 
     def flatten(self):
