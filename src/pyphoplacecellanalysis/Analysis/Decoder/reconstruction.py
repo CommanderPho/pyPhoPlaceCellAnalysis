@@ -1186,6 +1186,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             
         return epoch_time_bin_marginals_df
     
+    
 
 # ==================================================================================================================== #
 # Placemap Position Decoders                                                                                           #
@@ -1704,7 +1705,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         return filter_epochs_decoder_result
 
     @classmethod
-    def _perform_decoding_specific_epochs(cls, active_decoder, filter_epochs_decoder_result: DynamicContainer, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DecodedFilterEpochsResult:
+    def _perform_decoding_specific_epochs(cls, active_decoder: "BasePositionDecoder", filter_epochs_decoder_result: DynamicContainer, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DecodedFilterEpochsResult:
         """ Actually performs the computation
         
         NOTE: Uses active_decoder.decode(...) to actually do the decoding
@@ -1715,6 +1716,14 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         _arr_lengths = [len(v) for v in (np.arange(filter_epochs_decoder_result.num_filter_epochs), filter_epochs_decoder_result.spkcount, filter_epochs_decoder_result.nbins, filter_epochs_decoder_result.time_bin_containers)]
         assert np.allclose(_arr_lengths, filter_epochs_decoder_result.num_filter_epochs), f"all arrays should be equal or the zip will be limited to the fewest items, but _arr_lengths: {_arr_lengths}"
         
+
+        ## Set the static decoder properties
+        filter_epochs_decoder_result.pos_bin_edges = deepcopy(active_decoder.xbin)
+
+
+        # active_decoder.neuron_IDs
+        
+
         for i, curr_filter_epoch_spkcount, curr_epoch_num_time_bins, curr_filter_epoch_time_bin_container in zip(np.arange(filter_epochs_decoder_result.num_filter_epochs), filter_epochs_decoder_result.spkcount, filter_epochs_decoder_result.nbins, filter_epochs_decoder_result.time_bin_containers):
             ## New 2022-09-26 method with working time_bin_centers_list returned from epochs_spkcount
             a_time_bin_edges = np.atleast_1d(curr_filter_epoch_time_bin_container.edges)
