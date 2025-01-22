@@ -63,10 +63,19 @@ class EpochsEditor:
     def connect_double_click_event(self):
         print("Connecting double-click event...")
         self.plots.viewboxes[0].scene().sigMouseClicked.connect(self.on_mouse_click)
+        self.plots.viewboxes[0].setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.plots.viewboxes[0].customContextMenuRequested.connect(self.show_context_menu)
 
     def on_mouse_click(self, event):
         print(f"Mouse click detected: {event}")
-        if event.double():
+        if event.button() == QtCore.Qt.RightButton:
+            print("Right-click detected!")
+            pos = event.scenePos()
+            viewbox = self.plots.viewboxes[0]
+            if viewbox.sceneBoundingRect().contains(pos):
+                mouse_point = viewbox.mapSceneToView(pos)
+                self.show_context_menu(event.screenPos(), mouse_point)
+        elif event.double():
             print("Double-click detected!")
             pos = event.scenePos()
             viewbox = self.plots.viewboxes[0]
@@ -89,6 +98,23 @@ class EpochsEditor:
                 print(f"Adding new epoch: {new_epoch}")
                 self.curr_laps_df = self.curr_laps_df.append(new_epoch, ignore_index=True)
                 self.add_epoch_region(new_epoch)
+
+    def show_context_menu(self, screen_pos, mouse_point):
+        context_menu = QtWidgets.QMenu()
+        remove_action = context_menu.addAction("Remove")
+        action = context_menu.exec_(screen_pos)
+        if action == remove_action:
+            self.remove_epoch_at(mouse_point)
+
+    def remove_epoch_at(self, mouse_point):
+        for label, region in self.plots.lap_epoch_widgets.items():
+            if region.getRegion()[0] <= mouse_point.x() <= region.getRegion()[1]:
+                print(f"Removing epoch: {label}")
+                region.setParentItem(None)  # Remove the region from the plot
+                del self.plots.lap_epoch_widgets[label]
+                del self.plots.lap_epoch_labels[label]
+                self.curr_laps_df = self.curr_laps_df[self.curr_laps_df['label'] != label]
+                break
 
     def add_epoch_region(self, epoch):
         print(f"Creating epoch region for: {epoch}")
@@ -477,7 +503,9 @@ if __name__ == "__main__":
     epochs_editor.plots.win.show()  # Ensure the window is shown
 
     sys.exit(app.exec_())
-    
+
+
+
 
 
 
