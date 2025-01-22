@@ -23,6 +23,21 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 
 __all__ = ['EpochsEditor']
 
+class CustomViewBox(pg.ViewBox):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMouseEnabled(x=True, y=False)
+
+    def mouseClickEvent(self, event):
+        if event.button() == QtCore.Qt.RightButton:
+            print("Right-click detected!")
+            pos = event.scenePos()
+            if self.sceneBoundingRect().contains(pos):
+                mouse_point = self.mapSceneToView(pos)
+                self.parent().show_context_menu(event.screenPos(), mouse_point)
+        else:
+            super().mouseClickEvent(event)
+
 @metadata_attributes(short_name=None, tags=['useful', 'gui', 'utility', 'epochs', 'widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-17 19:25', related_items=[])
 @define(slots=False)
 class EpochsEditor:
@@ -63,19 +78,10 @@ class EpochsEditor:
     def connect_double_click_event(self):
         print("Connecting double-click event...")
         self.plots.viewboxes[0].scene().sigMouseClicked.connect(self.on_mouse_click)
-        self.plots.viewboxes[0].setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        self.plots.viewboxes[0].customContextMenuRequested.connect(self.show_context_menu)
 
     def on_mouse_click(self, event):
         print(f"Mouse click detected: {event}")
-        if event.button() == QtCore.Qt.RightButton:
-            print("Right-click detected!")
-            pos = event.scenePos()
-            viewbox = self.plots.viewboxes[0]
-            if viewbox.sceneBoundingRect().contains(pos):
-                mouse_point = viewbox.mapSceneToView(pos)
-                self.show_context_menu(event.screenPos(), mouse_point)
-        elif event.double():
+        if event.double():
             print("Double-click detected!")
             pos = event.scenePos()
             viewbox = self.plots.viewboxes[0]
@@ -200,13 +206,14 @@ class EpochsEditor:
         # sub1.addLabel(axis='bottom', text='time')
 
         sub1.nextRow()
-        v1 = sub1.addViewBox()
+        v1 = CustomViewBox()
         ax_pos = pg.PlotDataItem(x=pos_df.t.to_numpy(), y=pos_df[pos_variable_names[0]].to_numpy(), pen='white', name=pos_variable_names[0])
         v1.setMouseEnabled(x=True, y=False)
         # v1.enableAutoRange(x=False, y=True)
         # v1.setXRange(300, 450)
         # v1.setAutoVisible(x=False, y=True)
         v1.addItem(ax_pos)
+        sub1.addItem(v1)
 
         # legend_size = (80,60) # fixed size legend
         legend_size = None # auto-sizing legend to contents
@@ -228,12 +235,13 @@ class EpochsEditor:
 
         if include_velocity:
             sub1.nextRow()
-            v2 = sub1.addViewBox()
+            v2 = CustomViewBox()
             ax_velocity = pg.PlotDataItem(x=pos_df.t.to_numpy(), y=pos_df[pos_variable_names[1]].to_numpy(), pen='#21b9ffcb', name=pos_variable_names[1])
             
             v2.setMouseEnabled(x=True, y=False)
             v2.setXLink(v1)
             v2.addItem(ax_velocity)
+            sub1.addItem(v2)
             legend.addItem(ax_velocity, pos_variable_names[1])
             position_plots.append(ax_velocity)
             viewboxes.append(v2)
@@ -503,8 +511,6 @@ if __name__ == "__main__":
     epochs_editor.plots.win.show()  # Ensure the window is shown
 
     sys.exit(app.exec_())
-
-
 
 
 
