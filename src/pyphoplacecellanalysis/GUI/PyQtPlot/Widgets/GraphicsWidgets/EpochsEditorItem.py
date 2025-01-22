@@ -404,6 +404,38 @@ class EpochsEditor:
             
         for a_name, an_idxs in zip(('desc_crossing_ending_idxs', 'asc_crossing_ending_idxs'), (desc_crossing_ending_idxs, asc_crossing_ending_idxs)):
             an_item = self.add_indicies_points_scatter(an_idxs, points_name_str=a_name, points_kwargs=endpoint_ending_kwargs, add_subplot_index=[0,1])
-        
+
+
+if __name__ == "__main__":
+    import sys
+    from PyQt5.QtWidgets import QApplication
+
+    app = QApplication(sys.argv)
+
+    # Example data
+    pos_data = {
+        't': np.linspace(0, 100, 500),
+        'x_smooth': np.sin(np.linspace(0, 10, 500)),
+        'velocity_x_smooth': np.cos(np.linspace(0, 10, 500)),
+        'acceleration_x_smooth': np.sin(np.linspace(0, 10, 500)) * np.cos(np.linspace(0, 10, 500))
+    }
+    pos_df = pd.DataFrame(pos_data)
+
+    laps_data = {
+        'start': [10, 30, 50, 70, 90],
+        'stop': [20, 40, 60, 80, 100],
+        'lap_id': [1, 2, 3, 4, 5],
+        'label': ['Lap 1', 'Lap 2', 'Lap 3', 'Lap 4', 'Lap 5'],
+        'lap_dir': [1, -1, 1, -1, 1],
+        'is_LR_dir': [True, False, True, False, True]
+    }
+    curr_laps_df = pd.DataFrame(laps_data)
+
+    epochs_editor = EpochsEditor.init_laps_diagnoser(pos_df, curr_laps_df, include_velocity=True, include_accel=True)
+    epochs_editor.plots.win.show()  # Ensure the window is shown
+
+    sys.exit(app.exec_())
+
+
 
 
