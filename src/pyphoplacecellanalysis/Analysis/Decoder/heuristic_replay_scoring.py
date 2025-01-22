@@ -3615,27 +3615,9 @@ class HeuristicThresholdFiltering:
 # 2024-12-20 - Testing Performance                                                                                     #
 # ==================================================================================================================== #
 
-def convert_to_array_recursive(data: Any) -> Any:
-    """
-    Recursively converts lists and tuples in a nested structure into np.array objects.
-
-    Args:
-        data (Any): The input data, can be a list, tuple, dict, or other nested structure.
-
-    Returns:
-        Any: The transformed structure with lists and tuples replaced by np.array.
-
-    Usage:
-        result = convert_to_array_recursive([1, 2, (3, 4, [5, 6])])
-    """
-    if isinstance(data, (list, tuple)):
-        return np.array([convert_to_array_recursive(item) for item in data])
-    elif isinstance(data, dict):
-        
-        return {key: convert_to_array_recursive(value) for key, value in data.items()}
-    else:
-        return data
+from neuropy.utils.indexing_helpers import NumpyHelpers
     
+
 
 desired_selected_indicies_dict = {'chose_incorrect_subsequence_as_main_list[0]': [17, 18, 19, 20, 21, 22, 16],
 						 'intrusion[0]': [11, 10, 9, 8, 7, 5, 4, 3],
@@ -3818,7 +3800,7 @@ class SubsequenceDetectionSamples:
 
     @classmethod
     def get_all_example_dict(cls) -> Dict[str, Dict[Tuple, GroundTruthData]]:
-        return {k:convert_to_array_recursive(v) for k, v in {
+        return {k:NumpyHelpers.convert_to_array_recursive(v) for k, v in {
             'intrusion': cls.intrusion_example_positions_list,
             'jump': cls.jump_bad_list,
             'great': cls.good_long_sequences_list,
