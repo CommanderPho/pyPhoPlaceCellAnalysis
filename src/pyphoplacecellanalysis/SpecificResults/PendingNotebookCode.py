@@ -233,12 +233,11 @@ class BinByBinDecodingDebugger:
 
 
     @classmethod
-    def plot_bin_by_bin_decoding_example(cls):
+    def plot_bin_by_bin_decoding_example(cls, curr_active_pipeline, track_templates, time_bin_size: float = 0.250, a_lap_id: int = 9, a_decoder_name = 'long_LR'):
         """
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_bin_by_bin_decoding_example
 
-        """
-        ## INPUTS: time_bin_size
+                ## INPUTS: time_bin_size
         time_bin_size: float = 0.500 # 500ms
 
         ## any (generic) directionald decoder
@@ -249,45 +248,34 @@ class BinByBinDecodingDebugger:
         a_decoder_idx: int = track_templates.get_decoder_names().index(a_decoder_name)
         a_decoder = deepcopy(track_templates.long_LR_decoder)
 
+        
+        
+        """
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import LayoutScrollability, pyqtplot_build_image_bounds_extent
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import BaseTemplateDebuggingMixin, build_pf1D_heatmap_with_labels_and_peaks, TrackTemplates
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BinByBinDecodingDebugger
 
-        neuron_IDs = deepcopy(a_decoder.neuron_IDs)
+        # Example usage:
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
+        global_laps = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps).trimmed_to_non_overlapping() 
+        global_laps_epochs_df = global_laps.to_dataframe()
+        global_laps_epochs_df
 
-        spikes_df: pd.DataFrame = deepcopy(spikes_df).spikes.sliced_by_neuron_id(neuron_IDs) ## filter everything down
-        unique_units = np.unique(spikes_df['aclu']) # sorted
 
-        _out_decoded_time_bin_edges = {}
-        _out_decoded_unit_specific_time_binned_spike_counts = {}
-        _out_decoded_active_unit_lists = {}
-        _out_decoded_active_p_x_given_n = {}
 
-        for a_row in global_laps_epochs_df.itertuples():
-            t_start = a_row.start
-            t_end = a_row.stop
-            time_bin_edges: NDArray = np.arange(t_start, (t_end + time_bin_size), time_bin_size)
-            n_time_bins: int = len(time_bin_edges)-1
-            assert n_time_bins > 0
-            _out_decoded_time_bin_edges[a_row.lap_id] = time_bin_edges
-            # print(f'a_row: {a_row.lap_dir}')
+        ## COMPUTED: 
+        a_decoder_idx: int = track_templates.get_decoder_names().index(a_decoder_name)
+        a_decoder = deepcopy(track_templates.long_LR_decoder)
+        (_out_decoded_time_bin_edges, _out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists, _out_decoded_active_p_x_given_n, _out_decoded_active_plots_data) = BinByBinDecodingDebugger.build_spike_counts_and_decoder_outputs(track_templates=track_templates, global_laps_epochs_df=global_laps_epochs_df, spikes_df=global_spikes_df, a_decoder_name=a_decoder_name, time_bin_size=time_bin_size)
+        win, out_pf1D_decoder_template_objects, (_out_decoded_active_plots, _out_decoded_active_plots_data) = BinByBinDecodingDebugger.build_time_binned_decoder_debug_plots(a_decoder=a_decoder, a_lap_id=a_lap_id, _out_decoded_time_bin_edges=_out_decoded_time_bin_edges, _out_decoded_active_p_x_given_n=_out_decoded_active_p_x_given_n, _out_decoded_unit_specific_time_binned_spike_counts=_out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists=_out_decoded_active_unit_lists, _out_decoded_active_plots_data=_out_decoded_active_plots_data, debug_print=True)
+        print(f"Returned window: {win}")
+        print(f"Returned decoder objects: {out_pf1D_decoder_template_objects}")
 
-            unit_specific_time_binned_spike_counts: NDArray = np.array([
-                np.histogram(spikes_df.loc[spikes_df['aclu'] == unit, 't_rel_seconds'], bins=time_bin_edges)[0]
-                for unit in unique_units
-            ])
-            active_units_list = []
-            for a_time_bin_idx in np.arange(n_time_bins):
-                unit_spike_counts = np.squeeze(unit_specific_time_binned_spike_counts[:, a_time_bin_idx])
-                active_unit_idxs = np.where(unit_spike_counts > 0)[0]
-                active_units = neuron_IDs[active_unit_idxs]
-                active_aclu_spike_counts_dict = dict(zip(active_units, unit_spike_counts[active_unit_idxs]))
-                # active_units_list.append(active_units)
-                active_units_list.append(active_aclu_spike_counts_dict)
-            # end for a_time_bin_idx in np.arange(n_time_bins)...
-            _out_decoded_active_unit_lists[a_row.lap_id] = active_units_list
+        return win, out_pf1D_decoder_template_objects, (_out_decoded_active_plots, _out_decoded_active_plots_data)
+    
 
-            _out_decoded_unit_specific_time_binned_spike_counts[a_row.lap_id] = unit_specific_time_binned_spike_counts
-            ## OUTPUT: time_bin_edges, unit_specific_time_binned_spike_counts
-            _decoded_pos_outputs = long_LR_decoder.decode(unit_specific_time_binned_spike_counts=unit_specific_time_binned_spike_counts, time_bin_size=time_bin_size, output_flat_versions=True, debug_print=False)
-            _out_decoded_active_p_x_given_n[a_row.lap_id] = _decoded_pos_outputs
+
 
     ## OUTPUTS: _out_decoded_time_bin_edges, _out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists, _out_decoded_active_p_x_given_n
 
