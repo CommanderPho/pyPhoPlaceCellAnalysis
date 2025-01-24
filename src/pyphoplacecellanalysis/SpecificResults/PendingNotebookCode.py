@@ -65,7 +65,33 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 # @define(slots=False, eq=False)
 class BinByBinDecodingDebugger:
     """ handles displaying the process of debugging decoding for each time bin
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BinByBinDecodingDebugger
+    
+    Usage:    
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BinByBinDecodingDebugger    
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import LayoutScrollability, pyqtplot_build_image_bounds_extent
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import BaseTemplateDebuggingMixin, build_pf1D_heatmap_with_labels_and_peaks, TrackTemplates
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BinByBinDecodingDebugger
+
+        # Example usage:
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
+        global_laps = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps).trimmed_to_non_overlapping() 
+        global_laps_epochs_df = global_laps.to_dataframe()
+        global_laps_epochs_df
+
+        ## INPUTS: 
+        time_bin_size: float = 0.250
+        a_lap_id: int = 9
+        a_decoder_name = 'long_LR'
+
+        ## COMPUTED: 
+        a_decoder_idx: int = track_templates.get_decoder_names().index(a_decoder_name)
+        a_decoder = deepcopy(track_templates.long_LR_decoder)
+        (_out_decoded_time_bin_edges, _out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists, _out_decoded_active_p_x_given_n, _out_decoded_active_plots_data) = BinByBinDecodingDebugger.build_spike_counts_and_decoder_outputs(track_templates=track_templates, global_laps_epochs_df=global_laps_epochs_df, spikes_df=global_spikes_df, a_decoder_name=a_decoder_name, time_bin_size=time_bin_size)
+        win, out_pf1D_decoder_template_objects, (_out_decoded_active_plots, _out_decoded_active_plots_data) = BinByBinDecodingDebugger.build_time_binned_decoder_debug_plots(a_decoder=a_decoder, a_lap_id=a_lap_id, _out_decoded_time_bin_edges=_out_decoded_time_bin_edges, _out_decoded_active_p_x_given_n=_out_decoded_active_p_x_given_n, _out_decoded_unit_specific_time_binned_spike_counts=_out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists=_out_decoded_active_unit_lists, _out_decoded_active_plots_data=_out_decoded_active_plots_data, debug_print=True)
+        print(f"Returned window: {win}")
+        print(f"Returned decoder objects: {out_pf1D_decoder_template_objects}")
+
 
     """
     plots: RenderPlots = field(repr=keys_only_repr)
