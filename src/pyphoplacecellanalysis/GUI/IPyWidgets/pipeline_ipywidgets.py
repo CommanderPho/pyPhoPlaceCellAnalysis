@@ -464,6 +464,7 @@ def interactive_pipeline_files(curr_active_pipeline, defer_display:bool=False) -
 # 	widget.build_for_pipeline(curr_active_pipeline=curr_active_pipeline)
 # 	widget.show()
 
+import panel as pn
 
 
 @define(slots=False)
@@ -486,11 +487,16 @@ class PipelinePickleFileSelectorWidget:
     directory: Path = field()
     selected_local_pkl_files: List[Path] = field(default=Factory(list))
     selected_global_pkl_files: List[Path] = field(default=Factory(list))
+    # Add new fields for the callback functions
+    on_load_callback: Optional[Callable] = field(default=None)
+    on_save_callback: Optional[Callable] = field(default=None)
     
     local_file_browser_widget = field(init=False)
     global_file_browser_widget = field(init=False)
+    layout: pn.Column = field(init=False)
     debug_print: bool = field(default=False)
-    
+
+
     @property
     def active_local_pkl(self) -> Optional[Path]:
         """The active_local_pkl property."""
@@ -554,7 +560,50 @@ class PipelinePickleFileSelectorWidget:
         self.local_file_browser_widget = create_file_browser(self.directory, ['*loadedSessPickle*.pkl'], page_size=10, widget_height=400, selectable=1, on_selected_files_changed_fn=self.on_selected_local_sess_pkl_files_changed)
         self.global_file_browser_widget = create_file_browser(self.directory, ['output/*.pkl'], page_size=10, widget_height=400, selectable=1, on_selected_files_changed_fn=self.on_selected_global_computation_result_pkl_files_changed)
 
+        # Create Load/Save buttons
+        self.load_button = widgets.Button(description="Load")
+        self.save_button = widgets.Button(description="Save")
 
+
+        # Create two buttons
+        self.load_button = pn.widgets.Button(name='Load', button_type='primary')
+        self.save_button = pn.widgets.Button(name='Save', button_type='success')
+
+        # Arrange the Tabulator and buttons in a column
+        self.layout = pn.Column(self.local_file_browser_widget, self.global_file_browser_widget, pn.Row(self.save_button, self.load_button))
+
+        # Display the layout
+        # self.layout.servable()
+
+        # # Add button click handlers
+        # self.load_button.on_click(lambda b: self._handle_load_click())
+        # self.save_button.on_click(lambda b: self._handle_save_click())
+        
+        # # Create button row
+        # self.button_row = widgets.HBox([self.load_button, self.save_button])
+        
+        # # Get the widget objects from the file browsers
+        # local_widget = self.local_file_browser_widget.widget
+        # global_widget = self.global_file_browser_widget.widget
+        
+        # # Combine all widgets
+        # self.widget = widgets.VBox([
+        #     local_widget,
+        #     global_widget,
+        #     self.button_row
+        # ])
+        
+
+    def _handle_load_click(self):
+        if self.on_load_callback is not None:
+            self.on_load_callback(self.active_local_pkl, self.active_global_pkl)
+
+    def _handle_save_click(self):
+        if self.on_save_callback is not None:
+            self.on_save_callback(self.active_local_pkl, self.active_global_pkl)
+
+    def servable(self, **kwargs):
+        return self.layout.servable(**kwargs)
 
 
 
