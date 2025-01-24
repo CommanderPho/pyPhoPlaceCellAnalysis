@@ -181,7 +181,7 @@ class EpochsEditor:
         return curr_laps_df
 
     @classmethod
-    def perform_plot_laps_diagnoser(cls, pos_df: pd.DataFrame, curr_laps_df: pd.DataFrame, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None, on_epoch_region_selection_toggled_callback=None, loaded_track_limits=None):
+    def perform_plot_laps_diagnoser(cls, pos_df: pd.DataFrame, curr_laps_df: pd.DataFrame, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None, on_epoch_region_selection_toggled_callback=None, loaded_track_limits=None, grid_bin_bounds=None):
         """
             from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.EpochsEditorItem import perform_plot_laps_diagnoser
             plots_obj = EpochsEditor.perform_plot_laps_diagnoser(pos_df, curr_laps_df, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=_on_epoch_region_updated)
@@ -211,10 +211,10 @@ class EpochsEditor:
         sub1.nextRow()
         v1 = CustomViewBox()
         
+        track_lines = dict() 
+        
         if loaded_track_limits is not None:
             # Draws the track boundaries as dotted horizontal lines ______________________________________________________________ #
-            track_lines = dict() 
-
             long_xlim_start, long_xlim_end = loaded_track_limits['long_xlim']
             long_xlim_pen_style_dict = dict(color='#b6b6b6ff', width=0.5, style=pg.QtCore.Qt.DashLine)
     
@@ -227,11 +227,21 @@ class EpochsEditor:
             track_lines['short_xlim_start'] = pg.InfiniteLine(pos=short_xlim_start, angle=0, movable=False, pen=pg.mkPen(**short_xlim_pen_style_dict))
             track_lines['short_xlim_end'] = pg.InfiniteLine(pos=short_xlim_end, angle=0, movable=False, pen=pg.mkPen(**short_xlim_pen_style_dict))
     
-            ## Add all lines to the viewbox and store them in the additional_items dictionary
-            for k, vline in track_lines.items():
-                v1.addItem(vline)
-                additional_items[f'{k}_line'] = vline
+        if grid_bin_bounds is not None:
+            # Draws the grid_bin_bounds for x-axis thick horizontal lines ______________________________________________________________ #
+            grid_bin_bounds_xlim_start, grid_bin_bounds_xlim_end = grid_bin_bounds[0] ## x-axis
+            grid_bin_bounds_xlim_pen_style_dict = dict(color='#f5f5f5', width=1.0)
+    
+            track_lines['grid_bin_bounds_xlim_start'] = pg.InfiniteLine(pos=grid_bin_bounds_xlim_start, angle=0, movable=False, pen=pg.mkPen(**grid_bin_bounds_xlim_pen_style_dict), label='grid_bin_bounds')
+            track_lines['grid_bin_bounds_xlim_end'] = pg.InfiniteLine(pos=grid_bin_bounds_xlim_end, angle=0, movable=False, pen=pg.mkPen(**grid_bin_bounds_xlim_pen_style_dict))
+
+
+        ## Add all lines to the viewbox and store them in the additional_items dictionary
+        for k, vline in track_lines.items():
+            v1.addItem(vline)
+            additional_items[f'{k}_line'] = vline
             
+
 
 
         # Draws the laps as a white line _____________________________________________________________________________________ #
@@ -316,7 +326,7 @@ class EpochsEditor:
 
 
     @classmethod
-    def init_laps_diagnoser(cls, pos_df: pd.DataFrame, curr_laps_df: pd.DataFrame, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None, on_epoch_region_selection_toggled_callback=None, loaded_track_limits=None):
+    def init_laps_diagnoser(cls, pos_df: pd.DataFrame, curr_laps_df: pd.DataFrame, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None, on_epoch_region_selection_toggled_callback=None, loaded_track_limits=None, grid_bin_bounds=None):
         """ 
 
         Usage:
@@ -336,14 +346,14 @@ class EpochsEditor:
         curr_laps_df = cls.add_visualization_columns(curr_laps_df=curr_laps_df)
         _obj = cls(pos_df=pos_df, curr_laps_df=curr_laps_df, on_epoch_region_updated_callback=on_epoch_region_updated_callback, on_epoch_region_selection_toggled_callback=on_epoch_region_selection_toggled_callback, loaded_track_limits=loaded_track_limits)
         _obj.changed_laps_df = _obj.curr_laps_df.iloc[:0,:].copy() # should be in attrs_post_init
-        _obj.plots = cls.perform_plot_laps_diagnoser(pos_df, curr_laps_df, include_velocity=include_velocity, include_accel=include_accel, on_epoch_region_updated_callback=_obj.on_epoch_region_updated, on_epoch_region_selection_toggled_callback=_obj.on_epoch_region_selection_toggled, loaded_track_limits=loaded_track_limits)
+        _obj.plots = cls.perform_plot_laps_diagnoser(pos_df, curr_laps_df, include_velocity=include_velocity, include_accel=include_accel, on_epoch_region_updated_callback=_obj.on_epoch_region_updated, on_epoch_region_selection_toggled_callback=_obj.on_epoch_region_selection_toggled, loaded_track_limits=loaded_track_limits, grid_bin_bounds=grid_bin_bounds)
         _obj.connect_double_click_event()  # Connect the double-click event after plots are initialized
         return _obj
 
 
 
     @classmethod
-    def init_from_session(cls, sess, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None, on_epoch_region_selection_toggled_callback=None):
+    def init_from_session(cls, sess, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None, on_epoch_region_selection_toggled_callback=None, grid_bin_bounds=None):
         """ initialize from a session object. Does not modify the session. """
         # pos_df = sess.compute_position_laps() # ensures the laps are computed if they need to be:
         position_obj = copy.deepcopy(sess.position)
@@ -355,7 +365,7 @@ class EpochsEditor:
         curr_laps_df = sess.laps.to_dataframe()
         loaded_track_limits = copy.deepcopy(sess.config.loaded_track_limits)
         loaded_track_limits['x_midpoint'] = sess.config.x_midpoint
-        return cls.init_laps_diagnoser(pos_df=pos_df, curr_laps_df=curr_laps_df, include_velocity=include_velocity, include_accel=include_accel, on_epoch_region_updated_callback=on_epoch_region_updated_callback, on_epoch_region_selection_toggled_callback=on_epoch_region_selection_toggled_callback, loaded_track_limits=loaded_track_limits)
+        return cls.init_laps_diagnoser(pos_df=pos_df, curr_laps_df=curr_laps_df, include_velocity=include_velocity, include_accel=include_accel, on_epoch_region_updated_callback=on_epoch_region_updated_callback, on_epoch_region_selection_toggled_callback=on_epoch_region_selection_toggled_callback, loaded_track_limits=loaded_track_limits, grid_bin_bounds=grid_bin_bounds)
     
 
 

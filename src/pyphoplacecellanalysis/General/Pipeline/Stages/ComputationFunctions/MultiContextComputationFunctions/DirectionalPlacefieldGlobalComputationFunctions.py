@@ -6660,7 +6660,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
     Must have a signature of: (owning_pipeline_reference, global_computation_results, computation_results, active_configs, ..., **kwargs) at a minimum
     """
 
-    @function_attributes(short_name='directional_laps_overview', tags=['directional','laps','overview', 'pyqtgraph'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=['EpochsEditor'], used_by=[], creation_date='2023-11-09 12:03', related_items=[], is_global=True)
+    @function_attributes(short_name='directional_laps_overview', tags=['directional','laps','overview', 'pyqtgraph'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], requires_global_keys=["global_computation_results.computed_data['DirectionalLaps']"], uses=['EpochsEditor'], used_by=[], creation_date='2023-11-09 12:03', related_items=[], is_global=True)
     def _display_directional_laps_overview(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None, use_incremental_sorting: bool = False, **kwargs):
             """ Renders a window with the position/laps displayed in the middle and the four templates displayed to the left and right of them.
 
@@ -6707,8 +6707,11 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
             long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
 
+            grid_bin_bounds = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.grid_bin_bounds) # ((0.0, 287.7697841726619), (115.10791366906477, 172.66187050359713))
+            
+
             # uses `global_session`
-            epochs_editor = EpochsEditor.init_from_session(global_session, include_velocity=True, include_accel=False)
+            epochs_editor = EpochsEditor.init_from_session(global_session, include_velocity=True, include_accel=False, grid_bin_bounds=grid_bin_bounds)
             root_dockAreaWindow, app = DockAreaWrapper.wrap_with_dockAreaWindow(epochs_editor.plots.win, None, title='Pho Directional Laps Templates')
 
             decoders_dict = track_templates.get_decoders_dict() # decoders_dict = {'long_LR': track_templates.long_LR_decoder, 'long_RL': track_templates.long_RL_decoder, 'short_LR': track_templates.short_LR_decoder, 'short_RL': track_templates.short_RL_decoder, }
