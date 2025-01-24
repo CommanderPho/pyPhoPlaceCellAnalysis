@@ -558,7 +558,7 @@ class PipelinePickleFileSelectorWidget:
         # Create the file browser widget
         # file_browser_widget = create_file_browser(directory, patterns, page_size=10, widget_height=400, on_selected_files_changed_fn=on_selected_files_changed)
         self.local_file_browser_widget = create_file_browser(self.directory, ['*loadedSessPickle*.pkl'], page_size=10, widget_height=400, selectable=1, on_selected_files_changed_fn=self.on_selected_local_sess_pkl_files_changed)
-        self.global_file_browser_widget = create_file_browser(self.directory, ['output/*.pkl'], page_size=10, widget_height=400, selectable=1, on_selected_files_changed_fn=self.on_selected_global_computation_result_pkl_files_changed)
+        self.global_file_browser_widget = create_file_browser(self.directory, ['output/*global_computation_results*.pkl'], page_size=10, widget_height=400, selectable=1, on_selected_files_changed_fn=self.on_selected_global_computation_result_pkl_files_changed)
 
         # Create Load/Save buttons
         self.load_button = widgets.Button(description="Load")

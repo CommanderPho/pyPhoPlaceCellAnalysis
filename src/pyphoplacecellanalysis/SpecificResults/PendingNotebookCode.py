@@ -352,7 +352,7 @@ from pyphocorehelpers.Filesystem.path_helpers import set_posix_windows
 from pyphocorehelpers.assertion_helpers import Assert
 from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
 
-@function_attributes(short_name=None, tags=['UNFINISHED', 'UNUSED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-17 20:34', related_items=['PipelinePickleFileSelectorWidget', 'on_load_global'])
+@function_attributes(short_name=None, tags=['working', 'ui', 'interactive'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-17 20:34', related_items=['PipelinePickleFileSelectorWidget', 'on_load_global'])
 def on_load_local(active_session_pickle_file_widget, global_data_root_parent_path, active_data_mode_name, basedir, saving_mode, force_reload):
     """ Loads custom pipeline pickles that were saved out via `custom_save_filepaths['pipeline_pkl'] = curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, active_pickle_filename=custom_save_filenames['pipeline_pkl'])`
 
@@ -395,7 +395,12 @@ def on_load_local(active_session_pickle_file_widget, global_data_root_parent_pat
 
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import on_load_local, on_load_global
 
-        curr_active_pipeline, custom_suffix, proposed_load_pkl_path = on_load_local(active_session_pickle_file_widget)
+
+        curr_active_pipeline, custom_suffix, proposed_load_pkl_path = on_load_local(active_session_pickle_file_widget=active_session_pickle_file_widget, global_data_root_parent_path=global_data_root_parent_path, active_data_mode_name=active_data_mode_name, basedir=basedir, saving_mode=saving_mode, force_reload=force_reload) 
+        curr_active_pipeline = on_load_global(active_session_pickle_file_widget=active_session_pickle_file_widget, curr_active_pipeline=curr_active_pipeline, basedir=basedir, extended_computations_include_includelist=extended_computations_include_includelist, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist,
+                                            skip_global_load=False, force_reload=False, override_global_computation_results_pickle_path=active_session_pickle_file_widget.active_global_pkl)
+
+                                            
 
     """
     ## INPUTS: widget.active_global_pkl, widget.active_global_pkl
@@ -403,11 +408,9 @@ def on_load_local(active_session_pickle_file_widget, global_data_root_parent_pat
     from pyphoplacecellanalysis.General.Batch.runBatch import BatchSessionCompletionHandler # for `post_compute_validate(...
 
 
-
     proposed_load_pkl_path = active_session_pickle_file_widget.active_local_pkl.resolve()
     Assert.path_exists(proposed_load_pkl_path)
-    proposed_load_pkl_path
-
+    
     custom_suffix: str = active_session_pickle_file_widget.try_extract_custom_suffix()
     print(f'custom_suffix: "{custom_suffix}"')
 
@@ -447,8 +450,9 @@ def on_load_local(active_session_pickle_file_widget, global_data_root_parent_pat
     return curr_active_pipeline, custom_suffix, proposed_load_pkl_path
 
 
-@function_attributes(short_name=None, tags=[['UNFINISHED', 'UNUSED'], 'load', 'global'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-17 17:04', related_items=['PipelinePickleFileSelectorWidget', 'on_load_local'])
-def on_load_global(active_session_pickle_file_widget, curr_active_pipeline, basedir, extended_computations_include_includelist: List[str], force_recompute_override_computations_includelist: List[str]=[], skip_global_load: bool = True, force_reload: bool = False, override_global_computation_results_pickle_path: Path=None):
+@function_attributes(short_name=None, tags=['working', 'ui', 'interactive', 'load', 'global'], input_requires=[], output_provides=[], uses=['batch_evaluate_required_computations', 'curr_active_pipeline.load_pickled_global_computation_results'], used_by=[], creation_date='2025-01-17 17:04', related_items=['PipelinePickleFileSelectorWidget', 'on_load_local'])
+def on_load_global(active_session_pickle_file_widget, curr_active_pipeline, basedir, extended_computations_include_includelist: List[str], force_recompute_override_computations_includelist: List[str]=[],
+                    skip_global_load: bool = True, saving_mode: PipelineSavingScheme=PipelineSavingScheme.SKIP_SAVING, force_reload: bool = False, override_global_computation_results_pickle_path: Path=None):
     """
 
     curr_active_pipeline = on_load_global(active_session_pickle_file_widget, curr_active_pipeline, extended_computations_include_includelist: List[str], skip_global_load: bool = True, force_reload: bool = False, override_global_computation_results_pickle_path: Path=None)
@@ -464,10 +468,10 @@ def on_load_global(active_session_pickle_file_widget, curr_active_pipeline, base
 
 
     if active_session_pickle_file_widget.active_global_pkl is None:
-        skip_global_load: bool = True
+        skip_global_load = True
         override_global_computation_results_pickle_path = None
     else:
-        skip_global_load: bool = False
+        skip_global_load = False
         override_global_computation_results_pickle_path = active_session_pickle_file_widget.active_global_pkl.resolve()
         Assert.path_exists(override_global_computation_results_pickle_path)
         override_global_computation_results_pickle_path
