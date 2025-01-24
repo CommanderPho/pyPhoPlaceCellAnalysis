@@ -542,21 +542,23 @@ class DockLabel(VerticalLabel):
                 self.groupButton.move(button_x, 0)
                 current_x += button_size
         ## END if self.groupButton...    
+        button_occupied_space = ((button_size if button_size else 0) * num_total_title_bar_buttons)
 
         if self.elided_text_mode is not None:
             # Add elided text logic
             if debug_print:
                 print(f'self.elided_text_mode: {self.elided_text_mode} -- self.orientation: {self.orientation} -- w: {self.width()}, h: {self.height()}')
             font_metrics = QtGui.QFontMetrics(self.font())
+            
             if self.orientation == 'vertical':
                 ## sideways mode with bar on left
                 # available_text_space = max(0, self.height() - (size if self.closeButton else 0))
-                available_text_space = max(0, self.height() - (button_size * num_total_title_bar_buttons))
+                available_text_space = max(0, self.height() - button_occupied_space)
                 
             else:
                 ## regular mode with bar on top
                 # available_text_space = max(0, self.width() - (size if self.closeButton else 0))
-                available_text_space = max(0, self.width() - (button_size * num_total_title_bar_buttons))
+                available_text_space = max(0, self.width() - button_occupied_space)
                 
 
             if debug_print:
