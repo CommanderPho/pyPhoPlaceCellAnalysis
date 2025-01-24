@@ -205,13 +205,18 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
         out_all_pf_2D_pyqtgraph_binned_image_fig = display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_format_config)
         
     """
+    from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import get_custom_orange_with_low_values_dropped_cmap
+    from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
+
 
     wants_crosshairs= figure_format_config.get('wants_crosshairs', False) 
     
     # cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
     # cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
     # color_map = figure_format_config.get('color_map', 'viridis')
-    color_map = figure_format_config.get('color_map', pg.colormap.get('viridis','matplotlib'))
+    # active_cmap = ColormapHelpers.mpl_to_pg_colormap(get_custom_orange_with_low_values_dropped_cmap())
+    # color_map = figure_format_config.get('color_map', active_cmap)
+    color_map = figure_format_config.get('color_map', pg.colormap.get('jet','matplotlib'))
     # color_map = figure_format_config.get('color_map', 'viridis')
     # color_bar_mode = figure_format_config.get('color_bar_mode', 'each')
     color_bar_mode = figure_format_config.get('color_bar_mode', None) # no colorbars rendered  
@@ -279,6 +284,7 @@ def display_all_pf_2D_pyqtgraph_binned_image_rendering(active_pf_2D, figure_form
     else:
         max_value_formatter = None
         
+    ## Build Layout:
     nfigures, num_pages, included_combined_indicies_pages, page_grid_sizes, data_aspect_ratio, page_figure_sizes = _determine_best_placefield_2D_layout(xbin=active_pf_2D.xbin, ybin=active_pf_2D.ybin, included_unit_indicies=included_unit_indicies,
         **overriding_dict_with(lhs_dict={'subplots': (40, 3), 'fig_column_width': 8.0, 'fig_row_height': 1.0, 'resolution_multiplier': 1.0, 'max_screen_figure_size': (None, None), 'last_figure_subplots_same_layout': True, 'debug_print': True}, **figure_format_config))
 
