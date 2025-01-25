@@ -34,9 +34,11 @@ class CustomViewBox(pg.ViewBox):
             pos = event.scenePos()
             if self.sceneBoundingRect().contains(pos):
                 mouse_point = self.mapSceneToView(pos)
-                self.parent().show_context_menu(event.screenPos(), mouse_point)
+                if self.parent() is not None:
+                    self.parent().show_context_menu(event.screenPos(), mouse_point) # AttributeError: 'NoneType' object has no attribute 'show_context_menu'
         else:
             super().mouseClickEvent(event)
+
 
 @metadata_attributes(short_name=None, tags=['useful', 'gui', 'utility', 'epochs', 'widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-17 19:25', related_items=[])
 @define(slots=False)
@@ -212,7 +214,15 @@ class EpochsEditor:
         v1 = CustomViewBox()
         
         track_lines = dict() 
-        
+
+        if grid_bin_bounds is not None:
+            # Draws the grid_bin_bounds for x-axis thick horizontal lines ______________________________________________________________ #
+            grid_bin_bounds_xlim_start, grid_bin_bounds_xlim_end = grid_bin_bounds[0] ## x-axis
+            grid_bin_bounds_xlim_pen_style_dict = dict(color='#ca0000', width=1.0)
+    
+            track_lines['grid_bin_bounds_xlim_start'] = pg.InfiniteLine(pos=grid_bin_bounds_xlim_start, angle=0, movable=False, pen=pg.mkPen(**grid_bin_bounds_xlim_pen_style_dict), label='grid_bin_bounds_min')
+            track_lines['grid_bin_bounds_xlim_end'] = pg.InfiniteLine(pos=grid_bin_bounds_xlim_end, angle=0, movable=False, pen=pg.mkPen(**grid_bin_bounds_xlim_pen_style_dict), label='grid_bin_bounds_max')
+
         if loaded_track_limits is not None:
             # Draws the track boundaries as dotted horizontal lines ______________________________________________________________ #
             long_xlim_start, long_xlim_end = loaded_track_limits['long_xlim']
@@ -224,17 +234,9 @@ class EpochsEditor:
             short_xlim_start, short_xlim_end = loaded_track_limits['short_xlim']
             short_xlim_pen_style_dict = dict(color='#b6b6b6ff', width=0.5, style=pg.QtCore.Qt.DashLine)
     
-            track_lines['short_xlim_start'] = pg.InfiniteLine(pos=short_xlim_start, angle=0, movable=False, pen=pg.mkPen(**short_xlim_pen_style_dict))
+            track_lines['short_xlim_start'] = pg.InfiniteLine(pos=short_xlim_start, angle=0, movable=False, pen=pg.mkPen(**short_xlim_pen_style_dict), label='loaded_track_limits')
             track_lines['short_xlim_end'] = pg.InfiniteLine(pos=short_xlim_end, angle=0, movable=False, pen=pg.mkPen(**short_xlim_pen_style_dict))
     
-        if grid_bin_bounds is not None:
-            # Draws the grid_bin_bounds for x-axis thick horizontal lines ______________________________________________________________ #
-            grid_bin_bounds_xlim_start, grid_bin_bounds_xlim_end = grid_bin_bounds[0] ## x-axis
-            grid_bin_bounds_xlim_pen_style_dict = dict(color='#f5f5f5', width=1.0)
-    
-            track_lines['grid_bin_bounds_xlim_start'] = pg.InfiniteLine(pos=grid_bin_bounds_xlim_start, angle=0, movable=False, pen=pg.mkPen(**grid_bin_bounds_xlim_pen_style_dict), label='grid_bin_bounds')
-            track_lines['grid_bin_bounds_xlim_end'] = pg.InfiniteLine(pos=grid_bin_bounds_xlim_end, angle=0, movable=False, pen=pg.mkPen(**grid_bin_bounds_xlim_pen_style_dict))
-
 
         ## Add all lines to the viewbox and store them in the additional_items dictionary
         for k, vline in track_lines.items():
@@ -244,7 +246,7 @@ class EpochsEditor:
 
 
 
-        # Draws the laps as a white line _____________________________________________________________________________________ #
+        # Draws the lap positions as a white line _____________________________________________________________________________________ #
         ax_pos = pg.PlotDataItem(x=pos_df.t.to_numpy(), y=pos_df[pos_variable_names[0]].to_numpy(), pen='white', name=pos_variable_names[0]) # Draws the laps as white lines
 
 
@@ -305,8 +307,8 @@ class EpochsEditor:
             if epoch_linear_region is None:
                 ## Create a new one:
                 # add alpha
-                epoch_linear_region, epoch_region_label = build_pyqtgraph_epoch_indicator_regions(v1, t_start=a_lap.start, t_stop=a_lap.stop, epoch_label=a_lap.label, movable=True, **dict(pen=pg.mkPen(f'{a_lap.lap_color}d6', width=1.0), brush=pg.mkBrush(f"{a_lap.lap_color}42"), hoverBrush=pg.mkBrush(f"{a_lap.lap_color}a8"), hoverPen=pg.mkPen(a_lap.lap_accent_color, width=2.5)), custom_bound_data=a_lap.Index)
-                
+                epoch_linear_region, epoch_region_label = build_pyqtgraph_epoch_indicator_regions(v1, t_start=a_lap.start, t_stop=a_lap.stop, epoch_label=a_lap.label, movable=True, removable=True, **dict(pen=pg.mkPen(f'{a_lap.lap_color}d6', width=1.0), brush=pg.mkBrush(f"{a_lap.lap_color}42"), hoverBrush=pg.mkBrush(f"{a_lap.lap_color}a8"), hoverPen=pg.mkPen(a_lap.lap_accent_color, width=2.5)), 
+                                                                                                  custom_bound_data=a_lap.Index)                
                 lap_epoch_widgets[a_lap.label] = epoch_linear_region
                 lap_epoch_labels[a_lap.label] = epoch_region_label
                 if on_epoch_region_updated_callback is not None:
@@ -314,7 +316,16 @@ class EpochsEditor:
                 
                 if on_epoch_region_selection_toggled_callback is not None:
                     epoch_linear_region.sigClicked.connect(on_epoch_region_selection_toggled_callback)
-            
+
+
+                # Provide a callback to remove the ROI (and its children) when
+                # "remove" is selected from the context menu.
+                def remove():
+                    v1.removeItem(epoch_linear_region)
+                epoch_linear_region.sigRemoveRequested.connect(remove)
+
+                # epoch_linear_region.getContextMenus(
+                
 
         
         plots = RenderPlots('lap_debugger_plot', win=win,
