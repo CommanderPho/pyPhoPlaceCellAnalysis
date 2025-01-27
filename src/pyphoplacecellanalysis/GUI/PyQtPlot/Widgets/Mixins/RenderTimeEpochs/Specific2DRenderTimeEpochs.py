@@ -22,7 +22,7 @@ A general epochs_dataframe_formatter takes a dataframe and adds the required col
 
 @define(slots=False)
 class General2DRenderTimeEpochs(object):
-    """docstring for General2DRenderTimeEpochs."""
+    """Subclasses render specific epochs as intervals."""
     default_datasource_name: str = 'GeneralEpochs' # class variable
     # default_datasource_name: str = field(default='GeneralEpochs')
     

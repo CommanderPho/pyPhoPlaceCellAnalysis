@@ -302,7 +302,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
         self.add_rendered_intervals(datasource, name=datasource.custom_datasource_name, debug_print=False) # updates the rendered intervals on the change
         
         
-    def add_rendered_intervals(self, interval_datasource: IntervalsDatasource, name=None, child_plots=None, debug_print=False):
+    def add_rendered_intervals(self, interval_datasource: Union[pd.DataFrame, IntervalsDatasource], name=None, child_plots=None, debug_print=False):
         """ adds or updates the intervals specified by the interval_datasource to the plots 
         
         Inputs: 
@@ -323,6 +323,15 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                 .add_PBEs_intervals(...)
         
         """
+        if isinstance(interval_datasource, pd.DataFrame):
+            ## it's a dataframe, build a datasource
+            from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+            
+            interval_df: pd.DataFrame = deepcopy(interval_datasource)
+            interval_df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(df=interval_df, required_columns_synonym_dict=IntervalsDatasource._time_column_name_synonyms)
+            interval_datasource = General2DRenderTimeEpochs.build_render_time_epochs_datasource(interval_df)
+
+
         assert isinstance(interval_datasource, IntervalsDatasource), f"interval_datasource: must be an IntervalsDatasource object but instead is of type: {type(interval_datasource)}"
         if name is None:
             print(f'WARNING: no name provided for rendered intervals. Defaulting to datasource name: "{interval_datasource.custom_datasource_name}"')
