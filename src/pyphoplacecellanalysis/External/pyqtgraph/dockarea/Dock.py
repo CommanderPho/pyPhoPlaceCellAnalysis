@@ -100,10 +100,17 @@ class DockDisplayConfig(object):
     
 
 class Dock(QtWidgets.QWidget, DockDrop):
-
+    """ 
+    
+    self.widgetArea: QWidget - the main container for the contents of the dock, aside from the titlebar at the top
+    
+    """
     sigStretchChanged = QtCore.Signal()
     sigClosed = QtCore.Signal(object)
-
+    ## passthrough signals from `DockLabel`
+    # sigClicked = QtCore.Signal(object, object)
+    sigCollapseClicked = QtCore.Signal(object)
+    sigGroupClicked = QtCore.Signal(object)
 
     @property
     def config(self) -> Optional[DockDisplayConfig]:
@@ -138,6 +145,13 @@ class Dock(QtWidgets.QWidget, DockDrop):
         self.label = DockLabel(name, self, display_config)
         if display_config.showCloseButton:
             self.label.sigCloseClicked.connect(self.close)
+        if display_config.showCollapseButton:
+            self.label.sigCollapseClicked.connect(self.on_collapse_btn_clicked)
+        if display_config.showGroupButton:
+            self.label.sigGroupClicked.connect(self.on_group_btn_clicked)
+
+
+        self.contentsHidden = False
         self.labelHidden = False
         self.moveLabel = True  ## If false, the dock is no longer allowed to move the label.
         # self.autoOrient = autoOrientation
@@ -239,6 +253,52 @@ class Dock(QtWidgets.QWidget, DockDrop):
         self.labelHidden = False
         self.allowedAreas.add('center')
         self.updateStyle()
+        
+
+    def toggleContentVisibility(self):
+        """ toggles the visibility of the contents (everything except the title bar) for this Dock.
+        """
+        new_is_hidden: bool = (not self.contentsHidden)
+        if new_is_hidden:
+            ## now hidden
+            self.hideContents()
+        else:
+            ## now visible
+            self.showContents()
+
+    def setContentVisibility(self, is_visible: bool):
+        """ toggles the visibility of the contents (everything except the title bar) for this Dock.
+        """
+        new_is_hidden: bool = (not is_visible)
+        if new_is_hidden:
+            ## now hidden
+            self.hideContents()
+        else:
+            ## now visible
+            self.showContents()
+
+    def hideContents(self):
+        """
+        Hide the contents (everything except the title bar) for this Dock.
+        """
+        print(f'hideContents()')
+        self.widgetArea.hide()
+        self.contentsHidden = True
+        self.updateStyle()
+        print(f'\tdone.')
+        
+    def showContents(self):
+        """
+        Show the contents (everything except the title bar) for this Dock.
+        """
+        print(f'showContents()')
+        self.widgetArea.show()
+        self.contentsHidden = False
+        self.updateStyle()
+        print(f'\tdone.')
+        
+
+
 
     def title(self):
         """
@@ -379,6 +439,22 @@ class Dock(QtWidgets.QWidget, DockDrop):
     def dropEvent(self, *args):
         DockDrop.dropEvent(self, *args)
 
+    ## pass-through events:
+    def on_collapse_btn_clicked(self):
+        """Remove this dock from the DockArea it lives inside."""
+        self.toggleContentVisibility()
+        self.label.updateCollapseButtonStyle(is_collapse_active=self.contentsHidden)
+        self.sigCollapseClicked.emit(self)
+        
+    def on_group_btn_clicked(self):
+        """Remove this dock from the DockArea it lives inside."""
+        self.sigGroupClicked.emit(self)
+        
+
+
+
+
+
 
 class DockLabel(VerticalLabel):
     """ the label and 'title bar' at the top of the Dock widget that displays the title and allows dragging/closing. """
@@ -416,11 +492,11 @@ class DockLabel(VerticalLabel):
         if display_config.showCollapseButton:
             self.collapseButton = QtWidgets.QToolButton(self)
             self.collapseButton.clicked.connect(self.sigCollapseClicked)
-            self.collapseButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogListView))
+            self.collapseButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_TitleBarMinButton))
         if display_config.showGroupButton:
             self.groupButton = QtWidgets.QToolButton(self)
             self.groupButton.clicked.connect(self.sigGroupClicked)
-            self.groupButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_TitleBarMinButton))
+            self.groupButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogListView))
 
 
 
@@ -576,3 +652,23 @@ class DockLabel(VerticalLabel):
                 print(f'self.elided_text_mode == None so skipping eliding -- self.orientation: {self.orientation}')
         ## END if self.elided_text_mode is not None...
         super(DockLabel,self).resizeEvent(ev)
+
+
+    def updateCollapseButtonStyle(self, is_collapse_active: bool):
+        """Updates the collapse button style based on the current state."""
+        if is_collapse_active:
+            self.collapseButton.setStyleSheet("""
+                QToolButton {
+                    background-color: #0078d7; /* Highlighted blue for collapsed state */
+                }
+            """)
+        else:
+            self.collapseButton.setStyleSheet("") ## clear the stylesheet
+                        
+            # self.collapseButton.setStyleSheet("""
+            #     QToolButton {
+            #         background-color: #000000; /* Light gray for collapsed state */
+            #     }
+            # """)
+        # self.collapseButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_TitleBarMinButton))
+        

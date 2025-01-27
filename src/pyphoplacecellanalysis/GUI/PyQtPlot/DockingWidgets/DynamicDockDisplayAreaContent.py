@@ -74,8 +74,8 @@ class CustomDockDisplayConfig(DockDisplayConfig):
 
     def __attrs_post_init__(self):
       if self.custom_get_colors_dict is None:
-            self.custom_get_colors_dict = {False: DockDisplayColors(fg_color='#fff', bg_color='#66cc66', border_color='#54ba54'),
-                True: DockDisplayColors(fg_color='#aaa', bg_color='#44aa44', border_color='#339933'),
+            self.custom_get_colors_dict = {False: DockDisplayColors(fg_color='#111', bg_color='#66cc66', border_color='#54ba54'),
+                True: DockDisplayColors(fg_color='#333', bg_color='#44aa44', border_color='#339933'),
             }
 
     # def __init__(self, showCloseButton=True, fontSize='10px', corner_radius='2px', custom_get_colors_callback_fn=None, orientation=None, custom_get_colors_dict=None):
