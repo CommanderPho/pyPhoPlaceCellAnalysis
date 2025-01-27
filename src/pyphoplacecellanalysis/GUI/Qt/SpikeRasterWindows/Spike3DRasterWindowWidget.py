@@ -1030,7 +1030,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
         """
         print(f'spikes_raster_window._perform_build_attached_visible_interval_info_widget()')
-        # from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, get_utility_dock_colors
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DockDisplayColors, CustomDockDisplayConfig
         from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.StackedDynamicTablesWidget import TableManager
             
@@ -1056,9 +1055,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             
             ## Render in right sidebar:
             updated_ui_dict = {'ctrl_layout': None, 'dynamic_tables_container_widget': None, 'dynamic_tables_container_VBoxLayout': None, 'bottom_spacer_widget': None, 'manager': None} # , 'tables_dict': {}
-
-            # ctrls_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False)
-            
             root_ctrl_layout_widget = pg.LayoutWidget() ## ROOT layout widget
             updated_ui_dict['ctrl_layout'] = root_ctrl_layout_widget
 
@@ -1106,7 +1102,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
             # New Dock-based way _________________________________________________________________________________________________ #
             name: str = 'VisibleWindowIntervalTables'
-            display_config = CustomDockDisplayConfig(showCloseButton=True, orientation='horizontal', custom_get_colors_dict={False: DockDisplayColors(fg_color='#111', bg_color='#c5c5c5', border_color='#a7babd'),
+            display_config = CustomDockDisplayConfig(showCloseButton=True, showCollapseButton=True, orientation='horizontal', custom_get_colors_dict={False: DockDisplayColors(fg_color='#111', bg_color='#c5c5c5', border_color='#a7babd'),
                     True: DockDisplayColors(fg_color='#333', bg_color='#757575', border_color='#424242'),
                 })
             
@@ -1259,21 +1255,14 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         assert not hasattr(self.ui.rightSideContainerWidget.ui, 'neuron_widget_container')
         
         ## Render in right sidebar:
-
-        ## Prev way:        
-        # self.ui.rightSideContainerWidget.ui.neuron_widget_container = NeuronWidgetContainer(neuron_plotting_configs_dict, parent=self.right_sidebar_contents_container)
-        # self.right_sidebar_contents_container.addWidget(self.ui.rightSideContainerWidget.ui.neuron_widget_container) ## add reference to sidebar.ui.neuron_widget_container
-
-
         rightSideContainerWidget = self.ui.rightSideContainerWidget # pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterRightSidebarWidget.Spike3DRasterRightSidebarWidget
         right_sidebar_contents_container_dockarea = rightSideContainerWidget.right_sidebar_contents_container_dockarea
-
         
         # New Dock-based way _________________________________________________________________________________________________ #
         name: str = 'NeuronVisualConfigs'
         display_config = CustomDockDisplayConfig(showCloseButton=True, orientation='horizontal', custom_get_colors_dict={False: DockDisplayColors(fg_color='#111', bg_color='#c5c5c5', border_color='#a7babd'),
                 True: DockDisplayColors(fg_color='#333', bg_color='#757575', border_color='#424242'),
-            })
+            }, showCollapseButton=True)
         
         # Create new widget
         # No extant table widget and display_dock currently, create a new one:
@@ -1303,7 +1292,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
         return self.ui.rightSideContainerWidget.ui.neuron_widget_container, _connections_list
     
-        
+    @function_attributes(short_name=None, tags=['widget', 'interactive', 'display', 'config', 'intervals', 'epoch', 'visual'], input_requires=[], output_provides=[], uses=['_perform_build_attached_neuron_visual_configs_widget'], used_by=[], creation_date='2025-01-27 16:27', related_items=[])
     def build_neuron_visual_configs_widget(self, build_new_neuron_colormap:bool=False):
         """ addds to the right sidebar and connects controls """
         ## Get 2D or 3D Raster from spike_raster_window
@@ -1331,7 +1320,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.ui.rightSideContainerWidget.ui.neuron_widget_container, _connections_list = self._perform_build_attached_neuron_visual_configs_widget(neuron_plotting_configs_dict)
 
         # Display the sidebar:
-        self.set_right_sidebar_visibility(is_visible=True)
+        self.set_right_sidebar_visibility(True)
     
 
 
@@ -1358,7 +1347,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
         # New Dock-based way _________________________________________________________________________________________________ #
         name: str = 'EpochIntervalsVisualConfigs'
-        display_config = CustomDockDisplayConfig(showCloseButton=True, orientation='horizontal', custom_get_colors_dict={False: DockDisplayColors(fg_color='#111', bg_color='#c5c5c5', border_color='#a7babd'),
+        display_config = CustomDockDisplayConfig(showCloseButton=True, showCollapseButton=True, orientation='horizontal', custom_get_colors_dict={False: DockDisplayColors(fg_color='#111', bg_color='#c5c5c5', border_color='#a7babd'),
                 True: DockDisplayColors(fg_color='#333', bg_color='#757575', border_color='#424242'),
             })
         
@@ -1389,7 +1378,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             an_epochs_display_list_widget = active_2d_plot.ui.get('epochs_render_configs_widget', None)
             if an_epochs_display_list_widget is None:
                 # create a new one:    
-                an_epochs_display_list_widget:EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(epoch_display_configs, parent=a_layout_widget)
+                an_epochs_display_list_widget:EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(epoch_display_configs)
                 active_2d_plot.ui.epochs_render_configs_widget = an_epochs_display_list_widget
             else:
                 an_epochs_display_list_widget.update_from_configs(configs=epoch_display_configs)

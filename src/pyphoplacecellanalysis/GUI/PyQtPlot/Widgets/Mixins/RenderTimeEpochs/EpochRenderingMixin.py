@@ -615,9 +615,23 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
         ## Inline Concise: Position Replays, PBEs, and Ripples all below the scatter:
         for interval_key, interval_update_kwargs in update_dict.items():
             if interval_key in self.interval_datasources:
-                if not isinstance(interval_update_kwargs, dict):
-                    interval_update_kwargs = interval_update_kwargs.to_dict() # deal with EpochDisplayConfig 
-                self.interval_datasources[interval_key].update_visualization_properties(lambda active_df, **kwargs: General2DRenderTimeEpochs._update_df_visualization_columns(active_df, **(interval_update_kwargs | kwargs))) ## Fully inline
+                if isinstance(interval_update_kwargs, (list, tuple)):
+                    ## list of update dicts
+                    a_list_interval_update_kwargs = []
+                    for a_sub_interval_update_kwargs in interval_update_kwargs:
+                        if not isinstance(a_sub_interval_update_kwargs, dict):
+                            a_sub_interval_update_kwargs = a_sub_interval_update_kwargs.to_dict() # deal with EpochDisplayConfig 
+                        a_list_interval_update_kwargs.append(a_sub_interval_update_kwargs)
+                        # self.interval_datasources[interval_key].update_visualization_properties(lambda active_df, **kwargs: General2DRenderTimeEpochs._update_df_visualization_columns(active_df, **(a_sub_interval_update_kwargs | kwargs))) ## Fully inline
+                    ## Update with list
+                    # a_list_interval_update_kwargs = [a_sub_interval_update_kwargs for a_sub_interval_update_kwargs in interval_update_kwargs]
+                    self.interval_datasources[interval_key].update_visualization_properties(lambda active_df, **kwargs: General2DRenderTimeEpochs._update_df_visualization_columns(active_df, **(a_sub_interval_update_kwargs | kwargs))) ## Fully inline
+
+                else:
+                    ## single update item dict
+                    if not isinstance(interval_update_kwargs, dict):
+                        interval_update_kwargs = interval_update_kwargs.to_dict() # deal with EpochDisplayConfig 
+                    self.interval_datasources[interval_key].update_visualization_properties(lambda active_df, **kwargs: General2DRenderTimeEpochs._update_df_visualization_columns(active_df, **(interval_update_kwargs | kwargs))) ## Fully inline
             else:
                 print(f"WARNING: interval_key '{interval_key}' was not found in self.interval_datasources. Skipping update for unknown item.")
 
@@ -858,28 +872,30 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
         return out_configs_dict
     
 
-    @function_attributes(short_name=None, tags=['epoch', 'epoch_render_config_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-02 03:38', related_items=[])
-    def build_or_update_epoch_render_configs_widget(self, parent=None):
-        """
-        Called to update the render epoch configuration manager from the internal epoch datasources
-        """
-        from pyphoplacecellanalysis.GUI.Qt.Widgets.EpochRenderConfigWidget.EpochRenderConfigWidget import EpochRenderConfigsListWidget
+    # @function_attributes(short_name=None, tags=['epoch', 'epoch_render_config_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-02 03:38', related_items=[])
+    # def build_or_update_epoch_render_configs_widget(self, parent=None):
+    #     """
+    #     Called to update the render epoch configuration manager from the internal epoch datasources
+    #     """
+    #     from pyphoplacecellanalysis.GUI.Qt.Widgets.EpochRenderConfigWidget.EpochRenderConfigWidget import EpochRenderConfigsListWidget
 
-        epoch_display_configs = self.extract_interval_display_config_lists()
-        an_epochs_display_list_widget = self.ui.get('epochs_render_configs_widget', None)
-        if an_epochs_display_list_widget is None:
-            # create a new one:    
-            an_epochs_display_list_widget:EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(epoch_display_configs, parent=parent)
-            self.ui.epochs_render_configs_widget = an_epochs_display_list_widget
-        else:
-            an_epochs_display_list_widget.update_from_configs(configs=epoch_display_configs)
+    #     epoch_display_configs = self.extract_interval_display_config_lists()
+    #     an_epochs_display_list_widget = self.ui.get('epochs_render_configs_widget', None)
+    #     if an_epochs_display_list_widget is None:
+    #         # create a new one:    
+    #         an_epochs_display_list_widget:EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(epoch_display_configs, parent=parent)
+    #         self.ui.epochs_render_configs_widget = an_epochs_display_list_widget
+    #     else:
+    #         an_epochs_display_list_widget.update_from_configs(configs=epoch_display_configs)
 
 
-    @function_attributes(short_name=None, tags=['epochs', 'epoch_render_configs', 'update', 'sync'], input_requires=[], output_provides=[], uses=['self.extract_interval_display_config_lists'], used_by=[], creation_date='2024-07-03 11:27', related_items=['update_epochs_from_configs_widget'])
+    @function_attributes(short_name=None, tags=['epoch', 'epoch_render_config_widget', 'epochs', 'epoch_render_configs', 'update', 'sync'], input_requires=[], output_provides=[], uses=['self.extract_interval_display_config_lists'], used_by=[], creation_date='2024-07-03 11:27', related_items=['update_epochs_from_configs_widget'])
     def build_or_update_epoch_render_configs_widget(self, parent=None):
         """ `Plotted Rects` -> `configs widget`
         Called to update the render epoch configuration manager from the internal epoch datasources
         """
+        from pyphoplacecellanalysis.GUI.Qt.Widgets.EpochRenderConfigWidget.EpochRenderConfigWidget import EpochRenderConfigsListWidget
+        
         epoch_display_configs = self.extract_interval_display_config_lists()
         an_epochs_display_list_widget = self.ui.get('epochs_render_configs_widget', None)
         if an_epochs_display_list_widget is None:
@@ -887,6 +903,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
             print(f'no epochs_render_configs_widget exists, creating a new one...')
             an_epochs_display_list_widget:EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(epoch_display_configs, parent=parent)
             self.ui.epochs_render_configs_widget = an_epochs_display_list_widget
+            self.ui.connections['epochs_render_configs_widget_updated'] = an_epochs_display_list_widget.sigAnyConfigChanged.connect(lambda x: self.update_epochs_from_configs_widget())            
         else:
             an_epochs_display_list_widget.update_from_configs(configs=epoch_display_configs)
 
@@ -911,7 +928,16 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
 
         ## get the configs from the configs widget
         _out_configs = an_epochs_display_list_widget.configs_from_states()
-        update_dict = {k:v.to_dict() for k, v in _out_configs.items()}
+        
+        update_dict = {}
+        for k, v in _out_configs.items():
+            if not isinstance(v, (list, tuple)):
+                update_dict[k] = v.to_dict()
+            else:
+                update_dict[k] = [sub_v.to_dict() for sub_v in v] ## get the sub-items in the list
+                
+        
+        # update_dict = {k:v.to_dict() for k, v in _out_configs.items()}
         self.update_rendered_intervals_visualization_properties(update_dict=update_dict)
 
 
