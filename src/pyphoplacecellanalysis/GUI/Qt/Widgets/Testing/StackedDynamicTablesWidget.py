@@ -186,6 +186,7 @@ class CustomHeaderTableView(pg.QtWidgets.QTableView):
         """ Toggle visibility of the specified column. """
         self.setColumnHidden(column, not visible)
 
+
 @metadata_attributes(short_name=None, tags=['table', 'manager', 'ui'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-08 16:41', related_items=[])
 class TableManager:
     """ Manages a dynamically updating dict of tables, rendered as docked widgets
