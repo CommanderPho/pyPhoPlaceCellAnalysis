@@ -3876,7 +3876,8 @@ class TrainTestLapsSplitting:
     @function_attributes(short_name=None, tags=['testing', 'split', 'laps'], input_requires=[], output_provides=[], uses=[], used_by=['compute_train_test_split_laps_decoders'], creation_date='2024-03-29 15:37', related_items=[])
     @classmethod
     def split_laps_training_and_test(cls, laps_df: pd.DataFrame, training_data_portion: float=5.0/6.0, debug_print: bool = False):
-        """
+        """ Splits laps into separate training and test sections
+        
         Usage:
 
             from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import split_laps_training_and_test

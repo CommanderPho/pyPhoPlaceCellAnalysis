@@ -1061,7 +1061,7 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
 	else:
 		CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}" ## OLD:
 	
-	print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
+	print(f'\tCURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
 
 	callback_outputs = {
 		'active_laps_decoding_time_bin_size': None,
@@ -1087,8 +1087,8 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
 		
 		directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
 		track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
-		print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
-		print(f'included_qclu_values: {included_qclu_values}')
+		print(f'\tminimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
+		print(f'\tincluded_qclu_values: {included_qclu_values}')
 	
 		## INPUTS: curr_active_pipeline, track_templates, global_epoch_name, (long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj)
 		any_decoder_neuron_IDs: NDArray = deepcopy(track_templates.any_decoder_neuron_IDs)
@@ -1271,7 +1271,7 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
 
 		print(f'\t\t done (success).')
 
-	except BaseException as e:
+	except Exception as e:
 		exception_info = sys.exc_info()
 		err = CapturedException(e, exception_info)
 		print(f"WARN: on_complete_success_execution_session: encountered exception {err} while performing .compute_and_export_session_trial_by_trial_performance_completion_function(...) for curr_session_context: {curr_session_context}")
