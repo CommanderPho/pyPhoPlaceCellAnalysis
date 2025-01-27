@@ -9,6 +9,9 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidget
 ## IMPORTS:
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 from pyphoplacecellanalysis.External.pyqtgraph.widgets.LayoutWidget import LayoutWidget
+## For dock widget
+from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.NestedDockAreaWidget import NestedDockAreaWidget
+from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
 
 
 ## Define the .ui file path
@@ -22,6 +25,14 @@ class Spike3DRasterRightSidebarWidget(QtWidgets.QWidget):
     
     
     """
+    @property
+    def right_sidebar_contents_container(self) -> LayoutWidget:
+        return self.ui.layout_widget
+    
+    @property
+    def right_sidebar_contents_container_dockarea(self) -> NestedDockAreaWidget:
+        return self.ui.dynamic_docked_widget_container    
+
     def __init__(self, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self.ui = uic.loadUi(uiFile, self) # Load the .ui file
@@ -35,7 +46,31 @@ class Spike3DRasterRightSidebarWidget(QtWidgets.QWidget):
 
         # self.ui.btnToggleCollapseExpand # a LayoutWidget
         self.ui.layout_widget.setMinimumWidth(200.0)
+        
+        # ==================================================================================================================== #
+        # Build the nested dock areas via NestedDockAreaWidget                                                                 #
+        # ==================================================================================================================== #
 
+        # Create the dynamic docked widget container
+        self.ui.dynamic_docked_widget_container = NestedDockAreaWidget()
+        self.ui.dynamic_docked_widget_container.setObjectName("dynamic_docked_widget_container")
+        
+        # # Create a layout for the wrapper
+        # self.ui.wrapper_layout = pg.QtWidgets.QVBoxLayout() # parent_widget
+        # self.ui.wrapper_layout.setSpacing(0)
+        # self.ui.wrapper_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Add the container to the wrapper layout
+        # self.ui.wrapper_layout.addWidget(self.ui.dynamic_docked_widget_container)
+        
+        ## Add to the main layout widget
+        # self.ui.layout_widget.addLayout(self.ui.wrapper_layout)
+        
+        self.ui.layout_widget.addWidget(self.ui.dynamic_docked_widget_container)
+        self.ui.layout_widget.setContentsMargins(0, 0, 0, 0)
+    
+        self.ui.dock_items = {}  # Store dock items
+        
         # self.setVisible(True) # shows the sidebar
 
 
@@ -53,7 +88,11 @@ class SpikeRasterRightSidebarOwningMixin:
     @property
     def right_sidebar_contents_container(self) -> LayoutWidget:
         return self.right_sidebar_widget.ui.layout_widget
-
+    
+    @property
+    def right_sidebar_contents_container_dockarea(self) -> NestedDockAreaWidget:
+        return self.right_sidebar_widget.ui.dynamic_docked_widget_container
+    
     
     def toggle_right_sidebar(self):
         is_visible = self.right_sidebar_widget.isVisible()

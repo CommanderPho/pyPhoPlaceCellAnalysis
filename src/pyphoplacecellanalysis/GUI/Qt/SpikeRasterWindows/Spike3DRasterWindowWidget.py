@@ -1020,7 +1020,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     # Visible Epoch Intervals in Viewport Window Widgets                                                                   #
     # ==================================================================================================================== #
     
-    @function_attributes(short_name=None, tags=['visible_intervals_info'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-07 18:53', related_items=[])
+    @function_attributes(short_name=None, tags=['visible_intervals_info', 'table', 'widget', 'ui', 'right-sidebar'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-07 18:53', related_items=[])
     def _perform_build_attached_visible_interval_info_widget(self):
         """ Draws a dynamically updating stack of tables in the right sidebar showing the elements in the active intervals
         Called to update or create the tables
@@ -1031,7 +1031,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         """
         print(f'spikes_raster_window._perform_build_attached_visible_interval_info_widget()')
         # from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, get_utility_dock_colors
-        from pyphocorehelpers.gui.Qt.pandas_model import SimplePandasModel # , GroupedHeaderView #, create_tabbed_table_widget
+        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DockDisplayColors, CustomDockDisplayConfig
         from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.StackedDynamicTablesWidget import TableManager
             
         ## get the updated data:
@@ -1095,9 +1095,37 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             # VisibleIntervalTable
 
             ## add reference to sidebar.ui.neuron_widget_container
-            self.right_sidebar_contents_container.addWidget(root_ctrl_layout_widget) ## add the layout
+            
+            # OLD WAY ____________________________________________________________________________________________________________ #
+            # self.right_sidebar_contents_container.addWidget(root_ctrl_layout_widget) ## add the layout
+            
 
-            ## Connect	
+
+            rightSideContainerWidget = self.ui.rightSideContainerWidget # pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterRightSidebarWidget.Spike3DRasterRightSidebarWidget
+            right_sidebar_contents_container_dockarea = rightSideContainerWidget.right_sidebar_contents_container_dockarea
+
+            # New Dock-based way _________________________________________________________________________________________________ #
+            name: str = 'VisibleWindowIntervalTables'
+            display_config = CustomDockDisplayConfig(showCloseButton=True, orientation='horizontal', custom_get_colors_dict={False: DockDisplayColors(fg_color='#111', bg_color='#c5c5c5', border_color='#a7babd'),
+                    True: DockDisplayColors(fg_color='#333', bg_color='#757575', border_color='#424242'),
+                })
+            
+            # Create new widget
+            # No extant table widget and display_dock currently, create a new one:
+            dDisplayItem = right_sidebar_contents_container_dockarea.find_display_dock(identifier=name) # Dock
+            assert dDisplayItem is None
+            
+            # Add to dynamic dock container 
+            _, dDisplayItem = right_sidebar_contents_container_dockarea.add_display_dock(name, display_config=display_config, widget=root_ctrl_layout_widget, dockAddLocationOpts=['bottom'], autoOrientation=False)
+            dDisplayItem.setOrientation('horizontal', force=True)
+            dDisplayItem.updateStyle()
+            dDisplayItem.update()
+            
+            rightSideContainerWidget.dock_items[name] = dDisplayItem
+        
+
+
+            # Connect ____________________________________________________________________________________________________________ #
             ## TODO: use `self.connection_man`?
             # Rate limited version:`
             self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container['connections'] = {'update_connection': self.connection_man.connect_drivable_to_driver(drivable=self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container['manager'], driver=self.spike_raster_plt_2d,
@@ -1107,6 +1135,18 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
                                                         'interval_exited_window': pg.SignalProxy(self.spike_raster_plt_2d.sigOnIntervalExitedindow, delay=0.002, rateLimit=2, slot=(lambda _: self.on_update_right_sidebar_visible_interval_info_tables())),
             }
             
+
+            ## Dock all Grouped results from `'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView'`
+            ## INPUTS: active_2d_plot
+            grouped_dock_items_dict = right_sidebar_contents_container_dockarea.get_dockGroup_dock_dict()
+            nested_dock_items = {}
+            nested_dynamic_docked_widget_container_widgets = {}
+            for dock_group_name, flat_group_dockitems_list in grouped_dock_items_dict.items():
+                dDisplayItem, nested_dynamic_docked_widget_container = right_sidebar_contents_container_dockarea.build_wrapping_nested_dock_area(flat_group_dockitems_list, dock_group_name=dock_group_name)
+                nested_dock_items[dock_group_name] = dDisplayItem
+                nested_dynamic_docked_widget_container_widgets[dock_group_name] = nested_dynamic_docked_widget_container
+
+
             ## show it
             self.set_right_sidebar_visibility(True)
     
@@ -1214,29 +1254,52 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # Standalone:
         # neuron_widget_container = NeuronWidgetContainer(neuron_plotting_configs_dict)
         # neuron_widget_container.show()
-
+        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DockDisplayColors, CustomDockDisplayConfig
+                
         assert not hasattr(self.ui.rightSideContainerWidget.ui, 'neuron_widget_container')
         
         ## Render in right sidebar:
-        self.ui.rightSideContainerWidget.ui.neuron_widget_container = NeuronWidgetContainer(neuron_plotting_configs_dict, parent=self.right_sidebar_contents_container)
-        ## add reference to sidebar.ui.neuron_widget_container
-        self.right_sidebar_contents_container.addWidget(self.ui.rightSideContainerWidget.ui.neuron_widget_container)
 
-        ## Connect	
+        ## Prev way:        
+        # self.ui.rightSideContainerWidget.ui.neuron_widget_container = NeuronWidgetContainer(neuron_plotting_configs_dict, parent=self.right_sidebar_contents_container)
+        # self.right_sidebar_contents_container.addWidget(self.ui.rightSideContainerWidget.ui.neuron_widget_container) ## add reference to sidebar.ui.neuron_widget_container
+
+
+        rightSideContainerWidget = self.ui.rightSideContainerWidget # pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterRightSidebarWidget.Spike3DRasterRightSidebarWidget
+        right_sidebar_contents_container_dockarea = rightSideContainerWidget.right_sidebar_contents_container_dockarea
+
+        
+        # New Dock-based way _________________________________________________________________________________________________ #
+        name: str = 'NeuronVisualConfigs'
+        display_config = CustomDockDisplayConfig(showCloseButton=True, orientation='horizontal', custom_get_colors_dict={False: DockDisplayColors(fg_color='#111', bg_color='#c5c5c5', border_color='#a7babd'),
+                True: DockDisplayColors(fg_color='#333', bg_color='#757575', border_color='#424242'),
+            })
+        
+        # Create new widget
+        # No extant table widget and display_dock currently, create a new one:
+        dDisplayItem = right_sidebar_contents_container_dockarea.find_display_dock(identifier=name) # Dock
+        assert dDisplayItem is None
+        
+        self.ui.rightSideContainerWidget.ui.neuron_widget_container = NeuronWidgetContainer(neuron_plotting_configs_dict) ## a widget
+
+        # Add to dynamic dock container 
+        _, dDisplayItem = right_sidebar_contents_container_dockarea.add_display_dock(name, display_config=display_config, widget=self.ui.rightSideContainerWidget.ui.neuron_widget_container, dockAddLocationOpts=['bottom'], autoOrientation=False)
+        dDisplayItem.setOrientation('horizontal', force=True)
+        dDisplayItem.updateStyle()
+        dDisplayItem.update()
+        
+        rightSideContainerWidget.dock_items[name] = dDisplayItem
+        
+        ## Connect Signals
         ## TODO: use `self.connection_man`?
-
         _connections_list = []
         for curr_widget in self.ui.rightSideContainerWidget.ui.neuron_widget_container.config_widgets:        
             # Connect the signals to the widgets:
-            # curr_widget.spike_config_changed.connect(lambda are_included, spikes_config_changed_callback=ipcDataExplorer.change_unit_spikes_included, cell_id_copy=neuron_id: spikes_config_changed_callback(neuron_IDXs=None, cell_IDs=[cell_id_copy], are_included=are_included))
-            # # curr_widget.spike_config_changed.connect(_on_spike_config_changed)
-            # curr_widget.tuning_curve_display_config_changed.connect(_on_tuning_curve_display_config_changed)
             _connections_list.append(curr_widget.sig_neuron_color_changed.connect(self.on_neuron_color_display_config_changed))
 
         self.ui.rightSideContainerWidget.ui.neuron_widget_container.rebuild_neuron_id_to_widget_map()
         
-        _connections_list.append(self.ui.rightSideContainerWidget.ui.neuron_widget_container.sigRevert.connect(self.update_neuron_config_widgets_from_raster))
-        
+        _connections_list.append(self.ui.rightSideContainerWidget.ui.neuron_widget_container.sigRevert.connect(self.update_neuron_config_widgets_from_raster))        
 
         return self.ui.rightSideContainerWidget.ui.neuron_widget_container, _connections_list
     
@@ -1272,11 +1335,12 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     
 
 
-
+    @function_attributes(short_name=None, tags=['widget', 'interactive', 'display', 'config', 'intervals', 'epoch', 'visual'], input_requires=[], output_provides=[], uses=['EpochRenderConfigsListWidget'], used_by=[], creation_date='2025-01-27 14:06', related_items=[])
     def build_epoch_intervals_visual_configs_widget(self):
         """ addds to the right sidebar and connects controls """
         from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.epochs_plotting_mixins import EpochDisplayConfig, _get_default_epoch_configs
         from pyphoplacecellanalysis.GUI.Qt.Widgets.EpochRenderConfigWidget.EpochRenderConfigWidget import EpochRenderConfigWidget, EpochRenderConfigsListWidget
+        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DockDisplayColors, CustomDockDisplayConfig
 
         ## Get 2D or 3D Raster from spike_raster_window
         active_raster_plot = self.spike_raster_plt_2d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
@@ -1290,14 +1354,30 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # deepcopy(active_raster_plot.params.neuron_qcolors) #, active_raster_plot.params.neuron_qcolors_map
 
         rightSideContainerWidget = self.ui.rightSideContainerWidget # pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterRightSidebarWidget.Spike3DRasterRightSidebarWidget
-        a_layout_widget = rightSideContainerWidget.ui.layout_widget
-        # rightSideContainerWidget.setVisible(True) # shows the sidebar
+        right_sidebar_contents_container_dockarea = rightSideContainerWidget.right_sidebar_contents_container_dockarea
 
-        # epoch_display_configs = _get_default_epoch_configs()
-
+        # New Dock-based way _________________________________________________________________________________________________ #
+        name: str = 'EpochIntervalsVisualConfigs'
+        display_config = CustomDockDisplayConfig(showCloseButton=True, orientation='horizontal', custom_get_colors_dict={False: DockDisplayColors(fg_color='#111', bg_color='#c5c5c5', border_color='#a7babd'),
+                True: DockDisplayColors(fg_color='#333', bg_color='#757575', border_color='#424242'),
+            })
+        
+        # Create new widget
+        # No extant table widget and display_dock currently, create a new one:
+        dDisplayItem = right_sidebar_contents_container_dockarea.find_display_dock(identifier=name) # Dock
+        assert dDisplayItem is None
+        
         epoch_display_configs = active_raster_plot.extract_interval_display_config_lists()
-        an_epochs_display_list_widget:EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(epoch_display_configs, parent=a_layout_widget)
+        an_epochs_display_list_widget:EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(epoch_display_configs)
 
+        # Add to dynamic dock container 
+        _, dDisplayItem = right_sidebar_contents_container_dockarea.add_display_dock(name, display_config=display_config, widget=an_epochs_display_list_widget, dockAddLocationOpts=['bottom'], autoOrientation=False)
+        dDisplayItem.setOrientation('horizontal', force=True)
+        dDisplayItem.updateStyle()
+        dDisplayItem.update()
+        
+        rightSideContainerWidget.dock_items[name] = dDisplayItem
+        
         active_raster_plot.ui.epochs_render_configs_widget = an_epochs_display_list_widget
         
 
@@ -1322,7 +1402,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # self.ui.rightSideContainerWidget.ui.neuron_widget_container, _connections_list = self._perform_build_attached_neuron_visual_configs_widget(neuron_plotting_configs_dict)
 
         # Display the sidebar:
-        self.set_right_sidebar_visibility(is_visible=True)
+        self.set_right_sidebar_visibility(True)
+        
 
 
     @function_attributes(short_name=None, tags=['menus', 'actions'], input_requires=[], output_provides=[], uses=['PhoMenuHelper.build_all_programmatic_menu_command_dict'], used_by=[], creation_date='2024-12-18 16:29', related_items=[])
@@ -1542,7 +1623,7 @@ if __name__ == "__main__":
 
     def _subfn_run_main(pkl_path, debug_print:bool=True, debug_mode: bool=True):
         """ run main function to perform batch processing. """
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _setup_spike_raster_window_for_debugging
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.spike_raster_widgets import _setup_spike_raster_window_for_debugging
         
         print(f'pkl_path: {pkl_path}')
         
