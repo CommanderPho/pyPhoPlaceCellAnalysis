@@ -15,7 +15,8 @@ from pyphoplacecellanalysis.GUI.Qt.Menus.BaseMenuProviderMixin import BaseMenuCo
     
 
 class CreateLinkedWidget_MenuProvider(BaseMenuProviderMixin):
-    """ 
+    """ Linked widgets are launched in standalone windows to display potentially synchronized data.
+    
     
     .ui.menus.global_window_menus.debug_menu_provider.top_level_menu
     
