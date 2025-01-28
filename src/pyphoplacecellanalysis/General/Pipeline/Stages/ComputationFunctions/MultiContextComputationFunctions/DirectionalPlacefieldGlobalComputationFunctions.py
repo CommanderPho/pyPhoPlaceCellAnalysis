@@ -3822,7 +3822,7 @@ def _workaround_validate_has_directional_train_test_split_result(curr_active_pip
 class TrainTestLapsSplitting:
     
     @classmethod
-    def decode_using_new_decoders(cls, global_spikes_df, train_lap_specific_pf1D_Decoder_dict, test_epochs_dict, laps_decoding_time_bin_size: float):
+    def decode_using_new_decoders(cls, global_spikes_df, train_lap_specific_pf1D_Decoder_dict, test_epochs_dict, laps_decoding_time_bin_size: float) -> Dict[str, DecodedFilterEpochsResult]:
         """ 
 
 
@@ -4029,9 +4029,6 @@ class TrainTestLapsSplitting:
             print(f'\t_written_HDF5_manifest_keys: {_written_HDF5_manifest_keys}\n')
             # print(f'\t_written_HDF5_manifest_keys: {",\n".join(_written_HDF5_manifest_keys)}')
             
-        # train_lap_specific_pf1D_Decoder_dict, (train_epochs_dict, test_epochs_dict)
-        # return (train_test_split_laps_df_dict, train_test_split_laps_epoch_obj_dict), (split_train_test_lap_specific_pf1D_Decoder_dict, split_train_test_lap_specific_pf1D_dict, split_train_test_lap_specific_configs)
-
         return TrainTestSplitResult(is_global=True, training_data_portion=training_data_portion, test_data_portion=test_data_portion,
                              test_epochs_dict=test_epochs_dict, train_epochs_dict=train_epochs_dict,
                              train_lap_specific_pf1D_Decoder_dict=train_lap_specific_pf1D_Decoder_dict)

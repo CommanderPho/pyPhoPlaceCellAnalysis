@@ -89,7 +89,9 @@ def _single_compute_train_test_split_epochs_decoders(a_1D_decoder: BasePositionD
 
 
     a_training_test_names = [f"{a_modern_name}{a_suffix}" for a_suffix in training_test_suffixes] # ['long_LR_train', 'long_LR_test']
-    a_train_epoch_name: str = a_training_test_names[0] # just the train epoch, like 'long_LR_train'
+    a_train_epoch_name: str = a_training_test_names[0] # just the train epochs, like 'long_LR_train'
+    a_test_epoch_name: str = a_training_test_names[1] # just the test epochs, like 'long_LR_test'
+    
     a_training_test_split_epochs_df_dict: Dict[str, pd.DataFrame] = dict(zip(a_training_test_names, (an_epoch_training_df, an_epoch_test_df))) # analagoues to `directional_laps_results.split_directional_laps_dict`
 
     # _temp_a_training_test_split_laps_valid_epoch_df_dict: Dict[str,Epoch] = {k:deepcopy(v).get_non_overlapping() for k, v in a_training_test_split_laps_df_dict.items()} ## NOTE: these lose the associated extra columns like 'lap_id', 'lap_dir', etc.
@@ -127,7 +129,7 @@ def _single_compute_train_test_split_epochs_decoders(a_1D_decoder: BasePositionD
     epoch_filtered_curr_pf1D: PfND = a_sliced_pf1D_Decoder.pf
     
     ## ENDFOR a_modern_name in modern_names_list
-    return (a_training_test_split_epochs_df_dict, a_training_test_split_epochs_epoch_obj_dict), a_training_test_split_epochs_epoch_obj_dict, (an_epoch_period_description, a_config_copy, epoch_filtered_curr_pf1D, a_sliced_pf1D_Decoder)
+    return (a_training_test_split_epochs_df_dict, a_training_test_split_epochs_epoch_obj_dict), (a_train_epoch_name, a_test_epoch_name), (an_epoch_period_description, a_config_copy, epoch_filtered_curr_pf1D, a_sliced_pf1D_Decoder)
 
 
 
