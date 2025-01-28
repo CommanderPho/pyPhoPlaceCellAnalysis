@@ -27,6 +27,7 @@ from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.gui.interaction_helpers import CallbackWrapper
 from pyphocorehelpers.indexing_helpers import interleave_elements
 from pyphocorehelpers.exception_helpers import ExceptionPrintingContext
+from pyphocorehelpers.assertion_helpers import Assert
 
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
@@ -336,7 +337,7 @@ def perform_plot_1D_single_most_likely_position_curve(ax, time_window_centers, a
 
     """
     # Most-likely Estimated Position Plots (grey line):
-    assert len(time_window_centers) == len(active_most_likely_positions_1D)
+    Assert.same_length(time_window_centers, active_most_likely_positions_1D) # assert len(time_window_centers) == len(active_most_likely_positions_1D)
 
     if enable_flat_line_drawing:
         # Enable drawing flat lines for each time bin interval instead of just displaying the single point in the middle:
@@ -619,19 +620,61 @@ def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices
             if enable_flat_line_drawing:
                 # Enable drawing flat lines for each time bin interval instead of just displaying the single point in the middle:
                 #   build separate points for the start and end of each bin interval, and the repeat every element of the x and y values to line them up.
-                time_bin_size = (slices_time_window_centers[1]-slices_time_window_centers[0])
-                active_half_time_bin_seconds = time_bin_size / 2.0
-                active_time_window_start_points = np.expand_dims(slices_time_window_centers - active_half_time_bin_seconds, axis=1)
-                active_time_window_end_points = np.expand_dims(slices_time_window_centers + active_half_time_bin_seconds, axis=1)
-                active_time_window_start_end_points = interleave_elements(active_time_window_start_points, active_time_window_end_points) # from pyphocorehelpers.indexing_helpers import interleave_elements
-                
-                if debug_print:
-                    print(f'np.shape(active_time_window_end_points): {np.shape(active_time_window_end_points)}\nnp.shape(active_time_window_start_end_points): {np.shape(active_time_window_start_end_points)}') 
-                    # np.shape(active_time_window_end_points): (5783, 1)
-                    # np.shape(active_time_window_start_end_points): (11566, 1)
 
-                active_time_window_variable = active_time_window_start_end_points
-                slices_active_most_likely_positions_1D = np.repeat(slices_active_most_likely_positions_1D, 2, axis=0) # repeat each element twice
+
+                if isinstance(slices_active_most_likely_positions_1D, NDArray) and isinstance(slices_time_window_centers, NDArray):
+                    ## a simple NDArray, not a List[NDArray]
+                    ## SIMPLE:
+                    assert isinstance(slices_time_window_centers[0], float)
+                    assert isinstance(slices_time_window_centers[1], float)
+                    time_bin_size = (slices_time_window_centers[1]-slices_time_window_centers[0])
+                    active_half_time_bin_seconds = time_bin_size / 2.0
+                    active_time_window_start_points = np.expand_dims(slices_time_window_centers - active_half_time_bin_seconds, axis=1)
+                    active_time_window_end_points = np.expand_dims(slices_time_window_centers + active_half_time_bin_seconds, axis=1)
+                    active_time_window_start_end_points = interleave_elements(active_time_window_start_points, active_time_window_end_points) # from pyphocorehelpers.indexing_helpers import interleave_elements
+                    if debug_print:
+                        print(f'np.shape(active_time_window_end_points): {np.shape(active_time_window_end_points)}\nnp.shape(active_time_window_start_end_points): {np.shape(active_time_window_start_end_points)}') 
+                        # np.shape(active_time_window_end_points): (5783, 1)
+                        # np.shape(active_time_window_start_end_points): (11566, 1)
+
+                    active_time_window_variable = active_time_window_start_end_points
+                    slices_active_most_likely_positions_1D = np.repeat(slices_active_most_likely_positions_1D, 2, axis=0) # repeat each element twice
+                    
+                else:
+                    ## have to iterate the plots
+                    Assert.same_length(slices_time_window_centers, slices_active_most_likely_positions_1D)  # assert len(slices_time_window_centers) == len(slices_active_most_likely_positions_1D)
+                    _slices_active_most_likely_positions_1D_list: List[NDArray] = []
+                    _slices_time_window_centers_list: List[NDArray] = []
+                    for a_time_windows_centers, a_most_likely_1Ds in zip(slices_time_window_centers, slices_active_most_likely_positions_1D):
+                        ## SIMPLE:
+                        assert isinstance(a_time_windows_centers[0], float)
+                        assert isinstance(a_time_windows_centers[1], float)
+                        time_bin_size: float = (a_time_windows_centers[1]-a_time_windows_centers[0])
+                        active_half_time_bin_seconds = time_bin_size / 2.0
+                        active_time_window_start_points = np.expand_dims(a_time_windows_centers - active_half_time_bin_seconds, axis=1)
+                        active_time_window_end_points = np.expand_dims(a_time_windows_centers + active_half_time_bin_seconds, axis=1)
+                        active_time_window_start_end_points = interleave_elements(active_time_window_start_points, active_time_window_end_points) # from pyphocorehelpers.indexing_helpers import interleave_elements
+                        _active_slices_active_most_likely_positions_1D = np.repeat(slices_active_most_likely_positions_1D, 2, axis=0) # repeat each element twice
+                        _slices_time_window_centers_list.append(active_time_window_start_end_points)
+                        _slices_active_most_likely_positions_1D_list.append(_active_slices_active_most_likely_positions_1D)
+                    # END for a_time_windows_centers, a_most_likely...
+                    active_time_window_variable = _slices_time_window_centers_list
+                    slices_active_most_likely_positions_1D = _slices_active_most_likely_positions_1D_list
+                    
+
+                # ## SIMPLE:
+                # time_bin_size = (slices_time_window_centers[1]-slices_time_window_centers[0])
+                # active_half_time_bin_seconds = time_bin_size / 2.0
+                # active_time_window_start_points = np.expand_dims(slices_time_window_centers - active_half_time_bin_seconds, axis=1)
+                # active_time_window_end_points = np.expand_dims(slices_time_window_centers + active_half_time_bin_seconds, axis=1)
+                # active_time_window_start_end_points = interleave_elements(active_time_window_start_points, active_time_window_end_points) # from pyphocorehelpers.indexing_helpers import interleave_elements
+                
+                # if debug_print:
+                #     print(f'np.shape(active_time_window_end_points): {np.shape(active_time_window_end_points)}\nnp.shape(active_time_window_start_end_points): {np.shape(active_time_window_start_end_points)}') 
+
+                # active_time_window_variable = active_time_window_start_end_points
+                # slices_active_most_likely_positions_1D = np.repeat(slices_active_most_likely_positions_1D, 2, axis=0) # repeat each element twice
+
             else:
                 active_time_window_variable = slices_time_window_centers
             
@@ -646,7 +689,8 @@ def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices
                     
                 else:
                     ## have to iterate the plots
-                    assert len(active_time_window_variable) == len(slices_active_most_likely_positions_1D)
+                    Assert.same_length(active_time_window_variable, slices_active_most_likely_positions_1D) # assert len(active_time_window_variable) == len(slices_active_most_likely_positions_1D)
+                    
                     line_most_likely_position = []
                     for a_time_windows, a_most_likely_1Ds in zip(active_time_window_variable, slices_active_most_likely_positions_1D):
                         a_sub_epoch_line_most_likely_position = perform_plot_1D_single_most_likely_position_curve(ax, a_time_windows, a_most_likely_1Ds, enable_flat_line_drawing=False, lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, label=f'1-step: most likely positions {variable_name}', animated=False) # (Num windows x 2) ## enable_flat_line_drawing=False because we already built the flat lines above

@@ -988,38 +988,40 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
                 print(f'a_name: {a_name}:')
             for a_plot_name, a_plotted_intervals in an_intervals_dict.items():
                 if self.enable_debug_print:
-                    print(f'\ta_plot_name: {a_plot_name}, a_plotted_intervals: {a_plotted_intervals}, type(a_plotted_intervals): {type(a_plotted_intervals)}')
-                a_target_plot = self.plots[a_plot_name]
-                # if a_plot_name == target_plot_name:
-                ## Here's the object, add it to the legend
-                a_legend = legends_dict.get(a_target_plot, None) ## get the legend for this plot
-                if a_legend is None:
-                    ## create a legend:
-                    legends_dict[a_target_plot] = self._build_or_update_epoch_interval_rect_legend(a_target_plot.graphicsItem())
-                    a_legend = legends_dict[a_target_plot]
-                else:
-                    # reuse the legend
-                    # legends_dict[a_target_plot].clear() ## clear any existing items
-                    pass
-                assert a_legend is not None
-                # end if a_legend  
-                if (a_plot_name not in previously_encountered_plot_items):
-                    # first time for this plot
-                    a_legend.clear() ## clear
-
-                    needs_legend_margin: bool = (len(interval_info) > 0)
-
-                    ## Increase the right margin:
-                    if (self.params.enable_time_interval_legend_in_right_margin and needs_legend_margin):
-                        ## Increase the right margin:
-                        a_target_plot.layout.setContentsMargins(0, 0, 300, 0)  # left, top, right, bottom
+                    print(f'\ta_plot_name: {a_plot_name}, a_plotted_intervals: {a_plotted_intervals}, type(a_plotted_intervals): {type(a_plotted_intervals)}')                    
+                is_included_in_legend: bool = (a_plot_name in self.plots)
+                if is_included_in_legend:
+                    a_target_plot = self.plots[a_plot_name] # KeyError: 'RootPlot'
+                    # if a_plot_name == target_plot_name:
+                    ## Here's the object, add it to the legend
+                    a_legend = legends_dict.get(a_target_plot, None) ## get the legend for this plot
+                    if a_legend is None:
+                        ## create a legend:
+                        legends_dict[a_target_plot] = self._build_or_update_epoch_interval_rect_legend(a_target_plot.graphicsItem())
+                        a_legend = legends_dict[a_target_plot]
                     else:
-                        a_legend_plot.layout.setContentsMargins(0, 0, 0, 0)  # left, top, right, bottom
-                            
+                        # reuse the legend
+                        # legends_dict[a_target_plot].clear() ## clear any existing items
+                        pass
+                    assert a_legend is not None
+                    # end if a_legend  
+                    if (a_plot_name not in previously_encountered_plot_items):
+                        # first time for this plot
+                        a_legend.clear() ## clear
 
-                a_legend.addItem(a_plotted_intervals, a_name) ## add the item to the legend
-                previously_encountered_plot_items.append(a_plot_name)
+                        needs_legend_margin: bool = (len(interval_info) > 0)
 
+                        ## Increase the right margin:
+                        if (self.params.enable_time_interval_legend_in_right_margin and needs_legend_margin):
+                            ## Increase the right margin:
+                            a_target_plot.layout.setContentsMargins(0, 0, 300, 0)  # left, top, right, bottom
+                        else:
+                            a_legend_plot.layout.setContentsMargins(0, 0, 0, 0)  # left, top, right, bottom
+                                
+                    ## END if (a_plot_name not in previously_encountered_plot_items)..
+                    a_legend.addItem(a_plotted_intervals, a_name) ## add the item to the legend
+                    previously_encountered_plot_items.append(a_plot_name)
+                # END if is_included_in_legend
         return legends_dict
     
     @function_attributes(short_name=None, tags=['legend', 'remove_all', 'remove'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-01 18:29', related_items=[])

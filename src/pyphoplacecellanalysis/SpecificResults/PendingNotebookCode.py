@@ -82,6 +82,18 @@ def _adding_global_non_PBE_epochs(curr_active_pipeline, training_data_portion: f
     ## Drop test epochs that are too short:
     a_new_test_df = a_new_test_df.epochs.modify_each_epoch_by(final_output_minimum_epoch_duration=0.100) # 100ms minimum test epochs
 
+    ## Add the metadata:
+    # if a_new_training_df.attrs is None:
+    #     a_new_training_df.attrs = {} # create a new metadata dict on the dataframe
+    # a_new_training_df.attrs.update(train_test_period='train')
+    a_new_training_df = a_new_training_df.epochs.adding_or_updating_metadata(train_test_period='train', training_data_portion=training_data_portion)
+
+    # if a_new_test_df.attrs is None:
+    #     a_new_test_df.attrs = {} # create a new metadata dict on the dataframe
+    # a_new_test_df.attrs.update(train_test_period='test')
+    a_new_test_df = a_new_test_df.epochs.adding_or_updating_metadata(train_test_period='test', training_data_portion=training_data_portion)
+    
+
     ## Add the maze_id column to the epochs:
     t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
     a_new_training_df = a_new_training_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
@@ -98,6 +110,10 @@ def _adding_global_non_PBE_epochs(curr_active_pipeline, training_data_portion: f
     # a_new_test_df_dict = dict(zip(modern_names_list, list(a_new_test_df_dict.values())))
     a_new_training_df_dict = partition_df_dict(a_new_training_df, partitionColumn=partitionColumn)
     # a_new_training_df_dict = dict(zip(modern_names_list, list(a_new_training_df_dict.values())))
+
+
+    a_new_test_df_dict = {k:v.epochs.adding_or_updating_metadata(track_identity=k, train_test_period='test', training_data_portion=training_data_portion) for k, v in a_new_test_df_dict.items() if k != 'none'}
+    a_new_training_df_dict = {k:v.epochs.adding_or_updating_metadata(track_identity=k, train_test_period='train', training_data_portion=training_data_portion) for k, v in a_new_training_df_dict.items() if k != 'none'}
 
     ## OUTPUTS: new_decoder_dict, new_decoder_dict, new_decoder_dict, a_new_training_df_dict, a_new_test_df_dict
 
@@ -228,8 +244,8 @@ def compute_train_test_split_epochs_decoders(directional_laps_results: Direction
 
     ## Per-Period Outputs
     split_train_test_epoch_specific_configs = {}
-    split_train_test_epoch_specific_pf1D_dict = {} # analagous to `all_directional_decoder_dict` (despite `all_directional_decoder_dict` having an incorrect name, it's actually pfs)
-    split_train_test_epoch_specific_pf1D_Decoder_dict = {}
+    split_train_test_epoch_specific_pfND_dict = {} # analagous to `all_directional_decoder_dict` (despite `all_directional_decoder_dict` having an incorrect name, it's actually pfs)
+    split_train_test_epoch_specific_pfND_Decoder_dict = {}
 
     for a_modern_name in modern_names_list:
         ## Loop through each decoder:
@@ -256,15 +272,15 @@ def compute_train_test_split_epochs_decoders(directional_laps_results: Direction
         train_test_split_epoch_obj_dict.update(a_training_test_split_epochs_epoch_obj_dict)
         
         split_train_test_epoch_specific_configs[an_epoch_period_description] = a_config_copy
-        split_train_test_epoch_specific_pf1D_dict[an_epoch_period_description] = epoch_filtered_curr_pf1D
-        split_train_test_epoch_specific_pf1D_Decoder_dict[an_epoch_period_description] = a_sliced_pf1D_Decoder
+        split_train_test_epoch_specific_pfND_dict[an_epoch_period_description] = epoch_filtered_curr_pf1D
+        split_train_test_epoch_specific_pfND_Decoder_dict[an_epoch_period_description] = a_sliced_pf1D_Decoder
         
 
 
     ## ENDFOR a_modern_name in modern_names_list
         
     if debug_print:
-        print(list(split_train_test_epoch_specific_pf1D_Decoder_dict.keys())) # ['long_LR_train', 'long_RL_train', 'short_LR_train', 'short_RL_train']
+        print(list(split_train_test_epoch_specific_pfND_Decoder_dict.keys())) # ['long_LR_train', 'long_RL_train', 'short_LR_train', 'short_RL_train']
 
     ## OUTPUTS: (train_test_split_laps_df_dict, train_test_split_laps_epoch_obj_dict), (split_train_test_lap_specific_pf1D_Decoder_dict, split_train_test_lap_specific_pf1D_dict, split_train_test_lap_specific_configs)
 
@@ -274,7 +290,7 @@ def compute_train_test_split_epochs_decoders(directional_laps_results: Direction
 
     ## train_test_split_laps_df_dict['long_LR_test'] != train_test_split_laps_df_dict['long_LR_train'], which is correct
     ## Only the decoders built with the training epochs make any sense:
-    train_lap_specific_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = {k.split('_train', maxsplit=1)[0]:split_train_test_epoch_specific_pf1D_Decoder_dict[k] for k in train_epoch_names} # the `k.split('_train', maxsplit=1)[0]` part just gets the original key like 'long_LR'
+    train_lap_specific_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = {k.split('_train', maxsplit=1)[0]:split_train_test_epoch_specific_pfND_Decoder_dict[k] for k in train_epoch_names} # the `k.split('_train', maxsplit=1)[0]` part just gets the original key like 'long_LR'
 
     # DF mode so they don't lose the associated info:
     test_epochs_dict: Dict[str, pd.DataFrame] = {k.split('_test', maxsplit=1)[0]:v for k,v in train_test_split_epochs_df_dict.items() if k.endswith('_test')} # the `k.split('_test', maxsplit=1)[0]` part just gets the original key like 'long_LR'
