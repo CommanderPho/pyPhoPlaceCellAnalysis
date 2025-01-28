@@ -97,14 +97,14 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
 
     background_static_scroll_window_plot = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
     background_static_scroll_window_plot.setMinimumHeight(50.0)
-    background_static_scroll_window_plot.setMaximumHeight(75.0)
-    # background_static_scroll_window_plot.setFixedHeight(50.0)
+    # background_static_scroll_window_plot.setMaximumHeight(75.0)
+    # # background_static_scroll_window_plot.setFixedHeight(50.0)
 
-    # Set stretch factors to control priority
-    main_graphics_layout_widget.ci.layout.setRowStretchFactor(0, 3)  # Plot1: lowest priority
-    main_graphics_layout_widget.ci.layout.setRowStretchFactor(1, 2)  # Plot2: mid priority
-    main_graphics_layout_widget.ci.layout.setRowStretchFactor(2, 2)  # Plot3: highest priority
-    main_graphics_layout_widget.ci.layout.setRowStretchFactor(3, 2)  # Plot3: highest priority
+    # # Set stretch factors to control priority
+    # main_graphics_layout_widget.ci.layout.setRowStretchFactor(0, 3)  # Plot1: lowest priority
+    # main_graphics_layout_widget.ci.layout.setRowStretchFactor(1, 2)  # Plot2: mid priority
+    # main_graphics_layout_widget.ci.layout.setRowStretchFactor(2, 2)  # Plot3: highest priority
+    # main_graphics_layout_widget.ci.layout.setRowStretchFactor(3, 2)  # Plot3: highest priority
 
     _interval_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_interval_tracks(enable_interval_overview_track=False, should_link_to_main_plot_widget=has_main_raster_plot)
     interval_window_dock_config, intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item = _interval_tracks_out_dict['intervals']
@@ -146,8 +146,10 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
 
 
     ## add the right sidebar
-    visible_intervals_info_widget_container, visible_intervals_ctrl_layout_widget =  spike_raster_window._perform_build_attached_visible_interval_info_widget()
-
+    visible_intervals_info_widget_container, visible_intervals_ctrl_layout_widget =  spike_raster_window._perform_build_attached_visible_interval_info_widget() # builds the tables
+    
+    # spike_raster_window.build_epoch_intervals_visual_configs_widget()
+    
 
     ## Dock all Grouped results from `'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView'`
     ## INPUTS: active_2d_plot
