@@ -392,7 +392,7 @@ class IntervalsDatasource(BaseDatasource):
             return self.df[self.df['t_start', 't_end'].between(new_start, new_end)]
 
         except Exception as e:
-            print(f'WARN: fallback to non-series-based filtering. Exception: {e}.')            
+            print(f'WARN: fallback to non-series-based filtering. Exception: {e}. self.df.columns: {list(self.df.columns)}\n\tnew_start: {new_start}, new_end: {new_end}')            
             pass
 
         is_interval_start_in_active_window = np.logical_and((new_start <= self.df['t_start']), (self.df['t_start'] < new_end))

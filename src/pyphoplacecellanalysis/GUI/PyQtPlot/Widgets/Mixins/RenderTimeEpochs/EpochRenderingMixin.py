@@ -1,3 +1,11 @@
+from __future__ import annotations # prevents having to specify types for typehinting as strings
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    ## typehinting only imports here
+    from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.epochs_plotting_mixins import EpochDisplayConfig
+    
+
 from copy import copy, deepcopy
 from neuropy.core import Epoch
 from pyphocorehelpers.function_helpers import function_attributes
@@ -25,6 +33,8 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Render2
 from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import IntervalsDatasource
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs # required for `update_interval_visualization_properties(...)`
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
+
+
 
 
 class RenderedEpochsItemsContainer(iPythonKeyCompletingMixin, DynamicParameters):
@@ -302,7 +312,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
         self.add_rendered_intervals(datasource, name=datasource.custom_datasource_name, debug_print=False) # updates the rendered intervals on the change
         
         
-    def add_rendered_intervals(self, interval_datasource: Union[pd.DataFrame, IntervalsDatasource], name=None, child_plots=None, debug_print=False):
+    def add_rendered_intervals(self, interval_datasource: Union[pd.DataFrame, IntervalsDatasource], name=None, child_plots=None, debug_print=False, **vis_kwargs):
         """ adds or updates the intervals specified by the interval_datasource to the plots 
         
         Inputs: 
@@ -323,6 +333,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                 .add_PBEs_intervals(...)
         
         """
+        # vis_column_kwarg_keys = ['y_location', 'height', 'pen_color', 'brush_color']
         if isinstance(interval_datasource, pd.DataFrame):
             ## it's a dataframe, build a datasource
             from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
@@ -368,6 +379,10 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                 # Connect the source_data_changed_signal to handle changes to the datasource:
                 self.interval_datasources[name].source_data_changed_signal.connect(self.EpochRenderingMixin_on_interval_datasource_changed)
                         
+        
+        ## Update the visual properties if provided
+        if len(vis_kwargs) > 0:
+            self.interval_datasources[name].update_visualization_properties(lambda active_df, **kwargs: General2DRenderTimeEpochs._update_df_visualization_columns(active_df, **(vis_kwargs | kwargs))) ## Fully inline
         
         returned_rect_items = {}
         
@@ -908,6 +923,34 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
             an_epochs_display_list_widget.update_from_configs(configs=epoch_display_configs)
 
 
+    def update_epoch_interval_render_configs_from_configs(self, _out_configs: Dict[str, Union[EpochDisplayConfig, List[EpochDisplayConfig]]]):
+        """ Update plots from configs:
+        configs widget -> `Plotted Rects` 
+        
+        Usage:
+            an_epochs_display_list_widget = self.ui.get('epochs_render_configs_widget', None)
+            if an_epochs_display_list_widget is None:
+                # create a new one:    
+                raise NotImplementedError
+                # an_epochs_display_list_widget:EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(active_2d_plot.extract_interval_display_config_lists(), parent=active_2d_plot)
+                # active_2d_plot.ui.epochs_render_configs_widget = an_epochs_display_list_widget
+            # else:
+            #     an_epochs_display_list_widget.update_from_configs(configs=epoch_display_configs)
+
+            ## get the configs from the configs widget
+            _out_configs = an_epochs_display_list_widget.configs_from_states()
+            
+        """
+        update_dict = {}
+        for k, v in _out_configs.items():
+            if not isinstance(v, (list, tuple)):
+                update_dict[k] = v.to_dict()
+            else:
+                update_dict[k] = [sub_v.to_dict() for sub_v in v] ## get the sub-items in the list
+        self.update_rendered_intervals_visualization_properties(update_dict=update_dict)
+        
+
+
     @function_attributes(short_name=None, tags=['epochs', 'epoch_render_configs', 'update', 'sync'], input_requires=[], output_provides=[], uses=['self.update_rendered_intervals_visualization_properties'], used_by=[], creation_date='2024-07-03 11:27', related_items=['build_or_update_epoch_render_configs_widget'])
     def update_epochs_from_configs_widget(self):
         """ Update plots from configs:
@@ -927,16 +970,8 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
         #     an_epochs_display_list_widget.update_from_configs(configs=epoch_display_configs)
 
         ## get the configs from the configs widget
-        _out_configs = an_epochs_display_list_widget.configs_from_states()
-        
-        update_dict = {}
-        for k, v in _out_configs.items():
-            if not isinstance(v, (list, tuple)):
-                update_dict[k] = v.to_dict()
-            else:
-                update_dict[k] = [sub_v.to_dict() for sub_v in v] ## get the sub-items in the list
-                
-        
+        # _out_configs = an_epochs_display_list_widget.configs_from_states()
+        update_dict = an_epochs_display_list_widget.config_dicts_from_states()        
         # update_dict = {k:v.to_dict() for k, v in _out_configs.items()}
         self.update_rendered_intervals_visualization_properties(update_dict=update_dict)
 
