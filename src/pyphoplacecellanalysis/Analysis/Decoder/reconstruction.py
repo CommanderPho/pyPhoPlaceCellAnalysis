@@ -1215,9 +1215,9 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
     F: np.ndarray = non_serialized_field(default=None)
     P_x: np.ndarray = non_serialized_field(default=None)
 
-    setup_on_init:bool = True 
-    post_load_on_init:bool = False
-    debug_print: bool = False
+    setup_on_init:bool = non_serialized_field(default=True)
+    post_load_on_init:bool = non_serialized_field(default=False)
+    debug_print: bool = non_serialized_field(default=False)
 
     # Properties _________________________________________________________________________________________________________ #
 
@@ -1359,7 +1359,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         ## Restrict the PfNDs:
         epoch_replaced_pf1D: PfND = self.pf.replacing_computation_epochs(deepcopy(new_epochs_obj))
         ## apply the neuron_sliced_pf to the decoder:
-        updated_decoder = BasePositionDecoder(epoch_replaced_pf1D, setup_on_init=self.setup_on_init, post_load_on_init=self.post_load_on_init, debug_print=self.debug_print)
+        updated_decoder = BasePositionDecoder(pf=epoch_replaced_pf1D, setup_on_init=self.setup_on_init, post_load_on_init=self.post_load_on_init, debug_print=self.debug_print)
         return updated_decoder
 
 
