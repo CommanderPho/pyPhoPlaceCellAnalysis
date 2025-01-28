@@ -30,6 +30,7 @@ from pyphoplacecellanalysis.Resources.icon_helpers import try_get_icon
 path = os.path.dirname(os.path.abspath(__file__))
 uiFile = os.path.join(path, 'DockAreaDocksTree.ui')
 
+@metadata_attributes(short_name=None, tags=['build_dock_area_managing_tree_widget'], input_requires=[], output_provides=[], uses=[], used_by=['build_dock_area_managing_tree_widget'], creation_date='2025-01-28 07:32', related_items=['build_dock_area_managing_tree_widget'])
 class DockAreaDocksTree(QWidget):
     """ 
     
@@ -37,12 +38,13 @@ class DockAreaDocksTree(QWidget):
     
     
     dynamic_docked_widget_container = active_2d_plot.ui.dynamic_docked_widget_container # NestedDockAreaWidget
-    dock_tree_list = dynamic_docked_widget_container.get_dockGroup_dock_tree_dict()
+    dock_tree_list, group_meta_item_dict = dynamic_docked_widget_container.get_dockGroup_dock_tree_dict()
     a_dock_area_docks_tree_widget: DockAreaDocksTree = DockAreaDocksTree()
     a_dock_area_docks_tree_widget.rebuild_dock_tree_items(dock_tree_list=dock_tree_list)
     a_dock_area_docks_tree_widget.show()
 
     """
+    sigDockConfigChanged = pg.QtCore.Signal(object)
 
     # @property
     # def mainTreeWidget(self): #  -> pg.QtWidgets.QTreeWidget

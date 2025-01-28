@@ -1404,6 +1404,100 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         
 
 
+    @function_attributes(short_name=None, tags=['widget', 'dock_area_managing_tree', 'interactive', 'right-sidebar'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-28 07:22', related_items=['DockAreaDocksTree'])
+    def build_dock_area_managing_tree_widget(self):
+        """ addds to the right sidebar and connects controls """
+        from pyphoplacecellanalysis.GUI.Qt.Widgets.DockAreaDocksTree.DockAreaDocksTree import DockAreaDocksTree
+        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DockDisplayColors, CustomDockDisplayConfig
+
+        ## Get 2D or 3D Raster from spike_raster_window
+        active_raster_plot = self.spike_raster_plt_2d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
+        if active_raster_plot is None:
+            active_raster_plot = self.spike_raster_plt_3d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
+            assert active_raster_plot is not None
+
+
+        rightSideContainerWidget = self.ui.rightSideContainerWidget # pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterRightSidebarWidget.Spike3DRasterRightSidebarWidget
+        right_sidebar_contents_container_dockarea = rightSideContainerWidget.right_sidebar_contents_container_dockarea
+
+        # New Dock-based way _________________________________________________________________________________________________ #
+        name: str = 'DockAreaManagingTree'
+        widget_name: str = 'dockarea_dock_managing_tree_widget'
+        needs_init: bool = True
+        
+        # Create new widget
+        # No extant table widget and display_dock currently, create a new one:
+        dDisplayItem = right_sidebar_contents_container_dockarea.find_display_dock(identifier=name) # Dock
+        an_extant_widget = active_raster_plot.ui.get(widget_name, None)
+        
+        if (dDisplayItem is not None) and (an_extant_widget is not None):
+            needs_init = False
+            a_docks_tree_widget: DockAreaDocksTree = an_extant_widget
+            assert a_docks_tree_widget is not None
+            
+
+        if needs_init:
+            ## INITIALIZE:
+            assert dDisplayItem is None
+            assert an_extant_widget is None
+            epoch_display_configs = active_raster_plot.extract_interval_display_config_lists()
+            # active_raster_plot
+            a_docks_tree_widget:DockAreaDocksTree = DockAreaDocksTree()
+            
+            dynamic_docked_widget_container = active_raster_plot.ui.dynamic_docked_widget_container # NestedDockAreaWidget
+            dock_tree_list, group_meta_item_dict = dynamic_docked_widget_container.get_dockGroup_dock_tree_dict()
+            a_docks_tree_widget.rebuild_dock_tree_items(dock_tree_list=dock_tree_list)
+            
+
+            # Add to dynamic dock container
+            display_config = CustomDockDisplayConfig(showCloseButton=True, showCollapseButton=True, orientation='horizontal', custom_get_colors_dict={False: DockDisplayColors(fg_color='#111', bg_color='#c5c5c5', border_color='#a7babd'),
+                    True: DockDisplayColors(fg_color='#333', bg_color='#757575', border_color='#424242'),
+                })
+            _, dDisplayItem = right_sidebar_contents_container_dockarea.add_display_dock(name, display_config=display_config, widget=a_docks_tree_widget, dockAddLocationOpts=['bottom'], autoOrientation=False)
+            dDisplayItem.setOrientation('horizontal', force=True)
+            dDisplayItem.updateStyle()
+            dDisplayItem.update()
+            
+            rightSideContainerWidget.dock_items[name] = dDisplayItem    
+            active_raster_plot.ui.dockarea_dock_managing_tree_widget = a_docks_tree_widget
+        
+            ## Build Connections to signals:
+            _connections_list = []
+            def _on_update_dock_items(active_2d_plot):
+                print(f'_on_update_dock_items(...)')
+                dock_tree_list, group_meta_item_dict = active_2d_plot.ui.dynamic_docked_widget_container.get_dockGroup_dock_tree_dict()
+                a_dock_tree_widget = active_2d_plot.ui.get(widget_name, None)
+                if a_dock_tree_widget is None:
+                    # create a new one:    
+                    a_dock_tree_widget:DockAreaDocksTree = DockAreaDocksTree()
+                    active_2d_plot.ui.dockarea_dock_managing_tree_widget = a_dock_tree_widget
+                    a_docks_tree_widget.rebuild_dock_tree_items(dock_tree_list=dock_tree_list)
+                else:
+                    a_docks_tree_widget.rebuild_dock_tree_items(dock_tree_list=dock_tree_list)
+            # END def _on_update_dock_items(active_2d_plot)...
+
+
+            _a_connection = active_raster_plot.sigEmbeddedMatplotlibDockWidgetAdded.connect(lambda active_2d_plot, dock, widget: _on_update_dock_items(active_2d_plot=active_2d_plot))
+            _connections_list.append(_a_connection)
+            
+            _a_removed_connection = active_raster_plot.sigEmbeddedMatplotlibDockWidgetRemoved.connect(lambda active_2d_plot, removed_identifier: _on_update_dock_items(active_2d_plot=active_2d_plot))
+            _connections_list.append(_a_removed_connection)
+            
+            # ## Connect the update signal
+            # _a_sigAnyConfigChanged_connection = a_docks_tree_widget.sigDockConfigChanged.connect(lambda an_updated_epochs_display_list: active_raster_plot.update_epochs_from_configs_widget())
+            # _connections_list.append(_a_sigAnyConfigChanged_connection)
+
+        ## END if needs_init...
+        # self.ui.rightSideContainerWidget.ui.neuron_widget_container, _connections_list = self._perform_build_attached_neuron_visual_configs_widget(neuron_plotting_configs_dict)
+
+        # Display the sidebar:
+        self.set_right_sidebar_visibility(True)
+        
+
+# DockAreaDocksTree
+
+
+
     @function_attributes(short_name=None, tags=['menus', 'actions'], input_requires=[], output_provides=[], uses=['PhoMenuHelper.build_all_programmatic_menu_command_dict'], used_by=[], creation_date='2024-12-18 16:29', related_items=[])
     def build_all_menus_actions_dict(self, wants_flat_actions_dict: bool=True, **kwargs) -> Tuple[Dict, Dict[str, QtWidgets.QAction]]:
         """ gets absolutely all of the possible actions (from the menus, both global and context) and returns them 
