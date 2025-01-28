@@ -1319,6 +1319,17 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         # Return the new instance:
         return new_instance
 
+
+    @classmethod
+    def init_from_placefields(cls, pf: PfND, debug_print=False, **kwargs):
+        """ 2023-04-06 - Creates a new instance of this class from a placefields object. """
+        # Create the new instance:
+        new_instance = cls(pf=deepcopy(pf), debug_print=debug_print, **kwargs)
+        # Return the new instance:
+        return new_instance
+
+
+
     def setup(self):
         self.neuron_IDXs = None
         self.neuron_IDs = None
