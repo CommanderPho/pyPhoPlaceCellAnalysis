@@ -110,7 +110,8 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     # sigEmbeddedWidgetHierarchyChanged = QtCore.Signal(object) # emitted when the hierarchy of nested widgets changes, such as when a new dynamic matplotlib_render_plot_widget is added
     
     sigEmbeddedMatplotlibDockWidgetAdded = QtCore.Signal(object, object, object) # self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name]) -  emitted when a new matplotlib dock widget is added
-    
+    sigEmbeddedMatplotlibDockWidgetRemoved = QtCore.Signal(object, object) # (self, identifier: str)
+
 
     @property
     def overlay_text_lines_dict(self):
@@ -1462,6 +1463,8 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             extant_widget.deleteLater()
             self.ui.dynamic_docked_widget_container.remove_display_dock(identifer=name)    
             # self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name])
+            # self.sigEmbeddedMatplotlibDockWidgetRemoved.emit(self, dDisplayItem, extant_widget)
+            self.sigEmbeddedMatplotlibDockWidgetRemoved.emit(self, name) ## get the widget before it fails
             print(f'\tremoved.')
 
         
@@ -1503,7 +1506,8 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             active_matplotlib_view_widget = None # Set the matplotlib_view_widget to None ## TODO: this doesn't actually remove it from the UI container does it?
             ## remove from the dictionary
             del self.ui.matplotlib_view_widgets[identifier]
-
+            self.sigEmbeddedMatplotlibDockWidgetRemoved.emit(self, identifier) ## get the widget before it fails
+            
         else:
             print(f'active_matplotlib_view_widget with identifier {identifier} was not found!')
 
