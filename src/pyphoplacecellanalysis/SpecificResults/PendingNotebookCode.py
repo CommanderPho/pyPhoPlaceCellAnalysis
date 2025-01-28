@@ -56,7 +56,7 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, TrackTemplates, TrainTestSplitResult
 
 
-def _single_compute_train_test_split_epochs_decoders(a_1D_decoder, a_config, an_epoch_training_df, an_epoch_test_df, a_modern_name: str, training_test_suffixes = ['_train', '_test'], debug_print: bool = False): # , debug_output_hdf5_file_path=None, debug_plot: bool = False
+def _single_compute_train_test_split_epochs_decoders(a_1D_decoder: BasePositionDecoder, a_config: Any, an_epoch_training_df: pd.DataFrame, an_epoch_test_df: pd.DataFrame, a_modern_name: str, training_test_suffixes = ['_train', '_test'], debug_print: bool = False): # , debug_output_hdf5_file_path=None, debug_plot: bool = False
     """
         
     
@@ -117,13 +117,14 @@ def _single_compute_train_test_split_epochs_decoders(a_1D_decoder, a_config, an_
     else:
         a_config_copy = None
 
-    curr_pf1D = a_1D_decoder.pf
+    # curr_pf1D = a_1D_decoder.pf
     ## Restrict the PfNDs:
-    epoch_filtered_curr_pf1D: PfND = curr_pf1D.replacing_computation_epochs(deepcopy(curr_epoch_period_epoch_obj))
-    
+    # epoch_filtered_curr_pf1D: PfND = curr_pf1D.replacing_computation_epochs(deepcopy(curr_epoch_period_epoch_obj))
 
     ## apply the lap_filtered_curr_pf1D to the decoder:
-    a_sliced_pf1D_Decoder: BasePositionDecoder = BasePositionDecoder(pf=epoch_filtered_curr_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
+    # a_sliced_pf1D_Decoder: BasePositionDecoder = BasePositionDecoder(pf=epoch_filtered_curr_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)    
+    a_sliced_pf1D_Decoder: BasePositionDecoder = deepcopy(a_1D_decoder).replacing_computation_epochs(epochs=deepcopy(curr_epoch_period_epoch_obj)) # BasePositionDecoder(pf=epoch_filtered_curr_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
+    epoch_filtered_curr_pf1D: PfND = a_sliced_pf1D_Decoder.pf
     
     ## ENDFOR a_modern_name in modern_names_list
     return (a_training_test_split_epochs_df_dict, a_training_test_split_epochs_epoch_obj_dict), a_training_test_split_epochs_epoch_obj_dict, (an_epoch_period_description, a_config_copy, epoch_filtered_curr_pf1D, a_sliced_pf1D_Decoder)
