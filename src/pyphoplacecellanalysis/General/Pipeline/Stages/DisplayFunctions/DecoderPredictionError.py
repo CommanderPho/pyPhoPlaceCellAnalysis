@@ -639,9 +639,19 @@ def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices
             
             # Most-likely Estimated Position Plots (grey line):
             if ((not skip_plotting_most_likely_positions) and (slices_active_most_likely_positions_1D is not None)):
-                # Most likely position plots:                
-                # line_most_likely_position = perform_plot_1D_single_most_likely_position_curve(ax, slices_time_window_centers, slices_active_most_likely_positions_1D, enable_flat_line_drawing=enable_flat_line_drawing, lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, label=f'1-step: most likely positions {variable_name}', animated=False) # (Num windows x 2)
-                line_most_likely_position = perform_plot_1D_single_most_likely_position_curve(ax, active_time_window_variable, slices_active_most_likely_positions_1D, enable_flat_line_drawing=False, lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, label=f'1-step: most likely positions {variable_name}', animated=False) # (Num windows x 2) ## enable_flat_line_drawing=False because we already built the flat lines above
+                # Most likely position plots:               
+                if isinstance(slices_active_most_likely_positions_1D, NDArray) and isinstance(active_time_window_variable, NDArray):
+                    # line_most_likely_position = perform_plot_1D_single_most_likely_position_curve(ax, slices_time_window_centers, slices_active_most_likely_positions_1D, enable_flat_line_drawing=enable_flat_line_drawing, lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, label=f'1-step: most likely positions {variable_name}', animated=False) # (Num windows x 2)
+                    line_most_likely_position = perform_plot_1D_single_most_likely_position_curve(ax, time_window_centers=active_time_window_variable, active_most_likely_positions_1D=slices_active_most_likely_positions_1D, enable_flat_line_drawing=False, lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, label=f'1-step: most likely positions {variable_name}', animated=False) # (Num windows x 2) ## enable_flat_line_drawing=False because we already built the flat lines above
+                    
+                else:
+                    ## have to iterate the plots
+                    assert len(active_time_window_variable) == len(slices_active_most_likely_positions_1D)
+                    line_most_likely_position = []
+                    for a_time_windows, a_most_likely_1Ds in zip(active_time_window_variable, slices_active_most_likely_positions_1D):
+                        a_sub_epoch_line_most_likely_position = perform_plot_1D_single_most_likely_position_curve(ax, a_time_windows, a_most_likely_1Ds, enable_flat_line_drawing=False, lw=1.0, color='gray', alpha=0.8, marker='+', markersize=6, label=f'1-step: most likely positions {variable_name}', animated=False) # (Num windows x 2) ## enable_flat_line_drawing=False because we already built the flat lines above
+                        line_most_likely_position.append(a_sub_epoch_line_most_likely_position)
+
             else:
                 line_most_likely_position = None
                 
