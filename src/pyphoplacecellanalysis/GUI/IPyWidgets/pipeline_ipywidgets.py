@@ -561,7 +561,9 @@ class PipelinePickleFileSelectorWidget:
         if self.debug_print:
             print(f'\tfull_paths: {full_paths}')
         self.selected_local_pkl_files = full_paths
+        self._update_load_save_button_disabled_state()
         
+
     def on_selected_global_computation_result_pkl_files_changed(self, selected_df: pd.DataFrame):
         """ captures: file_table, on_selected_files_changed
         """
@@ -571,6 +573,7 @@ class PipelinePickleFileSelectorWidget:
         if self.debug_print:
             print(f'\tfull_paths: {full_paths}')
         self.selected_global_pkl_files = full_paths
+        self._update_load_save_button_disabled_state()
 
     def __attrs_post_init__(self):
         # Create the file browser widget
@@ -615,6 +618,12 @@ class PipelinePickleFileSelectorWidget:
         #     self.button_row
         # ])
         
+
+    def _update_load_save_button_disabled_state(self):
+        """ updates the .disabled property for the two action buttons """
+        self.load_button.disabled = self.is_load_button_disabled
+        self.save_button.disabled = self.is_save_button_disabled
+
 
     def _handle_load_click(self, event):
         print(f'\t._handle_load_click(event: {event})')
@@ -888,8 +897,7 @@ class PipelinePickleFileSelectorWidget:
         self.on_load_callback = _subfn_load
         self.on_save_callback = _subfn_save
         ## Update button enable states:        
-        self.load_button.disabled = self.is_load_button_disabled
-        self.save_button.disabled = self.is_save_button_disabled
+        self._update_load_save_button_disabled_state()
         
         return _subfn_load, _subfn_save
     
