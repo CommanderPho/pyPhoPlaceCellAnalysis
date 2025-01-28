@@ -83,7 +83,7 @@ QHeaderView::section { background-color: red };
         <property name="handleWidth">
          <number>10</number>
         </property>
-        <widget class="QWidget" name="mainLauncherContainer" native="true">
+        <widget class="QWidget" name="mainGridContainer" native="true">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
            <horstretch>0</horstretch>
@@ -103,7 +103,11 @@ QHeaderView::section { background-color: red };
           </size>
          </property>
          <property name="styleSheet">
-          <string notr="true">background-color: rgb(15, 15, 25);</string>
+          <string notr="true">/*background-color: rgb(15, 15, 25);*/
+background-color: rgb(248, 248, 248);
+alternate-background-color: rgb(204, 204, 204);
+border-color: rgb(54, 54, 54);
+color: rgb(20, 20, 20);</string>
          </property>
          <layout class="QGridLayout" name="gridLayout_3" rowstretch="0" columnstretch="0" rowminimumheight="0">
           <property name="leftMargin">
@@ -141,9 +145,20 @@ rgb(68, 68, 68)
 rgb(33, 33, 33)
 */
 
-QHeaderView::section { background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 rgba(33, 33, 33, 255), stop:1 rgba(68, 68, 68, 255));
+/*QHeaderView::section { background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 rgba(33, 33, 33, 255), stop:1 rgba(68, 68, 68, 255));
 border-color: rgb(100, 100, 100);
 }
+
+color: rgb(255, 255, 255);
+*/
+
+
+QHeaderView::section { background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 rgba(222, 222, 222, 255), stop:1 rgba(190, 190, 190, 255));
+border-color: rgb(33, 33, 33);
+color: rgb(18, 18, 18);
+}
+
+color: rgb(19, 19, 19);
 
 /*background-color: qlineargradient(spread:pad, x1:0, y1:1, x2:0, y2:0, stop:0 rgba(0, 0, 0, 255), stop:0.05 rgba(14, 8, 73, 255), stop:0.36 rgba(28, 17, 145, 255), stop:0.6 rgba(126, 14, 81, 255), stop:0.75 rgba(234, 11, 11, 255), stop:0.79 rgba(244, 70, 5, 255), stop:0.86 rgba(255, 136, 0, 255), stop:0.935 rgba(239, 236, 55, 255));
 */
@@ -158,6 +173,9 @@ border-color: rgb(100, 100, 100);
             <property name="showDropIndicator" stdset="0">
              <bool>false</bool>
             </property>
+            <property name="alternatingRowColors">
+             <bool>false</bool>
+            </property>
             <property name="selectionMode">
              <enum>QAbstractItemView::NoSelection</enum>
             </property>
@@ -167,8 +185,17 @@ border-color: rgb(100, 100, 100);
               <height>16</height>
              </size>
             </property>
+            <property name="indentation">
+             <number>12</number>
+            </property>
             <property name="rootIsDecorated">
-             <bool>false</bool>
+             <bool>true</bool>
+            </property>
+            <property name="uniformRowHeights">
+             <bool>true</bool>
+            </property>
+            <property name="animated">
+             <bool>true</bool>
             </property>
             <property name="headerHidden">
              <bool>false</bool>
@@ -176,9 +203,15 @@ border-color: rgb(100, 100, 100);
             <attribute name="headerVisible">
              <bool>true</bool>
             </attribute>
+            <attribute name="headerCascadingSectionResizes">
+             <bool>true</bool>
+            </attribute>
+            <attribute name="headerHighlightSections">
+             <bool>true</bool>
+            </attribute>
             <column>
              <property name="text">
-              <string notr="true">Dock</string>
+              <string notr="true">Docks</string>
              </property>
              <property name="toolTip">
               <string notr="true"/>
@@ -189,10 +222,35 @@ border-color: rgb(100, 100, 100);
              <property name="whatsThis">
               <string notr="true"/>
              </property>
+             <property name="background">
+              <color alpha="155">
+               <red>239</red>
+               <green>239</green>
+               <blue>239</blue>
+              </color>
+             </property>
+             <property name="foreground">
+              <brush brushstyle="NoBrush">
+               <color alpha="255">
+                <red>0</red>
+                <green>0</green>
+                <blue>0</blue>
+               </color>
+              </brush>
+             </property>
             </column>
             <item>
              <property name="text">
               <string notr="true">intervals</string>
+             </property>
+             <property name="foreground">
+              <brush brushstyle="NoBrush">
+               <color alpha="255">
+                <red>85</red>
+                <green>255</green>
+                <blue>255</blue>
+               </color>
+              </brush>
              </property>
              <property name="icon">
               <iconset resource="../../../../Resources/ActionIcons.qrc">

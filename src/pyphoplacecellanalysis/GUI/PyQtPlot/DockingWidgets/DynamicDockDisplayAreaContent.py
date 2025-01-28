@@ -1,4 +1,4 @@
-from typing import Callable, Optional, Dict, List, Tuple
+from typing import Callable, Optional, Dict, List, Tuple, Union
 from collections import OrderedDict
 from enum import Enum
 from attrs import define, field, Factory
@@ -438,7 +438,30 @@ class DynamicDockDisplayAreaContentMixin:
         return grouped_dock_items_dict
 
     
-
+    def get_dockGroup_dock_tree_dict(self, debug_print=False) -> List[Union[Dock, Dict[str, List[Dock]]]]:
+        """ extracts the 'widget' property that is the contents of each added dock item from the self.dynamic_display_dict and returns it as a flat list """
+        flat_dockitems_list = self.get_flat_dockitems_list()
+        tree_out_dock_items_list = []
+        non_grouped_dock_items_dict: List[Dock] = []
+        grouped_dock_items_dict: Dict[str, List[Dock]] = {}
+        # ungrouped_dock_items_list: List[Dock] = []
+        for a_dock in flat_dockitems_list:
+            ## have a dock
+            if len(a_dock.config.dock_group_names) == 0:
+                ## ungrouped items
+                non_grouped_dock_items_dict.append(a_dock)
+                
+            else:
+                for a_group_name in a_dock.config.dock_group_names: # a dock can belong to multiple groups
+                    if a_group_name not in grouped_dock_items_dict:
+                        grouped_dock_items_dict[a_group_name] = [] ## initialize to empty list
+                    grouped_dock_items_dict[a_group_name].append(a_dock) ## add the dock to the group
+                
+        tree_out_dock_items_list.extend(non_grouped_dock_items_dict)
+        tree_out_dock_items_list.append(grouped_dock_items_dict)
+        # for k, v in grouped_dock_items_dict.items():
+        #     tree_out_dock_items_list.append(grouped_dock_items_dict)
+        return tree_out_dock_items_list
 
     
     def add_display_dock(self, identifier=None, widget=None, dockSize=(300,200), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None, **kwargs):
