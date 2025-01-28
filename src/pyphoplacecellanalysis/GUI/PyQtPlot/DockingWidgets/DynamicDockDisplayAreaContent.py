@@ -438,19 +438,28 @@ class DynamicDockDisplayAreaContentMixin:
         return grouped_dock_items_dict
 
     
-    def get_dockGroup_dock_tree_dict(self, debug_print=False) -> List[Union[Dock, Dict[str, List[Dock]]]]:
+    def get_dockGroup_dock_tree_dict(self, debug_print=False) -> Tuple[List[Union[Dock, Dict[str, List[Dock]]]], Dict]:
         """ extracts the 'widget' property that is the contents of each added dock item from the self.dynamic_display_dict and returns it as a flat list """
         flat_dockitems_list = self.get_flat_dockitems_list()
         tree_out_dock_items_list = []
         non_grouped_dock_items_dict: List[Dock] = []
+        
+        group_meta_item_dict = {}
         grouped_dock_items_dict: Dict[str, List[Dock]] = {}
         # ungrouped_dock_items_list: List[Dock] = []
         for a_dock in flat_dockitems_list:
             ## have a dock
             if len(a_dock.config.dock_group_names) == 0:
                 ## ungrouped items
-                non_grouped_dock_items_dict.append(a_dock)
-                
+                parsed_name: str = str(a_dock.name())
+                is_group_meta_item: bool = (parsed_name.startswith('GROUP[') and parsed_name.endswith(']'))
+                if not is_group_meta_item:
+                    non_grouped_dock_items_dict.append(a_dock)
+                else:
+                    print(f'WARNING: encountered group meta-item for a_dock: {a_dock}, parsed_name: "{parsed_name}", parsed_name: {parsed_name}. Skipping this item')    
+                    group_meta_item_identifier: str = (parsed_name.removeprefix('GROUP[').removesuffix(']'))
+                    print(f'\tgroup_meta_item_identifier: "{group_meta_item_identifier}"')
+                    group_meta_item_dict[group_meta_item_identifier] = a_dock
             else:
                 for a_group_name in a_dock.config.dock_group_names: # a dock can belong to multiple groups
                     if a_group_name not in grouped_dock_items_dict:
@@ -461,7 +470,7 @@ class DynamicDockDisplayAreaContentMixin:
         tree_out_dock_items_list.append(grouped_dock_items_dict)
         # for k, v in grouped_dock_items_dict.items():
         #     tree_out_dock_items_list.append(grouped_dock_items_dict)
-        return tree_out_dock_items_list
+        return tree_out_dock_items_list, group_meta_item_dict
 
     
     def add_display_dock(self, identifier=None, widget=None, dockSize=(300,200), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None, **kwargs):
