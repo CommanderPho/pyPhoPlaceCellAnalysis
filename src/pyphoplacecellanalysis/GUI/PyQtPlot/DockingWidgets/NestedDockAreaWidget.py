@@ -17,6 +17,9 @@ class NestedDockAreaWidget(DynamicDockDisplayAreaContentMixin, QtWidgets.QWidget
         pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.NestedDockAreaWidget.NestedDockAreaWidget
         
     """
+    sigDockClosed = QtCore.Signal(object)
+    # sigDocksModified = QtCore.Signal(object)
+
     @property
     def area(self) -> DockArea:
         return self.ui.area
@@ -48,6 +51,7 @@ class NestedDockAreaWidget(DynamicDockDisplayAreaContentMixin, QtWidgets.QWidget
     def closeEvent(self, event):
         # Enables closing all secondary windows when this (main) window is closed.
         self.DynamicDockDisplayAreaContentMixin_on_destroy()
+        self.sigDockClosed.emit(self)
         
             
             
