@@ -49,7 +49,7 @@ ansi2html = {git = "https://github.com/CommanderPho/ansi2html.git", rev = "main"
 wheel = "^0.38.4"
 snakeviz = "^2.1.1"
 pyan = "^0.1.3"
-dvc = {version = "^2.45.1", extras = ["gdrive"]}
+dvc = {version = "^3.59.0", extras = ["gdrive"]}
 
 [tool.poetry.group.gui.dependencies]
 click = "^8.1.3"
