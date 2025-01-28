@@ -3775,8 +3775,6 @@ class TrainTestSplitResult(ComputedResult):
     train_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = serialized_field(default=None)
     train_lap_specific_pf1D_Decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = serialized_field(default=None)
 
-
-
     def sliced_by_neuron_id(self, included_neuron_ids: NDArray) -> "TrainTestSplitResult":
         """ refactored out of `self.filtered_by_frate(...)` and `TrackTemplates.determine_decoder_aclus_filtered_by_frate(...)`
         Only `self.train_lap_specific_pf1D_Decoder_dict` is affected
