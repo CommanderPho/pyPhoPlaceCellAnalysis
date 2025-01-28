@@ -93,7 +93,7 @@ class EpochRenderConfigWidget(pg.Qt.QtWidgets.QWidget):
 
 
     def on_update_config(self, *args, **kwargs):
-        print(f'.on_update_config(*args: {args}, **kwargs: {kwargs})')
+        print(f'EpochRenderConfigWidget.on_update_config(*args: {args}, **kwargs: {kwargs})')
         self.sigConfigChanged.emit(self)
         
 
@@ -305,7 +305,7 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
         self._build_children_widgets(configs=self.configs)
 
 
-    def configs_from_states(self) -> Dict[str, Union[EpochDisplayConfig, List[EpochDisplayConfig]]]:
+    def configs_from_states(self, as_EpochDisplayConfig_obj: bool=True) -> Dict[str, Union[EpochDisplayConfig, List[EpochDisplayConfig]]]:
         """ called to retrieve a valid config from the UI's properties... this means it could have just held a config as its model. """
         _out_configs = {}
         assert self.ui.out_render_config_widgets_dict is not None, f"self.ui.out_render_config_widgets_dict is None!"
@@ -325,12 +325,28 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
                 curr_widget = a_widget_or_widget_list
                 _out_configs[a_config_name] = curr_widget.config_from_state()
                 
-        return _out_configs
+        ## END FOR
+        if as_EpochDisplayConfig_obj:
+            return _out_configs
+        else:
+            ## convert the EpochDisplayConfig objects to dicts
+            update_dict = {}
+            for k, v in _out_configs.items():
+                if not isinstance(v, (list, tuple)):
+                    update_dict[k] = v.to_dict()
+                else:
+                    update_dict[k] = [sub_v.to_dict() for sub_v in v] ## get the sub-items in the list
+            return update_dict
         
 
+    def config_dicts_from_states(self) -> Dict[str, Union[Dict, List[Dict]]]:
+        """ called to retrieve a valid config from the UI's properties... this means it could have just held a config as its model. """
+        return self.configs_from_states(as_EpochDisplayConfig_obj=False) # type: ignore
+
     def on_config_ui_updated(self, *args, **kwargs):
-        print(f'.on_config_ui_updated(*args: {args}, **kwargs: {kwargs})')
+        print(f'EpochRenderConfigsListWidget.on_config_ui_updated(*args: {args}, **kwargs: {kwargs})')
         self.sigAnyConfigChanged.emit(self)
+
 
 def build_single_epoch_display_config_widget(render_config: EpochDisplayConfig) -> EpochRenderConfigWidget:
     """ builds a simple EpochRenderConfigWidget widget from a simple EpochDisplayConfig

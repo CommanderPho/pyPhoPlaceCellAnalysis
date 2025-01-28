@@ -1033,6 +1033,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DockDisplayColors, CustomDockDisplayConfig
         from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.StackedDynamicTablesWidget import TableManager
             
+        
         ## get the updated data:
         # included_series_names=['Replays', 'Laps', 'PBEs']
         included_series_names=None
@@ -1049,7 +1050,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
 
         if needs_init:
-            print(f'\t has no .visible_intervals_info_widget_container so NEEDS INIT!')
+            if self.debug_print:
+                print(f'\t has no .visible_intervals_info_widget_container so NEEDS INIT!')
             assert not hasattr(self.ui.rightSideContainerWidget.ui, 'visible_intervals_info_widget_container')
             self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container = {} # initialize
             
@@ -1086,17 +1088,9 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             manager.update_tables(dataframes_dict)
 
             self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container = updated_ui_dict # {k:v for k, v in updated_ui_dict.items()}
-
-            print(f'\t done.')
+            if self.debug_print:
+                print(f'\t done.')
             # VisibleIntervalTable
-
-            ## add reference to sidebar.ui.neuron_widget_container
-            
-            # OLD WAY ____________________________________________________________________________________________________________ #
-            # self.right_sidebar_contents_container.addWidget(root_ctrl_layout_widget) ## add the layout
-            
-
-
             rightSideContainerWidget = self.ui.rightSideContainerWidget # pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterRightSidebarWidget.Spike3DRasterRightSidebarWidget
             right_sidebar_contents_container_dockarea = rightSideContainerWidget.right_sidebar_contents_container_dockarea
 
@@ -1147,7 +1141,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             self.set_right_sidebar_visibility(True)
     
         else:
-            print(f'\t does not need init, just update')
+            if self.debug_print:
+                print(f'\t does not need init, just update')
             extant_dict = self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container
             
             extant_manager = extant_dict['manager']
@@ -1327,7 +1322,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     @function_attributes(short_name=None, tags=['widget', 'interactive', 'display', 'config', 'intervals', 'epoch', 'visual'], input_requires=[], output_provides=[], uses=['EpochRenderConfigsListWidget'], used_by=[], creation_date='2025-01-27 14:06', related_items=[])
     def build_epoch_intervals_visual_configs_widget(self):
         """ addds to the right sidebar and connects controls """
-        from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.epochs_plotting_mixins import EpochDisplayConfig, _get_default_epoch_configs
         from pyphoplacecellanalysis.GUI.Qt.Widgets.EpochRenderConfigWidget.EpochRenderConfigWidget import EpochRenderConfigWidget, EpochRenderConfigsListWidget
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DockDisplayColors, CustomDockDisplayConfig
 
@@ -1347,47 +1341,62 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
         # New Dock-based way _________________________________________________________________________________________________ #
         name: str = 'EpochIntervalsVisualConfigs'
-        display_config = CustomDockDisplayConfig(showCloseButton=True, showCollapseButton=True, orientation='horizontal', custom_get_colors_dict={False: DockDisplayColors(fg_color='#111', bg_color='#c5c5c5', border_color='#a7babd'),
-                True: DockDisplayColors(fg_color='#333', bg_color='#757575', border_color='#424242'),
-            })
+        needs_init: bool = True
         
         # Create new widget
         # No extant table widget and display_dock currently, create a new one:
         dDisplayItem = right_sidebar_contents_container_dockarea.find_display_dock(identifier=name) # Dock
-        assert dDisplayItem is None
+        an_extant_epochs_display_list_widget = active_raster_plot.ui.get('epochs_render_configs_widget', None)
         
-        epoch_display_configs = active_raster_plot.extract_interval_display_config_lists()
-        an_epochs_display_list_widget:EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(epoch_display_configs)
+        if (dDisplayItem is not None) and (an_extant_epochs_display_list_widget is not None):
+            needs_init = False
+            an_epochs_display_list_widget: EpochRenderConfigsListWidget = an_extant_epochs_display_list_widget
+            assert an_epochs_display_list_widget is not None
+            
 
-        # Add to dynamic dock container 
-        _, dDisplayItem = right_sidebar_contents_container_dockarea.add_display_dock(name, display_config=display_config, widget=an_epochs_display_list_widget, dockAddLocationOpts=['bottom'], autoOrientation=False)
-        dDisplayItem.setOrientation('horizontal', force=True)
-        dDisplayItem.updateStyle()
-        dDisplayItem.update()
+        if needs_init:
+            ## INITIALIZE:
+            assert dDisplayItem is None
+            assert an_extant_epochs_display_list_widget is None
+            epoch_display_configs = active_raster_plot.extract_interval_display_config_lists()
+            an_epochs_display_list_widget:EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(epoch_display_configs)
+            # Add to dynamic dock container
+            display_config = CustomDockDisplayConfig(showCloseButton=True, showCollapseButton=True, orientation='horizontal', custom_get_colors_dict={False: DockDisplayColors(fg_color='#111', bg_color='#c5c5c5', border_color='#a7babd'),
+                    True: DockDisplayColors(fg_color='#333', bg_color='#757575', border_color='#424242'),
+                })
+            _, dDisplayItem = right_sidebar_contents_container_dockarea.add_display_dock(name, display_config=display_config, widget=an_epochs_display_list_widget, dockAddLocationOpts=['bottom'], autoOrientation=False)
+            dDisplayItem.setOrientation('horizontal', force=True)
+            dDisplayItem.updateStyle()
+            dDisplayItem.update()
+            
+            rightSideContainerWidget.dock_items[name] = dDisplayItem    
+            active_raster_plot.ui.epochs_render_configs_widget = an_epochs_display_list_widget
         
-        rightSideContainerWidget.dock_items[name] = dDisplayItem
-        
-        active_raster_plot.ui.epochs_render_configs_widget = an_epochs_display_list_widget
-        
-
-        _connections_list = []
-        def _on_update_rendered_intervals(active_2d_plot):
-            print(f'_on_update_rendered_intervals(...)')
-            _legends_dict = active_2d_plot.build_or_update_all_epoch_interval_rect_legends()
-            epoch_display_configs = active_2d_plot.extract_interval_display_config_lists()
-            an_epochs_display_list_widget = active_2d_plot.ui.get('epochs_render_configs_widget', None)
-            if an_epochs_display_list_widget is None:
-                # create a new one:    
-                an_epochs_display_list_widget:EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(epoch_display_configs)
-                active_2d_plot.ui.epochs_render_configs_widget = an_epochs_display_list_widget
-            else:
-                an_epochs_display_list_widget.update_from_configs(configs=epoch_display_configs)
+            ## Build Connections to signals:
+            _connections_list = []
+            def _on_update_rendered_intervals(active_2d_plot):
+                print(f'_on_update_rendered_intervals(...)')
+                _legends_dict = active_2d_plot.build_or_update_all_epoch_interval_rect_legends()
+                epoch_display_configs = active_2d_plot.extract_interval_display_config_lists()
+                an_epochs_display_list_widget = active_2d_plot.ui.get('epochs_render_configs_widget', None)
+                if an_epochs_display_list_widget is None:
+                    # create a new one:    
+                    an_epochs_display_list_widget:EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(epoch_display_configs)
+                    active_2d_plot.ui.epochs_render_configs_widget = an_epochs_display_list_widget
+                else:
+                    an_epochs_display_list_widget.update_from_configs(configs=epoch_display_configs)
+            # END def _on_update_rendered_intervals(active_2d_plot)...
 
 
+            _a_connection = active_raster_plot.sigRenderedIntervalsListChanged.connect(_on_update_rendered_intervals)
+            _connections_list.append(_a_connection)
+            
 
-        _a_connection = active_raster_plot.sigRenderedIntervalsListChanged.connect(_on_update_rendered_intervals)
-        _connections_list.append(_a_connection)
-         
+            ## Connect the update signal
+            _a_sigAnyConfigChanged_connection = an_epochs_display_list_widget.sigAnyConfigChanged.connect(lambda an_updated_epochs_display_list: active_raster_plot.update_epochs_from_configs_widget())
+            _connections_list.append(_a_sigAnyConfigChanged_connection)
+
+        ## END if needs_init...
         # self.ui.rightSideContainerWidget.ui.neuron_widget_container, _connections_list = self._perform_build_attached_neuron_visual_configs_widget(neuron_plotting_configs_dict)
 
         # Display the sidebar:
