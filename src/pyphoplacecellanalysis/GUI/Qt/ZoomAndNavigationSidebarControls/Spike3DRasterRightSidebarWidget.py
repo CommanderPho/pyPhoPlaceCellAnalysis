@@ -23,8 +23,19 @@ uiFile = os.path.join(path, 'Spike3DRasterRightSidebarWidget.ui')
 class Spike3DRasterRightSidebarWidget(QtWidgets.QWidget):
     """ A simple container to hold interactive widgets
     
+    btnToggleDockManager
+    btnToggleIntervalManager
     
+    
+    btnAddDockTrack
+    
+    
+    btnToggleCollapseExpand
     """
+    sigToggleIntervalManagerPressed = QtCore.pyqtSignal()
+    sigToggleDockManagerPressed = QtCore.pyqtSignal()
+
+    
     @property
     def right_sidebar_contents_container(self) -> LayoutWidget:
         return self.ui.layout_widget
@@ -71,7 +82,20 @@ class Spike3DRasterRightSidebarWidget(QtWidgets.QWidget):
     
         self.ui.dock_items = {}  # Store dock items
         
+        self.ui.btnToggleDockManager.clicked.connect(self.toggle_dock_manager)
+        self.ui.btnToggleIntervalManager.clicked.connect(self.toggle_interval_manager)
+        
         # self.setVisible(True) # shows the sidebar
+
+    def toggle_dock_manager(self):
+        """ Toggles the visibility of the dock manager """
+        print("toggle_dock_manager()")
+        self.sigToggleDockManagerPressed.emit()
+        
+    def toggle_interval_manager(self):
+        """ Toggles the visibility of the interval manager """
+        print("toggle_interval_manager()")
+        self.sigToggleDockManagerPressed.emit()
 
 
 
@@ -103,6 +127,22 @@ class SpikeRasterRightSidebarOwningMixin:
     def set_right_sidebar_visibility(self, is_visible:bool):
         self.right_sidebar_widget.setVisible(is_visible) 
 
+    @pyqtExceptionPrintingSlot()
+    def on_toggle_interval_manager(self):
+        """ Toggles the visibility of the interval manager """
+        print(f'SpikeRasterRightSidebarOwningMixin.on_toggle_interval_manager()')
+        self.build_epoch_intervals_visual_configs_widget()
+        print(f'\tdone.')
+
+
+    @pyqtExceptionPrintingSlot()
+    def on_toggle_dock_manager(self):
+        """ Toggles the visibility of the dock manager """
+        print(f'SpikeRasterRightSidebarOwningMixin.on_toggle_dock_manager()')
+        self.build_dock_area_managing_tree_widget()
+        print(f'\tdone.')
+
+            
 
     @pyqtExceptionPrintingSlot()
     def SpikeRasterRightSidebarOwningMixin_on_init(self):
@@ -115,15 +155,17 @@ class SpikeRasterRightSidebarOwningMixin:
         pass
     
     @pyqtExceptionPrintingSlot()
-    def SpikeRasterRightSidebarOwningMixin_connectSignals(self, right_side_bar_controls):
+    def SpikeRasterRightSidebarOwningMixin_connectSignals(self, right_side_bar_controls: Spike3DRasterRightSidebarWidget):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         right_side_bar_connections = []
         # right_side_bar_connections.append(right_side_bar_controls.animation_time_step_changed.connect(self.on_animation_timestep_valueChanged))
         # right_side_bar_connections.append(right_side_bar_controls.temporal_zoom_factor_changed.connect(self.on_temporal_zoom_factor_valueChanged))
-        # right_side_bar_connections.append(right_side_bar_controls.render_window_duration_changed.connect(self.on_render_window_duration_valueChanged))
+        # right_side_bar_connections.append(right_side_bar_controls.render_window_duration_changed.connect(self.on_render_window_duration_valueChanged))        
+        right_side_bar_connections.append(right_side_bar_controls.sigToggleDockManagerPressed.connect(self.on_toggle_dock_manager))
+        right_side_bar_connections.append(right_side_bar_controls.sigToggleIntervalManagerPressed.connect(self.on_toggle_interval_manager))
+        
         return right_side_bar_connections
         
-
 
 
     @pyqtExceptionPrintingSlot()
