@@ -37,7 +37,7 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionD
 
 @define(slots=False)
 class DecodedTrajectoryPlotter:
-    """ plots a decoded 1D or 2D trajectory. 
+    """ Abstract Base Class for something that plots a decoded 1D or 2D trajectory. 
     
     """
     curr_epoch_idx: int = field(default=None)
@@ -85,7 +85,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     fig = field(default=None)
     axs: NDArray = field(default=None)
     laps_pages: List = field(default=Factory(list))
-
+    rotate_to_vertical: bool = field(default=False, metadata={'desc': 'if False, the track is rendered horizontally along its length, otherwise it is rendered vectically'})
+    
     ## MAIN PLOT FUNCTION:
     def plot_epoch(self, an_epoch_idx: int, include_most_likely_pos_line: Optional[bool]=None, time_bin_index: Optional[int]=None):
         """ 
@@ -248,7 +249,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 yield chunk()         # in outer generator, yield next chunk
             
         def _subfn_build_laps_multiplotter(nfields, linear_plot_data=None):
-            """ captures: fixed_columns, (long_track_inst, short_track_inst)
+            """ captures: self.rotate_to_vertical, fixed_columns, (long_track_inst, short_track_inst)
             
             """
             linear_plotter_indicies = np.arange(nfields)
