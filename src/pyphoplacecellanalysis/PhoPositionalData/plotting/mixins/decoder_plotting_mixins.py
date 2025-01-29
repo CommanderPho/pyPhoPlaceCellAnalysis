@@ -125,37 +125,54 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
         self.fig.canvas.draw_idle()
 
+
     def plot_epoch_with_slider_widget(self, an_epoch_idx: int, include_most_likely_pos_line: Optional[bool]=None):
         import ipywidgets as widgets
         from IPython.display import display
 
-        def integer_slider(update_func):
-            """ Captures: valid_aclus
-            """
-            # slider = widgets.IntSlider(description='epoch_IDX:', min=0, max=a_decoded_traj_plotter.num_filter_epochs-1, value=0)
-            slider = widgets.IntSlider(description='time bin:', min=0, max=(self.curr_n_time_bins-1), value=0)
+        self.curr_epoch_idx = an_epoch_idx  # Ensure curr_epoch_idx is set
+
+        def integer_slider(update_func, description, min_val, max_val, initial_val):
+            slider = widgets.IntSlider(description=description, min=min_val, max=max_val, value=initial_val)
 
             def on_slider_change(change):
                 if change['type'] == 'change' and change['name'] == 'value':
-                    # Call the user-provided update function with the current slider index
                     update_func(change['new'])
             slider.observe(on_slider_change)
-            display(slider)
+            return slider
 
+        def checkbox_widget(update_func, description, initial_val):
+            checkbox = widgets.Checkbox(description=description, value=initial_val)
 
-        def update_function(index):
-            """ Define an update function that will be called with the current slider index 
-            Captures a_result, an_ax, an_epoch_idx
-            """
-            # print(f'Slider index: {index}')
-            a_time_bin_index: int = int(index)
-            self.plot_epoch(an_epoch_idx=an_epoch_idx, include_most_likely_pos_line=include_most_likely_pos_line, time_bin_index=a_time_bin_index)
+            def on_checkbox_change(change):
+                update_func(change['new'])
+            checkbox.observe(on_checkbox_change)
+            return checkbox
 
-        ## Start by doing a plot:
-        self.plot_epoch(an_epoch_idx=an_epoch_idx)
-        # n_time_bins: int = a_decoded_traj_plotter.curr_n_time_bins
-        # Call the integer_slider function with the update function
-        return integer_slider(update_function)
+        def update_epoch_idx(index):
+            self.plot_epoch(an_epoch_idx=index, include_most_likely_pos_line=include_most_likely_pos_line, time_bin_index=time_bin_slider.value)
+
+        def update_time_bin_idx(index):
+            self.plot_epoch(an_epoch_idx=epoch_slider.value, include_most_likely_pos_line=include_most_likely_pos_line, time_bin_index=index)
+
+        def on_checkbox_change(value):
+            if value:
+                time_bin_slider.disabled = True
+                self.plot_epoch(an_epoch_idx=epoch_slider.value, include_most_likely_pos_line=include_most_likely_pos_line, time_bin_index=None)
+            else:
+                time_bin_slider.disabled = False
+                self.plot_epoch(an_epoch_idx=epoch_slider.value, include_most_likely_pos_line=include_most_likely_pos_line, time_bin_index=time_bin_slider.value)
+
+        epoch_slider = integer_slider(update_epoch_idx, 'epoch_IDX:', 0, (self.num_filter_epochs-1), an_epoch_idx)
+        time_bin_slider = integer_slider(update_time_bin_idx, 'time bin:', 0, (self.curr_n_time_bins-1), 0)
+        checkbox = checkbox_widget(on_checkbox_change, 'Disable time bin slider', True)
+
+        display(epoch_slider)
+        display(checkbox)
+        display(time_bin_slider)
+
+        self.plot_epoch(an_epoch_idx=an_epoch_idx, include_most_likely_pos_line=include_most_likely_pos_line)
+
     
     # fig, axs, laps_pages = plot_lap_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=22, active_page_index=0)
     @classmethod
@@ -431,7 +448,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 heatmaps.append(a_heatmap)
             else:
                 # plot all of them in a loop:
-                time_step_opacity: float = full_posterior_opacity/float(n_time_bins)
+                time_step_opacity: float = full_posterior_opacity/float(n_time_bins) # #TODO 2025-01-29 13:18: - [ ] This is probably not what I want, as it would be very faint when there are large numbers of time bins. Instead I want image multiplication or something.
                 time_step_opacity = max(time_step_opacity, 0.2) # no less than 0.2
                 if debug_print:
                     print(f'time_step_opacity: {time_step_opacity}')
@@ -488,7 +505,7 @@ from pyphoplacecellanalysis.Pho3D.PyVista.graphs import plot_3d_binned_bars, plo
 
 @define(slots=False)
 class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
-    """ plots a decoded trajectory using pyvista. 
+    """ plots a decoded trajectory (path) using pyvista. 
     
     Usage:
     from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryPyVistaPlotter
@@ -676,7 +693,7 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
         ## remove existing actors if they exist and are needed:
         self.perform_clear_existing_decoded_trajectory_plots()
 
-        (self.plotActors, self.data_dict), (self.plotActors_CenterLabels, self.data_dict_CenterLabels) = DecoderRenderingPyVistaMixin.perform_plot_posterior_bars(self.p,
+        (self.plotActors, self.data_dict), (self.plotActors_CenterLabels, self.data_dict_CenterLabels) = DecoderRenderingPyVistaMixin.perform_plot_posterior_fn(self.p,
                                                                                                 xbin=self.xbin, ybin=self.ybin, xbin_centers=self.xbin_centers, ybin_centers=self.ybin_centers,
                                                                                                 posterior_p_x_given_n=a_posterior_p_x_given_n, enable_point_labels=self.enable_point_labels, active_plot_fn=self.active_plot_fn)
         
@@ -695,7 +712,7 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
         ## remove existing actors if they exist and are needed:
         self.perform_clear_existing_decoded_trajectory_plots()
 
-        (self.plotActors, self.data_dict), (self.plotActors_CenterLabels, self.data_dict_CenterLabels) = DecoderRenderingPyVistaMixin.perform_plot_posterior_bars(self.p,
+        (self.plotActors, self.data_dict), (self.plotActors_CenterLabels, self.data_dict_CenterLabels) = DecoderRenderingPyVistaMixin.perform_plot_posterior_fn(self.p,
                                                                                                 xbin=self.xbin, ybin=self.ybin, xbin_centers=self.xbin_centers, ybin_centers=self.ybin_centers,
                                                                                                 time_bin_centers=a_time_bin_centers, posterior_p_x_given_n=a_posterior_p_x_given_n, enable_point_labels=self.enable_point_labels, active_plot_fn=self.active_plot_fn)
 
@@ -874,6 +891,7 @@ class DecoderRenderingPyVistaMixin:
         return self.params['decoded_trajectory_pyvista_plotter']
 
 
+    @function_attributes(short_name=None, tags=['probability'], input_requires=[], output_provides=[], uses=['DecodedTrajectoryPyVistaPlotter'], used_by=[], creation_date='2025-01-29 07:35', related_items=[])
     def add_decoded_posterior_bars(self, a_result: DecodedFilterEpochsResult, xbin: NDArray, xbin_centers: NDArray, ybin: Optional[NDArray], ybin_centers: Optional[NDArray], enable_plot_all_time_bins_in_epoch_mode:bool=True, active_plot_fn=None):
         """ adds the decoded posterior to the PyVista plotter
          
@@ -922,13 +940,19 @@ class DecoderRenderingPyVistaMixin:
 
 
     @classmethod
-    def perform_plot_posterior_bars(cls, p, xbin, ybin, xbin_centers, ybin_centers, posterior_p_x_given_n, time_bin_centers=None, enable_point_labels: bool = True, point_labeling_function=None, point_masking_function=None, posterior_name='P_x_given_n', active_plot_fn=None):
+    def perform_plot_posterior_fn(cls, p, xbin, ybin, xbin_centers, ybin_centers, posterior_p_x_given_n, time_bin_centers=None, enable_point_labels: bool = True, point_labeling_function=None, point_masking_function=None, posterior_name='P_x_given_n', active_plot_fn=None):
         """ called to perform the mesh generation and add_mesh calls
+        
+        Looks like it switches between 3 different potential plotting functions, all imported directly below
+
+        ## Defaults to `plot_3d_binned_bars` if nothing else is provided        
         
         """
         from pyphoplacecellanalysis.Pho3D.PyVista.graphs import plot_3d_binned_bars, plot_3d_stem_points, plot_point_labels
 
         if active_plot_fn is None:
+            ## Defaults to `plot_3d_binned_bars` if nothing else is provided     
+
             active_plot_fn = plot_3d_binned_bars
             # active_plot_fn = plot_3d_stem_points
         
@@ -983,5 +1007,5 @@ class DecoderRenderingPyVistaMixin:
 
 
         return (plotActors, data_dict), (plotActors_CenterLabels, data_dict_CenterLabels)
-    
+
 
