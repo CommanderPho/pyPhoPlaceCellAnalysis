@@ -391,6 +391,12 @@ class BatchCompletionHelpers:
 
 
 	# Replay Loading/Estimation Methods __________________________________________________________________________________ #
+	# All of these build an Epoch object with the following metadata keys set:
+	# metadata={'epochs_source': 'compute_diba_quiescent_style_replay_events',
+	# 			'included_qclu_values': included_qclu_values, 'minimum_inclusion_fr_Hz': minimum_inclusion_fr_Hz,
+	# 			'silence_duration': silence_duration, 'firing_window_duration': firing_window_duration,
+	# 			'qclu_included_aclus': qclu_included_aclus, 'min_num_active_neurons': min_num_active_neurons}
+	# }
 
 	@function_attributes(short_name=None, tags=['replay', 'ALT_REPLAYS', 'epochs', 'import', 'diba_evt_file'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-26 21:06', related_items=[])
 	@classmethod
@@ -635,6 +641,10 @@ class BatchCompletionHelpers:
 			print(F'saved out newly computed epochs to "{filepath}".')
 
 		return (qclu_included_aclus, active_track_templates, active_spikes_df, quiescent_periods), (new_replay_epochs_df, new_replay_epochs)
+
+
+
+
 
 
 	@function_attributes(short_name=None, tags=['MAIN', 'ALT_REPLAYS', 'replay'], input_requires=[], output_provides=[], uses=['compute_diba_quiescent_style_replay_events', 'try_load_neuroscope_EVT_file_epochs', 'try_load_neuroscope_EVT_file_epochs'], used_by=['compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function'], creation_date='2024-07-03 06:12', related_items=[])
