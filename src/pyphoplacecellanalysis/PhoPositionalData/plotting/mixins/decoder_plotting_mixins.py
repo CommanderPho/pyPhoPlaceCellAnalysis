@@ -31,7 +31,6 @@ from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import LapsVisualiza
 
 import matplotlib.pyplot as plt
 
-
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult
 
 
@@ -80,14 +79,17 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
     """
     prev_heatmaps: List = field(default=Factory(list))
-    a_line = field(default=None)
-    _out_markers = field(default=None)
+    artist_line_dict = field(default=Factory(dict))
+    artist_markers_dict = field(default=Factory(dict))
     fig = field(default=None)
     axs: NDArray = field(default=None)
     laps_pages: List = field(default=Factory(list))
+    
+    # measured_position_df: Optional[pd.DataFrame] = field(default=None)
     rotate_to_vertical: bool = field(default=False, metadata={'desc': 'if False, the track is rendered horizontally along its length, otherwise it is rendered vectically'})
     
     ## MAIN PLOT FUNCTION:
+    @function_attributes(short_name=None, tags=['main', 'plot', 'posterior', 'epoch', 'line', 'trajectory'], input_requires=[], output_provides=[], uses=['self._perform_add_decoded_posterior_and_trajectory'], used_by=['plot_epoch_with_slider_widget'], creation_date='2025-01-29 15:52', related_items=[])
     def plot_epoch(self, an_epoch_idx: int, include_most_likely_pos_line: Optional[bool]=None, time_bin_index: Optional[int]=None):
         """ 
         """
@@ -102,6 +104,13 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         a_time_bin_edges = self.a_result.time_bin_edges[an_epoch_idx] # (n_epoch_t_bins+1, )
         a_time_bin_centers = self.a_result.time_bin_containers[an_epoch_idx].centers # (n_epoch_t_bins, )
 
+        has_measured_positions: bool = hasattr(self.a_result, 'measured_positions_list')
+        if has_measured_positions:
+            a_measured_pos_df: pd.DataFrame = self.a_result.measured_positions_list[an_epoch_idx]
+            # assert len(a_measured_pos_df) == len(a_time_bin_centers)
+        else:
+            a_measured_pos_df = None
+
         # n_time_bins: int = len(self.a_result.time_bin_containers[an_epoch_idx].centers)
 
         assert len(a_time_bin_centers) == len(a_most_likely_positions)
@@ -114,20 +123,39 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             a_heatmap.remove()
         self.prev_heatmaps.clear()
 
-        if self._out_markers is not None:
-            self._out_markers.remove()
+        for k, a_line in self.artist_line_dict.items(): 
+            a_line.remove()
 
-        if self.a_line is not None:
-            self.a_line.remove()
-
+        for k, _out_markers in self.artist_markers_dict.items(): 
+            _out_markers.remove()
+            
+        self.artist_line_dict.clear()# = {}
+        self.artist_markers_dict.clear() # = {}
+        
         ## Perform the plot:
-        self.prev_heatmaps, self.a_line, self._out_markers = self._perform_add_decoded_posterior_and_trajectory(an_ax, xbin_centers=self.xbin_centers, a_p_x_given_n=a_p_x_given_n,
-                                                                            a_time_bin_centers=a_time_bin_centers, a_most_likely_positions=a_most_likely_positions, ybin_centers=self.ybin_centers, include_most_likely_pos_line=include_most_likely_pos_line, time_bin_index=time_bin_index) # , allow_time_slider=True
+        self.prev_heatmaps, (a_meas_pos_line, a_line), (_meas_pos_out_markers, _out_markers) = self._perform_add_decoded_posterior_and_trajectory(an_ax, xbin_centers=self.xbin_centers, a_p_x_given_n=a_p_x_given_n,
+                                                                            a_time_bin_centers=a_time_bin_centers, a_most_likely_positions=a_most_likely_positions, a_measured_pos_df=a_measured_pos_df, ybin_centers=self.ybin_centers,
+                                                                            include_most_likely_pos_line=include_most_likely_pos_line, time_bin_index=time_bin_index, rotate_to_vertical=self.rotate_to_vertical) # , allow_time_slider=True
+
+        if a_meas_pos_line is not None:
+            self.artist_line_dict['meas'] = a_meas_pos_line
+        if _meas_pos_out_markers is not None:
+            self.artist_markers_dict['meas'] = _meas_pos_out_markers
+        
+        if a_line is not None:
+            self.artist_line_dict['most_likely'] = a_line
+        if _out_markers is not None:
+            self.artist_markers_dict['most_likely'] = _out_markers
 
         self.fig.canvas.draw_idle()
 
 
+    @function_attributes(short_name=None, tags=['plotting', 'widget', 'interactive'], input_requires=[], output_provides=[], uses=['self.plot_epoch'], used_by=[], creation_date='2025-01-29 15:49', related_items=[])
     def plot_epoch_with_slider_widget(self, an_epoch_idx: int, include_most_likely_pos_line: Optional[bool]=None):
+        """ this builds an interactive ipywidgets slider to scroll through the decoded epoch events
+        
+        Internally calls `self.self.plot_epoch` to perform posterior and line plotting
+        """
         import ipywidgets as widgets
         from IPython.display import display
 
@@ -177,7 +205,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     
     # fig, axs, laps_pages = plot_lap_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=22, active_page_index=0)
     @classmethod
-    def _helper_add_gradient_line(cls, ax, t, x, y, add_markers=False):
+    def _helper_add_gradient_line(cls, ax, t, x, y, add_markers=False, time_cmap='viridis'):
         """ Adds a gradient line representing a timeseries of (x, y) positions.
 
         add_markers (bool): if True, draws points at each (x, y) position colored the same as the underlying line.
@@ -196,7 +224,9 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         # needs to be (numlines) x (points per line) x 2 (for x and y)
         points = np.array([x, y]).T.reshape(-1, 1, 2)
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
-        lc = LineCollection(segments, cmap='viridis', norm=norm)
+        if isinstance(time_cmap, str):
+            time_cmap = plt.get_cmap(time_cmap)  # Choose a colormap
+        lc = LineCollection(segments, cmap=time_cmap, norm=norm)
         # Set the values used for colormapping
         lc.set_array(t)
         lc.set_linewidth(2)
@@ -211,7 +241,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             _out_markers = ax.scatter(x=x, y=y, c=colors_arr)
             return line, _out_markers
         else:
-            return line
+            return line, None
 
     def plot_decoded_trajectories_2d(self, sess, curr_num_subplots=10, active_page_index=0, plot_actual_lap_lines:bool=False, fixed_columns: int = 2, use_theoretical_tracks_instead: bool = True ):
         """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots
@@ -268,11 +298,11 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 else:
                     # active_config = curr_active_pipeline.sess.config
                     an_ax = axs[curr_row][curr_col]
-                    background_track_shadings[a_linear_index] = _perform_plot_matplotlib_2D_tracks(long_track_inst=long_track_inst, short_track_inst=short_track_inst, ax=an_ax)
+                    background_track_shadings[a_linear_index] = _perform_plot_matplotlib_2D_tracks(long_track_inst=long_track_inst, short_track_inst=short_track_inst, ax=an_ax, rotate_to_vertical=self.rotate_to_vertical)
                 
             return mp, axs, linear_plotter_indicies, row_column_indicies, background_track_shadings
         
-        def _subfn_add_specific_lap_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, laps_position_traces, lap_time_ranges, use_time_gradient_line=True):
+        def _subfn_add_specific_lap_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, lap_position_traces, lap_time_ranges, use_time_gradient_line=True):
             # Add the lap trajectory:
             for a_linear_index in linear_plotter_indicies:
                 curr_lap_id = active_page_laps_ids[a_linear_index]
@@ -280,13 +310,13 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 curr_col = row_column_indicies[1][a_linear_index]
                 curr_lap_time_range = lap_time_ranges[curr_lap_id]
                 curr_lap_label_text = 'Lap[{}]: t({:.2f}, {:.2f})'.format(curr_lap_id, curr_lap_time_range[0], curr_lap_time_range[1])
-                curr_lap_num_points = len(laps_position_traces[curr_lap_id][0,:])
+                curr_lap_num_points = len(lap_position_traces[curr_lap_id][0,:])
                 if use_time_gradient_line:
                     # Create a continuous norm to map from data points to colors
-                    curr_lap_timeseries = np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(laps_position_traces[curr_lap_id][0,:]))
+                    curr_lap_timeseries = np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(lap_position_traces[curr_lap_id][0,:]))
                     norm = plt.Normalize(curr_lap_timeseries.min(), curr_lap_timeseries.max())
                     # needs to be (numlines) x (points per line) x 2 (for x and y)
-                    points = np.array([laps_position_traces[curr_lap_id][0,:], laps_position_traces[curr_lap_id][1,:]]).T.reshape(-1, 1, 2)
+                    points = np.array([lap_position_traces[curr_lap_id][0,:], lap_position_traces[curr_lap_id][1,:]]).T.reshape(-1, 1, 2)
                     segments = np.concatenate([points[:-1], points[1:]], axis=1)
                     lc = LineCollection(segments, cmap='viridis', norm=norm)
                     # Set the values used for colormapping
@@ -296,7 +326,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                     a_line = axs[curr_row][curr_col].add_collection(lc)
                     # add_arrow(line)
                 else:
-                    a_line = axs[curr_row][curr_col].plot(laps_position_traces[curr_lap_id][0,:], laps_position_traces[curr_lap_id][1,:], c='k', alpha=0.85)
+                    a_line = axs[curr_row][curr_col].plot(lap_position_traces[curr_lap_id][0,:], lap_position_traces[curr_lap_id][1,:], c='k', alpha=0.85)
                     # curr_lap_endpoint = curr_lap_position_traces[curr_lap_id][:,-1].T
                     a_start_arrow = _plot_helper_add_arrow(a_line[0], position=0, position_mode='index', direction='right', size=20, color='green') # start
                     a_middle_arrow = _plot_helper_add_arrow(a_line[0], position=None, position_mode='index', direction='right', size=20, color='yellow') # middle
@@ -314,15 +344,39 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         
         # lap_specific_position_dfs = [curr_position_df.groupby('lap').get_group(i)[['t','x','y','lin_pos']] for i in session.laps.lap_id]
 
-        laps_position_traces_list = [lap_pos_df[['x','y']].to_numpy().T for lap_pos_df in lap_specific_position_dfs]
+        if self.rotate_to_vertical:
+            # vertical
+            # x_columns = [col for col in lap_specific_position_dfs[0].columns if col.startswith("x")]
+            # y_columns = [col for col in lap_specific_position_dfs[0].columns if col.startswith("y")]
+
+            for a_df in lap_specific_position_dfs:
+                a_df['x_temp'] = deepcopy(a_df['x'])
+                a_df['x'] = deepcopy(a_df['y'])
+                a_df['y'] = deepcopy(a_df['x_temp'])
+                # a_df[['x', 'y']] = a_df[['y', 'x']] ## swap the columns order
+                
+            curr_position_df[['x', 'y']] = curr_position_df[['y', 'x']] ## swap the columns order
+            curr_position_df[['x_smooth', 'y_smooth']] = curr_position_df[['y_smooth', 'x_smooth']] ## swap the columns order
+
+            # print(x_columns)
+
+            # laps_position_traces_list = [lap_pos_df[position_col_names].to_numpy().T for lap_pos_df in lap_specific_position_dfs]
+            # lap_specific_position_dfs[['x', 'y']] = lap_specific_position_dfs[['y', 'x']] ## swap the columns order
+            
+            # lap_specific_position_dfs[['x', 'y']] = lap_specific_position_dfs[['y', 'x']] ## swap the columns order
+            # curr_position_df[['x', 'y']] = lap_specific_position_dfs[['y', 'x']] ## swap the columns order
+
+        position_col_names = ['x', 'y']
+        laps_position_traces_list = [lap_pos_df[position_col_names].to_numpy().T for lap_pos_df in lap_specific_position_dfs]
+        
         laps_time_range_list = [[lap_pos_df[['t']].to_numpy()[0].item(), lap_pos_df[['t']].to_numpy()[-1].item()] for lap_pos_df in lap_specific_position_dfs]
         
         num_laps = len(sess.laps.lap_id)
         linear_lap_index = np.arange(num_laps)
         lap_time_ranges = dict(zip(sess.laps.lap_id, laps_time_range_list))
-        lap_position_traces = dict(zip(sess.laps.lap_id, laps_position_traces_list))
+        lap_position_traces = dict(zip(sess.laps.lap_id, laps_position_traces_list)) ## each lap indexed by lap_id
         
-        all_maze_positions = curr_position_df[['x','y']].to_numpy().T # (2, 59308)
+        all_maze_positions = curr_position_df[position_col_names].to_numpy().T # (2, 59308)
         # np.shape(all_maze_positions)
         all_maze_data = [all_maze_positions for i in np.arange(curr_num_subplots)] # repeat the maze data for each subplot. (2, 593080)
         p, axs, linear_plotter_indicies, row_column_indicies, background_track_shadings = _subfn_build_laps_multiplotter(curr_num_subplots, all_maze_data)
@@ -331,7 +385,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         
         if plot_actual_lap_lines:
             active_page_laps_ids = laps_pages[active_page_index]
-            _subfn_add_specific_lap_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, lap_position_traces, lap_time_ranges, use_time_gradient_line=True)
+            _subfn_add_specific_lap_trajectory(p, axs, linear_plotter_indicies=linear_plotter_indicies, row_column_indicies=row_column_indicies, active_page_laps_ids=active_page_laps_ids, lap_position_traces=lap_position_traces, lap_time_ranges=lap_time_ranges, use_time_gradient_line=True)
             # plt.ylim((125, 152))
             
         self.fig = p
@@ -340,9 +394,10 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
         return p, axs, laps_pages
 
+    @function_attributes(short_name=None, tags=['plot'], input_requires=[], output_provides=[], uses=[], used_by=['.plot_epoch'], creation_date='2025-01-29 15:53', related_items=[])
     @classmethod
-    def _perform_add_decoded_posterior_and_trajectory(cls, an_ax, xbin_centers, a_p_x_given_n, a_time_bin_centers, a_most_likely_positions, ybin_centers=None,
-                                                        include_most_likely_pos_line: Optional[bool]=None, time_bin_index: Optional[int]=None, debug_print=False):
+    def _perform_add_decoded_posterior_and_trajectory(cls, an_ax, xbin_centers, a_p_x_given_n, a_time_bin_centers, a_most_likely_positions, ybin_centers=None, a_measured_pos_df: Optional[pd.DataFrame]=None,
+                                                        include_most_likely_pos_line: Optional[bool]=None, time_bin_index: Optional[int]=None, rotate_to_vertical:bool=False, debug_print=False):
         """ Plots the 1D or 2D posterior and most likely position trajectory over the top of an axes created with `fig, axs, laps_pages = plot_decoded_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=8, active_page_index=0, plot_actual_lap_lines=False)`
         
         np.shape(a_time_bin_centers) # 1D & 2D: (12,)
@@ -418,16 +473,36 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         n_time_bins = len(a_time_bin_centers)
         assert n_time_bins == np.shape(masked_posterior)[0]
 
+
+        # ==================================================================================================================== #
+        # Convert to vertical orientation if needed                                                                            #
+        # ==================================================================================================================== #
+        if not rotate_to_vertical:
+            image_extent = (x_values.min(), x_values.max(), y_values.min(), y_values.max())
+        else:
+            # vertical:
+            image_extent = (y_values.min(), y_values.max(), x_values.min(), x_values.max())
+            ## swap x and y:
+            y_values_temp = deepcopy(y_values)
+            y_values = deepcopy(x_values)
+            x_values = y_values_temp
+            
+            masked_posterior = masked_posterior.swapaxes(-2, -1)
+
+
+        # ==================================================================================================================== #
+        # Plot the Posterior Heatmaps                                                                                          #
+        # ==================================================================================================================== #
         if not is_2D: # 1D case
             # 1D Case:    
             if time_bin_index is not None:
                 assert (time_bin_index < n_time_bins)
                 a_heatmap = an_ax.imshow(masked_posterior[time_bin_index, :], aspect='auto', cmap='viridis', alpha=full_posterior_opacity,
-                                    extent=(x_values.min(), x_values.max(), y_values.min(), y_values.max()),
+                                    extent=image_extent,
                                     origin='lower', interpolation='none') # , norm=norm
             else:
                 a_heatmap = an_ax.imshow(masked_posterior, aspect='auto', cmap='viridis', alpha=full_posterior_opacity,
-                                    extent=(x_values.min(), x_values.max(), y_values.min(), y_values.max()),
+                                    extent=image_extent,
                                     origin='lower', interpolation='none') # , norm=norm
                 
             heatmaps = [a_heatmap]
@@ -443,7 +518,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 assert (time_bin_index < n_time_bins)
                 cmap='viridis'
                 a_heatmap = an_ax.imshow(np.squeeze(masked_posterior[time_bin_index,:,:]), aspect='auto', cmap=cmap, alpha=full_posterior_opacity,
-                                extent=(x_values.min(), x_values.max(), y_values.min(), y_values.max()),
+                                extent=image_extent,
                                 origin='lower', interpolation='none',
                                 vmin=vmin_global, vmax=vmax_global) # , norm=norm
                 heatmaps.append(a_heatmap)
@@ -462,7 +537,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                     # cmap = viridis_obj
                     cmap='viridis'
                     a_heatmap = an_ax.imshow(np.squeeze(masked_posterior[i,:,:]), aspect='auto', cmap=cmap, alpha=time_step_opacity,
-                                    extent=(x_values.min(), x_values.max(), y_values.min(), y_values.max()),
+                                    extent=image_extent,
                                     origin='lower', interpolation='none',
                                     vmin=vmin_global, vmax=vmax_global) # , norm=norm
                     heatmaps.append(a_heatmap)
@@ -471,10 +546,66 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         # cbar = plt.colorbar(a_heatmap, ax=an_ax)
         # cbar.set_label('Posterior Probability Density')
 
+        # Add Gradiant Measured Position (recorded laps) Line ________________________________________________________________ #
+        if (a_measured_pos_df is not None):
+            if debug_print:
+                print(f'plotting measured positions...')
+            a_measured_time_bin_centers: NDArray = np.atleast_1d([np.squeeze(a_measured_pos_df['t'].to_numpy())]) # np.atleast_1d([np.squeeze(a_measured_pos_df['t'].to_numpy())])
+            if debug_print:
+                print(f'\tnp.shape(a_measured_time_bin_centers): {np.shape(a_measured_time_bin_centers)}')
+            if not is_2D:
+                measured_fake_y_num_samples: int = len(a_measured_pos_df)
+                measured_fake_y_arr = np.linspace(fake_y_lower_bound, fake_y_upper_bound, measured_fake_y_num_samples)
+                x = np.atleast_1d([a_measured_pos_df['x'].to_numpy()])
+                y = np.atleast_1d([measured_fake_y_arr])
+            else:
+                # 2D:
+                x = np.squeeze(a_measured_pos_df['x'].to_numpy())
+                y = np.squeeze(a_measured_pos_df['y'].to_numpy())
+                
+            if time_bin_index is not None:
+                ## restrict to single time bin if time_bin_index is not None:
+                if debug_print:
+                    print(f'\ttime_bin_index is NOT None, so restricting to specific time bin: {time_bin_index}')
+                assert (time_bin_index < n_time_bins)
+                a_curr_tbin_center: float = a_time_bin_centers[time_bin_index] ## it's a real time
+                is_measured_t_bin_included = (a_measured_pos_df['t'].to_numpy() <= a_curr_tbin_center) ## find all bins less than the current index
+                a_measured_time_bin_centers = np.atleast_1d([np.squeeze(a_measured_pos_df['t'].to_numpy()[is_measured_t_bin_included])]) ## could just slice `a_measured_time_bin_centers`, but we don't
+                x = np.atleast_1d([x[is_measured_t_bin_included]])
+                y = np.atleast_1d([y[is_measured_t_bin_included]])
+                
+            if debug_print:
+                print(f'\tnp.shape(x): {np.shape(x)}')
+                print(f'\tnp.shape(y): {np.shape(y)}')
+                
+            ## squeeze back down so all are rank 1 - (n_epoch_t_bins, )
+            a_measured_time_bin_centers = np.squeeze(a_measured_time_bin_centers)
+            x = np.squeeze(x)
+            y = np.squeeze(y)
+            
+            if not rotate_to_vertical:
+                pos_kwargs = dict(x=x, y=y)
+            else:
+                # vertical:
+                ## swap x and y:
+                pos_kwargs = dict(x=y, y=x)
+                
+
+            time_cmap = 'Reds'
+            if not is_2D: # 1D case
+                # a_line = _helper_add_gradient_line(an_ax, t=a_time_bin_centers, x=a_most_likely_positions, y=np.full_like(a_time_bin_centers, fake_y_center))
+                a_meas_pos_line, _meas_pos_out_markers = cls._helper_add_gradient_line(an_ax, t=a_measured_time_bin_centers, **pos_kwargs, add_markers=False, time_cmap=time_cmap)
+            else:
+                # 2D case
+                a_meas_pos_line, _meas_pos_out_markers = cls._helper_add_gradient_line(an_ax, t=a_measured_time_bin_centers, **pos_kwargs, add_markers=False, time_cmap=time_cmap)
+        else:
+            a_meas_pos_line, _meas_pos_out_markers = None, None
+            
+
         # Add Gradient Most Likely Position Line _____________________________________________________________________________ #
         if include_most_likely_pos_line:
             if not is_2D:
-                x = np.atleast_1d([a_most_likely_positions[time_bin_index]])
+                x = np.atleast_1d([a_most_likely_positions[time_bin_index]]) # why time_bin_idx here?
                 y = np.atleast_1d([fake_y_arr[time_bin_index]])
             else:
                 # 2D:
@@ -488,16 +619,25 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 x = np.atleast_1d([x[time_bin_index]])
                 y = np.atleast_1d([y[time_bin_index]])
                 
+
+            if not rotate_to_vertical:
+                pos_kwargs = dict(x=x, y=y)
+            else:
+                # vertical:
+                ## swap x and y:
+                pos_kwargs = dict(x=y, y=x)
+                
+
             if not is_2D: # 1D case
                 # a_line = _helper_add_gradient_line(an_ax, t=a_time_bin_centers, x=a_most_likely_positions, y=np.full_like(a_time_bin_centers, fake_y_center))
-                a_line, _out_markers = cls._helper_add_gradient_line(an_ax, t=a_time_bin_centers, x=x, y=y, add_markers=True)
+                a_line, _out_markers = cls._helper_add_gradient_line(an_ax, t=a_time_bin_centers, **pos_kwargs, add_markers=True)
             else:
                 # 2D case
-                a_line, _out_markers = cls._helper_add_gradient_line(an_ax, t=a_time_bin_centers, x=x, y=y, add_markers=True)
+                a_line, _out_markers = cls._helper_add_gradient_line(an_ax, t=a_time_bin_centers, **pos_kwargs, add_markers=True)
         else:
             a_line, _out_markers = None, None
 
-        return heatmaps, a_line, _out_markers
+        return heatmaps, (a_meas_pos_line, a_line), (_meas_pos_out_markers, _out_markers)
 
 
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter import PhoInteractivePlotter
@@ -811,7 +951,7 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-@metadata_attributes(short_name=None, tags=['pyvista', 'mixin', 'decoder', '3D', 'position'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-27 14:38', related_items=[])
+@metadata_attributes(short_name=None, tags=['pyvista', 'mixin', 'decoder', '3D', 'position'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-27 14:38', related_items=['DecodedTrajectoryPyVistaPlotter'])
 class DecoderRenderingPyVistaMixin:
     """ Implementors render decoded positions and decoder info with PyVista 
     
