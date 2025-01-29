@@ -78,47 +78,44 @@ def _adding_global_non_PBE_epochs(curr_active_pipeline, training_data_portion: f
     global_epoch_only_non_PBE_epoch_df: pd.DataFrame = global_epoch_only_df.epochs.subtracting(PBE_df)
     global_epoch_only_non_PBE_epoch_df= global_epoch_only_non_PBE_epoch_df.epochs.modify_each_epoch_by(additive_factor=-0.008, final_output_minimum_epoch_duration=0.040)
     
-    a_new_training_df, a_new_test_df = global_epoch_only_non_PBE_epoch_df.epochs.split_into_training_and_test(training_data_portion=training_data_portion, group_column_name ='label', additional_epoch_identity_column_names=['label'], skip_get_non_overlapping=False, debug_print=False) # a_laps_training_df, a_laps_test_df both comeback good here.
+    a_new_global_training_df, a_new_global_test_df = global_epoch_only_non_PBE_epoch_df.epochs.split_into_training_and_test(training_data_portion=training_data_portion, group_column_name ='label', additional_epoch_identity_column_names=['label'], skip_get_non_overlapping=False, debug_print=False) # a_laps_training_df, a_laps_test_df both comeback good here.
     ## Drop test epochs that are too short:
-    a_new_test_df = a_new_test_df.epochs.modify_each_epoch_by(final_output_minimum_epoch_duration=0.100) # 100ms minimum test epochs
+    a_new_global_test_df = a_new_global_test_df.epochs.modify_each_epoch_by(final_output_minimum_epoch_duration=0.100) # 100ms minimum test epochs
 
     ## Add the metadata:
-    # if a_new_training_df.attrs is None:
-    #     a_new_training_df.attrs = {} # create a new metadata dict on the dataframe
-    # a_new_training_df.attrs.update(train_test_period='train')
-    a_new_training_df = a_new_training_df.epochs.adding_or_updating_metadata(train_test_period='train', training_data_portion=training_data_portion)
-
-    # if a_new_test_df.attrs is None:
-    #     a_new_test_df.attrs = {} # create a new metadata dict on the dataframe
-    # a_new_test_df.attrs.update(train_test_period='test')
-    a_new_test_df = a_new_test_df.epochs.adding_or_updating_metadata(train_test_period='test', training_data_portion=training_data_portion)
+    a_new_global_training_df = a_new_global_training_df.epochs.adding_or_updating_metadata(track_identity='global', train_test_period='train', training_data_portion=training_data_portion, interval_datasource_name=f'global_NonPBE_TRAIN')
+    a_new_global_test_df = a_new_global_test_df.epochs.adding_or_updating_metadata(track_identity='global', train_test_period='test', training_data_portion=training_data_portion, interval_datasource_name=f'global_NonPBE_TEST')
     
-
     ## Add the maze_id column to the epochs:
     t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
-    a_new_training_df = a_new_training_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
-    a_new_test_df = a_new_test_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
+    a_new_global_training_df = a_new_global_training_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
+    a_new_global_test_df = a_new_global_test_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
 
     maze_id_to_maze_name_map = {-1:'none', 0:'long', 1:'short'}
-    a_new_training_df['maze_name'] = a_new_training_df['maze_id'].map(maze_id_to_maze_name_map)
-    a_new_test_df['maze_name'] = a_new_test_df['maze_id'].map(maze_id_to_maze_name_map)
+    a_new_global_training_df['maze_name'] = a_new_global_training_df['maze_id'].map(maze_id_to_maze_name_map)
+    a_new_global_test_df['maze_name'] = a_new_global_test_df['maze_id'].map(maze_id_to_maze_name_map)
 
+    # ==================================================================================================================== #
+    # Splits the global epochs into the long/short epochs                                                                  #
+    # ==================================================================================================================== #
     # partitionColumn: str ='maze_id'
     partitionColumn: str ='maze_name'
     ## INPUTS: a_new_test_df, a_new_training_df, modern_names_list
-    a_new_test_df_dict = partition_df_dict(a_new_test_df, partitionColumn=partitionColumn)
+    a_new_test_df_dict = partition_df_dict(a_new_global_test_df, partitionColumn=partitionColumn)
     # a_new_test_df_dict = dict(zip(modern_names_list, list(a_new_test_df_dict.values())))
-    a_new_training_df_dict = partition_df_dict(a_new_training_df, partitionColumn=partitionColumn)
+    a_new_training_df_dict = partition_df_dict(a_new_global_training_df, partitionColumn=partitionColumn)
     # a_new_training_df_dict = dict(zip(modern_names_list, list(a_new_training_df_dict.values())))
 
-
-    a_new_test_df_dict = {k:v.epochs.adding_or_updating_metadata(track_identity=k, train_test_period='test', training_data_portion=training_data_portion) for k, v in a_new_test_df_dict.items() if k != 'none'}
-    a_new_training_df_dict = {k:v.epochs.adding_or_updating_metadata(track_identity=k, train_test_period='train', training_data_portion=training_data_portion) for k, v in a_new_training_df_dict.items() if k != 'none'}
+    # ==================================================================================================================== #
+    # Set Metadata                                                                                                         #
+    # ==================================================================================================================== #
+    a_new_test_df_dict = {k:v.epochs.adding_or_updating_metadata(track_identity=k, train_test_period='test', training_data_portion=training_data_portion, interval_datasource_name=f'{k}_NonPBE_TEST') for k, v in a_new_test_df_dict.items() if k != 'none'}
+    a_new_training_df_dict = {k:v.epochs.adding_or_updating_metadata(track_identity=k, train_test_period='train', training_data_portion=training_data_portion, interval_datasource_name=f'{k}_NonPBE_TRAIN') for k, v in a_new_training_df_dict.items() if k != 'none'}
 
     ## OUTPUTS: new_decoder_dict, new_decoder_dict, new_decoder_dict, a_new_training_df_dict, a_new_test_df_dict
 
     ## OUTPUTS: training_data_portion, a_new_training_df, a_new_test_df, a_new_training_df_dict, a_new_test_df_dict
-    return a_new_training_df, a_new_test_df, a_new_training_df_dict, a_new_test_df_dict
+    return a_new_global_training_df, a_new_global_test_df, a_new_training_df_dict, a_new_test_df_dict
 
 
 def _single_compute_train_test_split_epochs_decoders(a_1D_decoder: BasePositionDecoder, a_config: Any, an_epoch_training_df: pd.DataFrame, an_epoch_test_df: pd.DataFrame, a_modern_name: str, training_test_suffixes = ['_train', '_test'], debug_print: bool = False): # , debug_output_hdf5_file_path=None, debug_plot: bool = False

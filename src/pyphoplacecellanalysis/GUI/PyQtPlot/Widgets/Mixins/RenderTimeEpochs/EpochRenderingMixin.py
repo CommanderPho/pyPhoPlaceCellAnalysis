@@ -806,7 +806,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
         return ( _temp_active_effective_series_extreme_vertical_offsets.min(), _temp_active_effective_series_extreme_vertical_offsets.max()), all_series_positioning_dfs # (-24.16666666666667, -5.0)
 
 
-    @function_attributes(short_name=None, tags=['layout', 'epochs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-03 11:23', related_items=[])
+    @function_attributes(short_name=None, tags=['layout', 'epochs'], input_requires=[], output_provides=[], uses=['self.build_stacked_epoch_layout', 'self.get_render_intervals_plot_range', 'self.update_rendered_intervals_visualization_properties'], used_by=[], creation_date='2024-07-03 11:23', related_items=[])
     def apply_stacked_epoch_layout(self, rendered_interval_keys, desired_interval_height_ratios, epoch_render_stack_height=20.0, interval_stack_location='below', debug_print=True):
         """ Builds and applies a stacked layout for the list of specified epochs
 

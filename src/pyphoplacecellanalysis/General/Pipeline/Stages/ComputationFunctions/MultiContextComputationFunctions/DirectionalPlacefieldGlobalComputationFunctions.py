@@ -891,7 +891,7 @@ class DirectionalLapsResult(ComputedResult):
 
 
 
-
+@metadata_attributes(short_name=None, tags=['helper'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-24 00:00', related_items=[])
 class DirectionalLapsHelpers:
     """ 2023-10-24 - Directional Placefields Computations
 
@@ -3164,7 +3164,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
     
 
     @classmethod
-    def init_from_single_decoder_decoding_result_and_measured_pos_df(cls, a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame, pf1D_Decoder: Optional[BasePositionDecoder]=None, debug_print:bool=False) -> "CustomDecodeEpochsResult":
+    def init_from_single_decoder_decoding_result_and_measured_pos_df(cls, a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame, pfND_Decoder: Optional[BasePositionDecoder]=None, debug_print:bool=False) -> "CustomDecodeEpochsResult":
         """ compare the decoded most-likely-positions and the measured positions interpolated to the same time bins.
         
          all_directional_laps_filter_epochs_decoder_custom_result: CustomDecodeEpochsResult = CustomDecodeEpochsResult.init_from_single_decoder_decoding_result_and_measured_pos_df(a_decoder_decoding_result=deepcopy(all_directional_laps_filter_epochs_decoder_result), global_measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']))
@@ -3175,9 +3175,9 @@ class CustomDecodeEpochsResult(UnpackableMixin):
                                                                                                  decoder_result=a_decoder_decoding_result,
                                                                                                  epochs_bin_by_bin_performance_analysis_df=None,
         )
-        if pf1D_Decoder is not None:
+        if pfND_Decoder is not None:
             try:
-                a_custom_decoder_decoding_result.epochs_bin_by_bin_performance_analysis_df = a_custom_decoder_decoding_result.get_lap_bin_by_bin_performance_analysis_df(active_pf_2D=deepcopy(pf1D_Decoder), debug_print=debug_print) # active_pf_2D: used for binning position columns # active_pf_2D: used for binning position columns\
+                a_custom_decoder_decoding_result.epochs_bin_by_bin_performance_analysis_df = a_custom_decoder_decoding_result.get_lap_bin_by_bin_performance_analysis_df(active_pf_2D=deepcopy(pfND_Decoder), debug_print=debug_print) # active_pf_2D: used for binning position columns # active_pf_2D: used for binning position columns\
             except ValueError as e:
                 # AssertionError: curr_array_shape: (57, 3) but this only works with the Pseudo2D (all-directional) decoder with posteriors with .shape[1] == 4, corresponding to ['long_LR', 'long_RL', 'short_LR', 'short_RL'] 
                 pass # skip this for now
@@ -3482,8 +3482,8 @@ class CustomDecodeEpochsResult(UnpackableMixin):
         
 
 
-@function_attributes(short_name=None, tags=['USEFUL', 'decode', 'pure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-05 11:59', related_items=[])
-def _do_custom_decode_epochs(global_spikes_df: pd.DataFrame,  global_measured_position_df: pd.DataFrame, pf1D_Decoder: BasePositionDecoder, epochs_to_decode_df: pd.DataFrame, decoding_time_bin_size: float, debug_print=False, **kwargs) -> CustomDecodeEpochsResult: #Tuple[MeasuredDecodedPositionComparison, DecodedFilterEpochsResult]:
+@function_attributes(short_name='custom_decode_epochs', tags=['USEFUL', 'decode', 'pure'], input_requires=[], output_provides=[], uses=[], used_by=['_do_custom_decode_epochs_dict'], creation_date='2024-04-05 11:59', related_items=[])
+def _do_custom_decode_epochs(global_spikes_df: pd.DataFrame,  global_measured_position_df: pd.DataFrame, pfND_Decoder: BasePositionDecoder, epochs_to_decode_df: pd.DataFrame, decoding_time_bin_size: float, debug_print=False, **kwargs) -> CustomDecodeEpochsResult: #Tuple[MeasuredDecodedPositionComparison, DecodedFilterEpochsResult]:
     """
     Do a single position decoding using a single decoder for a single set of epochs
     
@@ -3491,21 +3491,21 @@ def _do_custom_decode_epochs(global_spikes_df: pd.DataFrame,  global_measured_po
     
     """
     ## INPUTS: global_spikes_df, train_lap_specific_pf1D_Decoder_dict, test_epochs_dict, laps_decoding_time_bin_size
-    decoder_result: DecodedFilterEpochsResult = pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=deepcopy(epochs_to_decode_df), decoding_time_bin_size=decoding_time_bin_size, debug_print=debug_print)
+    decoder_result: DecodedFilterEpochsResult = pfND_Decoder.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=deepcopy(epochs_to_decode_df), decoding_time_bin_size=decoding_time_bin_size, debug_print=debug_print)
     # Interpolated measured position DataFrame - looks good
     ## INPUTS: test_all_directional_decoder_result, all_directional_pf1D_Decoder
     test_all_directional_decoder_result: CustomDecodeEpochsResult = CustomDecodeEpochsResult.init_from_single_decoder_decoding_result_and_measured_pos_df(decoder_result, global_measured_position_df=global_measured_position_df,
-                                                                                                                                                          pf1D_Decoder=deepcopy(pf1D_Decoder), debug_print=debug_print,
+                                                                                                                                                          pfND_Decoder=deepcopy(pfND_Decoder), debug_print=debug_print,
                                                                                                                                                           )
     # epochs_bin_by_bin_performance_analysis_df = test_all_directional_decoder_result.epochs_bin_by_bin_performance_analysis_df ## UNPACK WITH: 
     
     return test_all_directional_decoder_result
 
 
-@function_attributes(short_name=None, tags=['decode', 'general', 'epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-05 11:59', related_items=[])
-def _do_custom_decode_epochs_dict(global_spikes_df: pd.DataFrame, global_measured_position_df: pd.DataFrame, pf1D_Decoder_dict: Dict[str, BasePositionDecoder], epochs_to_decode_dict: Dict[str, pd.DataFrame], decoding_time_bin_size: float, decoder_and_epoch_keys_independent:bool=True, **kwargs) -> Union[Dict[decoder_name, CustomDecodeEpochsResult], Dict[epoch_split_key, Dict[decoder_name, CustomDecodeEpochsResult]]]:
+@function_attributes(short_name='custom_decode_epochs_dict', tags=['decode', 'general', 'epoch'], input_requires=[], output_provides=[], uses=['_do_custom_decode_epochs'], used_by=[], creation_date='2024-04-05 11:59', related_items=[])
+def _do_custom_decode_epochs_dict(global_spikes_df: pd.DataFrame, global_measured_position_df: pd.DataFrame, pfND_Decoder_dict: Dict[str, BasePositionDecoder], epochs_to_decode_dict: Dict[str, pd.DataFrame], decoding_time_bin_size: float, decoder_and_epoch_keys_independent:bool=True, **kwargs) -> Union[Dict[decoder_name, CustomDecodeEpochsResult], Dict[epoch_split_key, Dict[decoder_name, CustomDecodeEpochsResult]]]:
     """
-    Do a single position decoding for a set of epochs
+    Do a position decoding for a each set of epochs (`epochs_to_decode_dict`) and each decoder from a dict of decoders (`pfND_Decoder_dict`)
 
     
     decoder_and_epoch_keys_independent: bool - if False, it indicates that pf1D_Decoder_dict and epochs_to_decode_dict share the same keys, meaning they are paired. If True, they will be treated as independent and the epochs will be decoded by all provided decoders.
@@ -3537,7 +3537,7 @@ def _do_custom_decode_epochs_dict(global_spikes_df: pd.DataFrame, global_measure
 
     """
     if (not decoder_and_epoch_keys_independent):
-        assert np.all(np.isin(pf1D_Decoder_dict.keys(), epochs_to_decode_dict.keys())), f"decoder_and_epoch_keys_independent == False but pf1D_Decoder_dict.keys(): {list(pf1D_Decoder_dict.keys())} != epochs_to_decode_dict.keys(): {list(epochs_to_decode_dict.keys())}"
+        assert np.all(np.isin(pfND_Decoder_dict.keys(), epochs_to_decode_dict.keys())), f"decoder_and_epoch_keys_independent == False but pf1D_Decoder_dict.keys(): {list(pfND_Decoder_dict.keys())} != epochs_to_decode_dict.keys(): {list(epochs_to_decode_dict.keys())}"
 
 
     ## INPUTS: global_spikes_df, train_lap_specific_pf1D_Decoder_dict, test_epochs_dict, laps_decoding_time_bin_size
@@ -3547,13 +3547,13 @@ def _do_custom_decode_epochs_dict(global_spikes_df: pd.DataFrame, global_measure
 
     final_decoder_results_dict: Dict[epoch_split_key, Dict[decoder_name, CustomDecodeEpochsResult]] = {str(an_epoch_name):{} for an_epoch_name in epochs_to_decode_dict.keys()}
 
-    for a_decoder_name, a_pf1D_Decoder in pf1D_Decoder_dict.items():
+    for a_decoder_name, a_pf1D_Decoder in pfND_Decoder_dict.items():
         for epoch_name, an_epoch_to_decode_df in epochs_to_decode_dict.items():
             if ((not decoder_and_epoch_keys_independent) and (a_decoder_name != epoch_name)):
                 continue # skip the non-matching elements
             else:
                 full_decoder_result: CustomDecodeEpochsResult = _do_custom_decode_epochs(global_spikes_df=global_spikes_df, global_measured_position_df=global_measured_position_df,
-                    pf1D_Decoder=a_pf1D_Decoder, epochs_to_decode_df=an_epoch_to_decode_df,
+                    pfND_Decoder=a_pf1D_Decoder, epochs_to_decode_df=an_epoch_to_decode_df,
                     decoding_time_bin_size=decoding_time_bin_size, **kwargs)
 
                 # measured_decoded_position_comparion, decoder_result = decoder_result
@@ -3567,7 +3567,7 @@ def _do_custom_decode_epochs_dict(global_spikes_df: pd.DataFrame, global_measure
 
 
 @function_attributes(short_name=None, tags=['TrainTestSplit', 'decode'], input_requires=[], output_provides=[],
-                      uses=['_do_custom_decode_epochs', '_check_result_laps_epochs_df_performance', 'DirectionalPseudo2DDecodersResult'], used_by=['_perform_run_rigorous_decoder_performance_assessment'], creation_date='2024-10-08 02:35', related_items=[])
+                      uses=['_do_custom_decode_epochs', 'get_proper_global_spikes_df', '_check_result_laps_epochs_df_performance', 'DirectionalPseudo2DDecodersResult'], used_by=['_perform_run_rigorous_decoder_performance_assessment'], creation_date='2024-10-08 02:35', related_items=[])
 def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_decoding_time_bin_size: float=1.5, force_recompute_directional_train_test_split_result: bool=False, compute_separate_decoder_results: bool=True, included_neuron_IDs=None, debug_print=False):
     """ 
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _do_train_test_split_decode_and_evaluate
@@ -3617,12 +3617,12 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
 
     test_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = directional_train_test_split_result.test_epochs_dict
     train_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = directional_train_test_split_result.train_epochs_dict
-    train_lap_specific_pf1D_Decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = directional_train_test_split_result.train_lap_specific_pf1D_Decoder_dict
+    train_lap_specific_pfND_Decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = directional_train_test_split_result.train_lap_specific_pf1D_Decoder_dict
 
 
     if included_neuron_IDs is not None:
         _alt_directional_train_test_split_result = directional_train_test_split_result.sliced_by_neuron_id(included_neuron_ids=included_neuron_IDs)
-        train_lap_specific_pf1D_Decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = _alt_directional_train_test_split_result.train_lap_specific_pf1D_Decoder_dict
+        train_lap_specific_pfND_Decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = _alt_directional_train_test_split_result.train_lap_specific_pf1D_Decoder_dict
         
 
     # OUTPUTS: train_test_split_laps_df_dict
@@ -3633,7 +3633,7 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
 
     # MERGED all_directional decoder _____________________________________________________________________________________ #
     # _all_directional_decoder_pf1D_dict: Dict[str, BasePositionDecoder] = deepcopy(train_lap_specific_pf1D_Decoder_dict) # copy the dictionary
-    _all_directional_decoder_pf1D_dict: Dict[str, PfND] = {k:v.pf for k, v in deepcopy(train_lap_specific_pf1D_Decoder_dict).items()} # copy the dictionary
+    _all_directional_decoder_pf1D_dict: Dict[str, PfND] = {k:v.pf for k, v in deepcopy(train_lap_specific_pfND_Decoder_dict).items()} # copy the dictionary
     all_directional_pf1D: PfND = PfND.build_merged_directional_placefields(_all_directional_decoder_pf1D_dict, debug_print=False) # `PfND.build_merged_directional_placefields`
     all_directional_pf1D_Decoder: BasePositionDecoder = BasePositionDecoder(all_directional_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
 
@@ -3648,7 +3648,7 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
         test_epochs_dict = {k:_add_extra_epochs_df_columns(epochs_df=ensure_dataframe(v)) for k, v in test_epochs_dict.items()}
         # Decoding of the test epochs (what matters):
         test_decoder_results_dict: Dict[types.DecoderName, CustomDecodeEpochsResult] = _do_custom_decode_epochs_dict(global_spikes_df=get_proper_global_spikes_df(curr_active_pipeline), global_measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']),
-                                                                                                                                        pf1D_Decoder_dict=train_lap_specific_pf1D_Decoder_dict,
+                                                                                                                                        pfND_Decoder_dict=train_lap_specific_pfND_Decoder_dict,
                                                                                                                                         epochs_to_decode_dict=deepcopy(test_epochs_dict), 
                                                                                                                                         decoding_time_bin_size=active_laps_decoding_time_bin_size,
                                                                                                                                         decoder_and_epoch_keys_independent=False, debug_print=debug_print)
@@ -3666,7 +3666,7 @@ def _do_train_test_split_decode_and_evaluate(curr_active_pipeline, active_laps_d
 
     ## Decoding of the test epochs (what matters) for `all_directional_pf1D_Decoder`:
     test_all_directional_decoder_result: CustomDecodeEpochsResult = _do_custom_decode_epochs(global_spikes_df=get_proper_global_spikes_df(curr_active_pipeline), global_measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']),
-                                                            pf1D_Decoder=all_directional_pf1D_Decoder, epochs_to_decode_df=deepcopy(all_test_epochs_df),
+                                                            pfND_Decoder=all_directional_pf1D_Decoder, epochs_to_decode_df=deepcopy(all_test_epochs_df),
                                                             decoding_time_bin_size=active_laps_decoding_time_bin_size, debug_print=debug_print)
     all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult = test_all_directional_decoder_result.decoder_result
     ## INPUTS: test_all_directional_decoder_result
