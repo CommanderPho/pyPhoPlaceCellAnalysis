@@ -109,20 +109,27 @@ def _adding_global_non_PBE_epochs(curr_active_pipeline, training_data_portion: f
     a_new_training_df_dict = partition_df_dict(a_new_global_training_df, partitionColumn=partitionColumn)
     # a_new_training_df_dict = dict(zip(modern_names_list, list(a_new_training_df_dict.values())))
 
+    ## add back in 'global' epoch
+    a_new_test_df_dict['global'] = deepcopy(a_new_global_test_df)
+    a_new_training_df_dict['global'] = deepcopy(a_new_global_test_df)
+    
+
     # ==================================================================================================================== #
     # Set Metadata                                                                                                         #
     # ==================================================================================================================== #
-    a_new_test_df_dict = {k:v.epochs.adding_or_updating_metadata(track_identity=k, train_test_period='test', training_data_portion=training_data_portion, interval_datasource_name=f'{k}_NonPBE_TEST') for k, v in a_new_test_df_dict.items() if k != 'none'}
-    a_new_training_df_dict = {k:v.epochs.adding_or_updating_metadata(track_identity=k, train_test_period='train', training_data_portion=training_data_portion, interval_datasource_name=f'{k}_NonPBE_TRAIN') for k, v in a_new_training_df_dict.items() if k != 'none'}
+    a_new_test_df_dict: Dict[types.DecoderName, pd.DataFrame] = {k:v.epochs.adding_or_updating_metadata(track_identity=k, train_test_period='test', training_data_portion=training_data_portion, interval_datasource_name=f'{k}_NonPBE_TEST') for k, v in a_new_test_df_dict.items() if k != 'none'}
+    a_new_training_df_dict: Dict[types.DecoderName, pd.DataFrame] = {k:v.epochs.adding_or_updating_metadata(track_identity=k, train_test_period='train', training_data_portion=training_data_portion, interval_datasource_name=f'{k}_NonPBE_TRAIN') for k, v in a_new_training_df_dict.items() if k != 'none'}
 
     ## OUTPUTS: new_decoder_dict, new_decoder_dict, new_decoder_dict, a_new_training_df_dict, a_new_test_df_dict
 
     ## OUTPUTS: training_data_portion, a_new_training_df, a_new_test_df, a_new_training_df_dict, a_new_test_df_dict
-    return a_new_global_training_df, a_new_global_test_df, a_new_training_df_dict, a_new_test_df_dict
+    return a_new_training_df_dict, a_new_test_df_dict
 
 
-def _single_compute_train_test_split_epochs_decoders(a_1D_decoder: BasePositionDecoder, a_config: Any, an_epoch_training_df: pd.DataFrame, an_epoch_test_df: pd.DataFrame, a_modern_name: str, training_test_suffixes = ['_train', '_test'], debug_print: bool = False): # , debug_output_hdf5_file_path=None, debug_plot: bool = False
-    """
+def _single_compute_train_test_split_epochs_decoders(a_decoder: BasePositionDecoder, a_config: Any, an_epoch_training_df: pd.DataFrame, an_epoch_test_df: pd.DataFrame, a_modern_name: str, training_test_suffixes = ['_train', '_test'], debug_print: bool = False): # , debug_output_hdf5_file_path=None, debug_plot: bool = False
+    """ Replaces the config and updates/recomputes the computation epochs
+    
+    
         
     
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_train_test_split_epochs_decoders, _single_compute_train_test_split_epochs_decoders
@@ -190,7 +197,7 @@ def _single_compute_train_test_split_epochs_decoders(a_1D_decoder: BasePositionD
 
     ## apply the lap_filtered_curr_pf1D to the decoder:
     # a_sliced_pf1D_Decoder: BasePositionDecoder = BasePositionDecoder(pf=epoch_filtered_curr_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)    
-    a_sliced_pf1D_Decoder: BasePositionDecoder = deepcopy(a_1D_decoder).replacing_computation_epochs(epochs=deepcopy(curr_epoch_period_epoch_obj)) # BasePositionDecoder(pf=epoch_filtered_curr_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
+    a_sliced_pf1D_Decoder: BasePositionDecoder = deepcopy(a_decoder).replacing_computation_epochs(epochs=deepcopy(curr_epoch_period_epoch_obj)) # BasePositionDecoder(pf=epoch_filtered_curr_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
     epoch_filtered_curr_pf1D: PfND = a_sliced_pf1D_Decoder.pf
     
     ## ENDFOR a_modern_name in modern_names_list
@@ -265,7 +272,7 @@ def compute_train_test_split_epochs_decoders(directional_laps_results: Direction
         an_epoch_training_df, an_epoch_test_df = a_prev_computation_epochs_df.epochs.split_into_training_and_test(training_data_portion=training_data_portion, group_column_name ='lap_id', additional_epoch_identity_column_names=['label', 'lap_id', 'lap_dir'], skip_get_non_overlapping=False, debug_print=False) # a_laps_training_df, a_laps_test_df both comeback good here.
         
 
-        (a_training_test_split_epochs_df_dict, a_training_test_split_epochs_epoch_obj_dict), a_training_test_split_epochs_epoch_obj_dict, (an_epoch_period_description, a_config_copy, epoch_filtered_curr_pf1D, a_sliced_pf1D_Decoder) = _single_compute_train_test_split_epochs_decoders(a_1D_decoder=a_1D_decoder, a_config=a_config,
+        (a_training_test_split_epochs_df_dict, a_training_test_split_epochs_epoch_obj_dict), a_training_test_split_epochs_epoch_obj_dict, (an_epoch_period_description, a_config_copy, epoch_filtered_curr_pf1D, a_sliced_pf1D_Decoder) = _single_compute_train_test_split_epochs_decoders(a_decoder=a_1D_decoder, a_config=a_config,
                                                                                                                                                                                                                                                                                             an_epoch_training_df=an_epoch_training_df, an_epoch_test_df=an_epoch_test_df,
                                                                                                                                                                                                                                                                                              a_modern_name=a_modern_name, debug_print=debug_print)
         train_test_split_epochs_df_dict.update(a_training_test_split_epochs_df_dict)
