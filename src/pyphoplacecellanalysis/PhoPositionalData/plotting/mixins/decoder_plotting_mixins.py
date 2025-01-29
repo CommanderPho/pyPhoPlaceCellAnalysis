@@ -67,6 +67,10 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     Usage:    
         from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter
 
+        ## 2D:
+        # Choose the ripple epochs to plot:
+        a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = deepcopy(LS_decoder_ripple_filter_epochs_decoder_result_dict)
+        a_result: DecodedFilterEpochsResult = a_decoded_filter_epochs_decoder_result_dict['long'] # 2D
         num_filter_epochs: int = a_result.num_filter_epochs
         a_decoded_traj_plotter = DecodedTrajectoryMatplotlibPlotter(a_result=a_result, xbin=xbin, xbin_centers=xbin_centers, ybin=ybin, ybin_centers=ybin_centers)
         fig, axs, laps_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(global_session, curr_num_subplots=8, active_page_index=0, plot_actual_lap_lines=False, use_theoretical_tracks_instead=True)
@@ -88,14 +92,14 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         """
         self.curr_epoch_idx = an_epoch_idx
 
-        an_ax = self.axs[0][1]
+        an_ax = self.axs[0][0] # np.shape(self.axs) - (n_subplots, 2)
 
         assert len(self.xbin_centers) == np.shape(self.a_result.p_x_given_n_list[an_epoch_idx])[0], f"np.shape(a_result.p_x_given_n_list[an_epoch_idx]): {np.shape(self.a_result.p_x_given_n_list[an_epoch_idx])}, len(xbin_centers): {len(self.xbin_centers)}"
 
-        a_p_x_given_n = self.a_result.p_x_given_n_list[an_epoch_idx]
-        a_most_likely_positions = self.a_result.most_likely_positions_list[an_epoch_idx]
-        a_time_bin_edges = self.a_result.time_bin_edges[an_epoch_idx]
-        a_time_bin_centers = self.a_result.time_bin_containers[an_epoch_idx].centers
+        a_p_x_given_n = self.a_result.p_x_given_n_list[an_epoch_idx] # (76, 40, n_epoch_t_bins)
+        a_most_likely_positions = self.a_result.most_likely_positions_list[an_epoch_idx] # (n_epoch_t_bins, n_pos_dims) 
+        a_time_bin_edges = self.a_result.time_bin_edges[an_epoch_idx] # (n_epoch_t_bins+1, )
+        a_time_bin_centers = self.a_result.time_bin_containers[an_epoch_idx].centers # (n_epoch_t_bins, )
 
         # n_time_bins: int = len(self.a_result.time_bin_containers[an_epoch_idx].centers)
 

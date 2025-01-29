@@ -55,9 +55,11 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 # ==================================================================================================================== #
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, TrackTemplates, TrainTestSplitResult
 
-@function_attributes(short_name=None, tags=['epochs', 'non-PBE'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-28 04:10', related_items=[])
-def _adding_global_non_PBE_epochs(curr_active_pipeline, training_data_portion: float = 5.0/6.0):
-    """ 
+
+@function_attributes(short_name=None, tags=['epochs', 'non-PBE'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-28 04:10', related_items=[]) 
+def _adding_global_non_PBE_epochs(curr_active_pipeline, training_data_portion: float = 5.0/6.0) -> Tuple[Dict[types.DecoderName, pd.DataFrame], Dict[types.DecoderName, pd.DataFrame]]:
+    """ Builds a dictionary of train/test-split epochs for ['long', 'short', 'global'] periods
+    
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _adding_global_non_PBE_epochs
     
     a_new_training_df, a_new_test_df, a_new_training_df_dict, a_new_test_df_dict = _adding_global_non_PBE_epochs(curr_active_pipeline)
@@ -74,6 +76,7 @@ def _adding_global_non_PBE_epochs(curr_active_pipeline, training_data_portion: f
     ## Build up a new epoch
     epochs_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.epochs).epochs.adding_global_epoch_row()
     global_epoch_only_df: pd.DataFrame = epochs_df.epochs.label_slice('maze')
+    
     # t_start, t_stop = epochs_df.epochs.t_start, epochs_df.epochs.t_stop
     global_epoch_only_non_PBE_epoch_df: pd.DataFrame = global_epoch_only_df.epochs.subtracting(PBE_df)
     global_epoch_only_non_PBE_epoch_df= global_epoch_only_non_PBE_epoch_df.epochs.modify_each_epoch_by(additive_factor=-0.008, final_output_minimum_epoch_duration=0.040)

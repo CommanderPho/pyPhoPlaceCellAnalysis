@@ -3267,7 +3267,7 @@ def plot_spike_count_and_firing_rate_normalizations(pho_custom_decoder, axs=None
 # ==================================================================================================================== #
 
 
-@metadata_attributes(short_name=None, tags=['MatplotlibPlotCommand'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-30 17:12', related_items=[])
+@metadata_attributes(short_name=None, tags=['track', 'MatplotlibPlotCommand'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-30 17:12', related_items=[])
 @define(slots=False)
 class CreateNewStackedDecodedEpochSlicesPlotCommand(BaseMenuCommand):
     """ Creates a stacked decoded epoch slices view by calling _display_plot_decoded_epoch_slices
@@ -3292,7 +3292,7 @@ class CreateNewStackedDecodedEpochSlicesPlotCommand(BaseMenuCommand):
         self._display_output[_out_display_key] = _out_plot_tuple
         
 
-@metadata_attributes(short_name=None, tags=['MatplotlibPlotCommand'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-30 17:12', related_items=[])
+@metadata_attributes(short_name=None, tags=['track', 'MatplotlibPlotCommand'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-30 17:12', related_items=[])
 @define(slots=False)
 class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
     """ analagous to CreateNewDataExplorer_ipspikes_PlotterCommand, holds references to the variables needed to perform the entire action (such as the reference to the decoder) which aren't accessible during the building of the menus.
@@ -3331,11 +3331,11 @@ class AddNewDecodedPosition_MatplotlibPlotCommand(BaseMenuCommand):
         
 
 
-@metadata_attributes(short_name=None, tags=['MatplotlibPlotCommand', 'GOOD', 'epoch-slices'],
+@metadata_attributes(short_name=None, tags=['track', 'MatplotlibPlotCommand', 'GOOD', 'epoch-slices'],
                       input_requires=['long_short_leave_one_out_decoding_analysis'], output_provides=[], uses=['plot_slices_1D_most_likely_position_comparsions', 'plot_slices_1D_most_likely_position_comparsions'], used_by=[], creation_date='2023-10-17 00:00', related_items=[])
 @define(slots=False)
 class AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(BaseMenuCommand):
-    """ 2023-10-17. Creates TWO ROWS - Uses `plot_slices_1D_most_likely_position_comparsions` to plot epoch slices (corresponding to certain periods in time) along the continuous session duration.
+    """ 2023-10-17. Creates TWO TRACKS/ROWS - Uses `plot_slices_1D_most_likely_position_comparsions` to plot epoch slices (corresponding to certain periods in time) along the continuous session duration.
     
     Plots JUST the decoded epoch slices.
     
@@ -3418,7 +3418,7 @@ class AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand(BaseMenuCommand):
 
 
 
-@metadata_attributes(short_name=None, tags=['MatplotlibPlotCommand', 'GOOD', 'TrackTemplates', 'epoch-slices'],
+@metadata_attributes(short_name=None, tags=['track', 'MatplotlibPlotCommand', 'GOOD', 'TrackTemplates', 'epoch-slices'],
                       input_requires=['DirectionalLaps', 'DirectionalDecodersEpochsEvaluations'], output_provides=[], uses=['plot_slices_1D_most_likely_position_comparsions', 'plot_slices_1D_most_likely_position_comparsions'], used_by=[], creation_date='2024-12-19 04:28', related_items=['AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand'])
 @define(slots=False)
 class AddNewTrackTemplatesDecodedEpochSlicesRows_MatplotlibPlotCommand(BaseMenuCommand):
