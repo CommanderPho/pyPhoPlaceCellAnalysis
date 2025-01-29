@@ -7897,7 +7897,63 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         
         return cls.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=most_recent_continuously_decoded_dict, info_string=info_string, pseudo2D_decoder=pseudo2D_decoder, debug_print=debug_print, **kwargs)
 
+
+    @function_attributes(short_name=None, tags=['tracks', 'custom_decoder'], input_requires=[], output_provides=[], uses=['cls._perform_add_new_decoded_posterior_row'], used_by=[], creation_date='2025-01-29 12:08', related_items=[])
+    @classmethod
+    def prepare_and_perform_custom_decoder_decoded_epochs(cls, curr_active_pipeline, active_2d_plot, continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult], info_string: str, xbin: NDArray, debug_print: bool=False, **kwargs):
+        """ adds the 3 tracks (long/short/global) to the spike3DRasterWindow as tracks
+        for `AddNewDecodedPosteriors_MatplotlibPlotCommand`
         
+        adds the decoded epochs for the long/short decoder from the global_computation_results as new matplotlib plot rows. 
+        
+        Usage:
+        
+            _output_dict = AddNewDecodedPosteriors_MatplotlibPlotCommand.prepare_and_perform_custom_decoder_decoded_epochs(curr_active_pipeline=None, active_2d_plot=active_2d_plot, continuously_decoded_dict=continuous_specific_decoded_results_dict, info_string='non-PBE-decodings', xbin=deepcopy(new_decoder_dict['global'].xbin), debug_print=False)
+
+        """
+        from attrs import make_class
+        SimpleDecoderDummy = make_class('SimpleDecoderDummy', attrs=['xbin'])
+        
+        from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
+        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, CustomCyclicColorsDockDisplayConfig, NamedColorScheme
+        
+        assert continuously_decoded_dict is not None
+
+        showCloseButton = True
+        _common_dock_config_kwargs = {'dock_group_names': [AddNewDecodedPosteriors_MatplotlibPlotCommand._build_dock_group_id(extended_dock_title_info=info_string)],
+                                                            'showCloseButton': showCloseButton,
+                                    }
+        
+
+        
+        dock_configs = dict(zip(('long', 'short', 'global'), (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Epochs.get_long_dock_colors, **_common_dock_config_kwargs),
+                                                              CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Epochs.get_short_dock_colors, **_common_dock_config_kwargs),
+                                                              CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Epochs.get_global_dock_colors, **_common_dock_config_kwargs))))
+
+        # Need all_directional_pf1D_Decoder_dict
+        output_dict = {}
+
+        for a_decoder_name, a_decoded_result in continuously_decoded_dict.items():
+            a_dock_config = dock_configs[a_decoder_name]
+            assert len(a_decoded_result.p_x_given_n_list) == 1
+            p_x_given_n = a_decoded_result.p_x_given_n_list[0]
+            # p_x_given_n = a_decoded_result.p_x_given_n_list[0]['p_x_given_n']
+            time_bin_containers = a_decoded_result.time_bin_containers[0]
+            time_window_centers = time_bin_containers.centers
+                    
+
+            _out_tuple = cls._perform_add_new_decoded_posterior_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=a_dock_config, a_decoder_name=a_decoder_name, a_position_decoder=SimpleDecoderDummy(xbin=xbin),
+                                                                        time_window_centers=time_window_centers, a_1D_posterior=p_x_given_n, extended_dock_title_info=info_string)
+            # identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = _out_tuple
+            output_dict[a_decoder_name] = _out_tuple
+        
+        # OUTPUTS: output_dict
+        return output_dict
+
+
+    # ==================================================================================================================== #
+    # General Methods                                                                                                      #
+    # ==================================================================================================================== #
 
     def validate_can_display(self) -> bool:
         """ returns True if the item is enabled, otherwise returns false """
@@ -7922,7 +7978,7 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         self.log_command(*args, **kwargs) # adds this command to the `menu_action_history_list` 
 
         ## To begin, the destination plot must have a matplotlib widget plot to render to:
-        # print(f'AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand.execute(...)')
+        # print(f'AddNewDecodedPosteriors_MatplotlibPlotCommand.execute(...)')
         active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
 
         # output_dict = self.add_pseudo2D_decoder_decoded_epochs(self._active_pipeline, active_2d_plot)
@@ -7933,7 +7989,7 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
             identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = an_output_tuple
             self._display_output[identifier_name] = an_output_tuple
         
-        print(f'\t AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand.execute() is done.')
+        print(f'\t AddNewDecodedPosteriors_MatplotlibPlotCommand.execute() is done.')
 
 
     def remove(self, *args, **kwargs) -> None:
@@ -7954,13 +8010,13 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
 @metadata_attributes(short_name=None, tags=['track', 'Spike3DRasterWindowWidget', 'MatplotlibPlotCommand', 'epoch', 'marginal'],
                       input_requires=['DirectionalDecodersDecoded', 'DirectionalDecodersDecoded.most_recent_continuously_decoded_dict["pseudo2D"]'], output_provides=[], uses=[], used_by=[], creation_date='2024-12-24 15:47', related_items=[])
 @define(slots=False)
-class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand):
+class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_MatplotlibPlotCommand):
     """ 2024-01-23
     Adds THREE rows ('non_marginalized_raw_result', 'marginal_over_direction', 'marginal_over_track_ID') to the SpikeRaster2D showing the marginalized posteriors for the continuously decoded decoder
     These are the 4 x n_total_time_bins grid of context likelihoods.
     
     Usage:
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewPseudo2DDecodedEpochs_MatplotlibPlotCommand
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewDecodedPosteriors_MatplotlibPlotCommand
 
     """
     _spike_raster_window = field()
