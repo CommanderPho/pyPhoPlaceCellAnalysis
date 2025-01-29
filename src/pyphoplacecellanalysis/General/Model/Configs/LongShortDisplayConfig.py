@@ -77,6 +77,56 @@ class DisplayColorsEnum:
     LR_fg_color, LR_bg_color, LR_border_color = DisplayColorsEnum.Laps.get_LR_dock_colors(None, is_dim=False)
     
     """
+
+    @classmethod
+    def apply_dock_border_color_adjustment(cls, a_dock_bg_color):
+        """ applies a consistent visual transformation to a color that represents LR direction to get the corresponding RL color. 
+        General the RL colors look darker, slightly less saturated
+
+        Usage:
+            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager, DisplayConfig, long_short_display_config_manager
+
+            long_epoch_config = long_short_display_config_manager.long_epoch_config.as_pyqtgraph_kwargs()
+            short_epoch_config = long_short_display_config_manager.short_epoch_config.as_pyqtgraph_kwargs()
+
+            color_dict = {'long_LR': long_epoch_config['brush'].color(), 'long_RL': LongShortDisplayConfigManager.apply_LR_to_RL_adjustment(long_epoch_config['brush'].color()),
+                            'short_LR': short_epoch_config['brush'].color(), 'short_RL': LongShortDisplayConfigManager.apply_LR_to_RL_adjustment(short_epoch_config['brush'].color())}
+            color_dict
+  
+        """
+        from pyphocorehelpers.gui.Qt.color_helpers import build_adjusted_color, ColorFormatConverter
+        border_adjustment_kwargs = {'hue_shift': -0.00022222222222223476, 'saturation_scale': 1.0104226090442343, 'value_scale': 0.654639175257732, 'alpha_scale': 1.0}
+        return ColorFormatConverter.qColor_to_hexstring(build_adjusted_color(a_dock_bg_color, **border_adjustment_kwargs), include_alpha=False)
+    
+    
+        
+    @classmethod
+    def apply_dock_dimming_adjustment(cls, a_non_dim_bg_color, a_non_dim_fg_color=None):
+        """ applies a consistent visual transformation to a color that represents LR direction to get the corresponding RL color. 
+        General the RL colors look darker, slightly less saturated
+
+        Usage:
+            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager, DisplayConfig, long_short_display_config_manager
+
+            long_epoch_config = long_short_display_config_manager.long_epoch_config.as_pyqtgraph_kwargs()
+            short_epoch_config = long_short_display_config_manager.short_epoch_config.as_pyqtgraph_kwargs()
+
+            color_dict = {'long_LR': long_epoch_config['brush'].color(), 'long_RL': LongShortDisplayConfigManager.apply_LR_to_RL_adjustment(long_epoch_config['brush'].color()),
+                            'short_LR': short_epoch_config['brush'].color(), 'short_RL': LongShortDisplayConfigManager.apply_LR_to_RL_adjustment(short_epoch_config['brush'].color())}
+            color_dict
+  
+        """
+        from pyphocorehelpers.gui.Qt.color_helpers import build_adjusted_color, ColorFormatConverter
+        dimming_adjustment_kwargs = {'hue_shift': -0.0007777777777777661, 'saturation_scale': 0.5486323831489424, 'value_scale': 1.018018018018018, 'alpha_scale': 1.0}
+        
+        if a_non_dim_fg_color is not None:
+            fg_dimming_adjustment_kwargs = {'hue_shift': 0.0, 'saturation_scale': 1.0, 'value_scale': 0.6666666666666666, 'alpha_scale': 1.0}
+            return (ColorFormatConverter.qColor_to_hexstring(build_adjusted_color(a_non_dim_bg_color, **dimming_adjustment_kwargs), include_alpha=False), ColorFormatConverter.qColor_to_hexstring(build_adjusted_color(a_non_dim_fg_color, **fg_dimming_adjustment_kwargs), include_alpha=False))
+        else:
+            return ColorFormatConverter.qColor_to_hexstring(build_adjusted_color(a_non_dim_bg_color, **dimming_adjustment_kwargs), include_alpha=False)
+    
+
+    
     class Laps:
         RL = '#5522de' # a purplish-royal-blue
         LR = '#aadd21' # a yellowish-green
@@ -140,13 +190,62 @@ class DisplayColorsEnum:
 
             return fg_color, bg_color, border_color
 
+
     class Epochs:
         long = '#0b0049' # a dark blue
         short = '#490000' # a dark red
-        
+        global_ = '#490040' # a dark purple
         long_dark_bg = '#1f02c2' # a lighter blue for use on dark backgrounds
         short_dark_bg = '#c70000' # a lighter red for use on dark backgrounds
-        
+        global_dark_bg = '#bd00c7' # a lighter purple for use on dark backgrounds
+
+
+        @classmethod
+        def get_long_dock_colors(cls, orientation, is_dim):
+            """ used for CustomDockDisplayConfig for even laps
+            
+            Usage:
+                from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
+                
+                even_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors())
+                
+                long_fg_color, long_bg_color, long_border_color = DisplayColorsEnum.Epochs.get_long_dock_colors(None, is_dim=False)
+                LR_fg_color, LR_bg_color, LR_border_color = DisplayColorsEnum.Laps.get_short_dock_colors(None, is_dim=False)
+            
+            """
+            fg_color = '#fff' # White
+            bg_color = '#1f02c2'
+            border_color = DisplayColorsEnum.apply_dock_border_color_adjustment(bg_color)         
+            if is_dim:
+                bg_color, fg_color = DisplayColorsEnum.apply_dock_dimming_adjustment(bg_color, fg_color)
+                border_color = DisplayColorsEnum.apply_dock_dimming_adjustment(border_color)
+
+            return fg_color, bg_color, border_color
+
+        @classmethod
+        def get_short_dock_colors(cls, orientation, is_dim):
+            """ 
+            """
+            fg_color = '#fff' # White
+            bg_color = '#c70000'
+            border_color = DisplayColorsEnum.apply_dock_border_color_adjustment(bg_color)         
+            if is_dim:
+                bg_color, fg_color = DisplayColorsEnum.apply_dock_dimming_adjustment(bg_color, fg_color)
+                border_color = DisplayColorsEnum.apply_dock_dimming_adjustment(border_color)
+            return fg_color, bg_color, border_color
+
+        @classmethod
+        def get_global_dock_colors(cls, orientation, is_dim):
+            """ used for CustomDockDisplayConfig for odd laps
+            """
+            fg_color = '#fff' # White
+            bg_color = '#bd00c7'
+            border_color = DisplayColorsEnum.apply_dock_border_color_adjustment(bg_color)         
+            if is_dim:
+                bg_color, fg_color = DisplayColorsEnum.apply_dock_dimming_adjustment(bg_color, fg_color)
+                border_color = DisplayColorsEnum.apply_dock_dimming_adjustment(border_color)
+            return fg_color, bg_color, border_color
+
 
     @classmethod
     @function_attributes(short_name=None, tags=['pyqtgraph', 'title', 'format'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-02 15:14', related_items=[])
