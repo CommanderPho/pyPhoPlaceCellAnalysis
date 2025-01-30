@@ -33,6 +33,8 @@ import matplotlib.pyplot as plt
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult
 
+from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
+
 
 @define(slots=False)
 class DecodedTrajectoryPlotter:
@@ -82,9 +84,13 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     prev_heatmaps: List = field(default=Factory(list))
     artist_line_dict = field(default=Factory(dict))
     artist_markers_dict = field(default=Factory(dict))
+    
+    artist_dict_array: List[List[Dict]] = field(init=False)
     fig = field(default=None)
     axs: NDArray = field(default=None)
     laps_pages: List = field(default=Factory(list))
+    row_column_indicies: NDArray = field(default=None)
+    linear_plotter_indicies: NDArray = field(default=None)
     
     # measured_position_df: Optional[pd.DataFrame] = field(default=None)
     rotate_to_vertical: bool = field(default=False, metadata={'desc': 'if False, the track is rendered horizontally along its length, otherwise it is rendered vectically'})
@@ -115,8 +121,16 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         self.curr_time_bin_idx = time_bin_index
 
 
+        a_linear_index: int = an_epoch_idx
+        curr_row = self.row_column_indicies[0][a_linear_index]
+        curr_col = self.row_column_indicies[1][a_linear_index]
+        curr_artist_dict = self.artist_dict_array[curr_row][curr_col]
+
+
+
+
         if override_ax is None:
-            an_ax = self.axs[0][0] # np.shape(self.axs) - (n_subplots, 2)
+            an_ax = self.axs[curr_row][curr_col] # np.shape(self.axs) - (n_subplots, 2)
         else:
             an_ax = override_ax
             
@@ -144,33 +158,36 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         #                                                                      a_time_bin_centers=a_time_bin_centers, a_most_likely_positions=a_most_likely_positions, ybin_centers=ybin_centers) # , allow_time_slider=True
 
         # removing existing:
-        for a_heatmap in self.prev_heatmaps:
-            a_heatmap.remove()
-        self.prev_heatmaps.clear()
 
-        for k, a_line in self.artist_line_dict.items(): 
+        # curr_artist_dict = {'prev_heatmaps': [], 'lines': {}, 'markers': {}}
+        
+        for a_heatmap in curr_artist_dict['prev_heatmaps']:
+            a_heatmap.remove()
+        curr_artist_dict['prev_heatmaps'].clear()
+
+        for k, a_line in curr_artist_dict['lines'].items(): 
             a_line.remove()
 
-        for k, _out_markers in self.artist_markers_dict.items(): 
+        for k, _out_markers in curr_artist_dict['markers'].items(): 
             _out_markers.remove()
             
-        self.artist_line_dict.clear()# = {}
-        self.artist_markers_dict.clear() # = {}
+        curr_artist_dict['lines'].clear()# = {}
+        curr_artist_dict['markers'].clear() # = {}
         
         ## Perform the plot:
-        self.prev_heatmaps, (a_meas_pos_line, a_line), (_meas_pos_out_markers, _out_markers) = self._perform_add_decoded_posterior_and_trajectory(an_ax, xbin_centers=self.xbin_centers, a_p_x_given_n=a_p_x_given_n,
+        curr_artist_dict['prev_heatmaps'], (a_meas_pos_line, a_line), (_meas_pos_out_markers, _out_markers) = self._perform_add_decoded_posterior_and_trajectory(an_ax, xbin_centers=self.xbin_centers, a_p_x_given_n=a_p_x_given_n,
                                                                             a_time_bin_centers=a_time_bin_centers, a_most_likely_positions=a_most_likely_positions, a_measured_pos_df=a_measured_pos_df, ybin_centers=self.ybin_centers,
                                                                             include_most_likely_pos_line=include_most_likely_pos_line, time_bin_index=time_bin_index, rotate_to_vertical=self.rotate_to_vertical) # , allow_time_slider=True
 
         if a_meas_pos_line is not None:
-            self.artist_line_dict['meas'] = a_meas_pos_line
+            curr_artist_dict['lines']['meas'] = a_meas_pos_line
         if _meas_pos_out_markers is not None:
-            self.artist_markers_dict['meas'] = _meas_pos_out_markers
+            curr_artist_dict['markers']['meas'] = _meas_pos_out_markers
         
         if a_line is not None:
-            self.artist_line_dict['most_likely'] = a_line
+            curr_artist_dict['lines']['most_likely'] = a_line
         if _out_markers is not None:
-            self.artist_markers_dict['most_likely'] = _out_markers
+            curr_artist_dict['markers']['most_likely'] = _out_markers
 
         self.fig.canvas.draw_idle()
 
@@ -281,6 +298,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     def plot_decoded_trajectories_2d(self, sess, curr_num_subplots=10, active_page_index=0, plot_actual_lap_lines:bool=False, fixed_columns: int = 2, use_theoretical_tracks_instead: bool = True ):
         """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots
         
+        Called to setup the graph.
+        
         Great plotting for laps.
         Plots in a paginated manner.
         
@@ -313,14 +332,15 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                         yield more    # yield more elements from the iterator
                 yield chunk()         # in outer generator, yield next chunk
             
-        def _subfn_build_laps_multiplotter(nfields, linear_plot_data=None):
-            """ captures: self.rotate_to_vertical, fixed_columns, (long_track_inst, short_track_inst)
+        def _subfn_build_epochs_multiplotter(nfields, linear_plot_data=None):
+            """ builds the figures
+             captures: self.rotate_to_vertical, fixed_columns, (long_track_inst, short_track_inst)
             
             """
             linear_plotter_indicies = np.arange(nfields)
             needed_rows = int(np.ceil(nfields / fixed_columns))
             row_column_indicies = np.unravel_index(linear_plotter_indicies, (needed_rows, fixed_columns)) # inverse is: np.ravel_multi_index(row_column_indicies, (needed_rows, fixed_columns))
-            fig, axs = plt.subplots(needed_rows, fixed_columns, sharex=True, sharey=True, figsize=[4*fixed_columns,14*needed_rows]) #ndarray (5,2)
+            fig, axs = plt.subplots(needed_rows, fixed_columns, sharex=True, sharey=True, figsize=[4*fixed_columns,14*needed_rows], gridspec_kw={'wspace': 0, 'hspace': 0}) #ndarray (5,2)
             axs = np.atleast_2d(axs)
             # mp.set_size_inches(18.5, 26.5)
 
@@ -328,11 +348,15 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             for a_linear_index in linear_plotter_indicies:
                 curr_row = row_column_indicies[0][a_linear_index]
                 curr_col = row_column_indicies[1][a_linear_index]
+                ## format the titles
+                an_ax = axs[curr_row][curr_col]
+                an_ax.set_xticks([])
+                an_ax.set_yticks([])
+                
                 if not use_theoretical_tracks_instead:
-                    background_track_shadings[a_linear_index] = axs[curr_row][curr_col].plot(linear_plot_data[a_linear_index][0,:], linear_plot_data[a_linear_index][1,:], c='k', alpha=0.2)
+                    background_track_shadings[a_linear_index] = an_ax.plot(linear_plot_data[a_linear_index][0,:], linear_plot_data[a_linear_index][1,:], c='k', alpha=0.2)
                 else:
                     # active_config = curr_active_pipeline.sess.config
-                    an_ax = axs[curr_row][curr_col]
                     background_track_shadings[a_linear_index] = _perform_plot_matplotlib_2D_tracks(long_track_inst=long_track_inst, short_track_inst=short_track_inst, ax=an_ax, rotate_to_vertical=self.rotate_to_vertical)
                 
             return fig, axs, linear_plotter_indicies, row_column_indicies, background_track_shadings
@@ -414,20 +438,39 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         all_maze_positions = curr_position_df[position_col_names].to_numpy().T # (2, 59308)
         # np.shape(all_maze_positions)
         all_maze_data = [all_maze_positions for i in np.arange(curr_num_subplots)] # repeat the maze data for each subplot. (2, 593080)
-        fig, axs, linear_plotter_indicies, row_column_indicies, background_track_shadings = _subfn_build_laps_multiplotter(curr_num_subplots, all_maze_data)
-        # generate the pages
-        laps_pages = [list(chunk) for chunk in _subfn_chunks(sess.laps.lap_id, curr_num_subplots)]
         
+        # Build Figures/Axes/Etc _____________________________________________________________________________________________ #
+        self.fig, self.axs, self.linear_plotter_indicies, self.row_column_indicies, background_track_shadings = _subfn_build_epochs_multiplotter(curr_num_subplots, all_maze_data)
+        # generate the pages
+        laps_pages = [list(chunk) for chunk in _subfn_chunks(sess.laps.lap_id, curr_num_subplots)] ## this is specific to actual laps...
+         
         if plot_actual_lap_lines:
+            ## IDK what this is sadly, i think it's a reminant of the lap plotter?
             active_page_laps_ids = laps_pages[active_page_index]
-            _subfn_add_specific_lap_trajectory(fig, axs, linear_plotter_indicies=linear_plotter_indicies, row_column_indicies=row_column_indicies, active_page_laps_ids=active_page_laps_ids, lap_position_traces=lap_position_traces, lap_time_ranges=lap_time_ranges, use_time_gradient_line=True)
+            _subfn_add_specific_lap_trajectory(self.fig, self.axs, linear_plotter_indicies=self.linear_plotter_indicies, row_column_indicies=self.row_column_indicies, active_page_laps_ids=active_page_laps_ids, lap_position_traces=lap_position_traces, lap_time_ranges=lap_time_ranges, use_time_gradient_line=True)
             # plt.ylim((125, 152))
             
-        self.fig = fig
-        self.axs = axs
         self.laps_pages = laps_pages
 
-        return fig, axs, laps_pages
+
+
+        ## Build artist holders:
+        # MatplotlibRenderPlots
+        self.artist_dict_array = [] ## list
+        for a_list in self.row_column_indicies:
+            a_new_artists_list = []
+            for an_element in a_list:
+                a_new_artists_list.append({'prev_heatmaps': [], 'lines': {}, 'markers': {}}) ## make a new empty dict for each element
+            ## accumulate the lists
+            self.artist_dict_array.append(a_new_artists_list)                
+        ## Access via ` self.artist_dict_array[curr_row][curr_col]`, same as the axes
+
+        # for a_linear_index in self.linear_plotter_indicies:
+        #     curr_row = self.row_column_indicies[0][a_linear_index]
+        #     curr_col = self.row_column_indicies[1][a_linear_index]
+            #   curr_artist_dict = self.artist_dict_array[curr_row][curr_col]
+
+        return self.fig, self.axs, laps_pages
 
     @function_attributes(short_name=None, tags=['plot'], input_requires=[], output_provides=[], uses=[], used_by=['.plot_epoch'], creation_date='2025-01-29 15:53', related_items=[])
     @classmethod
@@ -452,7 +495,6 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
 
         """
-        
 
         is_single_time_bin_mode: bool = (time_bin_index is not None) and (time_bin_index != -1)
         assert not is_single_time_bin_mode, f"time_bin_index: {time_bin_index}"
