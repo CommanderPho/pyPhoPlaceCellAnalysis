@@ -78,6 +78,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         integer_slider
 
     """
+    ## Artists/Figures/Axes:
     prev_heatmaps: List = field(default=Factory(list))
     artist_line_dict = field(default=Factory(dict))
     artist_markers_dict = field(default=Factory(dict))
@@ -88,16 +89,31 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     # measured_position_df: Optional[pd.DataFrame] = field(default=None)
     rotate_to_vertical: bool = field(default=False, metadata={'desc': 'if False, the track is rendered horizontally along its length, otherwise it is rendered vectically'})
     
+    
+    ## Current Visibility State
+    curr_epoch_idx: int = field(default=0)
+    curr_time_bin_idx: Optional[int] = field(default=None)
+    
+    ## Widgets
     epoch_slider = field(default=None, init=False)
     time_bin_slider = field(default=None, init=False)
     checkbox = field(default=None, init=False)
 
+    @property
+    def is_single_time_bin_mode(self) -> bool:
+        """ if True, all the time bins within the curr_epoch_idx are plotted, otherwise, only the time bin specified by curr_time_bin_idx is used."""
+        return (self.curr_time_bin_idx is not None)
+
+
     ## MAIN PLOT FUNCTION:
     @function_attributes(short_name=None, tags=['main', 'plot', 'posterior', 'epoch', 'line', 'trajectory'], input_requires=[], output_provides=[], uses=['self._perform_add_decoded_posterior_and_trajectory'], used_by=['plot_epoch_with_slider_widget'], creation_date='2025-01-29 15:52', related_items=[])
-    def plot_epoch(self, an_epoch_idx: int, include_most_likely_pos_line: Optional[bool]=None, time_bin_index: Optional[int]=None, override_ax=None):
-        """ 
+    def plot_epoch(self, an_epoch_idx: int, time_bin_index: Optional[int]=None, include_most_likely_pos_line: Optional[bool]=None, override_ax=None):
+        """ Main plotting function.
+             Internally calls `self._perform_add_decoded_posterior_and_trajectory(...)` to do the plotting.
         """
         self.curr_epoch_idx = an_epoch_idx
+        self.curr_time_bin_idx = time_bin_index
+
 
         if override_ax is None:
             an_ax = self.axs[0][0] # np.shape(self.axs) - (n_subplots, 2)
@@ -163,7 +179,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     def plot_epoch_with_slider_widget(self, an_epoch_idx: int, include_most_likely_pos_line: Optional[bool]=None):
         """ this builds an interactive ipywidgets slider to scroll through the decoded epoch events
         
-        Internally calls `self.self.plot_epoch` to perform posterior and line plotting
+        Internally calls `self.plot_epoch` to perform posterior and line plotting
         """
         import ipywidgets as widgets
         from IPython.display import display
@@ -188,42 +204,43 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             checkbox.observe(on_checkbox_change)
             return checkbox
 
-        def update_epoch_idx(index):
-            print(f'update_epoch_idx(index: {index}) called')
+        def update_epoch_idx(index):            
+            # print(f'update_epoch_idx(index: {index}) called')
             time_bin_index = None # default to no time_bin_idx
-            if not self.time_bin_slider.disabled:
-                self.time_bin_slider.value = 0 # reset to 0
-                time_bin_index = self.time_bin_slider.value
-            self.plot_epoch(an_epoch_idx=index, include_most_likely_pos_line=include_most_likely_pos_line, time_bin_index=time_bin_index)
+            # if not self.time_bin_slider.disabled:
+            #     print(f'\t(not self.time_bin_slider.disabled)!!')
+            #     self.time_bin_slider.value = 0 # reset to 0
+            #     time_bin_index = self.time_bin_slider.value
+            self.plot_epoch(an_epoch_idx=index, time_bin_index=time_bin_index, include_most_likely_pos_line=include_most_likely_pos_line)
 
-        def update_time_bin_idx(index):
-            print(f'update_time_bin_idx(index: {index}) called')
-            self.plot_epoch(an_epoch_idx=self.epoch_slider.value, include_most_likely_pos_line=include_most_likely_pos_line, time_bin_index=index)
+        # def update_time_bin_idx(index):
+        #     print(f'update_time_bin_idx(index: {index}) called')
+        #     self.plot_epoch(an_epoch_idx=self.epoch_slider.value, time_bin_index=index, include_most_likely_pos_line=include_most_likely_pos_line)
 
-        def on_checkbox_change(value):
-            print(f'on_checkbox_change(value: {value}) called')
-            if value:
-                self.time_bin_slider.disabled = True
-                self.plot_epoch(an_epoch_idx=self.epoch_slider.value, include_most_likely_pos_line=include_most_likely_pos_line, time_bin_index=None)
-            else:
-                self.time_bin_slider.disabled = False
-                self.plot_epoch(an_epoch_idx=self.epoch_slider.value, include_most_likely_pos_line=include_most_likely_pos_line, time_bin_index=self.time_bin_slider.value)
+        # def on_checkbox_change(value):
+        #     print(f'on_checkbox_change(value: {value}) called')
+        #     if value:
+        #         self.time_bin_slider.disabled = True
+        #         self.plot_epoch(an_epoch_idx=self.epoch_slider.value, time_bin_index=None, include_most_likely_pos_line=include_most_likely_pos_line)
+        #     else:
+        #         self.time_bin_slider.disabled = False
+        #         self.plot_epoch(an_epoch_idx=self.epoch_slider.value, time_bin_index=self.time_bin_slider.value, include_most_likely_pos_line=include_most_likely_pos_line)
 
         self.epoch_slider = integer_slider(update_epoch_idx, 'epoch_IDX:', 0, (self.num_filter_epochs-1), an_epoch_idx)
-        self.time_bin_slider = integer_slider(update_time_bin_idx, 'time bin:', 0, (self.curr_n_time_bins-1), 0)
-        self.checkbox = checkbox_widget(on_checkbox_change, 'Disable time bin slider', True)
+        # self.time_bin_slider = integer_slider(update_time_bin_idx, 'time bin:', 0, (self.curr_n_time_bins-1), 0)
+        # self.checkbox = checkbox_widget(on_checkbox_change, 'Disable time bin slider', True)
 
-        self.plot_epoch(an_epoch_idx=an_epoch_idx, include_most_likely_pos_line=include_most_likely_pos_line, time_bin_index=None)
+        self.plot_epoch(an_epoch_idx=an_epoch_idx, time_bin_index=None, include_most_likely_pos_line=include_most_likely_pos_line)
 
         display(self.epoch_slider)
-        display(self.checkbox)
-        display(self.time_bin_slider)
+        # display(self.checkbox)
+        # display(self.time_bin_slider)
 
 
     
     # fig, axs, laps_pages = plot_lap_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=22, active_page_index=0)
     @classmethod
-    def _helper_add_gradient_line(cls, ax, t, x, y, add_markers=False, time_cmap='viridis'):
+    def _helper_add_gradient_line(cls, ax, t, x, y, add_markers=False, time_cmap='viridis', **LineCollection_kwargs):
         """ Adds a gradient line representing a timeseries of (x, y) positions.
 
         add_markers (bool): if True, draws points at each (x, y) position colored the same as the underlying line.
@@ -244,7 +261,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
         if isinstance(time_cmap, str):
             time_cmap = plt.get_cmap(time_cmap)  # Choose a colormap
-        lc = LineCollection(segments, cmap=time_cmap, norm=norm)
+        lc = LineCollection(segments, cmap=time_cmap, norm=norm, **LineCollection_kwargs)
         # Set the values used for colormapping
         lc.set_array(t)
         lc.set_linewidth(2)
@@ -303,7 +320,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             linear_plotter_indicies = np.arange(nfields)
             needed_rows = int(np.ceil(nfields / fixed_columns))
             row_column_indicies = np.unravel_index(linear_plotter_indicies, (needed_rows, fixed_columns)) # inverse is: np.ravel_multi_index(row_column_indicies, (needed_rows, fixed_columns))
-            mp, axs = plt.subplots(needed_rows, fixed_columns, sharex=True, sharey=True) #ndarray (5,2)
+            fig, axs = plt.subplots(needed_rows, fixed_columns, sharex=True, sharey=True, figsize=[4*fixed_columns,14*needed_rows]) #ndarray (5,2)
             axs = np.atleast_2d(axs)
             # mp.set_size_inches(18.5, 26.5)
 
@@ -318,7 +335,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                     an_ax = axs[curr_row][curr_col]
                     background_track_shadings[a_linear_index] = _perform_plot_matplotlib_2D_tracks(long_track_inst=long_track_inst, short_track_inst=short_track_inst, ax=an_ax, rotate_to_vertical=self.rotate_to_vertical)
                 
-            return mp, axs, linear_plotter_indicies, row_column_indicies, background_track_shadings
+            return fig, axs, linear_plotter_indicies, row_column_indicies, background_track_shadings
         
         def _subfn_add_specific_lap_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_laps_ids, lap_position_traces, lap_time_ranges, use_time_gradient_line=True):
             # Add the lap trajectory:
@@ -397,25 +414,25 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         all_maze_positions = curr_position_df[position_col_names].to_numpy().T # (2, 59308)
         # np.shape(all_maze_positions)
         all_maze_data = [all_maze_positions for i in np.arange(curr_num_subplots)] # repeat the maze data for each subplot. (2, 593080)
-        p, axs, linear_plotter_indicies, row_column_indicies, background_track_shadings = _subfn_build_laps_multiplotter(curr_num_subplots, all_maze_data)
+        fig, axs, linear_plotter_indicies, row_column_indicies, background_track_shadings = _subfn_build_laps_multiplotter(curr_num_subplots, all_maze_data)
         # generate the pages
         laps_pages = [list(chunk) for chunk in _subfn_chunks(sess.laps.lap_id, curr_num_subplots)]
         
         if plot_actual_lap_lines:
             active_page_laps_ids = laps_pages[active_page_index]
-            _subfn_add_specific_lap_trajectory(p, axs, linear_plotter_indicies=linear_plotter_indicies, row_column_indicies=row_column_indicies, active_page_laps_ids=active_page_laps_ids, lap_position_traces=lap_position_traces, lap_time_ranges=lap_time_ranges, use_time_gradient_line=True)
+            _subfn_add_specific_lap_trajectory(fig, axs, linear_plotter_indicies=linear_plotter_indicies, row_column_indicies=row_column_indicies, active_page_laps_ids=active_page_laps_ids, lap_position_traces=lap_position_traces, lap_time_ranges=lap_time_ranges, use_time_gradient_line=True)
             # plt.ylim((125, 152))
             
-        self.fig = p
+        self.fig = fig
         self.axs = axs
         self.laps_pages = laps_pages
 
-        return p, axs, laps_pages
+        return fig, axs, laps_pages
 
     @function_attributes(short_name=None, tags=['plot'], input_requires=[], output_provides=[], uses=[], used_by=['.plot_epoch'], creation_date='2025-01-29 15:53', related_items=[])
     @classmethod
     def _perform_add_decoded_posterior_and_trajectory(cls, an_ax, xbin_centers, a_p_x_given_n, a_time_bin_centers, a_most_likely_positions, ybin_centers=None, a_measured_pos_df: Optional[pd.DataFrame]=None,
-                                                        include_most_likely_pos_line: Optional[bool]=None, time_bin_index: Optional[int]=None, rotate_to_vertical:bool=False, debug_print=True, posterior_masking_value: float = 0.0025): # posterior_masking_value: float = 0.01 -- 1D
+                                                        include_most_likely_pos_line: Optional[bool]=None, time_bin_index: Optional[int]=None, rotate_to_vertical:bool=False, debug_print=False, posterior_masking_value: float = 0.0025): # posterior_masking_value: float = 0.01 -- 1D
         """ Plots the 1D or 2D posterior and most likely position trajectory over the top of an axes created with `fig, axs, laps_pages = plot_decoded_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=8, active_page_index=0, plot_actual_lap_lines=False)`
         
         np.shape(a_time_bin_centers) # 1D & 2D: (12,)
@@ -436,6 +453,11 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
         """
         
+
+        is_single_time_bin_mode: bool = (time_bin_index is not None) and (time_bin_index != -1)
+        assert not is_single_time_bin_mode, f"time_bin_index: {time_bin_index}"
+        
+
         # full_posterior_opacity: float = 0.92
         full_posterior_opacity: float = 1.0
         
@@ -454,8 +476,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
         x_values = deepcopy(xbin_centers)  # Replace with your x axis values
 
-
-        print(f'a_measured_pos_df.shape: {a_measured_pos_df.shape}')
+        if debug_print:
+            print(f'a_measured_pos_df.shape: {a_measured_pos_df.shape}')
         
 
         if not is_2D: # 1D case
@@ -517,7 +539,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         # ==================================================================================================================== #
         if not is_2D: # 1D case
             # 1D Case:    
-            if time_bin_index is not None:
+            if is_single_time_bin_mode:
                 assert (time_bin_index < n_time_bins)
                 a_heatmap = an_ax.imshow(masked_posterior[time_bin_index, :], aspect='auto', cmap='viridis', alpha=full_posterior_opacity,
                                     extent=image_extent,
@@ -536,7 +558,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             vmax_global = np.nanmax(posterior)
             if debug_print:
                 print(f'vmin_global: {vmin_global}, vmax_global: {vmax_global}')
-            if time_bin_index is not None:
+            if is_single_time_bin_mode:
                 assert (time_bin_index < n_time_bins)
                 cmap='viridis'
                 a_heatmap = an_ax.imshow(np.squeeze(masked_posterior[time_bin_index,:,:]), aspect='auto', cmap=cmap, alpha=full_posterior_opacity,
@@ -583,10 +605,10 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 x = np.squeeze(a_measured_pos_df['x'].to_numpy())
                 y = np.squeeze(a_measured_pos_df['y'].to_numpy())
                 
-            if time_bin_index is not None:
-                ## restrict to single time bin if time_bin_index is not None:
+            if is_single_time_bin_mode:
+                ## restrict to single time bin if is_single_time_bin_mode:
                 if debug_print:
-                    print(f'\ttime_bin_index is NOT None, so restricting to specific time bin: {time_bin_index}')
+                    print(f'\tis_single_time_bin_mode, so restricting to specific time bin: {time_bin_index}')
                 assert (time_bin_index < n_time_bins)
                 a_curr_tbin_center: float = a_time_bin_centers[time_bin_index] ## it's a real time
                 is_measured_t_bin_included = (a_measured_pos_df['t'].to_numpy() <= a_curr_tbin_center) ## find all bins less than the current index
@@ -616,14 +638,16 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 pos_kwargs = dict(x=y, y=x) ## swap x and y
                 
             add_markers = True
-            time_cmap = 'Reds'
+            # time_cmap = 'Reds'
+            time_cmap = 'gist_gray'
             if not is_2D: # 1D case
                 # a_line = _helper_add_gradient_line(an_ax, t=a_time_bin_centers, x=a_most_likely_positions, y=np.full_like(a_time_bin_centers, fake_y_center))
-                a_meas_pos_line, _meas_pos_out_markers = cls._helper_add_gradient_line(an_ax, t=a_measured_time_bin_centers, **pos_kwargs, add_markers=add_markers, time_cmap=time_cmap)
+                a_meas_pos_line, _meas_pos_out_markers = cls._helper_add_gradient_line(an_ax, t=a_measured_time_bin_centers, **pos_kwargs, add_markers=add_markers, time_cmap=time_cmap, zorder=0)
             else:
                 # 2D case
-                print(f'a_measured_time_bin_centers: {a_measured_time_bin_centers}')
-                a_meas_pos_line, _meas_pos_out_markers = cls._helper_add_gradient_line(an_ax, t=a_measured_time_bin_centers, **pos_kwargs, add_markers=add_markers, time_cmap=time_cmap)
+                if debug_print:
+                    print(f'a_measured_time_bin_centers: {a_measured_time_bin_centers}')
+                a_meas_pos_line, _meas_pos_out_markers = cls._helper_add_gradient_line(an_ax, t=a_measured_time_bin_centers, **pos_kwargs, add_markers=add_markers, time_cmap=time_cmap, zorder=0)
                 
             # _out_markers = ax.scatter(x=x, y=y, c=colors_arr)
             
@@ -641,8 +665,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 x = np.squeeze(a_most_likely_positions[:,0])
                 y = np.squeeze(a_most_likely_positions[:,1])
                 
-            if time_bin_index is not None:
-                ## restrict to single time bin if time_bin_index is not None:
+            if is_single_time_bin_mode:
+                ## restrict to single time bin if is_single_time_bin_mode:
                 assert (time_bin_index < n_time_bins)
                 a_time_bin_centers = np.atleast_1d([a_time_bin_centers[time_bin_index]])
                 x = np.atleast_1d([x[time_bin_index]])
