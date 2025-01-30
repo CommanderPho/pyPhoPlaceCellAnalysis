@@ -94,12 +94,17 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
     ## MAIN PLOT FUNCTION:
     @function_attributes(short_name=None, tags=['main', 'plot', 'posterior', 'epoch', 'line', 'trajectory'], input_requires=[], output_provides=[], uses=['self._perform_add_decoded_posterior_and_trajectory'], used_by=['plot_epoch_with_slider_widget'], creation_date='2025-01-29 15:52', related_items=[])
-    def plot_epoch(self, an_epoch_idx: int, include_most_likely_pos_line: Optional[bool]=None, time_bin_index: Optional[int]=None):
+    def plot_epoch(self, an_epoch_idx: int, include_most_likely_pos_line: Optional[bool]=None, time_bin_index: Optional[int]=None, override_ax=None):
         """ 
         """
         self.curr_epoch_idx = an_epoch_idx
 
-        an_ax = self.axs[0][0] # np.shape(self.axs) - (n_subplots, 2)
+        if override_ax is None:
+            an_ax = self.axs[0][0] # np.shape(self.axs) - (n_subplots, 2)
+        else:
+            an_ax = override_ax
+            
+        # an_ax = self.axs[0][0] # np.shape(self.axs) - (n_subplots, 2)
 
         assert len(self.xbin_centers) == np.shape(self.a_result.p_x_given_n_list[an_epoch_idx])[0], f"np.shape(a_result.p_x_given_n_list[an_epoch_idx]): {np.shape(self.a_result.p_x_given_n_list[an_epoch_idx])}, len(xbin_centers): {len(self.xbin_centers)}"
 
@@ -410,7 +415,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     @function_attributes(short_name=None, tags=['plot'], input_requires=[], output_provides=[], uses=[], used_by=['.plot_epoch'], creation_date='2025-01-29 15:53', related_items=[])
     @classmethod
     def _perform_add_decoded_posterior_and_trajectory(cls, an_ax, xbin_centers, a_p_x_given_n, a_time_bin_centers, a_most_likely_positions, ybin_centers=None, a_measured_pos_df: Optional[pd.DataFrame]=None,
-                                                        include_most_likely_pos_line: Optional[bool]=None, time_bin_index: Optional[int]=None, rotate_to_vertical:bool=False, debug_print=True):
+                                                        include_most_likely_pos_line: Optional[bool]=None, time_bin_index: Optional[int]=None, rotate_to_vertical:bool=False, debug_print=True, posterior_masking_value: float = 0.0025): # posterior_masking_value: float = 0.01 -- 1D
         """ Plots the 1D or 2D posterior and most likely position trajectory over the top of an axes created with `fig, axs, laps_pages = plot_decoded_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=8, active_page_index=0, plot_actual_lap_lines=False)`
         
         np.shape(a_time_bin_centers) # 1D & 2D: (12,)
@@ -430,7 +435,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
 
         """
-        posterior_masking_value: float = 0.01
+        
         # full_posterior_opacity: float = 0.92
         full_posterior_opacity: float = 1.0
         
@@ -448,6 +453,10 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             is_2D = True
 
         x_values = deepcopy(xbin_centers)  # Replace with your x axis values
+
+
+        print(f'a_measured_pos_df.shape: {a_measured_pos_df.shape}')
+        
 
         if not is_2D: # 1D case
             # 1D Case:    
@@ -604,8 +613,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 pos_kwargs = dict(x=x, y=y)
             else:
                 # vertical:
-                ## swap x and y:
-                pos_kwargs = dict(x=y, y=x)
+                pos_kwargs = dict(x=y, y=x) ## swap x and y
                 
             add_markers = True
             time_cmap = 'Reds'
@@ -614,6 +622,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 a_meas_pos_line, _meas_pos_out_markers = cls._helper_add_gradient_line(an_ax, t=a_measured_time_bin_centers, **pos_kwargs, add_markers=add_markers, time_cmap=time_cmap)
             else:
                 # 2D case
+                print(f'a_measured_time_bin_centers: {a_measured_time_bin_centers}')
                 a_meas_pos_line, _meas_pos_out_markers = cls._helper_add_gradient_line(an_ax, t=a_measured_time_bin_centers, **pos_kwargs, add_markers=add_markers, time_cmap=time_cmap)
                 
             # _out_markers = ax.scatter(x=x, y=y, c=colors_arr)
