@@ -1,20 +1,38 @@
 import sys
+import os
 import numpy as np
 
-from pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterLeftSidebarControlBarBase import Ui_leftSideToolbarWidget # Generated file from .ui
+from PyQt5 import QtGui, QtWidgets, uic
+from PyQt5.QtWidgets import QMessageBox, QToolTip, QStackedWidget, QHBoxLayout, QVBoxLayout, QSplitter, QFormLayout, QLabel, QFrame, QPushButton, QTableWidget, QTableWidgetItem
+from PyQt5.QtWidgets import QApplication, QFileSystemModel, QTreeView, QWidget, QHeaderView
+from PyQt5.QtGui import QPainter, QBrush, QPen, QColor, QFont, QIcon
+from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlot, QSize, QDir
+
+# from pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterLeftSidebarControlBarBase import Ui_leftSideToolbarWidget # Generated file from .ui
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
-from qtpy import QtCore, QtWidgets
-
-def trap_exc_during_debug(*args):
-    # when app raises uncaught exception, print info
-    print(args)
+# from qtpy import QtCore, QtWidgets
+# Generated from c:\Users\pho\repos\Spike3DWorkEnv\pyPhoPlaceCellAnalysis\src\pyphoplacecellanalysis\GUI\Qt\ZoomAndNavigationSidebarControls\Spike3DRasterLeftSidebarControlBarBase.ui automatically by PhoPyQtClassGenerator VSCode Extension
 
 
-# install exception hook: without this, uncaught exception would cause application to exit
-sys.excepthook = trap_exc_during_debug
+
+## IMPORTS:
+# 
+
+## Define the .ui file path
+path = os.path.dirname(os.path.abspath(__file__))
+uiFile = os.path.join(path, 'Spike3DRasterLeftSidebarControlBarWidget.ui')
 
 
-class Spike3DRasterLeftSidebarControlBar(QtWidgets.QWidget):
+# def trap_exc_during_debug(*args):
+#     # when app raises uncaught exception, print info
+#     print(args)
+
+
+# # install exception hook: without this, uncaught exception would cause application to exit
+# sys.excepthook = trap_exc_during_debug
+
+
+class Spike3DRasterLeftSidebarControlBar(QWidget):
     """ A controls bar with buttons loaded from a Qt .ui file. 
     
     self.ui.btnToggleCrosshairTrace
@@ -23,16 +41,16 @@ class Spike3DRasterLeftSidebarControlBar(QtWidgets.QWidget):
     
     """
     
-    animation_time_step_changed = QtCore.Signal(float) # returns bool indicating whether is_playing
-    temporal_zoom_factor_changed = QtCore.Signal(float)
-    render_window_duration_changed = QtCore.Signal(float)
+    animation_time_step_changed = pyqtSignal(float) # returns bool indicating whether is_playing
+    temporal_zoom_factor_changed = pyqtSignal(float)
+    render_window_duration_changed = pyqtSignal(float)
         
-    crosshair_trace_toggled = QtCore.Signal(bool)
+    crosshair_trace_toggled = pyqtSignal(bool)
 
-    @property
-    def lblCrosshairTraceValue(self):
-        """The lblCrosshairTraceValue property."""
-        return self.ui.lblCrosshairTraceValue
+    # @property
+    # def lblCrosshairTraceValue(self):
+    #     """The lblCrosshairTraceValue property."""
+    #     return self.ui.lblCrosshairTraceValue
 
 
     @property
@@ -53,10 +71,9 @@ class Spike3DRasterLeftSidebarControlBar(QtWidgets.QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
-        self.ui = Ui_leftSideToolbarWidget()
-        self.ui.setupUi(self) # builds the design from the .ui onto this widget.
+        self.ui = uic.loadUi(uiFile, self) # Load the .ui file
         
-        self.initUI()
+        # self.initUI()
         self.show() # Show the GUI
 
 
@@ -124,8 +141,8 @@ class Spike3DRasterLeftSidebarControlBar(QtWidgets.QWidget):
         self.crosshair_trace_toggled.emit(self.ui.btnToggleCrosshairTrace.isChecked())
         
 
-    def __str__(self):
-         return
+    # def __str__(self):
+    #      return
      
      
 
@@ -231,10 +248,10 @@ class SpikeRasterLeftSidebarControlsMixin:
 
         
     
-     
-if __name__ == "__main__":
-    import sys
-    app = QtWidgets.QApplication(sys.argv)
-    testWidget = Spike3DRasterLeftSidebarControlBar()
-    # testWidget.show()
+## Start Qt event loop
+if __name__ == '__main__':
+    app = QApplication([])
+    widget = Spike3DRasterLeftSidebarControlBar()
+    widget.show()
     sys.exit(app.exec_())
+
