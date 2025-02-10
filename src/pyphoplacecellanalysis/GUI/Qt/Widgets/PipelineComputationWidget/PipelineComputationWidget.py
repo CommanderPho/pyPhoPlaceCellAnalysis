@@ -164,40 +164,9 @@ class PipelineComputationWidget(PipelineOwningMixin, QWidget):
         # self.params.dt_format_string = "%Y-%m-%d %H:%M:%S"
         self.params.dt_format_string = "%m-%d %H:%M"
 
-        ## Process curr_active_pipeline
-        any_recent, epoch_latest, self.params.epoch_each, (global_latest, self.params.global_comp) = self._owning_pipeline.get_computation_times(debug_print=False)
-        self.params.all_validators = self._owning_pipeline.get_merged_computation_function_validators()
-        self.params.global_only = {k: v for k, v in self.params.all_validators.items() if v.is_global}
-        self.params.non_global_only = {k: v for k, v in self.params.all_validators.items() if not v.is_global}
-        self.params.non_global_map = {v.computation_fn_name: v.short_name for k, v in self.params.non_global_only.items() if not v.short_name.startswith('_DEP')}
-        self.params.global_map = {v.computation_fn_name: v.short_name for k, v in self.params.global_only.items() if not v.short_name.startswith('_DEP')}
-        self.params.epoch_each = {epoch: {self.params.non_global_map.get(fn, fn): t for fn, t in comps.items()} for epoch, comps in self.params.epoch_each.items()}
-        self.params.global_comp = {self.params.global_map.get(fn, fn): t for fn, t in self.params.global_comp.items()}
+        # ## Process curr_active_pipeline
+        self.rebuild_data_from_pipeline()
         
-
-        self.params.filtered_epoch_column_names = deepcopy(list(self._owning_pipeline.filtered_epochs.keys()))
-        self.params.num_filtered_epoch_columns = len(self.params.filtered_epoch_column_names)
-        
-
-        
-
-        # recompute_date = datetime.datetime(2024, 4, 1, 0, 0, 0)
-        # self.params.epochs_recompute = [epoch for epoch, t in epoch_latest.items() if t < recompute_date]
-        # self.params.epoch_each_recompute = {epoch: {comp: t for comp, t in comps.items() if t < recompute_date} for epoch, comps in self.params.epoch_each.items()}
-        
-        # unique_comp_names_set = set([])
-        unique_comp_names_list = []
-        for an_epoch, a_results_dict in self.params.epoch_each.items():
-            for k,v in a_results_dict.items():
-                curr_comp_name: str = self.params.non_global_map.get(k, k)
-                # unique_comp_names_set.add(curr_comp_name)
-                if curr_comp_name not in unique_comp_names_list:
-                    unique_comp_names_list.append(curr_comp_name) ## preserving order
-                
-        self.params.required_unique_comp_names_list = deepcopy(unique_comp_names_list)
-        # self.params.required_num_computation_rows = np.max([len(a_results_dict) for an_epoch, a_results_dict in self.params.epoch_each.items()])
-        self.params.required_num_computation_rows = len(self.params.required_unique_comp_names_list)
-
         self.initUI()
         self.show() # Show the GUI
 
@@ -375,6 +344,40 @@ class PipelineComputationWidget(PipelineOwningMixin, QWidget):
         # self.gridLayout_MainContent.addWidget(cw, row=1, column=0)
         self.ui.gridLayout_MainContent.addWidget(self.ui.mainContentWidget) # row=1, column=0
 
+
+    def rebuild_data_from_pipeline(self):
+        """ uses `self._owning_pipeline` to update all self.params.* variables used in creating/updating tables
+        """
+        ## Process curr_active_pipeline
+        any_recent, epoch_latest, self.params.epoch_each, (global_latest, self.params.global_comp) = self._owning_pipeline.get_computation_times(debug_print=False)
+        self.params.all_validators = self._owning_pipeline.get_merged_computation_function_validators()
+        self.params.global_only = {k: v for k, v in self.params.all_validators.items() if v.is_global}
+        self.params.non_global_only = {k: v for k, v in self.params.all_validators.items() if not v.is_global}
+        self.params.non_global_map = {v.computation_fn_name: v.short_name for k, v in self.params.non_global_only.items() if not v.short_name.startswith('_DEP')}
+        self.params.global_map = {v.computation_fn_name: v.short_name for k, v in self.params.global_only.items() if not v.short_name.startswith('_DEP')}
+        self.params.epoch_each = {epoch: {self.params.non_global_map.get(fn, fn): t for fn, t in comps.items()} for epoch, comps in self.params.epoch_each.items()}
+        self.params.global_comp = {self.params.global_map.get(fn, fn): t for fn, t in self.params.global_comp.items()}
+        
+        self.params.filtered_epoch_column_names = deepcopy(list(self._owning_pipeline.filtered_epochs.keys()))
+        self.params.num_filtered_epoch_columns = len(self.params.filtered_epoch_column_names)
+        # recompute_date = datetime.datetime(2024, 4, 1, 0, 0, 0)
+        # self.params.epochs_recompute = [epoch for epoch, t in epoch_latest.items() if t < recompute_date]
+        # self.params.epoch_each_recompute = {epoch: {comp: t for comp, t in comps.items() if t < recompute_date} for epoch, comps in self.params.epoch_each.items()}
+        
+        # unique_comp_names_set = set([])
+        unique_comp_names_list = []
+        for an_epoch, a_results_dict in self.params.epoch_each.items():
+            for k,v in a_results_dict.items():
+                curr_comp_name: str = self.params.non_global_map.get(k, k)
+                # unique_comp_names_set.add(curr_comp_name)
+                if curr_comp_name not in unique_comp_names_list:
+                    unique_comp_names_list.append(curr_comp_name) ## preserving order
+                
+        self.params.required_unique_comp_names_list = deepcopy(unique_comp_names_list)
+        # self.params.required_num_computation_rows = np.max([len(a_results_dict) for an_epoch, a_results_dict in self.params.epoch_each.items()])
+        self.params.required_num_computation_rows = len(self.params.required_unique_comp_names_list)
+
+
             
 
     def updateUi(self):
@@ -384,10 +387,11 @@ class PipelineComputationWidget(PipelineOwningMixin, QWidget):
         #     self._programmatically_add_display_function_buttons()
         # self.updateButtonsEnabled(False) # disable all buttons to start
         # self.ui.contextSelectorWidget.sigContextChanged.connect(self.on_context_changed)
-        
+        self.rebuild_data_from_pipeline()
 
         ## Update the local epoch results tree:
-        
+        self.ui.tbl_EpochLocalResults = self._initUI_build_local_epoch_results_table()
+        self.ui.tbl_global_computations = self._initUI_build_global_computations_results_table()
 
         pass
     
