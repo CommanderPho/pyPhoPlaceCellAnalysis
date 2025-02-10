@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <author>Pho Hale</author>
+ <class>RootWidget</class>
+ <widget class="QWidget" name="RootWidget">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>218</width>
+    <height>716</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Pipeline Computation Widget</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">background-color: rgb(71, 58, 46);
+border-color: rgb(207, 207, 207);
+background-color: rgba(71, 65, 60, 180);
+color: rgb(244, 244, 244);
+border-color: rgb(0, 0, 0);
+QHeaderView::section { background-color: red };
+</string>
+  </property>
+  <layout class="QGridLayout" name="gridLayout" rowstretch="1,0">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>2</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <property name="verticalSpacing">
+    <number>0</number>
+   </property>
+   <item row="0" column="0" rowspan="2" colspan="2">
+    <widget class="QFrame" name="mainContentFrame">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+       <horstretch>1</horstretch>
+       <verstretch>1</verstretch>
+      </sizepolicy>
+     </property>
+     <layout class="QGridLayout" name="gridLayout_2" rowstretch="0" columnstretch="0">
+      <property name="leftMargin">
+       <number>0</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>4</number>
+      </property>
+      <property name="spacing">
+       <number>0</number>
+      </property>
+      <item row="0" column="0">
+       <widget class="QSplitter" name="splitter">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <horstretch>1</horstretch>
+          <verstretch>1</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::StyledPanel</enum>
+        </property>
+        <property name="frameShadow">
+         <enum>QFrame::Plain</enum>
+        </property>
+        <property name="orientation">
+         <enum>Qt::Vertical</enum>
+        </property>
+        <property name="handleWidth">
+         <number>10</number>
+        </property>
+        <widget class="QWidget" name="mainComputationFunctionsContainer" native="true">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+           <horstretch>0</horstretch>
+           <verstretch>1</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>500</height>
+          </size>
+         </property>
+         <property name="baseSize">
+          <size>
+           <width>0</width>
+           <height>800</height>
+          </size>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">background-color: rgb(0, 0, 0);</string>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_MainContent">
+          <item row="0" column="0">
+           <widget class="QTreeWidget" name="mainTreeWidget">
+            <property name="styleSheet">
+             <string notr="true">QHeaderView::section { background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 rgba(0, 0, 0, 255), stop:1 rgba(255, 255, 255, 255)) }</string>
+            </property>
+            <property name="selectionMode">
+             <enum>QAbstractItemView::NoSelection</enum>
+            </property>
+            <property name="iconSize">
+             <size>
+              <width>32</width>
+              <height>64</height>
+             </size>
+            </property>
+            <column>
+             <property name="text">
+              <string notr="true">Widgets</string>
+             </property>
+            </column>
+            <item>
+             <property name="text">
+              <string notr="true">Spike2DRaster</string>
+             </property>
+             <property name="icon">
+              <iconset resource="../../../../Resources/GuiResources.qrc">
+               <normaloff>:/Icons/Icons/SpikeRaster2DIcon.ico</normaloff>:/Icons/Icons/SpikeRaster2DIcon.ico</iconset>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string notr="true">Behavior</string>
+             </property>
+             <property name="icon">
+              <iconset resource="../../../../Resources/ActionIcons.qrc">
+               <normaloff>:/Render/Icons/Icon/SimplePlot/Laps.png</normaloff>:/Render/Icons/Icon/SimplePlot/Laps.png</iconset>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string notr="true">StackedEpochViewer</string>
+             </property>
+             <property name="icon">
+              <iconset resource="../../../../Resources/ActionIcons.qrc">
+               <normaloff>:/Render/Icons/graphics/MultiAxesPlot.png</normaloff>:/Render/Icons/graphics/MultiAxesPlot.png</iconset>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string notr="true">Occupancy</string>
+             </property>
+             <property name="icon">
+              <iconset resource="../../../../Resources/ActionIcons.qrc">
+               <normaloff>:/Render/Icons/Icon/Occupancy.png</normaloff>:/Render/Icons/Icon/Occupancy.png</iconset>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string notr="true">1D Placefields</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string notr="true">1D Decoding</string>
+             </property>
+             <property name="icon">
+              <iconset resource="../../../../Resources/ActionIcons.qrc">
+               <normaloff>:/Render/Icons/Icon/Decode.png</normaloff>:/Render/Icons/Icon/Decode.png</iconset>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string notr="true">2D Placefields</string>
+             </property>
+             <property name="icon">
+              <iconset resource="../../../../Resources/ActionIcons.qrc">
+               <normaloff>:/Render/Icons/Icon/Heatmap.png</normaloff>:/Render/Icons/Icon/Heatmap.png</iconset>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string notr="true">2D Decoding</string>
+             </property>
+             <property name="icon">
+              <iconset resource="../../../../Resources/ActionIcons.qrc">
+               <normaloff>:/Render/Icons/Icon/Decode.png</normaloff>:/Render/Icons/Icon/Decode.png</iconset>
+             </property>
+            </item>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+        <widget class="QWidget" name="secondarytInfoWidget" native="true">
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>200</height>
+          </size>
+         </property>
+         <property name="baseSize">
+          <size>
+           <width>0</width>
+           <height>200</height>
+          </size>
+         </property>
+        </widget>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
+  <action name="actionConnect">
+   <property name="text">
+    <string>Connect</string>
+   </property>
+   <property name="toolTip">
+    <string>Connect this window's timeline to another window</string>
+   </property>
+  </action>
+ </widget>
+ <resources>
+  <include location="../../../../Resources/GuiResources.qrc"/>
+  <include location="../../../../Resources/ActionIcons.qrc"/>
+ </resources>
+ <connections/>
+</ui>
