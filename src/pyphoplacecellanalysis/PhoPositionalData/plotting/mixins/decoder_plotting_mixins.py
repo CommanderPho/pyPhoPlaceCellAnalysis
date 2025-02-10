@@ -478,15 +478,15 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         # Build Figures/Axes/Etc _____________________________________________________________________________________________ #
         self.fig, self.axs, self.linear_plotter_indicies, self.row_column_indicies, background_track_shadings = _subfn_build_epochs_multiplotter(curr_num_subplots, all_maze_data)
         # generate the pages
-        laps_pages = [list(chunk) for chunk in _subfn_chunks(sess.laps.lap_id, curr_num_subplots)] ## this is specific to actual laps...
+        epochs_pages = [list(chunk) for chunk in _subfn_chunks(sess.laps.lap_id, curr_num_subplots)] ## this is specific to actual laps...
          
         if plot_actual_lap_lines:
             ## IDK what this is sadly, i think it's a reminant of the lap plotter?
-            active_page_laps_ids = laps_pages[active_page_index]
+            active_page_laps_ids = epochs_pages[active_page_index]
             _subfn_add_specific_lap_trajectory(self.fig, self.axs, linear_plotter_indicies=self.linear_plotter_indicies, row_column_indicies=self.row_column_indicies, active_page_laps_ids=active_page_laps_ids, lap_position_traces=lap_position_traces, lap_time_ranges=lap_time_ranges, use_time_gradient_line=True)
             # plt.ylim((125, 152))
             
-        self.laps_pages = laps_pages
+        self.laps_pages = epochs_pages
 
 
 
@@ -506,7 +506,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         #     curr_col = self.row_column_indicies[1][a_linear_index]
             #   curr_artist_dict = self.artist_dict_array[curr_row][curr_col]
 
-        return self.fig, self.axs, laps_pages
+        return self.fig, self.axs, epochs_pages
 
     @function_attributes(short_name=None, tags=['plot'], input_requires=[], output_provides=[], uses=[], used_by=['.plot_epoch'], creation_date='2025-01-29 15:53', related_items=[])
     @classmethod
