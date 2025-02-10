@@ -38,7 +38,7 @@ class Spike3DRasterRightSidebarWidget(QtWidgets.QWidget):
     
     @property
     def right_sidebar_contents_container(self) -> LayoutWidget:
-        return self.ui.layout_widget
+        return self.ui.layout_widget # AttributeError: 'Spike3DRasterRightSidebarWidget' object has no attribute 'ui'
     
     @property
     def right_sidebar_contents_container_dockarea(self) -> NestedDockAreaWidget:

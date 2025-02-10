@@ -318,8 +318,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         
         ## Connect the UI Controls:
         # Helper Mixins: buildUI:
-        self.SpikeRasterLeftSidebarControlsMixin_on_buildUI() # Call this to set the initial values for the UI before signals are connected.
-        self.SpikeRasterRightSidebarOwningMixin_on_buildUI()
+        self.SpikeRasterLeftSidebarControlsMixin_on_buildUI() # `self.ui.leftSideToolbarWidget` Call this to set the initial values for the UI before signals are connected.
+        self.SpikeRasterRightSidebarOwningMixin_on_buildUI() # `self.ui.rightSideContainerWidget`
 
 
         # self.ui.bottom_controls_frame, self.ui.bottom_controls_layout = self.SpikeRasterBottomFrameControlsMixin_on_buildUI() # NOTE: do not call for the window as it already has a valid bottom bar widget
@@ -332,7 +332,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.ui.left_side_bar_connections = self.SpikeRasterLeftSidebarControlsMixin_connectSignals(self.ui.leftSideToolbarWidget)
 
         self.ui.right_side_bar_connections = None
-        self.ui.right_side_bar_connections = self.SpikeRasterRightSidebarOwningMixin_connectSignals(self.ui.leftSideToolbarWidget)
+        self.ui.right_side_bar_connections = self.SpikeRasterRightSidebarOwningMixin_connectSignals(self.ui.rightSideContainerWidget)
 
         
         ## Setup the right side bar:
@@ -1020,8 +1020,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         spike_raster_window.params.complete_session_context = deepcopy(complete_session_context) # Updates `spike_raster_window.params.complete_session_context`
         complete_session_context_window_title_str: str = complete_session_context.get_description(separator='|', include_property_names=False) # 'kdiba|gor01|two|2006-6-07_16-40-19|normal_computed|[1, 2, 4, 6, 7, 8, 9]|5.0'
         spike_raster_window.params.window_title = f"Spike Raster Window - {complete_session_context_window_title_str}" # Updates `spike_raster_window.params.window_title`
-        spike_raster_window.window().setWindowTitle(spike_raster_window.params.window_title) ## sets the window title
-
+        # spike_raster_window.window().setWindowTitle(spike_raster_window.params.window_title) ## sets the window title
+        spike_raster_window.setWindowTitle(spike_raster_window.params.window_title)
         return spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget)
 
 
@@ -1698,7 +1698,13 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             spike_raster_window.setWindowTitle(desired_window_title)
             
         """
-        self.window().setWindowTitle(desired_window_title)
+        # self.window().setWindowTitle(desired_window_title) ## causes kernel crashes
+        win = self.window()        
+        if win is self:
+            super().setWindowTitle(desired_window_title) 
+        else:
+            win.setWindowTitle(desired_window_title)
+
 
 
 # ==================================================================================================================== #
