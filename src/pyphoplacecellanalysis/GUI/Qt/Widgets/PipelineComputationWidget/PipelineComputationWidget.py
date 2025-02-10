@@ -1,6 +1,7 @@
 # PipelineComputationWidget.py
 # Generated from c:\Users\pho\repos\Spike3DWorkEnv\pyPhoPlaceCellAnalysis\src\pyphoplacecellanalysis\GUI\Qt\Widgets\PipelineComputationWidget\PipelineComputationWidget.ui automatically by PhoPyQtClassGenerator VSCode Extension
 from copy import deepcopy
+import numpy as np
 import sys
 import os
 
@@ -50,28 +51,42 @@ class PipelineComputationWidget(PipelineOwningMixin, QWidget):
         # self.ui = PhoUIContainer(name='PipelineComputationWidget')
         self.ui.connections = PhoUIContainer(name='PipelineComputationWidget')
         
+        self.params.table_stylesheet = "QHeaderView::section { background-color:  rgb(61, 61, 61); }"
+        
 
         ## Process curr_active_pipeline
         any_recent, epoch_latest, self.params.epoch_each, (global_latest, self.params.global_comp) = self._owning_pipeline.get_computation_times(debug_print=False)
         self.params.all_validators = self._owning_pipeline.get_merged_computation_function_validators()
-        global_only = {k: v for k, v in self.params.all_validators.items() if v.is_global}
-        non_global_only = {k: v for k, v in self.params.all_validators.items() if not v.is_global}
-        non_global_map = {v.computation_fn_name: v.short_name for k, v in non_global_only.items() if not v.short_name.startswith('_DEP')}
-        global_map = {v.computation_fn_name: v.short_name for k, v in global_only.items() if not v.short_name.startswith('_DEP')}
-        self.params.epoch_each = {epoch: {non_global_map.get(fn, fn): t for fn, t in comps.items()} for epoch, comps in self.params.epoch_each.items()}
-        self.params.global_comp = {global_map.get(fn, fn): t for fn, t in self.params.global_comp.items()}
+        self.params.global_only = {k: v for k, v in self.params.all_validators.items() if v.is_global}
+        self.params.non_global_only = {k: v for k, v in self.params.all_validators.items() if not v.is_global}
+        self.params.non_global_map = {v.computation_fn_name: v.short_name for k, v in self.params.non_global_only.items() if not v.short_name.startswith('_DEP')}
+        self.params.global_map = {v.computation_fn_name: v.short_name for k, v in self.params.global_only.items() if not v.short_name.startswith('_DEP')}
+        self.params.epoch_each = {epoch: {self.params.non_global_map.get(fn, fn): t for fn, t in comps.items()} for epoch, comps in self.params.epoch_each.items()}
+        self.params.global_comp = {self.params.global_map.get(fn, fn): t for fn, t in self.params.global_comp.items()}
         
 
         self.params.filtered_epoch_column_names = deepcopy(list(self._owning_pipeline.filtered_epochs.keys()))
         self.params.num_filtered_epoch_columns = len(self.params.filtered_epoch_column_names)
         
 
+        
+
         # recompute_date = datetime.datetime(2024, 4, 1, 0, 0, 0)
         # self.params.epochs_recompute = [epoch for epoch, t in epoch_latest.items() if t < recompute_date]
         # self.params.epoch_each_recompute = {epoch: {comp: t for comp, t in comps.items() if t < recompute_date} for epoch, comps in self.params.epoch_each.items()}
         
-
-
+        # unique_comp_names_set = set([])
+        unique_comp_names_list = []
+        for an_epoch, a_results_dict in self.params.epoch_each.items():
+            for k,v in a_results_dict.items():
+                curr_comp_name: str = self.params.non_global_map.get(k, k)
+                # unique_comp_names_set.add(curr_comp_name)
+                if curr_comp_name not in unique_comp_names_list:
+                    unique_comp_names_list.append(curr_comp_name) ## preserving order
+                
+        self.params.required_unique_comp_names_list = deepcopy(unique_comp_names_list)
+        # self.params.required_num_computation_rows = np.max([len(a_results_dict) for an_epoch, a_results_dict in self.params.epoch_each.items()])
+        self.params.required_num_computation_rows = len(self.params.required_unique_comp_names_list)
 
         self.initUI()
         self.show() # Show the GUI
@@ -93,11 +108,36 @@ class PipelineComputationWidget(PipelineOwningMixin, QWidget):
         return tree_EpochLocalResults
     
 
+    def _initUI_build_local_epoch_results_table(self):
+        """ 
+        Uses: self.params.epoch_each, self.params.filtered_epoch_column_names, self.params.num_filtered_epoch_columns, self.params.required_num_computation_rows
+        """
+        tbl_EpochLocalResults = QTableWidget()
+        tbl_EpochLocalResults.setStyleSheet(self.params.table_stylesheet)
+        tbl_EpochLocalResults.setColumnCount(self.params.num_filtered_epoch_columns+1)
+        tbl_EpochLocalResults.setHorizontalHeaderLabels(["Epoch/Computation", *self.params.filtered_epoch_column_names])
+        tbl_EpochLocalResults.setRowCount(self.params.required_num_computation_rows)
+        # for i, (comp, t) in enumerate(global_comp.items()):
+        
+        for comp_name_row, comp_name in enumerate(self.params.required_unique_comp_names_list):
+            tbl_EpochLocalResults.setItem(comp_name_row, 0, QTableWidgetItem(str(comp_name))) ## set the comp_name column
+            ## for each epoch, set the time
+            for epoch_col_idx, (epoch_name, comps_t_dict) in enumerate(self.params.epoch_each.items()):            
+                ## find this particular computation's datetime
+                curr_comp_dt = comps_t_dict.get(comp_name, None)
+                tbl_EpochLocalResults.setItem(comp_name_row, (epoch_col_idx+1), QTableWidgetItem(str(curr_comp_dt))) # the (+1) holds space for the computation name
+
+        tbl_EpochLocalResults.resizeColumnsToContents()
+        tbl_EpochLocalResults.verticalHeader().setVisible(False)
+        return tbl_EpochLocalResults
+    
+    
+
     def initUI(self):
         """ build 
         """
-        cw = QWidget()
-        layout = QVBoxLayout(cw)
+        self.ui.mainContentWidget = QWidget()
+        self.ui.mainContentVBoxLayout = QVBoxLayout(self.ui.mainContentWidget)
 
 
         # layout.addWidget(QLabel(f"Any Most Recent Computation: {self.params.any_recent}"))
@@ -112,22 +152,26 @@ class PipelineComputationWidget(PipelineOwningMixin, QWidget):
         # layout.addWidget(tbl1)
         # tbl1.resizeColumnsToContents()
         
-        layout.addWidget(QLabel("Epoch Each Result Computations"))
-        tree_EpochLocalResults = self._initUI_build_local_epoch_results_tree()
-        layout.addWidget(tree_EpochLocalResults)
-
-
-        tbl_global_computations = QTableWidget()
-        tbl_global_computations.setColumnCount(2)
-        tbl_global_computations.setHorizontalHeaderLabels(["Global Computation", "Completion Time"])
-        tbl_global_computations.setRowCount(len(self.params.global_comp))
-        for i, (comp, t) in enumerate(self.params.global_comp.items()):
-            tbl_global_computations.setItem(i, 0, QTableWidgetItem(str(comp)))
-        tbl_global_computations.setItem(i, 1, QTableWidgetItem(str(t)))
-        layout.addWidget(QLabel("Global Computations"))
-        layout.addWidget(tbl_global_computations)
-        tbl_global_computations.resizeColumnsToContents()
+        self.ui.mainContentVBoxLayout.addWidget(QLabel("Epoch Each Result Computations"))
+        # self.ui.tree_EpochLocalResults = self._initUI_build_local_epoch_results_tree()
+        # layout.addWidget(self.ui.tree_EpochLocalResults)
         
+        self.ui.tbl_EpochLocalResults = self._initUI_build_local_epoch_results_table()
+        self.ui.mainContentVBoxLayout.addWidget(self.ui.tbl_EpochLocalResults)
+
+
+        self.ui.tbl_global_computations = QTableWidget()
+        self.ui.tbl_global_computations.setColumnCount(2)
+        self.ui.tbl_global_computations.setHorizontalHeaderLabels(["Global Computation", "Completion Time"])
+        self.ui.tbl_global_computations.setRowCount(len(self.params.global_comp))
+        for i, (comp, t) in enumerate(self.params.global_comp.items()):
+            self.ui.tbl_global_computations.setItem(i, 0, QTableWidgetItem(str(comp)))
+        self.ui.tbl_global_computations.setItem(i, 1, QTableWidgetItem(str(t)))
+        self.ui.mainContentVBoxLayout.addWidget(QLabel("Global Computations"))
+        self.ui.mainContentVBoxLayout.addWidget(self.ui.tbl_global_computations)
+        self.ui.tbl_global_computations.resizeColumnsToContents()
+        self.ui.tbl_global_computations.setStyleSheet(self.params.table_stylesheet)
+        self.ui.tbl_global_computations.verticalHeader().setVisible(False)
         # tbl3 = QTableWidget()
         # tbl3.setColumnCount(2)
         # tbl3.setHorizontalHeaderLabels(["Epoch", "Needs Recompute"])
@@ -152,7 +196,7 @@ class PipelineComputationWidget(PipelineOwningMixin, QWidget):
 
         ## add to the main layout widget:
         # self.gridLayout_MainContent.addWidget(cw, row=1, column=0)
-        self.ui.gridLayout_MainContent.addWidget(cw) # row=1, column=0
+        self.ui.gridLayout_MainContent.addWidget(self.ui.mainContentWidget) # row=1, column=0
 
             
 
@@ -163,6 +207,11 @@ class PipelineComputationWidget(PipelineOwningMixin, QWidget):
         #     self._programmatically_add_display_function_buttons()
         # self.updateButtonsEnabled(False) # disable all buttons to start
         # self.ui.contextSelectorWidget.sigContextChanged.connect(self.on_context_changed)
+        
+
+        ## Update the local epoch results tree:
+        
+
         pass
     
 
