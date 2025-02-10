@@ -446,6 +446,40 @@ class PipelineComputationWidget(TableContextMenuProviderDelegate, PipelineOwning
         pass
     
 
+    # ==================================================================================================================== #
+    # Computation/Pipeline Action Functions                                                                                #
+    # ==================================================================================================================== #
+    
+    def _perform_run_compute_function(self, curr_compute_fcn, debug_print=False):
+        # custom_args = {} # TODO
+        # custom_args = self.active_figure_format_config or {}
+        # if debug_print:
+        #     print(f'custom_args: {custom_args}')
+            
+
+        curr_active_pipeline = self._owning_pipeline
+        curr_active_pipeline.reload_default_computation_functions()
+        # newly_computed_values = curr_active_pipeline.batch_extended_computations(include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+        #                                                     force_recompute=force_recompute_global, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+        # needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = curr_active_pipeline.batch_evaluate_required_computations(include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+        #                                                     force_recompute=force_recompute_global, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+        # print(f'Post-load global computations: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
+
+
+        # custom_kwargs = {'num_shuffles': 5, 'skip_laps': False, 'minimum_inclusion_fr_Hz':2.0, 'included_qclu_values':[1,2,4,5,6,7]}
+        # computation_kwargs_list = [custom_kwargs]
+        
+        computation_kwargs_list = None
+        compute_outputs = curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=[curr_compute_fcn], computation_kwargs_list=computation_kwargs_list, 
+                                                        enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+
+
+
+        # 'optional_kwargs'
+        # print(f'_perform_run_display_function(curr_display_fcn: {curr_display_fcn}): context: {self.ui.contextSelectorWidget.current_selected_context}')
+        # compute_outputs = self.owning_pipeline.display(curr_compute_fcn, self.ui.contextSelectorWidget.current_selected_context, **custom_args)
+        return compute_outputs
+    
 
     # ==================================================================================================================== #
     # TableContextMenuProviderDelegate Implementations                                                                     #
@@ -475,7 +509,8 @@ class PipelineComputationWidget(TableContextMenuProviderDelegate, PipelineOwning
             ## get the name of the global computation to recompute
             curr_global_comp_fn_name: str = self.params.required_unique_global_comp_names_list[row_index]
             action_recompute = QAction(f"Recompute `{curr_global_comp_fn_name}`", target_table)
-            action_recompute.triggered.connect(lambda: print(f"Recomputing Global Computation `{curr_global_comp_fn_name}` - {row_index}"))
+            # action_recompute.triggered.connect(lambda: print(f"Recomputing Global Computation `{curr_global_comp_fn_name}` - {row_index}"); self._perform_run_compute_function(curr_compute_fcn=curr_global_comp_fn_name);)
+            action_recompute.triggered.connect(lambda: self._perform_run_compute_function(curr_compute_fcn=curr_global_comp_fn_name))
             menu.addAction(action_recompute)
 
         else:
