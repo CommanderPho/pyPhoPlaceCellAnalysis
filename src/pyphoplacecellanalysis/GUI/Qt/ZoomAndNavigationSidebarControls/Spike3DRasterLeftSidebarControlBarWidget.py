@@ -17,6 +17,7 @@ sys.excepthook = trap_exc_during_debug
 class Spike3DRasterLeftSidebarControlBar(QtWidgets.QWidget):
     """ A controls bar with buttons loaded from a Qt .ui file. 
     
+    self.ui.btnToggleCrosshairTrace
     self.ui.lblCrosshairTraceStaticLabel
     self.ui.lblCrosshairTraceValue
     
@@ -26,6 +27,7 @@ class Spike3DRasterLeftSidebarControlBar(QtWidgets.QWidget):
     temporal_zoom_factor_changed = QtCore.Signal(float)
     render_window_duration_changed = QtCore.Signal(float)
         
+    crosshair_trace_toggled = QtCore.Signal(bool)
 
     @property
     def lblCrosshairTraceValue(self):
@@ -48,6 +50,7 @@ class Spike3DRasterLeftSidebarControlBar(QtWidgets.QWidget):
             self.ui.lblCrosshairTraceStaticLabel.setVisible(False)
             self.ui.lblCrosshairTraceValue.setVisible(False)
 
+
     def __init__(self, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self.ui = Ui_leftSideToolbarWidget()
@@ -55,6 +58,7 @@ class Spike3DRasterLeftSidebarControlBar(QtWidgets.QWidget):
         
         self.initUI()
         self.show() # Show the GUI
+
 
     def initUI(self):
         # Disable the scroll bar
@@ -67,7 +71,9 @@ class Spike3DRasterLeftSidebarControlBar(QtWidgets.QWidget):
         self.ui.spinAnimationTimeStep.sigValueChanged.connect(self.animation_time_step_valueChanged)
         self.ui.spinTemporalZoomFactor.sigValueChanged.connect(self.temporal_zoom_factor_valueChanged)
         self.ui.spinRenderWindowDuration.sigValueChanged.connect(self.render_window_duration_valueChanged)
-        
+        self.ui.btnToggleCrosshairTrace.clicked.connect(self.crosshair_trace_button_Toggled)
+
+        self.ui.btnToggleCrosshairTrace.setVisible(True)
         self.ui.lblCrosshairTraceStaticLabel.setVisible(False)
         self.ui.lblCrosshairTraceValue.setVisible(False)
              
@@ -110,6 +116,14 @@ class Spike3DRasterLeftSidebarControlBar(QtWidgets.QWidget):
         # TODO: emit the temporal changed signal:    
         # self.temporal_zoom_factor_changed.emit(float_slider_val)
                         
+
+    @pyqtExceptionPrintingSlot()
+    def crosshair_trace_button_Toggled(self):
+        # print(f'sb: {sb}, sb.value(): {str(sb.value())}')
+        # old_value = self.render_window_duration
+        self.crosshair_trace_toggled.emit(self.ui.btnToggleCrosshairTrace.isChecked())
+        
+
     def __str__(self):
          return
      
@@ -150,6 +164,7 @@ class SpikeRasterLeftSidebarControlsMixin:
         left_side_bar_connections.append(left_side_bar_controls.animation_time_step_changed.connect(self.on_animation_timestep_valueChanged))
         left_side_bar_connections.append(left_side_bar_controls.temporal_zoom_factor_changed.connect(self.on_temporal_zoom_factor_valueChanged))
         left_side_bar_connections.append(left_side_bar_controls.render_window_duration_changed.connect(self.on_render_window_duration_valueChanged))
+        # left_side_bar_connections.append(left_side_bar_controls.crosshair_trace_toggled.connect(self.on_render_window_duration_valueChanged)) # #TODO 2025-02-10 16:50: - [ ] Add handler for enable/disable crosshairs trace
         return left_side_bar_connections
         
             
