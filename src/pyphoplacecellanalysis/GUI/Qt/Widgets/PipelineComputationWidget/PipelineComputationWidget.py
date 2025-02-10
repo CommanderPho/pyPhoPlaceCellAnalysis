@@ -14,165 +14,22 @@ from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlo
 
 ## IMPORTS:
 # 
+from pyphocorehelpers.gui.Qt.table_helpers import CustomContextTableWidget, TableContextMenuProviderDelegate
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PipelineOwningMixin import PipelineOwningMixin
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
-from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import TableSizingHelpers
+from pyphocorehelpers.gui.Qt.table_helpers import TableSizingHelpers
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 
 ## Define the .ui file path
 path = os.path.dirname(os.path.abspath(__file__))
 uiFile = os.path.join(path, 'PipelineComputationWidget.ui')
 
 
-class TableContextMenuProviderDelegate:
-    """ implementors provide context menus for clicked table cells
-    
-    """
-    def get_context_menu(self, target_table, row_index: Optional[int]=None, column_index: Optional[int]=None, is_row_header: bool=False, is_column_header: bool=False) -> QMenu:
-        raise NotImplementedError(f'Implementors must override and provide this function!')
-    
 
 
-
-class CustomTableWidget(QTableWidget):
-    """ provides specific context menus based on whether the user right-clicked in the row/col headers, a cell, or elsewhere 
-    """
-    def __init__(self, rows: Optional[int]=None, columns: Optional[int]=None, context_menu_delegate: Optional[TableContextMenuProviderDelegate]=None, parent: Optional[QWidget] = None):
-        if (rows is not None) or (columns is not None):
-            super().__init__(rows, columns, parent=parent)
-        else:
-            super().__init__(parent=parent)
-            
-        self._debug_print = False
-        self._context_menu_delegate = context_menu_delegate
-
-        self.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.customContextMenuRequested.connect(self.show_cell_menu)
-
-        self.horizontalHeader().setContextMenuPolicy(Qt.CustomContextMenu)
-        self.horizontalHeader().customContextMenuRequested.connect(self.show_column_header_menu)
-        
-        self.verticalHeader().setContextMenuPolicy(Qt.CustomContextMenu)
-        self.verticalHeader().customContextMenuRequested.connect(self.show_row_header_menu)
-        
-        
-
-    def show_cell_menu(self, pos):
-        # Get the cell that was clicked
-        index = self.indexAt(pos)
-        if not index.isValid():
-            return  # Ignore clicks outside valid cells
-
-        row, col = index.row(), index.column()
-        # print(f'show_cell_menu(pos: {pos}):\n\trow: {row}, col: {col}')
-        
-        menu: Optional[QMenu] = None
-        if self._context_menu_delegate is not None:
-            # print(f'\t has context_menu_delegate!')
-            menu = self._context_menu_delegate.get_context_menu(target_table=self, row_index=row, column_index=col, is_row_header=False, is_column_header=False)
-        else:
-            print(f'CustomTableWidget: has no context menu delegate!')
-            pass
-
-        if menu is None: 
-            ## still has no menu, make default:
-            menu = QMenu(self)
-            action_edit = QAction(f"Edit Cell ({row}, {col})", self)
-            action_delete = QAction(f"Delete Cell ({row}, {col})", self)
-            action_info = QAction(f"Cell Info ({row}, {col})", self)
-
-            action_edit.triggered.connect(lambda: self.editItem(self.item(row, col)))
-            action_delete.triggered.connect(lambda: self.setItem(row, col, None))
-            action_info.triggered.connect(lambda: print(f"Cell ({row}, {col}): {self.item(row, col).text() if self.item(row, col) else 'Empty'}"))
-
-            menu.addAction(action_edit)
-            menu.addAction(action_delete)
-            menu.addAction(action_info)
-
-        ## cell `menu.exec_(...)` to display the menu:
-        menu.exec_(self.viewport().mapToGlobal(pos))
-        
-
-
-    def show_row_header_menu(self, pos):
-        # Convert local position to global position
-        header = self.verticalHeader()
-        global_pos = header.mapToGlobal(pos)
-
-        # Determine which column was clicked
-        row = header.logicalIndexAt(pos.y())
-
-        if row >= 0:  # Ensure it's a valid column
-            if self._debug_print:
-                print(f'show_row_header_menu(pos: {pos}):\n\trow: {row}')
-            menu: Optional[QMenu] = None
-            if self._context_menu_delegate is not None:
-                if self._debug_print:
-                    print(f'\t has context_menu_delegate!')
-                menu = self._context_menu_delegate.get_context_menu(target_table=self, row_index=row, column_index=None, is_row_header=True, is_column_header=False)
-            else:
-                print(f'CustomTableWidget: has no context menu delegate!')
-                pass
-            if menu is None: 
-                ## still has no menu, make default:
-                menu = QMenu(self)
-
-                action_sort = QAction(f"Sort Row {row}", self)
-                action_hide = QAction(f"Hide Row {row}", self)
-                action_resize = QAction(f"Resize Row {row}", self)
-
-                action_sort.triggered.connect(lambda: print(f"Sorting row {row}"))
-                action_hide.triggered.connect(lambda: self.setRowHidden(row, True))
-                action_resize.triggered.connect(lambda: header.resizeSection(row, 100))
-
-                menu.addAction(action_sort)
-                menu.addAction(action_hide)
-                menu.addAction(action_resize)
-
-            ## cell `menu.exec_(...)` to display the menu:
-            menu.exec_(global_pos)
-            
-
-    def show_column_header_menu(self, pos):
-        # Convert local position to global position
-        header = self.horizontalHeader()
-        global_pos = header.mapToGlobal(pos)
-
-        # Determine which column was clicked
-        col = header.logicalIndexAt(pos.x())
-
-        if col >= 0:  # Ensure it's a valid column
-            if self._debug_print:
-                print(f'show_column_header_menu(pos: {pos}):\n\tcol: {col}')
-            menu: Optional[QMenu] = None
-            if self._context_menu_delegate is not None:
-                if self._debug_print:
-                    print(f'\t has context_menu_delegate!')
-                menu = self._context_menu_delegate.get_context_menu(target_table=self, row_index=None, column_index=col, is_row_header=False, is_column_header=True)
-            else:
-                print(f'CustomTableWidget: has no context menu delegate!')
-                pass 
-               
-            if menu is None: 
-                ## still has no menu, make default:
-                menu = QMenu(self)
-                action_sort = QAction(f"Sort Column {col}", self)
-                action_hide = QAction(f"Hide Column {col}", self)
-                action_resize = QAction(f"Resize Column {col}", self)
-
-                action_sort.triggered.connect(lambda: print(f"Sorting column {col}"))
-                action_hide.triggered.connect(lambda: self.setColumnHidden(col, True))
-                action_resize.triggered.connect(lambda: header.resizeSection(col, 100))
-
-                menu.addAction(action_sort)
-                menu.addAction(action_hide)
-                menu.addAction(action_resize)
-
-            menu.exec_(global_pos)
-            
-
-
-
+@metadata_attributes(short_name=None, tags=['widget', 'gui', 'computation_functions', 'pipeline', 'GUI', 'interactive'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-10 14:47', related_items=[])
 class PipelineComputationWidget(TableContextMenuProviderDelegate, PipelineOwningMixin, QWidget):
     """ A widget that contains two tables, the first displaying the computation completion times for the local computations, and the second for the global computations
     
@@ -240,7 +97,7 @@ class PipelineComputationWidget(TableContextMenuProviderDelegate, PipelineOwning
         """
         was_table_created: bool = False
         if (not hasattr(self.ui, 'tbl_EpochLocalResults')) or (self.ui.tbl_EpochLocalResults is None):        
-            tbl_EpochLocalResults = CustomTableWidget(context_menu_delegate=self)
+            tbl_EpochLocalResults = CustomContextTableWidget(context_menu_delegate=self)
             tbl_EpochLocalResults.setStyleSheet(self.params.table_stylesheet)
             was_table_created = True
         else:
@@ -292,7 +149,7 @@ class PipelineComputationWidget(TableContextMenuProviderDelegate, PipelineOwning
         """
         was_table_created: bool = False
         if (not hasattr(self.ui, 'tbl_global_computations')) or (self.ui.tbl_global_computations is None):        
-            tbl_global_computations = CustomTableWidget(context_menu_delegate=self)
+            tbl_global_computations = CustomContextTableWidget(context_menu_delegate=self)
             tbl_global_computations.setStyleSheet(self.params.table_stylesheet)
             was_table_created = True
         else:
