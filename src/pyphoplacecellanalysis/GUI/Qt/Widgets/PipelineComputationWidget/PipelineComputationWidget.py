@@ -16,11 +16,14 @@ from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlo
 from pyphoplacecellanalysis.GUI.Qt.Mixins.PipelineOwningMixin import PipelineOwningMixin
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
-
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import TableSizingHelpers
 
 ## Define the .ui file path
 path = os.path.dirname(os.path.abspath(__file__))
 uiFile = os.path.join(path, 'PipelineComputationWidget.ui')
+
+
+
 
 class PipelineComputationWidget(PipelineOwningMixin, QWidget):
     """ 
@@ -30,7 +33,10 @@ class PipelineComputationWidget(PipelineOwningMixin, QWidget):
     Usage:
     
         from pyphoplacecellanalysis.GUI.Qt.Widgets.PipelineComputationWidget.PipelineComputationWidget import PipelineComputationWidget
-    
+
+        win = PipelineComputationWidget(owning_pipeline=curr_active_pipeline)
+        win.show()
+
     """
     # @property
     # def gridLayout_MainContent(self) -> QGridLayout:
@@ -52,7 +58,8 @@ class PipelineComputationWidget(PipelineOwningMixin, QWidget):
         self.ui.connections = PhoUIContainer(name='PipelineComputationWidget')
         
         self.params.table_stylesheet = "QHeaderView::section { background-color:  rgb(61, 61, 61); }"
-        
+        # self.params.dt_format_string = "%Y-%m-%d %H:%M:%S"
+        self.params.dt_format_string = "%m-%d %H:%M"
 
         ## Process curr_active_pipeline
         any_recent, epoch_latest, self.params.epoch_each, (global_latest, self.params.global_comp) = self._owning_pipeline.get_computation_times(debug_print=False)
@@ -92,20 +99,20 @@ class PipelineComputationWidget(PipelineOwningMixin, QWidget):
         self.show() # Show the GUI
 
 
-    def _initUI_build_local_epoch_results_tree(self):
-        """ 
-        Uses: self.params.epoch_each, self.params.filtered_epoch_column_names, self.params.num_filtered_epoch_columns
-        """
-        tree_EpochLocalResults = QTreeWidget()
-        tree_EpochLocalResults.setColumnCount(self.params.num_filtered_epoch_columns+1)
-        tree_EpochLocalResults.setHeaderLabels(["Epoch/Computation", *self.params.filtered_epoch_column_names])
-        for epoch, comps in self.params.epoch_each.items():
-            epoch_item = QTreeWidgetItem([str(epoch), ""])
-            for comp, t in comps.items():
-                epoch_item.addChild(QTreeWidgetItem([str(comp), str(t)]))
-            tree_EpochLocalResults.addTopLevelItem(epoch_item)
-        tree_EpochLocalResults.expandAll()
-        return tree_EpochLocalResults
+    # def _initUI_build_local_epoch_results_tree(self):
+    #     """ 
+    #     Uses: self.params.epoch_each, self.params.filtered_epoch_column_names, self.params.num_filtered_epoch_columns
+    #     """
+    #     tree_EpochLocalResults = QTreeWidget()
+    #     tree_EpochLocalResults.setColumnCount(self.params.num_filtered_epoch_columns+1)
+    #     tree_EpochLocalResults.setHeaderLabels(["Epoch/Computation", *self.params.filtered_epoch_column_names])
+    #     for epoch, comps in self.params.epoch_each.items():
+    #         epoch_item = QTreeWidgetItem([str(epoch), ""])
+    #         for comp, t in comps.items():
+    #             epoch_item.addChild(QTreeWidgetItem([str(comp), str(t)]))
+    #         tree_EpochLocalResults.addTopLevelItem(epoch_item)
+    #     tree_EpochLocalResults.expandAll()
+    #     return tree_EpochLocalResults
     
 
     def _initUI_build_local_epoch_results_table(self):
@@ -125,10 +132,15 @@ class PipelineComputationWidget(PipelineOwningMixin, QWidget):
             for epoch_col_idx, (epoch_name, comps_t_dict) in enumerate(self.params.epoch_each.items()):            
                 ## find this particular computation's datetime
                 curr_comp_dt = comps_t_dict.get(comp_name, None)
-                tbl_EpochLocalResults.setItem(comp_name_row, (epoch_col_idx+1), QTableWidgetItem(str(curr_comp_dt))) # the (+1) holds space for the computation name
+                curr_comp_formatted_dt: str = curr_comp_dt.strftime(self.params.dt_format_string)
+                tbl_EpochLocalResults.setItem(comp_name_row, (epoch_col_idx+1), QTableWidgetItem(curr_comp_formatted_dt)) # the (+1) holds space for the computation name
 
         tbl_EpochLocalResults.resizeColumnsToContents()
         tbl_EpochLocalResults.verticalHeader().setVisible(False)
+        total_required_table_height: int = TableSizingHelpers.determine_required_table_height(tbl_EpochLocalResults)
+        tbl_EpochLocalResults.setMinimumHeight(total_required_table_height)  # Set the required height
+        tbl_EpochLocalResults.setMaximumHeight(total_required_table_height)  # Prevent scrolling
+        
         return tbl_EpochLocalResults
     
     
@@ -160,18 +172,26 @@ class PipelineComputationWidget(PipelineOwningMixin, QWidget):
         self.ui.mainContentVBoxLayout.addWidget(self.ui.tbl_EpochLocalResults)
 
 
+        ## Build Global Computation Progress Widget:
+        self.ui.mainContentVBoxLayout.addWidget(QLabel("Global Computations"))
         self.ui.tbl_global_computations = QTableWidget()
         self.ui.tbl_global_computations.setColumnCount(2)
         self.ui.tbl_global_computations.setHorizontalHeaderLabels(["Global Computation", "Completion Time"])
         self.ui.tbl_global_computations.setRowCount(len(self.params.global_comp))
-        for i, (comp, t) in enumerate(self.params.global_comp.items()):
+        for i, (comp, dt) in enumerate(self.params.global_comp.items()):
+            curr_comp_formatted_dt: str = dt.strftime(self.params.dt_format_string)
             self.ui.tbl_global_computations.setItem(i, 0, QTableWidgetItem(str(comp)))
-        self.ui.tbl_global_computations.setItem(i, 1, QTableWidgetItem(str(t)))
-        self.ui.mainContentVBoxLayout.addWidget(QLabel("Global Computations"))
+            self.ui.tbl_global_computations.setItem(i, 1, QTableWidgetItem(curr_comp_formatted_dt))
+            
+        
         self.ui.mainContentVBoxLayout.addWidget(self.ui.tbl_global_computations)
         self.ui.tbl_global_computations.resizeColumnsToContents()
         self.ui.tbl_global_computations.setStyleSheet(self.params.table_stylesheet)
         self.ui.tbl_global_computations.verticalHeader().setVisible(False)
+        total_required_table_height: int = TableSizingHelpers.determine_required_table_height(self.ui.tbl_global_computations)
+        self.ui.tbl_global_computations.setMinimumHeight(total_required_table_height)  # Set the required height
+        self.ui.tbl_global_computations.setMaximumHeight(total_required_table_height)  # Prevent scrolling
+        
         # tbl3 = QTableWidget()
         # tbl3.setColumnCount(2)
         # tbl3.setHorizontalHeaderLabels(["Epoch", "Needs Recompute"])

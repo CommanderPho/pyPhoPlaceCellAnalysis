@@ -105,19 +105,22 @@ QHeaderView::section { background-color:  rgb(61, 61, 61); }</string>
           <string notr="true">background-color: rgb(0, 0, 0);
 QHeaderView::section { background-color:  rgb(61, 61, 61); }</string>
          </property>
-         <layout class="QGridLayout" name="gridLayout_MainContent"/>
+         <layout class="QGridLayout" name="gridLayout_MainContent" rowstretch="0" columnstretch="0"/>
         </widget>
         <widget class="QWidget" name="secondarytInfoWidget" native="true">
+         <property name="enabled">
+          <bool>false</bool>
+         </property>
          <property name="minimumSize">
           <size>
            <width>0</width>
-           <height>200</height>
+           <height>0</height>
           </size>
          </property>
          <property name="baseSize">
           <size>
            <width>0</width>
-           <height>200</height>
+           <height>0</height>
           </size>
          </property>
         </widget>
