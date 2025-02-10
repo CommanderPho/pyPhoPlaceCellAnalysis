@@ -740,7 +740,9 @@ class PipelinePickleFileSelectorWidget:
 
         print(f'Pipeline loaded from custom pickle!!')
         ## OUTPUT: curr_active_pipeline
-
+        print(f'''# ==================================================================================================================== #
+        # on_load_local -- COMPLETE -- 
+        # ==================================================================================================================== #''')
         return curr_active_pipeline, custom_suffix, proposed_load_pkl_path
 
 
@@ -857,12 +859,17 @@ class PipelinePickleFileSelectorWidget:
                                                             force_recompute=force_recompute_global, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
         print(f'Post-load global computations: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
 
+
+        print(f'''# ==================================================================================================================== #
+        # on_load_global -- COMPLETE -- 
+        # ==================================================================================================================== #''')
         return curr_active_pipeline
 
 
     def _build_load_save_callbacks(self, global_data_root_parent_path: Path, active_data_mode_name: str, basedir: Path, saving_mode, force_reload: bool,
                                 extended_computations_include_includelist: List[str], force_recompute_override_computations_includelist: Optional[List[str]]=None):
-        """ 
+        """ Called to provide the widget with everything needed to actually load the pipeline, which is required before the "Load" button is enabled.
+        
         
         _subfn_load, _subfn_save = active_session_pickle_file_widget._build_load_save_callbacks(global_data_root_parent_path=global_data_root_parent_path, active_data_mode_name=active_data_mode_name, basedir=basedir, saving_mode=saving_mode, force_reload=force_reload,
 															 extended_computations_include_includelist=extended_computations_include_includelist, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist)
