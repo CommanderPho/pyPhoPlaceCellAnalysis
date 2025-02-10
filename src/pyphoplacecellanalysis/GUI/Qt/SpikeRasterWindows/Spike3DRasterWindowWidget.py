@@ -1015,6 +1015,13 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         main_plot_widget = active_2d_plot.plots.main_plot_widget # PlotItem
         background_static_scroll_plot_widget = active_2d_plot.plots.background_static_scroll_window_plot # PlotItem
 
+        ## Fix window title to display the session context post-hoc
+        complete_session_context, (curr_session_context,  additional_session_context) = curr_active_pipeline.get_complete_session_context()
+        spike_raster_window.params.complete_session_context = deepcopy(complete_session_context) # Updates `spike_raster_window.params.complete_session_context`
+        complete_session_context_window_title_str: str = complete_session_context.get_description(separator='|', include_property_names=False) # 'kdiba|gor01|two|2006-6-07_16-40-19|normal_computed|[1, 2, 4, 6, 7, 8, 9]|5.0'
+        spike_raster_window.params.window_title = f"Spike Raster Window - {complete_session_context_window_title_str}" # Updates `spike_raster_window.params.window_title`
+        spike_raster_window.window().setWindowTitle(spike_raster_window.params.window_title) ## sets the window title
+
         return spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget)
 
 
@@ -1678,6 +1685,20 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         else:
             event.ignore()
             
+
+
+    def setWindowTitle(self, desired_window_title: str):
+        """ passthrough support for setting the window title
+        
+        Prevents having to use `spike_raster_window.window().setWindowTitle(desired_window_title)`.
+        
+        Usage:
+            ## Fix window title to display the session context post-hoc
+            desired_window_title: str = curr_active_pipeline.get_complete_session_identifier_string() # 'kdiba_gor01_two_2006-6-07_16-40-19__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_5.0'
+            spike_raster_window.setWindowTitle(desired_window_title)
+            
+        """
+        self.window().setWindowTitle(desired_window_title)
 
 
 # ==================================================================================================================== #

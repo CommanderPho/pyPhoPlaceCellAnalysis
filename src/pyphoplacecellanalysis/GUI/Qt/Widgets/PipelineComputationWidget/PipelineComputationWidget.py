@@ -451,6 +451,7 @@ class PipelineComputationWidget(TableContextMenuProviderDelegate, PipelineOwning
     # ==================================================================================================================== #
     
     def _perform_run_compute_function(self, curr_compute_fcn, debug_print=False):
+        """ tries to use the pipeline to execute the named curr_compute_fcn """
         # custom_args = {} # TODO
         # custom_args = self.active_figure_format_config or {}
         # if debug_print:
