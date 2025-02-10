@@ -1,12 +1,13 @@
 # PipelineComputationWidget.py
 # Generated from c:\Users\pho\repos\Spike3DWorkEnv\pyPhoPlaceCellAnalysis\src\pyphoplacecellanalysis\GUI\Qt\Widgets\PipelineComputationWidget\PipelineComputationWidget.ui automatically by PhoPyQtClassGenerator VSCode Extension
 from copy import deepcopy
+from typing import Optional
 import numpy as np
 import sys
 import os
 
 from PyQt5 import QtGui, QtWidgets, uic
-from PyQt5.QtWidgets import QMessageBox, QToolTip, QStackedWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QSplitter, QFormLayout, QLabel, QFrame, QPushButton, QTableWidget, QTableWidgetItem, QTreeWidget, QTreeWidgetItem
+from PyQt5.QtWidgets import QMessageBox, QToolTip, QStackedWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QSplitter, QFormLayout, QLabel, QFrame, QPushButton, QTableWidget, QTableWidgetItem, QMenu, QAction, QTreeWidget, QTreeWidgetItem
 from PyQt5.QtWidgets import QApplication, QFileSystemModel, QTreeView, QWidget, QHeaderView
 from PyQt5.QtGui import QPainter, QBrush, QPen, QColor, QFont, QIcon
 from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlot, QSize, QDir
@@ -22,6 +23,108 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import 
 path = os.path.dirname(os.path.abspath(__file__))
 uiFile = os.path.join(path, 'PipelineComputationWidget.ui')
 
+
+class CustomTableWidget(QTableWidget):
+    """ provides specific context menus based on whether the user right-clicked in the row/col headers, a cell, or elsewhere 
+    """
+    def __init__(self, rows: Optional[int]=None, columns: Optional[int]=None, parent: Optional[QWidget] = None):
+        if (rows is not None) or (columns is not None):
+            super().__init__(rows, columns, parent=parent)
+        else:
+            super().__init__(parent=parent)
+
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_cell_menu)
+
+        self.horizontalHeader().setContextMenuPolicy(Qt.CustomContextMenu)
+        self.horizontalHeader().customContextMenuRequested.connect(self.show_column_header_menu)
+        
+        self.verticalHeader().setContextMenuPolicy(Qt.CustomContextMenu)
+        self.verticalHeader().customContextMenuRequested.connect(self.show_row_header_menu)
+        
+        
+
+    def show_cell_menu(self, pos):
+        # Get the cell that was clicked
+        index = self.indexAt(pos)
+        if not index.isValid():
+            return  # Ignore clicks outside valid cells
+
+        row, col = index.row(), index.column()
+        print(f'show_cell_menu(pos: {pos}):\n\trow: {row}, col: {col}')
+        
+        menu = QMenu(self)
+
+        action_edit = QAction(f"Edit Cell ({row}, {col})", self)
+        action_delete = QAction(f"Delete Cell ({row}, {col})", self)
+        action_info = QAction(f"Cell Info ({row}, {col})", self)
+
+        action_edit.triggered.connect(lambda: self.editItem(self.item(row, col)))
+        action_delete.triggered.connect(lambda: self.setItem(row, col, None))
+        action_info.triggered.connect(lambda: print(f"Cell ({row}, {col}): {self.item(row, col).text() if self.item(row, col) else 'Empty'}"))
+
+        menu.addAction(action_edit)
+        menu.addAction(action_delete)
+        menu.addAction(action_info)
+
+        menu.exec_(self.viewport().mapToGlobal(pos))
+        
+
+    def show_row_header_menu(self, pos):
+        # Convert local position to global position
+        header = self.verticalHeader()
+        global_pos = header.mapToGlobal(pos)
+
+        # Determine which column was clicked
+        row = header.logicalIndexAt(pos.y())
+
+        if row >= 0:  # Ensure it's a valid column
+            print(f'show_row_header_menu(pos: {pos}):\n\trow: {row}')
+        
+            menu = QMenu(self)
+
+            action_sort = QAction(f"Sort Column {row}", self)
+            action_hide = QAction(f"Hide Column {row}", self)
+            action_resize = QAction(f"Resize Column {row}", self)
+
+            action_sort.triggered.connect(lambda: print(f"Sorting column {row}"))
+            action_hide.triggered.connect(lambda: self.setColumnHidden(row, True))
+            action_resize.triggered.connect(lambda: header.resizeSection(row, 100))
+
+            menu.addAction(action_sort)
+            menu.addAction(action_hide)
+            menu.addAction(action_resize)
+
+            menu.exec_(global_pos)
+            
+
+    def show_column_header_menu(self, pos):
+        # Convert local position to global position
+        header = self.horizontalHeader()
+        global_pos = header.mapToGlobal(pos)
+
+        # Determine which column was clicked
+        col = header.logicalIndexAt(pos.x())
+
+        if col >= 0:  # Ensure it's a valid column
+            print(f'show_column_header_menu(pos: {pos}):\n\tcol: {col}')
+        
+            menu = QMenu(self)
+
+            action_sort = QAction(f"Sort Column {col}", self)
+            action_hide = QAction(f"Hide Column {col}", self)
+            action_resize = QAction(f"Resize Column {col}", self)
+
+            action_sort.triggered.connect(lambda: print(f"Sorting column {col}"))
+            action_hide.triggered.connect(lambda: self.setColumnHidden(col, True))
+            action_resize.triggered.connect(lambda: header.resizeSection(col, 100))
+
+            menu.addAction(action_sort)
+            menu.addAction(action_hide)
+            menu.addAction(action_resize)
+
+            menu.exec_(global_pos)
+            
 
 
 
