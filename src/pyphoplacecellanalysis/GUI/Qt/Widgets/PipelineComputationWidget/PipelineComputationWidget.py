@@ -121,22 +121,29 @@ class PipelineComputationWidget(PipelineOwningMixin, QWidget):
         """
         tbl_EpochLocalResults = QTableWidget()
         tbl_EpochLocalResults.setStyleSheet(self.params.table_stylesheet)
-        tbl_EpochLocalResults.setColumnCount(self.params.num_filtered_epoch_columns+1)
-        tbl_EpochLocalResults.setHorizontalHeaderLabels(["Epoch/Computation", *self.params.filtered_epoch_column_names])
+        ## row-header style:
+        tbl_EpochLocalResults.setColumnCount(self.params.num_filtered_epoch_columns)
+        tbl_EpochLocalResults.setHorizontalHeaderLabels(self.params.filtered_epoch_column_names)
+        # tbl_EpochLocalResults.setColumnCount(self.params.num_filtered_epoch_columns+1)
+        # tbl_EpochLocalResults.setHorizontalHeaderLabels(["Epoch/Computation", *self.params.filtered_epoch_column_names])
         tbl_EpochLocalResults.setRowCount(self.params.required_num_computation_rows)
         # for i, (comp, t) in enumerate(global_comp.items()):
         
         for comp_name_row, comp_name in enumerate(self.params.required_unique_comp_names_list):
-            tbl_EpochLocalResults.setItem(comp_name_row, 0, QTableWidgetItem(str(comp_name))) ## set the comp_name column
+            # model.setHeaderData(row, Qt.Vertical, label) 
+            tbl_EpochLocalResults.setVerticalHeaderItem(comp_name_row, QTableWidgetItem(str(comp_name)))  # Vertical header (row headers)
+            # tbl_EpochLocalResults.setItem(comp_name_row, 0, QTableWidgetItem(str(comp_name))) ## set the comp_name column
             ## for each epoch, set the time
             for epoch_col_idx, (epoch_name, comps_t_dict) in enumerate(self.params.epoch_each.items()):            
                 ## find this particular computation's datetime
+                # active_col_idx: int = (epoch_col_idx+1)
+                active_col_idx: int = epoch_col_idx # header-style
                 curr_comp_dt = comps_t_dict.get(comp_name, None)
                 curr_comp_formatted_dt: str = curr_comp_dt.strftime(self.params.dt_format_string)
-                tbl_EpochLocalResults.setItem(comp_name_row, (epoch_col_idx+1), QTableWidgetItem(curr_comp_formatted_dt)) # the (+1) holds space for the computation name
+                tbl_EpochLocalResults.setItem(comp_name_row, active_col_idx, QTableWidgetItem(curr_comp_formatted_dt)) # the (+1) holds space for the computation name
 
         tbl_EpochLocalResults.resizeColumnsToContents()
-        tbl_EpochLocalResults.verticalHeader().setVisible(False)
+        # tbl_EpochLocalResults.verticalHeader().setVisible(False)
         total_required_table_height: int = TableSizingHelpers.determine_required_table_height(tbl_EpochLocalResults)
         tbl_EpochLocalResults.setMinimumHeight(total_required_table_height)  # Set the required height
         tbl_EpochLocalResults.setMaximumHeight(total_required_table_height)  # Prevent scrolling
@@ -175,19 +182,23 @@ class PipelineComputationWidget(PipelineOwningMixin, QWidget):
         ## Build Global Computation Progress Widget:
         self.ui.mainContentVBoxLayout.addWidget(QLabel("Global Computations"))
         self.ui.tbl_global_computations = QTableWidget()
-        self.ui.tbl_global_computations.setColumnCount(2)
-        self.ui.tbl_global_computations.setHorizontalHeaderLabels(["Global Computation", "Completion Time"])
+        self.ui.tbl_global_computations.setColumnCount(1)
+        self.ui.tbl_global_computations.setHorizontalHeaderLabels(["Completion Time"])
+        # self.ui.tbl_global_computations.setColumnCount(2)
+        # self.ui.tbl_global_computations.setHorizontalHeaderLabels(["Global Computation", "Completion Time"])
         self.ui.tbl_global_computations.setRowCount(len(self.params.global_comp))
-        for i, (comp, dt) in enumerate(self.params.global_comp.items()):
+        for i, (comp_name, dt) in enumerate(self.params.global_comp.items()):
             curr_comp_formatted_dt: str = dt.strftime(self.params.dt_format_string)
-            self.ui.tbl_global_computations.setItem(i, 0, QTableWidgetItem(str(comp)))
-            self.ui.tbl_global_computations.setItem(i, 1, QTableWidgetItem(curr_comp_formatted_dt))
+            # self.ui.tbl_global_computations.setItem(i, 0, QTableWidgetItem(str(comp_name)))
+            # self.ui.tbl_global_computations.setItem(i, 1, QTableWidgetItem(curr_comp_formatted_dt))
+            self.ui.tbl_global_computations.setVerticalHeaderItem(i, QTableWidgetItem(str(comp_name)))  # Vertical header (row headers)
+            self.ui.tbl_global_computations.setItem(i, 0, QTableWidgetItem(curr_comp_formatted_dt))
             
         
         self.ui.mainContentVBoxLayout.addWidget(self.ui.tbl_global_computations)
         self.ui.tbl_global_computations.resizeColumnsToContents()
         self.ui.tbl_global_computations.setStyleSheet(self.params.table_stylesheet)
-        self.ui.tbl_global_computations.verticalHeader().setVisible(False)
+        # self.ui.tbl_global_computations.verticalHeader().setVisible(False)
         total_required_table_height: int = TableSizingHelpers.determine_required_table_height(self.ui.tbl_global_computations)
         self.ui.tbl_global_computations.setMinimumHeight(total_required_table_height)  # Set the required height
         self.ui.tbl_global_computations.setMaximumHeight(total_required_table_height)  # Prevent scrolling
