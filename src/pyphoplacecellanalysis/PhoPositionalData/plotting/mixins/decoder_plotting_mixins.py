@@ -30,6 +30,7 @@ from itertools import islice
 from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import LapsVisualizationMixin, LineCollection, _plot_helper_add_arrow # plot_lap_trajectories_2d
 
 import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult
 
@@ -119,7 +120,6 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         """
         self.curr_epoch_idx = an_epoch_idx
         self.curr_time_bin_idx = time_bin_index
-
 
         a_linear_index: int = an_epoch_idx
         curr_row = self.row_column_indicies[0][a_linear_index]
@@ -295,7 +295,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         else:
             return line, None
 
-    def plot_decoded_trajectories_2d(self, sess, curr_num_subplots=10, active_page_index=0, plot_actual_lap_lines:bool=False, fixed_columns: int = 2, use_theoretical_tracks_instead: bool = True ):
+    def plot_decoded_trajectories_2d(self, sess, curr_num_subplots=10, active_page_index=0, plot_actual_lap_lines:bool=False, fixed_columns: int = 2, use_theoretical_tracks_instead: bool = True, existing_ax=None, axes_inset_locators_list=None):
         """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots
         
         Called to setup the graph.
@@ -340,7 +340,43 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             linear_plotter_indicies = np.arange(nfields)
             needed_rows = int(np.ceil(nfields / fixed_columns))
             row_column_indicies = np.unravel_index(linear_plotter_indicies, (needed_rows, fixed_columns)) # inverse is: np.ravel_multi_index(row_column_indicies, (needed_rows, fixed_columns))
-            fig, axs = plt.subplots(needed_rows, fixed_columns, sharex=True, sharey=True, figsize=[4*fixed_columns,14*needed_rows], gridspec_kw={'wspace': 0, 'hspace': 0}) #ndarray (5,2)
+            
+            if existing_ax is None:
+                ## Create a new axes and figure
+                fig, axs = plt.subplots(needed_rows, fixed_columns, sharex=True, sharey=True, figsize=[4*fixed_columns,14*needed_rows], gridspec_kw={'wspace': 0, 'hspace': 0}) #ndarray (5,2)
+                
+            else:
+                ## use the existing axes to plot the subaxes on
+                print(f'using subaxes on the existing axes')
+                assert axes_inset_locators_list is not None
+                
+                fig = existing_ax.get_figure()
+                ## convert to relative??
+                
+                axs = [] ## list
+                # for curr_row, a_row_list in enumerate(self.row_column_indicies):
+                a_linear_index = 0
+                for curr_row in np.arange(needed_rows):
+                    a_new_axs_list = []
+                    # for curr_col, an_element in enumerate(a_row_list):
+                    for curr_col in np.arange(fixed_columns):
+                        # Add subaxes at [left, bottom, width, height] in normalized parent coordinates
+                        # ax_inset = existing_ax.add_axes([0.2, 0.6, 0.3, 0.3])  # Positioned at 20% left, 60% bottom
+                        ax_inset_location = axes_inset_locators_list[a_linear_index]
+                        ax_inset = existing_ax.inset_axes(ax_inset_location, transform=existing_ax.transData, borderpad=0) # [x0, y0, width, height], where [x0, y0] is the lower-left corner -- can do data_coords by adding `, transform=existing_ax.transData`
+                        a_new_axs_list.append(ax_inset) 
+                        a_linear_index += 1 ## increment
+
+                    ## accumulate the lists
+                    axs.append(a_new_axs_list)        
+
+                for a_linear_index in linear_plotter_indicies:
+                    curr_row = row_column_indicies[0][a_linear_index]
+                    curr_col = row_column_indicies[1][a_linear_index]
+                    ## format the titles
+                    an_ax = axs[curr_row][curr_col]
+                    
+
             axs = np.atleast_2d(axs)
             # mp.set_size_inches(18.5, 26.5)
 
@@ -681,7 +717,11 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 
             add_markers = True
             # time_cmap = 'Reds'
-            time_cmap = 'gist_gray'
+            # time_cmap = 'gist_gray'
+            
+            colors = [(0, 0.6, 0), (0, 0, 0)] # first color is black, last is green
+            time_cmap = LinearSegmentedColormap.from_list("GreenToBlack", colors, N=25)
+
             if not is_2D: # 1D case
                 # a_line = _helper_add_gradient_line(an_ax, t=a_time_bin_centers, x=a_most_likely_positions, y=np.full_like(a_time_bin_centers, fake_y_center))
                 a_meas_pos_line, _meas_pos_out_markers = cls._helper_add_gradient_line(an_ax, t=a_measured_time_bin_centers, **pos_kwargs, add_markers=add_markers, time_cmap=time_cmap, zorder=0)
