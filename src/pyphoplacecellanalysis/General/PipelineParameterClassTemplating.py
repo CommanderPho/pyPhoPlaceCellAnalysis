@@ -115,11 +115,19 @@ class GlobalComputationParametersAttrsClassTemplating:
         import platform
         import pkg_resources # for Slurm templating
         from jinja2 import Environment, FileSystemLoader # for Slurm templating
+        
+        # ## Default:
+        # attrs_class_defn_template_filename: str = 'attrs_class_defn_template.py.j2' # used for the 
+        # attrs_container_class_defn_template_filename: str = 'attrs_container_class_defn_template.py.j2' ## used for the individual computation-specific parameter subclasses
+
+        ## with `param.Parameterized` support:
+        attrs_class_defn_template_filename: str = 'attrs_plus_param_class_defn_template.py.j2' # used for the 
+        attrs_container_class_defn_template_filename: str = 'attrs_plus_param_container_class_defn_template.py.j2' ## used for the individual computation-specific parameter subclasses
 
         # Set up Jinja2 environment
         template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
         env = Environment(loader=FileSystemLoader(template_path))
-        attrs_class_defn_template = env.get_template('attrs_class_defn_template.py.j2')
+        attrs_class_defn_template = env.get_template(attrs_class_defn_template_filename)
 
         nested_classes_dict = {}
         imports_dict = {}
@@ -158,13 +166,29 @@ class GlobalComputationParametersAttrsClassTemplating:
         # Set up Jinja2 environment
         template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
         env = Environment(loader=FileSystemLoader(template_path))
-        attrs_container_class_defn_template = env.get_template('attrs_container_class_defn_template.py.j2')
-        attrs_container_class_defn_str: str = attrs_container_class_defn_template.render(
+        # attrs_container_class_defn_template = env.get_template('attrs_container_class_defn_template.py.j2')
+        # attrs_container_class_defn_str: str = attrs_container_class_defn_template.render(
+        #     container_class_name="ComputationKWargParameters",
+        #     base_classes=["HDF_SerializationMixin", "AttrsBasedClassHelperMixin", "BaseGlobalComputationParameters"],
+        #     class_names= contained_parameter_type_names,
+        #     container_class_docstring="The base class for computation parameter types."
+        # )
+
+
+        # `attrs_plus_param_container_class_defn_template.py.j2`: Plus `param.Parameterized` implementation
+        attrs_plus_param_container_class_defn_template = env.get_template(attrs_container_class_defn_template_filename)
+        attrs_container_class_defn_str: str = attrs_plus_param_container_class_defn_template.render(
             container_class_name="ComputationKWargParameters",
-            base_classes=["HDF_SerializationMixin", "AttrsBasedClassHelperMixin", "BaseGlobalComputationParameters"],
+            base_classes=["HDF_SerializationMixin", "AttrsBasedClassHelperMixin", "BaseGlobalComputationParameters"], # , "param.Parameterized"
             class_names= contained_parameter_type_names,
             container_class_docstring="The base class for computation parameter types."
         )
+
+
+
+
+
+
         attrs_container_class_defn_str = '\n'.join(line for line in attrs_container_class_defn_str.split('\n') if line.strip())
         # print(f'attrs_container_class_defn_str\n{attrs_container_class_defn_str}\n\n')
 
@@ -198,7 +222,8 @@ class GlobalComputationParametersAttrsClassTemplating:
 
     @classmethod
     def main_generate_params_classes(cls, curr_active_pipeline, print_defns=False):
-        """ 
+        """ Main function called with a `curr_active_pipeline` to explicitly generate the boilerplate parameters classes
+        
         from pyphoplacecellanalysis.General.PipelineParameterClassTemplating import GlobalComputationParametersAttrsClassTemplating
         registered_merged_computation_function_default_kwargs_dict, code_str, nested_classes_dict, (imports_dict, imports_list, imports_string) = GlobalComputationParametersAttrsClassTemplating.main_generate_params_classes(curr_active_pipeline=curr_active_pipeline)
         """        
