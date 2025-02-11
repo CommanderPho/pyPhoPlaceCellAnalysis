@@ -101,7 +101,8 @@ def attrs_to_parameters_container(cls):
         else:
             default = field.type()
         
-        variable_name: str = field.name.removeprefix('_').removesuffix('_Parameters')
+        variable_name: str = str(field.name).removeprefix('_').removesuffix('_Parameters')
+        print(f'field.name: "{field.name}", variable_name: "{variable_name}"')
         param_obj = param.ClassSelector(class_=field.type, default=default, doc=f'{variable_name} param', label=variable_name)
         
         # setattr(cls, field.name, param_obj)
@@ -129,7 +130,9 @@ class BaseGlobalComputationParameters(BaseConfig, param.Parameterized):
 
     def __attrs_post_init__(self):
         param.Parameterized.__init__(self)
-        
+        active_attribute_names_list = deepcopy(self.get_param_Params_attribute_names())
+        self.param.watch(self._sync_param_to_raw_attr_field_internal, active_attribute_names_list)
+
 
     def __repr__(self):
         """ 2024-01-11 - Renders only the fields and their sizes  """
@@ -238,6 +241,31 @@ class BaseGlobalComputationParameters(BaseConfig, param.Parameterized):
         # self._post_load_update()
         # self =  self.__class__.from_state(state=self.__dict__)
 
+
+    # ==================================================================================================================== #
+    # Params Helpers                                                                                                       #
+    # ==================================================================================================================== #
+    
+    # def __setattr__(self, name, value):
+    #     super().__setattr__(name, value)
+    #     is_PARAM_variable: bool = name.endswith('_PARAM')
+    #     if is_PARAM_variable:
+    #         original_variable_name: str = deepcopy(name).removesuffix('_PARAM')
+    #         ## update the original value
+    #         setattr(self, original_variable_name, value)
+            
+    #     # if name == "my_param":
+    #     #     self._internal_value = value  # Ensure sync
+
+
+    def _sync_param_to_raw_attr_field_internal(self, event):
+        """ called to sync variables"""
+        print(f"_sync_param_to_raw_attr_field_internal(...): Parameter '{event.name}' changed from {event.old} to {event.new}")
+        is_PARAM_variable: bool = event.name.endswith('_PARAM')
+        assert is_PARAM_variable
+        original_variable_name: str = deepcopy(event.name).removesuffix('_PARAM')
+        setattr(self, original_variable_name, event.new) # Sync non-param property
+    
 
     @classmethod
     def get_class_param_Params_attribute_names(cls) -> List[str]:
@@ -681,7 +709,10 @@ class ComputationKWargParameters(HDF_SerializationMixin, AttrsBasedClassHelperMi
         if recursive_to_dict:
             return {k:v.to_params_dict(param_name_excludeList=param_name_excludeList) for k, v in self.param.values().items() if k not in param_name_excludeList}
         else:
-            return {k:v.param for k, v in self.param.values().items() if k not in param_name_excludeList}
+            _out_dict = {k:v for k, v in self.param.values().items() if k not in param_name_excludeList}
+            # _out_dict = {k:v.param for k, v in self.param.values().items() if k not in param_name_excludeList}
+            _out_dict = {k:v.param for k, v in _out_dict.items()}
+            return _out_dict
 
 
     @function_attributes(short_name=None, tags=['panel', 'params'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 03:01', related_items=[])
