@@ -27,7 +27,7 @@ class {{ container_class_name }}({{ base_classes | join(', ') }}):
     "optional[dict]": "param.Dict",
     "optional[tuple]": "param.Tuple"
 } %}
-{{ "    \n    ## PARAMS - these are class properties\n    Line two\n    " }}
+{{ "    \n    ## PARAMS - these are class properties\n    \n" }}
 {% for class_name in class_names|default([]) %}
 {% set variable_name = (class_name | lower)[:-11] if (class_name | lower).endswith('_parameters') else (class_name | lower) %}
     {{ variable_name ~ "_PARAM" }} = {{ type_map[class_name|lower] }}(default=Factory({{ class_name }}), doc='{{ variable_name }} param', label='{{ variable_name }}')

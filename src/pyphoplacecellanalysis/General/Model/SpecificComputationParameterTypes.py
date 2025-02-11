@@ -101,7 +101,8 @@ def attrs_to_parameters_container(cls):
         else:
             default = field.type()
         
-        param_obj = param.ClassSelector(class_=field.type, default=default)
+        variable_name: str = field.name.removeprefix('_').removesuffix('_Parameters')
+        param_obj = param.ClassSelector(class_=field.type, default=default, doc=f'{variable_name} param', label=variable_name)
         
         # setattr(cls, field.name, param_obj)
         
@@ -682,6 +683,17 @@ class ComputationKWargParameters(HDF_SerializationMixin, AttrsBasedClassHelperMi
         else:
             return {k:v.param for k, v in self.param.values().items() if k not in param_name_excludeList}
 
+
+    @function_attributes(short_name=None, tags=['panel', 'params'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 03:01', related_items=[])
+    def display_params(self):
+        """ 
+        
+        """
+        import panel as pn
+        # pn.extension()
+
+        out_configs_dict = self.to_params_dict(recursive_to_dict=False)
+        return pn.Column(*[pn.Param(a_sub_v) for a_sub_v in reversed(out_configs_dict.values())])
 
 
 # @attrs_to_parameters ## added manually
