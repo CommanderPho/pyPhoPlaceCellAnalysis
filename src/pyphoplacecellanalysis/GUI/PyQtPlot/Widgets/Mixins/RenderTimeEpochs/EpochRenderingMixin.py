@@ -863,6 +863,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
 
 
     # 2023-10-16 - Interval `EpochDisplayConfig` extraction from datasources: ____________________________________________ #
+    @function_attributes(short_name=None, tags=['panel', 'parameters'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 02:12', related_items=[])
     def extract_interval_display_config_lists(self) -> Dict: #[str, EpochDisplayConfig]:
         """ Build the EpochDisplayConfig lists for each interval datasource
 
