@@ -1,7 +1,12 @@
 from copy import deepcopy
+import param
 from pathlib import Path
-from typing import Optional
-from attrs import define, field, Factory, astuple, asdict
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing_extensions import TypeAlias
+from nptyping import NDArray
+import pyphoplacecellanalysis.General.type_aliases as types
+import attrs
+from attrs import define, field, Factory, astuple, asdict, fields
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_attribute_field, serialized_field, non_serialized_field
 from neuropy.utils.mixins.HDF5_representable import HDF_SerializationMixin
 from neuropy.core.parameters import BaseConfig
@@ -24,7 +29,16 @@ same_thresh_fraction_of_track: float=0.05, max_ignore_bins:float=2, max_jump_dis
 
 """
 
-class BaseGlobalComputationParameters(BaseConfig):
+
+def attrs_to_parameters(cls):
+    for field in attrs.fields(cls):
+        default = field.default if field.default is not attrs.NOTHING else None
+        setattr(cls, field.name, param.Parameter(default=default))
+    return cls
+
+
+@attrs_to_parameters
+class BaseGlobalComputationParameters(BaseConfig, param.Parameterized):
     """ Base class
     """
     
