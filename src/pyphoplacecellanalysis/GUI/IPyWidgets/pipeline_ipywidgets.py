@@ -531,6 +531,16 @@ class PipelinePickleFileSelectorWidget:
         return (self.on_save_callback is None) or (self.on_get_global_variable_callback is None)
     
 
+    @property
+    def active_local_file_names_list(self) -> List[str]:
+        """The discovered local filenames."""
+        return self.local_file_browser_widget._data['File Name'].tolist()
+        
+    @property
+    def active_global_file_names_list(self) -> List[str]:
+        """The discovered global filenames."""
+        return self.global_file_browser_widget._data['File Name'].tolist()
+
 
     def try_extract_custom_suffix(self) -> Optional[str]:
         """ uses the local pkl first 
@@ -908,6 +918,57 @@ class PipelinePickleFileSelectorWidget:
         
         return _subfn_load, _subfn_save
     
+
+    @function_attributes(short_name=None, tags=['matching', 'pipeline', 'file'], input_requires=[], output_provides=[], uses=[], used_by=['try_select_first_valid_files'], creation_date='2025-02-11 02:40', related_items=[])
+    def try_determine_matching_global_file(self, local_file_name: str) -> Tuple[str, Optional[int]]:
+        """ try to find corresponding global file: for the specified local_file_name 
+        """
+        selected_context_suffix_only: str = local_file_name.removeprefix('loadedSessPickle') # '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_4.0'
+        ## try to find corresponding global file:
+        corresponding_global_file_name: str = f'global_computation_results{selected_context_suffix_only}.pkl'
+        corresponding_global_section_index = None
+        try:
+            corresponding_global_section_index = self.active_global_file_names_list.index(corresponding_global_file_name)
+            if corresponding_global_section_index == -1:
+                corresponding_global_section_index = None
+            # else:
+            #     # return corresponding_global_section_index
+            #     pass
+        except ValueError as e:
+            # index not found
+            corresponding_global_section_index = None
+            # return None
+        except Exception as e:
+            raise e
+        # corresponding_global_section_indicies = [self.active_global_file_names_list.index(corresponding_global_file_name)]
+        return corresponding_global_file_name, corresponding_global_section_index
+    
+    @function_attributes(short_name=None, tags=['select-first', 'startup', 'select', 'gui'], input_requires=[], output_provides=[], uses=['try_determine_matching_global_file'], used_by=[], creation_date='2025-02-11 02:40', related_items=[])
+    def try_select_first_valid_files(self) -> bool:
+        """
+        try selecting the first
+        """
+        if len(self.active_local_file_names_list) < 1:
+            print(f'have 0 local files, cannot select first.')
+            return False
+        
+        ## otherwise it's safe to set the selection
+        self.local_file_browser_widget.selection = [0]
+        # self.global_file_browser_widget.selection = [0]
+        first_selected_local_path: Path = Path(self.selected_local_pkl_files[0])
+        selected_local_file_name: str = first_selected_local_path.stem # 'loadedSessPickle_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_4.0'
+        ## try to find corresponding global file:
+        corresponding_global_file_name, corresponding_global_section_index = self.try_determine_matching_global_file(local_file_name=selected_local_file_name)
+        if corresponding_global_section_index is None:
+            # failed to find
+            self.global_file_browser_widget.selection = [] ## clear global selection
+            return False # failed
+        else:
+            corresponding_global_section_indicies = [corresponding_global_section_index] # single list
+
+        ## set selection to corresponding
+        self.global_file_browser_widget.selection = corresponding_global_section_indicies
+        return True
 
 
 
