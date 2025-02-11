@@ -56,6 +56,8 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 		combined_pos_df.loc[global_pos_df.index, 'global_lin_pos'] = global_pos_df.lin_pos
 
 		title = 'grid_bin_bounds validation across epochs'
+		const_line_text_label_y_offset: float = 0.05
+		const_line_text_label_x_offset: float = 0.1
 		
 		# Plot it:
 		combined_pos_df.plot(x='t', y=['x', 'lin_pos', 'long_lin_pos', 'short_pos_df', 'global_lin_pos'], title='grid_bin_bounds validation across epochs')
@@ -63,6 +65,10 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 		ax = plt.gca()
 		ax.set_title(title)
 		fig.canvas.manager.set_window_title(title)
+		
+		
+		ax.legend(loc='upper left') # Move legend inside the plot, in the top-left corner
+		# ax.legend(loc='upper left', bbox_to_anchor=(1, 1)) # Move legend outside the plot
 		
 		final_context = owning_pipeline_reference.sess.get_context().adding_context('display_fn', display_fn_name='_display_grid_bin_bounds_validation')
 		
@@ -78,10 +84,23 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 		long_track_line_collection, short_track_line_collection = perform_add_1D_track_bounds_lines(long_notable_x_platform_positions=tuple(long_notable_x_platform_positions), short_notable_x_platform_positions=tuple(short_notable_x_platform_positions), ax=ax, is_vertical=False)
 
 		## horizontal lines:
+		## midpoint line: dotted blue line centered in the bounds (along y)
 		midpoint_line_collection = ax.hlines(x_midpoint, label='x_midpoint', xmin=ax.get_xbound()[0], xmax=ax.get_xbound()[1], colors='#0000FFAA', linewidths=1.0, linestyles='dashed', zorder=-98) # matplotlib.collections.LineCollection midpoint_line_collection
-		((grid_bin_bounds_x0, grid_bin_bounds_x1), (grid_bin_bounds_y0, grid_bin_bounds_y1)) = grid_bin_bounds
+		ax.text(ax.get_xbound()[1], (x_midpoint + const_line_text_label_y_offset), 'x_mid', ha='right', va='bottom', fontsize=8, color='#0000FFAA', zorder=-98) # Add right-aligned text label slightly above the hline
 
-		grid_bin_bounds_line_collection = ax.hlines([grid_bin_bounds_x0, grid_bin_bounds_x1], label='grid_bin_bounds', xmin=ax.get_xbound()[0], xmax=ax.get_xbound()[1], colors='#20202e', linewidths=2.0, linestyles='solid', zorder=-98) # grid_bin_bounds_line_collection
+
+		((grid_bin_bounds_x0, grid_bin_bounds_x1), (grid_bin_bounds_y0, grid_bin_bounds_y1)) = grid_bin_bounds
+		## 2 lines corresponding to the x0 and x1 of the grid_bin_bounds:
+		grid_bin_bounds_line_collection = ax.hlines([grid_bin_bounds_x0, grid_bin_bounds_x1], label='grid_bin_bounds - after - dark blue', xmin=ax.get_xbound()[0], xmax=ax.get_xbound()[1], colors='#2e2e20', linewidths=2.0, linestyles='solid', zorder=-98) # grid_bin_bounds_line_collection
+		# _grid_bin_bound_labels_x_pos = (ax.get_xbound()[1] - const_line_text_label_x_offset)
+		
+		_grid_bin_bound_labels_x_pos: float = ax.get_xbound()[0] + ((ax.get_xbound()[1] - ax.get_xbound()[0])/2.0) # center point
+		print(f'_grid_bin_bound_labels_x_pos: {_grid_bin_bound_labels_x_pos}')
+		ax.text(_grid_bin_bound_labels_x_pos, (grid_bin_bounds_x0 - const_line_text_label_y_offset), 'grid_bin_bounds[x0]', ha='center', va='bottom', fontsize=9, color='#2e2d20', zorder=-97) # Add right-aligned text label slightly above the hline
+		ax.text(_grid_bin_bound_labels_x_pos, (grid_bin_bounds_x1 + const_line_text_label_y_offset), 'grid_bin_bounds[x1]', ha='center', va='top', fontsize=9, color='#2e2d20', zorder=-97) # this will be the top (highest y-pos) line.
+		
+		# Show legend
+		# ax.legend()
 
 		if save_figure:
 			saved_figure_paths = owning_pipeline_reference.output_figure(final_context, fig)
