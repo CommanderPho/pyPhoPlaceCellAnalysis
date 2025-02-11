@@ -1,0 +1,42 @@
+@attrs_to_parameters
+@define(slots=False)
+class {{ container_class_name }}({{ base_classes | join(', ') }}):
+    """ {{ container_class_docstring | default('Container class for aggregated parameter types.') }} """
+
+{% for class_name in class_names %}
+    {{ class_name | lower }}: {{ class_name }} = serialized_field(default=Factory({{ class_name }}))
+{% endfor %}
+
+    @classmethod
+    def init_from_pipeline(cls, curr_active_pipeline):
+        """ Initializes an instance from the pipeline object. """
+        params_class_type_dict = deepcopy(cls.__annotations__)
+        registered_merged_computation_function_default_kwargs_dict = (
+            GlobalComputationParametersAttrsClassTemplating.main_extract_params_default_values(curr_active_pipeline=curr_active_pipeline)
+        )
+        ignore_kwarg_names = GlobalComputationParametersAttrsClassTemplating.ignore_kwarg_names
+        registered_merged_computation_function_default_kwargs_dict = {
+            fn_best_name(v): get_fn_kwargs_with_defaults(v, ignore_kwarg_names=ignore_kwarg_names)
+            for k, v in curr_active_pipeline.registered_merged_computation_function_dict.items()
+        }
+        registered_merged_computation_function_default_kwargs_dict = {
+            k: v for k, v in registered_merged_computation_function_default_kwargs_dict.items() if len(v) > 0
+        }
+
+        _out_param_typed_parameters_dict = {}
+        for k, v_dict in registered_merged_computation_function_default_kwargs_dict.items():
+            final_key = k.removeprefix('_')
+            try:
+                a_type = params_class_type_dict[final_key]
+                _out_param_typed_parameters_dict[final_key] = a_type(**v_dict)
+            except Exception as e:
+                print(f"Error initializing field: {k}, {final_key}, {v_dict}, {e}")
+                raise
+
+        return cls(**_out_param_typed_parameters_dict)
+
+    def to_hdf(self, file_path, key: str, **kwargs):
+        """ Saves the object and its fields to the specified HDF5 file. """
+        {% for class_name in class_names %}
+        self.{{ class_name | lower }}.to_hdf(file_path, key=f"{key}/{{ class_name | lower }}")
+        {% endfor %}

@@ -1,0 +1,26 @@
+@attrs_to_parameters
+@define(slots=False, eq=False, repr=False)
+{% set base_classes = ["HDF_SerializationMixin", "AttrsBasedClassHelperMixin"] if should_build_hdf_class|default('False') else ["object"] %}
+{% if additional_bases|default([]) %}
+{% set base_classes = base_classes + additional_bases %}
+{% endif %}
+class {{ class_name }}({{ base_classes | join(', ') }}):
+    """ Docstring for {{ class_name }}. 
+    """
+{% if should_build_hdf_class|default('False') %}
+{% for var_tuple in fields_tuples_list|default([]) %}
+	{{ var_tuple[0] }}: {{ var_tuple[1] }} = {{ "serialized_field" if (var_tuple[1] | lower) in ["list", "ndarray", "tuple", "dict"] else "serialized_attribute_field" }}(default={{ var_tuple[2] }})
+    {# {{ var_tuple[0] }}: {{ var_tuple[1] }} = serialized_attribute_field(default={{ var_tuple[2] }}) #}
+{% endfor %}
+{% else %}
+{% for var_tuple in fields_tuples_list|default([]) %}
+    {{ var_tuple[0] }}: {{ var_tuple[1] }} = field(default={{ var_tuple[2] }})
+{% endfor %}
+{% endif %}
+
+{% if should_build_hdf_class|default('False') %}
+    # HDFMixin Conformances ______________________________________________________________________________________________ #
+    def to_hdf(self, file_path, key: str, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path"""
+        super().to_hdf(file_path, key=key, **kwargs)
+{% endif %}
