@@ -186,32 +186,33 @@ class merged_directional_placefields_Parameters(HDF_SerializationMixin, AttrsBas
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
 
+@attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class rank_order_shuffle_analysis_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for rank_order_shuffle_analysis_Parameters. 
     """
     num_shuffles: int = serialized_attribute_field(default=500)
     minimum_inclusion_fr_Hz: float = serialized_attribute_field(default=5.0)
-    included_qclu_values: list = serialized_field(default=[1, 2])
+    included_qclu_values: list = serialized_field(default=[1, 2, 4, 6, 7, 9])
     skip_laps: bool = serialized_attribute_field(default=False)
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
 
+@attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class directional_decoders_decode_continuous_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for directional_decoders_decode_continuous_Parameters. 
     """
     time_bin_size: Optional[float] = serialized_attribute_field(default=None)
     should_disable_cache: bool = serialized_attribute_field(default=False)
-    
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
 
-
+@attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class directional_decoders_epoch_heuristic_scoring_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for directional_decoders_epoch_heuristic_scoring_Parameters. 
@@ -225,7 +226,6 @@ class directional_decoders_epoch_heuristic_scoring_Parameters(HDF_SerializationM
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
         
-
 @attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class directional_decoders_evaluate_epochs_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
@@ -302,8 +302,19 @@ class wcorr_shuffle_analysis_Parameters(HDF_SerializationMixin, AttrsBasedClassH
 
 @attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
+class position_decoding_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
+    """ Docstring for position_decoding_Parameters. 
+    """
+    override_decoding_time_bin_size: Optional[float] = serialized_attribute_field(default=None)
+    # HDFMixin Conformances ______________________________________________________________________________________________ #
+    def to_hdf(self, file_path, key: str, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path"""
+        super().to_hdf(file_path, key=key, **kwargs)
+
+@attrs_to_parameters
+@define(slots=False, eq=False, repr=False)
 class perform_specific_epochs_decoding_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
-    """ Docstring for _perform_specific_epochs_decoding_Parameters. 
+    """ Docstring for perform_specific_epochs_decoding_Parameters. 
     """
     decoder_ndim: int = serialized_attribute_field(default=2)
     filter_epochs: str = serialized_attribute_field(default='ripple')
@@ -316,7 +327,7 @@ class perform_specific_epochs_decoding_Parameters(HDF_SerializationMixin, AttrsB
 @attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class DEP_ratemap_peaks_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
-    """ Docstring for _DEP_ratemap_peaks_Parameters. 
+    """ Docstring for DEP_ratemap_peaks_Parameters. 
     """
     peak_score_inclusion_percent_threshold: float = serialized_attribute_field(default=0.25)
     # HDFMixin Conformances ______________________________________________________________________________________________ #
