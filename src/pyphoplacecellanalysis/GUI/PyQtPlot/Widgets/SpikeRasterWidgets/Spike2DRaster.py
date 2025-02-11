@@ -112,7 +112,8 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     sigEmbeddedMatplotlibDockWidgetAdded = QtCore.Signal(object, object, object) # self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name]) -  emitted when a new matplotlib dock widget is added
     sigEmbeddedMatplotlibDockWidgetRemoved = QtCore.Signal(object, object) # (self, identifier: str)
 
-
+    sigCrosshairsUpdated = QtCore.Signal(object, str, str) # (self, name, trace_value) - CrosshairsTracingMixin Conformance
+    
     @property
     def overlay_text_lines_dict(self):
         """The lines of text to be displayed in the overlay."""    
