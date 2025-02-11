@@ -133,6 +133,7 @@ class GlobalComputationParametersAttrsClassTemplating:
         imports_dict = {}
 
         for k, v in registered_merged_computation_function_default_kwargs_dict.items():
+            k = k.removeprefix('_') # do not allow starting with underscores
             _param_class_name: str = f'{k}_Parameters'
             # _param_class_name = _param_class_name.removeprefix('_') # remove leading underscores
             

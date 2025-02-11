@@ -1,5 +1,6 @@
 from copy import deepcopy
 import param
+import pathlib
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
@@ -172,6 +173,7 @@ print(code_str)
 
 """
 
+@attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class merged_directional_placefields_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for merged_directional_placefields_Parameters. 
