@@ -1,4 +1,6 @@
+{% if not should_include_explicit_param_Params_fields|default(false) %}
 @attrs_to_parameters
+{% endif %}
 @define(slots=False, eq=False, repr=False)
 {% set base_classes = ["HDF_SerializationMixin", "AttrsBasedClassHelperMixin"] if should_build_hdf_class|default('False') else ["object"] %}
 {% if additional_bases|default([]) %}
@@ -17,7 +19,31 @@ class {{ class_name }}({{ base_classes | join(', ') }}):
     {{ var_tuple[0] }}: {{ var_tuple[1] }} = field(default={{ var_tuple[2] }})
 {% endfor %}
 {% endif %}
-
+{% if should_include_explicit_param_Params_fields|default('False') %}
+{% set type_map = {
+    "str": "param.String",
+    "int": "param.Integer",
+    "float": "param.Number",
+    "bool": "param.Boolean",
+    "list": "param.List",
+    "dict": "param.Dict",
+    "tuple": "param.Tuple",
+    "path": "param.Path",
+    "optional[str]": "param.String",
+    "optional[int]": "param.Integer",
+    "optional[float]": "param.Number",
+    "optional[bool]": "param.Boolean",
+    "optional[path]": "param.Path",
+    "optional[list]": "param.List",
+    "optional[dict]": "param.Dict",
+    "optional[tuple]": "param.Tuple"
+} %}
+    ## PARAMS - these are class properties
+{% for var_tuple in fields_tuples_list|default([]) %}
+	{{ var_tuple[0] ~ "_PARAM" }} = {{ type_map[var_tuple[1]|lower] }}(default={{ var_tuple[2] }})
+    {# {{ var_tuple[0] }}: {{ var_tuple[1] }} = serialized_attribute_field(default={{ var_tuple[2] }}) #}
+{% endfor %}
+{% endif %}
 {% if should_build_hdf_class|default('False') %}
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
