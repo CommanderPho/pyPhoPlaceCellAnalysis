@@ -572,7 +572,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         add_markers (bool): if True, draws points at each (x, y) position colored the same as the underlying line.
         
         
-        _helper_add_gradient_line(ax=axs[curr_row][curr_col]],
+        cls._helper_add_gradient_line(ax=axs[curr_row][curr_col]],
             t=np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(laps_position_traces[curr_lap_id][0,:]))
             x=laps_position_traces[curr_lap_id][0,:],
             y=laps_position_traces[curr_lap_id][1,:]
@@ -603,6 +603,51 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             return line, _out_markers
         else:
             return line, None
+
+
+    @function_attributes(short_name=None, tags=['plot', 'posterior', 'helper'], input_requires=[], output_provides=[], uses=[], creation_date='2025-02-11', related_items=[])
+    @classmethod
+    def _helper_add_heatmap(cls, ax, xbin_centers, p_x_given_n, ybin_centers, posterior_masking_value, rotate_to_vertical, debug_print=False):
+        """
+        Helper function to plot the decoded posterior on the provided matplotlib axes.
+        
+        Args:
+            ax (matplotlib.axes.Axes): The axes on which to plot.
+            xbin_centers (np.ndarray): The x bin centers for the posterior.
+            p_x_given_n (np.ndarray): The 2D decoded posterior data.
+            ybin_centers (np.ndarray): The y bin centers. If None, uses array index.
+            posterior_masking_value (float): Value below which the posterior is masked.
+            rotate_to_vertical (bool): If True, rotates the posterior data.
+            debug_print (bool): If True, prints debug information.
+            
+        Returns:
+            The image handle from ax.imshow.
+        """
+        if debug_print:
+            print("Original p_x_given_n shape:", p_x_given_n.shape)
+        
+        # Apply masking to the posterior data
+        masked_posterior = np.where(p_x_given_n < posterior_masking_value, np.nan, p_x_given_n)
+        
+        # Rotate the data if specified
+        if rotate_to_vertical:
+            masked_posterior = np.rot90(masked_posterior)
+        
+        # Define the extent for imshow
+        if ybin_centers is None:
+            y_extent = [0, masked_posterior.shape[0]]
+        else:
+            y_extent = [ybin_centers[0], ybin_centers[-1]]
+        extent = [xbin_centers[0], xbin_centers[-1], y_extent[0], y_extent[1]]
+        
+        if debug_print:
+            print("Plotting posterior with extent:", extent)
+        
+        # Plot the posterior once using imshow
+        cax = ax.imshow(masked_posterior, origin='lower', extent=extent, aspect='auto', cmap='viridis')
+        
+        return cax
+    
 
     def plot_decoded_trajectories_2d(self, sess, curr_num_subplots=10, active_page_index=0, plot_actual_lap_lines:bool=False, fixed_columns: int = 2, use_theoretical_tracks_instead: bool = True, existing_ax=None, axes_inset_locators_list=None):
         """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots
@@ -948,8 +993,20 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         # ==================================================================================================================== #
         # Plot the Posterior Heatmaps                                                                                          #
         # ==================================================================================================================== #
+        # Posterior plotting is delegated to the helper function for drop-in compatibility
+        heatmaps = cls._helper_add_heatmap(
+            an_ax, 
+            xbin_centers, 
+            a_p_x_given_n, 
+            ybin_centers, 
+            posterior_masking_value, 
+            rotate_to_vertical, 
+            time_cmap='viridis',
+            debug_print=debug_print
+        )
+
         cmap='viridis'
-        
+
         if not is_2D: # 1D case
             # 1D Case:    
             if is_single_time_bin_mode:
