@@ -575,6 +575,24 @@ class ComputationKWargParameters(HDF_SerializationMixin, AttrsBasedClassHelperMi
     DEP_ratemap_peaks: DEP_ratemap_peaks_Parameters = serialized_field(default=Factory(DEP_ratemap_peaks_Parameters))	
     ratemap_peaks_prominence2d: ratemap_peaks_prominence2d_Parameters = serialized_field(default=Factory(ratemap_peaks_prominence2d_Parameters))
     
+
+    # ## PARAMS - these are class properties
+    # merged_directional_placefields_PARAM = (default=Factory(merged_directional_placefields_Parameters), doc='merged_directional_placefields param', label='merged_directional_placefields')
+    # rank_order_shuffle_analysis_PARAM = (default=Factory(rank_order_shuffle_analysis_Parameters), doc='rank_order_shuffle_analysis param', label='rank_order_shuffle_analysis')
+    # directional_decoders_decode_continuous_PARAM = (default=Factory(directional_decoders_decode_continuous_Parameters), doc='directional_decoders_decode_continuous param', label='directional_decoders_decode_continuous')
+    # directional_decoders_evaluate_epochs_PARAM = (default=Factory(directional_decoders_evaluate_epochs_Parameters), doc='directional_decoders_evaluate_epochs param', label='directional_decoders_evaluate_epochs')
+    # directional_decoders_epoch_heuristic_scoring_PARAM = (default=Factory(directional_decoders_epoch_heuristic_scoring_Parameters), doc='directional_decoders_epoch_heuristic_scoring param', label='directional_decoders_epoch_heuristic_scoring')
+    # directional_train_test_split_PARAM = (default=Factory(directional_train_test_split_Parameters), doc='directional_train_test_split param', label='directional_train_test_split')
+    # long_short_decoding_analyses_PARAM = (default=Factory(long_short_decoding_analyses_Parameters), doc='long_short_decoding_analyses param', label='long_short_decoding_analyses')
+    # long_short_rate_remapping_PARAM = (default=Factory(long_short_rate_remapping_Parameters), doc='long_short_rate_remapping param', label='long_short_rate_remapping')
+    # long_short_inst_spike_rate_groups_PARAM = (default=Factory(long_short_inst_spike_rate_groups_Parameters), doc='long_short_inst_spike_rate_groups param', label='long_short_inst_spike_rate_groups')
+    # wcorr_shuffle_analysis_PARAM = (default=Factory(wcorr_shuffle_analysis_Parameters), doc='wcorr_shuffle_analysis param', label='wcorr_shuffle_analysis')
+    # position_decoding_PARAM = (default=Factory(position_decoding_Parameters), doc='position_decoding param', label='position_decoding')
+    # perform_specific_epochs_decoding_PARAM = (default=Factory(perform_specific_epochs_decoding_Parameters), doc='perform_specific_epochs_decoding param', label='perform_specific_epochs_decoding')
+    # dep_ratemap_peaks_PARAM = (default=Factory(DEP_ratemap_peaks_Parameters), doc='dep_ratemap_peaks param', label='dep_ratemap_peaks')
+    # ratemap_peaks_prominence2d_PARAM = (default=Factory(ratemap_peaks_prominence2d_Parameters), doc='ratemap_peaks_prominence2d param', label='ratemap_peaks_prominence2d')
+    
+
     @classmethod
     def init_from_pipeline(cls, curr_active_pipeline):
         """ Initializes an instance from the pipeline object.
