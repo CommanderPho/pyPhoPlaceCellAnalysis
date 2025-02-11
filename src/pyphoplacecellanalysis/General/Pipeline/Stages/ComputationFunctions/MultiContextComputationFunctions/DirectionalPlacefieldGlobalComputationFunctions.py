@@ -849,13 +849,13 @@ class DirectionalLapsResult(ComputedResult):
             return _obj.filtered_by_frate_and_qclu(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
         
 
-    def filtered_by_included_aclus(self, qclu_included_aclus) -> "DirectionalLapsResult":
+    def filtered_by_included_aclus(self, included_neuronIDs) -> "DirectionalLapsResult":
         """ Returns a copy of self with each decoder filtered by the `qclu_included_aclus`
         
         Usage:
         
         qclu_included_aclus = curr_active_pipeline.determine_good_aclus_by_qclu(included_qclu_values=[1,2,4,9])
-        modified_directional_laps_results = directional_laps_results.filtered_by_included_aclus(qclu_included_aclus)
+        modified_directional_laps_results = directional_laps_results.filtered_by_included_aclus(included_neuronIDs=qclu_included_aclus)
         modified_directional_laps_results
 
         """
@@ -867,7 +867,7 @@ class DirectionalLapsResult(ComputedResult):
         modified_decoders_list = []
         for a_decoder in decoders_list:
             # a_decoder = deepcopy(directional_laps_results.long_LR_one_step_decoder_1D)
-            is_aclu_qclu_included_list = np.isin(a_decoder.pf.ratemap.neuron_ids, qclu_included_aclus)
+            is_aclu_qclu_included_list = np.isin(a_decoder.pf.ratemap.neuron_ids, included_neuronIDs)
             included_aclus = np.array(a_decoder.pf.ratemap.neuron_ids)[is_aclu_qclu_included_list]
             modified_decoder = a_decoder.get_by_id(included_aclus)
             modified_decoders_list.append(modified_decoder)
