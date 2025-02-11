@@ -293,7 +293,7 @@ class SingleArtistMultiEpochBatchHelpers:
             # matplotlib ax was passed
             data = deepcopy(active_all_rect_arr)
             # rect_patches = [Rectangle((x, y), w, h) for x, y, w, h in data]
-            rect_patches = [Rectangle((x, y), w, h, **matplotlib_rect_kwargs) for x, y, w, h in data] # , transform=ax.transData
+            rect_patches = [Rectangle((x, y), w, h, **matplotlib_rect_kwargs, transform=ax.transData) for x, y, w, h in data] # , transform=ax.transData
             
             # ## legacy patch-based way
             # rect = patches.Rectangle((x, y), w, h, **matplotlib_rect_kwargs)
