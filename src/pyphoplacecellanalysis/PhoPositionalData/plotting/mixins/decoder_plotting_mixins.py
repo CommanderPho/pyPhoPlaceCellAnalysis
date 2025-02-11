@@ -20,7 +20,7 @@ from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_pl
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
-
+from pyphocorehelpers.assertion_helpers import Assert
 
 # ==================================================================================================================== #
 # 2024-04-12 - Decoded Trajectory Plotting on Maze (1D & 2D) - Posteriors and Most Likely Position Paths               #
@@ -35,6 +35,307 @@ from matplotlib.colors import LinearSegmentedColormap
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult
 
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
+
+
+class SingleArtistMultiEpochBatchHelpers:
+    """ 
+    
+    from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import SingleArtistMultiEpochBatchHelpers
+    """
+    @function_attributes(short_name=None, tags=['reshape', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 05:57', related_items=[])
+    @classmethod
+    def reshape_p_x_given_n_for_single_artist_display(cls, updated_timebins_p_x_given_n: NDArray, debug_print=False) -> NDArray:
+        """ 
+        from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import reshape_p_x_given_n_for_single_artist_display
+        
+        """
+        stacked_p_x_given_n = deepcopy(updated_timebins_p_x_given_n) # drop the last epoch
+        if debug_print:
+            print(np.shape(stacked_p_x_given_n)) # (76, 40, 33008)
+        stacked_p_x_given_n = np.moveaxis(stacked_p_x_given_n, -1, 0)
+        if debug_print:
+            print(np.shape(stacked_p_x_given_n)) # (33008, 76, 40)
+        stacked_p_x_given_n = np.row_stack(stacked_p_x_given_n) # .shape: (99009, 39)
+        if debug_print:
+            print(np.shape(stacked_p_x_given_n)) # (2508608, 40)
+        stacked_p_x_given_n = np.expand_dims(stacked_p_x_given_n, axis=0)
+        if debug_print:
+            print(np.shape(stacked_p_x_given_n)) # (1, 2508608, 40)
+        return stacked_p_x_given_n
+
+    @classmethod
+    def _slice_to_epoch_range(cls, flat_timebins_p_x_given_n, flat_time_bin_centers, desired_epoch_start_idx: int = 0, desired_epoch_end_idx: int = 15):
+        """ trims down to a specific epoch range """
+        flat_timebins_p_x_given_n = flat_timebins_p_x_given_n[:, :, desired_epoch_start_idx:desired_epoch_end_idx]
+        flat_time_bin_centers = flat_time_bin_centers[desired_epoch_start_idx:desired_epoch_end_idx]
+        return flat_timebins_p_x_given_n, flat_time_bin_centers
+
+
+    # ==================================================================================================================== #
+    # Batch Track Shape Plotting                                                                                           #
+    # ==================================================================================================================== #
+    @classmethod
+    def rect_tuples_to_NDArray(cls, rects, x_offset:float=0.0) -> NDArray:
+        """ .shape (3, 4) """
+        return np.vstack([[x+x_offset, y, w, h] for x, y, w, h, *args in rects])
+        
+    @function_attributes(short_name=None, tags=['new', 'active'], input_requires=[], output_provides=[], uses=[], used_by=['cls.all_stacked_rect_arr_normalization'], creation_date='2025-02-11 08:41', related_items=[])
+    @classmethod
+    def rect_arr_normalization(cls, a_rect_arr, debug_print=False) -> NDArray:
+        """ Normalizes the offsets and size to [0, 1]
+        .shape (3, 4)
+        
+        Usage:
+            Example 1:        
+                normalized_long_rect_arr, ((x0_offset, y0_offset), (normalized_x0_offset, normalized_y0_offset), w0_multiplier, h0_total) = SingleArtistMultiEpochBatchHelpers.rect_arr_normalization(long_rect_arr)
+                normalized_long_rect_arr
+
+            Example 2:
+                track_single_rect_arr_dict = {'long': long_rect_arr, 'short': short_rect_arr}
+                track_single_rect_arr_dict
+                track_single_normalized_rect_arr_dict = {k:SingleArtistMultiEpochBatchHelpers.rect_arr_normalization(v)[0] for k, v in track_single_rect_arr_dict.items()}
+                track_normalization_tuple_dict = {k:SingleArtistMultiEpochBatchHelpers.rect_arr_normalization(v)[1] for k, v in track_single_rect_arr_dict.items()}
+                track_single_normalized_rect_arr_dict
+                track_normalization_tuple_dict
+
+        """
+        if debug_print:
+            print(f'a_rect_arr: {a_rect_arr}, np.shape(a_rect_arr): {np.shape(a_rect_arr)}')
+            
+        x0_offset: float = a_rect_arr[0, 0]
+        y0_offset: float = a_rect_arr[0, 1]
+        w0_multiplier: float = a_rect_arr[0, 2]
+        h0_total: float = np.sum(a_rect_arr, axis=0)[3]
+
+        if debug_print:
+            print(f'x0_offset: {x0_offset}, y0_offset: {y0_offset}, w0_multiplier: {w0_multiplier}, h0_total: {h0_total}')
+            
+        ## normalize plotting by these values:
+        normalized_long_rect_arr = deepcopy(a_rect_arr)
+        normalized_long_rect_arr[:, 2] /= w0_multiplier
+        normalized_long_rect_arr[:, 3] /= h0_total
+        normalized_long_rect_arr[:, 0] /= w0_multiplier
+        normalized_long_rect_arr[:, 1] /= h0_total
+        if debug_print:
+            print(f'normalized_long_rect_arr: {normalized_long_rect_arr}')
+
+        normalized_x0_offset: float = normalized_long_rect_arr[0, 0]
+        normalized_y0_offset: float = normalized_long_rect_arr[0, 1]
+        if debug_print:
+            print(f'normalized_x0_offset: {normalized_x0_offset}, normalized_y0_offset: {normalized_y0_offset}')
+        
+        ## only after scaling should we apply the translational offset
+        normalized_long_rect_arr[:, 0] -= normalized_x0_offset
+        normalized_long_rect_arr[:, 1] -= normalized_y0_offset
+
+        # ## raw tanslational offset
+        # normalized_long_rect_arr[:, 0] -= x0_offset
+        # normalized_long_rect_arr[:, 1] -= y0_offset
+
+        return normalized_long_rect_arr, ((x0_offset, y0_offset), (normalized_x0_offset, normalized_y0_offset), w0_multiplier, h0_total)
+
+
+    @function_attributes(short_name=None, tags=['new', 'active'], input_requires=[], output_provides=[], uses=['cls.rect_arr_normalization'], used_by=[], creation_date='2025-02-11 08:41', related_items=[])
+    @classmethod
+    def all_stacked_rect_arr_normalization(cls, built_track_rects, num_horizontal_repeats: int, x_offset: float = 0.0) -> NDArray:
+        """ 
+        Usage:
+        
+            all_long_rect_arr = rect_tuples_to_horizontally_stacked_NDArray(long_rects, num_horizontal_repeats=(a_result.num_filter_epochs-1))
+            all_short_rect_arr = rect_tuples_to_horizontally_stacked_NDArray(short_rects, num_horizontal_repeats=(a_result.num_filter_epochs-1))
+
+        """
+        a_track_rect_arr = cls.rect_tuples_to_NDArray(built_track_rects, x_offset=x_offset)
+        # x0s = a_track_rect_arr[:, 0] # x0
+        # widths = a_track_rect_arr[:, 2] # w
+        # heights = a_track_rect_arr[:, 3] # h
+
+        ## INPUTS: track_single_normalized_rect_arr_dict, track_normalization_tuple_dict
+
+        # active_track_name: str = 'long'
+        track_single_normalized_rect_arr, track_normalization_tuple = SingleArtistMultiEpochBatchHelpers.rect_arr_normalization(a_track_rect_arr)
+        (x0_offset, y0_offset), (normalized_x0_offset, normalized_y0_offset), w0_multiplier, h0_total = track_normalization_tuple ## unpack track_normalization_tuple
+
+        single_subdiv_normalized_width = 1.0
+        single_subdiv_normalized_height = 1.0
+        single_subdiv_normalized_offset_x = 1.0
+
+        test_arr = []
+        for epoch_idx in np.arange(num_horizontal_repeats):
+            an_arr = deepcopy(track_single_normalized_rect_arr)
+            an_arr[:, 0] += (epoch_idx * single_subdiv_normalized_offset_x) ## set offset 
+            test_arr.append(an_arr)
+            
+        test_arr = np.vstack(test_arr)
+        # np.shape(test_arr) # (5211, 4)
+        return test_arr
+            
+
+    @function_attributes(short_name=None, tags=['new', 'active'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 08:41', related_items=[])
+    @classmethod
+    def track_dict_all_stacked_rect_arr_normalization(cls, built_track_rects_dict, num_horizontal_repeats: int) -> Dict[str, NDArray]:
+        """ 
+        Usage:
+        
+            all_long_rect_arr = rect_tuples_to_horizontally_stacked_NDArray(long_rects, num_horizontal_repeats=(a_result.num_filter_epochs-1))
+            all_short_rect_arr = rect_tuples_to_horizontally_stacked_NDArray(short_rects, num_horizontal_repeats=(a_result.num_filter_epochs-1))
+
+        """
+        track_all_normalized_rect_arr_dict = {}
+        for active_track_name, built_track_rects in built_track_rects_dict.items():
+            track_all_normalized_rect_arr_dict[active_track_name] = cls.all_stacked_rect_arr_normalization(built_track_rects=built_track_rects, num_horizontal_repeats=num_horizontal_repeats)
+
+        ## OUTPUTS: track_all_normalized_rect_arr_dict
+        return track_all_normalized_rect_arr_dict
+    
+
+    @function_attributes(short_name=None, tags=['new', 'active', 'inverse'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 08:41', related_items=[])
+    @classmethod
+    def track_dict_all_stacked_rect_arr_inverse_normalization(cls, track_all_rect_arr_dict, ax, num_active_horizontal_repeats: int) -> Dict[str, NDArray]:
+        """ 
+        Usage:
+        
+            all_long_rect_arr = rect_tuples_to_horizontally_stacked_NDArray(long_rects, num_horizontal_repeats=(a_result.num_filter_epochs-1))
+            all_short_rect_arr = rect_tuples_to_horizontally_stacked_NDArray(short_rects, num_horizontal_repeats=(a_result.num_filter_epochs-1))
+
+        """
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+
+        ax_width: float = np.diff(xlim)[0]
+        ax_height: float = np.diff(ylim)[0]
+
+        # (xlim, ylim)
+        # (ax_width, ax_height)
+
+        inverse_normalization_factor_width: float = ax_width / num_active_horizontal_repeats
+        inverse_normalization_factor_height: float = 1.0 / ax_height
+
+        # (inverse_normalization_factor_width, inverse_normalization_factor_height)
+        
+        ## OUTPUTS: inverse_normalization_factor_width, inverse_normalization_factor_height
+
+        # ax.get_width()
+        inverse_normalized_track_all_rect_arr_dict = {}
+
+        for k, test_arr in track_all_rect_arr_dict.items():
+            new_test_arr = deepcopy(test_arr)
+            new_test_arr[:, 2] *= inverse_normalization_factor_width # scale by the width
+            new_test_arr[:, 0] *= inverse_normalization_factor_width
+
+            new_test_arr[:, 3] *= inverse_normalization_factor_height # scale by the width
+            new_test_arr[:, 1] *= inverse_normalization_factor_height
+
+            inverse_normalized_track_all_rect_arr_dict[k] = new_test_arr
+            
+        return inverse_normalized_track_all_rect_arr_dict
+        ## OUTPUTS: inverse_normalized_track_all_rect_arr_dict
+    
+
+
+    # @function_attributes(short_name=None, tags=['new', 'active'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-10 00:00', related_items=[])
+    # @classmethod
+    # def rect_tuples_to_horizontally_stacked_NDArray(cls, built_track_rects, num_horizontal_repeats: int, padding_x: float = 0.0, axes_inset_locators_list=None):
+    #     """ 
+    #     Usage:
+        
+    #         all_long_rect_arr = rect_tuples_to_horizontally_stacked_NDArray(long_rects, num_horizontal_repeats=(a_result.num_filter_epochs-1))
+    #         all_short_rect_arr = rect_tuples_to_horizontally_stacked_NDArray(short_rects, num_horizontal_repeats=(a_result.num_filter_epochs-1))
+
+    #     """
+    #     a_track_rect_arr = cls.rect_tuples_to_NDArray(built_track_rects, x_offset=-131.142)
+    #     x0s = a_track_rect_arr[:, 0] # x0
+    #     widths = a_track_rect_arr[:, 2] # w
+    #     heights = a_track_rect_arr[:, 3] # h
+
+    #     if axes_inset_locators_list is None:        
+    #         # x1s = x0s + widths
+    #         # x0s
+    #         # widths
+    #         # x1s
+    #         single_subdiv_width: float = np.max(widths)
+    #         single_subdiv_height: float = np.max(heights)
+            
+    #         single_subdiv_offset_x: float = single_subdiv_width + padding_x
+
+    #         ## OUTPUTS: single_subdiv_width, single_subdiv_height, single_subdiv_offset_x
+    #         return np.vstack(deepcopy([((epoch_idx * single_subdiv_offset_x), 0, single_subdiv_width, single_subdiv_height) for epoch_idx in np.arange(num_horizontal_repeats)])) # [x0, y0, width, height], where [x0, y0] is the lower-left corner -- can do data_coords by adding `, transform=existing_ax.transData`
+    #     else:
+    #         return np.vstack(deepcopy([((axes_inset_locators_list[epoch_idx, 0] * single_subdiv_offset_x), 0, single_subdiv_width, single_subdiv_height) for epoch_idx in np.arange(num_horizontal_repeats)])) # [x0, y0, width, height], where [x0, y0] is the lower-left corner -- can do data_coords by adding `, transform=existing_ax.transData`
+
+    @function_attributes(short_name=None, tags=['new', 'active'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 09:16', related_items=[])
+    @classmethod
+    def add_batch_track_shapes(cls, ax, inverse_normalized_track_all_rect_arr_dict, track_kwargs_dict):
+        """ 
+        
+        track_kwargs_dict = {'long': long_kwargs, 'short': short_kwargs}
+        track_shape_patch_collection_artists = SingleArtistMultiEpochBatchHelpers.add_batch_track_shapes(ax=ax, inverse_normalized_track_all_rect_arr_dict=inverse_normalized_track_all_rect_arr_dict, track_kwargs_dict=track_kwargs_dict)
+        fig.canvas.draw_idle()
+        
+        """
+        import matplotlib.pyplot as plt
+        from matplotlib.patches import Rectangle
+        from matplotlib.collections import PatchCollection
+        # import matplotlib.patches as patches
+        assert track_kwargs_dict is not None
+        
+        track_names_list = ['long', 'short']
+        # track_kwargs_dict = {'long': long_kwargs, 'short': short_kwargs}
+        track_shape_patch_collection_artists = {'long': None, 'short': None}
+
+        for active_track_name in track_names_list:
+            # matplotlib_rect_kwargs_override = long_kwargs # {'linewidth': 2, 'edgecolor': '#0099ff42', 'facecolor': '#0099ff07'}
+
+            matplotlib_rect_kwargs = track_kwargs_dict[active_track_name] # {'linewidth': 2, 'edgecolor': '#0099ff42', 'facecolor': '#0099ff07'}
+            # active_all_rect_arr = track_all_rect_arr_dict[active_track_name]
+            active_all_rect_arr = inverse_normalized_track_all_rect_arr_dict[active_track_name]
+
+            # matplotlib ax was passed
+            data = deepcopy(active_all_rect_arr)
+            # rect_patches = [Rectangle((x, y), w, h) for x, y, w, h in data]
+            rect_patches = [Rectangle((x, y), w, h, **matplotlib_rect_kwargs) for x, y, w, h in data] # , transform=ax.transData
+            
+            # ## legacy patch-based way
+            # rect = patches.Rectangle((x, y), w, h, **matplotlib_rect_kwargs)
+            # plot_item.add_patch(rect)    
+
+            # pc = PatchCollection(patches, edgecolors='k', facecolors='none')
+            if track_shape_patch_collection_artists.get(active_track_name, None) is not None:
+                # remove extant
+                print(f'removing existing artist.')
+                track_shape_patch_collection_artists[active_track_name].remove()
+                track_shape_patch_collection_artists[active_track_name] = None
+
+            # pc = PatchCollection(rect_patches, edgecolors=matplotlib_rect_kwargs.get('edgecolor', '#0099ff42'), facecolors=matplotlib_rect_kwargs.get('facecolor', '#0099ff07'))
+            pc = PatchCollection(rect_patches, match_original=True) #, transform=ax.transAxes , transform=ax.transData
+            track_shape_patch_collection_artists[active_track_name] = pc
+            ax.add_collection(pc)
+        ## END for active_track_name in track_names_list:
+
+        # plt.gca().add_collection(pc)
+        # plt.show()
+        # ax.get_figure()
+        # fig.canvas.draw_idle()
+        
+        return track_shape_patch_collection_artists
+
+
+    # @function_attributes(short_name=None, tags=['DEPRICATED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-10 00:00', related_items=[])
+    # @classmethod
+    # def add_rectangles(cls, ax, rect_arr, edgecolors='none', facecolors='red', **kwargs):
+    #     """ 
+        
+    #     long_pc: PolyCollection = SingleArtistMultiEpochBatchHelpers.add_rectangles(ax=track_ax, rect_arr=all_long_rect_arr, facecolors='red')
+    #     short_pc: PolyCollection = SingleArtistMultiEpochBatchHelpers.add_rectangles(ax=track_ax, rect_arr=all_short_rect_arr, facecolors='blue')
+
+    #     """
+    #     from matplotlib.collections import PolyCollection
+    #     verts = np.stack((np.column_stack((rect_arr[:,0], rect_arr[:,1])), np.column_stack((rect_arr[:,0]+rect_arr[:,2], rect_arr[:,1])), np.column_stack((rect_arr[:,0]+rect_arr[:,2], rect_arr[:,1]+rect_arr[:,3])), np.column_stack((rect_arr[:,0], rect_arr[:,1]+rect_arr[:,3]))), axis=1)
+    #     # pc = PolyCollection(verts, edgecolors=edgecolors, facecolors=facecolors, transform=ax.transData, **kwargs)
+    #     pc = PolyCollection(verts, edgecolors=edgecolors, facecolors=facecolors, **kwargs) # , transform=ax.transData
+    #     ax.add_collection(pc)
+    #     return pc
+
 
 
 @define(slots=False)
@@ -511,7 +812,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     @function_attributes(short_name=None, tags=['plot'], input_requires=[], output_provides=[], uses=[], used_by=['.plot_epoch'], creation_date='2025-01-29 15:53', related_items=[])
     @classmethod
     def _perform_add_decoded_posterior_and_trajectory(cls, an_ax, xbin_centers, a_p_x_given_n, a_time_bin_centers, a_most_likely_positions, ybin_centers=None, a_measured_pos_df: Optional[pd.DataFrame]=None,
-                                                        include_most_likely_pos_line: Optional[bool]=None, time_bin_index: Optional[int]=None, rotate_to_vertical:bool=False, debug_print=False, posterior_masking_value: float = 0.0025): # posterior_masking_value: float = 0.01 -- 1D
+                                                        include_most_likely_pos_line: Optional[bool]=None, time_bin_index: Optional[int]=None, rotate_to_vertical:bool=False, debug_print=False, posterior_masking_value: float = 0.0025, should_perform_reshape: bool=True): # posterior_masking_value: float = 0.01 -- 1D
         """ Plots the 1D or 2D posterior and most likely position trajectory over the top of an axes created with `fig, axs, laps_pages = plot_decoded_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=8, active_page_index=0, plot_actual_lap_lines=False)`
         
         np.shape(a_time_bin_centers) # 1D & 2D: (12,)
@@ -540,7 +841,11 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         full_posterior_opacity: float = 1.0
         
         ## INPUTS: xbin_centers, a_p_x_given_n, a_time_bin_centers, a_most_likely_positions, ybin_centers=None
-        posterior = deepcopy(a_p_x_given_n).T # np.shape(posterior): 1D: (56, 27);    2D: (12, 6, 57)
+        if should_perform_reshape:
+            posterior = deepcopy(a_p_x_given_n).T # np.shape(posterior): 1D: (56, 27) - (n_t, n_xbins);    2D: (12, 6, 57) - (n_t, n_ybins, n_xbins)
+        else:
+            posterior = deepcopy(a_p_x_given_n) ## do NOT reshape
+            
         if debug_print:
             print(f'np.shape(posterior): {np.shape(posterior)}')
         # Create a masked array where all values < 0.25 are masked
@@ -555,7 +860,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         x_values = deepcopy(xbin_centers)  # Replace with your x axis values
 
         if debug_print:
-            print(f'a_measured_pos_df.shape: {a_measured_pos_df.shape}')
+            if a_measured_pos_df is not None:
+                print(f'a_measured_pos_df.shape: {a_measured_pos_df.shape}')
         
 
         if not is_2D: # 1D case
@@ -592,9 +898,16 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
         # Plot the posterior heatmap _________________________________________________________________________________________ #
         # Note: origin='lower' makes sure that the [0, 0] index is at the bottom left corner.
-        n_time_bins = len(a_time_bin_centers)
-        assert n_time_bins == np.shape(masked_posterior)[0]
-
+        n_time_bins: int = len(a_time_bin_centers)
+        a_time_bin_centers_shape = np.shape(a_time_bin_centers)
+        # n_time_bins: int = np.max(a_time_bin_centers_shape)
+        # if len(a_time_bin_centers_shape) > 1:
+            ## 2D, transpose
+            
+        masked_posterior_shape = np.shape(masked_posterior)
+        n_masked_posterior_time_bins: int = masked_posterior_shape[0]
+        # assert n_time_bins == np.shape(masked_posterior)[0]
+        Assert.all_equal(n_time_bins, n_masked_posterior_time_bins)
 
         # ==================================================================================================================== #
         # Convert to vertical orientation if needed                                                                            #
@@ -608,9 +921,12 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             y_values_temp = deepcopy(y_values)
             y_values = deepcopy(x_values)
             x_values = y_values_temp
-            
+            ## swap the two spatial axes
+            if debug_print:
+                print(f'rotate_to_vertical: True, so swapping masked_posterior axes:\n\tOriginal: {np.shape(masked_posterior)}')
             masked_posterior = masked_posterior.swapaxes(-2, -1)
-
+            if debug_print:
+                print(f'\tPost-Swap: {np.shape(masked_posterior)}')
 
         # ==================================================================================================================== #
         # Plot the Posterior Heatmaps                                                                                          #
@@ -638,6 +954,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 print(f'vmin_global: {vmin_global}, vmax_global: {vmax_global}')
             if is_single_time_bin_mode:
                 assert (time_bin_index < n_time_bins)
+                if debug_print:
+                    print(f'\tis_single_time_bin_mode: True!')
                 cmap='viridis'
                 a_heatmap = an_ax.imshow(np.squeeze(masked_posterior[time_bin_index,:,:]), aspect='auto', cmap=cmap, alpha=full_posterior_opacity,
                                 extent=image_extent,
@@ -646,6 +964,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 heatmaps.append(a_heatmap)
             else:
                 # plot all of them in a loop:
+                if debug_print:
+                    print(f'\tis_single_time_bin_mode: False!')
                 time_step_opacity: float = full_posterior_opacity/float(n_time_bins) # #TODO 2025-01-29 13:18: - [ ] This is probably not what I want, as it would be very faint when there are large numbers of time bins. Instead I want image multiplication or something.
                 time_step_opacity = max(time_step_opacity, 0.2) # no less than 0.2
                 if debug_print:
