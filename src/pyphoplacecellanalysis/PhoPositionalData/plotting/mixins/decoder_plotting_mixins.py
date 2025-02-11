@@ -223,7 +223,7 @@ class SingleArtistMultiEpochBatchHelpers:
         return normalized_long_rect_arr, ((x0_offset, y0_offset), (normalized_x0_offset, normalized_y0_offset), w0_multiplier, h0_total)
 
 
-    @function_attributes(short_name=None, tags=['new', 'active'], input_requires=[], output_provides=[], uses=['cls.rect_arr_normalization'], used_by=[], creation_date='2025-02-11 08:41', related_items=[])
+    @function_attributes(short_name=None, tags=['new', 'active'], input_requires=[], output_provides=[], uses=['cls.rect_tuples_to_NDArray', 'cls.rect_arr_normalization'], used_by=['cls.track_dict_all_stacked_rect_arr_normalization'], creation_date='2025-02-11 08:41', related_items=[])
     @classmethod
     def all_stacked_rect_arr_normalization(cls, built_track_rects, num_horizontal_repeats: int, x_offset: float = 0.0) -> NDArray:
         """ 
@@ -259,7 +259,7 @@ class SingleArtistMultiEpochBatchHelpers:
         return test_arr
             
 
-    @function_attributes(short_name=None, tags=['new', 'active'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 08:41', related_items=[])
+    @function_attributes(short_name=None, tags=['new', 'active'], input_requires=[], output_provides=[], uses=['cls.all_stacked_rect_arr_normalization'], used_by=[], creation_date='2025-02-11 08:41', related_items=[])
     @classmethod
     def track_dict_all_stacked_rect_arr_normalization(cls, built_track_rects_dict, num_horizontal_repeats: int) -> Dict[str, NDArray]:
         """ 
@@ -351,7 +351,7 @@ class SingleArtistMultiEpochBatchHelpers:
     #     else:
     #         return np.vstack(deepcopy([((axes_inset_locators_list[epoch_idx, 0] * single_subdiv_offset_x), 0, single_subdiv_width, single_subdiv_height) for epoch_idx in np.arange(num_horizontal_repeats)])) # [x0, y0, width, height], where [x0, y0] is the lower-left corner -- can do data_coords by adding `, transform=existing_ax.transData`
 
-    @function_attributes(short_name=None, tags=['new', 'active'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 09:16', related_items=[])
+    @function_attributes(short_name=None, tags=['main', 'new', 'active'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 09:16', related_items=[])
     @classmethod
     def add_batch_track_shapes(cls, ax, inverse_normalized_track_all_rect_arr_dict, track_kwargs_dict, transform=None):
         """ 
