@@ -14,6 +14,7 @@ from neuropy.core.parameters import BaseConfig
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphocorehelpers.function_helpers import get_fn_kwargs_with_defaults, get_decorated_function_attributes, fn_best_name
 from pyphocorehelpers.print_helpers import strip_type_str_to_classname
+from pyphoplacecellanalysis.General.Model.Configs.ParamConfigs import BasePlotDataParams
 
 """ 
 from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import merged_directional_placefields_Parameters
@@ -113,10 +114,16 @@ def attrs_to_parameters_container(cls):
 
 # @attrs_to_parameters
 class BaseGlobalComputationParameters(BaseConfig, param.Parameterized):
+# class BaseGlobalComputationParameters(BaseConfig, BasePlotDataParams):
     """ Base class
     """
-    
+    # Overriding defaults from parent
+    # name = param.String(default='BaseGlobalComputationParameters', doc='Name of the global computations')
+    # isVisible = param.Boolean(default=False, doc="Whether the global computations widget is visible") # default to False    
 
+    def __attrs_post_init__(self):
+        param.Parameterized.__init__(self)
+        
 
     def __repr__(self):
         """ 2024-01-11 - Renders only the fields and their sizes  """
@@ -225,6 +232,32 @@ class BaseGlobalComputationParameters(BaseConfig, param.Parameterized):
         # self._post_load_update()
         # self =  self.__class__.from_state(state=self.__dict__)
 
+
+    @classmethod
+    def get_class_param_Params_attribute_names(cls) -> List[str]:
+        return [k for k in cls.param.values().keys() if k not in ['name']]
+    
+    def get_param_Params_attribute_names(self) -> List[str]:
+        return [k for k in self.param.values().keys() if k not in ['name']]
+        
+        
+    @classmethod
+    def get_class_param_Params_dict(cls, param_name_excludeList=None) -> Dict:
+        # param_name_excludeList = ['name']
+        if param_name_excludeList is None:
+            param_name_excludeList = []
+        return {k:v for k, v in cls.param.values().items() if k not in param_name_excludeList}
+    
+
+    def to_params_dict(self, param_name_excludeList=None) -> Dict:
+        """ returns as a dictionary representation """
+        # param_name_excludeList = ['name']
+        if param_name_excludeList is None:
+            param_name_excludeList = []
+        return {k:v for k, v in self.param.values().items() if k not in param_name_excludeList}
+    
+
+
         
 
 # ==================================================================================================================== #
@@ -246,7 +279,6 @@ print(code_str)
 
 """
 
-@attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class merged_directional_placefields_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for merged_directional_placefields_Parameters. 
@@ -254,12 +286,15 @@ class merged_directional_placefields_Parameters(HDF_SerializationMixin, AttrsBas
     laps_decoding_time_bin_size: float = serialized_attribute_field(default=0.25)
     ripple_decoding_time_bin_size: float = serialized_attribute_field(default=0.025)
     should_validate_lap_decoding_performance: bool = serialized_attribute_field(default=False)
+    ## PARAMS - these are class properties
+    laps_decoding_time_bin_size_PARAM = param.Number(default=0.25)
+    ripple_decoding_time_bin_size_PARAM = param.Number(default=0.025)
+    should_validate_lap_decoding_performance_PARAM = param.Boolean(default=False)
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
 
-@attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class rank_order_shuffle_analysis_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for rank_order_shuffle_analysis_Parameters. 
@@ -268,25 +303,42 @@ class rank_order_shuffle_analysis_Parameters(HDF_SerializationMixin, AttrsBasedC
     minimum_inclusion_fr_Hz: float = serialized_attribute_field(default=5.0)
     included_qclu_values: list = serialized_field(default=[1, 2, 4, 6, 7, 9])
     skip_laps: bool = serialized_attribute_field(default=False)
-    
+    ## PARAMS - these are class properties
+    num_shuffles_PARAM = param.Integer(default=500)
+    minimum_inclusion_fr_Hz_PARAM = param.Number(default=5.0)
+    included_qclu_values_PARAM = param.List(default=[1, 2, 4, 6, 7, 9])
+    skip_laps_PARAM = param.Boolean(default=False)
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
 
-@attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class directional_decoders_decode_continuous_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for directional_decoders_decode_continuous_Parameters. 
     """
     time_bin_size: Optional[float] = serialized_attribute_field(default=None)
     should_disable_cache: bool = serialized_attribute_field(default=False)
+    ## PARAMS - these are class properties
+    time_bin_size_PARAM = param.Number(default=None)
+    should_disable_cache_PARAM = param.Boolean(default=False)
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
 
-@attrs_to_parameters
+@define(slots=False, eq=False, repr=False)
+class directional_decoders_evaluate_epochs_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
+    """ Docstring for directional_decoders_evaluate_epochs_Parameters. 
+    """
+    should_skip_radon_transform: bool = serialized_attribute_field(default=False)
+    ## PARAMS - these are class properties
+    should_skip_radon_transform_PARAM = param.Boolean(default=False)
+    # HDFMixin Conformances ______________________________________________________________________________________________ #
+    def to_hdf(self, file_path, key: str, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path"""
+        super().to_hdf(file_path, key=key, **kwargs)
+
 @define(slots=False, eq=False, repr=False)
 class directional_decoders_epoch_heuristic_scoring_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for directional_decoders_epoch_heuristic_scoring_Parameters. 
@@ -295,35 +347,30 @@ class directional_decoders_epoch_heuristic_scoring_Parameters(HDF_SerializationM
     max_ignore_bins: int = serialized_attribute_field(default=2)
     max_jump_distance_cm: float = serialized_attribute_field(default=60.0)
     use_bin_units_instead_of_realworld: bool = serialized_attribute_field(default=False)
-    # HDFMixin Conformances ______________________________________________________________________________________________ #
-    def to_hdf(self, file_path, key: str, **kwargs):
-        """ Saves the object to key in the hdf5 file specified by file_path"""
-        super().to_hdf(file_path, key=key, **kwargs)
-        
-@attrs_to_parameters
-@define(slots=False, eq=False, repr=False)
-class directional_decoders_evaluate_epochs_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
-    """ Docstring for directional_decoders_evaluate_epochs_Parameters. 
-    """
-    should_skip_radon_transform: bool = serialized_attribute_field(default=False)
+    ## PARAMS - these are class properties
+    same_thresh_fraction_of_track_PARAM = param.Number(default=0.05)
+    max_ignore_bins_PARAM = param.Integer(default=2)
+    max_jump_distance_cm_PARAM = param.Number(default=60.0)
+    use_bin_units_instead_of_realworld_PARAM = param.Boolean(default=False)
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
 
-@attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class directional_train_test_split_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for directional_train_test_split_Parameters. 
     """
     training_data_portion: float = serialized_attribute_field(default=0.8333333333333334)
     debug_output_hdf5_file_path: Optional[Path] = serialized_attribute_field(default=None)
+    ## PARAMS - these are class properties
+    training_data_portion_PARAM = param.Number(default=0.8333333333333334)
+    debug_output_hdf5_file_path_PARAM = param.Path(default=None)
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
 
-@attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class long_short_decoding_analyses_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for long_short_decoding_analyses_Parameters. 
@@ -333,12 +380,17 @@ class long_short_decoding_analyses_Parameters(HDF_SerializationMixin, AttrsBased
     always_recompute_replays: bool = serialized_attribute_field(default=False)
     override_long_epoch_name: Optional[str] = serialized_attribute_field(default=None)
     override_short_epoch_name: Optional[str] = serialized_attribute_field(default=None)
+    ## PARAMS - these are class properties
+    decoding_time_bin_size_PARAM = param.Number(default=None)
+    perform_cache_load_PARAM = param.Boolean(default=False)
+    always_recompute_replays_PARAM = param.Boolean(default=False)
+    override_long_epoch_name_PARAM = param.String(default=None)
+    override_short_epoch_name_PARAM = param.String(default=None)
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
 
-@attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class long_short_rate_remapping_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for long_short_rate_remapping_Parameters. 
@@ -346,46 +398,53 @@ class long_short_rate_remapping_Parameters(HDF_SerializationMixin, AttrsBasedCla
     decoding_time_bin_size: Optional[float] = serialized_attribute_field(default=None)
     perform_cache_load: bool = serialized_attribute_field(default=False)
     always_recompute_replays: bool = serialized_attribute_field(default=False)
+    ## PARAMS - these are class properties
+    decoding_time_bin_size_PARAM = param.Number(default=None)
+    perform_cache_load_PARAM = param.Boolean(default=False)
+    always_recompute_replays_PARAM = param.Boolean(default=False)
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
 
-@attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class long_short_inst_spike_rate_groups_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for long_short_inst_spike_rate_groups_Parameters. 
     """
     instantaneous_time_bin_size_seconds: Optional[float] = serialized_attribute_field(default=0.01)
+    ## PARAMS - these are class properties
+    instantaneous_time_bin_size_seconds_PARAM = param.Number(default=0.01)
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
 
-@attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class wcorr_shuffle_analysis_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for wcorr_shuffle_analysis_Parameters. 
     """
     num_shuffles: int = serialized_attribute_field(default=1024)
     drop_previous_result_and_compute_fresh: bool = serialized_attribute_field(default=False)
+    ## PARAMS - these are class properties
+    num_shuffles_PARAM = param.Integer(default=1024)
+    drop_previous_result_and_compute_fresh_PARAM = param.Boolean(default=False)
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
 
-@attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class position_decoding_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for position_decoding_Parameters. 
     """
     override_decoding_time_bin_size: Optional[float] = serialized_attribute_field(default=None)
+    ## PARAMS - these are class properties
+    override_decoding_time_bin_size_PARAM = param.Number(default=None)
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
 
-@attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class perform_specific_epochs_decoding_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for perform_specific_epochs_decoding_Parameters. 
@@ -393,23 +452,27 @@ class perform_specific_epochs_decoding_Parameters(HDF_SerializationMixin, AttrsB
     decoder_ndim: int = serialized_attribute_field(default=2)
     filter_epochs: str = serialized_attribute_field(default='ripple')
     decoding_time_bin_size: Optional[float] = serialized_attribute_field(default=0.02)
+    ## PARAMS - these are class properties
+    decoder_ndim_PARAM = param.Integer(default=2)
+    filter_epochs_PARAM = param.String(default='ripple')
+    decoding_time_bin_size_PARAM = param.Number(default=0.02)
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
 
-@attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class DEP_ratemap_peaks_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for DEP_ratemap_peaks_Parameters. 
     """
     peak_score_inclusion_percent_threshold: float = serialized_attribute_field(default=0.25)
+    ## PARAMS - these are class properties
+    peak_score_inclusion_percent_threshold_PARAM = param.Number(default=0.25)
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
 
-@attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class ratemap_peaks_prominence2d_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for ratemap_peaks_prominence2d_Parameters. 
@@ -419,6 +482,12 @@ class ratemap_peaks_prominence2d_Parameters(HDF_SerializationMixin, AttrsBasedCl
     minimum_included_peak_height: float = serialized_attribute_field(default=0.2)
     uniform_blur_size: int = serialized_attribute_field(default=3)
     gaussian_blur_sigma: int = serialized_attribute_field(default=3)
+    ## PARAMS - these are class properties
+    step_PARAM = param.Number(default=0.01)
+    peak_height_multiplier_probe_levels_PARAM = param.Tuple(default=(0.5, 0.9))
+    minimum_included_peak_height_PARAM = param.Number(default=0.2)
+    uniform_blur_size_PARAM = param.Integer(default=3)
+    gaussian_blur_sigma_PARAM = param.Integer(default=3)
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
@@ -432,7 +501,31 @@ class ratemap_peaks_prominence2d_Parameters(HDF_SerializationMixin, AttrsBasedCl
 @attrs_to_parameters_container
 @define(slots=False)
 class ComputationKWargParameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
-    """ The base class for computation parameter types. """
+    """ The base class for computation parameter types. 
+    
+    Usage:
+        from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters, merged_directional_placefields_Parameters, rank_order_shuffle_analysis_Parameters, directional_decoders_decode_continuous_Parameters, directional_decoders_evaluate_epochs_Parameters, directional_train_test_split_Parameters, long_short_decoding_analyses_Parameters, long_short_rate_remapping_Parameters, long_short_inst_spike_rate_groups_Parameters, wcorr_shuffle_analysis_Parameters, perform_specific_epochs_decoding_Parameters, DEP_ratemap_peaks_Parameters, ratemap_peaks_prominence2d_Parameters
+
+        allow_update_global_computation_config = True
+        ## Add `curr_active_pipeline.global_computation_results.computation_config` as needed:
+        if curr_active_pipeline.global_computation_results.computation_config is None:
+            curr_global_param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters.init_from_pipeline(curr_active_pipeline=curr_active_pipeline)
+            if allow_update_global_computation_config:
+                print('global_computation_results.computation_config is None! Making new one!')
+                curr_active_pipeline.global_computation_results.computation_config = curr_global_param_typed_parameters
+                print(f'\tdone. Pipeline needs resave!')
+        else:
+            curr_global_param_typed_parameters: ComputationKWargParameters = curr_active_pipeline.global_computation_results.computation_config
+            
+        ## OUTPUTS: curr_global_param_typed_parameters
+        import param
+        import panel as pn
+        pn.extension()
+        
+        out_configs_dict = curr_global_param_typed_parameters.to_params_dict(recursive_to_dict=False)
+        pn.Column(*[pn.Param(a_sub_v) for a_sub_v in reversed(out_configs_dict.values())])
+
+    """
     merged_directional_placefields: merged_directional_placefields_Parameters = serialized_field(default=Factory(merged_directional_placefields_Parameters))	
     rank_order_shuffle_analysis: rank_order_shuffle_analysis_Parameters = serialized_field(default=Factory(rank_order_shuffle_analysis_Parameters))	
     directional_decoders_decode_continuous: directional_decoders_decode_continuous_Parameters = serialized_field(default=Factory(directional_decoders_decode_continuous_Parameters))	
@@ -534,6 +627,11 @@ class ComputationKWargParameters(HDF_SerializationMixin, AttrsBasedClassHelperMi
         #         raise
         # return cls(**_out_param_typed_parameters_dict)
 
+
+    def __attrs_post_init__(self):
+        param.Parameterized.__init__(self)
+        
+
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object and its fields to the specified HDF5 file. """
         # get_serialized_dataset_fields = self.get_serialized_dataset_fields(serialization_format='hdf')
@@ -552,6 +650,33 @@ class ComputationKWargParameters(HDF_SerializationMixin, AttrsBasedClassHelperMi
         self.DEP_ratemap_peaks.to_hdf(file_path, key=f"{key}/DEP_ratemap_peaks")
         self.ratemap_peaks_prominence2d.to_hdf(file_path, key=f"{key}/ratemap_peaks_prominence2d")
         # super().to_hdf(file_path, key=key, **kwargs)
+
+
+    # ==================================================================================================================== #
+    # Params Overrides                                                                                                     #
+    # ==================================================================================================================== #
+    def get_param_Params_attribute_names(self) -> List[str]:
+        return [k for k in self.param.values().keys() if k not in ['name']]
+        
+
+    def to_params_dict(self, param_name_excludeList=None, recursive_to_dict: bool=False) -> Dict:
+        """ overrides to provide recurrsive implementation
+        returns as a dictionary representation 
+        
+        Working:
+        
+            out_configs_dict = curr_global_param_typed_parameters.to_params_dict(recursive_to_dict=False)
+            pn.Column(*[pn.Param(a_sub_v) for a_sub_v in reversed(out_configs_dict.values())])
+
+        """
+        # param_name_excludeList = ['name']
+        if param_name_excludeList is None:
+            param_name_excludeList = ['name']
+        if recursive_to_dict:
+            return {k:v.to_params_dict(param_name_excludeList=param_name_excludeList) for k, v in self.param.values().items() if k not in param_name_excludeList}
+        else:
+            return {k:v.param for k, v in self.param.values().items() if k not in param_name_excludeList}
+
 
 
 # @attrs_to_parameters ## added manually

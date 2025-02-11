@@ -1,4 +1,6 @@
+{% if not should_include_explicit_param_Params_fields|default(false) %}
 @attrs_to_parameters
+{% endif %}
 @define(slots=False)
 class {{ container_class_name }}({{ base_classes | join(', ') }}):
     """ {{ container_class_docstring | default('Container class for aggregated parameter types.') }} """
@@ -6,6 +8,32 @@ class {{ container_class_name }}({{ base_classes | join(', ') }}):
 {% for class_name in class_names %}
     {{ (class_name | lower)[:-11] if (class_name | lower).endswith('_parameters') else (class_name | lower) }}: {{ class_name }} = serialized_field(default=Factory({{ class_name }}))	
 {% endfor %}
+{% if should_include_explicit_param_Params_fields|default('False') %}
+{% set type_map = {
+    "str": "param.String",
+    "int": "param.Integer",
+    "float": "param.Number",
+    "bool": "param.Boolean",
+    "list": "param.List",
+    "dict": "param.Dict",
+    "tuple": "param.Tuple",
+    "path": "param.Path",
+    "optional[str]": "param.String",
+    "optional[int]": "param.Integer",
+    "optional[float]": "param.Number",
+    "optional[bool]": "param.Boolean",
+    "optional[path]": "param.Path",
+    "optional[list]": "param.List",
+    "optional[dict]": "param.Dict",
+    "optional[tuple]": "param.Tuple"
+} %}
+{{ "    \n    ## PARAMS - these are class properties\n    Line two\n    " }}
+{% for class_name in class_names|default([]) %}
+{% set variable_name = (class_name | lower)[:-11] if (class_name | lower).endswith('_parameters') else (class_name | lower) %}
+    {{ variable_name ~ "_PARAM" }} = {{ type_map[class_name|lower] }}(default=Factory({{ class_name }}))
+    {# {{ var_tuple[0] }}: {{ var_tuple[1] }} = serialized_attribute_field(default={{ var_tuple[2] }}) #}
+{% endfor %}
+{% endif %}
 
     @classmethod
     def init_from_pipeline(cls, curr_active_pipeline):

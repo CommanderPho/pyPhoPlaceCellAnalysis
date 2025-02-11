@@ -11,7 +11,7 @@ class {{ class_name }}({{ base_classes | join(', ') }}):
     """
 {% if should_build_hdf_class|default('False') %}
 {% for var_tuple in fields_tuples_list|default([]) %}
-	{{ var_tuple[0] }}: {{ var_tuple[1] }} = {{ "serialized_field" if (var_tuple[1] | lower) in ["list", "ndarray", "tuple", "dict"] else "serialized_attribute_field" }}(default={{ var_tuple[2] }})
+    {{ var_tuple[0] }}: {{ var_tuple[1] }} = {{ "serialized_field" if (var_tuple[1] | lower) in ["list", "ndarray", "tuple", "dict"] else "serialized_attribute_field" }}(default={{ var_tuple[2] }})
     {# {{ var_tuple[0] }}: {{ var_tuple[1] }} = serialized_attribute_field(default={{ var_tuple[2] }}) #}
 {% endfor %}
 {% else %}
@@ -40,7 +40,7 @@ class {{ class_name }}({{ base_classes | join(', ') }}):
 } %}
     ## PARAMS - these are class properties
 {% for var_tuple in fields_tuples_list|default([]) %}
-	{{ var_tuple[0] ~ "_PARAM" }} = {{ type_map[var_tuple[1]|lower] }}(default={{ var_tuple[2] }})
+    {{ var_tuple[0] ~ "_PARAM" }} = {{ type_map[var_tuple[1]|lower] }}(default={{ var_tuple[2] }})
     {# {{ var_tuple[0] }}: {{ var_tuple[1] }} = serialized_attribute_field(default={{ var_tuple[2] }}) #}
 {% endfor %}
 {% endif %}
