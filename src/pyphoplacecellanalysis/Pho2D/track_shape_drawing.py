@@ -816,6 +816,11 @@ class LinearTrackInstance:
         return self.track_dimensions.plot_rects(plot_item=plot_item, offset=offset_point, matplotlib_rect_kwargs_override=matplotlib_rect_kwargs_override, rotate_to_vertical=rotate_to_vertical)
 
 
+    def build_rects(self, include_rendering_properties:bool=False, rotate_to_vertical:bool=False):
+        offset_point = self.grid_bin_bounds.center_point # (self.grid_bin_bounds.center_point[0], 0.75)
+        return self.track_dimensions._build_component_rectangles(is_zero_centered=True, offset_point=offset_point, include_rendering_properties=include_rendering_properties, rotate_to_vertical=rotate_to_vertical)
+        
+
 
 def get_track_length_dict(long_grid_bin_bounds, short_grid_bin_bounds) -> Tuple[Dict[str, float], Dict[str, float]]:
     """ Gets the actual track lengths from the grid_bin_bounds
