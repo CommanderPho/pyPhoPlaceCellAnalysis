@@ -835,9 +835,20 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         n_timebins = np.sum(self.nbins)
         flat_time_bin_containers = np.hstack(self.time_bin_containers)
         # timebins_p_x_given_n = [].extend(self.p_x_given_n_list)
-        timebins_p_x_given_n = np.hstack(self.p_x_given_n_list) # # .shape: (239, 5) - (n_x_bins, n_epoch_time_bins)  --TO-->  .shape: (63, 4146) - (n_x_bins, n_flattened_all_epoch_time_bins)
+        # timebins_p_x_given_n = np.hstack(self.p_x_given_n_list) # # .shape: (239, 5) - (n_x_bins, n_epoch_time_bins)  --TO-->  .shape: (63, 4146) - (n_x_bins, n_flattened_all_epoch_time_bins)
+        # Determine posterior shape
+        a_posterior = self.p_x_given_n_list[0]
+        posterior_dims = len(np.shape(a_posterior))
+        
+        if posterior_dims == 2:
+            timebins_p_x_given_n = np.hstack(self.p_x_given_n_list)
+        elif posterior_dims == 3:
+            timebins_p_x_given_n = np.concatenate(self.p_x_given_n_list, axis=-1)
+        else:
+            raise ValueError("Unsupported posterior shape: {}".format(np.shape(a_posterior)))
+        
         # TODO 2023-04-13 -can these squished similar way?: most_likely_positions_list, most_likely_position_indicies_list 
-        return n_timebins, flat_time_bin_containers, timebins_p_x_given_n
+        return n_timebins, flat_time_bin_containers, timebins_p_x_given_n # flat_time_bin_containers: seems to be an NDArray of centers or something instead of containers
 
 
     def flatten_to_masked_values(self):
@@ -862,10 +873,28 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             updated_curr_num_bins = a_curr_num_bins + 2 # add two (start/end) bins
             a_centers = self.time_bin_containers[epoch_idx].centers
             a_posterior = self.p_x_given_n_list[epoch_idx]
-            n_pos_bins = np.shape(a_posterior)[0]
+            a_posterior_shape = np.shape(a_posterior)
+            n_pos_bins = a_posterior_shape[0]
+            posterior_dims = len(a_posterior_shape)
+        
+            if posterior_dims == 2:
+                # 1D (x-only) posterior per time bin
+                updated_posterior = np.full((n_pos_bins, updated_curr_num_bins), np.nan)
+            elif posterior_dims == 3:
+                # 2D (x & y) posterior per time bin
+                n_y_pos_bins = a_posterior_shape[1]
+                updated_posterior = np.full((n_pos_bins, n_y_pos_bins, updated_curr_num_bins), np.nan)
+            else:
+                raise ValueError("Unsupported posterior shape: {}".format(a_posterior_shape))
             
-            updated_posterior = np.full((n_pos_bins, updated_curr_num_bins), np.nan)
-            updated_posterior[:,1:-1] = a_posterior
+            if posterior_dims == 2:
+                updated_posterior[:, 1:-1] = a_posterior
+            elif posterior_dims == 3:
+                updated_posterior[:, :, 1:-1] = a_posterior
+            
+
+            # updated_posterior = np.full((n_pos_bins, updated_curr_num_bins), np.nan)
+            # updated_posterior[:,1:-1] = a_posterior ## does not work for 2D posteriors - ValueError: could not broadcast input array from shape (76,40,17) into shape (76,17)
 
             curr_is_masked_bin = np.full((updated_curr_num_bins,), True)
             curr_is_masked_bin[1:-1] = False
@@ -876,13 +905,14 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             updated_timebins_p_x_given_n.append(updated_posterior)
             updated_is_masked_bin.append(curr_is_masked_bin)
 
-    
-        updated_timebins_p_x_given_n = np.hstack(updated_timebins_p_x_given_n) # # .shape: (239, 5) - (n_x_bins, n_epoch_time_bins)  --TO-->  .shape: (63, 4146) - (n_x_bins, n_flattened_all_epoch_time_bins)
+        updated_timebins_p_x_given_n = np.hstack(updated_timebins_p_x_given_n) if posterior_dims == 2 else np.concatenate(updated_timebins_p_x_given_n, axis=-1)
+        # updated_timebins_p_x_given_n = np.hstack(updated_timebins_p_x_given_n) # # .shape: (239, 5) - (n_x_bins, n_epoch_time_bins)  --TO-->  .shape: (63, 4146) - (n_x_bins, n_flattened_all_epoch_time_bins)
         updated_time_bin_containers = np.hstack(np.hstack(updated_time_bin_containers))
         updated_is_masked_bin = np.hstack(updated_is_masked_bin)
 
         assert np.shape(updated_time_bin_containers)[0] == desired_total_n_timebins
-        assert np.shape(updated_timebins_p_x_given_n)[1] == desired_total_n_timebins
+        # assert np.shape(updated_timebins_p_x_given_n)[1] == desired_total_n_timebins
+        assert np.shape(updated_timebins_p_x_given_n)[-1] == desired_total_n_timebins
         assert np.shape(updated_is_masked_bin)[0] == desired_total_n_timebins
 
         return desired_total_n_timebins, updated_is_masked_bin, updated_time_bin_containers, updated_timebins_p_x_given_n
