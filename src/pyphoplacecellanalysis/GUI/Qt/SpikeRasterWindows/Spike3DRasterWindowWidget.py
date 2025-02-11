@@ -639,6 +639,18 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.render_window_duration = updated_val
         # TODO 2023-03-29 19:14: - [ ] need to set self.render_window_duration.timeWindow.window_duration = updated_val
         
+    @pyqtExceptionPrintingSlot(bool)
+    def on_crosshair_trace_toggled(self, updated_is_crosshair_trace_enabled):
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.on_crosshair_trace_toggled(updated_is_crosshair_trace_enabled: {updated_is_crosshair_trace_enabled})')
+        old_value = spike_raster_window.params.is_crosshair_trace_enabled
+        did_update: bool = (old_value != updated_is_crosshair_trace_enabled)
+        spike_raster_window.params.is_crosshair_trace_enabled = updated_is_crosshair_trace_enabled
+        if self.spike_raster_plt_2d is not None:
+            ## set SpikeRaster2D's is_crosshair_trace_enabled
+            self.spike_raster_plt_2d
+        
+
 
 
     ########################################################
