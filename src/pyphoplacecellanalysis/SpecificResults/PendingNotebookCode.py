@@ -49,6 +49,64 @@ from pyphocorehelpers.DataStructure.general_parameter_containers import Visualiz
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
 
+# ==================================================================================================================== #
+# 2025-02-11 - Subdivided Epochs                                                                                       #
+# ==================================================================================================================== #
+from neuropy.core.epoch import subdivide_epochs, ensure_dataframe, ensure_Epoch
+
+def build_subdivided_epochs(curr_active_pipeline, subdivide_bin_size: float = 1.0):
+    """ 
+    subdivide_bin_size = 1.0 # Specify the size of each sub-epoch in seconds
+    
+    Usage:
+    
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_subdivided_epochs
+        
+        subdivide_bin_size: float = 1.0
+        (global_subivided_epochs_obj, global_subivided_epochs_df), global_pos_df = build_subdivided_epochs(curr_active_pipeline, subdivide_bin_size=subdivide_bin_size)
+        ## Do Decoding of only the test epochs to validate performance
+        subdivided_epochs_specific_decoded_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {a_name:a_new_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), filter_epochs=deepcopy(global_subivided_epochs_obj), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False) for a_name, a_new_decoder in new_decoder_dict.items()}
+
+    
+    """
+    ## OUTPUTS: test_epoch_specific_decoded_results_dict, continuous_specific_decoded_results_dict
+
+    ## INPUTS: new_decoder_dict
+    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+    # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
+    single_global_epoch_df: pd.DataFrame = pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})
+    # single_global_epoch_df['label'] = single_global_epoch_df.index.to_numpy()
+    single_global_epoch: Epoch = Epoch(single_global_epoch_df)
+
+    df: pd.DataFrame = ensure_dataframe(deepcopy(single_global_epoch)) 
+    df['maze_name'] = 'global'
+    # df['interval_type_id'] = 666
+
+      
+    subdivided_df: pd.DataFrame = subdivide_epochs(df, subdivide_bin_size)
+    subdivided_df['label'] = deepcopy(subdivided_df.index.to_numpy())
+    subdivided_df['stop'] = subdivided_df['stop'] - 1e-12
+    global_subivided_epochs_obj = ensure_Epoch(subdivided_df)
+
+    # ## Do Decoding of only the test epochs to validate performance
+    # subdivided_epochs_specific_decoded_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {a_name:a_new_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), filter_epochs=deepcopy(global_subivided_epochs_obj), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False) for a_name, a_new_decoder in new_decoder_dict.items()}
+
+    ## OUTPUTS: subdivided_epochs_specific_decoded_results_dict
+    # takes 4min 30 sec to run
+
+    ## Adds the 'global_subdivision_idx' column to 'global_pos_df' so it can get the measured positions by plotting
+    # INPUTS: global_subivided_epochs_obj, original_pos_dfs_dict
+    # global_subivided_epochs_obj
+    global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
+    global_subivided_epochs_df = global_subivided_epochs_obj.epochs.to_dataframe() #.rename(columns={'t_rel_seconds':'t'})
+    global_subivided_epochs_df['label'] = deepcopy(global_subivided_epochs_df.index.to_numpy())
+    global_pos_df: pd.DataFrame = deepcopy(global_session.position.to_dataframe()) #.rename(columns={'t':'t_rel_seconds'})
+    global_pos_df.time_point_event.adding_epochs_identity_column(epochs_df=global_subivided_epochs_df, epoch_id_key_name='global_subdivision_idx', epoch_label_column_name='label', drop_non_epoch_events=True, should_replace_existing_column=True) # , override_time_variable_name='t_rel_seconds'
+    return (global_subivided_epochs_obj, global_subivided_epochs_df), global_pos_df
+
+
+
 
 # ==================================================================================================================== #
 # 2025-01-27 - New Train/Test Splitting Results                                                                        #
@@ -56,75 +114,189 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, TrackTemplates, TrainTestSplitResult
 
 
-@function_attributes(short_name=None, tags=['epochs', 'non-PBE'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-28 04:10', related_items=[]) 
-def _adding_global_non_PBE_epochs(curr_active_pipeline, training_data_portion: float = 5.0/6.0) -> Tuple[Dict[types.DecoderName, pd.DataFrame], Dict[types.DecoderName, pd.DataFrame]]:
-    """ Builds a dictionary of train/test-split epochs for ['long', 'short', 'global'] periods
-    
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _adding_global_non_PBE_epochs
-    
-    a_new_training_df, a_new_test_df, a_new_training_df_dict, a_new_test_df_dict = _adding_global_non_PBE_epochs(curr_active_pipeline)
-    a_new_training_df
-    a_new_test_df
 
-        
+
+
+@define(slots=False, eq=False, repr=False)
+class Compute_NonPBE_Epochs:
+    """ 
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import Compute_NonPBE_Epochs
+    
     """
-    from neuropy.core.epoch import EpochsAccessor, Epoch, ensure_dataframe
-    # import portion as P # Required for interval search: portion~=2.3.0
-    from pyphocorehelpers.indexing_helpers import partition_df_dict, partition_df
+    single_global_epoch_df: pd.DataFrame = field()
+    global_epoch_only_non_PBE_epoch_df: pd.DataFrame = field()
+    # a_new_global_training_df: pd.DataFrame = field()
+    # a_new_global_test_df: pd.DataFrame = field()
+
+    a_new_training_df_dict: Dict[types.DecoderName, pd.DataFrame] = field()
+    a_new_test_df_dict: Dict[types.DecoderName, pd.DataFrame] = field()
+    
+    a_new_training_epoch_obj_dict: Dict[types.DecoderName, Epoch] = field(init=False)
+    a_new_testing_epoch_obj_dict: Dict[types.DecoderName, Epoch] = field(init=False)
+    
+
+    @function_attributes(short_name=None, tags=['epochs', 'non-PBE'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-28 04:10', related_items=[]) 
+    @classmethod
+    def _adding_global_non_PBE_epochs(cls, curr_active_pipeline, training_data_portion: float = 5.0/6.0) -> Tuple[Dict[types.DecoderName, pd.DataFrame], Dict[types.DecoderName, pd.DataFrame]]:
+        """ Builds a dictionary of train/test-split epochs for ['long', 'short', 'global'] periods
+        
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _adding_global_non_PBE_epochs
+        
+        a_new_training_df, a_new_test_df, a_new_training_df_dict, a_new_test_df_dict = _adding_global_non_PBE_epochs(curr_active_pipeline)
+        a_new_training_df
+        a_new_test_df
+
             
-    PBE_df: pd.DataFrame = ensure_dataframe(deepcopy(curr_active_pipeline.sess.pbe))
-    ## Build up a new epoch
-    epochs_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.epochs).epochs.adding_global_epoch_row()
-    global_epoch_only_df: pd.DataFrame = epochs_df.epochs.label_slice('maze')
+        """
+        from neuropy.core.epoch import EpochsAccessor, Epoch, ensure_dataframe
+        # import portion as P # Required for interval search: portion~=2.3.0
+        from pyphocorehelpers.indexing_helpers import partition_df_dict, partition_df
+                
+        PBE_df: pd.DataFrame = ensure_dataframe(deepcopy(curr_active_pipeline.sess.pbe))
+        ## Build up a new epoch
+        epochs_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.epochs).epochs.adding_global_epoch_row()
+        global_epoch_only_df: pd.DataFrame = epochs_df.epochs.label_slice('maze')
+        
+        # t_start, t_stop = epochs_df.epochs.t_start, epochs_df.epochs.t_stop
+        global_epoch_only_non_PBE_epoch_df: pd.DataFrame = global_epoch_only_df.epochs.subtracting(PBE_df)
+        global_epoch_only_non_PBE_epoch_df= global_epoch_only_non_PBE_epoch_df.epochs.modify_each_epoch_by(additive_factor=-0.008, final_output_minimum_epoch_duration=0.040)
+        
+        a_new_global_training_df, a_new_global_test_df = global_epoch_only_non_PBE_epoch_df.epochs.split_into_training_and_test(training_data_portion=training_data_portion, group_column_name ='label', additional_epoch_identity_column_names=['label'], skip_get_non_overlapping=False, debug_print=False) # a_laps_training_df, a_laps_test_df both comeback good here.
+        ## Drop test epochs that are too short:
+        a_new_global_test_df = a_new_global_test_df.epochs.modify_each_epoch_by(final_output_minimum_epoch_duration=0.100) # 100ms minimum test epochs
+
+        ## Add the metadata:
+        a_new_global_training_df = a_new_global_training_df.epochs.adding_or_updating_metadata(track_identity='global', train_test_period='train', training_data_portion=training_data_portion, interval_datasource_name=f'global_NonPBE_TRAIN')
+        a_new_global_test_df = a_new_global_test_df.epochs.adding_or_updating_metadata(track_identity='global', train_test_period='test', training_data_portion=training_data_portion, interval_datasource_name=f'global_NonPBE_TEST')
+        
+        ## Add the maze_id column to the epochs:
+        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        a_new_global_training_df = a_new_global_training_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
+        a_new_global_test_df = a_new_global_test_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
+
+        maze_id_to_maze_name_map = {-1:'none', 0:'long', 1:'short'}
+        a_new_global_training_df['maze_name'] = a_new_global_training_df['maze_id'].map(maze_id_to_maze_name_map)
+        a_new_global_test_df['maze_name'] = a_new_global_test_df['maze_id'].map(maze_id_to_maze_name_map)
+
+        # ==================================================================================================================== #
+        # Splits the global epochs into the long/short epochs                                                                  #
+        # ==================================================================================================================== #
+        # partitionColumn: str ='maze_id'
+        partitionColumn: str ='maze_name'
+        ## INPUTS: a_new_test_df, a_new_training_df, modern_names_list
+        a_new_test_df_dict = partition_df_dict(a_new_global_test_df, partitionColumn=partitionColumn)
+        # a_new_test_df_dict = dict(zip(modern_names_list, list(a_new_test_df_dict.values())))
+        a_new_training_df_dict = partition_df_dict(a_new_global_training_df, partitionColumn=partitionColumn)
+        # a_new_training_df_dict = dict(zip(modern_names_list, list(a_new_training_df_dict.values())))
+
+        ## add back in 'global' epoch
+        a_new_test_df_dict['global'] = deepcopy(a_new_global_test_df)
+        a_new_training_df_dict['global'] = deepcopy(a_new_global_test_df)
+        
+
+        # ==================================================================================================================== #
+        # Set Metadata                                                                                                         #
+        # ==================================================================================================================== #
+        a_new_test_df_dict: Dict[types.DecoderName, pd.DataFrame] = {k:v.epochs.adding_or_updating_metadata(track_identity=k, train_test_period='test', training_data_portion=training_data_portion, interval_datasource_name=f'{k}_NonPBE_TEST') for k, v in a_new_test_df_dict.items() if k != 'none'}
+        a_new_training_df_dict: Dict[types.DecoderName, pd.DataFrame] = {k:v.epochs.adding_or_updating_metadata(track_identity=k, train_test_period='train', training_data_portion=training_data_portion, interval_datasource_name=f'{k}_NonPBE_TRAIN') for k, v in a_new_training_df_dict.items() if k != 'none'}
+
+        ## OUTPUTS: new_decoder_dict, new_decoder_dict, new_decoder_dict, a_new_training_df_dict, a_new_test_df_dict
+
+        ## OUTPUTS: training_data_portion, a_new_training_df, a_new_test_df, a_new_training_df_dict, a_new_test_df_dict
+        return a_new_training_df_dict, a_new_test_df_dict, (global_epoch_only_non_PBE_epoch_df, a_new_global_training_df, a_new_global_test_df)
+
+    @classmethod
+    def init_from_pipeline(cls, curr_active_pipeline, training_data_portion: float = 5.0/6.0):
+        a_new_training_df_dict, a_new_test_df_dict, (global_epoch_only_non_PBE_epoch_df, a_new_global_training_df, a_new_global_test_df) = cls._adding_global_non_PBE_epochs(curr_active_pipeline)
+        
+        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
+        single_global_epoch_df: pd.DataFrame = pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})
+        # single_global_epoch_df['label'] = single_global_epoch_df.index.to_numpy()
+        # single_global_epoch: Epoch = Epoch(self.single_global_epoch_df)
+        
+        _obj = cls(single_global_epoch_df=single_global_epoch_df, global_epoch_only_non_PBE_epoch_df=global_epoch_only_non_PBE_epoch_df, a_new_training_df_dict=a_new_training_df_dict, a_new_test_df_dict=a_new_test_df_dict)
+        return _obj
+
+    def __attrs_post_init__(self):
+        # Add post-init logic here
+        self.a_new_training_epoch_obj_dict = {k:Epoch(deepcopy(v)).get_non_overlapping() for k, v in self.a_new_training_df_dict.items()}
+        self.a_new_testing_epoch_obj_dict = {k:Epoch(deepcopy(v)).get_non_overlapping() for k, v in self.a_new_test_df_dict.items()}
+
+
+        # curr_active_pipeline.filtered_sessions[global_any_name].non_PBE_epochs
+        
+
+
+        pass
     
-    # t_start, t_stop = epochs_df.epochs.t_start, epochs_df.epochs.t_stop
-    global_epoch_only_non_PBE_epoch_df: pd.DataFrame = global_epoch_only_df.epochs.subtracting(PBE_df)
-    global_epoch_only_non_PBE_epoch_df= global_epoch_only_non_PBE_epoch_df.epochs.modify_each_epoch_by(additive_factor=-0.008, final_output_minimum_epoch_duration=0.040)
-    
-    a_new_global_training_df, a_new_global_test_df = global_epoch_only_non_PBE_epoch_df.epochs.split_into_training_and_test(training_data_portion=training_data_portion, group_column_name ='label', additional_epoch_identity_column_names=['label'], skip_get_non_overlapping=False, debug_print=False) # a_laps_training_df, a_laps_test_df both comeback good here.
-    ## Drop test epochs that are too short:
-    a_new_global_test_df = a_new_global_test_df.epochs.modify_each_epoch_by(final_output_minimum_epoch_duration=0.100) # 100ms minimum test epochs
 
-    ## Add the metadata:
-    a_new_global_training_df = a_new_global_training_df.epochs.adding_or_updating_metadata(track_identity='global', train_test_period='train', training_data_portion=training_data_portion, interval_datasource_name=f'global_NonPBE_TRAIN')
-    a_new_global_test_df = a_new_global_test_df.epochs.adding_or_updating_metadata(track_identity='global', train_test_period='test', training_data_portion=training_data_portion, interval_datasource_name=f'global_NonPBE_TEST')
-    
-    ## Add the maze_id column to the epochs:
-    t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
-    a_new_global_training_df = a_new_global_training_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
-    a_new_global_test_df = a_new_global_test_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
+    def recompute(self, curr_active_pipeline, epochs_decoding_time_bin_size: float = 0.025):
+        """ 
+        
+        test_epoch_specific_decoded_results_dict, continuous_specific_decoded_results_dict, new_decoder_dict, new_pfs_dict = a_new_NonPBE_Epochs_obj.recompute(curr_active_pipeline=curr_active_pipeline, epochs_decoding_time_bin_size = 0.058)
+        
+        """
+        from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch
+        from neuropy.analyses.placefields import PfND
+        # from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult, SingleEpochDecodedResult
+        # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
 
-    maze_id_to_maze_name_map = {-1:'none', 0:'long', 1:'short'}
-    a_new_global_training_df['maze_name'] = a_new_global_training_df['maze_id'].map(maze_id_to_maze_name_map)
-    a_new_global_test_df['maze_name'] = a_new_global_test_df['maze_id'].map(maze_id_to_maze_name_map)
+         # 25ms
+        # epochs_decoding_time_bin_size: float = 0.050 # 50ms
+        # epochs_decoding_time_bin_size: float = 0.250 # 250ms
 
-    # ==================================================================================================================== #
-    # Splits the global epochs into the long/short epochs                                                                  #
-    # ==================================================================================================================== #
-    # partitionColumn: str ='maze_id'
-    partitionColumn: str ='maze_name'
-    ## INPUTS: a_new_test_df, a_new_training_df, modern_names_list
-    a_new_test_df_dict = partition_df_dict(a_new_global_test_df, partitionColumn=partitionColumn)
-    # a_new_test_df_dict = dict(zip(modern_names_list, list(a_new_test_df_dict.values())))
-    a_new_training_df_dict = partition_df_dict(a_new_global_training_df, partitionColumn=partitionColumn)
-    # a_new_training_df_dict = dict(zip(modern_names_list, list(a_new_training_df_dict.values())))
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+        long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name].computed_data for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        long_computation_config, short_computation_config, global_computation_config = [curr_active_pipeline.computation_results[an_epoch_name].computation_config for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+        long_pf1D, short_pf1D, global_pf1D = long_results.pf1D, short_results.pf1D, global_results.pf1D
+        long_pf2D, short_pf2D, global_pf2D = long_results.pf2D, short_results.pf2D, global_results.pf2D
 
-    ## add back in 'global' epoch
-    a_new_test_df_dict['global'] = deepcopy(a_new_global_test_df)
-    a_new_training_df_dict['global'] = deepcopy(a_new_global_test_df)
-    
+        # t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
+        # single_global_epoch_df: pd.DataFrame = pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})
+        # single_global_epoch_df['label'] = single_global_epoch_df.index.to_numpy()
+        # single_global_epoch: Epoch = Epoch(single_global_epoch_df)
 
-    # ==================================================================================================================== #
-    # Set Metadata                                                                                                         #
-    # ==================================================================================================================== #
-    a_new_test_df_dict: Dict[types.DecoderName, pd.DataFrame] = {k:v.epochs.adding_or_updating_metadata(track_identity=k, train_test_period='test', training_data_portion=training_data_portion, interval_datasource_name=f'{k}_NonPBE_TEST') for k, v in a_new_test_df_dict.items() if k != 'none'}
-    a_new_training_df_dict: Dict[types.DecoderName, pd.DataFrame] = {k:v.epochs.adding_or_updating_metadata(track_identity=k, train_test_period='train', training_data_portion=training_data_portion, interval_datasource_name=f'{k}_NonPBE_TRAIN') for k, v in a_new_training_df_dict.items() if k != 'none'}
+        single_global_epoch: Epoch = Epoch(self.single_global_epoch_df)
 
-    ## OUTPUTS: new_decoder_dict, new_decoder_dict, new_decoder_dict, a_new_training_df_dict, a_new_test_df_dict
+        # # Time-dependent
+        # long_pf1D_dt: PfND_TimeDependent = long_results.pf1D_dt
+        # long_pf2D_dt: PfND_TimeDependent = long_results.pf2D_dt
+        # short_pf1D_dt: PfND_TimeDependent = short_results.pf1D_dt
+        # short_pf2D_dt: PfND_TimeDependent = short_results.pf2D_dt
+        # global_pf1D_dt: PfND_TimeDependent = global_results.pf1D_dt
+        # global_pf2D_dt: PfND_TimeDependent = global_results.pf2D_dt
 
-    ## OUTPUTS: training_data_portion, a_new_training_df, a_new_test_df, a_new_training_df_dict, a_new_test_df_dict
-    return a_new_training_df_dict, a_new_test_df_dict
+        ## extract values:
+        a_new_training_df_dict = self.a_new_training_df_dict
+        # a_new_training_epoch_obj_dict: Dict[types.DecoderName, Epoch] = self.a_new_training_epoch_obj_dict
+        a_new_testing_epoch_obj_dict: Dict[types.DecoderName, Epoch] = self.a_new_testing_epoch_obj_dict
 
+        ## INPUTS: (a_new_training_df_dict, a_new_testing_epoch_obj_dict), (a_new_test_df_dict, a_new_testing_epoch_obj_dict)
+        original_pos_dfs_dict: Dict[types.DecoderName, pd.DataFrame] = {'long': deepcopy(long_session.position.to_dataframe()), 'short': deepcopy(short_session.position.to_dataframe()), 'global': deepcopy(global_session.position.to_dataframe())}
+        # original_pfs_dict: Dict[str, PfND] = {'long_any': deepcopy(long_pf1D_dt), 'short_any': deepcopy(short_pf1D_dt), 'global': deepcopy(global_pf1D_dt)}  ## Uses 1Ddt Placefields
+        # original_pfs_dict: Dict[str, PfND] = {'long': deepcopy(long_pf1D), 'short': deepcopy(short_pf1D), 'global': deepcopy(global_pf1D)} ## Uses 1D Placefields
+        original_pfs_dict: Dict[types.DecoderName, PfND] = {'long': deepcopy(long_pf2D), 'short': deepcopy(short_pf2D), 'global': deepcopy(global_pf2D)} ## Uses 2D Placefields
+
+        # Build new Decoders and Placefields _________________________________________________________________________________ #
+        new_decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = {k:BasePositionDecoder(pf=a_pfs).replacing_computation_epochs(epochs=deepcopy(a_new_training_df_dict[k])) for k, a_pfs in original_pfs_dict.items()} ## build new simple decoders
+        new_pfs_dict: Dict[types.DecoderName, PfND] =  {k:deepcopy(a_new_decoder.pf) for k, a_new_decoder in new_decoder_dict.items()}  ## Uses 2D Placefields
+        ## OUTPUTS: new_decoder_dict, new_pfs_dict
+
+        ## INPUTS: (a_new_training_df_dict, a_new_testing_epoch_obj_dict), (new_decoder_dict, new_pfs_dict)
+
+        ## Do Decoding of only the test epochs to validate performance
+        test_epoch_specific_decoded_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {a_name:a_new_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), filter_epochs=deepcopy(a_new_testing_epoch_obj_dict[a_name]), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False) for a_name, a_new_decoder in new_decoder_dict.items()}
+
+        ## Do Continuous Decoding (for all time (`single_global_epoch`), using the decoder from each epoch)
+        continuous_specific_decoded_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {a_name:a_new_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), filter_epochs=deepcopy(single_global_epoch), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False) for a_name, a_new_decoder in new_decoder_dict.items()}
+
+
+        return test_epoch_specific_decoded_results_dict, continuous_specific_decoded_results_dict, new_decoder_dict, new_pfs_dict
 
 def _single_compute_train_test_split_epochs_decoders(a_decoder: BasePositionDecoder, a_config: Any, an_epoch_training_df: pd.DataFrame, an_epoch_test_df: pd.DataFrame, a_modern_name: str, training_test_suffixes = ['_train', '_test'], debug_print: bool = False): # , debug_output_hdf5_file_path=None, debug_plot: bool = False
     """ Replaces the config and updates/recomputes the computation epochs
