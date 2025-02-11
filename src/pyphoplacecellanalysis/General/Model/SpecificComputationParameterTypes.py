@@ -31,19 +31,22 @@ same_thresh_fraction_of_track: float=0.05, max_ignore_bins:float=2, max_jump_dis
 """
 
 
+attrs_to_params_type_map = { str: param.String, int: param.Integer, float: param.Number, bool: param.Boolean, list: param.List, dict: param.Dict, tuple: param.Tuple, Path: param.Path,
+                Optional[str]: param.String, Optional[int]: param.Integer, Optional[float]: param.Number, Optional[bool]: param.Boolean, Optional[Path]: param.Path,
+                Optional[list]: param.List, Optional[dict]: param.Dict, Optional[tuple]: param.Tuple,
+                }
+
 def attrs_to_parameters(cls):
-    type_map = { str: param.String, int: param.Integer, float: param.Number, bool: param.Boolean, list: param.List, dict: param.Dict, tuple: param.Tuple, Path: param.Path,
-                 Optional[str]: param.String, Optional[int]: param.Integer, Optional[float]: param.Number, Optional[bool]: param.Boolean, Optional[Path]: param.Path,
-                 Optional[list]: param.List, Optional[dict]: param.Dict, Optional[tuple]: param.Tuple,
-                 }
+    """ captures: `attrs_to_params_type_map`
+    """
     for field in attrs.fields(cls):
         default = field.default if field.default is not attrs.NOTHING else None
         # setattr(cls, field.name, param.Parameter(default=default))
         # p_type = type_map.get(field.type, param.Parameter)
-        p_type = type_map.get(field.type, None)
+        p_type = attrs_to_params_type_map.get(field.type, None)
         assert (p_type is not None), f"failed for field: {field}"
-        if field.metadata is None:
-            field.metadata = {} ## initialize
+        # if field.metadata is None:
+        #     field.metadata = {} ## initialize
         ## update the field metadata
         # field.metadata.update(param=p_type(default=default))
         # field.metadata['param'] = p_type(default=default)
@@ -91,7 +94,19 @@ def attrs_to_parameters_container(cls):
                 default = default.factory()
         else:
             default = field.type()
-        setattr(cls, field.name, param.ClassSelector(class_=field.type, default=default))
+        
+        param_obj = param.ClassSelector(class_=field.type, default=default)
+        
+        # setattr(cls, field.name, param_obj)
+        
+        # set the parameter on the class under the same name as the field
+        # setattr(cls, curr_param_class_var_name, param_obj)
+        # setattr(cls, field.name, param_obj)
+        # register the parameter so that Parameterized picks it up
+        # cls._add_parameter(param_obj)
+        # cls.param.add_parameter(curr_param_class_var_name, param_obj)
+        cls.param.add_parameter(field.name, param_obj)
+        
     return cls
 
 
