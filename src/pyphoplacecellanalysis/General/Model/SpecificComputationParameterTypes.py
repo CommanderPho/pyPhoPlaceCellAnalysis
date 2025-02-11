@@ -32,13 +32,44 @@ same_thresh_fraction_of_track: float=0.05, max_ignore_bins:float=2, max_jump_dis
 
 
 def attrs_to_parameters(cls):
+    type_map = { str: param.String, int: param.Integer, float: param.Number, bool: param.Boolean, list: param.List, dict: param.Dict, tuple: param.Tuple }
+    
     for field in attrs.fields(cls):
         default = field.default if field.default is not attrs.NOTHING else None
-        setattr(cls, field.name, param.Parameter(default=default))
+        # setattr(cls, field.name, param.Parameter(default=default))
+        # p_type = type_map.get(field.type, param.Parameter)
+        p_type = type_map.get(field.type, None)
+        assert (p_type is not None), f"failed for field: {field}"
+        
+        setattr(cls, field.name, p_type(default=default))
     return cls
 
 
-@attrs_to_parameters
+# def attrs_to_parameters_container(cls):
+#     """ all fields should be `param.Parameterized` subclasses """
+#     for field in attrs.fields(cls):
+#         field_type = field.type
+#         default = field.default if field.default is not attrs.NOTHING else field_type()
+#         setattr(cls, field.name, param.ClassSelector(class_=field_type, default=default))
+#     return cls
+
+def attrs_to_parameters_container(cls):
+    """ all fields should be `param.Parameterized` subclasses """
+    for field in attrs.fields(cls):
+        if field.default is not attrs.NOTHING:
+            default = field.default
+            if isinstance(default, attrs.Factory):
+                if default.takes_self:
+                    raise ValueError("Factory with takes_self=True is not supported")
+                default = default.factory()
+        else:
+            default = field.type()
+        setattr(cls, field.name, param.ClassSelector(class_=field.type, default=default))
+    return cls
+
+
+
+# @attrs_to_parameters
 class BaseGlobalComputationParameters(BaseConfig, param.Parameterized):
     """ Base class
     """
@@ -355,7 +386,7 @@ class ratemap_peaks_prominence2d_Parameters(HDF_SerializationMixin, AttrsBasedCl
 # Main Class                                                                                                           #
 # ==================================================================================================================== #
 
-@attrs_to_parameters
+@attrs_to_parameters_container
 @define(slots=False)
 class ComputationKWargParameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ The base class for computation parameter types. """
