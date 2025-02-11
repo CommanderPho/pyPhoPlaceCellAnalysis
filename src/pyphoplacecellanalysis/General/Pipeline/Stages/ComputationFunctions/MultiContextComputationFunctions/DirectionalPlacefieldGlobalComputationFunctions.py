@@ -7716,7 +7716,7 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
 
 
 
-    @function_attributes(short_name=None, tags=['row', 'posterior'], input_requires=[], output_provides=[], uses=['add_new_matplotlib_render_plot_widget', 'plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2024-12-18 08:53', related_items=[])
+    @function_attributes(short_name=None, tags=['row', 'posterior'], input_requires=[], output_provides=[], uses=['add_new_matplotlib_render_plot_widget', 'plot_1D_most_likely_position_comparsions'], used_by=['prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs'], creation_date='2024-12-18 08:53', related_items=[])
     @classmethod
     def _perform_add_new_decoded_posterior_row(cls, curr_active_pipeline, active_2d_plot, a_dock_config, a_decoder_name: str, a_position_decoder: BasePositionDecoder, time_window_centers, a_1D_posterior, extended_dock_title_info: Optional[str]=None):
         """ used with `add_pseudo2D_decoder_decoded_epochs` - adds a single decoded row to the matplotlib dynamic output
@@ -7774,6 +7774,25 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
                                                                 active_most_likely_positions_1D=active_most_likely_positions,
                                                                 ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
                                                                 posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
+
+        ## Update the params
+        widget.params.variable_name = variable_name
+        widget.params.posterior_heatmap_imshow_kwargs = deepcopy(posterior_heatmap_imshow_kwargs)
+        widget.params.enable_flat_line_drawing = False
+        if extended_dock_title_info is not None:
+            widget.params.extended_dock_title_info = deepcopy(extended_dock_title_info)
+            
+        ## Update the plots_data
+        if time_window_centers is not None:
+            widget.plots_data.time_window_centers = deepcopy(time_window_centers)
+        if active_bins is not None:
+            widget.plots_data.xbin = deepcopy(active_bins)
+        if active_most_likely_positions is not None:
+            widget.plots_data.active_most_likely_positions = deepcopy(active_most_likely_positions)
+        widget.plots_data.variable_name = variable_name
+        if a_1D_posterior is not None:
+            widget.plots_data.matrix = deepcopy(a_1D_posterior)
+        
 
         widget.draw() # alternative to accessing through full path?
         active_2d_plot.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
