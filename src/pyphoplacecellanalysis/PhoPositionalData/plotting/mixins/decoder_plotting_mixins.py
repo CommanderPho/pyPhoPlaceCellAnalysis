@@ -12,6 +12,9 @@ decoder_name: TypeAlias = str # a string that describes a decoder, such as 'Long
 epoch_split_key: TypeAlias = str # a string that describes a split epoch, such as 'train' or 'test'
 DecoderName = NewType('DecoderName', str)
 from neuropy.core.neuron_identities import NeuronIdentityAccessingMixin
+from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
+from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
+from pyphocorehelpers.DataStructure.general_parameter_containers import RenderPlotsData, VisualizationParameters
 
 from pyphocorehelpers.indexing_helpers import get_dict_subset
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore
@@ -387,6 +390,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     artist_line_dict = field(default=Factory(dict))
     artist_markers_dict = field(default=Factory(dict))
     
+    plots_data_dict_array: List[List[RenderPlotsData]] = field(init=False)
     artist_dict_array: List[List[Dict]] = field(init=False)
     fig = field(default=None)
     axs: NDArray = field(default=None)
@@ -415,7 +419,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
     ## MAIN PLOT FUNCTION:
     @function_attributes(short_name=None, tags=['main', 'plot', 'posterior', 'epoch', 'line', 'trajectory'], input_requires=[], output_provides=[], uses=['self._perform_add_decoded_posterior_and_trajectory'], used_by=['plot_epoch_with_slider_widget'], creation_date='2025-01-29 15:52', related_items=[])
-    def plot_epoch(self, an_epoch_idx: int, time_bin_index: Optional[int]=None, include_most_likely_pos_line: Optional[bool]=None, override_ax=None):
+    def plot_epoch(self, an_epoch_idx: int, time_bin_index: Optional[int]=None, include_most_likely_pos_line: Optional[bool]=None, override_ax=None, should_post_hoc_fit_to_image_extent: bool = True, debug_print:bool = False):
         """ Main plotting function.
              Internally calls `self._perform_add_decoded_posterior_and_trajectory(...)` to do the plotting.
         """
@@ -426,8 +430,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         curr_row = self.row_column_indicies[0][a_linear_index]
         curr_col = self.row_column_indicies[1][a_linear_index]
         curr_artist_dict = self.artist_dict_array[curr_row][curr_col]
-
-
+        curr_plot_data: RenderPlotsData = self.plots_data_dict_array[curr_row][curr_col]
 
 
         if override_ax is None:
@@ -476,10 +479,15 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         curr_artist_dict['markers'].clear() # = {}
         
         ## Perform the plot:
-        curr_artist_dict['prev_heatmaps'], (a_meas_pos_line, a_line), (_meas_pos_out_markers, _out_markers) = self._perform_add_decoded_posterior_and_trajectory(an_ax, xbin_centers=self.xbin_centers, a_p_x_given_n=a_p_x_given_n,
+        curr_artist_dict['prev_heatmaps'], (a_meas_pos_line, a_line), (_meas_pos_out_markers, _out_markers), plots_data = self._perform_add_decoded_posterior_and_trajectory(an_ax, xbin_centers=self.xbin_centers, a_p_x_given_n=a_p_x_given_n,
                                                                             a_time_bin_centers=a_time_bin_centers, a_most_likely_positions=a_most_likely_positions, a_measured_pos_df=a_measured_pos_df, ybin_centers=self.ybin_centers,
-                                                                            include_most_likely_pos_line=include_most_likely_pos_line, time_bin_index=time_bin_index, rotate_to_vertical=self.rotate_to_vertical) # , allow_time_slider=True
+                                                                            include_most_likely_pos_line=include_most_likely_pos_line, time_bin_index=time_bin_index, rotate_to_vertical=self.rotate_to_vertical, should_perform_reshape=True, should_post_hoc_fit_to_image_extent=should_post_hoc_fit_to_image_extent, debug_print=debug_print) # , allow_time_slider=True
 
+
+        ## update the plot_data
+        curr_plot_data.update(plots_data)
+        self.plots_data_dict_array[curr_row][curr_col] = curr_plot_data ## set to the new value
+        
         if a_meas_pos_line is not None:
             curr_artist_dict['lines']['meas'] = a_meas_pos_line
         if _meas_pos_out_markers is not None:
@@ -778,6 +786,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         
         # Build Figures/Axes/Etc _____________________________________________________________________________________________ #
         self.fig, self.axs, self.linear_plotter_indicies, self.row_column_indicies, background_track_shadings = _subfn_build_epochs_multiplotter(curr_num_subplots, all_maze_data)
+        perform_update_title_subtitle(fig=self.fig, ax=None, title_string="DecodedTrajectoryMatplotlibPlotter - plot_decoded_trajectories_2d") # , subtitle_string="TEST - SUBTITLE"
+        
         # generate the pages
         epochs_pages = [list(chunk) for chunk in _subfn_chunks(sess.laps.lap_id, curr_num_subplots)] ## this is specific to actual laps...
          
@@ -793,12 +803,16 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
         ## Build artist holders:
         # MatplotlibRenderPlots
+        self.plots_data_dict_array = []
         self.artist_dict_array = [] ## list
         for a_list in self.row_column_indicies:
             a_new_artists_list = []
+            a_new_plot_data_list = []
             for an_element in a_list:
                 a_new_artists_list.append({'prev_heatmaps': [], 'lines': {}, 'markers': {}}) ## make a new empty dict for each element
+                a_new_plot_data_list.append(RenderPlotsData(f"DecodedTrajectoryMatplotlibPlotter.plot_decoded_trajectories_2d", image_extent=None))
             ## accumulate the lists
+            self.plots_data_dict_array.append(a_new_plot_data_list)
             self.artist_dict_array.append(a_new_artists_list)                
         ## Access via ` self.artist_dict_array[curr_row][curr_col]`, same as the axes
 
@@ -812,7 +826,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     @function_attributes(short_name=None, tags=['plot'], input_requires=[], output_provides=[], uses=[], used_by=['.plot_epoch'], creation_date='2025-01-29 15:53', related_items=[])
     @classmethod
     def _perform_add_decoded_posterior_and_trajectory(cls, an_ax, xbin_centers, a_p_x_given_n, a_time_bin_centers, a_most_likely_positions, ybin_centers=None, a_measured_pos_df: Optional[pd.DataFrame]=None,
-                                                        include_most_likely_pos_line: Optional[bool]=None, time_bin_index: Optional[int]=None, rotate_to_vertical:bool=False, debug_print=False, posterior_masking_value: float = 0.0025, should_perform_reshape: bool=True): # posterior_masking_value: float = 0.01 -- 1D
+                                                        include_most_likely_pos_line: Optional[bool]=None, time_bin_index: Optional[int]=None, rotate_to_vertical:bool=False, debug_print=False, posterior_masking_value: float = 0.0025, should_perform_reshape: bool=True, should_post_hoc_fit_to_image_extent: bool=False): # posterior_masking_value: float = 0.01 -- 1D
         """ Plots the 1D or 2D posterior and most likely position trajectory over the top of an axes created with `fig, axs, laps_pages = plot_decoded_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=8, active_page_index=0, plot_actual_lap_lines=False)`
         
         np.shape(a_time_bin_centers) # 1D & 2D: (12,)
@@ -835,7 +849,6 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
         is_single_time_bin_mode: bool = (time_bin_index is not None) and (time_bin_index != -1)
         assert not is_single_time_bin_mode, f"time_bin_index: {time_bin_index}"
-        
 
         # full_posterior_opacity: float = 0.92
         full_posterior_opacity: float = 1.0
@@ -857,6 +870,10 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             # 2D case
             is_2D = True
 
+
+        if debug_print:
+            print(f'is_single_time_bin_mode: {is_single_time_bin_mode}, is_2D: {is_2D}')
+            
         x_values = deepcopy(xbin_centers)  # Replace with your x axis values
 
         if debug_print:
@@ -931,15 +948,17 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         # ==================================================================================================================== #
         # Plot the Posterior Heatmaps                                                                                          #
         # ==================================================================================================================== #
+        cmap='viridis'
+        
         if not is_2D: # 1D case
             # 1D Case:    
             if is_single_time_bin_mode:
                 assert (time_bin_index < n_time_bins)
-                a_heatmap = an_ax.imshow(masked_posterior[time_bin_index, :], aspect='auto', cmap='viridis', alpha=full_posterior_opacity,
+                a_heatmap = an_ax.imshow(masked_posterior[time_bin_index, :], aspect='auto', cmap=cmap, alpha=full_posterior_opacity,
                                     extent=image_extent,
                                     origin='lower', interpolation='none') # , norm=norm
             else:
-                a_heatmap = an_ax.imshow(masked_posterior, aspect='auto', cmap='viridis', alpha=full_posterior_opacity,
+                a_heatmap = an_ax.imshow(masked_posterior, aspect='auto', cmap=cmap, alpha=full_posterior_opacity,
                                     extent=image_extent,
                                     origin='lower', interpolation='none') # , norm=norm
                 
@@ -956,7 +975,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 assert (time_bin_index < n_time_bins)
                 if debug_print:
                     print(f'\tis_single_time_bin_mode: True!')
-                cmap='viridis'
+                
                 a_heatmap = an_ax.imshow(np.squeeze(masked_posterior[time_bin_index,:,:]), aspect='auto', cmap=cmap, alpha=full_posterior_opacity,
                                 extent=image_extent,
                                 origin='lower', interpolation='none',
@@ -977,7 +996,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                     # cmap = make_red_cmap(time)
                     # viridis_obj = mpl.colormaps['viridis'].resampled(8)
                     # cmap = viridis_obj
-                    cmap='viridis'
+                    # cmap='viridis'
                     a_heatmap = an_ax.imshow(np.squeeze(masked_posterior[i,:,:]), aspect='auto', cmap=cmap, alpha=time_step_opacity,
                                     extent=image_extent,
                                     origin='lower', interpolation='none',
@@ -1024,7 +1043,6 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             x = np.squeeze(x)
             y = np.squeeze(y)
             
-
             if debug_print:
                 print(f'\tFinal Shapes:')
                 print(f'\tnp.shape(x): {np.shape(x)}, np.shape(y): {np.shape(y)}, np.shape(a_measured_time_bin_centers): {np.shape(a_measured_time_bin_centers)}')
@@ -1091,8 +1109,19 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 a_line, _out_markers = cls._helper_add_gradient_line(an_ax, t=a_time_bin_centers, **pos_kwargs, add_markers=True)
         else:
             a_line, _out_markers = None, None
+            
 
-        return heatmaps, (a_meas_pos_line, a_line), (_meas_pos_out_markers, _out_markers)
+        if should_post_hoc_fit_to_image_extent:
+            ## set Axes xlims/ylims post-hoc so they fit
+            an_ax.set_xlim(image_extent[0], image_extent[1])
+            an_ax.set_ylim(image_extent[2], image_extent[3])
+
+
+        # plot_data = MatplotlibRenderPlots(name='_perform_add_decoded_posterior_and_trajectory')
+        # plots = RenderPlots('_perform_add_decoded_posterior_and_trajectory')
+        plots_data = RenderPlotsData(name='_perform_add_decoded_posterior_and_trajectory', image_extent=deepcopy(image_extent))
+
+        return heatmaps, (a_meas_pos_line, a_line), (_meas_pos_out_markers, _out_markers), plots_data
 
 
 from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter import PhoInteractivePlotter
