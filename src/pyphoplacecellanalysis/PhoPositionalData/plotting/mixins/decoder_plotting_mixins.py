@@ -605,49 +605,151 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             return line, None
 
 
-    @function_attributes(short_name=None, tags=['plot', 'posterior', 'helper'], input_requires=[], output_provides=[], uses=[], creation_date='2025-02-11', related_items=[])
-    @classmethod
-    def _helper_add_heatmap(cls, ax, xbin_centers, p_x_given_n, ybin_centers, posterior_masking_value, rotate_to_vertical, debug_print=False):
-        """
-        Helper function to plot the decoded posterior on the provided matplotlib axes.
+    # @function_attributes(short_name=None, tags=['plot', 'posterior', 'helper'], input_requires=[], output_provides=[], uses=[], creation_date='2025-02-11', related_items=[])
+    # @classmethod
+    # def _helper_add_heatmap(cls, ax, xbin_centers, p_x_given_n, ybin_centers, posterior_masking_value, rotate_to_vertical, debug_print=False):
+    #     """
+    #     Helper function to plot the decoded posterior on the provided matplotlib axes.
         
-        Args:
-            ax (matplotlib.axes.Axes): The axes on which to plot.
-            xbin_centers (np.ndarray): The x bin centers for the posterior.
-            p_x_given_n (np.ndarray): The 2D decoded posterior data.
-            ybin_centers (np.ndarray): The y bin centers. If None, uses array index.
-            posterior_masking_value (float): Value below which the posterior is masked.
-            rotate_to_vertical (bool): If True, rotates the posterior data.
-            debug_print (bool): If True, prints debug information.
+    #     Args:
+    #         ax (matplotlib.axes.Axes): The axes on which to plot.
+    #         xbin_centers (np.ndarray): The x bin centers for the posterior.
+    #         p_x_given_n (np.ndarray): The 2D decoded posterior data.
+    #         ybin_centers (np.ndarray): The y bin centers. If None, uses array index.
+    #         posterior_masking_value (float): Value below which the posterior is masked.
+    #         rotate_to_vertical (bool): If True, rotates the posterior data.
+    #         debug_print (bool): If True, prints debug information.
+            
+    #     Returns:
+    #         The image handle from ax.imshow.
+    #     """
+    #     if debug_print:
+    #         print("Original p_x_given_n shape:", p_x_given_n.shape)
+        
+    #     # Apply masking to the posterior data
+    #     masked_posterior = np.where(p_x_given_n < posterior_masking_value, np.nan, p_x_given_n)
+        
+    #     # Rotate the data if specified
+    #     if rotate_to_vertical:
+    #         masked_posterior = np.rot90(masked_posterior)
+        
+    #     # Define the extent for imshow
+    #     if ybin_centers is None:
+    #         y_extent = [0, masked_posterior.shape[0]]
+    #     else:
+    #         y_extent = [ybin_centers[0], ybin_centers[-1]]
+    #     extent = [xbin_centers[0], xbin_centers[-1], y_extent[0], y_extent[1]]
+        
+    #     if debug_print:
+    #         print("Plotting posterior with extent:", extent)
+        
+    #     # Plot the posterior once using imshow
+    #     cax = ax.imshow(masked_posterior, origin='lower', extent=extent, aspect='auto', cmap='viridis')
+        
+    #     return cax
+    
+    @function_attributes(short_name=None, tags=['AI', 'posterior', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 12:00', related_items=[])
+    @classmethod
+    def _helper_add_heatmap(cls, an_ax, xbin_centers, a_p_x_given_n, a_time_bin_centers, ybin_centers=None, rotate_to_vertical:bool=False, debug_print:bool=False, posterior_masking_value: float = 0.0025, full_posterior_opacity: float = 1.0, cmap = 'viridis', should_perform_reshape: bool=True):
+        """
+        Helper that handles all the posterior heatmap plotting (for both 1D and 2D cases).
+        
+        Arguments:
+            an_ax: the matplotlib axes to plot upon.
+            xbin_centers: x axis bin centers.
+            a_p_x_given_n: the decoded posterior array. If should_perform_reshape is True, its transpose is taken.
+            a_time_bin_centers: array of time bin centers.
+            ybin_centers: if provided then a 2D posterior is assumed.
+            rotate_to_vertical: if True, swap the x and y axes.
+            debug_print: if True, prints debug information.
+            posterior_masking_value: values below this are masked.
+            should_perform_reshape: if True, reshapes the posterior.
             
         Returns:
-            The image handle from ax.imshow.
+            heatmaps: list of image handles.
+            image_extent: extent (x_min, x_max, y_min, y_max) used for imshow.
+            extra_dict: dictionary of additional computed values:
+                For 1D: includes 'fake_y_center', 'fake_y_lower_bound', 'fake_y_upper_bound', 'fake_y_arr'.
+                For 2D: may include 'y_values' and the flag 'is_2D': True.
         """
-        if debug_print:
-            print("Original p_x_given_n shape:", p_x_given_n.shape)
-        
-        # Apply masking to the posterior data
-        masked_posterior = np.where(p_x_given_n < posterior_masking_value, np.nan, p_x_given_n)
-        
-        # Rotate the data if specified
-        if rotate_to_vertical:
-            masked_posterior = np.rot90(masked_posterior)
-        
-        # Define the extent for imshow
-        if ybin_centers is None:
-            y_extent = [0, masked_posterior.shape[0]]
+        # Reshape the posterior if necessary.
+        if should_perform_reshape:
+            posterior = deepcopy(a_p_x_given_n).T
         else:
-            y_extent = [ybin_centers[0], ybin_centers[-1]]
-        extent = [xbin_centers[0], xbin_centers[-1], y_extent[0], y_extent[1]]
-        
+            posterior = deepcopy(a_p_x_given_n)
         if debug_print:
-            print("Plotting posterior with extent:", extent)
+            print(f'np.shape(posterior): {np.shape(posterior)}')
         
-        # Plot the posterior once using imshow
-        cax = ax.imshow(masked_posterior, origin='lower', extent=extent, aspect='auto', cmap='viridis')
+        masked_posterior = np.ma.masked_less(posterior, posterior_masking_value)
+        is_2D: bool = (np.ndim(posterior) >= 3)
+        if debug_print:
+            print(f'is_2D: {is_2D}')
         
-        return cax
-    
+        x_values = deepcopy(xbin_centers)
+        extra_dict = {'is_2D': is_2D}
+        
+        if not is_2D:
+            # 1D: Build fake y-axis values from current axes limits.
+            y_min, y_max = an_ax.get_ylim()
+            fake_y_width = (y_max - y_min)
+            fake_y_center: float = y_min + (fake_y_width / 2.0)
+            fake_y_lower_bound: float = fake_y_center - fake_y_width
+            fake_y_upper_bound: float = fake_y_center + fake_y_width
+            fake_y_num_samples: int = len(a_time_bin_centers)
+            fake_y_arr = np.linspace(fake_y_lower_bound, fake_y_upper_bound, fake_y_num_samples)
+            extra_dict.update({
+                'fake_y_center': fake_y_center,
+                'fake_y_lower_bound': fake_y_lower_bound,
+                'fake_y_upper_bound': fake_y_upper_bound,
+                'fake_y_arr': fake_y_arr,
+            })
+            # For plotting, use fake_y values.
+            y_values = np.linspace(fake_y_lower_bound, fake_y_upper_bound, fake_y_num_samples)
+            extra_dict['y_values'] = y_values ## not needed?
+        else:
+            # 2D: use provided ybin_centers.
+            assert ybin_centers is not None, "For 2D posterior, ybin_centers must be provided."
+            y_values = deepcopy(ybin_centers)
+            extra_dict['y_values'] = y_values
+        
+        # Adjust for vertical orientation if requested.
+        if rotate_to_vertical:
+            image_extent = (y_values.min(), y_values.max(), x_values.min(), x_values.max())
+            # Swap x and y arrays.
+            x_values, y_values = y_values, x_values
+            if debug_print:
+                print(f'rotate_to_vertical: swapping axes. Original masked_posterior shape: {np.shape(masked_posterior)}')
+            masked_posterior = masked_posterior.swapaxes(-2, -1)
+            if debug_print:
+                print(f'Post-swap masked_posterior shape: {np.shape(masked_posterior)}')
+        else:
+            image_extent = (x_values.min(), x_values.max(), y_values.min(), y_values.max())
+        
+        
+        n_time_bins: int = len(a_time_bin_centers)
+        masked_shape = np.shape(masked_posterior)
+        Assert.all_equal(n_time_bins, masked_shape[0])
+        
+        
+        heatmaps = []
+        # For simplicity, we assume non-single-time-bin mode (as asserted in the calling function).
+        if not is_2D:
+            a_heatmap = an_ax.imshow(masked_posterior, aspect='auto', cmap=cmap, alpha=full_posterior_opacity,
+                                       extent=image_extent, origin='lower', interpolation='none')
+            heatmaps.append(a_heatmap)
+        else:
+            vmin_global = np.nanmin(posterior)
+            vmax_global = np.nanmax(posterior)
+            # Give a minimum opacity per time step.
+            time_step_opacity: float = max(full_posterior_opacity/float(n_time_bins), 0.2)
+            for i in np.arange(n_time_bins):
+                a_heatmap = an_ax.imshow(np.squeeze(masked_posterior[i, :, :]), aspect='auto', cmap=cmap, alpha=time_step_opacity,
+                                           extent=image_extent, origin='lower', interpolation='none',
+                                           vmin=vmin_global, vmax=vmax_global)
+                heatmaps.append(a_heatmap)
+        return heatmaps, image_extent, extra_dict
+
+
 
     def plot_decoded_trajectories_2d(self, sess, curr_num_subplots=10, active_page_index=0, plot_actual_lap_lines:bool=False, fixed_columns: int = 2, use_theoretical_tracks_instead: bool = True, existing_ax=None, axes_inset_locators_list=None):
         """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots
@@ -895,176 +997,184 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         is_single_time_bin_mode: bool = (time_bin_index is not None) and (time_bin_index != -1)
         assert not is_single_time_bin_mode, f"time_bin_index: {time_bin_index}"
 
-        # full_posterior_opacity: float = 0.92
-        full_posterior_opacity: float = 1.0
+        # # full_posterior_opacity: float = 0.92
+        # full_posterior_opacity: float = 1.0
         
-        ## INPUTS: xbin_centers, a_p_x_given_n, a_time_bin_centers, a_most_likely_positions, ybin_centers=None
-        if should_perform_reshape:
-            posterior = deepcopy(a_p_x_given_n).T # np.shape(posterior): 1D: (56, 27) - (n_t, n_xbins);    2D: (12, 6, 57) - (n_t, n_ybins, n_xbins)
-        else:
-            posterior = deepcopy(a_p_x_given_n) ## do NOT reshape
+        # ## INPUTS: xbin_centers, a_p_x_given_n, a_time_bin_centers, a_most_likely_positions, ybin_centers=None
+        # if should_perform_reshape:
+        #     posterior = deepcopy(a_p_x_given_n).T # np.shape(posterior): 1D: (56, 27) - (n_t, n_xbins);    2D: (12, 6, 57) - (n_t, n_ybins, n_xbins)
+        # else:
+        #     posterior = deepcopy(a_p_x_given_n) ## do NOT reshape
             
-        if debug_print:
-            print(f'np.shape(posterior): {np.shape(posterior)}')
-        # Create a masked array where all values < 0.25 are masked
-        masked_posterior = np.ma.masked_less(posterior, posterior_masking_value)
-        # Define a normalization instance which scales data values to the [0, 1] range
-        # norm = mcolors.Normalize(vmin=np.nanmin(masked_posterior), vmax=np.nanmax(masked_posterior))
-        is_2D: bool = False
-        if np.ndim(posterior) >= 3:
-            # 2D case
-            is_2D = True
+        # if debug_print:
+        #     print(f'np.shape(posterior): {np.shape(posterior)}')
+        # # Create a masked array where all values < 0.25 are masked
+        # masked_posterior = np.ma.masked_less(posterior, posterior_masking_value)
+        # # Define a normalization instance which scales data values to the [0, 1] range
+        # # norm = mcolors.Normalize(vmin=np.nanmin(masked_posterior), vmax=np.nanmax(masked_posterior))
+        # is_2D: bool = False
+        # if np.ndim(posterior) >= 3:
+        #     # 2D case
+        #     is_2D = True
 
 
         if debug_print:
             print(f'is_single_time_bin_mode: {is_single_time_bin_mode}, is_2D: {is_2D}')
             
-        x_values = deepcopy(xbin_centers)  # Replace with your x axis values
+        # x_values = deepcopy(xbin_centers)  # Replace with your x axis values
 
         if debug_print:
             if a_measured_pos_df is not None:
                 print(f'a_measured_pos_df.shape: {a_measured_pos_df.shape}')
         
 
-        if not is_2D: # 1D case
-            # 1D Case:    
-            if include_most_likely_pos_line is None:
-                include_most_likely_pos_line = True # default to True for 2D
-            # Build fake 2D data out of 1D posterior
+        # if not is_2D: # 1D case
+        #     # 1D Case:    
+        #     if include_most_likely_pos_line is None:
+        #         include_most_likely_pos_line = True # default to True for 2D
+        #     # Build fake 2D data out of 1D posterior
                 
-            ## Build the fake y-values from the current axes ylims, which are set when the track graphic is plotted:
-            y_min, y_max = an_ax.get_ylim()
-            fake_y_width = (y_max - y_min)
-            fake_y_center: float = y_min + (fake_y_width / 2.0)
-            fake_y_lower_bound: float = (fake_y_center - fake_y_width)
-            fake_y_upper_bound: float = (fake_y_center + fake_y_width)
+        #     ## Build the fake y-values from the current axes ylims, which are set when the track graphic is plotted:
+        #     y_min, y_max = an_ax.get_ylim()
+        #     fake_y_width = (y_max - y_min)
+        #     fake_y_center: float = y_min + (fake_y_width / 2.0)
+        #     fake_y_lower_bound: float = (fake_y_center - fake_y_width)
+        #     fake_y_upper_bound: float = (fake_y_center + fake_y_width)
 
-            # ## Build the fake-y values from scratch using hardcoded values:
-            # fake_y_width: float = 2.5
-            # fake_y_center: float = 140.0
-            # fake_y_lower_bound: float = (fake_y_center - fake_y_width)
-            # fake_y_upper_bound: float = (fake_y_center + fake_y_width)
+        #     # ## Build the fake-y values from scratch using hardcoded values:
+        #     # fake_y_width: float = 2.5
+        #     # fake_y_center: float = 140.0
+        #     # fake_y_lower_bound: float = (fake_y_center - fake_y_width)
+        #     # fake_y_upper_bound: float = (fake_y_center + fake_y_width)
 
-            fake_y_num_samples: int = 5
-            # y_values = np.linspace(0, 5, 50)    # Replace with your y axis values
-            y_values = np.linspace(fake_y_lower_bound, fake_y_upper_bound, fake_y_num_samples) # Replace with your y axis value
-            # posterior = np.repeat(a_p_x_given_n, repeats=fake_y_num_samples, axis=0)
-            fake_y_num_samples: int = len(a_time_bin_centers)
-            fake_y_arr = np.linspace(fake_y_lower_bound, fake_y_upper_bound, fake_y_num_samples)
+        #     fake_y_num_samples: int = 5
+        #     # y_values = np.linspace(0, 5, 50)    # Replace with your y axis values
+        #     y_values = np.linspace(fake_y_lower_bound, fake_y_upper_bound, fake_y_num_samples) # Replace with your y axis value
+        #     # posterior = np.repeat(a_p_x_given_n, repeats=fake_y_num_samples, axis=0)
+        #     fake_y_num_samples: int = len(a_time_bin_centers)
+        #     fake_y_arr = np.linspace(fake_y_lower_bound, fake_y_upper_bound, fake_y_num_samples)
+        # else:
+        #     # 2D case:
+        #     assert ybin_centers is not None
+        #     y_values = deepcopy(ybin_centers)
+        #     if include_most_likely_pos_line is None:
+        #         include_most_likely_pos_line = False # default to False for 2D
+
+        # ==================================================================================================================== #
+        # Plot the posterior heatmap                                                                                           #
+        # ==================================================================================================================== #
+        # Delegate the posterior plotting functionality.
+        heatmaps, image_extent, extra_dict = cls._helper_add_heatmap(
+            an_ax, xbin_centers, a_p_x_given_n, a_time_bin_centers, ybin_centers=ybin_centers,
+            rotate_to_vertical=rotate_to_vertical, debug_print=debug_print, 
+            posterior_masking_value=posterior_masking_value, should_perform_reshape=should_perform_reshape)
+        
+        is_2D: bool = extra_dict['is_2D']
+        
+        # For 1D case, retrieve fake y values.
+        if np.ndim(deepcopy(a_p_x_given_n)) < 3:
+            fake_y_center = extra_dict['fake_y_center']
+            fake_y_arr = extra_dict['fake_y_arr']
         else:
-            # 2D case:
-            assert ybin_centers is not None
-            y_values = deepcopy(ybin_centers)
-            if include_most_likely_pos_line is None:
-                include_most_likely_pos_line = False # default to False for 2D
-
-        # Plot the posterior heatmap _________________________________________________________________________________________ #
-        # Note: origin='lower' makes sure that the [0, 0] index is at the bottom left corner.
-        n_time_bins: int = len(a_time_bin_centers)
-        a_time_bin_centers_shape = np.shape(a_time_bin_centers)
+            fake_y_center = None
+            fake_y_arr = None
+                    
+        # # Note: origin='lower' makes sure that the [0, 0] index is at the bottom left corner.
+        # n_time_bins: int = len(a_time_bin_centers)
+        # a_time_bin_centers_shape = np.shape(a_time_bin_centers)
         # n_time_bins: int = np.max(a_time_bin_centers_shape)
         # if len(a_time_bin_centers_shape) > 1:
             ## 2D, transpose
             
-        masked_posterior_shape = np.shape(masked_posterior)
-        n_masked_posterior_time_bins: int = masked_posterior_shape[0]
-        # assert n_time_bins == np.shape(masked_posterior)[0]
-        Assert.all_equal(n_time_bins, n_masked_posterior_time_bins)
+        # masked_posterior_shape = np.shape(masked_posterior)
+        # n_masked_posterior_time_bins: int = masked_posterior_shape[0]
+        # # assert n_time_bins == np.shape(masked_posterior)[0]
+        # Assert.all_equal(n_time_bins, n_masked_posterior_time_bins)
 
-        # ==================================================================================================================== #
-        # Convert to vertical orientation if needed                                                                            #
-        # ==================================================================================================================== #
-        if not rotate_to_vertical:
-            image_extent = (x_values.min(), x_values.max(), y_values.min(), y_values.max())
-        else:
-            # vertical:
-            image_extent = (y_values.min(), y_values.max(), x_values.min(), x_values.max())
-            ## swap x and y:
-            y_values_temp = deepcopy(y_values)
-            y_values = deepcopy(x_values)
-            x_values = y_values_temp
-            ## swap the two spatial axes
-            if debug_print:
-                print(f'rotate_to_vertical: True, so swapping masked_posterior axes:\n\tOriginal: {np.shape(masked_posterior)}')
-            masked_posterior = masked_posterior.swapaxes(-2, -1)
-            if debug_print:
-                print(f'\tPost-Swap: {np.shape(masked_posterior)}')
+        # # ==================================================================================================================== #
+        # # Convert to vertical orientation if needed                                                                            #
+        # # ==================================================================================================================== #
+        # if not rotate_to_vertical:
+        #     image_extent = (x_values.min(), x_values.max(), y_values.min(), y_values.max())
+        # else:
+        #     # vertical:
+        #     image_extent = (y_values.min(), y_values.max(), x_values.min(), x_values.max())
+        #     ## swap x and y:
+        #     y_values_temp = deepcopy(y_values)
+        #     y_values = deepcopy(x_values)
+        #     x_values = y_values_temp
+        #     ## swap the two spatial axes
+        #     if debug_print:
+        #         print(f'rotate_to_vertical: True, so swapping masked_posterior axes:\n\tOriginal: {np.shape(masked_posterior)}')
+        #     masked_posterior = masked_posterior.swapaxes(-2, -1)
+        #     if debug_print:
+        #         print(f'\tPost-Swap: {np.shape(masked_posterior)}')
 
-        # ==================================================================================================================== #
-        # Plot the Posterior Heatmaps                                                                                          #
-        # ==================================================================================================================== #
-        # Posterior plotting is delegated to the helper function for drop-in compatibility
-        heatmaps = cls._helper_add_heatmap(
-            an_ax, 
-            xbin_centers, 
-            a_p_x_given_n, 
-            ybin_centers, 
-            posterior_masking_value, 
-            rotate_to_vertical, 
-            time_cmap='viridis',
-            debug_print=debug_print
-        )
+        # # ==================================================================================================================== #
+        # # Plot the Posterior Heatmaps                                                                                          #
+        # # ==================================================================================================================== #
+        # cmap='viridis'
 
-        cmap='viridis'
-
-        if not is_2D: # 1D case
-            # 1D Case:    
-            if is_single_time_bin_mode:
-                assert (time_bin_index < n_time_bins)
-                a_heatmap = an_ax.imshow(masked_posterior[time_bin_index, :], aspect='auto', cmap=cmap, alpha=full_posterior_opacity,
-                                    extent=image_extent,
-                                    origin='lower', interpolation='none') # , norm=norm
-            else:
-                a_heatmap = an_ax.imshow(masked_posterior, aspect='auto', cmap=cmap, alpha=full_posterior_opacity,
-                                    extent=image_extent,
-                                    origin='lower', interpolation='none') # , norm=norm
+        # if not is_2D: # 1D case
+        #     # 1D Case:    
+        #     if is_single_time_bin_mode:
+        #         assert (time_bin_index < n_time_bins)
+        #         a_heatmap = an_ax.imshow(masked_posterior[time_bin_index, :], aspect='auto', cmap=cmap, alpha=full_posterior_opacity,
+        #                             extent=image_extent,
+        #                             origin='lower', interpolation='none') # , norm=norm
+        #     else:
+        #         a_heatmap = an_ax.imshow(masked_posterior, aspect='auto', cmap=cmap, alpha=full_posterior_opacity,
+        #                             extent=image_extent,
+        #                             origin='lower', interpolation='none') # , norm=norm
                 
-            heatmaps = [a_heatmap]
+        #     heatmaps = [a_heatmap]
 
-        else:
-            # 2D case:
-            heatmaps = []
-            vmin_global = np.nanmin(posterior)
-            vmax_global = np.nanmax(posterior)
-            if debug_print:
-                print(f'vmin_global: {vmin_global}, vmax_global: {vmax_global}')
-            if is_single_time_bin_mode:
-                assert (time_bin_index < n_time_bins)
-                if debug_print:
-                    print(f'\tis_single_time_bin_mode: True!')
+        # else:
+        #     # 2D case:
+        #     heatmaps = []
+        #     vmin_global = np.nanmin(posterior)
+        #     vmax_global = np.nanmax(posterior)
+        #     if debug_print:
+        #         print(f'vmin_global: {vmin_global}, vmax_global: {vmax_global}')
+        #     if is_single_time_bin_mode:
+        #         assert (time_bin_index < n_time_bins)
+        #         if debug_print:
+        #             print(f'\tis_single_time_bin_mode: True!')
                 
-                a_heatmap = an_ax.imshow(np.squeeze(masked_posterior[time_bin_index,:,:]), aspect='auto', cmap=cmap, alpha=full_posterior_opacity,
-                                extent=image_extent,
-                                origin='lower', interpolation='none',
-                                vmin=vmin_global, vmax=vmax_global) # , norm=norm
-                heatmaps.append(a_heatmap)
-            else:
-                # plot all of them in a loop:
-                if debug_print:
-                    print(f'\tis_single_time_bin_mode: False!')
-                time_step_opacity: float = full_posterior_opacity/float(n_time_bins) # #TODO 2025-01-29 13:18: - [ ] This is probably not what I want, as it would be very faint when there are large numbers of time bins. Instead I want image multiplication or something.
-                time_step_opacity = max(time_step_opacity, 0.2) # no less than 0.2
-                if debug_print:
-                    print(f'time_step_opacity: {time_step_opacity}')
+        #         a_heatmap = an_ax.imshow(np.squeeze(masked_posterior[time_bin_index,:,:]), aspect='auto', cmap=cmap, alpha=full_posterior_opacity,
+        #                         extent=image_extent,
+        #                         origin='lower', interpolation='none',
+        #                         vmin=vmin_global, vmax=vmax_global) # , norm=norm
+        #         heatmaps.append(a_heatmap)
+        #     else:
+        #         # plot all of them in a loop:
+        #         if debug_print:
+        #             print(f'\tis_single_time_bin_mode: False!')
+        #         time_step_opacity: float = full_posterior_opacity/float(n_time_bins) # #TODO 2025-01-29 13:18: - [ ] This is probably not what I want, as it would be very faint when there are large numbers of time bins. Instead I want image multiplication or something.
+        #         time_step_opacity = max(time_step_opacity, 0.2) # no less than 0.2
+        #         if debug_print:
+        #             print(f'time_step_opacity: {time_step_opacity}')
 
-                for i in np.arange(n_time_bins):
-                    # time = float(i) / (float(n_time_bins) - 1.0)  # Normalize time to be between 0 and 1
-                    # cmap = make_timestep_cmap(time)
-                    # cmap = make_red_cmap(time)
-                    # viridis_obj = mpl.colormaps['viridis'].resampled(8)
-                    # cmap = viridis_obj
-                    # cmap='viridis'
-                    a_heatmap = an_ax.imshow(np.squeeze(masked_posterior[i,:,:]), aspect='auto', cmap=cmap, alpha=time_step_opacity,
-                                    extent=image_extent,
-                                    origin='lower', interpolation='none',
-                                    vmin=vmin_global, vmax=vmax_global) # , norm=norm
-                    heatmaps.append(a_heatmap)
+        #         for i in np.arange(n_time_bins):
+        #             # time = float(i) / (float(n_time_bins) - 1.0)  # Normalize time to be between 0 and 1
+        #             # cmap = make_timestep_cmap(time)
+        #             # cmap = make_red_cmap(time)
+        #             # viridis_obj = mpl.colormaps['viridis'].resampled(8)
+        #             # cmap = viridis_obj
+        #             # cmap='viridis'
+        #             a_heatmap = an_ax.imshow(np.squeeze(masked_posterior[i,:,:]), aspect='auto', cmap=cmap, alpha=time_step_opacity,
+        #                             extent=image_extent,
+        #                             origin='lower', interpolation='none',
+        #                             vmin=vmin_global, vmax=vmax_global) # , norm=norm
+        #             heatmaps.append(a_heatmap)
 
         # # Add colorbar
         # cbar = plt.colorbar(a_heatmap, ax=an_ax)
         # cbar.set_label('Posterior Probability Density')
 
         # Add Gradiant Measured Position (recorded laps) Line ________________________________________________________________ #
+
+            
         if (a_measured_pos_df is not None):
             if debug_print:
                 print(f'plotting measured positions...')
