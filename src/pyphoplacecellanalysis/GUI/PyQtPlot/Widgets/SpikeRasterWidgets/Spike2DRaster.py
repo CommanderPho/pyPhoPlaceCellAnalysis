@@ -1222,6 +1222,13 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             
         return plt
     
+
+    @property
+    def active_embedded_track_pyqtgraph_time_sync_widgets(self) -> Dict[str, PyqtgraphTimeSynchronizedWidget]:
+        """The Dict containing the embedded PyqtgraphTimeSynchronizedWidget belonging to various tracks."""
+        return {identifier:active_matplotlib_view_widget for identifier, active_matplotlib_view_widget in self.ui.matplotlib_view_widgets.items() if active_matplotlib_view_widget.is_pyqtgraph_based()}
+
+
     @function_attributes(short_name=None, tags=['pyqtgraph', 'render_plot_group'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 04:59', related_items=[])
     def create_separate_render_plot_item(self, row=None, col=None, rowspan=1, colspan=1, name='new_curves_separate_plot'):
         """ Adds a separate pyqtgraph independent plot for epoch time rects to the 2D plot above the others:
