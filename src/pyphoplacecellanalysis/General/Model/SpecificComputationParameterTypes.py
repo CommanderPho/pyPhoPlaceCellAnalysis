@@ -226,6 +226,7 @@ class directional_decoders_epoch_heuristic_scoring_Parameters(HDF_SerializationM
         super().to_hdf(file_path, key=key, **kwargs)
         
 
+@attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class directional_decoders_evaluate_epochs_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for directional_decoders_evaluate_epochs_Parameters. 
@@ -236,6 +237,7 @@ class directional_decoders_evaluate_epochs_Parameters(HDF_SerializationMixin, At
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
 
+@attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class directional_train_test_split_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for directional_train_test_split_Parameters. 
@@ -247,6 +249,7 @@ class directional_train_test_split_Parameters(HDF_SerializationMixin, AttrsBased
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
 
+@attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class long_short_decoding_analyses_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for long_short_decoding_analyses_Parameters. 
@@ -261,6 +264,7 @@ class long_short_decoding_analyses_Parameters(HDF_SerializationMixin, AttrsBased
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
 
+@attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class long_short_rate_remapping_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for long_short_rate_remapping_Parameters. 
@@ -273,6 +277,7 @@ class long_short_rate_remapping_Parameters(HDF_SerializationMixin, AttrsBasedCla
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
 
+@attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class long_short_inst_spike_rate_groups_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for long_short_inst_spike_rate_groups_Parameters. 
@@ -283,6 +288,7 @@ class long_short_inst_spike_rate_groups_Parameters(HDF_SerializationMixin, Attrs
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
 
+@attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class wcorr_shuffle_analysis_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for wcorr_shuffle_analysis_Parameters. 
@@ -294,6 +300,7 @@ class wcorr_shuffle_analysis_Parameters(HDF_SerializationMixin, AttrsBasedClassH
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
 
+@attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class perform_specific_epochs_decoding_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for _perform_specific_epochs_decoding_Parameters. 
@@ -306,6 +313,7 @@ class perform_specific_epochs_decoding_Parameters(HDF_SerializationMixin, AttrsB
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
 
+@attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class DEP_ratemap_peaks_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for _DEP_ratemap_peaks_Parameters. 
@@ -316,6 +324,7 @@ class DEP_ratemap_peaks_Parameters(HDF_SerializationMixin, AttrsBasedClassHelper
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
 
+@attrs_to_parameters
 @define(slots=False, eq=False, repr=False)
 class ratemap_peaks_prominence2d_Parameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ Docstring for ratemap_peaks_prominence2d_Parameters. 
