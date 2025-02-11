@@ -3510,17 +3510,37 @@ class AddNewTrackTemplatesDecodedEpochSlicesRows_MatplotlibPlotCommand(BaseMenuC
             matplotlib_view_widget_name: str = matplotlib_view_widget_names_map[a_name]
             a_dock_config = dock_configs[a_name]
             a_decoder_decoded_epochs_result: DecodedFilterEpochsResult = filtered_decoder_filter_epochs_decoder_result_dict[a_name] ## get the result # DecodedFilterEpochsResult
+            slices_active_most_likely_positions_1D = None
             ## Creates a new row with `add_new_matplotlib_render_plot_widget`:
             plot_replay_tuple_dict[a_name] = active_2d_plot.add_new_matplotlib_render_plot_widget(name=matplotlib_view_widget_name, display_config=a_dock_config)
             curr_decoded_replay_matplotlib_view_widget, curr_decoded_replay_fig, curr_decoded_replay_ax = plot_replay_tuple_dict[a_name]
             _out_curr_plot_tuple = plot_slices_1D_most_likely_position_comparsions(curr_active_pipeline.sess.position.to_dataframe(), slices_time_window_centers=[v.centers for v in a_decoder_decoded_epochs_result.time_bin_containers], xbin=a_decoder.xbin.copy(),
                                                                     slices_posteriors=a_decoder_decoded_epochs_result.p_x_given_n_list,
-                                                                    slices_active_most_likely_positions_1D=None, enable_flat_line_drawing=False, ax=curr_decoded_replay_ax[0], debug_print=debug_print,
+                                                                    slices_active_most_likely_positions_1D=slices_active_most_likely_positions_1D, enable_flat_line_drawing=False, ax=curr_decoded_replay_ax[0], debug_print=debug_print,
                                                                     posterior_heatmap_imshow_kwargs=dict(cmap=active_cmap),
                                                                     )
             _, _, curr_out_img_list = _out_curr_plot_tuple
             plot_heatmap_img_list_dict[a_name] = curr_out_img_list
 
+
+            ## Update the params
+            # widget.params.variable_name = variable_name
+            curr_decoded_replay_matplotlib_view_widget.params.posterior_heatmap_imshow_kwargs = deepcopy(dict(cmap=active_cmap))
+            curr_decoded_replay_matplotlib_view_widget.params.enable_flat_line_drawing = False
+            # if extended_dock_title_info is not None:
+            #     widget.params.extended_dock_title_info = deepcopy(extended_dock_title_info)
+                
+            ## Update the plots_data
+            if a_decoder_decoded_epochs_result.time_bin_containers is not None:
+                curr_decoded_replay_matplotlib_view_widget.plots_data.slices_time_window_centers = deepcopy([v.centers for v in a_decoder_decoded_epochs_result.time_bin_containers])
+            if a_decoder.xbin is not None:
+                curr_decoded_replay_matplotlib_view_widget.plots_data.xbin = deepcopy(a_decoder.xbin)
+            if slices_active_most_likely_positions_1D is not None:
+                curr_decoded_replay_matplotlib_view_widget.plots_data.slices_active_most_likely_positions_1D = deepcopy(slices_active_most_likely_positions_1D)
+            # widget.plots_data.variable_name = variable_name
+            if a_decoder_decoded_epochs_result.p_x_given_n_list is not None:
+                curr_decoded_replay_matplotlib_view_widget.plots_data.slices_posteriors = deepcopy(a_decoder_decoded_epochs_result.p_x_given_n_list)
+                
             # long_decoded_replay_fig, long_decoded_replay_ax = _out_long
             active_2d_plot.sync_matplotlib_render_plot_widget(matplotlib_view_widget_name)
             curr_decoded_replay_matplotlib_view_widget.draw()
