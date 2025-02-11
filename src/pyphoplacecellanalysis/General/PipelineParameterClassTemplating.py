@@ -185,8 +185,8 @@ class GlobalComputationParametersAttrsClassTemplating:
         #     container_class_docstring="The base class for computation parameter types."
         # )
 
-        # container_class_should_include_explicit_param_Params_fields: bool = include_explicit_param_Params_fields
-        container_class_should_include_explicit_param_Params_fields: bool = False
+        container_class_should_include_explicit_param_Params_fields: bool = include_explicit_param_Params_fields
+        # container_class_should_include_explicit_param_Params_fields: bool = False
 
         # `attrs_plus_param_container_class_defn_template.py.j2`: Plus `param.Parameterized` implementation
         attrs_plus_param_container_class_defn_template = env.get_template(attrs_container_class_defn_template_filename)
