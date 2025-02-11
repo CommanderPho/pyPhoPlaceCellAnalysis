@@ -6,6 +6,8 @@ from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
 from nptyping import NDArray
 import pyphoplacecellanalysis.General.type_aliases as types
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 import attrs
 from attrs import define, field, Factory, astuple, asdict, fields
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_attribute_field, serialized_field, non_serialized_field
@@ -37,6 +39,8 @@ attrs_to_params_type_map = { str: param.String, int: param.Integer, float: param
                 Optional[list]: param.List, Optional[dict]: param.Dict, Optional[tuple]: param.Tuple,
                 }
 
+
+@function_attributes(short_name=None, tags=['parameters', 'attrs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 02:56', related_items=[])
 def attrs_to_parameters(cls):
     """ captures: `attrs_to_params_type_map`
     """
@@ -84,6 +88,7 @@ def attrs_to_parameters(cls):
 #         setattr(cls, field.name, param.ClassSelector(class_=field_type, default=default))
 #     return cls
 
+@function_attributes(short_name=None, tags=['parameters', 'attrs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 02:56', related_items=[])
 def attrs_to_parameters_container(cls):
     """ all fields should be `param.Parameterized` subclasses """
     for field in attrs.fields(cls):
@@ -287,9 +292,9 @@ class merged_directional_placefields_Parameters(HDF_SerializationMixin, AttrsBas
     ripple_decoding_time_bin_size: float = serialized_attribute_field(default=0.025)
     should_validate_lap_decoding_performance: bool = serialized_attribute_field(default=False)
     ## PARAMS - these are class properties
-    laps_decoding_time_bin_size_PARAM = param.Number(default=0.25)
-    ripple_decoding_time_bin_size_PARAM = param.Number(default=0.025)
-    should_validate_lap_decoding_performance_PARAM = param.Boolean(default=False)
+    laps_decoding_time_bin_size_PARAM = param.Number(default=0.25, doc='laps_decoding_time_bin_size param', label='laps_decoding_time_bin_size')
+    ripple_decoding_time_bin_size_PARAM = param.Number(default=0.025, doc='ripple_decoding_time_bin_size param', label='ripple_decoding_time_bin_size')
+    should_validate_lap_decoding_performance_PARAM = param.Boolean(default=False, doc='should_validate_lap_decoding_performance param', label='should_validate_lap_decoding_performance')
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
@@ -304,10 +309,10 @@ class rank_order_shuffle_analysis_Parameters(HDF_SerializationMixin, AttrsBasedC
     included_qclu_values: list = serialized_field(default=[1, 2, 4, 6, 7, 9])
     skip_laps: bool = serialized_attribute_field(default=False)
     ## PARAMS - these are class properties
-    num_shuffles_PARAM = param.Integer(default=500)
-    minimum_inclusion_fr_Hz_PARAM = param.Number(default=5.0)
-    included_qclu_values_PARAM = param.List(default=[1, 2, 4, 6, 7, 9])
-    skip_laps_PARAM = param.Boolean(default=False)
+    num_shuffles_PARAM = param.Integer(default=500, doc='num_shuffles param', label='num_shuffles')
+    minimum_inclusion_fr_Hz_PARAM = param.Number(default=5.0, doc='minimum_inclusion_fr_Hz param', label='minimum_inclusion_fr_Hz')
+    included_qclu_values_PARAM = param.List(default=[1, 2, 4, 6, 7, 9], doc='included_qclu_values param', label='included_qclu_values')
+    skip_laps_PARAM = param.Boolean(default=False, doc='skip_laps param', label='skip_laps')
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
@@ -320,8 +325,8 @@ class directional_decoders_decode_continuous_Parameters(HDF_SerializationMixin, 
     time_bin_size: Optional[float] = serialized_attribute_field(default=None)
     should_disable_cache: bool = serialized_attribute_field(default=False)
     ## PARAMS - these are class properties
-    time_bin_size_PARAM = param.Number(default=None)
-    should_disable_cache_PARAM = param.Boolean(default=False)
+    time_bin_size_PARAM = param.Number(default=None, doc='time_bin_size param', label='time_bin_size')
+    should_disable_cache_PARAM = param.Boolean(default=False, doc='should_disable_cache param', label='should_disable_cache')
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
@@ -333,7 +338,7 @@ class directional_decoders_evaluate_epochs_Parameters(HDF_SerializationMixin, At
     """
     should_skip_radon_transform: bool = serialized_attribute_field(default=False)
     ## PARAMS - these are class properties
-    should_skip_radon_transform_PARAM = param.Boolean(default=False)
+    should_skip_radon_transform_PARAM = param.Boolean(default=False, doc='should_skip_radon_transform param', label='should_skip_radon_transform')
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
@@ -348,10 +353,10 @@ class directional_decoders_epoch_heuristic_scoring_Parameters(HDF_SerializationM
     max_jump_distance_cm: float = serialized_attribute_field(default=60.0)
     use_bin_units_instead_of_realworld: bool = serialized_attribute_field(default=False)
     ## PARAMS - these are class properties
-    same_thresh_fraction_of_track_PARAM = param.Number(default=0.05)
-    max_ignore_bins_PARAM = param.Integer(default=2)
-    max_jump_distance_cm_PARAM = param.Number(default=60.0)
-    use_bin_units_instead_of_realworld_PARAM = param.Boolean(default=False)
+    same_thresh_fraction_of_track_PARAM = param.Number(default=0.05, doc='same_thresh_fraction_of_track param', label='same_thresh_fraction_of_track')
+    max_ignore_bins_PARAM = param.Integer(default=2, doc='max_ignore_bins param', label='max_ignore_bins')
+    max_jump_distance_cm_PARAM = param.Number(default=60.0, doc='max_jump_distance_cm param', label='max_jump_distance_cm')
+    use_bin_units_instead_of_realworld_PARAM = param.Boolean(default=False, doc='use_bin_units_instead_of_realworld param', label='use_bin_units_instead_of_realworld')
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
@@ -362,10 +367,10 @@ class directional_train_test_split_Parameters(HDF_SerializationMixin, AttrsBased
     """ Docstring for directional_train_test_split_Parameters. 
     """
     training_data_portion: float = serialized_attribute_field(default=0.8333333333333334)
-    debug_output_hdf5_file_path: Optional[Path] = serialized_attribute_field(default=None)
+    debug_output_hdf5_file_path: Optional[pathlib.Path] = serialized_attribute_field(default=None)
     ## PARAMS - these are class properties
-    training_data_portion_PARAM = param.Number(default=0.8333333333333334)
-    debug_output_hdf5_file_path_PARAM = param.Path(default=None)
+    training_data_portion_PARAM = param.Number(default=0.8333333333333334, doc='training_data_portion param', label='training_data_portion')
+    debug_output_hdf5_file_path_PARAM = param.Path(default=None, doc='debug_output_hdf5_file_path param', label='debug_output_hdf5_file_path')
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
@@ -381,11 +386,11 @@ class long_short_decoding_analyses_Parameters(HDF_SerializationMixin, AttrsBased
     override_long_epoch_name: Optional[str] = serialized_attribute_field(default=None)
     override_short_epoch_name: Optional[str] = serialized_attribute_field(default=None)
     ## PARAMS - these are class properties
-    decoding_time_bin_size_PARAM = param.Number(default=None)
-    perform_cache_load_PARAM = param.Boolean(default=False)
-    always_recompute_replays_PARAM = param.Boolean(default=False)
-    override_long_epoch_name_PARAM = param.String(default=None)
-    override_short_epoch_name_PARAM = param.String(default=None)
+    decoding_time_bin_size_PARAM = param.Number(default=None, doc='decoding_time_bin_size param', label='decoding_time_bin_size')
+    perform_cache_load_PARAM = param.Boolean(default=False, doc='perform_cache_load param', label='perform_cache_load')
+    always_recompute_replays_PARAM = param.Boolean(default=False, doc='always_recompute_replays param', label='always_recompute_replays')
+    override_long_epoch_name_PARAM = param.String(default=None, doc='override_long_epoch_name param', label='override_long_epoch_name')
+    override_short_epoch_name_PARAM = param.String(default=None, doc='override_short_epoch_name param', label='override_short_epoch_name')
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
@@ -399,9 +404,9 @@ class long_short_rate_remapping_Parameters(HDF_SerializationMixin, AttrsBasedCla
     perform_cache_load: bool = serialized_attribute_field(default=False)
     always_recompute_replays: bool = serialized_attribute_field(default=False)
     ## PARAMS - these are class properties
-    decoding_time_bin_size_PARAM = param.Number(default=None)
-    perform_cache_load_PARAM = param.Boolean(default=False)
-    always_recompute_replays_PARAM = param.Boolean(default=False)
+    decoding_time_bin_size_PARAM = param.Number(default=None, doc='decoding_time_bin_size param', label='decoding_time_bin_size')
+    perform_cache_load_PARAM = param.Boolean(default=False, doc='perform_cache_load param', label='perform_cache_load')
+    always_recompute_replays_PARAM = param.Boolean(default=False, doc='always_recompute_replays param', label='always_recompute_replays')
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
@@ -413,7 +418,7 @@ class long_short_inst_spike_rate_groups_Parameters(HDF_SerializationMixin, Attrs
     """
     instantaneous_time_bin_size_seconds: Optional[float] = serialized_attribute_field(default=0.01)
     ## PARAMS - these are class properties
-    instantaneous_time_bin_size_seconds_PARAM = param.Number(default=0.01)
+    instantaneous_time_bin_size_seconds_PARAM = param.Number(default=0.01, doc='instantaneous_time_bin_size_seconds param', label='instantaneous_time_bin_size_seconds')
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
@@ -426,8 +431,8 @@ class wcorr_shuffle_analysis_Parameters(HDF_SerializationMixin, AttrsBasedClassH
     num_shuffles: int = serialized_attribute_field(default=1024)
     drop_previous_result_and_compute_fresh: bool = serialized_attribute_field(default=False)
     ## PARAMS - these are class properties
-    num_shuffles_PARAM = param.Integer(default=1024)
-    drop_previous_result_and_compute_fresh_PARAM = param.Boolean(default=False)
+    num_shuffles_PARAM = param.Integer(default=1024, doc='num_shuffles param', label='num_shuffles')
+    drop_previous_result_and_compute_fresh_PARAM = param.Boolean(default=False, doc='drop_previous_result_and_compute_fresh param', label='drop_previous_result_and_compute_fresh')
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
@@ -439,7 +444,7 @@ class position_decoding_Parameters(HDF_SerializationMixin, AttrsBasedClassHelper
     """
     override_decoding_time_bin_size: Optional[float] = serialized_attribute_field(default=None)
     ## PARAMS - these are class properties
-    override_decoding_time_bin_size_PARAM = param.Number(default=None)
+    override_decoding_time_bin_size_PARAM = param.Number(default=None, doc='override_decoding_time_bin_size param', label='override_decoding_time_bin_size')
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
@@ -453,9 +458,9 @@ class perform_specific_epochs_decoding_Parameters(HDF_SerializationMixin, AttrsB
     filter_epochs: str = serialized_attribute_field(default='ripple')
     decoding_time_bin_size: Optional[float] = serialized_attribute_field(default=0.02)
     ## PARAMS - these are class properties
-    decoder_ndim_PARAM = param.Integer(default=2)
-    filter_epochs_PARAM = param.String(default='ripple')
-    decoding_time_bin_size_PARAM = param.Number(default=0.02)
+    decoder_ndim_PARAM = param.Integer(default=2, doc='decoder_ndim param', label='decoder_ndim')
+    filter_epochs_PARAM = param.String(default='ripple', doc='filter_epochs param', label='filter_epochs')
+    decoding_time_bin_size_PARAM = param.Number(default=0.02, doc='decoding_time_bin_size param', label='decoding_time_bin_size')
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
@@ -467,7 +472,7 @@ class DEP_ratemap_peaks_Parameters(HDF_SerializationMixin, AttrsBasedClassHelper
     """
     peak_score_inclusion_percent_threshold: float = serialized_attribute_field(default=0.25)
     ## PARAMS - these are class properties
-    peak_score_inclusion_percent_threshold_PARAM = param.Number(default=0.25)
+    peak_score_inclusion_percent_threshold_PARAM = param.Number(default=0.25, doc='peak_score_inclusion_percent_threshold param', label='peak_score_inclusion_percent_threshold')
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
@@ -483,11 +488,11 @@ class ratemap_peaks_prominence2d_Parameters(HDF_SerializationMixin, AttrsBasedCl
     uniform_blur_size: int = serialized_attribute_field(default=3)
     gaussian_blur_sigma: int = serialized_attribute_field(default=3)
     ## PARAMS - these are class properties
-    step_PARAM = param.Number(default=0.01)
-    peak_height_multiplier_probe_levels_PARAM = param.Tuple(default=(0.5, 0.9))
-    minimum_included_peak_height_PARAM = param.Number(default=0.2)
-    uniform_blur_size_PARAM = param.Integer(default=3)
-    gaussian_blur_sigma_PARAM = param.Integer(default=3)
+    step_PARAM = param.Number(default=0.01, doc='step param', label='step')
+    peak_height_multiplier_probe_levels_PARAM = param.Tuple(default=(0.5, 0.9), doc='peak_height_multiplier_probe_levels param', label='peak_height_multiplier_probe_levels')
+    minimum_included_peak_height_PARAM = param.Number(default=0.2, doc='minimum_included_peak_height param', label='minimum_included_peak_height')
+    uniform_blur_size_PARAM = param.Integer(default=3, doc='uniform_blur_size param', label='uniform_blur_size')
+    gaussian_blur_sigma_PARAM = param.Integer(default=3, doc='gaussian_blur_sigma param', label='gaussian_blur_sigma')
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""

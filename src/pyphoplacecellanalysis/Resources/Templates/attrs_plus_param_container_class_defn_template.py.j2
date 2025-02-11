@@ -30,7 +30,7 @@ class {{ container_class_name }}({{ base_classes | join(', ') }}):
 {{ "    \n    ## PARAMS - these are class properties\n    Line two\n    " }}
 {% for class_name in class_names|default([]) %}
 {% set variable_name = (class_name | lower)[:-11] if (class_name | lower).endswith('_parameters') else (class_name | lower) %}
-    {{ variable_name ~ "_PARAM" }} = {{ type_map[class_name|lower] }}(default=Factory({{ class_name }}))
+    {{ variable_name ~ "_PARAM" }} = {{ type_map[class_name|lower] }}(default=Factory({{ class_name }}), doc='{{ variable_name }} param', label='{{ variable_name }}')
     {# {{ var_tuple[0] }}: {{ var_tuple[1] }} = serialized_attribute_field(default={{ var_tuple[2] }}) #}
 {% endfor %}
 {% endif %}

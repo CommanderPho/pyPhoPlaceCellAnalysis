@@ -52,6 +52,8 @@ class GlobalComputationParametersAttrsClassTemplating:
     # print(_defn_lines)
     # _flat_fields_tuples_list
 
+    
+    #TODO 2025-02-11 02:54: - [ ] returning "pathlib.Path" instead of "Path"
 
     """
     types_override_dict = {'time_bin_size': Optional[float], 'decoding_time_bin_size': Optional[float], 'instantaneous_time_bin_size_seconds': Optional[float],
