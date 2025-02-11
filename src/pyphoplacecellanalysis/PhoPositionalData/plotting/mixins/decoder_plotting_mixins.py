@@ -1018,9 +1018,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         #     is_2D = True
 
 
-        if debug_print:
-            print(f'is_single_time_bin_mode: {is_single_time_bin_mode}, is_2D: {is_2D}')
-            
+
         # x_values = deepcopy(xbin_centers)  # Replace with your x axis values
 
         if debug_print:
@@ -1070,11 +1068,17 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             posterior_masking_value=posterior_masking_value, should_perform_reshape=should_perform_reshape)
         
         is_2D: bool = extra_dict['is_2D']
-        
+        if debug_print:
+            print(f'is_single_time_bin_mode: {is_single_time_bin_mode}, is_2D: {is_2D}')
+            
+
         # For 1D case, retrieve fake y values.
         if np.ndim(deepcopy(a_p_x_given_n)) < 3:
             fake_y_center = extra_dict['fake_y_center']
             fake_y_arr = extra_dict['fake_y_arr']
+            fake_y_lower_bound = extra_dict['fake_y_lower_bound']
+            fake_y_upper_bound = extra_dict['fake_y_upper_bound']
+            
         else:
             fake_y_center = None
             fake_y_arr = None
