@@ -47,7 +47,7 @@ class SingleArtistMultiEpochBatchHelpers:
     """
     @function_attributes(short_name=None, tags=['reshape', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 05:57', related_items=[])
     @classmethod
-    def reshape_p_x_given_n_for_single_artist_display(cls, updated_timebins_p_x_given_n: NDArray, debug_print=False) -> NDArray:
+    def reshape_p_x_given_n_for_single_artist_display(cls, updated_timebins_p_x_given_n: NDArray, rotate_to_vertical: bool = True, should_expand_first_dim: bool=True, debug_print=False) -> NDArray:
         """ 
         from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import reshape_p_x_given_n_for_single_artist_display
         
@@ -55,15 +55,27 @@ class SingleArtistMultiEpochBatchHelpers:
         stacked_p_x_given_n = deepcopy(updated_timebins_p_x_given_n) # drop the last epoch
         if debug_print:
             print(np.shape(stacked_p_x_given_n)) # (76, 40, 33008)
-        stacked_p_x_given_n = np.moveaxis(stacked_p_x_given_n, -1, 0)
+        stacked_p_x_given_n = np.moveaxis(stacked_p_x_given_n, -1, 0) # move the n_t dimension/axis (which starts as last) to be first (0th)
         if debug_print:
             print(np.shape(stacked_p_x_given_n)) # (33008, 76, 40)
-        stacked_p_x_given_n = np.row_stack(stacked_p_x_given_n) # .shape: (99009, 39)
+            
+
+        n_xbins, n_ybins, n_tbins = np.shape(stacked_p_x_given_n) # (76, 40, 29532)        
+        if not rotate_to_vertical:
+            # stacked_p_x_given_n = np.row_stack(stacked_p_x_given_n) # .shape: (99009, 39) - ((n_xbins*n_tbins), n_ybins)
+            stacked_p_x_given_n = np.swapaxes(stacked_p_x_given_n, 1, 2).reshape((-1, n_ybins))
+        else:
+            ## display with y-axis along the primary axis=1
+            # stacked_p_x_given_n = np.column_stack(stacked_p_x_given_n) # .shape: (n_xbins, (n_ybins*n_tbins))
+            stacked_p_x_given_n = stacked_p_x_given_n.reshape(stacked_p_x_given_n.shape[0], stacked_p_x_given_n.shape[1] * stacked_p_x_given_n.shape[2]) # .shape: (n_xbins, (n_ybins*n_tbins))
+
         if debug_print:
             print(np.shape(stacked_p_x_given_n)) # (2508608, 40)
-        stacked_p_x_given_n = np.expand_dims(stacked_p_x_given_n, axis=0)
-        if debug_print:
-            print(np.shape(stacked_p_x_given_n)) # (1, 2508608, 40)
+            
+        if should_expand_first_dim:
+            stacked_p_x_given_n = np.expand_dims(stacked_p_x_given_n, axis=0)
+            if debug_print:
+                print(np.shape(stacked_p_x_given_n)) # (1, 2508608, 40)
         return stacked_p_x_given_n
 
     @classmethod
@@ -72,6 +84,78 @@ class SingleArtistMultiEpochBatchHelpers:
         flat_timebins_p_x_given_n = flat_timebins_p_x_given_n[:, :, desired_epoch_start_idx:desired_epoch_end_idx]
         flat_time_bin_centers = flat_time_bin_centers[desired_epoch_start_idx:desired_epoch_end_idx]
         return flat_timebins_p_x_given_n, flat_time_bin_centers
+
+
+    @classmethod
+    def complete_build_stacked_flat_arrays(cls, a_result, a_new_global_decoder, desired_epoch_start_idx:int=0, desired_epoch_end_idx: Optional[int] = None, rotate_to_vertical: bool = True, should_expand_first_dim: bool=True):
+        """ 
+        a_result: DecodedFilterEpochsResult = subdivided_epochs_specific_decoded_results_dict['global']
+        a_new_global_decoder = new_decoder_dict['global']
+        # delattr(a_result, 'measured_positions_list')
+        a_result.measured_positions_list = deepcopy([global_pos_df[global_pos_df['global_subdivision_idx'] == epoch_idx] for epoch_idx in np.arange(a_result.num_filter_epochs)]) ## add a List[pd.DataFrame] to plot as the measured positions
+        rotate_to_vertical: bool = True
+        should_expand_first_dim: bool=True
+        (n_xbins, n_ybins, n_tbins), (flattened_n_xbins, flattened_n_ybins, flattened_n_tbins), (stacked_p_x_given_n, stacked_flat_time_bin_centers, stacked_flat_xbin_centers, stacked_flat_ybin_centers) = SingleArtistMultiEpochBatchHelpers.complete_build_stacked_flat_arrays(a_result=a_result, a_new_global_decoder=a_new_global_decoder, rotate_to_vertical=rotate_to_vertical, should_expand_first_dim=should_expand_first_dim)
+
+        
+        # Example 2: Filtering to epochs: [0, 20]
+        rotate_to_vertical: bool = True
+        should_expand_first_dim: bool=True
+        (n_xbins, n_ybins, n_tbins), (flattened_n_xbins, flattened_n_ybins, flattened_n_tbins), (stacked_p_x_given_n, stacked_flat_time_bin_centers, stacked_flat_xbin_centers, stacked_flat_ybin_centers) = SingleArtistMultiEpochBatchHelpers.complete_build_stacked_flat_arrays(a_result=a_result, a_new_global_decoder=a_new_global_decoder,
+                                                                                                                                                                                                                                                                                desired_epoch_end_idx=20, rotate_to_vertical=rotate_to_vertical, should_expand_first_dim=should_expand_first_dim)
+                                                                                                                                                                                                                                                                                
+        """
+        n_timebins, flat_time_bin_containers, flat_timebins_p_x_given_n = a_result.flatten()
+        flat_time_bin_containers = flat_time_bin_containers.tolist()
+        flat_time_bin_centers: NDArray = np.hstack([v.centers for v in flat_time_bin_containers])
+
+        # np.shape(flat_time_bin_containers) # (1738,)
+        timebins_p_x_given_n_shape = np.shape(flat_timebins_p_x_given_n) # (76, 40, 29532)
+        n_xbins, n_ybins, n_tbins = timebins_p_x_given_n_shape
+        # (n_xbins, n_ybins, n_tbins)
+        # np.shape(flat_time_bin_centers) # (29532,)
+
+        
+        if desired_epoch_end_idx is not None:
+            ## Filter if desired:
+            flat_timebins_p_x_given_n, flat_time_bin_centers = cls._slice_to_epoch_range(flat_timebins_p_x_given_n=flat_timebins_p_x_given_n, flat_time_bin_centers=flat_time_bin_centers, desired_epoch_start_idx=desired_epoch_start_idx, desired_epoch_end_idx=desired_epoch_end_idx)
+        
+        flattened_timebins_p_x_given_n_shape = np.shape(flat_timebins_p_x_given_n) # (76, 40, 29532)
+        n_xbins, n_ybins, n_tbins = flattened_timebins_p_x_given_n_shape ## MUST BE UPDATED POST SLICE
+        # (n_xbins, n_ybins, n_tbins)
+
+        # flattened_n_xbins, flattened_n_ybins, flattened_n_tbins = flattened_timebins_p_x_given_n_shape
+        # (flattened_n_xbins, flattened_n_ybins, flattened_n_tbins)
+        # np.shape(flat_time_bin_centers) # (29532,)
+        ## OUTPUTS: flat_p_x_given_n, flat_time_bin_centers, 
+        stacked_p_x_given_n = cls.reshape_p_x_given_n_for_single_artist_display(flat_timebins_p_x_given_n, rotate_to_vertical=rotate_to_vertical, should_expand_first_dim=should_expand_first_dim) # (1, 57, 90)
+        # np.shape(stacked_p_x_given_n) # (1, 2244432, 40)
+        
+
+        xbin_centers = deepcopy(a_new_global_decoder.xbin_centers)
+        ybin_centers = deepcopy(a_new_global_decoder.ybin_centers)
+
+        if not rotate_to_vertical:
+            stacked_flat_time_bin_centers = flat_time_bin_centers.repeat(n_xbins) # ((n_xbins*n_tbins), ) -- both are original sizes
+            stacked_flat_xbin_centers = deepcopy(xbin_centers).repeat(n_tbins)  
+            stacked_flat_ybin_centers = deepcopy(ybin_centers)         
+        else:
+            # vertically-oriented tracks (default)
+            stacked_flat_time_bin_centers = flat_time_bin_centers.repeat(n_ybins) # ((n_ybins*n_tbins), ) -- both are original sizes
+            stacked_flat_xbin_centers = deepcopy(xbin_centers)
+            stacked_flat_ybin_centers = deepcopy(ybin_centers).repeat(n_tbins) ## these will lay along the x-axis
+
+        flattened_n_xbins = len(stacked_flat_xbin_centers)
+        flattened_n_ybins = len(stacked_flat_ybin_centers)
+        flattened_n_tbins = len(stacked_flat_time_bin_centers)
+        # (flattened_n_xbins, flattened_n_ybins, flattened_n_tbins)
+
+        if should_expand_first_dim:
+            stacked_flat_time_bin_centers = np.expand_dims(stacked_flat_time_bin_centers, axis=0) # (1, (n_xbins*n_tbins)) or (1, (n_ybins*n_tbins)) -- both are original sizes
+
+        # np.shape(stacked_flat_time_bin_centers) # (1, (n_ybins*n_tbins))
+        ## OUPTUTS: (n_xbins, n_ybins, n_tbins), (flattened_n_xbins, flattened_n_ybins, flattened_n_tbins), (stacked_flat_time_bin_centers, stacked_flat_xbin_centers, stacked_flat_ybin_centers)
+        return (n_xbins, n_ybins, n_tbins), (flattened_n_xbins, flattened_n_ybins, flattened_n_tbins), (stacked_p_x_given_n, stacked_flat_time_bin_centers, stacked_flat_xbin_centers, stacked_flat_ybin_centers)
 
 
     # ==================================================================================================================== #
@@ -268,7 +352,7 @@ class SingleArtistMultiEpochBatchHelpers:
 
     @function_attributes(short_name=None, tags=['new', 'active'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 09:16', related_items=[])
     @classmethod
-    def add_batch_track_shapes(cls, ax, inverse_normalized_track_all_rect_arr_dict, track_kwargs_dict):
+    def add_batch_track_shapes(cls, ax, inverse_normalized_track_all_rect_arr_dict, track_kwargs_dict, transform=None):
         """ 
         
         track_kwargs_dict = {'long': long_kwargs, 'short': short_kwargs}
@@ -281,6 +365,10 @@ class SingleArtistMultiEpochBatchHelpers:
         from matplotlib.collections import PatchCollection
         # import matplotlib.patches as patches
         assert track_kwargs_dict is not None
+
+        extra_transform_kwargs = {}
+        if transform is not None:
+            extra_transform_kwargs['transform'] = transform
         
         track_names_list = ['long', 'short']
         # track_kwargs_dict = {'long': long_kwargs, 'short': short_kwargs}
@@ -296,7 +384,7 @@ class SingleArtistMultiEpochBatchHelpers:
             # matplotlib ax was passed
             data = deepcopy(active_all_rect_arr)
             # rect_patches = [Rectangle((x, y), w, h) for x, y, w, h in data]
-            rect_patches = [Rectangle((x, y), w, h, **matplotlib_rect_kwargs, transform=ax.transData) for x, y, w, h in data] # , transform=ax.transData
+            rect_patches = [Rectangle((x, y), w, h, **matplotlib_rect_kwargs, **extra_transform_kwargs) for x, y, w, h in data] # , transform=ax.transData, transform=ax.transData
             
             # ## legacy patch-based way
             # rect = patches.Rectangle((x, y), w, h, **matplotlib_rect_kwargs)
@@ -641,7 +729,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             an_ax: the matplotlib axes to plot upon.
             xbin_centers: x axis bin centers.
             a_p_x_given_n: the decoded posterior array. If should_perform_reshape is True, its transpose is taken.
-            a_time_bin_centers: array of time bin centers.
+            a_time_bin_centers: array of time bin centers. -- Unused if 2D
             ybin_centers: if provided then a 2D posterior is assumed.
             rotate_to_vertical: if True, swap the x and y axes.
             debug_print: if True, prints debug information.
@@ -702,17 +790,19 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             x_values, y_values = y_values, x_values
             if debug_print:
                 print(f'rotate_to_vertical: swapping axes. Original masked_posterior shape: {np.shape(masked_posterior)}')
-            masked_posterior = masked_posterior.swapaxes(-2, -1)
+            masked_posterior = masked_posterior.swapaxes(-2, -1) ## swap the last two (x, y) axes -- this doesn't work, because
             if debug_print:
                 print(f'Post-swap masked_posterior shape: {np.shape(masked_posterior)}')
         else:
             image_extent = (x_values.min(), x_values.max(), y_values.min(), y_values.max())
         
-        
+        ## set after any swapping:
+        extra_dict['x_values'] = x_values
+        extra_dict['y_values'] = y_values
+
         n_time_bins: int = len(a_time_bin_centers)
         masked_shape = np.shape(masked_posterior)
         Assert.all_equal(n_time_bins, masked_shape[0])
-        
         
         heatmaps = []
         # For simplicity, we assume non-single-time-bin mode (as asserted in the calling function).
