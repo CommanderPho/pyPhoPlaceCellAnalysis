@@ -1,6 +1,7 @@
 import numpy as np
 from attrs import define, Factory, field, fields
 from typing import Callable, List, Dict, Optional
+from neuropy.utils.indexing_helpers import wrap_in_container_if_needed
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 import networkx as nx
@@ -433,6 +434,9 @@ class SpecificComputationValidator:
 
             provided_global_keys
         """
+        # When passing a scalar, it gets wrapped in a list; but when passing an already list-like object, it is returned as-is:
+        probe_fn_names = wrap_in_container_if_needed(probe_fn_names, container_constructor=list)
+        
         found_matching_validators = {}
         provided_global_keys = []
         for a_name, a_validator in remaining_comp_specifiers_dict.items():
@@ -465,6 +469,10 @@ class SpecificComputationValidator:
         provided_global_keys
 
         """
+        # When passing a scalar, it gets wrapped in a list; but when passing an already list-like object, it is returned as-is:
+        provided_global_keys = wrap_in_container_if_needed(provided_global_keys, container_constructor=list)
+        provided_local_keys = wrap_in_container_if_needed(provided_local_keys, container_constructor=list)
+        
         dependent_validators = {}
         for a_name, a_validator in remaining_comp_specifiers_dict.items():
             if a_validator.is_dependency_in_required_global_keys(provided_global_keys):
@@ -501,6 +509,9 @@ class SpecificComputationValidator:
             provided_global_keys # ['DirectionalMergedDecoders', 'DirectionalDecodersEpochsEvaluations', 'SequenceBased']
 
         """
+        # When passing a scalar, it gets wrapped in a list; but when passing an already list-like object, it is returned as-is:
+        probe_fn_names = wrap_in_container_if_needed(probe_fn_names, container_constructor=list)
+        
         provided_global_keys = []
         provided_local_keys = []
         
@@ -529,9 +540,12 @@ class SpecificComputationValidator:
         else:
             found_matching_validators = {}
 
-        if isinstance(probe_provided_result_keys, str):
-            probe_provided_result_keys = [probe_provided_result_keys] ## just a single item, turn it into a single item list
+        # if isinstance(probe_provided_result_keys, str):
+        #     probe_provided_result_keys = [probe_provided_result_keys] ## just a single item, turn it into a single item list
 
+        # When passing a scalar, it gets wrapped in a list; but when passing an already list-like object, it is returned as-is:
+        probe_provided_result_keys = wrap_in_container_if_needed(probe_provided_result_keys, container_constructor=list)
+        
         assert isinstance(probe_provided_result_keys, (list, tuple)), f" it must be a list! type(probe_provided_result_keys): {type(probe_provided_result_keys)}"
 
         for a_name, a_validator in remaining_comp_specifiers_dict.items():
@@ -574,6 +588,9 @@ class SpecificComputationValidator:
         required_global_keys
 
         """
+        required_global_keys = wrap_in_container_if_needed(required_global_keys, container_constructor=list)
+        required_local_keys = wrap_in_container_if_needed(required_local_keys, container_constructor=list)
+        
         required_validators = {}
         for a_name, a_validator in remaining_comp_specifiers_dict.items():
             if a_validator.is_requirement_for_global_keys(required_global_keys):

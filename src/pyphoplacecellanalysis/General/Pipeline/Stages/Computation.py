@@ -20,6 +20,7 @@ from neuropy import core
 from neuropy.core.epoch import Epoch
 from neuropy.analyses.placefields import PlacefieldComputationParameters, perform_compute_placefields
 from neuropy.utils.result_context import IdentifyingContext, DisplaySpecifyingIdentifyingContext
+from neuropy.utils.indexing_helpers import wrap_in_container_if_needed
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters # to replace simple PlacefieldComputationParameters, `load_pickled_global_computation_results`
 from pyphocorehelpers.function_helpers import compose_functions, compose_functions_with_error_handling
@@ -1670,10 +1671,12 @@ class PipelineWithComputedPipelineStageMixin:
         dependent_validators = {}
         for a_name, a_validator in validators.items():
             if provided_global_keys is not None:
+                provided_global_keys = wrap_in_container_if_needed(provided_global_keys, container_constructor=list)
                 for a_changed_key in provided_global_keys:
                     if (a_changed_key in a_validator.results_specification.requires_global_keys):
                         dependent_validators[a_name] = a_validator
             if provided_local_keys is not None:
+                provided_local_keys = wrap_in_container_if_needed(provided_local_keys, container_constructor=list)
                 for a_changed_key in provided_local_keys:
                     if (a_changed_key in a_validator.results_specification.requires_local_keys):
                         dependent_validators[a_name] = a_validator
