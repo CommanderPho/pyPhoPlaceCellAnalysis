@@ -4,7 +4,7 @@ class {{ container_class_name }}({{ base_classes | join(', ') }}):
     """ {{ container_class_docstring | default('Container class for aggregated parameter types.') }} """
 
 {% for class_name in class_names %}
-    {{ class_name | lower }}: {{ class_name }} = serialized_field(default=Factory({{ class_name }}))
+    {{ (class_name | lower)[:-11] if (class_name | lower).endswith('_parameters') else (class_name | lower) }}: {{ class_name }} = serialized_field(default=Factory({{ class_name }}))	
 {% endfor %}
 
     @classmethod
@@ -38,5 +38,5 @@ class {{ container_class_name }}({{ base_classes | join(', ') }}):
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object and its fields to the specified HDF5 file. """
         {% for class_name in class_names %}
-        self.{{ class_name | lower }}.to_hdf(file_path, key=f"{key}/{{ class_name | lower }}")
+        self.{{ (class_name | lower)[:-11] if (class_name | lower).endswith('_parameters') else (class_name | lower) }}.to_hdf(file_path, key=f"{key}/{{ (class_name | lower)[:-11] if (class_name | lower).endswith('_parameters') else (class_name | lower) }}")
         {% endfor %}
