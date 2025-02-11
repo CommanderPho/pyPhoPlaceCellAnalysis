@@ -355,56 +355,153 @@ class ratemap_peaks_prominence2d_Parameters(HDF_SerializationMixin, AttrsBasedCl
 # Main Class                                                                                                           #
 # ==================================================================================================================== #
 
-# @attrs_to_parameters
+@attrs_to_parameters
+@define(slots=False)
+class ComputationKWargParameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
+    """ The base class for computation parameter types. """
+    merged_directional_placefields: merged_directional_placefields_Parameters = serialized_field(default=Factory(merged_directional_placefields_Parameters))	
+    rank_order_shuffle_analysis: rank_order_shuffle_analysis_Parameters = serialized_field(default=Factory(rank_order_shuffle_analysis_Parameters))	
+    directional_decoders_decode_continuous: directional_decoders_decode_continuous_Parameters = serialized_field(default=Factory(directional_decoders_decode_continuous_Parameters))	
+    directional_decoders_evaluate_epochs: directional_decoders_evaluate_epochs_Parameters = serialized_field(default=Factory(directional_decoders_evaluate_epochs_Parameters))	
+    directional_decoders_epoch_heuristic_scoring: directional_decoders_epoch_heuristic_scoring_Parameters = serialized_field(default=Factory(directional_decoders_epoch_heuristic_scoring_Parameters))	
+    directional_train_test_split: directional_train_test_split_Parameters = serialized_field(default=Factory(directional_train_test_split_Parameters))	
+    long_short_decoding_analyses: long_short_decoding_analyses_Parameters = serialized_field(default=Factory(long_short_decoding_analyses_Parameters))	
+    long_short_rate_remapping: long_short_rate_remapping_Parameters = serialized_field(default=Factory(long_short_rate_remapping_Parameters))	
+    long_short_inst_spike_rate_groups: long_short_inst_spike_rate_groups_Parameters = serialized_field(default=Factory(long_short_inst_spike_rate_groups_Parameters))	
+    wcorr_shuffle_analysis: wcorr_shuffle_analysis_Parameters = serialized_field(default=Factory(wcorr_shuffle_analysis_Parameters))	
+    position_decoding: position_decoding_Parameters = serialized_field(default=Factory(position_decoding_Parameters))	
+    perform_specific_epochs_decoding: perform_specific_epochs_decoding_Parameters = serialized_field(default=Factory(perform_specific_epochs_decoding_Parameters))	
+    DEP_ratemap_peaks: DEP_ratemap_peaks_Parameters = serialized_field(default=Factory(DEP_ratemap_peaks_Parameters))	
+    ratemap_peaks_prominence2d: ratemap_peaks_prominence2d_Parameters = serialized_field(default=Factory(ratemap_peaks_prominence2d_Parameters))
+    
+    @classmethod
+    def init_from_pipeline(cls, curr_active_pipeline):
+        """ Initializes an instance from the pipeline object.
+        
+        param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters.init_from_pipeline(curr_active_pipeline=curr_active_pipeline)
+
+        Usage:        
+            from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters
+
+            ## Add `curr_active_pipeline.global_computation_results.computation_config` as needed:
+            if curr_active_pipeline.global_computation_results.computation_config is None:
+                print('global_computation_results.computation_config is None! Making new one!')
+                curr_active_pipeline.global_computation_results.computation_config = ComputationKWargParameters.init_from_pipeline(curr_active_pipeline=curr_active_pipeline)
+                print(f'\tdone. Pipeline needs resave!')
+                
+                
+        """
+        from pyphoplacecellanalysis.General.PipelineParameterClassTemplating import GlobalComputationParametersAttrsClassTemplating
+        
+        # ==================================================================================================================== #
+        # MANUAL                                                                                                               #
+        # ==================================================================================================================== #
+        registered_merged_computation_function_default_kwargs_dict = GlobalComputationParametersAttrsClassTemplating.main_extract_params_default_values(curr_active_pipeline=curr_active_pipeline)
+        
+        ignore_kwarg_names = GlobalComputationParametersAttrsClassTemplating.ignore_kwarg_names
+        registered_merged_computation_function_default_kwargs_dict = {fn_best_name(v):get_fn_kwargs_with_defaults(v, ignore_kwarg_names=ignore_kwarg_names) for k, v in curr_active_pipeline.registered_merged_computation_function_dict.items()}
+        registered_merged_computation_function_default_kwargs_dict = {k:v for k, v in registered_merged_computation_function_default_kwargs_dict.items() if len(v)>0} # filter empty lists
+        
+        # params_class_type_list = [merged_directional_placefields_Parameters, rank_order_shuffle_analysis_Parameters, directional_decoders_decode_continuous_Parameters, directional_decoders_evaluate_epochs_Parameters, directional_train_test_split_Parameters, long_short_decoding_analyses_Parameters, long_short_rate_remapping_Parameters, long_short_inst_spike_rate_groups_Parameters, wcorr_shuffle_analysis_Parameters, perform_specific_epochs_decoding_Parameters, DEP_ratemap_peaks_Parameters, ratemap_peaks_prominence2d_Parameters]
+        # params_class_type_dict = dict(zip({k.removeprefix('_') for k in imports_dict.keys()}, params_class_type_list))
+        # params_class_type_dict = dict(zip({k for k in imports_dict.keys()}, params_class_type_list))
+        # params_class_type_dict = dict(zip(imports_list, params_class_type_list))
+        # params_class_type_dict
+        
+        params_class_type_dict = deepcopy(cls.__annotations__)
+        
+        ## Convert to the new native types
+        ## INPUTS: registered_merged_computation_function_default_kwargs_dict, params_class_type_dict
+        _out_param_typed_parameters_dict = {}
+        for k, v_dict in registered_merged_computation_function_default_kwargs_dict.items():
+            a_type = None
+            final_key: str = k.removeprefix('_')
+            try:
+                a_type = params_class_type_dict[final_key] # KeyError: 'directional_decoders_epoch_heuristic_scoring'
+                _out_param_typed_parameters_dict[final_key] = a_type(**v_dict)
+            
+            except Exception as e:
+                print(f'k: {k}, final_key: {final_key}, v_dict: {v_dict}')
+                print(f'\ta_type: {a_type}')
+                raise
+
+            # a_type = params_class_type_dict[k]
+            # _out_param_typed_parameters_dict[k.removeprefix('_')] = a_type(**v_dict)
+        # _out_param_typed_parameters_dict
+
+        ## OUTPUTS: _out_param_typed_parameters_dict
+        # param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters(**_out_param_typed_parameters_dict)
+        param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters(**_out_param_typed_parameters_dict)
+        return param_typed_parameters
+    
+        # # ==================================================================================================================== #
+        # # AUTOGEN                                                                                                              #
+        # # ==================================================================================================================== #
+        # params_class_type_dict = deepcopy(cls.__annotations__)
+        # registered_merged_computation_function_default_kwargs_dict = (
+        #     GlobalComputationParametersAttrsClassTemplating.main_extract_params_default_values(curr_active_pipeline=curr_active_pipeline)
+        # )
+        # ignore_kwarg_names = GlobalComputationParametersAttrsClassTemplating.ignore_kwarg_names
+        # registered_merged_computation_function_default_kwargs_dict = {
+        #     fn_best_name(v): get_fn_kwargs_with_defaults(v, ignore_kwarg_names=ignore_kwarg_names)
+        #     for k, v in curr_active_pipeline.registered_merged_computation_function_dict.items()
+        # }
+        # registered_merged_computation_function_default_kwargs_dict = {
+        #     k: v for k, v in registered_merged_computation_function_default_kwargs_dict.items() if len(v) > 0
+        # }
+        # _out_param_typed_parameters_dict = {}
+        # for k, v_dict in registered_merged_computation_function_default_kwargs_dict.items():
+        #     final_key = k.removeprefix('_')
+        #     try:
+        #         a_type = params_class_type_dict[final_key]
+        #         _out_param_typed_parameters_dict[final_key] = a_type(**v_dict)
+        #     except Exception as e:
+        #         print(f"Error initializing field: {k}, {final_key}, {v_dict}, {e}")
+        #         raise
+        # return cls(**_out_param_typed_parameters_dict)
+
+    def to_hdf(self, file_path, key: str, **kwargs):
+        """ Saves the object and its fields to the specified HDF5 file. """
+        # get_serialized_dataset_fields = self.get_serialized_dataset_fields(serialization_format='hdf')
+        self.merged_directional_placefields.to_hdf(file_path, key=f"{key}/merged_directional_placefields")
+        self.rank_order_shuffle_analysis.to_hdf(file_path, key=f"{key}/rank_order_shuffle_analysis")
+        self.directional_decoders_decode_continuous.to_hdf(file_path, key=f"{key}/directional_decoders_decode_continuous")
+        self.directional_decoders_evaluate_epochs.to_hdf(file_path, key=f"{key}/directional_decoders_evaluate_epochs")
+        self.directional_decoders_epoch_heuristic_scoring.to_hdf(file_path, key=f"{key}/directional_decoders_epoch_heuristic_scoring")
+        self.directional_train_test_split.to_hdf(file_path, key=f"{key}/directional_train_test_split")
+        self.long_short_decoding_analyses.to_hdf(file_path, key=f"{key}/long_short_decoding_analyses")
+        self.long_short_rate_remapping.to_hdf(file_path, key=f"{key}/long_short_rate_remapping")
+        self.long_short_inst_spike_rate_groups.to_hdf(file_path, key=f"{key}/long_short_inst_spike_rate_groups")
+        self.wcorr_shuffle_analysis.to_hdf(file_path, key=f"{key}/wcorr_shuffle_analysis")
+        self.position_decoding.to_hdf(file_path, key=f"{key}/position_decoding")
+        self.perform_specific_epochs_decoding.to_hdf(file_path, key=f"{key}/perform_specific_epochs_decoding")
+        self.DEP_ratemap_peaks.to_hdf(file_path, key=f"{key}/DEP_ratemap_peaks")
+        self.ratemap_peaks_prominence2d.to_hdf(file_path, key=f"{key}/ratemap_peaks_prominence2d")
+        # super().to_hdf(file_path, key=key, **kwargs)
+
+
+# @attrs_to_parameters ## added manually
 # @define(slots=False)
 # class ComputationKWargParameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
-#     """ The base class for computation parameter types. 
+#     """ the base class
+    
 #     from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters, merged_directional_placefields_Parameters, rank_order_shuffle_analysis_Parameters, directional_decoders_decode_continuous_Parameters, directional_decoders_evaluate_epochs_Parameters, directional_train_test_split_Parameters, long_short_decoding_analyses_Parameters, long_short_rate_remapping_Parameters, long_short_inst_spike_rate_groups_Parameters, wcorr_shuffle_analysis_Parameters, _perform_specific_epochs_decoding_Parameters, _DEP_ratemap_peaks_Parameters, ratemap_peaks_prominence2d_Parameters
 
+    
 #     """
-#     merged_directional_placefields_parameters: merged_directional_placefields_Parameters = serialized_field(default=Factory(merged_directional_placefields_Parameters))
-#     rank_order_shuffle_analysis_parameters: rank_order_shuffle_analysis_Parameters = serialized_field(default=Factory(rank_order_shuffle_analysis_Parameters))
-#     directional_decoders_decode_continuous_parameters: directional_decoders_decode_continuous_Parameters = serialized_field(default=Factory(directional_decoders_decode_continuous_Parameters))
-#     directional_decoders_evaluate_epochs_parameters: directional_decoders_evaluate_epochs_Parameters = serialized_field(default=Factory(directional_decoders_evaluate_epochs_Parameters))
-#     directional_decoders_epoch_heuristic_scoring_parameters: directional_decoders_epoch_heuristic_scoring_Parameters = serialized_field(default=Factory(directional_decoders_epoch_heuristic_scoring_Parameters))
-#     directional_train_test_split_parameters: directional_train_test_split_Parameters = serialized_field(default=Factory(directional_train_test_split_Parameters))
-#     long_short_decoding_analyses_parameters: long_short_decoding_analyses_Parameters = serialized_field(default=Factory(long_short_decoding_analyses_Parameters))
-#     long_short_rate_remapping_parameters: long_short_rate_remapping_Parameters = serialized_field(default=Factory(long_short_rate_remapping_Parameters))
-#     long_short_inst_spike_rate_groups_parameters: long_short_inst_spike_rate_groups_Parameters = serialized_field(default=Factory(long_short_inst_spike_rate_groups_Parameters))
-#     wcorr_shuffle_analysis_parameters: wcorr_shuffle_analysis_Parameters = serialized_field(default=Factory(wcorr_shuffle_analysis_Parameters))
-#     position_decoding_parameters: position_decoding_Parameters = serialized_field(default=Factory(position_decoding_Parameters))
-#     _perform_specific_epochs_decoding_parameters: _perform_specific_epochs_decoding_Parameters = serialized_field(default=Factory(_perform_specific_epochs_decoding_Parameters))
-#     _dep_ratemap_peaks_parameters: _DEP_ratemap_peaks_Parameters = serialized_field(default=Factory(_DEP_ratemap_peaks_Parameters))
-#     ratemap_peaks_prominence2d_parameters: ratemap_peaks_prominence2d_Parameters = serialized_field(default=Factory(ratemap_peaks_prominence2d_Parameters))
-    
-#     # @classmethod
-#     # def init_from_pipeline(cls, curr_active_pipeline):
-#     #     """ Initializes an instance from the pipeline object. """
-#     #     from pyphoplacecellanalysis.General.PipelineParameterClassTemplating import GlobalComputationParametersAttrsClassTemplating
-        
-#     #     params_class_type_dict = deepcopy(cls.__annotations__)
-#     #     registered_merged_computation_function_default_kwargs_dict = (
-#     #         GlobalComputationParametersAttrsClassTemplating.main_extract_params_default_values(curr_active_pipeline=curr_active_pipeline)
-#     #     )
-#     #     ignore_kwarg_names = GlobalComputationParametersAttrsClassTemplating.ignore_kwarg_names
-#     #     registered_merged_computation_function_default_kwargs_dict = {
-#     #         fn_best_name(v): get_fn_kwargs_with_defaults(v, ignore_kwarg_names=ignore_kwarg_names)
-#     #         for k, v in curr_active_pipeline.registered_merged_computation_function_dict.items()
-#     #     }
-#     #     registered_merged_computation_function_default_kwargs_dict = {
-#     #         k: v for k, v in registered_merged_computation_function_default_kwargs_dict.items() if len(v) > 0
-#     #     }
-#     #     _out_param_typed_parameters_dict = {}
-#     #     for k, v_dict in registered_merged_computation_function_default_kwargs_dict.items():
-#     #         final_key = k.removeprefix('_')
-#     #         try:
-#     #             a_type = params_class_type_dict[final_key]
-#     #             _out_param_typed_parameters_dict[final_key] = a_type(**v_dict)
-#     #         except Exception as e:
-#     #             print(f"Error initializing field: {k}, {final_key}, {v_dict}, {e}")
-#     #             raise
-#     #     return cls(**_out_param_typed_parameters_dict)
-    
+#     merged_directional_placefields: merged_directional_placefields_Parameters = serialized_field(default=Factory(merged_directional_placefields_Parameters))
+#     rank_order_shuffle_analysis: rank_order_shuffle_analysis_Parameters = serialized_field(default=Factory(rank_order_shuffle_analysis_Parameters))
+#     directional_decoders_decode_continuous: directional_decoders_decode_continuous_Parameters = serialized_field(default=Factory(directional_decoders_decode_continuous_Parameters))
+#     directional_decoders_epoch_heuristic_scoring: directional_decoders_epoch_heuristic_scoring_Parameters = serialized_field(default=Factory(directional_decoders_epoch_heuristic_scoring_Parameters))
+#     directional_decoders_evaluate_epochs: directional_decoders_evaluate_epochs_Parameters = serialized_field(default=Factory(directional_decoders_evaluate_epochs_Parameters))
+#     directional_train_test_split: directional_train_test_split_Parameters = serialized_field(default=Factory(directional_train_test_split_Parameters))
+#     long_short_decoding_analyses: long_short_decoding_analyses_Parameters = serialized_field(default=Factory(long_short_decoding_analyses_Parameters))
+#     long_short_rate_remapping: long_short_rate_remapping_Parameters = serialized_field(default=Factory(long_short_rate_remapping_Parameters))
+#     long_short_inst_spike_rate_groups: long_short_inst_spike_rate_groups_Parameters = serialized_field(default=Factory(long_short_inst_spike_rate_groups_Parameters))
+#     wcorr_shuffle_analysis: wcorr_shuffle_analysis_Parameters = serialized_field(default=Factory(wcorr_shuffle_analysis_Parameters))
+#     perform_specific_epochs_decoding: perform_specific_epochs_decoding_Parameters = serialized_field(default=Factory(perform_specific_epochs_decoding_Parameters))
+#     DEP_ratemap_peaks: DEP_ratemap_peaks_Parameters = serialized_field(default=Factory(DEP_ratemap_peaks_Parameters))
+#     ratemap_peaks_prominence2d: ratemap_peaks_prominence2d_Parameters = serialized_field(default=Factory(ratemap_peaks_prominence2d_Parameters))
 
 #     @classmethod
 #     def init_from_pipeline(cls, curr_active_pipeline):
@@ -422,9 +519,6 @@ class ratemap_peaks_prominence2d_Parameters(HDF_SerializationMixin, AttrsBasedCl
                 
             
 #         """
-#         # ==================================================================================================================== #
-#         # Manual                                                                                                               #
-#         # ==================================================================================================================== #
 #         from pyphoplacecellanalysis.General.PipelineParameterClassTemplating import GlobalComputationParametersAttrsClassTemplating
         
 #         registered_merged_computation_function_default_kwargs_dict = GlobalComputationParametersAttrsClassTemplating.main_extract_params_default_values(curr_active_pipeline=curr_active_pipeline)
@@ -464,28 +558,13 @@ class ratemap_peaks_prominence2d_Parameters(HDF_SerializationMixin, AttrsBasedCl
 #         # param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters(**_out_param_typed_parameters_dict)
 #         param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters(**_out_param_typed_parameters_dict)
 #         return param_typed_parameters
-    
-    
 
+#         ## OUTPUTS: param_typed_parameters
+
+
+#     # HDFMixin Conformances ______________________________________________________________________________________________ #
 #     def to_hdf(self, file_path, key: str, **kwargs):
-#         """ Saves the object and its fields to the specified HDF5 file. """
-#         # self.merged_directional_placefields_parameters.to_hdf(file_path, key=f"{key}/merged_directional_placefields_parameters")
-#         # self.rank_order_shuffle_analysis_parameters.to_hdf(file_path, key=f"{key}/rank_order_shuffle_analysis_parameters")
-#         # self.directional_decoders_decode_continuous_parameters.to_hdf(file_path, key=f"{key}/directional_decoders_decode_continuous_parameters")
-#         # self.directional_decoders_evaluate_epochs_parameters.to_hdf(file_path, key=f"{key}/directional_decoders_evaluate_epochs_parameters")
-#         # self.directional_decoders_epoch_heuristic_scoring_parameters.to_hdf(file_path, key=f"{key}/directional_decoders_epoch_heuristic_scoring_parameters")
-#         # self.directional_train_test_split_parameters.to_hdf(file_path, key=f"{key}/directional_train_test_split_parameters")
-#         # self.long_short_decoding_analyses_parameters.to_hdf(file_path, key=f"{key}/long_short_decoding_analyses_parameters")
-#         # self.long_short_rate_remapping_parameters.to_hdf(file_path, key=f"{key}/long_short_rate_remapping_parameters")
-#         # self.long_short_inst_spike_rate_groups_parameters.to_hdf(file_path, key=f"{key}/long_short_inst_spike_rate_groups_parameters")
-#         # self.wcorr_shuffle_analysis_parameters.to_hdf(file_path, key=f"{key}/wcorr_shuffle_analysis_parameters")
-#         # self.position_decoding_parameters.to_hdf(file_path, key=f"{key}/position_decoding_parameters")
-#         # self._perform_specific_epochs_decoding_parameters.to_hdf(file_path, key=f"{key}/_perform_specific_epochs_decoding_parameters")
-#         # self._dep_ratemap_peaks_parameters.to_hdf(file_path, key=f"{key}/_dep_ratemap_peaks_parameters")
-#         # self.ratemap_peaks_prominence2d_parameters.to_hdf(file_path, key=f"{key}/ratemap_peaks_prominence2d_parameters")
-#         # ==================================================================================================================== #
-#         # Manual                                                                                                               #
-#         # ==================================================================================================================== #
+#         """ Saves the object to key in the hdf5 file specified by file_path"""
 #         # get_serialized_dataset_fields = self.get_serialized_dataset_fields(serialization_format='hdf')
 #         # self.merged_directional_placefields.to_hdf(file_path=file_path, key=f"{key}/merged_directional_placefields")
 #         # self.rank_order_shuffle_analysis.to_hdf(file_path=file_path, key=f"{key}/rank_order_shuffle_analysis")
@@ -502,109 +581,4 @@ class ratemap_peaks_prominence2d_Parameters(HDF_SerializationMixin, AttrsBasedCl
 #         self.DEP_ratemap_peaks.to_hdf(file_path, key=f'{key}/DEP_ratemap_peaks')
 #         self.ratemap_peaks_prominence2d.to_hdf(file_path, key=f'{key}/ratemap_peaks_prominence2d')
 #         # super().to_hdf(file_path, key=key, **kwargs)
-        
-
-
-
-@attrs_to_parameters ## added manually
-@define(slots=False)
-class ComputationKWargParameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
-    """ the base class
-    
-    from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters, merged_directional_placefields_Parameters, rank_order_shuffle_analysis_Parameters, directional_decoders_decode_continuous_Parameters, directional_decoders_evaluate_epochs_Parameters, directional_train_test_split_Parameters, long_short_decoding_analyses_Parameters, long_short_rate_remapping_Parameters, long_short_inst_spike_rate_groups_Parameters, wcorr_shuffle_analysis_Parameters, _perform_specific_epochs_decoding_Parameters, _DEP_ratemap_peaks_Parameters, ratemap_peaks_prominence2d_Parameters
-
-    
-    """
-    merged_directional_placefields: merged_directional_placefields_Parameters = serialized_field(default=Factory(merged_directional_placefields_Parameters))
-    rank_order_shuffle_analysis: rank_order_shuffle_analysis_Parameters = serialized_field(default=Factory(rank_order_shuffle_analysis_Parameters))
-    directional_decoders_decode_continuous: directional_decoders_decode_continuous_Parameters = serialized_field(default=Factory(directional_decoders_decode_continuous_Parameters))
-    directional_decoders_epoch_heuristic_scoring: directional_decoders_epoch_heuristic_scoring_Parameters = serialized_field(default=Factory(directional_decoders_epoch_heuristic_scoring_Parameters))
-    directional_decoders_evaluate_epochs: directional_decoders_evaluate_epochs_Parameters = serialized_field(default=Factory(directional_decoders_evaluate_epochs_Parameters))
-    directional_train_test_split: directional_train_test_split_Parameters = serialized_field(default=Factory(directional_train_test_split_Parameters))
-    long_short_decoding_analyses: long_short_decoding_analyses_Parameters = serialized_field(default=Factory(long_short_decoding_analyses_Parameters))
-    long_short_rate_remapping: long_short_rate_remapping_Parameters = serialized_field(default=Factory(long_short_rate_remapping_Parameters))
-    long_short_inst_spike_rate_groups: long_short_inst_spike_rate_groups_Parameters = serialized_field(default=Factory(long_short_inst_spike_rate_groups_Parameters))
-    wcorr_shuffle_analysis: wcorr_shuffle_analysis_Parameters = serialized_field(default=Factory(wcorr_shuffle_analysis_Parameters))
-    perform_specific_epochs_decoding: perform_specific_epochs_decoding_Parameters = serialized_field(default=Factory(perform_specific_epochs_decoding_Parameters))
-    DEP_ratemap_peaks: DEP_ratemap_peaks_Parameters = serialized_field(default=Factory(DEP_ratemap_peaks_Parameters))
-    ratemap_peaks_prominence2d: ratemap_peaks_prominence2d_Parameters = serialized_field(default=Factory(ratemap_peaks_prominence2d_Parameters))
-
-    @classmethod
-    def init_from_pipeline(cls, curr_active_pipeline):
-        """ 
-        param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters.init_from_pipeline(curr_active_pipeline=curr_active_pipeline)
-
-        Usage:        
-            from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters
-
-            ## Add `curr_active_pipeline.global_computation_results.computation_config` as needed:
-            if curr_active_pipeline.global_computation_results.computation_config is None:
-                print('global_computation_results.computation_config is None! Making new one!')
-                curr_active_pipeline.global_computation_results.computation_config = ComputationKWargParameters.init_from_pipeline(curr_active_pipeline=curr_active_pipeline)
-                print(f'\tdone. Pipeline needs resave!')
-                
-            
-        """
-        from pyphoplacecellanalysis.General.PipelineParameterClassTemplating import GlobalComputationParametersAttrsClassTemplating
-        
-        registered_merged_computation_function_default_kwargs_dict = GlobalComputationParametersAttrsClassTemplating.main_extract_params_default_values(curr_active_pipeline=curr_active_pipeline)
-        
-        ignore_kwarg_names = GlobalComputationParametersAttrsClassTemplating.ignore_kwarg_names
-        registered_merged_computation_function_default_kwargs_dict = {fn_best_name(v):get_fn_kwargs_with_defaults(v, ignore_kwarg_names=ignore_kwarg_names) for k, v in curr_active_pipeline.registered_merged_computation_function_dict.items()}
-        registered_merged_computation_function_default_kwargs_dict = {k:v for k, v in registered_merged_computation_function_default_kwargs_dict.items() if len(v)>0} # filter empty lists
-        
-        # params_class_type_list = [merged_directional_placefields_Parameters, rank_order_shuffle_analysis_Parameters, directional_decoders_decode_continuous_Parameters, directional_decoders_evaluate_epochs_Parameters, directional_train_test_split_Parameters, long_short_decoding_analyses_Parameters, long_short_rate_remapping_Parameters, long_short_inst_spike_rate_groups_Parameters, wcorr_shuffle_analysis_Parameters, perform_specific_epochs_decoding_Parameters, DEP_ratemap_peaks_Parameters, ratemap_peaks_prominence2d_Parameters]
-        # params_class_type_dict = dict(zip({k.removeprefix('_') for k in imports_dict.keys()}, params_class_type_list))
-        # params_class_type_dict = dict(zip({k for k in imports_dict.keys()}, params_class_type_list))
-        # params_class_type_dict = dict(zip(imports_list, params_class_type_list))
-        # params_class_type_dict
-        
-        params_class_type_dict = deepcopy(cls.__annotations__)
-        
-        ## Convert to the new native types
-        ## INPUTS: registered_merged_computation_function_default_kwargs_dict, params_class_type_dict
-        _out_param_typed_parameters_dict = {}
-        for k, v_dict in registered_merged_computation_function_default_kwargs_dict.items():
-            a_type = None
-            final_key: str = k.removeprefix('_')
-            try:
-                a_type = params_class_type_dict[final_key] # KeyError: 'directional_decoders_epoch_heuristic_scoring'
-                _out_param_typed_parameters_dict[final_key] = a_type(**v_dict)
-            
-            except Exception as e:
-                print(f'k: {k}, final_key: {final_key}, v_dict: {v_dict}')
-                print(f'\ta_type: {a_type}')
-                raise
-
-            # a_type = params_class_type_dict[k]
-            # _out_param_typed_parameters_dict[k.removeprefix('_')] = a_type(**v_dict)
-        # _out_param_typed_parameters_dict
-
-        ## OUTPUTS: _out_param_typed_parameters_dict
-        # param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters(**_out_param_typed_parameters_dict)
-        param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters(**_out_param_typed_parameters_dict)
-        return param_typed_parameters
-
-        ## OUTPUTS: param_typed_parameters
-
-
-    # HDFMixin Conformances ______________________________________________________________________________________________ #
-    def to_hdf(self, file_path, key: str, **kwargs):
-        """ Saves the object to key in the hdf5 file specified by file_path"""
-        # get_serialized_dataset_fields = self.get_serialized_dataset_fields(serialization_format='hdf')
-        # self.merged_directional_placefields.to_hdf(file_path=file_path, key=f"{key}/merged_directional_placefields")
-        # self.rank_order_shuffle_analysis.to_hdf(file_path=file_path, key=f"{key}/rank_order_shuffle_analysis")
-        self.merged_directional_placefields.to_hdf(file_path, key=f'{key}/merged_directional_placefields')
-        self.rank_order_shuffle_analysis.to_hdf(file_path, key=f'{key}/rank_order_shuffle_analysis')
-        self.directional_decoders_decode_continuous.to_hdf(file_path=file_path, key=f"{key}/directional_decoders_decode_continuous")
-        self.directional_decoders_evaluate_epochs.to_hdf(file_path=file_path, key=f"{key}/directional_decoders_evaluate_epochs")
-        self.directional_train_test_split.to_hdf(file_path, key=f'{key}/directional_train_test_split')
-        self.long_short_decoding_analyses.to_hdf(file_path, key=f'{key}/long_short_decoding_analyses')
-        self.long_short_rate_remapping.to_hdf(file_path, key=f'{key}/long_short_rate_remapping')
-        self.long_short_inst_spike_rate_groups.to_hdf(file_path, key=f'{key}/long_short_inst_spike_rate_groups')
-        self.wcorr_shuffle_analysis.to_hdf(file_path, key=f'{key}/wcorr_shuffle_analysis')
-        self.perform_specific_epochs_decoding.to_hdf(file_path, key=f'{key}/perform_specific_epochs_decoding')
-        self.DEP_ratemap_peaks.to_hdf(file_path, key=f'{key}/DEP_ratemap_peaks')
-        self.ratemap_peaks_prominence2d.to_hdf(file_path, key=f'{key}/ratemap_peaks_prominence2d')
-        # super().to_hdf(file_path, key=key, **kwargs)
         
