@@ -1190,7 +1190,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             ## Then look for previously complete computation results that are missing computations that have been registered after they were computed, or that were previously part of the excludelist but now are not:
 
 
-    @function_attributes(short_name=None, tags=['valid_track_times'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-05 16:18', related_items=[])
+    @function_attributes(short_name=None, tags=['valid_track_times', 'loaded_track_limits'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-05 16:18', related_items=[])
     @classmethod
     def perform_find_first_and_last_valid_position_times(cls, pos_df, loaded_track_limits):
         """ uses the positions and the loaded_track_limits to determine the first and last valid times for each session. 
@@ -1218,7 +1218,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         last_valid_pos_time: float = valid_pos_df['t'].max()
         return (first_valid_pos_time, last_valid_pos_time)
 
-    @function_attributes(short_name=None, tags=['valid_track_times'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-05 16:18', related_items=[])
+    @function_attributes(short_name=None, tags=['valid_track_times', 'loaded_track_limits'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-05 16:18', related_items=[])
     def find_first_and_last_valid_position_times(self):
         """ uses the positions and the loaded_track_limits to determine the first and last valid times for each session. 
         
@@ -2912,7 +2912,7 @@ class PipelineWithComputedPipelineStageMixin:
         
         return complete_session_context, (curr_session_context,  additional_session_context)
 
-    @function_attributes(short_name=None, tags=['valid_track_times'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-05 16:18', related_items=[])
+    @function_attributes(short_name=None, tags=['valid_track_times', 'loaded_track_limits'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-05 16:18', related_items=[])
     def find_first_and_last_valid_position_times(self):
         """ uses the positions and the loaded_track_limits to determine the first and last valid times for each session. 
         
