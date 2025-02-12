@@ -32,95 +32,96 @@ same_thresh_fraction_of_track: float=0.05, max_ignore_bins:float=2, max_jump_dis
 
 
 """
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsWithParamParameterizedHelpers, BaseAttrsParameterizedParameters, BaseContainerAttrsParameterizedParametersToDictWidgetMixin
 
 
-attrs_to_params_type_map = { str: param.String, int: param.Integer, float: param.Number, bool: param.Boolean, list: param.List, dict: param.Dict, tuple: param.Tuple, Path: param.Path,
-                Optional[str]: param.String, Optional[int]: param.Integer, Optional[float]: param.Number, Optional[bool]: param.Boolean, Optional[Path]: param.Path,
-                Optional[list]: param.List, Optional[dict]: param.Dict, Optional[tuple]: param.Tuple,
-                }
+# attrs_to_params_type_map = { str: param.String, int: param.Integer, float: param.Number, bool: param.Boolean, list: param.List, dict: param.Dict, tuple: param.Tuple, Path: param.Path,
+#                 Optional[str]: param.String, Optional[int]: param.Integer, Optional[float]: param.Number, Optional[bool]: param.Boolean, Optional[Path]: param.Path,
+#                 Optional[list]: param.List, Optional[dict]: param.Dict, Optional[tuple]: param.Tuple,
+#                 }
 
 
-@function_attributes(short_name=None, tags=['parameters', 'attrs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 02:56', related_items=[])
-def attrs_to_parameters(cls):
-    """ captures: `attrs_to_params_type_map`
-    """
-    for field in attrs.fields(cls):
-        default = field.default if field.default is not attrs.NOTHING else None
-        # setattr(cls, field.name, param.Parameter(default=default))
-        # p_type = type_map.get(field.type, param.Parameter)
-        p_type = attrs_to_params_type_map.get(field.type, None)
-        assert (p_type is not None), f"failed for field: {field}"
-        # if field.metadata is None:
-        #     field.metadata = {} ## initialize
-        ## update the field metadata
-        # field.metadata.update(param=p_type(default=default))
-        # field.metadata['param'] = p_type(default=default)
-        # setattr(cls, field.name, p_type(default=default))
-        curr_param_class_var_name: str = f"{field.name}_PARAM"
+# @function_attributes(short_name=None, tags=['parameters', 'attrs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 02:56', related_items=[])
+# def attrs_to_parameters(cls_to_decorate):
+#     """ captures: `attrs_to_params_type_map`
+#     """
+#     for field in attrs.fields(cls_to_decorate):
+#         default = field.default if field.default is not attrs.NOTHING else None
+#         # setattr(cls, field.name, param.Parameter(default=default))
+#         # p_type = type_map.get(field.type, param.Parameter)
+#         p_type = attrs_to_params_type_map.get(field.type, None)
+#         assert (p_type is not None), f"failed for field: {field}"
+#         # if field.metadata is None:
+#         #     field.metadata = {} ## initialize
+#         ## update the field metadata
+#         # field.metadata.update(param=p_type(default=default))
+#         # field.metadata['param'] = p_type(default=default)
+#         # setattr(cls, field.name, p_type(default=default))
+#         curr_param_class_var_name: str = f"{field.name}_PARAM"
         
-        if hasattr(cls, curr_param_class_var_name):
-            delattr(cls, curr_param_class_var_name) ## remove extant
-            assert (not hasattr(cls, curr_param_class_var_name)), f"hasattr even after removal!"
+#         if hasattr(cls_to_decorate, curr_param_class_var_name):
+#             delattr(cls_to_decorate, curr_param_class_var_name) ## remove extant
+#             assert (not hasattr(cls_to_decorate, curr_param_class_var_name)), f"hasattr even after removal!"
 
                
 
-        param_obj = p_type(default=default)
-        # set the parameter on the class under the same name as the field
-        # setattr(cls, curr_param_class_var_name, param_obj)
-        # setattr(cls, field.name, param_obj)
-        # register the parameter so that Parameterized picks it up
-        # cls._add_parameter(param_obj)
-        # cls.param.add_parameter(curr_param_class_var_name, param_obj)
-        cls.param.add_parameter(field.name, param_obj)
+#         param_obj = p_type(default=default)
+#         # set the parameter on the class under the same name as the field
+#         # setattr(cls, curr_param_class_var_name, param_obj)
+#         # setattr(cls, field.name, param_obj)
+#         # register the parameter so that Parameterized picks it up
+#         # cls._add_parameter(param_obj)
+#         # cls.param.add_parameter(curr_param_class_var_name, param_obj)
+#         cls_to_decorate.param.add_parameter(field.name, param_obj)
 
-        # cls._add_parameter(
-        # getattr(cls, curr_param_class_var_name, None)
+#         # cls._add_parameter(
+#         # getattr(cls, curr_param_class_var_name, None)
         
 
-    return cls
+#     return cls_to_decorate
 
 
-# def attrs_to_parameters_container(cls):
+# # def attrs_to_parameters_container(cls):
+# #     """ all fields should be `param.Parameterized` subclasses """
+# #     for field in attrs.fields(cls):
+# #         field_type = field.type
+# #         default = field.default if field.default is not attrs.NOTHING else field_type()
+# #         setattr(cls, field.name, param.ClassSelector(class_=field_type, default=default))
+# #     return cls
+
+# @function_attributes(short_name=None, tags=['parameters', 'attrs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 02:56', related_items=[])
+# def attrs_to_parameters_container(cls_to_decorate):
 #     """ all fields should be `param.Parameterized` subclasses """
-#     for field in attrs.fields(cls):
-#         field_type = field.type
-#         default = field.default if field.default is not attrs.NOTHING else field_type()
-#         setattr(cls, field.name, param.ClassSelector(class_=field_type, default=default))
-#     return cls
-
-@function_attributes(short_name=None, tags=['parameters', 'attrs'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 02:56', related_items=[])
-def attrs_to_parameters_container(cls):
-    """ all fields should be `param.Parameterized` subclasses """
-    for field in attrs.fields(cls):
-        if field.default is not attrs.NOTHING:
-            default = field.default
-            if isinstance(default, attrs.Factory):
-                if default.takes_self:
-                    raise ValueError("Factory with takes_self=True is not supported")
-                default = default.factory()
-        else:
-            default = field.type()
+#     for field in attrs.fields(cls_to_decorate):
+#         if field.default is not attrs.NOTHING:
+#             default = field.default
+#             if isinstance(default, attrs.Factory):
+#                 if default.takes_self:
+#                     raise ValueError("Factory with takes_self=True is not supported")
+#                 default = default.factory()
+#         else:
+#             default = field.type()
         
-        variable_name: str = str(field.name).removeprefix('_').removesuffix('_Parameters')
-        print(f'field.name: "{field.name}", variable_name: "{variable_name}"')
-        param_obj = param.ClassSelector(class_=field.type, default=default, doc=f'{variable_name} param', label=variable_name)
+#         variable_name: str = str(field.name).removeprefix('_').removesuffix('_Parameters')
+#         print(f'field.name: "{field.name}", variable_name: "{variable_name}"')
+#         param_obj = param.ClassSelector(class_=field.type, default=default, doc=f'{variable_name} param', label=variable_name)
         
-        # setattr(cls, field.name, param_obj)
+#         # setattr(cls, field.name, param_obj)
         
-        # set the parameter on the class under the same name as the field
-        # setattr(cls, curr_param_class_var_name, param_obj)
-        # setattr(cls, field.name, param_obj)
-        # register the parameter so that Parameterized picks it up
-        # cls._add_parameter(param_obj)
-        # cls.param.add_parameter(curr_param_class_var_name, param_obj)
-        cls.param.add_parameter(field.name, param_obj)
+#         # set the parameter on the class under the same name as the field
+#         # setattr(cls, curr_param_class_var_name, param_obj)
+#         # setattr(cls, field.name, param_obj)
+#         # register the parameter so that Parameterized picks it up
+#         # cls._add_parameter(param_obj)
+#         # cls.param.add_parameter(curr_param_class_var_name, param_obj)
+#         cls_to_decorate.param.add_parameter(field.name, param_obj)
         
-    return cls
+#     return cls_to_decorate
 
 
 
 # @attrs_to_parameters
-class BaseGlobalComputationParameters(BaseConfig, param.Parameterized):
+class BaseGlobalComputationParameters(BaseAttrsParameterizedParameters):
 # class BaseGlobalComputationParameters(BaseConfig, BasePlotDataParams):
     """ Base class
     """
@@ -532,9 +533,9 @@ class ratemap_peaks_prominence2d_Parameters(HDF_SerializationMixin, AttrsBasedCl
 # Main Class                                                                                                           #
 # ==================================================================================================================== #
 
-@attrs_to_parameters_container
+@AttrsWithParamParameterizedHelpers.attrs_to_parameters_container
 @define(slots=False)
-class ComputationKWargParameters(HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
+class ComputationKWargParameters(BaseContainerAttrsParameterizedParametersToDictWidgetMixin, HDF_SerializationMixin, AttrsBasedClassHelperMixin, BaseGlobalComputationParameters):
     """ The base class for computation parameter types. 
     
     Usage:
@@ -705,44 +706,45 @@ class ComputationKWargParameters(HDF_SerializationMixin, AttrsBasedClassHelperMi
 
 
     # ==================================================================================================================== #
-    # Params Overrides                                                                                                     #
+    # BaseContainerAttrsParameterizedParametersToDictWidgetMixin Conformances - Params Overrides                           #
     # ==================================================================================================================== #
-    def get_param_Params_attribute_names(self) -> List[str]:
-        return [k for k in self.param.values().keys() if k not in ['name']]
+    # def get_param_Params_attribute_names(self) -> List[str]:
+    #     return [k for k in self.param.values().keys() if k not in ['name']]
         
 
-    def to_params_dict(self, param_name_excludeList=None, recursive_to_dict: bool=False) -> Dict:
-        """ overrides to provide recurrsive implementation
-        returns as a dictionary representation 
+    # def to_params_dict(self, param_name_excludeList=None, recursive_to_dict: bool=False) -> Dict:
+    #     """ overrides to provide recurrsive implementation
+    #     returns as a dictionary representation 
         
-        Working:
+    #     Working:
         
-            out_configs_dict = curr_global_param_typed_parameters.to_params_dict(recursive_to_dict=False)
-            pn.Column(*[pn.Param(a_sub_v) for a_sub_v in reversed(out_configs_dict.values())])
+    #         out_configs_dict = curr_global_param_typed_parameters.to_params_dict(recursive_to_dict=False)
+    #         pn.Column(*[pn.Param(a_sub_v) for a_sub_v in reversed(out_configs_dict.values())])
 
-        """
-        # param_name_excludeList = ['name']
-        if param_name_excludeList is None:
-            param_name_excludeList = ['name']
-        if recursive_to_dict:
-            return {k:v.to_params_dict(param_name_excludeList=param_name_excludeList) for k, v in self.param.values().items() if k not in param_name_excludeList}
-        else:
-            _out_dict = {k:v for k, v in self.param.values().items() if k not in param_name_excludeList}
-            # _out_dict = {k:v.param for k, v in self.param.values().items() if k not in param_name_excludeList}
-            _out_dict = {k:v.param for k, v in _out_dict.items()}
-            return _out_dict
+    #     """
+    #     # param_name_excludeList = ['name']
+    #     if param_name_excludeList is None:
+    #         param_name_excludeList = ['name']
+    #     if recursive_to_dict:
+    #         return {k:v.to_params_dict(param_name_excludeList=param_name_excludeList) for k, v in self.param.values().items() if k not in param_name_excludeList}
+    #     else:
+    #         _out_dict = {k:v for k, v in self.param.values().items() if k not in param_name_excludeList}
+    #         # _out_dict = {k:v.param for k, v in self.param.values().items() if k not in param_name_excludeList}
+    #         _out_dict = {k:v.param for k, v in _out_dict.items()}
+    #         return _out_dict
 
 
-    @function_attributes(short_name=None, tags=['panel', 'params'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 03:01', related_items=[])
-    def display_params(self):
-        """ 
+    # @function_attributes(short_name=None, tags=['panel', 'params'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 03:01', related_items=[])
+    # def display_params(self):
+    #     """ 
         
-        """
-        import panel as pn
-        # pn.extension()
+    #     """
+    #     import panel as pn
+    #     # pn.extension()
 
-        out_configs_dict = self.to_params_dict(recursive_to_dict=False)
-        return pn.Column(*[pn.Param(a_sub_v) for a_sub_v in reversed(out_configs_dict.values())])
+    #     out_configs_dict = self.to_params_dict(recursive_to_dict=False)
+    #     return pn.Column(*[pn.Param(a_sub_v) for a_sub_v in reversed(out_configs_dict.values())])
+
 
 
 # @attrs_to_parameters ## added manually
