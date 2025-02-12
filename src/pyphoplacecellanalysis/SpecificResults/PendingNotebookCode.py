@@ -60,6 +60,27 @@ from attrs import define, field, Factory, asdict # used for `ComputedResult`
 from neuropy.utils.indexing_helpers import get_values_from_keypaths, set_value_by_keypath, update_nested_dict
 
 
+def find_percent_pos_samples_within_grid_bin_bounds(pos_df: pd.DataFrame, grid_bin_bounds):
+    """ sanity-checks the grid_bin_bounds against the pos_df to see what percent of positions fall within the bounds
+    
+    percentage_within_ranges, filtered_df = find_percent_pos_samples_within_grid_bin_bounds(pos_df=pos_df, grid_bin_bounds=correct_grid_bin_bounds)
+    
+    percentage_within_ranges, filtered_df = find_percent_pos_samples_within_grid_bin_bounds(pos_df=pos_df, grid_bin_bounds=((0.0, 287.7697841726619), (115.10791366906477, 172.66187050359713)))
+
+    percentage_within_ranges, filtered_df = find_percent_pos_samples_within_grid_bin_bounds(pos_df=pos_df, grid_bin_bounds=((37.0773897438341, 250.69004399129707), (107.8177789584226, 113.7570079192343)))
+
+    """
+    (xmin, xmax), (ymin, ymax) = grid_bin_bounds
+    pos_df = pos_df
+    # Filter the DataFrame for rows where 'x' and 'y' are within their respective ranges
+    filtered_df = pos_df[(pos_df['x'] >= xmin) & (pos_df['x'] <= xmax) & 
+                    (pos_df['y'] >= ymin) & (pos_df['y'] <= ymax)]
+
+    # Calculate the percentage of rows within both ranges
+    percentage_within_ranges = (len(filtered_df) / len(pos_df)) * 100
+    print(f'percentage_within_ranges: {percentage_within_ranges}')
+    return percentage_within_ranges, filtered_df
+
 @function_attributes(short_name=None, tags=['active', 'fix', 'grid_bin_bounds'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-12 03:54', related_items=[])
 def get_hardcoded_known_good_grid_bin_bounds(curr_active_pipeline):
     """ gets the actually correct grid_bin_bounds, fixing months worth of problems
@@ -82,7 +103,10 @@ def get_hardcoded_known_good_grid_bin_bounds(curr_active_pipeline):
 @function_attributes(short_name=None, tags=['MAIN', 'IMPORTANT', 'hardcoded', 'override', 'grid_bin_bounds'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-12 08:17', related_items=[])
 def HARD_OVERRIDE_grid_bin_bounds(curr_active_pipeline, hard_manual_override_grid_bin_bounds = ((0.0, 287.7697841726619), (80.0, 200.0))):
     """ manually overrides the grid_bin_bounds in all places needed to ensure they are correct. 
-    
+
+    #TODO 2025-02-12 11:25: - [ ] Are these only the FILTERED sessions, meaning they neglect the `curr_active_pipeline.sess.*` properties?
+
+        
     did_any_change, change_dict = HARD_OVERRIDE_grid_bin_bounds(curr_active_pipeline, hard_manual_override_grid_bin_bounds = ((0.0, 287.7697841726619), (80.0, 200.0)))
     change_dict
     """
@@ -114,24 +138,6 @@ def HARD_OVERRIDE_grid_bin_bounds(curr_active_pipeline, hard_manual_override_gri
 
     return did_any_change, change_dict
     
-
-
-
-def _expand_InteractivePlaceCellConfig_to_dict(a_config):
-    a_config_dict = asdict(a_config, recurse=True, filter=lambda a, v: 'resolved_required_filespecs_dict' not in a.name)
-    a_config_dict = benedict(a_config_dict)
-    keys_to_remove = [k for k in a_config_dict.keypaths() if 'resolved_optional_filespecs_dict' in k] # Remove any nested keys that contain 'resolved_required_filespecs_dict'
-    # print(f'keys_to_remove: {keys_to_remove}')
-    a_config_dict.remove(keys_to_remove)
-    # print(f'list: {list(a_config_dict.keys())}')
-
-    ## Expands any dict-like but non-dict objects at the specified keypaths:
-    to_dict_keypaths_list = ['computation_config', 'computation_config.pf_params', 'computation_config.spike_analysis'] + ['active_session_config.preprocessing_parameters.epoch_estimation_parameters']
-    for a_keypath in to_dict_keypaths_list:
-        a_config_dict[a_keypath] = a_config_dict[a_keypath].to_dict()
-    
-    return a_config_dict
-
 
 
 
