@@ -48,6 +48,114 @@ from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
+# ==================================================================================================================== #
+# 2025-02-12 - Final grid_bin_bounds fix by hardcoding                                                                 #
+# ==================================================================================================================== #
+# from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _set_grid_bin_bounds_params, _get_grid_bin_bounds_params
+from benedict import benedict
+from neuropy.utils.mixins.indexing_helpers import get_dict_subset
+from neuropy.utils.indexing_helpers import flatten_dict
+from attrs import define, field, Factory, asdict # used for `ComputedResult`
+
+from neuropy.utils.indexing_helpers import get_values_from_keypaths, set_value_by_keypath, update_nested_dict
+
+
+@function_attributes(short_name=None, tags=['MAIN', 'IMPORTANT', 'hardcoded', 'override', 'grid_bin_bounds'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-12 08:17', related_items=[])
+def HARD_OVERRIDE_grid_bin_bounds(curr_active_pipeline, hard_manual_override_grid_bin_bounds = ((0.0, 287.7697841726619), (80.0, 200.0))):
+    """ manually overrides the grid_bin_bounds in all places needed to ensure they are correct. 
+    
+    did_any_change, change_dict = HARD_OVERRIDE_grid_bin_bounds(curr_active_pipeline, hard_manual_override_grid_bin_bounds = ((0.0, 287.7697841726619), (80.0, 200.0)))
+    change_dict
+    """
+    
+    did_any_change: bool = False
+    change_dict = {}
+
+    for a_decoder_name, a_config in curr_active_pipeline.active_configs.items():
+        # a_config: InteractivePlaceCellConfig
+        _old_val = deepcopy(a_config.computation_config.pf_params.grid_bin_bounds)
+        will_change: bool = (_old_val != hard_manual_override_grid_bin_bounds)
+        change_dict[f'active_configs["{a_decoder_name}"]'] = will_change
+        a_config.computation_config.pf_params.grid_bin_bounds = deepcopy(hard_manual_override_grid_bin_bounds) ## FORCEIPLY UPDATE
+        if will_change:
+            did_any_change = True
+            
+    ## THE ONES THAT START WRONG
+    for a_decoder_name, a_config in curr_active_pipeline.computation_results.items():
+        # a_config: InteractivePlaceCellConfig
+        _old_val = deepcopy(a_config.computation_config.pf_params.grid_bin_bounds)
+        will_change: bool = (_old_val != hard_manual_override_grid_bin_bounds)
+        change_dict[f'computation_results["{a_decoder_name}"]'] = will_change
+        a_config.computation_config.pf_params.grid_bin_bounds = deepcopy(hard_manual_override_grid_bin_bounds) ## FORCEIPLY UPDATE
+        if will_change:
+            did_any_change = True
+
+    
+    curr_active_pipeline.sess.config.grid_bin_bounds = deepcopy(hard_manual_override_grid_bin_bounds) ## FORCEIPLY UPDATE ## needs it
+
+    return did_any_change, change_dict
+    
+
+
+
+def _expand_InteractivePlaceCellConfig_to_dict(a_config):
+    a_config_dict = asdict(a_config, recurse=True, filter=lambda a, v: 'resolved_required_filespecs_dict' not in a.name)
+    a_config_dict = benedict(a_config_dict)
+    keys_to_remove = [k for k in a_config_dict.keypaths() if 'resolved_optional_filespecs_dict' in k] # Remove any nested keys that contain 'resolved_required_filespecs_dict'
+    # print(f'keys_to_remove: {keys_to_remove}')
+    a_config_dict.remove(keys_to_remove)
+    # print(f'list: {list(a_config_dict.keys())}')
+
+    ## Expands any dict-like but non-dict objects at the specified keypaths:
+    to_dict_keypaths_list = ['computation_config', 'computation_config.pf_params', 'computation_config.spike_analysis'] + ['active_session_config.preprocessing_parameters.epoch_estimation_parameters']
+    for a_keypath in to_dict_keypaths_list:
+        a_config_dict[a_keypath] = a_config_dict[a_keypath].to_dict()
+    
+    return a_config_dict
+
+
+
+
+final_relevant_specific_pos_bounds_keypaths_list =  [
+'active_session_config.loaded_track_limits.long_xlim',
+'active_session_config.loaded_track_limits.long_ylim',
+'active_session_config.loaded_track_limits.short_xlim',
+'active_session_config.loaded_track_limits.short_ylim',
+] + [
+'computation_config.pf_params.grid_bin',
+'computation_config.pf_params.grid_bin_bounds',
+'computation_config.pf_params.smooth',
+]
+
+def _get_grid_bin_bounds_params(out_filtered_sess_configs_dict: benedict):
+    """ Extracts the grid_bin_bounds relevant keys from the dict and returns them
+    captures: `final_relevant_specific_pos_bounds_keypaths_list`
+    
+    Usage:
+    
+        final_relevant_specific_pos_bounds_params_dict = _get_grid_bin_bounds_params(out_filtered_sess_configs_dict=out_filtered_sess_configs_dict)
+        final_relevant_specific_pos_bounds_params_dict
+
+    """
+    return {k:get_values_from_keypaths(v, final_relevant_specific_pos_bounds_keypaths_list) for k, v in out_filtered_sess_configs_dict.items()}
+
+
+def _set_grid_bin_bounds_params(out_filtered_sess_configs_dict: benedict, override_parameters_flat_keypaths_dict: Dict[str, Any]) -> benedict:
+    """ updates the dict with the specified overrides
+
+    Usage:    
+        ## update existing values
+        override_parameters_flat_keypaths_dict = {'computation_config.pf_params.grid_bin_bounds': ((0.0, 287.7697841726619), (80.0, 200.0)), }
+        out_filtered_sess_configs_dict = _set_grid_bin_bounds_params(out_filtered_sess_configs_dict=out_filtered_sess_configs_dict, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
+
+    """
+    if override_parameters_flat_keypaths_dict is None:
+        return None
+    for a_decoder_name, a_config in out_filtered_sess_configs_dict.items():        
+        update_nested_dict(a_config, deepcopy(override_parameters_flat_keypaths_dict))
+    return out_filtered_sess_configs_dict
+
+
 
 # ==================================================================================================================== #
 # 2025-02-11 - Subdivided Epochs                                                                                       #
