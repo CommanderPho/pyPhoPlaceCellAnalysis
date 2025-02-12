@@ -380,8 +380,7 @@ class TrialByTrialActivityWindow:
         
         # additional_cmap_names = {'long_LR': '#0099ff', 'long_RL': '#7a00ff', 'short_LR': '#f51616', 'short_RL': '#e3f516'}
 
-        additional_cmap_names = {'long_LR': '#4169E1', 'long_RL': '#607B00',
-                        'short_LR': '#DC143C', 'short_RL': '#990099'}
+        additional_cmap_names = {'long_LR': '#4169E1', 'long_RL': '#607B00', 'short_LR': '#DC143C', 'short_RL': '#990099'}
         # additional_cmap_names = {k: ColorFormatConverter.qColor_to_hexstring(v) for k, v in color_dict.items()}
 
         # plot_trial_to_trial_reliability_all_decoders_image_stack
@@ -407,8 +406,7 @@ class TrialByTrialActivityWindow:
         ## INPUTS: directional_active_lap_pf_results_dicts
 
         # enable_stacked_long_and_short: bool = False # not currently working, they have to be overlayed exactly on top of each other
-        # additional_decoder_y_offsets = {'long_LR': 0, 'long_RL': 0,
-        #                 'short_LR': 1, 'short_RL': 1}
+        # additional_decoder_y_offsets = {'long_LR': 0, 'long_RL': 0, 'short_LR': 1, 'short_RL': 1}
         
         for decoder_name, active_trial_by_trial_activity_obj in directional_active_lap_pf_results_dicts.items():  # Replace with actual decoder names
             if decoder_name != 'long_LR':
