@@ -60,6 +60,25 @@ from attrs import define, field, Factory, asdict # used for `ComputedResult`
 from neuropy.utils.indexing_helpers import get_values_from_keypaths, set_value_by_keypath, update_nested_dict
 
 
+@function_attributes(short_name=None, tags=['active', 'fix', 'grid_bin_bounds'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-12 03:54', related_items=[])
+def get_hardcoded_known_good_grid_bin_bounds(curr_active_pipeline):
+    """ gets the actually correct grid_bin_bounds, fixing months worth of problems
+    
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import get_hardcoded_known_good_grid_bin_bounds
+        correct_grid_bin_bounds = get_hardcoded_known_good_grid_bin_bounds(curr_active_pipeline)
+        correct_grid_bin_bounds
+
+    """
+    a_session_context = curr_active_pipeline.get_session_context() # IdentifyingContext.try_init_from_session_key(session_str=a_session_uid, separator='|')
+    # session_uid: str = a_session_context.get_description(separator="|", include_property_names=False)
+    # last_valid_pos_time = UserAnnotationsManager.get_hardcoded_specific_session_override_dict().get(a_session_context, {}).get('track_end_t', None)
+    # first_valid_pos_time = UserAnnotationsManager.get_hardcoded_specific_session_override_dict().get(a_session_context, {}).get('track_start_t', None)
+    correct_grid_bin_bounds = UserAnnotationsManager.get_hardcoded_specific_session_override_dict().get(a_session_context, {}).get('grid_bin_bounds', None)
+    assert correct_grid_bin_bounds is not None, f"session: {a_session_context} was not found in overrides!"
+    return deepcopy(correct_grid_bin_bounds) ## returns the correct grid_bin_bounds for the pipeline
+
+
 @function_attributes(short_name=None, tags=['MAIN', 'IMPORTANT', 'hardcoded', 'override', 'grid_bin_bounds'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-12 08:17', related_items=[])
 def HARD_OVERRIDE_grid_bin_bounds(curr_active_pipeline, hard_manual_override_grid_bin_bounds = ((0.0, 287.7697841726619), (80.0, 200.0))):
     """ manually overrides the grid_bin_bounds in all places needed to ensure they are correct. 
