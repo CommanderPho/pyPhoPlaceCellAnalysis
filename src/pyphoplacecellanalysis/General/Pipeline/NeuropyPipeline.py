@@ -582,8 +582,14 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
     @classmethod
     def compare_pipelines(cls, lhs, rhs, debug_print=False):
-        lhs_compare_dict = cls.build_pipeline_compare_dict(lhs)
-        rhs_compare_dict = cls.build_pipeline_compare_dict(rhs)
+        if not isinstance(lhs, dict):
+            lhs_compare_dict = cls.build_pipeline_compare_dict(lhs)
+        else:
+            lhs_compare_dict = lhs
+        if not isinstance(rhs, dict):
+            rhs_compare_dict = cls.build_pipeline_compare_dict(rhs)
+        else:
+            rhs_compare_dict = rhs
         curr_diff = DiffableObject.compute_diff(lhs_compare_dict, rhs_compare_dict)
         if debug_print:
             print(f'curr_diff: {curr_diff}')
