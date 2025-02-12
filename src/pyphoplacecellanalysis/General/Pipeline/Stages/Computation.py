@@ -2679,9 +2679,12 @@ class PipelineWithComputedPipelineStageMixin:
                 # a_params.param.add_parameter('recompute', param.Action(lambda x: a_params.recompute_method(), label="Recompute"))
                 a_params.add_parameter('recompute', param.Action(lambda x: _test_perform_recompute_action(a_params, name=a_name), label="Recompute"))
 
+
+            styles_kwargs = dict() # no custom styles
             # Apply scaling via CSS
-            style = {"transform": "scale(0.25)", "transform-origin": "top left"}
-            layout = pn.Column(*[pn.Param(a_sub_v) for a_sub_v in reversed(out_configs_dict.values())], styles=style, sizing_mode="fixed")
+            # style = {"transform": "scale(0.5)", "transform-origin": "top left"}
+            # styles_kwargs = dict(styles=style, sizing_mode="fixed")
+            layout = pn.Column(*[pn.Param(a_sub_v) for a_sub_v in reversed(out_configs_dict.values())], **styles_kwargs)
             return layout
 
 
@@ -2697,6 +2700,12 @@ class PipelineWithComputedPipelineStageMixin:
     def update_parameters(self, override_parameters_flat_keypaths_dict: Dict[str, Any]=None) -> None:
         """ updates any of the user-parameters by keypaths for the pipeline
         
+        Example:
+        
+            override_parameters_flat_keypaths_dict = {'rank_order_shuffle_analysis.included_qclu_values': included_qclu_values, 'rank_order_shuffle_analysis.minimum_inclusion_fr_Hz': minimum_inclusion_fr_Hz}
+            
+            curr_active_pipeline.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict) # should already be updated, but try it again anyway.
+
         """
         from neuropy.core.parameters import ParametersContainer
         from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters
