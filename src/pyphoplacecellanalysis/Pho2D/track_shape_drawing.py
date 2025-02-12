@@ -1021,7 +1021,7 @@ def perform_add_1D_track_bounds_lines(long_notable_x_platform_positions=None, sh
             # Iterate through the hlines in the LineCollection and add labels
             assert len(short_notable_x_platform_label_names) == len(short_notable_x_platform_positions)
             for pos, a_txt_label in zip(short_notable_x_platform_positions, short_notable_x_platform_label_names):
-                ax.text(ax.get_xbound()[1], (pos + const_line_text_label_y_offset), a_txt_label, color=short_track_line_collection.get_colors(), fontsize=9, ha='right', va='bottom', zorder=-98)            
+                ax.text(ax.get_xbound()[1], (pos + const_line_text_label_y_offset), a_txt_label, color=short_track_line_collection.get_colors(), fontsize=9, ha='right', va='bottom', zorder=-98)
 
     else:
         short_track_line_collection = None
