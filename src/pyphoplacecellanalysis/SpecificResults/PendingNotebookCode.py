@@ -100,9 +100,9 @@ def get_hardcoded_known_good_grid_bin_bounds(curr_active_pipeline):
     return deepcopy(correct_grid_bin_bounds) ## returns the correct grid_bin_bounds for the pipeline
 
 
-@function_attributes(short_name=None, tags=['MAIN', 'IMPORTANT', 'hardcoded', 'override', 'grid_bin_bounds'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-12 08:17', related_items=[])
-def HARD_OVERRIDE_grid_bin_bounds(curr_active_pipeline, hard_manual_override_grid_bin_bounds = ((0.0, 287.7697841726619), (80.0, 200.0))):
-    """ manually overrides the grid_bin_bounds in all places needed to ensure they are correct. 
+@function_attributes(short_name=None, tags=['MAIN', 'IMPORTANT', 'hardcoded', 'override', 'grid_bin_bounds'], input_requires=[], output_provides=[], uses=['safe_limit_num_grid_bin_values'], used_by=[], creation_date='2025-02-12 08:17', related_items=[])
+def HARD_OVERRIDE_grid_bin_bounds(curr_active_pipeline, hard_manual_override_grid_bin_bounds = ((0.0, 287.7697841726619), (80.0, 200.0)), desired_grid_bin = (2.0, 2.0), max_allowed_num_bins=(60, 9)):
+    """ manually overrides the `grid_bin_bounds` and `grid_bin` in all places needed to ensure they are correct. 
 
     #TODO 2025-02-12 11:25: - [ ] Are these only the FILTERED sessions, meaning they neglect the `curr_active_pipeline.sess.*` properties?
 
@@ -110,6 +110,7 @@ def HARD_OVERRIDE_grid_bin_bounds(curr_active_pipeline, hard_manual_override_gri
     did_any_change, change_dict = HARD_OVERRIDE_grid_bin_bounds(curr_active_pipeline, hard_manual_override_grid_bin_bounds = ((0.0, 287.7697841726619), (80.0, 200.0)))
     change_dict
     """
+    from neuropy.utils.mixins.binning_helpers import safe_limit_num_grid_bin_values
     
     did_any_change: bool = False
     change_dict = {}
@@ -120,6 +121,8 @@ def HARD_OVERRIDE_grid_bin_bounds(curr_active_pipeline, hard_manual_override_gri
         will_change: bool = (_old_val != hard_manual_override_grid_bin_bounds)
         change_dict[f'active_configs["{a_decoder_name}"]'] = will_change
         a_config.computation_config.pf_params.grid_bin_bounds = deepcopy(hard_manual_override_grid_bin_bounds) ## FORCEIPLY UPDATE
+        (constrained_grid_bin_sizes, constrained_num_grid_bins) = safe_limit_num_grid_bin_values(a_config.computation_config.pf_params.grid_bin_bounds, desired_grid_bin_sizes=deepcopy(desired_grid_bin), max_allowed_num_bins=max_allowed_num_bins, debug_print=False)
+        a_config.computation_config.pf_params.grid_bin = constrained_grid_bin_sizes
         if will_change:
             did_any_change = True
             
@@ -130,12 +133,15 @@ def HARD_OVERRIDE_grid_bin_bounds(curr_active_pipeline, hard_manual_override_gri
         will_change: bool = (_old_val != hard_manual_override_grid_bin_bounds)
         change_dict[f'computation_results["{a_decoder_name}"]'] = will_change
         a_config.computation_config.pf_params.grid_bin_bounds = deepcopy(hard_manual_override_grid_bin_bounds) ## FORCEIPLY UPDATE
+        (constrained_grid_bin_sizes, constrained_num_grid_bins) = safe_limit_num_grid_bin_values(a_config.computation_config.pf_params.grid_bin_bounds, desired_grid_bin_sizes=deepcopy(desired_grid_bin), max_allowed_num_bins=max_allowed_num_bins, debug_print=False)
+        a_config.computation_config.pf_params.grid_bin = constrained_grid_bin_sizes
         if will_change:
             did_any_change = True
-
     
     curr_active_pipeline.sess.config.grid_bin_bounds = deepcopy(hard_manual_override_grid_bin_bounds) ## FORCEIPLY UPDATE ## needs it
-
+    (constrained_grid_bin_sizes, constrained_num_grid_bins) = safe_limit_num_grid_bin_values(curr_active_pipeline.sess.config.grid_bin_bounds, desired_grid_bin_sizes=deepcopy(desired_grid_bin), max_allowed_num_bins=max_allowed_num_bins, debug_print=False)
+    curr_active_pipeline.sess.config.grid_bin = constrained_grid_bin_sizes
+    
     return did_any_change, change_dict
     
 
