@@ -1624,11 +1624,13 @@ class PipelineWithComputedPipelineStageMixin:
     # ==================================================================================================================== #
     # Dependency Parsing/Determination                                                                                     #
     # ==================================================================================================================== #
-    def find_matching_validators(self, probe_fn_names: List[str], skip_reload_computation_fcns: bool = False, debug_print=False):
-        """
+    def find_matching_validators(self, probe_fn_names: List[str], skip_reload_computation_fcns: bool = False, debug_print=False) -> List[SpecificComputationValidator]:
+        """ takes a list of computation function names, short_names, or other identifiers, and returns a dict of validators
+        
         Usage:
-            remaining_comp_specifiers_dict, found_matching_validators, provided_global_keys = curr_active_pipeline.find_matching_validators(probe_fn_names=['long_short_decoding_analyses','long_short_fr_indicies_analyses'])
-            provided_global_keys
+            from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import SpecificComputationValidator
+            found_matching_validators_list: List[SpecificComputationValidator] = curr_active_pipeline.find_matching_validators(probe_fn_names=['long_short_decoding_analyses','long_short_fr_indicies_analyses'])
+            found_matching_validators_list
         """
         if not skip_reload_computation_fcns:
             self.reload_default_computation_functions()
@@ -1636,8 +1638,10 @@ class PipelineWithComputedPipelineStageMixin:
         if isinstance(probe_fn_names, str):
             probe_fn_names = [probe_fn_names] ## just a single item, turn it into a single item list
 
-        remaining_comp_specifiers_dict, found_matching_validators, provided_global_keys = SpecificComputationValidator.find_matching_validators(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), probe_fn_names=probe_fn_names)
-        return (remaining_comp_specifiers_dict, found_matching_validators, provided_global_keys)
+        _remaining_comp_specifiers_dict, found_matching_validators_dict, _unknown_provided_global_keys = SpecificComputationValidator.find_matching_validators(remaining_comp_specifiers_dict=deepcopy(self.get_merged_computation_function_validators()), probe_fn_names=probe_fn_names)
+        # return (remaining_comp_specifiers_dict, found_matching_validators, provided_global_keys)
+        return list(found_matching_validators_dict.values()) # just return a List[SpecificComputationValidator]
+                
 
 
     @function_attributes(short_name=None, tags=['dependencies'], input_requires=[], output_provides=[], uses=[], used_by=['self.find_downstream_dependencies'], creation_date='2025-01-13 12:32', related_items=[])
@@ -1826,6 +1830,25 @@ class PipelineWithComputedPipelineStageMixin:
         required_global_keys = list(remaining_required_global_result_keys) ## convert to a list
         required_local_keys = list(remaining_required_local_result_keys) ## convert to a list
         return upstream_required_validators, (required_global_keys, required_local_keys)
+
+
+    # ACTUALLY USEFUL VERSIONS of the dependencies/requirements functions: _______________________________________________ #
+    def find_invalidated_computations(self, invalidated_probe_fn_names: List[str], invalidated_local_keys: List[str]=None, invalidated_global_keys: List[str]=None, skip_reload_computation_fcns: bool = False, debug_print=False) -> List[str]:
+        """ given one ore more computations that have become invalid, find all the computations that depend on the invalidated value and therefore must be invalidated themselves.
+        
+        Usage:
+
+        """
+        if invalidated_local_keys is not None:
+            raise NotImplementedError(f"invalidated_local_keys mode is not implemented yet, use `find_invalidated_computations(invalidated_probe_fn_names = ['_perform_baseline_placefield_computation', '_perform_time_dependent_placefield_computation', ... your invalidated computation fn names, ...]) mode.")
+        if invalidated_global_keys is not None:
+            raise NotImplementedError(f"invalidated_global_keys mode is not implemented yet, use `find_invalidated_computations(invalidated_probe_fn_names = ['_perform_baseline_placefield_computation', '_perform_time_dependent_placefield_computation', ... your invalidated computation fn names, ...]) mode.")        
+
+        ## TODO: Finish implementation here
+        invalidated_probe_fn_names = ... # find the dependent results
+        
+        return additional_invalidated_probe_fn_names
+
 
 
 
