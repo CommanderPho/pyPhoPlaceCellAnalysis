@@ -6556,7 +6556,9 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
             long_session, short_session, global_session = [owning_pipeline_reference.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
 
             grid_bin_bounds = deepcopy(owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.grid_bin_bounds) # ((0.0, 287.7697841726619), (115.10791366906477, 172.66187050359713))
-            
+            ## #TODO 2025-02-12 03:31: - [ ] YIKES!! above grid_bin_bounds should be wrong, 
+            # correct_grid_bin_bounds = deepcopy(owning_pipeline_reference.active_configs[global_epoch_name].computation_config.pf_params.grid_bin_bounds) ## CORRECT
+        
 
             # uses `global_session`
             epochs_editor = EpochsEditor.init_from_session(global_session, include_velocity=True, include_accel=False, grid_bin_bounds=grid_bin_bounds)

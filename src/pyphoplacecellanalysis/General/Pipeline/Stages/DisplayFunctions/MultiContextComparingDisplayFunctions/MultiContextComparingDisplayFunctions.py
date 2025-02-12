@@ -108,7 +108,7 @@ class MultiContextComparingDisplayFunctions(AllFunctionEnumeratingMixin, metacla
 		long_track_line_collection, short_track_line_collection = perform_add_1D_track_bounds_lines(**perform_add_1D_track_bounds_lines_kwargs, ax=ax)
 
 
-
+		# Plot REAL `grid_bin_bounds` ________________________________________________________________________________________ #
 		((grid_bin_bounds_x0, grid_bin_bounds_x1), (grid_bin_bounds_y0, grid_bin_bounds_y1)) = grid_bin_bounds
 		if is_x_axis:
 			## horizontal lines:

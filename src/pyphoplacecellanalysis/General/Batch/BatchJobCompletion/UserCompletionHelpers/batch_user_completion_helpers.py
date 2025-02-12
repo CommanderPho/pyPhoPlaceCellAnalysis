@@ -2156,7 +2156,9 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
 
 @function_attributes(short_name=None, tags=['UNFINISHED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def reload_exported_kdiba_session_position_info_mat_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
-	""" 
+	""" Called to update the pipeline's important position info parameters (such as the grid_bin_bounds, positions, etc) from a loaded .mat file
+	
+	
 	from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import reload_exported_kdiba_session_position_info_mat_completion_function
 	
 	Results can be extracted from batch output by 
@@ -2184,8 +2186,7 @@ def reload_exported_kdiba_session_position_info_mat_completion_function(self, gl
 		"""
 		# sess_config: SessionConfig = SessionConfig(**deepcopy(a_session.config.__getstate__()))
 		sess_config: SessionConfig = deepcopy(a_session.config)
-		sess_config
-
+		
 		# 'first_valid_pos_time'
 		a_session.config = sess_config
 		_bak_loaded_track_limits = deepcopy(a_session.config.loaded_track_limits)
