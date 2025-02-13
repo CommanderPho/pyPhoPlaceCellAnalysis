@@ -181,9 +181,10 @@ def HARD_OVERRIDE_grid_bin_bounds(curr_active_pipeline, hard_manual_override_gri
     active_data_mode_registered_class = active_data_session_types_registered_classes_dict[active_data_mode_name]
     # active_data_mode_type_properties = known_data_session_type_properties_dict[active_data_mode_name]
 
+    change_dict = {}
 
     def _subfn_update_session_config(a_session):
-        """ captures: curr_active_pipeline
+        """ captures: curr_active_pipeline, hard_manual_override_grid_bin_bounds, change_dict
         """
         did_any_change: bool = False
         
@@ -203,7 +204,7 @@ def HARD_OVERRIDE_grid_bin_bounds(curr_active_pipeline, hard_manual_override_gri
         _new_loaded_track_limits = deepcopy(a_session.config.loaded_track_limits)
         # did_change: bool = ((_bak_loaded_track_limits is None) or (_new_loaded_track_limits != _bak_loaded_track_limits))
         did_loaded_track_limits_change: bool = ((_bak_loaded_track_limits is None) or np.any((np.array(_new_loaded_track_limits) != np.array(_bak_loaded_track_limits))))
-        change_dict[f'active_configs["{a_decoder_name}"].loaded_track_limits'] = did_loaded_track_limits_change
+        change_dict[f'filtered_sessions["{a_decoder_name}"].loaded_track_limits'] = did_loaded_track_limits_change
         if did_loaded_track_limits_change:
             did_any_change = True
 
@@ -218,10 +219,29 @@ def HARD_OVERRIDE_grid_bin_bounds(curr_active_pipeline, hard_manual_override_gri
                     _old_val = deepcopy(_old_val)
 
                 will_change: bool = (_old_val != new_val)
-                change_dict[f'active_configs["{a_decoder_name}"].{k}'] = will_change
+                change_dict[f'active_configs["{a_decoder_name}"].config.{k}'] = will_change
                 setattr(a_session.config, k, deepcopy(new_val))
                 if will_change:
                     did_any_change = True
+
+
+        # grid_bin_bounds
+        _old_val = deepcopy(a_session.config.grid_bin_bounds)
+        will_change: bool = (_old_val != hard_manual_override_grid_bin_bounds)
+        change_dict[f'filtered_sessions["{a_decoder_name}"].config.grid_bin_bounds'] = (change_dict.get(f'filtered_sessions["{a_decoder_name}"].config.grid_bin_bounds', False) | will_change)
+        a_session.config.grid_bin_bounds = deepcopy(hard_manual_override_grid_bin_bounds) ## FORCEIPLY UPDATE
+        if will_change:
+            did_any_change = True
+        
+        # grid_bin
+        _old_val = deepcopy(a_session.config.grid_bin)
+        (constrained_grid_bin_sizes, constrained_num_grid_bins) = safe_limit_num_grid_bin_values(a_session.config.grid_bin_bounds, desired_grid_bin_sizes=deepcopy(desired_grid_bin), max_allowed_num_bins=max_allowed_num_bins, debug_print=False)
+        will_change: bool = (_old_val != constrained_grid_bin_sizes)
+        change_dict[f'filtered_sessions["{a_decoder_name}"].config.grid_bin'] = (change_dict.get(f'filtered_sessions["{a_decoder_name}"].config.grid_bin', False) | will_change)        
+        a_session.config.grid_bin = constrained_grid_bin_sizes
+        if will_change:
+            did_any_change = True
+            
 
         return did_any_change, a_session
     
@@ -229,7 +249,6 @@ def HARD_OVERRIDE_grid_bin_bounds(curr_active_pipeline, hard_manual_override_gri
 
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
     did_any_change: bool = False
-    change_dict = {}
 
     for a_decoder_name, a_config in curr_active_pipeline.active_configs.items():
         # a_config: InteractivePlaceCellConfig
@@ -265,28 +284,18 @@ def HARD_OVERRIDE_grid_bin_bounds(curr_active_pipeline, hard_manual_override_gri
         # loaded_track_limits, other overrides
         new_did_change, a_filtered_session = _subfn_update_session_config(a_session=a_filtered_session)
         if new_did_change:
-            print(f'\tfiltered_session[{k}] changed!')
+            print(f'\tfiltered_session[{a_decoder_name}] changed!')
         did_any_change = did_any_change | new_did_change
 
-        # grid_bin_bounds
-        _old_val = deepcopy(a_filtered_session.config.grid_bin_bounds)
-        will_change: bool = (_old_val != hard_manual_override_grid_bin_bounds)
-        change_dict[f'filtered_sessions["{a_decoder_name}"].config.grid_bin_bounds'] = will_change
-        a_filtered_session.config.grid_bin_bounds = deepcopy(hard_manual_override_grid_bin_bounds) ## FORCEIPLY UPDATE
-        if will_change:
-            did_any_change = True
-        
-        # grid_bin
-        _old_val = deepcopy(a_filtered_session.config.grid_bin)
-        (constrained_grid_bin_sizes, constrained_num_grid_bins) = safe_limit_num_grid_bin_values(a_filtered_session.config.grid_bin_bounds, desired_grid_bin_sizes=deepcopy(desired_grid_bin), max_allowed_num_bins=max_allowed_num_bins, debug_print=False)
-        will_change: bool = (_old_val != constrained_grid_bin_sizes)
-        change_dict[f'filtered_sessions["{a_decoder_name}"].config.grid_bin'] = will_change        
-        a_filtered_session.config.grid_bin = constrained_grid_bin_sizes
-        if will_change:
-            did_any_change = True
+
             
     ### root/unfiltered session:
-
+    new_did_change, curr_active_pipeline.sess = _subfn_update_session_config(a_session=curr_active_pipeline.sess)
+    if new_did_change:
+        print(f'\tcurr_active_pipeline.sess[{a_decoder_name}] changed!')
+    did_any_change = did_any_change | new_did_change
+    
+    ## just to be safe:
     curr_active_pipeline.sess.config.grid_bin_bounds = deepcopy(hard_manual_override_grid_bin_bounds) ## FORCEIPLY UPDATE ## needs it
     (constrained_grid_bin_sizes, constrained_num_grid_bins) = safe_limit_num_grid_bin_values(curr_active_pipeline.sess.config.grid_bin_bounds, desired_grid_bin_sizes=deepcopy(desired_grid_bin), max_allowed_num_bins=max_allowed_num_bins, debug_print=False)
     curr_active_pipeline.sess.config.grid_bin = constrained_grid_bin_sizes
