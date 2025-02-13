@@ -48,16 +48,86 @@ from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 
-# ==================================================================================================================== #
-# 2025-02-12 - Final grid_bin_bounds fix by hardcoding                                                                 #
-# ==================================================================================================================== #
-# from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _set_grid_bin_bounds_params, _get_grid_bin_bounds_params
 from benedict import benedict
 from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 from neuropy.utils.indexing_helpers import flatten_dict
 from attrs import define, field, Factory, asdict # used for `ComputedResult`
 
 from neuropy.utils.indexing_helpers import get_values_from_keypaths, set_value_by_keypath, update_nested_dict
+
+
+
+
+# ==================================================================================================================== #
+# 2025-02-13 - Misc                                                                                                    #
+# ==================================================================================================================== #
+@function_attributes(short_name=None, tags=['UNFINISHED', 'plotting', 'computing'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-13 14:58', related_items=[])
+def add_continuous_decoded_posterior(spike_raster_window, curr_active_pipeline, desired_time_bin_size: float, debug_print=True):
+    """ computes the continuously decoded position posteriors (if needed) using the pipeline, then adds them as a new track to the SpikeRaster2D 
+    
+    """
+    # ==================================================================================================================== #
+    # COMPUTING                                                                                                            #
+    # ==================================================================================================================== #
+    
+    # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': 0.058}], #computation_kwargs_list=[{'time_bin_size': 0.025}], 
+    #                                                   enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+    # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields', 'directional_decoders_decode_continuous'], computation_kwargs_list=[{'laps_decoding_time_bin_size': 0.058}, {'time_bin_size': 0.058, 'should_disable_cache':False}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': desired_time_bin_size, 'should_disable_cache': False}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+    
+
+    # ==================================================================================================================== #
+    # PLOTTING                                                                                                             #
+    # ==================================================================================================================== #
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewDecodedPosteriors_MatplotlibPlotCommand
+
+    display_output = {}
+    AddNewDecodedPosteriors_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionPseudo2DDecodedEpochsDockedMatplotlibView')
+
+    all_global_menus_actionsDict, global_flat_action_dict = spike_raster_window.build_all_menus_actions_dict()
+    if debug_print:
+        print(list(global_flat_action_dict.keys()))
+
+
+    ## extract the components so the `background_static_scroll_window_plot` scroll bar is the right size:
+    active_2d_plot = spike_raster_window.spike_raster_plt_2d
+    
+    active_2d_plot.params.enable_non_marginalized_raw_result = False
+    active_2d_plot.params.enable_marginal_over_direction = False
+    active_2d_plot.params.enable_marginal_over_track_ID = True
+
+
+    menu_commands = [
+        'AddTimeCurves.Position',
+        # 'DockedWidgets.LongShortDecodedEpochsDockedMatplotlibView',
+        # 'DockedWidgets.DirectionalDecodedEpochsDockedMatplotlibView',
+        # 'DockedWidgets.TrackTemplatesDecodedEpochsDockedMatplotlibView',
+        'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView',
+        #  'DockedWidgets.ContinuousPseudo2DDecodedMarginalsDockedMatplotlibView',
+
+    ]
+    # menu_commands = ['actionPseudo2DDecodedEpochsDockedMatplotlibView', 'actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView'] # , 'AddTimeIntervals.SessionEpochs'
+    for a_command in menu_commands:
+        # all_global_menus_actionsDict[a_command].trigger()
+        global_flat_action_dict[a_command].trigger()
+
+
+    ## Dock all Grouped results from `'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView'`
+    ## INPUTS: active_2d_plot
+    grouped_dock_items_dict = active_2d_plot.ui.dynamic_docked_widget_container.get_dockGroup_dock_dict()
+    nested_dock_items = {}
+    nested_dynamic_docked_widget_container_widgets = {}
+    for dock_group_name, flat_group_dockitems_list in grouped_dock_items_dict.items():
+        dDisplayItem, nested_dynamic_docked_widget_container = active_2d_plot.ui.dynamic_docked_widget_container.build_wrapping_nested_dock_area(flat_group_dockitems_list, dock_group_name=dock_group_name)
+        nested_dock_items[dock_group_name] = dDisplayItem
+        nested_dynamic_docked_widget_container_widgets[dock_group_name] = nested_dynamic_docked_widget_container
+
+    ## OUTPUTS: nested_dock_items, nested_dynamic_docked_widget_container_widgets
+
+
+    pass
+
+
 
 
 # ==================================================================================================================== #
