@@ -60,6 +60,54 @@ from attrs import define, field, Factory, asdict # used for `ComputedResult`
 from neuropy.utils.indexing_helpers import get_values_from_keypaths, set_value_by_keypath, update_nested_dict
 
 
+
+
+
+@function_attributes(short_name=None, tags=['ESSENTIAL', 'UNUSED', 'grid_bin_bounds', 'grid_bin'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-12 19:50', related_items=[])
+def FINAL_FIX_GRID_BIN_BOUNDS(curr_active_pipeline):
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import get_hardcoded_known_good_grid_bin_bounds, HARD_OVERRIDE_grid_bin_bounds, find_percent_pos_samples_within_grid_bin_bounds
+
+    correct_grid_bin_bounds = get_hardcoded_known_good_grid_bin_bounds(curr_active_pipeline)
+    did_any_change, change_dict = HARD_OVERRIDE_grid_bin_bounds(curr_active_pipeline, hard_manual_override_grid_bin_bounds=deepcopy(correct_grid_bin_bounds))
+    
+    ## All invalidated ones:
+    computation_functions_name_includelist=['_perform_baseline_placefield_computation', '_perform_time_dependent_placefield_computation', '_perform_extended_statistics_computation',
+                                        '_perform_position_decoding_computation', 
+                                        '_perform_firing_rate_trends_computation',
+                                        '_perform_pf_find_ratemap_peaks_computation',
+                                        '_perform_time_dependent_pf_sequential_surprise_computation'
+                                        '_perform_two_step_position_decoding_computation',
+                                        # '_perform_recursive_latent_placefield_decoding'
+                                    ]  # '_perform_pf_find_ratemap_peaks_peak_prominence2d_computation'
+
+    # ## Only Essentials:
+    # computation_functions_name_includelist=['_perform_baseline_placefield_computation',
+    #                                         '_perform_time_dependent_placefield_computation',
+    #                                         '_perform_extended_statistics_computation',
+    #                                     '_perform_position_decoding_computation', 
+    #                                     '_perform_firing_rate_trends_computation',
+    #                                     # '_perform_pf_find_ratemap_peaks_computation',
+    #                                     # '_perform_time_dependent_pf_sequential_surprise_computation'
+    #                                     '_perform_two_step_position_decoding_computation',
+    #                                     # '_perform_recursive_latent_placefield_decoding'
+    #                                 ]  # '_perform_pf_find_ratemap_peaks_peak_prominence2d_computation'
+
+    # computation_functions_name_includelist=['_perform_baseline_placefield_computation']
+    # curr_active_pipeline.perform_computations(computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=None, fail_on_exception=True, debug_print=FalTruese, overwrite_extant_results=True) #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
+    # curr_active_pipeline.perform_computations(computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=None, enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True) # , overwrite_extant_results=False #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
+
+    # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+
+    # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pf_computation', 'pfdt_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=False)
+    # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pf_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True)
+
+
+    # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=computation_functions_name_includelist, enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True)
+    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=computation_functions_name_includelist, fail_on_exception=True, debug_print=True)
+
+
+
+
 def find_percent_pos_samples_within_grid_bin_bounds(pos_df: pd.DataFrame, grid_bin_bounds):
     """ sanity-checks the grid_bin_bounds against the pos_df to see what percent of positions fall within the bounds
     
