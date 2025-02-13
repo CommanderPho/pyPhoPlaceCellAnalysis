@@ -14,7 +14,7 @@ from PyQt5.QtWidgets import QApplication, QFileSystemModel, QTreeView, QTreeWidg
 from PyQt5.QtGui import QPainter, QBrush, QPen, QColor, QFont, QIcon, QContextMenuEvent
 from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlot, QSize, QDir, QUrl, QTimer
 
-
+from pyphocorehelpers.programming_helpers import copy_to_clipboard
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore, QtGui
 from pyphoplacecellanalysis.General.Pipeline.Stages.Display import Plot, DisplayFunctionItem
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
@@ -76,6 +76,11 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         curr_fcn = curr_active_pipeline.registered_display_function_dict['_display_2d_placefield_result_plot_ratemaps_2D']
         print(str(curr_fcn.__code__.co_varnames)) # PyFunction_GetCode # ('computation_result', 'active_config', 'enable_saving_to_disk', 'kwargs', 'display_outputs', 'plot_variable_name', 'active_figure', 'active_pf_computation_params', 'session_identifier', 'fig_label', 'active_pf_2D_figures', 'should_save_to_disk')
 
+        
+        
+    self.ui.btnCopySelectedDisplayFunctionCode
+    
+    
      """
     _curr_active_pipeline_ref = None #  : Optional[Plot]
     debug_print = False
@@ -127,11 +132,17 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
 
 
     # __init__ fcn _______________________________________________________________________________________________________ #
-    def __init__(self, debug_print=False, parent=None):
+    def __init__(self, debug_print=False, should_use_nice_display_names: bool = True, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self.ui = uic.loadUi(uiFile, self) # Load the .ui file
         self._curr_active_pipeline_ref = None
         self.debug_print = debug_print
+        self.should_use_nice_display_names = should_use_nice_display_names
+        if should_use_nice_display_names:
+            self.best_display_name_to_function_name_map = {}
+        else:
+            self.best_display_name_to_function_name_map = None
+
         # self._displayContextSelectorWidget = None
         # self.ui.displayContextSelectorWidget = None
 
@@ -175,6 +186,7 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         self.docPanelTextBrowser.setOpenExternalLinks(False) # Disable automatic opening of external links
         self.docPanelTextBrowser.anchorClicked.connect(self.handle_link_click) # Connect the link click handler
     
+        self.ui.btnCopySelectedDisplayFunctionCode.clicked.connect(self.handle_copy_code_button_clicked)
 
     # ==================================================================================================================== #
     # Item Access Methods                                                                                                  #
@@ -184,7 +196,11 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         return {a_fn_name:DisplayFunctionItem.init_from_fn_object(a_fn, icon_path=icon_table.get(a_fn_name, None)) for a_fn_name, a_fn in self.curr_active_pipeline.registered_display_function_dict.items()}
 
     def get_display_function_item(self, a_fn_name: str) -> Optional[DisplayFunctionItem]:
-        return self.get_display_function_items().get(a_fn_name, None)
+        if self.should_use_nice_display_names:
+            an_active_fn_name: str = self.best_display_name_to_function_name_map.get(a_fn_name, a_fn_name)
+            return self.get_display_function_items().get(an_active_fn_name, None)
+        else:
+            return self.get_display_function_items().get(a_fn_name, None)
     
     def update_local_display_items_are_enabled(self):
         """ sets the local display items as disabled if no context is selected. 
@@ -202,10 +218,13 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         """ rebuilds the entire tree using the items provided by `self.get_display_function_items()`
         
         """
+        if self.should_use_nice_display_names:
+            self.best_display_name_to_function_name_map = {}
+
         self.ui.displayFunctionTreeItem_global_fns = None
         self.ui.displayFunctionTreeItem_non_global_fns = None
         
-        should_use_nice_display_names: bool = False # currently broken
+         # currently broken
 
         # Add root item
         displayFunctionTreeItem = QtWidgets.QTreeWidgetItem(["Display Functions"])
@@ -233,8 +252,9 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
             #     active_name = a_fcn_name
 
             # active_name: str = a_disp_fn_item.name
-            if should_use_nice_display_names:
+            if self.should_use_nice_display_names:
                 active_name: str = a_disp_fn_item.best_display_name
+                self.best_display_name_to_function_name_map[a_disp_fn_item.best_display_name] = a_disp_fn_item.name # function name
             else:
                 active_name: str = a_disp_fn_item.name # function name
 
@@ -249,8 +269,8 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
             active_tooltip_text = (a_disp_fn_item.docs or "No tooltip")
             childDisplayFunctionTreeItem.setToolTip(0, active_tooltip_text)
             childDisplayFunctionTreeItem.setData(0, QtCore.Qt.UserRole, a_fcn_name) # "Child 1 custom data"
-            # childDisplayFunctionTreeItem.setData(0, QtCore.Qt.UserRole, a_disp_fn_item) # "Child 1 custom data"
             childDisplayFunctionTreeItem.setData(1, QtCore.Qt.UserRole, a_disp_fn_item.is_global)
+            childDisplayFunctionTreeItem.setData(2, QtCore.Qt.UserRole, a_disp_fn_item.name)
 
             if (a_disp_fn_item.icon_path is not None) and (len(a_disp_fn_item.icon_path) > 0):
                 # has valid iconpath
@@ -279,9 +299,12 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
     def build_for_pipeline(self, curr_active_pipeline):
         self._curr_active_pipeline_ref = curr_active_pipeline
         curr_active_pipeline.reload_default_display_functions()
-        
-        self.displayContextSelectorWidget.build_for_pipeline(curr_active_pipeline)
-        self._rebuild_tree()
+        ## update window title/etc
+        session_id_str: str = self._curr_active_pipeline_ref.get_complete_session_identifier_string()
+        self.setWindowTitle(f'Spike3D Launcher: {session_id_str}')
+        self.displayContextSelectorWidget.build_for_pipeline(curr_active_pipeline) ## update the context list
+        self._rebuild_tree() ## call self._rebuild_tree()
+
         
         
     # Handle link click
@@ -321,6 +344,26 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
             print(f'\t WARN: a_disp_fn_item is None for key: "{a_fcn_name}"')
             
 
+
+    def handle_copy_code_button_clicked(self, *args, **kwargs):
+        print(f'handle_copy_code_button_clicked(...)')
+        selected_items = self.treeWidget.selectedItems() # List[QTreeWidgetItem]
+        all_out_code: List[str] = []
+        for item in selected_items:
+            # print(item.text(0), "-", item.text(1))  # Print data from column 0 and column 1
+            item_data = item.data(0, 0) # ItemDataRole 
+            # print(f'\titem_data: {item_data}')
+            assert item_data is not None
+            assert isinstance(item_data, str)
+            a_fcn_name: str = item_data
+            all_out_code.append(self.build_display_function_run_code(a_fcn_name=a_fcn_name)) 
+        final_out_code: str = '\n'.join(all_out_code)
+        print(final_out_code)
+        ## copy to clipboard
+        copy_to_clipboard(code_str=final_out_code, message_print=True)
+        
+
+
     # ==================================================================================================================== #
     # Events                                                                                                               #
     # ==================================================================================================================== #
@@ -329,6 +372,7 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         if self.debug_print:
             print(f"Item single-clicked: {item}, column: {column}\n\t", item.text(column))
         item_data = item.data(column, 0) # ItemDataRole 
+        # item_data = item.data(column, 2)
         if self.debug_print:
             print(f'\titem_data: {item_data}')
         assert item_data is not None, f"item_Data is None"
@@ -344,8 +388,8 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
             print(f"Item double-clicked: {item}, column: {column}\n\t", item.text(column))
         # print(f'\titem.data: {item.data}')
         # raise NotImplementedError
-        # item_data = item.data(column, 0) # ItemDataRole 
         item_data = item.data(column, 0) # ItemDataRole 
+        # item_data = item.data(column, 2)
         if self.debug_print:
             print(f'\titem_data: {item_data}')
         assert item_data is not None, f"item_Data is None"
@@ -360,6 +404,7 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         if self.debug_print:
             print(f"Item hovered: {item}, column: {column}\n\t", item.text(column))
         item_data = item.data(column, 0) # ItemDataRole 
+        # item_data = item.data(column, 2)
         if self.debug_print:
             print(f'\titem_data: {item_data}')
         assert item_data is not None
@@ -374,6 +419,7 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         if self.debug_print:
             print(f"on_tree_item_selection_changed: {item}, column: {column}\n\t", item.text(column))
         item_data = item.data(column, 0) # ItemDataRole 
+        # item_data = item.data(column, 2)
         if self.debug_print:
             print(f'\titem_data: {item_data}')
         assert item_data is not None
@@ -486,19 +532,54 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         a_disp_fn_item = self.get_display_function_item(a_fn_name=a_fcn_name)
         assert a_disp_fn_item is not None, f"a_disp_fn_item is None! for a_fn_name='{a_fcn_name}'"
         if a_disp_fn_item.is_global:
-            return self.curr_active_pipeline.display(display_function=a_fcn_name, active_session_configuration_context=None, *args, **kwargs)
+            return self.curr_active_pipeline.display(display_function=a_disp_fn_item.name, active_session_configuration_context=None, *args, **kwargs)
         else:
             # non-global, needs a context:
             current_selected_context = self.displayContextSelectorWidget.current_selected_context
             if current_selected_context is not None:
                 # args = list(args) ## convert to list if a tuple
                 # args.insert(0, current_selected_context)
-                return self.curr_active_pipeline.display(display_function=a_fcn_name, active_session_configuration_context=current_selected_context, *args, **kwargs)
+                return self.curr_active_pipeline.display(display_function=a_disp_fn_item.name, active_session_configuration_context=current_selected_context, *args, **kwargs)
             else:
                 return None
 
         # return a_fn_handle(*args, **kwargs)
         
+
+
+    def build_display_function_run_code(self, a_fcn_name: str, include_initial_define_line=True) -> str:
+        """ btnCopySelectedDisplayFunctionCode
+        """
+        code_out: str = ""
+        if include_initial_define_line:
+            code_out = f"{code_out}_out = dict()\n"
+
+        a_fn_handle = self._perform_get_display_function_code(a_fcn_name=a_fcn_name)
+        assert a_fn_handle is not None
+        # args = []
+        # kwargs = {}
+        a_disp_fn_item: DisplayFunctionItem = self.get_display_function_item(a_fn_name=a_fcn_name)
+        assert a_disp_fn_item is not None, f"a_disp_fn_item is None! for a_fn_name='{a_fcn_name}'"
+        if a_disp_fn_item.is_global:
+            code_out = f"{code_out}_out['{a_disp_fn_item.name}'] = curr_active_pipeline.display(display_function='{a_disp_fn_item.name}', active_session_configuration_context=None) # {a_disp_fn_item.name}\n" # , *{args}, **{kwargs}
+        else:
+            # non-global, needs a context:
+            current_selected_context = self.displayContextSelectorWidget.current_selected_context
+            if current_selected_context is not None:
+                # args = list(args) ## convert to list if a tuple
+                # args.insert(0, current_selected_context)
+                code_out = f"{code_out}_out['{a_disp_fn_item.name}'] = curr_active_pipeline.display(display_function='{a_disp_fn_item.name}', active_session_configuration_context={current_selected_context.get_initialization_code_string()}) # {a_disp_fn_item.name}\n" # , *{args}, **{kwargs}
+            else:
+                return None
+            
+        return code_out
+        # return f""" 
+        #     _out = dict()
+        #     _out['{a_fcn_name}'] = curr_active_pipeline.display('{a_fcn_name}') # {a_fcn_name}
+        # """
+
+
+
 
 
 

@@ -1,3 +1,6 @@
+from copy import deepcopy
+import numpy as np
+
 import matplotlib
 matplotlib.use('Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -19,11 +22,12 @@ from pyphocorehelpers.function_helpers import function_attributes
 
 from pyphocorehelpers.gui.Qt.widgets.toast_notification_widget import ToastWidget, ToastShowingWidgetMixin
 from pyphocorehelpers.plotting.mixins.plotting_backend_mixin import PlottingBackendSpecifyingMixin, PlottingBackendType
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.CrosshairsTracingMixin import CrosshairsTracingMixin
 
 __all__ = ['CustomMatplotlibWidget']
 
 @metadata_attributes(short_name=None, tags=['matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-08 14:20')
-class CustomMatplotlibWidget(ToastShowingWidgetMixin, PlottingBackendSpecifyingMixin, QtWidgets.QWidget):
+class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, PlottingBackendSpecifyingMixin, QtWidgets.QWidget):
     """
     Implements a Matplotlib figure inside a QWidget.
     Use getFigure() and redraw() to interact with matplotlib.
@@ -37,7 +41,9 @@ class CustomMatplotlibWidget(ToastShowingWidgetMixin, PlottingBackendSpecifyingM
         subplot.plot(x,y)
         mw.draw()
     """
+    sigCrosshairsUpdated = QtCore.Signal(object, str, str) # (self, name, trace_value) - CrosshairsTracingMixin Conformance
     
+
     @classmethod
     def get_plot_backing_type(cls) -> PlottingBackendType:
         """PlottingBackendSpecifyingMixin conformance: Implementor should return either [PlottingBackendType.Matplotlib, PlottingBackendType.PyQtGraph]."""
@@ -57,7 +63,7 @@ class CustomMatplotlibWidget(ToastShowingWidgetMixin, PlottingBackendSpecifyingM
         QtWidgets.QWidget.__init__(self)
         
         ## Init containers:
-        self.params = VisualizationParameters(name=name, plot_function_name=plot_function_name, debug_print=False)
+        self.params = VisualizationParameters(name=name, plot_function_name=plot_function_name, debug_print=False, wants_crosshairs=kwargs.get('wants_crosshairs', False), should_force_discrete_to_bins=kwargs.get('should_force_discrete_to_bins', False))
         self.plots_data = RenderPlotsData(name=name)
         self.plots = RenderPlots(name=name)
         self.ui = PhoUIContainer(name=name)
@@ -318,3 +324,104 @@ class CustomMatplotlibWidget(ToastShowingWidgetMixin, PlottingBackendSpecifyingM
         # Call the base class implementation
         super().showEvent(event)
 
+
+    # ==================================================================================================================== #
+    # CrosshairsTracingMixin Conformances                                                                                  #
+    # ==================================================================================================================== #
+    def add_crosshairs(self, plot_item, name, matrix=None, xbins=None, ybins=None, enable_y_trace:bool=False):
+        """ adds crosshairs that allow the user to hover a bin and have the label dynamically display the bin (x, y) and value.
+        
+        Uses:
+        self.params.should_force_discrete_to_bins
+        
+        Updates self.plots[name], self.ui.connections[name]
+        
+        Emits: self.sigCrosshairsUpdated
+        
+        """
+        ax = plot_item
+        print(f'Matplotlib add_crosshairs(ax: {ax}, name: "{name}", ...):')
+        plots_dict = self.plots.get(name, {})
+        if 'crosshairs_vLine' not in plots_dict:
+            if name not in self.plots:
+                 self.plots[name] = {}
+            vLine = ax.axvline(x=0, color='k', lw=1, ls='--')
+            self.plots[name]['crosshairs_vLine'] = vLine
+            if enable_y_trace:
+                hLine = ax.axhline(y=0, color='k', lw=1, ls='--')
+                self.plots[name]['crosshairs_hLine'] = hLine
+                
+            should_force = self.params.get('crosshairs_discrete', True)
+            
+            def mouseMoved(event):
+                if event.inaxes == ax:
+                    x_point = event.xdata
+                    if enable_y_trace: y_point = event.ydata
+                    if should_force:
+                        x_point = float(int(round(x_point)))+0.5
+                        if enable_y_trace: y_point = float(int(round(y_point)))+0.5
+                    index_x = int(x_point)
+                    if enable_y_trace: index_y = int(y_point)
+                    value_str = ''
+                    if matrix is not None:
+                        shape = np.shape(matrix)
+                        valid_x = (index_x >= 0 and index_x < shape[0])
+                        valid_y = (index_y >= 0 and index_y < shape[1]) if enable_y_trace else True
+                        if valid_x and valid_y:
+                            if should_force:
+                                if (xbins is not None) and (ybins is not None) and enable_y_trace:
+                                    value_str = f"(x[{index_x}]={xbins[index_x]:.3f}, y[{index_y}]={ybins[index_y]:.3f}), value={matrix[index_x][index_y]:.3f}"
+                                else:
+                                    value_str = f"(x={index_x}, y={index_x if not enable_y_trace else index_y}), value={matrix[index_x][index_y]:.3f}"
+                            else:
+                                value_str = f"(x={x_point:.1f}, y={y_point:.1f}), value={matrix[index_x][index_y]:.3f}" if enable_y_trace else f"(x={x_point:.1f}), value={matrix[index_x][0]:.3f}"
+                            print(f'value_str: {value_str}')
+                    vLine.set_xdata(x_point)
+                    if enable_y_trace: self.plots[name]['crosshairs_hLine'].set_ydata(y_point)
+                    self.sigCrosshairsUpdated.emit(self, name, value_str)
+                    ax.figure.canvas.draw_idle()
+                    
+            cid = ax.figure.canvas.mpl_connect('motion_notify_event', mouseMoved)
+            self.ui.connections[name] = cid
+        else:
+            pass
+
+    def remove_crosshairs(self, plot_item, name=None):
+        print(f'CustomMatplotlibWidget.remove_crosshairs(plot_item: {plot_item}, name: "{name}"):')
+        if name is None:
+            for key in list(self.plots.keys()):
+                for ln in ('crosshairs_vLine','crosshairs_hLine'):
+                    if ln in self.plots[key]: self.plots[key][ln].remove()
+                if key in self.ui.connections: plot_item.figure.canvas.mpl_disconnect(self.ui.connections[key]); del self.ui.connections[key]
+                del self.plots[key]
+        else:
+            if name in self.plots:
+                for ln in ('crosshairs_vLine','crosshairs_hLine'):
+                    if ln in self.plots[name]: self.plots[name][ln].remove()
+                if name in self.ui.connections: plot_item.figure.canvas.mpl_disconnect(self.ui.connections[name]); del self.ui.connections[name]
+                del self.plots[name]
+        plot_item.figure.canvas.draw_idle()
+
+
+    def update_crosshair_trace(self, wants_crosshairs_trace: bool):
+        """ updates the crosshair trace peferences
+        """
+        print(f'CustomMatplotlibWidget.update_crosshair_trace(wants_crosshairs_trace: {wants_crosshairs_trace}):')
+        old_value = deepcopy(self.params.wants_crosshairs)
+        did_change: bool = (old_value != wants_crosshairs_trace)
+        if did_change:
+            self.params.wants_crosshairs = wants_crosshairs_trace
+            if self.params.wants_crosshairs:
+                print(f'\tadding crosshairs...')
+                ybins = self.plots_data.get('ybin', None)
+                # has_ybins: bool = (ybins not None)
+                has_ybins: bool = True
+                self.add_crosshairs(plot_item=self.ax, name='root_plot_item', matrix=self.plots_data.get('matrix', None), xbins=self.plots_data.get('xbin', None), ybins=ybins, enable_y_trace=has_ybins)
+            else:
+                print(f'\tremoving crosshairs...')
+                self.remove_crosshairs(plot_item=self.ax, name='root_plot_item')
+                
+            print(f'\tdone.')
+        else:
+            print(f'\tno change!')
+            

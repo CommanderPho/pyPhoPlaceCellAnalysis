@@ -18,7 +18,7 @@ Example:
     # }
 
     import pyphoplacecellanalysis.External.pyqtgraph as pg
-    from pyphoplacecellanalysis.GUI.PyQtPlot.Examples.pyqtplot_DataTreeWidget import plot_dataTreeWidget
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Examples.pyqtplot_DataTreeWidget import CustomFormattingDataTreeWidget, plot_dataTreeWidget
     tree, app = plot_dataTreeWidget(data=d, title='PhoOutputDataTreeApp')
     pg.exec() # required in an empty notebook to get the window to show instead of just launching and locking up
 

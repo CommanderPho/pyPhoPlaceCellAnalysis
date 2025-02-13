@@ -1,5 +1,29 @@
 <RCC>
   <qresource prefix="Icons">
+    <file>Icons/Icon/application--arrow.png</file>
+    <file>Icons/Icon/application-blue.png</file>
+    <file>Icons/Icon/application-dock.png</file>
+    <file>Icons/Icon/application-dock-180.png</file>
+    <file>Icons/Icon/application-dock-270.png</file>
+    <file>Icons/Icon/application-dock-tab.png</file>
+    <file>Icons/Icon/application-export.png</file>
+    <file>Icons/Icon/application-icon.png</file>
+    <file>Icons/Icon/application-import.png</file>
+    <file>Icons/Icon/application-list.png</file>
+    <file>Icons/Icon/application--minus.png</file>
+    <file>Icons/Icon/application-plus.png</file>
+    <file>Icons/Icon/application--plus.png</file>
+    <file>Icons/Icon/application-resize-actual.png</file>
+    <file>Icons/Icon/applications-blue.png</file>
+    <file>Icons/Icon/application-sidebar-collapse.png</file>
+    <file>Icons/Icon/application-sidebar-expand.png</file>
+    <file>Icons/Icon/applications-stack.png</file>
+    <file>Icons/Icon/application-sub.png</file>
+    <file>Icons/Icon/application-table.png</file>
+    <file>Icons/Icon/application-tile.png</file>
+    <file>Icons/Icon/application-tile-horizontal.png</file>
+    <file>Icons/Icon/application-tile-vertical.png</file>
+    <file>Icons/Icon/application-tree.png</file>
     <file>Icons/actions/clock-rollback-black.png</file>
     <file>Icons/actions/clock-rollback-white.png</file>
     <file>Icons/actions/nos-nitrous-oxide-white.png</file>

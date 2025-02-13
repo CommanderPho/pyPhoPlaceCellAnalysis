@@ -1997,7 +1997,7 @@ class SubsequencesPartitioningResult(ComputedResult):
             return out  # Return the MatplotlibRenderPlots object
 
 
-
+    @function_attributes(short_name=None, tags=['plot', 'debug'], input_requires=[], output_provides=[], uses=['._debug_plot_time_bins_multiple'], used_by=['._plot_step_by_step_subsequence_partition_process', 'cls.plot_test_subsequences_as_ax_stack'], creation_date='2025-01-22 13:03', related_items=[])
     def plot_time_bins_multiple(self, num='debug_plot_time_binned_positions', ax=None, enable_position_difference_indicators=True, enable_axes_formatting=False, override_positions_list=None, flat_time_window_edges=None,
                                 arrow_alpha: float = 0.4, subsequence_line_color_alpha: float = 0.55, **kwargs):
         if override_positions_list is None:
@@ -2046,7 +2046,7 @@ class SubsequencesPartitioningResult(ComputedResult):
         )
 
 
-
+    @function_attributes(short_name=None, tags=['plot', 'debug'], input_requires=[], output_provides=[], uses=['.plot_time_bins_multiple'], used_by=[], creation_date='2025-01-22 13:03', related_items=[])
     def _plot_step_by_step_subsequence_partition_process(self, extant_fig=None, extant_ax_dict=None, force_integer_x_axis_index: bool = True, use_debug_step_intermediates:bool=True, **kwargs):
         """ diagnostic for debugging the step-by-step sequence partitioning heuristics 
         
@@ -2486,6 +2486,9 @@ class SubsequencesPartitioningResultScoringComputations:
     def _META_build_epoch_SubsequencesPartitioningResult(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, pos_bin_edges: NDArray, max_ignore_bins:int=2, same_thresh_cm: Optional[float]=6.0, same_thresh_fraction_of_track: Optional[float] = None, max_jump_distance_cm: float = 60.0) -> SubsequencesPartitioningResult:
         """ 
         partition_result: SubsequencesPartitioningResult = HeuristicReplayScoring._META_build_epoch_SubsequencesPartitioningResult(a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length, pos_bin_edges=pos_bin_edges, max_ignore_bins=max_ignore_bins, same_thresh_cm=same_thresh_cm, same_thresh_fraction_of_track=same_thresh_fraction_of_track, max_jump_distance_cm=max_jump_distance_cm)
+        
+        PERFORMANCE: this is slow, taking about 0.5sec per run
+        
         """
         ## INPUTS: a_result: DecodedFilterEpochsResult, an_epoch_idx: int = 1, a_decoder_track_length: float
         a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
@@ -3186,7 +3189,7 @@ class HeuristicReplayScoring:
         
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_all_heuristic_scores
 
-        a_decoded_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(a_decoded_filter_epochs_decoder_result_dict=a_decoded_filter_epochs_decoder_result_dict)
+        a_decoded_filter_epochs_decoder_result_dict, _out_new_scores, partition_result_dict = HeuristicReplayScoring.compute_all_heuristic_scores(a_decoded_filter_epochs_decoder_result_dict=a_decoded_filter_epochs_decoder_result_dict)
 
         
         """
@@ -3273,7 +3276,6 @@ class HeuristicReplayScoring:
             _out_new_scores[a_name] =  pd.DataFrame([asdict(cls.compute_pho_heuristic_replay_scores(a_result=a_result, an_epoch_idx=an_epoch_idx, pos_bin_edges=deepcopy(xbin_edges), use_bin_units_instead_of_realworld=use_bin_units_instead_of_realworld, max_ignore_bins=max_ignore_bins, same_thresh_cm=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm), filter=lambda a, v: a.name not in ['position_derivatives_df']) for an_epoch_idx in np.arange(a_result.num_filter_epochs)])
             assert np.shape(_out_new_scores[a_name])[0] == np.shape(a_result.filter_epochs)[0], f"np.shape(_out_new_scores[a_name])[0]: {np.shape(_out_new_scores[a_name])[0]} != np.shape(a_result.filter_epochs)[0]: {np.shape(a_result.filter_epochs)[0]}"
             a_result.filter_epochs = PandasHelpers.adding_additional_df_columns(original_df=a_result.filter_epochs, additional_cols_df=_out_new_scores[a_name]) # update the filter_epochs with the new columns
-            
         # END for a_name, a_result in....
 
         return a_decoded_filter_epochs_decoder_result_dict, _out_new_scores, partition_result_dict
@@ -3612,52 +3614,34 @@ class HeuristicThresholdFiltering:
 # 2024-12-20 - Testing Performance                                                                                     #
 # ==================================================================================================================== #
 
-def convert_to_array_recursive(data: Any) -> Any:
-    """
-    Recursively converts lists and tuples in a nested structure into np.array objects.
-
-    Args:
-        data (Any): The input data, can be a list, tuple, dict, or other nested structure.
-
-    Returns:
-        Any: The transformed structure with lists and tuples replaced by np.array.
-
-    Usage:
-        result = convert_to_array_recursive([1, 2, (3, 4, [5, 6])])
-    """
-    if isinstance(data, (list, tuple)):
-        return np.array([convert_to_array_recursive(item) for item in data])
-    elif isinstance(data, dict):
-        
-        return {key: convert_to_array_recursive(value) for key, value in data.items()}
-    else:
-        return data
+from neuropy.utils.indexing_helpers import NumpyHelpers
     
 
+
 desired_selected_indicies_dict = {'chose_incorrect_subsequence_as_main_list[0]': [17, 18, 19, 20, 21, 22, 16],
-						 'intrusion[0]': [11, 10, 9, 8, 7, 5, 4, 3],
-						 'intrusion[1]': [17, 18, 19, 20],
-						 'intrusion[2]': [7, 8, 9, 10],
-						 'intrusion[3]': [2, 3, 5, 6, 7, 8],
+                         'intrusion[0]': [11, 10, 9, 8, 7, 5, 4, 3],
+                         'intrusion[1]': [17, 18, 19, 20],
+                         'intrusion[2]': [7, 8, 9, 10],
+                         'intrusion[3]': [2, 3, 5, 6, 7, 8],
                          'intrusion[4]': [11, 10, 9, 8, 7, 6, 5, 3, 2],
-						 'false_negative_incorrect_split_list[0]': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 20, 21, 23, 22, 24, 25],
+                         'false_negative_incorrect_split_list[0]': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 20, 21, 23, 22, 24, 25],
                          'false_negative_incorrect_split_list[1]': [4, 5, 6, 7, 8, 9, 10],
                          'false_negative_incorrect_split_list[2]': [0, 1, 2, 4, 5, 6, 9, 10, 11],
-						 'wrongly_split_main_sequence_and_grabbed_part_list[0]': [7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 20, 21, 22, 23, 6],
-						 'wrongly_split_main_sequence_and_grabbed_part_list[1]': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], ## seems split artificially in the middle several times based on step-size.
-						 'wrongly_split_main_sequence_and_grabbed_part_list[2]': [5, 4, 6, 9, 10, 11, 12, 13, 14, 16, 17, 19, 20, 3, 2, 1, 0],
-						 'wrongly_split_main_sequence_and_grabbed_part_list[3]': [6, 7, 9, 10, 11, 14, 15, 5, 4, 3, 2, 1],
-						 'wrongly_split_main_sequence_and_grabbed_part_list[4]': [5, 6, 7, 8, 9, 10],
-						 'wrongly_split_main_sequence_and_grabbed_part_list[5]': [6, 7, 8, 9, 10],
-						 'wrongly_split_main_sequence_and_grabbed_part_list[6]': [7, 8, 9, 10, 11, 6],
-						 'wrongly_split_main_sequence_and_grabbed_part_list[7]': [0, 2, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 20, 22, 23, 24, 25],
-						 'jump[0]': [7, 8, 9, 10, 11, 12, 13, 14],
-						 'jump[1]': [1, 2, 3, 4, 5],
-						 'jump[2]': [2, 3, 4, 5],
-						 'jump[3]': [4, 3, 5, 6, 7],
-						 'great[0]': [1, 2, 3, 4, 5, 6],
-						 'false_positive[0]': [],
-						 'true_positives[0]': [1, 2, 3, 4, 5, 6, 7, 8],
+                         'wrongly_split_main_sequence_and_grabbed_part_list[0]': [7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 20, 21, 22, 23, 6],
+                         'wrongly_split_main_sequence_and_grabbed_part_list[1]': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], ## seems split artificially in the middle several times based on step-size.
+                         'wrongly_split_main_sequence_and_grabbed_part_list[2]': [5, 4, 6, 9, 10, 11, 12, 13, 14, 16, 17, 19, 20, 3, 2, 1, 0],
+                         'wrongly_split_main_sequence_and_grabbed_part_list[3]': [6, 7, 9, 10, 11, 14, 15, 5, 4, 3, 2, 1],
+                         'wrongly_split_main_sequence_and_grabbed_part_list[4]': [5, 6, 7, 8, 9, 10],
+                         'wrongly_split_main_sequence_and_grabbed_part_list[5]': [6, 7, 8, 9, 10],
+                         'wrongly_split_main_sequence_and_grabbed_part_list[6]': [7, 8, 9, 10, 11, 6],
+                         'wrongly_split_main_sequence_and_grabbed_part_list[7]': [0, 2, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 20, 22, 23, 24, 25],
+                         'jump[0]': [7, 8, 9, 10, 11, 12, 13, 14],
+                         'jump[1]': [1, 2, 3, 4, 5],
+                         'jump[2]': [2, 3, 4, 5],
+                         'jump[3]': [4, 3, 5, 6, 7],
+                         'great[0]': [1, 2, 3, 4, 5, 6],
+                         'false_positive[0]': [],
+                         'true_positives[0]': [1, 2, 3, 4, 5, 6, 7, 8],
                          'true_positives[1]': [0, 1, 2, 3, 4, 5, 6, 7],
                          'true_positives[2]': [0, 1, 2, 3, 4, 5, 6, 7, 8],
                          'true_positives[3]': [0, 1, 2, 3, 4, 5],
@@ -3815,7 +3799,7 @@ class SubsequenceDetectionSamples:
 
     @classmethod
     def get_all_example_dict(cls) -> Dict[str, Dict[Tuple, GroundTruthData]]:
-        return {k:convert_to_array_recursive(v) for k, v in {
+        return {k:NumpyHelpers.convert_to_array_recursive(v) for k, v in {
             'intrusion': cls.intrusion_example_positions_list,
             'jump': cls.jump_bad_list,
             'great': cls.good_long_sequences_list,

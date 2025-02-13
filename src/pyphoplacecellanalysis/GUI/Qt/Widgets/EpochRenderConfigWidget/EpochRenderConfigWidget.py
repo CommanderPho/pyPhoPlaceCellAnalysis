@@ -3,7 +3,7 @@
 from copy import deepcopy
 import sys
 import os
-from typing import Optional, List, Dict, Callable
+from typing import Optional, List, Dict, Callable, Union
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets, mkQApp, uic
@@ -34,6 +34,9 @@ class EpochRenderConfigWidget(pg.Qt.QtWidgets.QWidget):
     """ a widget that allows graphically configuring a single data series for rendering Epoch rectangles 
         EpochDisplayConfig
     """
+    sigConfigChanged = QtCore.Signal(object)
+    # sigCollapseClicked = QtCore.Signal(object)
+    # sigGroupClicked = QtCore.Signal(object)
     config: EpochDisplayConfig = field(default=Factory(EpochDisplayConfig))
         
     ## Attrs manual __init__
@@ -52,6 +55,16 @@ class EpochRenderConfigWidget(pg.Qt.QtWidgets.QWidget):
         param_to_pyqt_binding_dict = ParamToPyQtBinding.param_to_pyqt_binding_dict()
         ui_element_list = self.get_ui_element_list()
         bound_config_value_list = self.get_bound_config_value_list()
+        
+
+        ## Setup connections:
+        self.ui.connections = {}
+        self.ui.connections['chkbtnVisible'] = self.ui.chkbtnVisible.toggled.connect(self.on_update_config)    
+        self.ui.connections['btnFillColor'] = self.ui.btnFillColor.sigColorChanging.connect(self.on_update_config)
+        self.ui.connections['btnPenColor'] = self.ui.btnPenColor.sigColorChanging.connect(self.on_update_config)
+        self.ui.connections['doubleSpinBoxHeight'] = self.ui.doubleSpinBoxHeight.valueChanged.connect(self.on_update_config)
+        self.ui.connections['doubleSpinBoxOffset'] = self.ui.doubleSpinBoxOffset.valueChanged.connect(self.on_update_config)
+        self.ui.connections['btnTitle'] = self.ui.btnTitle.pressed.connect(self.on_update_config)
         
         # for a_config_property, a_widget in zip(bound_config_value_list, ui_element_list):
         #     a_widget_type = type(a_widget)
@@ -78,6 +91,11 @@ class EpochRenderConfigWidget(pg.Qt.QtWidgets.QWidget):
     def get_config_property_names_list(self) -> List[str]:
         return ['name', 'pen_QColor', 'brush_QColor', 'height', 'y_location', 'isVisible']
 
+
+    def on_update_config(self, *args, **kwargs):
+        print(f'EpochRenderConfigWidget.on_update_config(*args: {args}, **kwargs: {kwargs})')
+        self.sigConfigChanged.emit(self)
+        
 
     ## Programmatic Update/Retrieval:    
     def update_from_config(self, config: EpochDisplayConfig):
@@ -172,19 +190,22 @@ def clear_layout(layout):
 class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
     """ a widget that contains a vertical list of `EpochRenderConfigWidget`. Allowing graphically configuring the rendering Epochs 
 
-    History: based of of function `build_containing_epoch_display_configs_root_widget`
+    History: based off of function `build_containing_epoch_display_configs_root_widget`
 
 
     from pyphoplacecellanalysis.GUI.Qt.Widgets.EpochRenderConfigWidget.EpochRenderConfigWidget import EpochRenderConfigsListWidget
 
     
     """
+    sigAnyConfigChanged = QtCore.Signal(object)
+    # sigSpecificConfigChanged = QtCore.Signal(object, object)
+    
     ui: PhoUIContainer = field(init=False, default=None)
-    configs: Dict[str, EpochDisplayConfig] = field(init=False, default=None)
+    configs: Dict[str, Union[EpochDisplayConfig, List[EpochDisplayConfig]]] = field(init=False, default=None)
     # out_render_config_widgets_dict: Dict[str, pg.Qt.QtWidgets.QWidget] = field(init=False, default=None)
 
     ## Attrs manual __init__
-    def __init__(self, configs: Optional[Dict[str, EpochDisplayConfig]]=None, parent=None): # 
+    def __init__(self, configs: Optional[Dict[str, Union[EpochDisplayConfig, List[EpochDisplayConfig]]]]=None, parent=None): # 
         self.ui = PhoUIContainer()
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self.configs = configs or {}
@@ -194,7 +215,7 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
         self.initUI()
 
 
-    def _build_children_widgets(self, configs):
+    def _build_children_widgets(self, configs: Union[EpochDisplayConfig, List[EpochDisplayConfig]]):
         """
         updates:
             self.ui.config_widget_layout
@@ -205,14 +226,19 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
         assert self.ui.out_render_config_widgets_dict is not None
         assert len(self.ui.out_render_config_widgets_dict) == 0
 
+        added_widget_dict = {}
+        _connections_dict = {}
+        
         # self.ui.out_render_config_widgets_dict = {}
         for a_config_name, a_config in configs.items():
             if isinstance(a_config, (list, tuple)):
+                # a list of configs
                 if len(a_config) == 1:
                     curr_widget = build_single_epoch_display_config_widget(a_config[0]) # 
                     self.ui.config_widget_layout.addWidget(curr_widget)
                     self.ui.out_render_config_widgets_dict[a_config_name] = curr_widget
-
+                    added_widget_dict[a_config[0]] = [curr_widget]
+                    
                 else:
                     ## extract all items
                     a_sub_config_widget_layout = pg.Qt.QtWidgets.QHBoxLayout()
@@ -220,7 +246,8 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
                     a_sub_config_widget_layout.setContentsMargins(0, 0, 0, 0)
                     a_sub_config_widget_layout.setObjectName(f"horizontalLayout[{a_config_name}]")
                     
-                    self.ui.out_render_config_widgets_dict[a_config_name] = []
+                    self.ui.out_render_config_widgets_dict[a_config_name] = [] # start with an empty list
+                    # added_widget_dict[a_config] = []
 
 
                     for i, a_sub_config in enumerate(a_config):
@@ -229,7 +256,9 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
                         a_sub_config_widget_layout.addWidget(a_sub_curr_widget)
                         # self.ui.out_render_config_widgets_dict[a_config_name] = curr_widget
                         self.ui.out_render_config_widgets_dict[a_config_name].append(a_sub_curr_widget)
-                        
+                        # added_widget_dict[a_config].append(a_sub_curr_widget)
+                        added_widget_dict[a_sub_config] = [a_sub_curr_widget]
+
                     # curr_widget = a_sub_config_widget_layout
                     self.ui.config_widget_layout.addLayout(a_sub_config_widget_layout)
 
@@ -238,13 +267,20 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
                 curr_widget = build_single_epoch_display_config_widget(a_config)
                 self.ui.config_widget_layout.addWidget(curr_widget)
                 self.ui.out_render_config_widgets_dict[a_config_name] = curr_widget
+                added_widget_dict[a_config] = [curr_widget]
 
-
+            ## Connect signals to widgets
+            for a_config, a_widget_list in added_widget_dict.items():
+                _connections_dict[a_config] = []
+                for a_widget in a_widget_list:
+                    # self.ui.out_render_config_widgets_dict[a_config_name]
+                    _connections_dict[a_config].append(a_widget.sigConfigChanged.connect(self.on_config_ui_updated))
 
 
     def initUI(self):
         # self.ui.rootWidget = pg.Qt.QtWidgets.QWidget()
         # self.addWidget(self.ui.rootWidget)
+        self.ui.connections = {}
         self.ui.config_widget_layout = pg.Qt.QtWidgets.QVBoxLayout()
         self.ui.config_widget_layout.setSpacing(0)
         self.ui.config_widget_layout.setContentsMargins(0, 0, 0, 0)
@@ -252,7 +288,8 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
         self.ui.config_widget_layout.setObjectName("verticalLayout")
 
         self.ui.out_render_config_widgets_dict = {}
-        self.ui.out_render_config_widgets_dict = self._build_children_widgets(configs=self.configs)
+        # self.ui.out_render_config_widgets_dict = self._build_children_widgets(configs=self.configs)
+        self._build_children_widgets(configs=self.configs)
         self.setLayout(self.ui.config_widget_layout)
 
                 
@@ -261,24 +298,54 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
         self.ui.out_render_config_widgets_dict.clear()
 
     ## Programmatic Update/Retrieval:    
-    def update_from_configs(self, configs: Dict[str, EpochDisplayConfig]):
+    def update_from_configs(self, configs: Dict[str, Union[EpochDisplayConfig, List[EpochDisplayConfig]]]):
         """ called to programmatically update the config """
         self.clear_all_child_widgets()
         self.configs = configs ## update self.configs
         self._build_children_widgets(configs=self.configs)
 
 
-    def configs_from_states(self) -> Dict[str, EpochDisplayConfig]:
+    def configs_from_states(self, as_EpochDisplayConfig_obj: bool=True) -> Dict[str, Union[EpochDisplayConfig, List[EpochDisplayConfig]]]:
         """ called to retrieve a valid config from the UI's properties... this means it could have just held a config as its model. """
         _out_configs = {}
-        for a_name, a_widget in self.ui.out_render_config_widgets_dict.items():
-            # for a_config_name, a_config in self.configs.items():
-            a_config = self.configs[a_name]
-            _out_configs[a_name] = a_widget.config_from_state()
-        # raise NotImplementedError
-        return _out_configs
+        assert self.ui.out_render_config_widgets_dict is not None, f"self.ui.out_render_config_widgets_dict is None!"
+        for a_config_name, a_widget_or_widget_list in self.ui.out_render_config_widgets_dict.items():
+            if isinstance(a_widget_or_widget_list, (list, tuple)):
+                # a list of configs
+                if len(a_widget_or_widget_list) == 1:
+                    curr_widget = a_widget_or_widget_list[0]
+                    _out_configs[a_config_name] = curr_widget.config_from_state()
+                else:
+                    ## extract all items                    
+                    _out_configs[a_config_name] = [] # start with an empty list
+                    for i, a_sub_curr_widget in enumerate(a_widget_or_widget_list):
+                        _out_configs[a_config_name].append(a_sub_curr_widget.config_from_state())
+            else:
+                # Otherwise a straight-up config
+                curr_widget = a_widget_or_widget_list
+                _out_configs[a_config_name] = curr_widget.config_from_state()
+                
+        ## END FOR
+        if as_EpochDisplayConfig_obj:
+            return _out_configs
+        else:
+            ## convert the EpochDisplayConfig objects to dicts
+            update_dict = {}
+            for k, v in _out_configs.items():
+                if not isinstance(v, (list, tuple)):
+                    update_dict[k] = v.to_dict()
+                else:
+                    update_dict[k] = [sub_v.to_dict() for sub_v in v] ## get the sub-items in the list
+            return update_dict
         
 
+    def config_dicts_from_states(self) -> Dict[str, Union[Dict, List[Dict]]]:
+        """ called to retrieve a valid config from the UI's properties... this means it could have just held a config as its model. """
+        return self.configs_from_states(as_EpochDisplayConfig_obj=False) # type: ignore
+
+    def on_config_ui_updated(self, *args, **kwargs):
+        print(f'EpochRenderConfigsListWidget.on_config_ui_updated(*args: {args}, **kwargs: {kwargs})')
+        self.sigAnyConfigChanged.emit(self)
 
 
 def build_single_epoch_display_config_widget(render_config: EpochDisplayConfig) -> EpochRenderConfigWidget:

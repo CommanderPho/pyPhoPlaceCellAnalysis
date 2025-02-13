@@ -3,7 +3,16 @@ from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.InfiniteLine import
 
 
 class CustomInfiniteLine(InfiniteLine):
-    """ A custom pg.InfiniteLine subclass with custom requirements to hold a customizable modifier key or mouse button to access hover/drag functionality. """
+    """ A custom pg.InfiniteLine subclass with custom requirements to hold a customizable modifier key or mouse button to access hover/drag functionality.
+    
+    =============================== ===================================================
+    **Signals:**
+    sigDragged(self)
+    sigPositionChangeFinished(self)
+    sigPositionChanged(self)
+    sigClicked(self, ev)
+    =============================== ===================================================
+    """
     def __init__(self, pos=None, angle=90, pen=None, movable=False, bounds=None, hoverPen=None, label=None, labelOpts=None, span=(0, 1), markers=None, name=None,
                  custom_mouse_drag_criteria_fn=None, custom_mouse_hover_criteria_fn=None, custom_mouse_click_criteria_fn=None):
         InfiniteLine.__init__(self, pos=pos, angle=angle, pen=pen, movable=movable, bounds=bounds, hoverPen=hoverPen, label=label, labelOpts=labelOpts, span=span, markers=markers, name=name)

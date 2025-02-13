@@ -39,7 +39,7 @@ from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers imp
 class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=DisplayFunctionRegistryHolder):
     """ Functions related to visualizing Bayesian Decoder performance. """
     
-    @function_attributes(short_name='1d_placefields', tags=['display', 'placefields', '1D', 'matplotlib'], input_requires=[], output_provides=[], uses=['Pf1D.plot_ratemaps_1D(...)'], used_by=[], creation_date='2023-04-11 03:05')
+    @function_attributes(short_name='1d_placefields', tags=['display', 'placefields', '1D', 'matplotlib'], input_requires=["computation_result.computed_data['pf1D']"], output_provides=[], uses=['Pf1D.plot_ratemaps_1D(...)'], used_by=[], creation_date='2023-04-11 03:05')
     def _display_1d_placefields(computation_result, active_config, owning_pipeline=None, active_context=None, defer_display=False, **kwargs):
         from neuropy.core.neuron_identities import PlotStringBrevityModeEnum
         assert active_context is not None
@@ -73,15 +73,15 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         return MatplotlibRenderPlots(figures=[active_figure], axes=[ax_pf_1D], context=active_display_fn_identifying_ctx)
 
      
-    @function_attributes(short_name='1d_placefield_occupancy', tags=['display', 'placefields', '1D', 'occupancy', 'matplotlib'], input_requires=[], output_provides=[], uses=['PfND.plot_ratemaps_2D', 'neuropy.plotting.ratemaps.plot_ratemap_1D'], used_by=[], creation_date='2023-06-15 17:24')
-    def _display_1d_placefield_occupancy(computation_result, active_config, enable_saving_to_disk=False, active_context=None, **kwargs):
+    @function_attributes(short_name='1d_placefield_occupancy', tags=['display', 'placefields', '1D', 'occupancy', 'matplotlib'], input_requires=["computation_result.computed_data['pf1D']"], output_provides=[], uses=['PfND.plot_ratemaps_2D', 'neuropy.plotting.ratemaps.plot_ratemap_1D'], used_by=[], creation_date='2023-06-15 17:24')
+    def _display_1d_placefield_occupancy(computation_result, active_config, enable_saving_to_disk=False, active_context=None, plot_pos_bin_axes: bool=True, **kwargs):
         """ displays placefield occupancy in a MATPLOTLIB window 
         """
         assert active_context is not None
         active_display_ctx = active_context.adding_context('display_fn', display_fn_name='plot_occupancy_1D')
         # active_display_ctx_string = active_display_ctx.get_description(separator='|')
         
-        display_outputs = computation_result.computed_data['pf1D'].plot_occupancy(active_context=active_display_ctx, **({} | kwargs))
+        display_outputs = computation_result.computed_data['pf1D'].plot_occupancy(active_context=active_display_ctx, **({'plot_pos_bin_axes': plot_pos_bin_axes} | kwargs))
         
         # plot_variable_name = ({'plot_variable': None} | kwargs)
         plot_variable_name = kwargs.get('plot_variable', enumTuningMap2DPlotVariables.OCCUPANCY).name
@@ -111,7 +111,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
 
 
 
-    @function_attributes(short_name='2d_placefield_result_plot_ratemaps_2D', tags=['display', 'placefields', '2D', 'matplotlib'], input_requires=[], output_provides=[], uses=['PfND.plot_ratemaps_2D', 'neuropy.plotting.ratemaps.plot_ratemap_2D'], used_by=[], creation_date='2023-04-11 03:05')
+    @function_attributes(short_name='2d_placefield_result_plot_ratemaps_2D', tags=['display', 'placefields', '2D', 'matplotlib'], input_requires=["computation_result.computed_data['pf2D']"], output_provides=[], uses=['PfND.plot_ratemaps_2D', 'neuropy.plotting.ratemaps.plot_ratemap_2D'], used_by=[], creation_date='2023-04-11 03:05')
     def _display_2d_placefield_result_plot_ratemaps_2D(computation_result, active_config, enable_saving_to_disk=False, active_context=None, **kwargs):
         """ displays 2D placefields in a MATPLOTLIB window 
         
@@ -158,7 +158,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         return MatplotlibRenderPlots(figures=active_pf_2D_figures, axes=display_outputs[1], graphics=display_outputs[2], context=active_display_ctx)
     
 
-    @function_attributes(short_name='2d_placefield_occupancy', tags=['display', 'placefields', '2D', 'occupancy', 'matplotlib'], input_requires=[], output_provides=[], uses=['PfND.plot_ratemaps_2D', 'neuropy.plotting.ratemaps.plot_ratemap_2D'], used_by=[], creation_date='2023-04-11 03:05')
+    @function_attributes(short_name='2d_placefield_occupancy', tags=['display', 'placefields', '2D', 'occupancy', 'matplotlib'], input_requires=["computation_result.computed_data['pf2D']"], output_provides=[], uses=['PfND.plot_ratemaps_2D', 'neuropy.plotting.ratemaps.plot_ratemap_2D'], used_by=[], creation_date='2023-04-11 03:05')
     def _display_2d_placefield_occupancy(computation_result, active_config, enable_saving_to_disk=False, active_context=None, **kwargs):
         """ displays placefield occupancy in a MATPLOTLIB window 
         
@@ -202,7 +202,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         return MatplotlibRenderPlots(figures=active_pf_2D_figures, axes=display_outputs[1], graphics=[], context=active_display_ctx)
 
 
-    @function_attributes(short_name='normal', tags=['display', 'placefields', '2D', 'matplotlib'], input_requires=[], output_provides=[], uses=['neuropy.plotting.placemaps.plot_all_placefields', 'neuropy.plotting.ratemaps.plot_ratemap_2D'], used_by=[], creation_date='2023-04-11 03:05')
+    @function_attributes(short_name='normal', tags=['display', 'placefields', '2D', 'matplotlib'], input_requires=["computation_result.computed_data['pf2D']"], output_provides=[], uses=['neuropy.plotting.placemaps.plot_all_placefields', 'neuropy.plotting.ratemaps.plot_ratemap_2D'], used_by=[], creation_date='2023-04-11 03:05')
     def _display_normal(computation_result, active_config, **kwargs):
         """
         
@@ -218,7 +218,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         # return occupancy_fig, active_pf_2D_figures
         return MatplotlibRenderPlots(figures=[occupancy_fig, active_pf_2D_figures])   
 
-    @function_attributes(short_name='placemaps_pyqtplot_2D', tags=['display', 'placefields', '2D', 'pyqtgraph', 'pyqtplot'], conforms_to=['context_returning'], input_requires=[], output_provides=[], uses=['display_all_pf_2D_pyqtgraph_binned_image_rendering'], used_by=[], creation_date='2023-04-11 03:05')
+    @function_attributes(short_name='placemaps_pyqtplot_2D', tags=['display', 'placefields', '2D', 'pyqtgraph', 'pyqtplot'], conforms_to=['context_returning'], input_requires=["computation_result.computed_data['pf2D']"], output_provides=[], uses=['display_all_pf_2D_pyqtgraph_binned_image_rendering'], used_by=[], creation_date='2023-04-11 03:05')
     def _display_placemaps_pyqtplot_2D(computation_result, active_config, enable_saving_to_disk=False, active_context=None, defer_show:bool=False, **kwargs):
         """  displays 2D placefields in a pyqtgraph window
         """
@@ -253,7 +253,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
 
         return PyqtgraphRenderPlots(parent_root_widget=out_all_pf_2D_pyqtgraph_binned_image_fig, context=active_context)
 
-    @function_attributes(short_name='recurrsive_latent_placefield_comparisons', tags=['display', 'recurrsive', 'placefields', '2D', 'pyqtplot'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-04-11 03:05')
+    @function_attributes(short_name='recurrsive_latent_placefield_comparisons', tags=['display', 'recurrsive', 'placefields', '2D', 'pyqtplot'], input_requires=["computation_result.computed_data['pf2D_RecursiveLatent']", "computation_result.computed_data['pf2D_Decoder']"], output_provides=[], uses=[], used_by=[], creation_date='2023-04-11 03:05')
     def _display_recurrsive_latent_placefield_comparisons(computation_result, active_config, owning_pipeline_reference=None, enable_saving_to_disk=False, active_context=None, defer_show:bool=False, **kwargs):
             """ Create `master_dock_win` - centralized plot output window to collect individual figures/controls in (2022-08-18) 
             NOTE: Ignores `active_config` because context_nested_docks is for all contexts

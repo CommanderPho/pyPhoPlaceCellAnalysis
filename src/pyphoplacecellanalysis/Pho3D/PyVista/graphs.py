@@ -100,7 +100,46 @@ def plot_3d_binned_bars(p, xbin, ybin, data, zScalingFactor=1.0, drop_below_thre
 
 
 
-def plot_3d_stem_points(p, xbin, ybin, data, zScalingFactor=1.0, drop_below_threshold: float=None, enable_drawing_stem_lines:bool=False, **kwargs):
+
+def add_vertical_stems(p, points, track_z=0.0, stem_color='black', stem_alpha=1.0, line_width=2, name="vertical_stems"):
+    """
+    Adds vertical stems (lines) from track_z up to each point's z-coordinate.
+
+    :param plotter:       A pyvista Plotter.
+    :param points:        Nx3 numpy array of x, y, z coordinates.
+    :param track_z:       The z-level of the track (stems start here).
+    :param stem_color:    The color of the stems (default='black').
+    :param stem_alpha:    The alpha value for line transparency.
+    :param line_width:    The thickness of each stem line.
+    :param name:          A string used to name this mesh.
+    """
+    import pyvista as pv
+    import numpy as np
+    
+    lines_polydata = pv.PolyData()
+    all_points = []
+    lines = []
+    curr_idx = 0
+
+    for (x, y, z) in points:
+        all_points.append([x, y, track_z])  # start at track_z
+        all_points.append([x, y, z])       # end at point's z
+        lines.append(2)     # number of points in this line
+        lines.append(curr_idx)
+        lines.append(curr_idx+1)
+        curr_idx += 2
+
+    lines_polydata.points = np.array(all_points)
+    lines_polydata.lines = np.array(lines)
+    p.add_mesh(
+        lines_polydata, 
+        color=stem_color, 
+        line_width=line_width,
+        name=name, 
+        opacity=stem_alpha
+    )
+
+def plot_3d_stem_points(p, xbin, ybin, data, zScalingFactor=1.0, drop_below_threshold: float=None, enable_drawing_stem_lines:bool=True, **kwargs):
     """ Plots a 3D stem-plots with points. I'd like colored dots for each point in a 2D matrix, with their height (z-axis) representing the value and their color to reflect how recently they were updated.
 
     Usage:
@@ -108,7 +147,11 @@ def plot_3d_stem_points(p, xbin, ybin, data, zScalingFactor=1.0, drop_below_thre
         plotActors, data_dict = plot_3d_stem_points(pActiveTuningCurvesPlotter, active_epoch_placefields2D.ratemap.xbin, active_epoch_placefields2D.ratemap.ybin, active_epoch_placefields2D.ratemap.occupancy)
     """
     debug_print: bool = kwargs.pop('debug_print', False)
-
+    # track_z = kwargs.pop('track_z', 0.0)   # Default track z-level
+    # stem_color = kwargs.pop('stem_color', 'black')
+    # stem_alpha = kwargs.pop('stem_alpha', 1.0)
+    # stem_line_width = kwargs.pop('stem_line_width', 2)
+    
     if drop_below_threshold is not None:
         # print(f'drop_below_threshold: {drop_below_threshold}')
         # active_data[np.where(active_data < drop_below_threshold)] = np.nan
@@ -254,7 +297,6 @@ def plot_3d_stem_points(p, xbin, ybin, data, zScalingFactor=1.0, drop_below_thre
     }
     return plotActors, data_dict
     
-
 
 
 

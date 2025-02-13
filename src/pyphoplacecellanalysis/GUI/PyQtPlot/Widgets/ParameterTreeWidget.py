@@ -63,6 +63,7 @@ def create_parameter_tree_widget(parameters: Parameter, debug_print=False):
 
 
 if __name__ == '__main__':
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ParameterTreeWidget import create_parameter_tree_widget
     # win, param_tree = create_pipeline_filter_parameter_tree()
     win, param_tree = create_parameter_tree_widget()
     pg.exec()

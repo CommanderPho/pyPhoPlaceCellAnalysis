@@ -1,0 +1,349 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <author>Pho Hale</author>
+ <class>RootWidget</class>
+ <widget class="QWidget" name="RootWidget">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>218</width>
+    <height>710</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>DockAreaDocksTree</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">background-color: rgb(71, 58, 46);
+border-color: rgb(207, 207, 207);
+background-color: rgba(71, 65, 60, 180);
+color: rgb(244, 244, 244);
+border-color: rgb(0, 0, 0);
+QHeaderView::section { background-color: red };
+</string>
+  </property>
+  <layout class="QGridLayout" name="gridLayout" rowstretch="1,0">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <property name="verticalSpacing">
+    <number>0</number>
+   </property>
+   <item row="0" column="0" rowspan="2" colspan="2">
+    <widget class="QFrame" name="mainContentFrame">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+       <horstretch>1</horstretch>
+       <verstretch>1</verstretch>
+      </sizepolicy>
+     </property>
+     <layout class="QGridLayout" name="gridLayout_2" rowstretch="0" columnstretch="0">
+      <property name="leftMargin">
+       <number>0</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <property name="spacing">
+       <number>0</number>
+      </property>
+      <item row="0" column="0">
+       <widget class="QSplitter" name="splitter">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <horstretch>1</horstretch>
+          <verstretch>1</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::StyledPanel</enum>
+        </property>
+        <property name="frameShadow">
+         <enum>QFrame::Plain</enum>
+        </property>
+        <property name="orientation">
+         <enum>Qt::Vertical</enum>
+        </property>
+        <property name="handleWidth">
+         <number>10</number>
+        </property>
+        <widget class="QWidget" name="mainGridContainer" native="true">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+           <horstretch>0</horstretch>
+           <verstretch>1</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>200</height>
+          </size>
+         </property>
+         <property name="baseSize">
+          <size>
+           <width>200</width>
+           <height>800</height>
+          </size>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">/*background-color: rgb(15, 15, 25);*/
+background-color: rgb(248, 248, 248);
+alternate-background-color: rgb(204, 204, 204);
+border-color: rgb(54, 54, 54);
+color: rgb(20, 20, 20);</string>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_3" rowstretch="0" columnstretch="0" rowminimumheight="0">
+          <property name="leftMargin">
+           <number>0</number>
+          </property>
+          <property name="topMargin">
+           <number>0</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>0</number>
+          </property>
+          <property name="spacing">
+           <number>0</number>
+          </property>
+          <item row="0" column="0">
+           <widget class="QTreeWidget" name="mainTreeWidget">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+              <horstretch>1</horstretch>
+              <verstretch>1</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="baseSize">
+             <size>
+              <width>100</width>
+              <height>200</height>
+             </size>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">/*QHeaderView::section { background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 rgba(0, 0, 0, 255), stop:1 rgba(255, 255, 255, 255)) }
+rgb(68, 68, 68)
+rgb(33, 33, 33)
+*/
+
+/*QHeaderView::section { background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 rgba(33, 33, 33, 255), stop:1 rgba(68, 68, 68, 255));
+border-color: rgb(100, 100, 100);
+}
+
+color: rgb(255, 255, 255);
+*/
+
+
+QHeaderView::section { background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 rgba(222, 222, 222, 255), stop:1 rgba(190, 190, 190, 255));
+border-color: rgb(33, 33, 33);
+color: rgb(18, 18, 18);
+}
+
+color: rgb(19, 19, 19);
+
+/*background-color: qlineargradient(spread:pad, x1:0, y1:1, x2:0, y2:0, stop:0 rgba(0, 0, 0, 255), stop:0.05 rgba(14, 8, 73, 255), stop:0.36 rgba(28, 17, 145, 255), stop:0.6 rgba(126, 14, 81, 255), stop:0.75 rgba(234, 11, 11, 255), stop:0.79 rgba(244, 70, 5, 255), stop:0.86 rgba(255, 136, 0, 255), stop:0.935 rgba(239, 236, 55, 255));
+*/
+</string>
+            </property>
+            <property name="frameShadow">
+             <enum>QFrame::Raised</enum>
+            </property>
+            <property name="lineWidth">
+             <number>1</number>
+            </property>
+            <property name="showDropIndicator" stdset="0">
+             <bool>false</bool>
+            </property>
+            <property name="alternatingRowColors">
+             <bool>false</bool>
+            </property>
+            <property name="selectionMode">
+             <enum>QAbstractItemView::NoSelection</enum>
+            </property>
+            <property name="iconSize">
+             <size>
+              <width>16</width>
+              <height>16</height>
+             </size>
+            </property>
+            <property name="indentation">
+             <number>12</number>
+            </property>
+            <property name="rootIsDecorated">
+             <bool>true</bool>
+            </property>
+            <property name="uniformRowHeights">
+             <bool>true</bool>
+            </property>
+            <property name="animated">
+             <bool>true</bool>
+            </property>
+            <property name="headerHidden">
+             <bool>false</bool>
+            </property>
+            <attribute name="headerVisible">
+             <bool>true</bool>
+            </attribute>
+            <attribute name="headerCascadingSectionResizes">
+             <bool>true</bool>
+            </attribute>
+            <attribute name="headerHighlightSections">
+             <bool>true</bool>
+            </attribute>
+            <column>
+             <property name="text">
+              <string notr="true">Docks</string>
+             </property>
+             <property name="toolTip">
+              <string notr="true"/>
+             </property>
+             <property name="statusTip">
+              <string notr="true"/>
+             </property>
+             <property name="whatsThis">
+              <string notr="true"/>
+             </property>
+             <property name="background">
+              <color alpha="155">
+               <red>239</red>
+               <green>239</green>
+               <blue>239</blue>
+              </color>
+             </property>
+             <property name="foreground">
+              <brush brushstyle="NoBrush">
+               <color alpha="255">
+                <red>0</red>
+                <green>0</green>
+                <blue>0</blue>
+               </color>
+              </brush>
+             </property>
+            </column>
+            <item>
+             <property name="text">
+              <string notr="true">intervals</string>
+             </property>
+             <property name="foreground">
+              <brush brushstyle="NoBrush">
+               <color alpha="255">
+                <red>85</red>
+                <green>255</green>
+                <blue>255</blue>
+               </color>
+              </brush>
+             </property>
+             <property name="icon">
+              <iconset resource="../../../../Resources/ActionIcons.qrc">
+               <normaloff>:/Icons/Icons/Icon/Rectangles.png</normaloff>:/Icons/Icons/Icon/Rectangles.png</iconset>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string notr="true">new_curves_separate_plot</string>
+             </property>
+             <property name="icon">
+              <iconset resource="../../../../Resources/ActionIcons.qrc">
+               <normaloff>:/Render/Icons/Icon/SimplePlot/Laps.png</normaloff>:/Render/Icons/Icon/SimplePlot/Laps.png</iconset>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string notr="true">GROUP[ContinuousDecode_ - t_bin_size: 0.025]</string>
+             </property>
+             <property name="toolTip">
+              <string notr="true"/>
+             </property>
+             <property name="statusTip">
+              <string notr="true"/>
+             </property>
+             <property name="whatsThis">
+              <string notr="true"/>
+             </property>
+             <property name="icon">
+              <iconset resource="../../../../Resources/ActionIcons.qrc">
+               <normaloff>:/Icons/Icons/Icon/application-sub.png</normaloff>:/Icons/Icons/Icon/application-sub.png</iconset>
+             </property>
+             <item>
+              <property name="text">
+               <string notr="true">ContinuousDecode_long_LR - t_bin_size: 0.025</string>
+              </property>
+              <property name="icon">
+               <iconset resource="../../../../Resources/ActionIcons.qrc">
+                <normaloff>:/Render/Icons/graphics/MultiAxesPlot.png</normaloff>:/Render/Icons/graphics/MultiAxesPlot.png</iconset>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string notr="true">ContinuousDecode_long_RL - t_bin_size: 0.025</string>
+              </property>
+              <property name="icon">
+               <iconset resource="../../../../Resources/ActionIcons.qrc">
+                <normaloff>:/Render/Icons/Icon/Occupancy.png</normaloff>:/Render/Icons/Icon/Occupancy.png</iconset>
+              </property>
+             </item>
+            </item>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+        <widget class="QWidget" name="secondarytInfoWidget" native="true">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+           <horstretch>1</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>100</height>
+          </size>
+         </property>
+         <property name="baseSize">
+          <size>
+           <width>0</width>
+           <height>200</height>
+          </size>
+         </property>
+        </widget>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
+  <action name="actionConnect">
+   <property name="text">
+    <string>Connect</string>
+   </property>
+   <property name="toolTip">
+    <string>Connect this window's timeline to another window</string>
+   </property>
+  </action>
+ </widget>
+ <resources>
+  <include location="../../../../Resources/GuiResources.qrc"/>
+  <include location="../../../../Resources/ActionIcons.qrc"/>
+ </resources>
+ <connections/>
+</ui>

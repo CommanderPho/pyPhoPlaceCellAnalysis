@@ -133,7 +133,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
     Must have a signature of: (owning_pipeline_reference, global_computation_results, computation_results, active_configs, ..., **kwargs) at a minimum
     """
 
-    @function_attributes(short_name='jonathan_interactive_replay_firing_rate_comparison', tags=['display','interactive','jonathan', 'firing_rate', 'pyqtgraph'], input_requires=[], output_provides=[], uses=['PhoJonathanPlotHelpers', '_make_jonathan_interactive_plot'], used_by=[], creation_date='2023-04-11 03:14', is_global=True)
+    @function_attributes(short_name='jonathan_interactive_replay_firing_rate_comparison', tags=['display','interactive','jonathan', 'firing_rate', 'pyqtgraph'], input_requires=["global_computation_results.computed_data['jonathan_firing_rate_analysis']", "computation_result.computed_data['pf1D']"], output_provides=[], uses=['PhoJonathanPlotHelpers', '_make_jonathan_interactive_plot'], used_by=[], creation_date='2023-04-11 03:14', is_global=True)
     def _display_jonathan_interactive_replay_firing_rate_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, included_neuron_types=None, require_placefield=True, save_figure=True, **kwargs):
             """ Jonathan's interactive display. Currently hacked up to directly compute the results to display within this function
                 Internally calls `_make_jonathan_interactive_plot(...)`
@@ -196,6 +196,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 
             return graphics_output_dict
 
+    ## #TODO 2025-01-16 10:00: - [ ] The below function just uses the direct global computation key name, instead of "global_computation_results.computed_data['jonathan_firing_rate_analysis']" like I have been doing for the others
     @function_attributes(short_name='batch_pho_jonathan_replay_firing_rate_comparison', tags=['display','jonathan', 'firing_rate', 'matplotlib', 'batch', 'inefficient', 'slow'], input_requires=['jonathan_firing_rate_analysis'], output_provides=[],
                          uses=['PhoJonathanPlotHelpers._make_pho_jonathan_batch_plots', 'build_extra_cell_info_label_string'], used_by=['BatchPhoJonathanFiguresHelper'], creation_date='2023-04-11 03:14', is_global=True)
     def _display_batch_pho_jonathan_replay_firing_rate_comparison(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, **kwargs):
@@ -566,7 +567,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
             # graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}            
             return graphics_output_dict
 
-    @function_attributes(short_name=None, tags=['display', 'long_short', 'laps', 'position', 'behavior', 'needs_footer', '1D'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-29 18:20', related_items=[], is_global=True)
+    @function_attributes(short_name='long_short_laps', tags=['display', 'long_short', 'laps', 'position', 'behavior', 'needs_footer', '1D'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-29 18:20', related_items=[], is_global=True)
     def _display_long_short_laps(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, defer_render=False, save_figure=True, **kwargs):
             """ Displays a figure displaying the 1D laps detected for both the long and short tracks.
                 Usage:
@@ -847,7 +848,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         graphics_output_dict = MatplotlibRenderPlots(name='long_short_expected_v_observed_firing_rate', figures=(fig,), axes=(axes,), context=final_context, plot_data={'context': final_context, 'path': active_out_figure_paths})
         return graphics_output_dict
 
-    @function_attributes(short_name=None, tags=['Qt', 'figure', 'display', 'long_short_stacked_epoch_slices', 'epoch', 'needs_improvement', 'inefficient'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[],
+    @function_attributes(short_name='long_and_short_stacked_epoch_slices', tags=['Qt', 'figure', 'display', 'long_short_stacked_epoch_slices', 'epoch', 'needs_improvement', 'inefficient'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[],
                           uses=['plot_decoded_epoch_slices_paginated', 'QT'], used_by=[], creation_date='2023-06-02 14:12', is_global=True)
     def _display_long_and_short_stacked_epoch_slices(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, included_epoch_indicies=None, defer_render=False, save_figure=True, **kwargs):
         """ Plots two figures showing the entire stack of decoded epochs for both the long and short, including their Radon transformed lines if that information is available.
@@ -1764,6 +1765,10 @@ def plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_cont
         # reuse_axs_tuple=(ax_long_pf_1D, ax_short_pf_1D)
         # reuse_axs_tuple=(ax_long_pf_1D, ax_long_pf_1D) # plot only on long axis
         (fig_long_pf_1D, ax_long_pf_1D, long_sort_ind, long_neurons_colors_array), (fig_short_pf_1D, ax_short_pf_1D, short_sort_ind, short_neurons_colors_array) = plot_short_v_long_pf1D_comparison(long_results, short_results, curr_any_context_neurons, reuse_axs_tuple=reuse_axs_tuple, single_figure=True)
+
+
+
+    - [ ] Placefields Should be sorted by long track peak by default
 
     """
     from pyphoplacecellanalysis.Pho2D.track_shape_drawing import add_vertical_track_bounds_lines, add_track_shapes

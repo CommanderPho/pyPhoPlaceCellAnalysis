@@ -169,3 +169,21 @@ class InteractivePlaceCellConfig(BaseConfig):
     filter_config: dict = field(default=Factory(dict))
 
 
+    def to_dict(self) -> Dict:
+        """ returns a (nested) benedict representation of its contents 
+        """
+        from benedict import benedict
+        
+        a_config_dict = asdict(self, recurse=True, filter=lambda a, v: 'resolved_required_filespecs_dict' not in a.name)
+        a_config_dict = benedict(a_config_dict)
+        keys_to_remove = [k for k in a_config_dict.keypaths() if 'resolved_optional_filespecs_dict' in k] # Remove any nested keys that contain 'resolved_required_filespecs_dict'
+        # print(f'keys_to_remove: {keys_to_remove}')
+        a_config_dict.remove(keys_to_remove)
+        # print(f'list: {list(a_config_dict.keys())}')
+
+        ## Expands any dict-like but non-dict objects at the specified keypaths:
+        to_dict_keypaths_list = ['computation_config', 'computation_config.pf_params', 'computation_config.spike_analysis'] + ['active_session_config.preprocessing_parameters.epoch_estimation_parameters']
+        for a_keypath in to_dict_keypaths_list:
+            a_config_dict[a_keypath] = a_config_dict[a_keypath].to_dict()
+        
+        return a_config_dict

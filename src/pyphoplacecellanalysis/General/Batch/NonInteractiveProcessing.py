@@ -592,32 +592,32 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
 	# Plot long|short firing rate index:
 	try:
 		_out = curr_active_pipeline.display('_display_short_long_firing_rate_index_comparison', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): _display_short_long_firing_rate_index_comparison failed with error: {e}\n skipping.')
 	
 	try:
 		_out = curr_active_pipeline.display('_display_long_short_expected_v_observed_firing_rate', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): _prepare_plot_expected_vs_observed failed with error: {e}\n skipping.')
 	
 	try:
 		_out = curr_active_pipeline.display('_display_grid_bin_bounds_validation', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): _display_grid_bin_bounds_validation failed with error: {e}\n skipping.')
 		
 	try:
 		_out = curr_active_pipeline.display('_display_running_and_replay_speeds_over_time', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): _display_running_and_replay_speeds_over_time failed with error: {e}\n skipping.')
 		
 	try:
 		_out = curr_active_pipeline.display('_display_long_short_laps', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure) # batch_extended_programmatic_figures(...): _display_long_short_laps failed with error: plot_position_curves_figure() got an unexpected keyword argument 'active_config_name'
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): _display_long_short_laps failed with error: {e}\n skipping.')
 		
 	try:
 		_out = curr_active_pipeline.display('_display_long_and_short_firing_rate_replays_v_laps', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): _display_long_and_short_firing_rate_replays_v_laps failed with error: {e}\n skipping.')
 				
 	try:
@@ -628,14 +628,14 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
 								   long_kwargs={'sortby': sort_idx, 'single_cell_pfmap_processing_fn': long_single_cell_pfmap_processing_fn},
 								   short_kwargs={'sortby': sort_idx, 'single_cell_pfmap_processing_fn': short_single_cell_pfmap_processing_fn, 'curve_hatch_style': {'hatch':'///', 'edgecolor':'k'}},
 								   save_figure=save_figure) # defer_render=True, 
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): _display_long_short_pf1D_comparison failed with error: {e}\n skipping.')
 
 	
 	try:
 		_out = curr_active_pipeline.display('_display_directional_merged_pf_decoded_stacked_epoch_slices', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure, is_dark_mode=False)
 		print(f'`directional_decoded_stacked_epoch_slices` completed. \n\t_out_paths: {_out}\n\n')
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): "_display_directional_merged_pf_decoded_stacked_epoch_slices" failed with error: {e}\n skipping.')
 
 
@@ -644,7 +644,7 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
 		try:
 			#TODO 2023-07-06 14:46: - [ ] This is quite slow - can I do defer_render=True?
 			_out = curr_active_pipeline.display('_display_long_and_short_stacked_epoch_slices', curr_active_pipeline.get_session_context(), defer_render=False, save_figure=save_figure)
-		except BaseException as e:
+		except Exception as e:
 			print(f'batch_extended_programmatic_figures(...): _prepare_plot_long_and_short_epochs failed with error: {e}\n skipping.')
 		
 	## Exports the video of the surprise:
@@ -664,7 +664,7 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
 
 		video_output_parent_path = export_active_relative_entropy_results_videos(active_relative_entropy_results, active_context=curr_active_pipeline.get_session_context())
 
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): export_active_relative_entropy_results_videos failed with error: {e}\n skipping.')
 
 
@@ -678,14 +678,14 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
 		## all cells:
 		fig_1c_figures_all_dict = BatchPhoJonathanFiguresHelper.run(curr_active_pipeline, neuron_replay_stats_df, included_unit_neuron_IDs=None, n_max_page_rows=20, write_vector_format=False, write_png=True, show_only_refined_cells=False, disable_top_row=True)
 	
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): BatchPhoJonathanFiguresHelper.run(...) failed for all cells. failed with error: {e}\n skipping.')
 		
 
 	# _display_directional_merged_pf_decoded_epochs_marginals ________________________________________________________________________________ #
 	try:
 		_out = curr_active_pipeline.display('_display_directional_merged_pf_decoded_epochs_marginals', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): "_display_directional_merged_pf_decoded_epochs_marginals" failed with error: {e}\n skipping.')
 
 
@@ -693,19 +693,19 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
 	# _display_rank_order_z_stats_results ________________________________________________________________________________ #
 	try:
 		_out = curr_active_pipeline.display('_display_rank_order_z_stats_results', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure)
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): "_display_rank_order_z_stats_results" failed with error: {e}\n skipping.')
 
 
 	try:
 		_out = curr_active_pipeline.display('_display_directional_track_remapping_diagram', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure, is_dark_mode=False)
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): "_display_directional_track_remapping_diagram" failed with error: {e}\n skipping.')
 
 
 	try:
 		_out = curr_active_pipeline.display('_display_trial_to_trial_reliability', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=save_figure, is_dark_mode=False)
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): "_display_trial_to_trial_reliability" failed with error: {e}\n skipping.')
 
 
@@ -734,7 +734,7 @@ def batch_extended_programmatic_figures(curr_active_pipeline, write_vector_forma
 					**_curr_interaction_mode_kwargs, # interactive mode
 					skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, save_figure=save_figure)
 		
-	except BaseException as e:
+	except Exception as e:
 		print(f'batch_extended_programmatic_figures(...): "_display_directional_merged_pf_decoded_epochs" failed with error: {e}\n skipping.')
 
 
@@ -1010,41 +1010,52 @@ class BatchPhoJonathanFiguresHelper:
 # ==================================================================================================================== #
 @function_attributes(short_name=None, tags=['active', 'batch', 'public', 'neptune', 'figures', 'output'], input_requires=[], output_provides=[],
 					  uses=['batch_programmatic_figures', 'batch_extended_programmatic_figures'], used_by=[], creation_date='2023-06-12 14:23', related_items=[])
-def batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=None):
+def batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=None, debug_print: bool = False):
 	""" 2023-05-25 - Performs all the batch plotting commands. 
+
+	Note: takes ~20 minutes to plot all figures and generates MANY new figure windows with an interactive backend
+	NEPTUNE NOTE: Always uses the "PhoDibaLongShortUpdated" neptue project
+		
+	Usage:
+		from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_perform_all_plots
+
+		_out = batch_perform_all_plots(curr_active_pipeline, debug_print=True)
+
 	
-	from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_perform_all_plots
-	Always uses the "PhoDibaLongShortUpdated" neptue project
-
+	
 	"""
-	try:
-		from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import Neptuner
+	if enable_neptune:
+		try:
+			from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import Neptuner
 
-		if neptuner is None:
-			neptuner = Neptuner.init_with_pipeline(curr_active_pipeline)
+			if neptuner is None:
+				neptuner = Neptuner.init_with_pipeline(curr_active_pipeline)
 
-	except BaseException as e:
-		print(f'in `batch_perform_all_plots(...)`: Neptuner.init_with_pipeline(curr_active_pipeline)(...) failed with exception: {e}. Continuing but disabling neptune.')
-		enable_neptune = False
-		print(f'\t since neptune setup failed, neptune will be disabled going forward.')
+		except Exception as e:
+			print(f'in `batch_perform_all_plots(...)`: Neptuner.init_with_pipeline(curr_active_pipeline)(...) failed with exception: {e}. Continuing but disabling neptune.')
+			enable_neptune = False
+			print(f'\t since neptune setup failed, neptune will be disabled going forward.')
+			neptuner = None
+	else:
 		neptuner = None
-		 
+
+
 	curr_active_pipeline.reload_default_display_functions()
 	try:
-		active_identifying_session_ctx, active_out_figures_dict = batch_programmatic_figures(curr_active_pipeline)
-	except BaseException as e:
+		active_identifying_session_ctx, active_out_figures_dict = batch_programmatic_figures(curr_active_pipeline, debug_print=debug_print)
+	except Exception as e:
 		print(f'in `batch_perform_all_plots(...)`: batch_programmatic_figures(...) failed with exception: {e}. Continuing.')
 	
 	try:
-		batch_extended_programmatic_figures(curr_active_pipeline=curr_active_pipeline)
-	except BaseException as e:
+		batch_extended_programmatic_figures(curr_active_pipeline=curr_active_pipeline, debug_print=debug_print)
+	except Exception as e:
 		print(f'in `batch_perform_all_plots(...)`: batch_extended_programmatic_figures(...) failed with exception: {e}. Continuing.')
 	
 	if enable_neptune:
 		try:
-			succeeded_fig_paths, failed_fig_paths = neptuner.upload_figures(curr_active_pipeline)
+			succeeded_fig_paths, failed_fig_paths = neptuner.upload_figures(curr_active_pipeline, debug_print=debug_print)
 			# neptune_output_figures(curr_active_pipeline)
-		except BaseException as e:
+		except Exception as e:
 			print(f'in `batch_perform_all_plots(...)`: neptune_output_figures(...) failed with exception: {e}. Continuing.')
 		finally:
 			neptuner.stop()
@@ -1055,6 +1066,245 @@ def batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=
 
 
 
+
+class PipelineWithComputedBatchablePipelineStageMixin:
+		
+	@function_attributes(short_name='batch_evaluate', tags=['batch', 'computation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-20 21:05', related_items=['pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing.batch_evaluate_required_computations'])
+	def batch_evaluate_required_computations(self, include_includelist=None, included_computation_filter_names=None, include_global_functions=False, fail_on_exception=False, progress_print=True, debug_print=False, force_recompute:bool=False, force_recompute_override_computations_includelist=None):
+		""" determines how many of the specified computations are already valid, vs. how many will need to be recomputed. 
+
+		force_recompute:bool=False
+		force_recompute_override_computations_includelist: Optional[List[str]] a list of computation function names to recompute regardless of their validator's status.
+		
+		from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_evaluate_required_computations
+
+		needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=['lap_direction_determination'], include_global_functions=True, fail_on_exception=False, progress_print=True,
+															force_recompute=False, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+		needs_computation_output_dict
+		
+
+		WARNING: `force_recompute_override_computations_includelist` must be a subset of the items in `include_includelist`
+		include_includelist = ['pf_computation', 'split_to_directional_laps', 'merged_directional_placefields', 'rank_order_shuffle_analysis']
+		force_recompute_override_computations_includelist = ['pf_computation', 'split_to_directional_laps']
+		
+		The whole function is only called if  ((_comp_specifier.short_name in include_includelist) or (_comp_specifier.computation_fn_name in include_includelist)) is true.
+		
+		"""
+		#TODO 2023-09-08 07:48: - [ ] Currently only executes functions with a valid `validate_computation_test` set and silently skips functions that don't exist or are missing a validator.
+		#TODO 2023-08-31 11:05: - [X] Do local computations first for all valid filter_epochs, then do global
+
+		force_recompute_override_computations_includelist = force_recompute_override_computations_includelist or []
+
+		## Get the names of the global and non-global computations:
+		non_global_comp_names, global_comp_names = get_all_batch_computation_names()
+		
+		if include_includelist is None:
+			# include all:
+			include_includelist = non_global_comp_names + global_comp_names
+		else:
+			print(f'included includelist is specified: {include_includelist}, so only performing these extended computations.')
+
+		#TODO 2024-01-09 21:41: - [ ] I don't enforce that every member of  `force_recompute_override_computations_includelist` is in `include_includelist` because one might be specified in a "_comp_specifier.short_name" format while the other a "_comp_specifier.computation_fn_name", so they wouldn't literally match.
+		# If the function is specified in `force_recompute_override_computations_includelist` it should NOT be omitted from `include_includelist`.
+		# #  The whole function is only called if  ((_comp_specifier.short_name in include_includelist) or (_comp_specifier.computation_fn_name in include_includelist)) is true, so check.
+		# for a_name in force_recompute_override_computations_includelist:
+		#     assert (not (a_name not in ((_comp_specifier.short_name in include_includelist) or (_comp_specifier.computation_fn_name in include_includelist)))), f'WARNING: function "{a_name}" specified in `force_recompute_override_computations_includelist` is missing from `include_includelist`: ({include_includelist})! If this is the case, the function will never be computed (forced or otherwise).\nIf the function is specified in `force_recompute_override_computations_includelist` it should not be omitted from `included_computation_filter_names`.'            
+		#     # print(f'WARNING: function "{a_name}" specified in `force_recompute_override_computations_includelist` is missing from `include_includelist`: ({include_includelist})! If this is the case, the function will never be computed (forced or otherwise).')
+		assert len(force_recompute_override_computations_includelist) <= len(include_includelist), f"READ THE NOTE ABOUT force_recompute_override_computations_includelist being a subset of include_includelist in the code above!! include_includelist: {include_includelist}\nforce_recompute_override_computations_includelist: {force_recompute_override_computations_includelist}"
+
+		## Get computed relative entropy measures:
+		_, _, global_epoch_name = self.find_LongShortGlobal_epoch_names()
+		# global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'
+
+		if included_computation_filter_names is None:
+			included_computation_filter_names = [global_epoch_name] # use only the global epoch: e.g. ['maze']
+			if progress_print:
+				print(f'Running batch_evaluate_required_computations(...) with global_epoch_name: "{global_epoch_name}"')
+		else:
+			if progress_print:
+				print(f'Running batch_evaluate_required_computations(...) with included_computation_filter_names: "{included_computation_filter_names}"')
+
+
+		## Specify the computations and the requirements to validate them.
+
+		## Hardcoded comp_specifiers
+		_comp_specifiers = list(self.get_merged_computation_function_validators().values())
+		# ## Execution order is currently determined by `_comp_specifiers` order and not the order the `include_includelist` lists them (which is good) but the `curr_active_pipeline.registered_merged_computation_function_dict` has them registered in *REVERSE* order for the specific computation function called, so we need to reverse these
+
+		remaining_include_function_names = {k:False for k in include_includelist.copy()}
+
+		valid_computed_results_output_list = [] # items that have valid results (that pass the validator)
+		needs_computation_output_dict = {} # items that need to be computed
+
+		for _comp_specifier in _comp_specifiers:
+			if (not _comp_specifier.is_global) or include_global_functions:
+				# if (_comp_specifier.short_name in include_includelist) or (_comp_specifier.computation_fn_name in include_includelist):
+				if _comp_specifier.is_name_in(include_includelist):
+					if (not _comp_specifier.is_global):
+						# Not Global-only, need to compute for all `included_computation_filter_names`:
+						for a_computation_filter_name in included_computation_filter_names:
+							has_valid_computation: bool = _comp_specifier.try_validate_is_computation_valid(self, computation_filter_name=a_computation_filter_name, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
+							if has_valid_computation:
+								valid_computed_results_output_list.append((a_computation_filter_name, _comp_specifier.short_name))
+
+							needs_compute: bool = (not has_valid_computation)
+							if needs_compute:
+								if _comp_specifier.short_name not in needs_computation_output_dict:
+									needs_computation_output_dict[_comp_specifier.short_name] = {}
+
+								needs_computation_output_dict[_comp_specifier.short_name][a_computation_filter_name] = _comp_specifier.computation_precidence
+
+					else:
+						# Global-Only:
+						_curr_force_recompute = force_recompute or _comp_specifier.is_name_in(force_recompute_override_computations_includelist) # force_recompute for this specific result if either of its name is included in `force_recompute_override_computations_includelist`
+						has_valid_computation: bool = _comp_specifier.try_validate_is_computation_valid(self, computation_filter_name=global_epoch_name, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=_curr_force_recompute)
+						
+						if has_valid_computation:
+							valid_computed_results_output_list.append(_comp_specifier.short_name)
+
+						needs_compute: bool = (not has_valid_computation)
+						if needs_compute:
+							needs_computation_output_dict[_comp_specifier.short_name] = _comp_specifier.computation_precidence
+
+							
+
+					## ENDIF is_global
+							
+					## remove from the found name from the list of remaining function names
+					if (_comp_specifier.short_name in include_includelist):
+						del remaining_include_function_names[_comp_specifier.short_name]
+					elif (_comp_specifier.computation_fn_name in include_includelist):
+						del remaining_include_function_names[_comp_specifier.computation_fn_name]
+					else:
+						raise NotImplementedError
+
+		if len(remaining_include_function_names) > 0:
+			print(f'WARNING: after checking all_comp_specifiers found the functions: {remaining_include_function_names} still remain! Are they correct and do they have proper validator decorators?')
+		if progress_print:
+			print('done with all batch_evaluate_required_computations(...).')
+
+		return needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names
+
+
+	@function_attributes(short_name='batch_extended_computations', tags=['batch', 'computation', 'evaluation', 'automated', 'session', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-20 21:08', related_items=['pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing.batch_extended_computations'])
+	def batch_extended_computations(self, include_includelist=None, included_computation_filter_names=None, include_global_functions=False, fail_on_exception=False, progress_print=True, debug_print=False, force_recompute:bool=False, force_recompute_override_computations_includelist=None, computation_kwargs_dict=None, dry_run:bool=False):
+		""" performs the remaining required global computations
+
+		force_recompute:bool=False
+		force_recompute_override_computations_includelist: Optional[List[str]] a list of computation function names to recompute regardless of their validator's status.
+		
+		from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations
+		batch_extended_computations(include_includelist=['merged_directional_placefields'], include_global_functions=True)
+		
+		WARNING: `force_recompute_override_computations_includelist` must be a subset of the items in `include_includelist`
+		include_includelist = ['pf_computation', 'split_to_directional_laps', 'merged_directional_placefields', 'rank_order_shuffle_analysis']
+		force_recompute_override_computations_includelist = ['pf_computation', 'split_to_directional_laps']
+		
+		The whole function is only called if  ((_comp_specifier.short_name in include_includelist) or (_comp_specifier.computation_fn_name in include_includelist)) is true.
+		
+		
+		computation_kwargs_dict={'rank_order_shuffle_analysis':({'num_shuffles': 500, 'skip_laps': False} | dict(minimum_inclusion_fr_Hz=2.0, included_qclu_values=[1,2,4,5,6,7]))}
+		"""
+		#TODO 2023-09-08 07:48: - [ ] Currently only executes functions with a valid `validate_computation_test` set and silently skips functions that don't exist or are missing a validator.
+		#TODO 2023-08-31 11:05: - [X] Do local computations first for all valid filter_epochs, then do global
+
+		def _subfn_on_already_computed(_comp_name, computation_filter_name):
+			""" captures: `progress_print`, `force_recompute`
+			raises AttributeError if force_recompute is true to trigger recomputation """
+			if progress_print:
+				print(f'{_comp_name}, {computation_filter_name} already computed.')
+			if force_recompute:
+				if progress_print:
+					print(f'\tforce_recompute is true so recomputing anyway')
+				raise AttributeError # just raise an AttributeError to trigger recomputation    
+
+		newly_computed_values = []
+		force_recompute_override_computations_includelist = force_recompute_override_computations_includelist or []
+
+		## Get the names of the global and non-global computations:
+		non_global_comp_names, global_comp_names = get_all_batch_computation_names()
+		
+		if include_includelist is None:
+			# include all:
+			include_includelist = non_global_comp_names + global_comp_names
+		else:
+			print(f'included includelist is specified: {include_includelist}, so only performing these extended computations.')
+
+		#TODO 2024-01-09 21:41: - [ ] I don't enforce that every member of  `force_recompute_override_computations_includelist` is in `include_includelist` because one might be specified in a "_comp_specifier.short_name" format while the other a "_comp_specifier.computation_fn_name", so they wouldn't literally match.
+		assert len(force_recompute_override_computations_includelist) <= len(include_includelist), f"READ THE NOTE ABOUT force_recompute_override_computations_includelist being a subset of include_includelist in the code above!! include_includelist: {include_includelist}\nforce_recompute_override_computations_includelist: {force_recompute_override_computations_includelist}"
+
+		## Get computed relative entropy measures:
+		_, _, global_epoch_name = self.find_LongShortGlobal_epoch_names()
+		# global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'
+
+		if included_computation_filter_names is None:
+			included_computation_filter_names = [global_epoch_name] # use only the global epoch: e.g. ['maze']
+			if progress_print:
+				print(f'Running batch_extended_computations(...) with global_epoch_name: "{global_epoch_name}"')
+		else:
+			if progress_print:
+				print(f'Running batch_extended_computations(...) with included_computation_filter_names: "{included_computation_filter_names}"')
+
+		
+		## Specify the computations and the requirements to validate them.
+
+		## Hardcoded comp_specifiers
+		_comp_specifiers = list(self.get_merged_computation_function_validators().values())
+		## Execution order is currently determined by `_comp_specifiers` order and not the order the `include_includelist` lists them (which is good) but the `curr_active_pipeline.registered_merged_computation_function_dict` has them registered in *REVERSE* order for the specific computation function called, so we need to reverse these
+
+		## apply arbitrary sort:
+		_comp_specifier_dict = {_comp_specifier.short_name:_comp_specifier for _comp_specifier in _comp_specifiers}
+		# move_to_end_names = ['directional_train_test_split', 'directional_decoders_decode_continuous', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring']
+		# _comp_specifier_dict = reorder_keys_relative(_comp_specifier_dict, key_names=move_to_end_names, relative_mode='end') # list(filter(lambda column: column.endswith('_peak_heights'), existing_columns))
+		_comp_specifier_dict = dict(sorted(_comp_specifier_dict.items(), key=lambda item: item[1].computation_precidence))
+		# back to list
+		_comp_specifiers = list(_comp_specifier_dict.values())
+
+		remaining_include_function_names = {k:False for k in include_includelist.copy()}
+
+		for _comp_specifier in _comp_specifiers:
+			if (not _comp_specifier.is_global) or include_global_functions:
+				if (_comp_specifier.short_name in include_includelist) or (_comp_specifier.computation_fn_name in include_includelist):
+					## get any required overriding kwargs
+						# Set `_comp_specifier.computation_fn_kwargs` if they're provided in computation_kwargs_dict
+					if computation_kwargs_dict is not None:
+						a_computation_kwargs_list = ((computation_kwargs_dict.get(_comp_specifier.short_name, None) or computation_kwargs_dict.get(_comp_specifier.computation_fn_name, None)))
+						if a_computation_kwargs_list is not None:
+							_comp_specifier.computation_fn_kwargs = deepcopy(a_computation_kwargs_list)
+					
+					if (not _comp_specifier.is_global):
+						# Not Global-only, need to compute for all `included_computation_filter_names`:
+						for a_computation_filter_name in included_computation_filter_names:
+							if not dry_run:
+								newly_computed_values += _comp_specifier.try_computation_if_needed(self, computation_filter_name=a_computation_filter_name, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=force_recompute)
+							else:
+								print(f'dry-run: {_comp_specifier.short_name}, computation_filter_name={a_computation_filter_name}, force_recompute={force_recompute}')
+
+					else:
+						# Global-Only:
+						_curr_force_recompute = force_recompute or _comp_specifier.is_name_in(force_recompute_override_computations_includelist) # force_recompute for this specific result if either of its name is included in `force_recompute_override_computations_includelist`
+						if not dry_run:
+							newly_computed_values += _comp_specifier.try_computation_if_needed(self, computation_filter_name=global_epoch_name, on_already_computed_fn=_subfn_on_already_computed, fail_on_exception=fail_on_exception, progress_print=progress_print, debug_print=debug_print, force_recompute=_curr_force_recompute)
+						else:
+							print(f'dry-run: {_comp_specifier.short_name}, force_recompute={force_recompute}, curr_force_recompute={_curr_force_recompute}')
+							# Check for existing result:
+							is_known_missing_provided_keys: bool = _comp_specifier.try_check_missing_provided_keys(self)
+							if is_known_missing_provided_keys:
+								print(f'{_comp_specifier.short_name} -- is_known_missing_provided_keys = True!')
+
+					if (_comp_specifier.short_name in include_includelist):
+						del remaining_include_function_names[_comp_specifier.short_name]
+					elif (_comp_specifier.computation_fn_name in include_includelist):
+						del remaining_include_function_names[_comp_specifier.computation_fn_name]
+					else:
+						raise NotImplementedError
+
+		if len(remaining_include_function_names) > 0:
+			print(f'WARNING: after execution of all _comp_specifiers found the functions: {remaining_include_function_names} still remain! Are they correct and do they have proper validator decorators?')
+		if progress_print:
+			print('done with all batch_extended_computations(...).')
+
+		return newly_computed_values
 
 
 # ==================================================================================================================== #

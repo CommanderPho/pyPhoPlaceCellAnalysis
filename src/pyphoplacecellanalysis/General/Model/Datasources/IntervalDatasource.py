@@ -9,6 +9,8 @@ import pandas as pd
 import neuropy.utils.type_aliases as types
 from neuropy.core import Epoch
 from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+from neuropy.core.epoch import ensure_dataframe
+
 
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore
 from pyphoplacecellanalysis.General.Model.Datasources.Datasources import BaseDatasource, DataframeDatasource
@@ -342,7 +344,7 @@ class IntervalsDatasource(BaseDatasource):
         # return cls(plot_df, datasource_name=datasource_name)
         
     @classmethod
-    def init_from_epoch_object(cls, epochs, dataframe_vis_columns_function, datasource_name='intervals_datasource_from_epoch_obj', debug_print=False):
+    def init_from_epoch_object(cls, epochs, dataframe_vis_columns_function, datasource_name='intervals_datasource_from_epoch_obj', debug_print=False): # , additional_included_columns=None
         """ Builds an appropriate IntervalsDatasource from any Epoch object and a function that is passed the converted dataframe and adds the visualization specific columns: ['series_vertical_offset', 'series_height', 'pen', 'brush']
         
         Input:
@@ -352,21 +354,35 @@ class IntervalsDatasource(BaseDatasource):
         Returns:
             IntervalsDatasource
         """
+        # if additional_included_columns is None:
+        #     additional_included_columns = []
         try:
+            raw_df: pd.DataFrame = ensure_dataframe(epochs)
+
             # Start by assuming it's an Epoch object, and try to convert it to a dataframe
-            raw_df = epochs.to_dataframe()
-            active_df = pd.DataFrame({'t_start':raw_df.start.copy(), 't_duration':raw_df.duration.copy()}) # still will need columns ['series_vertical_offset', 'series_height', 'pen', 'brush'] added later
-            # RESOLVED: is this 'raw_df.durations.copy()' instead of 'raw_df.duration.copy()' a bug? No, this is right for the result of Epoch.to_dataframe()
+            # raw_df = epochs.to_dataframe()
+            # active_df = pd.DataFrame({'t_start':raw_df.start.copy(), 't_duration':raw_df.duration.copy(), **{k:raw_df[k].copy() for k in additional_included_columns} }) # still will need columns ['series_vertical_offset', 'series_height', 'pen', 'brush'] added later .to_numpy()
+            
+            active_df = deepcopy(raw_df)
+            # RESOLVED: is this 'raw_df.durations.copy()' instead of 'raw_df.duration.copy()' a bug? No, this is right for the result of Epoch.to_dataframe() 
         except AttributeError:
             # if it's not an Epoch, assume it's a dataframe
             active_df = epochs.copy()
             # TODO: need to rename the columns?
             # active_df = pd.DataFrame({'t_start':raw_df.start.copy(), 't_duration':raw_df.duration.copy()}) # still will need columns ['series_vertical_offset', 'series_height', 'pen', 'brush'] added later
         except Exception as e:
-            raise e
+            raise
         
+        ## ensure the time columns are named correctly (['t_start', 't_duration', 't_end'])
+        if not np.isin(cls._required_interval_time_columns, active_df.columns).all():
+            ## try to do the rename
+            active_df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(df=active_df, required_columns_synonym_dict=cls._time_column_name_synonyms)
+
+        ## Validate that it has all required columns:
+        assert np.isin(cls._required_interval_time_columns, active_df.columns).all(), f"dataframe is missing required columns:\n Required: {cls._required_interval_time_columns}, current: {active_df.columns} "
+        active_df = active_df.loc[:, ~active_df.columns.duplicated(keep='last')] ## drop any duplicated columns, not sure how this is happening
         active_df = cls.add_missing_reciprocal_columns_if_needed(active_df)
-        active_df = dataframe_vis_columns_function(active_df)
+        active_df = dataframe_vis_columns_function(active_df) ## call the `dataframe_vis_columns_function`, which requires all columns be in place already
         return cls(active_df, datasource_name=datasource_name)
     
     @QtCore.pyqtSlot(float, float)
@@ -376,7 +392,7 @@ class IntervalsDatasource(BaseDatasource):
             return self.df[self.df['t_start', 't_end'].between(new_start, new_end)]
 
         except Exception as e:
-            print(f'WARN: fallback to non-series-based filtering. Exception: {e}.')            
+            print(f'WARN: fallback to non-series-based filtering. Exception: {e}. self.df.columns: {list(self.df.columns)}\n\tnew_start: {new_start}, new_end: {new_end}')            
             pass
 
         is_interval_start_in_active_window = np.logical_and((new_start <= self.df['t_start']), (self.df['t_start'] < new_end))

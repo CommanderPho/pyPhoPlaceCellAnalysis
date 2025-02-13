@@ -118,7 +118,7 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         return {'spike_raster_plt_2d':spike_raster_plt_2d, 'spike_raster_plt_3d_vedo':spike_raster_plt_3d_vedo, 'spike_3d_to_2d_window_connection':spike_3d_to_2d_window_connection, 'spike_raster_window': spike_raster_window}
 
 
-    @function_attributes(short_name='spike_rasters_window', tags=['display','interactive', 'primary', 'raster', '2D', 'ui', 'pyqtplot'], input_requires=[], output_provides=[], uses=['_build_additional_window_menus'], used_by=[], creation_date='2023-04-11 03:05')
+    @function_attributes(short_name='spike_rasters_window', tags=['display','interactive', 'primary', 'raster', '2D', 'ui', 'pyqtplot'], input_requires=[], output_provides=[], uses=['Spike3DRasterWindowWidget', '_build_additional_window_menus'], used_by=[], creation_date='2023-04-11 03:05')
     @staticmethod
     def _display_spike_rasters_window(computation_result, active_config, enable_saving_to_disk=False, **kwargs):
         """ Displays a Spike3DRasterWindowWidget with a configurable set of raster widgets and controls in it.
@@ -139,7 +139,7 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         neuron_sort_order=kwargs.pop('neuron_sort_order', None)
         
         included_neuron_ids = kwargs.pop('included_neuron_ids', None)
-        spikes_df = computation_result.sess.spikes_df
+        spikes_df: pd.DataFrame = computation_result.sess.spikes_df ## pulls from the session here
         if included_neuron_ids is None:
             included_neuron_ids = spikes_df.spikes.neuron_ids
 
@@ -152,14 +152,14 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         active_display_fn_identifying_ctx_string = active_display_fn_identifying_ctx.get_description(separator='|') # Get final discription string:
 
         ## It's passed a specific computation_result which has a .sess attribute that's used to determine which spikes are displayed or not.
-        spike_raster_window = Spike3DRasterWindowWidget(spikes_df, type_of_3d_plotter=type_of_3d_plotter, application_name=f'Spike Raster Window - {active_display_fn_identifying_ctx_string}', neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order)
+        spike_raster_window: Spike3DRasterWindowWidget = Spike3DRasterWindowWidget(spikes_df, type_of_3d_plotter=type_of_3d_plotter, application_name=f'Spike Raster Window - {active_display_fn_identifying_ctx_string}', neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order) ## surprisingly only needs spikes_df !!?!
         # Set Window Title Options:
         a_file_prefix = str(computation_result.sess.filePrefix.resolve())
         spike_raster_window.setWindowFilePath(a_file_prefix)
         spike_raster_window.setWindowTitle(f'Spike Raster Window - {active_config_name} - {a_file_prefix}')
         
         ## Build the additional menus:
-        output_references = _build_additional_window_menus(spike_raster_window, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx)
+        output_references = _build_additional_window_menus(spike_raster_window, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx) ## the menus on the other hand take the entire pipeline, because they might need that valuable DATA
 
         return {'spike_raster_plt_2d':spike_raster_window.spike_raster_plt_2d, 'spike_raster_plt_3d':spike_raster_window.spike_raster_plt_3d, 'spike_raster_window': spike_raster_window}
 
@@ -544,9 +544,9 @@ class NewSimpleRaster:
     ```
     
     """
-    neuron_IDs: NDArray = field(repr=True)
-    neuron_colors: Dict[int, QColor] = field(init=False, repr=False) # , default=Factory(dict)
-    neuron_y_pos: Dict[int, float] = field(init=False, repr=True) # , default=Factory(dict)
+    neuron_IDs: NDArray = field(repr=True, metadata={'shape':'n_aclus'})
+    neuron_colors: Dict[int, QColor] = field(init=False, repr=False, metadata={'shape':'n_aclus'}) # , default=Factory(dict)
+    neuron_y_pos: Dict[int, float] = field(init=False, repr=True, metadata={'shape':'n_aclus'}) # , default=Factory(dict)
 
     def __attrs_post_init__(self):
         self.neuron_colors = dict()
@@ -616,7 +616,7 @@ class NewSimpleRaster:
             a_spikes_df['visualization_raster_emphasis_state'] = SpikeEmphasisState.Default
         return a_spikes_df
 
-    def build_spikes_all_spots_from_df(self, spikes_df: pd.DataFrame, is_spike_included=None, should_return_data_tooltips_kwargs:bool=True, generate_debug_tuples=False, **kwargs):
+    def build_spikes_all_spots_from_df(self, spikes_df: pd.DataFrame, is_spike_included=None, should_return_data_tooltips_kwargs:bool=True, generate_debug_tuples=False, downsampling_rate: int = 1, **kwargs):
         """ builds the 'all_spots' tuples suitable for setting self.plots_data.all_spots from ALL Spikes 
             Needs to be called whenever:
                 spikes_df['visualization_raster_y_location']
@@ -625,21 +625,26 @@ class NewSimpleRaster:
             Changes.
         Removed `config_fragile_linear_neuron_IDX_map`
         """
+        if (downsampling_rate is not None) and (downsampling_rate > 1):
+            active_spikes_df = deepcopy(spikes_df).iloc[::downsampling_rate]  # Take every 10th row
+        else:
+            active_spikes_df = deepcopy(spikes_df)
+        
         # INLINEING `build_spikes_data_values_from_df`: ______________________________________________________________________ #
         # curr_spike_x, curr_spike_y, curr_spike_pens, all_scatterplot_tooltips_kwargs, all_spots, curr_n = cls.build_spikes_data_values_from_df(spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=is_spike_included, should_return_data_tooltips_kwargs=should_return_data_tooltips_kwargs, **kwargs)
         # All units at once approach:
-        active_time_variable_name = spikes_df.spikes.time_variable_name
+        active_time_variable_name = active_spikes_df.spikes.time_variable_name
         # Copy only the relevent columns so filtering is easier:
-        filtered_spikes_df = spikes_df[[active_time_variable_name, 'visualization_raster_y_location',  'visualization_raster_emphasis_state', 'aclu', 'fragile_linear_neuron_IDX']].copy()
+        filtered_spikes_df = active_spikes_df[[active_time_variable_name, 'visualization_raster_y_location',  'visualization_raster_emphasis_state', 'aclu', 'fragile_linear_neuron_IDX']].copy()
         
         spike_emphasis_states = kwargs.get('spike_emphasis_state', None)
         if spike_emphasis_states is not None:
-            assert len(spike_emphasis_states) == np.shape(spikes_df)[0], f"if specified, spike_emphasis_states must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]} and len(is_included_indicies): {len(spike_emphasis_states)}"
+            assert len(spike_emphasis_states) == np.shape(active_spikes_df)[0], f"if specified, spike_emphasis_states must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(active_spikes_df)[0]} and len(is_included_indicies): {len(spike_emphasis_states)}"
             # Can set it on the dataframe:
             # 'visualization_raster_y_location'
         
         if is_spike_included is not None:
-            assert len(is_spike_included) == np.shape(spikes_df)[0], f"if specified, is_included_indicies must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]} and len(is_included_indicies): {len(is_spike_included)}"
+            assert len(is_spike_included) == np.shape(active_spikes_df)[0], f"if specified, is_included_indicies must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(active_spikes_df)[0]} and len(is_included_indicies): {len(is_spike_included)}"
             ## filter them by the is_included_indicies:
             filtered_spikes_df = filtered_spikes_df[is_spike_included]
         
@@ -656,10 +661,10 @@ class NewSimpleRaster:
 
             if generate_debug_tuples:
                 # debug_datapoint_column_names = [spikes_df.spikes.time_variable_name, 'shank', 'cluster', 'aclu', 'qclu', 'x', 'y', 'speed', 'traj', 'lap', 'maze_relative_lap', 'maze_id', 'neuron_type', 'flat_spike_idx', 'x_loaded', 'y_loaded', 'lin_pos', 'fragile_linear_neuron_IDX', 'PBE_id', 'scISI', 'neuron_IDX', 'replay_epoch_id', 'visualization_raster_y_location', 'visualization_raster_emphasis_state']
-                debug_datapoint_column_names = [spikes_df.spikes.time_variable_name, 'aclu', 'fragile_linear_neuron_IDX', 'visualization_raster_y_location'] # a subset I'm actually interested in for debugging
+                debug_datapoint_column_names = [active_spikes_df.spikes.time_variable_name, 'aclu', 'fragile_linear_neuron_IDX', 'visualization_raster_y_location'] # a subset I'm actually interested in for debugging
                 active_datapoint_column_names = debug_datapoint_column_names # all values for the purpose of debugging
             else:
-                default_datapoint_column_names = [spikes_df.spikes.time_variable_name, 'aclu', 'fragile_linear_neuron_IDX']
+                default_datapoint_column_names = [active_spikes_df.spikes.time_variable_name, 'aclu', 'fragile_linear_neuron_IDX']
                 active_datapoint_column_names = default_datapoint_column_names
                 
             def _tip_fn(x, y, data):
@@ -672,10 +677,10 @@ class NewSimpleRaster:
                 return f"spike: (x={x:.3f}, y={y:.2f})\n{data_string}"
 
             # spikes_data = spikes_df[active_datapoint_column_names].to_records(index=False).tolist() # list of tuples
-            spikes_data = spikes_df[active_datapoint_column_names].to_dict('records') # list of dicts
+            spikes_data = active_spikes_df[active_datapoint_column_names].to_dict('records') # list of dicts
             spikes_data = [ScatterItemData(**v) for v in spikes_data] 
             all_scatterplot_tooltips_kwargs = dict(data=spikes_data, tip=_tip_fn)
-            assert len(all_scatterplot_tooltips_kwargs['data']) == np.shape(spikes_df)[0], f"if specified, all_scatterplot_tooltips_kwargs must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(spikes_df)[0]} and len((all_scatterplot_tooltips_kwargs['data']): {len(all_scatterplot_tooltips_kwargs['data'])}"
+            assert len(all_scatterplot_tooltips_kwargs['data']) == np.shape(active_spikes_df)[0], f"if specified, all_scatterplot_tooltips_kwargs must be the same length as the number of spikes but np.shape(spikes_df)[0]: {np.shape(active_spikes_df)[0]} and len((all_scatterplot_tooltips_kwargs['data']): {len(all_scatterplot_tooltips_kwargs['data'])}"
         else:
             all_scatterplot_tooltips_kwargs = None
             
@@ -695,10 +700,27 @@ class NewSimpleRaster:
             return all_spots
 
 
+
+
 @function_attributes(short_name=None, tags=['raster', 'simple', 'working', 'stateless'], input_requires=[], output_provides=[], uses=['_plot_empty_raster_plot_frame', 'build_scatter_plot_kwargs', '_build_units_y_grid'], used_by=['_plot_empty_raster_plot_frame', ''], creation_date='2023-12-06 13:49', related_items=['NewSimpleRaster'])
-def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, scatter_app_name='pho_test', defer_show=False, active_context=None, **kwargs) -> tuple[Any, pg.GraphicsLayoutWidget, RenderPlots, RenderPlotsData]:
+def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, scatter_app_name='pho_test', defer_show=False, active_context=None, 
+                         win=None, plots_data=None, plots=None, add_debug_header_label: bool=True, **kwargs) -> tuple[Any, pg.GraphicsLayoutWidget, RenderPlots, RenderPlotsData]:
     """ This uses `NewSimpleRaster` and pyqtgraph's scatter function to render a simple raster plot. Simpler than the `SpikeRaster2D`-like implementations.
 
+    
+    If extant data passed in, updates:
+    
+        plots_data.spikes_df
+        plots_data.all_spots
+        plots_data.all_scatterplot_tooltips_kwargs
+        
+        if add_debug_header_label:
+              plots.debug_header_label
+        plots.root_plot
+        plots.scatter_plot
+        plots.grid
+        
+    
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import new_plot_raster_plot
 
@@ -706,8 +728,14 @@ def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort
 
     """
     
-    # make root container for plots
-    app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name, defer_show=defer_show, active_context=active_context)
+    needs_create_new = ((win is None) or (plots_data is None) or (plots is None))
+    if needs_create_new:
+        # make root container for plots
+        app, win, plots, plots_data = _plot_empty_raster_plot_frame(scatter_app_name=scatter_app_name, defer_show=defer_show, active_context=active_context)
+    else:
+        app = kwargs.pop('app', None) # no app needed, but passthrough so it doesn't fail
+        
+
     if unit_sort_order is None:
         unit_sort_order = np.arange(len(included_neuron_ids))
     assert len(unit_sort_order) == len(included_neuron_ids)
@@ -722,17 +750,22 @@ def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort
     plots_data.all_spots, plots_data.all_scatterplot_tooltips_kwargs = plots_data.new_sorted_raster.build_spikes_all_spots_from_df(spikes_df=plots_data.spikes_df, should_return_data_tooltips_kwargs=True, generate_debug_tuples=False)
 
     # Add header label
-    # plots.debug_header_label = pg.LabelItem(justify='right', text='debug_header_label')
-    # win.addItem(plots.debug_header_label)
-    plots.debug_header_label = win.addLabel("debug_header_label") # , row=1, colspan=4
-    win.nextRow()
-    # plots.debug_label2 = win.addLabel("Label2") # , col=1, colspan=4
-    # win.nextRow()
+    if add_debug_header_label:
+        # plots.debug_header_label = pg.LabelItem(justify='right', text='debug_header_label')
+        # win.addItem(plots.debug_header_label)
+        plots.debug_header_label = win.addLabel("debug_header_label") # , row=1, colspan=4
+        win.nextRow()
+        # plots.debug_label2 = win.addLabel("Label2") # , col=1, colspan=4
+        # win.nextRow()
     
     # # Actually setup the plot:
-    plots.root_plot = win.addPlot(title="Raster") # this seems to be the equivalent to an 'axes'
+    if (not plots.has_attr('root_plot')):
+        plots.root_plot = win.addPlot(title="Raster") # this seems to be the equivalent to an 'axes'
 
-    scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs)
+    if scatter_plot_kwargs is None:
+        scatter_plot_kwargs = {} ## make them empty at least
+        
+    scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs, tick_width=scatter_plot_kwargs.pop('tick_width', 0.1), tick_height=scatter_plot_kwargs.pop('tick_height', 1.0))
     
     plots.scatter_plot = pg.ScatterPlotItem(**scatter_plot_kwargs)
     plots.scatter_plot.setObjectName('scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
@@ -753,9 +786,6 @@ def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort
     # tick_ydict = {y_pos:f"{int(aclu)}" for y_pos, aclu in zip(a_series_identity_y_values, sorted_neuron_ids)} # {0.5: '68', 1.5: '75', 2.5: '54', 3.5: '10', 4.5: '104', 5.5: '90', 6.5: '44', 7.5: '15', 8.5: '93', 9.5: '79', 10.5: '56', 11.5: '84', 12.5: '78', 13.5: '31', 14.5: '16', 15.5: '40', 16.5: '25', 17.5: '81', 18.5: '70', 19.5: '66', 20.5: '24', 21.5: '98', 22.5: '80', 23.5: '77', 24.5: '60', 25.5: '39', 26.5: '9', 27.5: '82', 28.5: '85', 29.5: '101', 30.5: '87', 31.5: '26', 32.5: '43', 33.5: '65', 34.5: '48', 35.5: '52', 36.5: '92', 37.5: '11', 38.5: '51', 39.5: '72', 40.5: '18', 41.5: '53', 42.5: '47', 43.5: '89', 44.5: '102', 45.5: '61'}
     tick_ydict = {plots_data.new_sorted_raster.neuron_y_pos[aclu]:f"{int(aclu)}" for aclu in plots_data.new_sorted_raster.neuron_IDs}
     a_left_axis.setTicks([tick_ydict.items()])
-
-    # win.nextRow()
-    # plots.debug_label3 = win.addLabel("Label3") # , col=1, colspan=4
 
     return RasterPlotSetupTuple(app, win, plots, plots_data)
 
@@ -832,10 +862,15 @@ def _build_default_tick(tick_width: float = 0.1, tick_height: float = 1.0) -> Qt
     return vtick
 
 
-def build_scatter_plot_kwargs(scatter_plot_kwargs=None):
-    """build the default scatter plot kwargs, and merge them with the provided kwargs"""
+def build_scatter_plot_kwargs(scatter_plot_kwargs=None, tick_width: float = 1.0, tick_height: float = 1.0):
+    """build the default scatter plot kwargs, and merge them with the provided kwargs
+    
+    
+    build_scatter_plot_kwargs(scatter_plot_kwargs=dict(size=5, hoverable=False), tick_width=0.0, tick_height=1.0)
+    
+    """
     # Common Tick Label 
-    vtick = _build_default_tick(tick_width=1.0)
+    vtick = _build_default_tick(tick_width=tick_width, tick_height=tick_height)
     default_scatter_plot_kwargs = dict(name='spikeRasterOverviewWindowScatterPlotItem', pxMode=True, symbol=vtick, size=2, pen={'color': 'w', 'width': 1}, hoverable=True)
 
     if scatter_plot_kwargs is None:
@@ -1098,7 +1133,10 @@ def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_ord
     # # Actually setup the plot:
     plots.root_plot = win.addPlot() # this seems to be the equivalent to an 'axes'
 
-    scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs)
+    # build_scatter_plot_kwargs(scatter_plot_kwargs=dict(size=5, hoverable=False), tick_width=0.0, tick_height=1.0)
+    # build_scatter_plot_kwargs(scatter_plot_kwargs=dict(size=5, hoverable=False, tick_width=0.0, tick_height=1.0))
+
+    scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs, tick_width=scatter_plot_kwargs.pop('tick_width', 0.1), tick_height=scatter_plot_kwargs.pop('tick_height', 1.0))
     
     plots.scatter_plot = pg.ScatterPlotItem(**scatter_plot_kwargs)
     plots.scatter_plot.setObjectName('scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
@@ -1476,7 +1514,7 @@ def _recover_filter_config_name_from_display_context(owning_pipeline_reference, 
     return active_config_name
 
 
-@function_attributes(short_name=None, tags=['menu', 'spike_raster', 'ui'], input_requires=[], output_provides=[], uses=[], used_by=['_build_additional_window_menus'], creation_date='2023-11-09 19:32', related_items=[])
+@function_attributes(short_name=None, tags=['menu', 'spike_raster', 'ui'], input_requires=[], output_provides=[], uses=['LocalMenus_AddRenderable'], used_by=['_build_additional_window_menus'], creation_date='2023-11-09 19:32', related_items=[])
 def _build_additional_spikeRaster2D_menus(spike_raster_plt_2d, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx):
     active_config_name: str = _recover_filter_config_name_from_display_context(owning_pipeline_reference, active_display_fn_identifying_ctx) # recover active_config_name from the context
 
@@ -1491,8 +1529,14 @@ def _build_additional_spikeRaster2D_menus(spike_raster_plt_2d, owning_pipeline_r
     return output_references
 
 
-@function_attributes(short_name=None, tags=['menu', 'spike_raster', 'gui'], input_requires=[], output_provides=[], uses=['_build_additional_spikeRaster2D_menus'], used_by=['_display_spike_rasters_window'], creation_date='2023-11-09 19:32', related_items=[])
-def _build_additional_window_menus(spike_raster_window, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx):
+@function_attributes(short_name=None, tags=['menu', 'spike_raster', 'gui', 'IMPORTANT'], input_requires=[], output_provides=[], uses=['_build_additional_spikeRaster2D_menus', 'ConnectionControlsMenuMixin', 'CreateNewConnectedWidgetMenuHelper', 'CreateLinkedWidget_MenuProvider', 'DebugMenuProviderMixin', 'DockedWidgets_MenuProvider', ], used_by=['_display_spike_rasters_window'], creation_date='2023-11-09 19:32', related_items=[])
+def _build_additional_window_menus(spike_raster_window: Spike3DRasterWindowWidget, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx):
+    """ needs the entire pipeline so that data is avilable for any of the optional display menus
+        - secondarily so it can call the pipeline's normal .display(...) functions to create new visualizations
+
+    TODO: seems like it should be a Spike3DRasterWindowWidget member property
+    
+    """
     assert owning_pipeline_reference is not None
     active_config_name: str = _recover_filter_config_name_from_display_context(owning_pipeline_reference, active_display_fn_identifying_ctx) # recover active_config_name from the context
 

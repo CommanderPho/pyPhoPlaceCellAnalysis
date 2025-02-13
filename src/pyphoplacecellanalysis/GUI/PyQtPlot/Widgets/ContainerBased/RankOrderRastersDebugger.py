@@ -65,7 +65,7 @@ __all__ = ['RankOrderRastersDebugger']
 # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import _debug_plot_directional_template_rasters, build_selected_spikes_df, add_selected_spikes_df_points_to_scatter_plot
 
 
-@metadata_attributes(short_name=None, tags=['gui', 'window', 'figure', '🖼️', '🎨'], input_requires=[], output_provides=[], uses=['_debug_plot_directional_template_rasters', 'add_selected_spikes_df_points_to_scatter_plot'], used_by=[], creation_date='2023-11-17 19:59', related_items=[])
+@metadata_attributes(short_name=None, tags=['gui', 'window', 'figure', '🖼️', '🎨'], input_requires=[], output_provides=[], uses=['_debug_plot_directional_template_rasters', 'add_selected_spikes_df_points_to_scatter_plot'], used_by=['rank_order_debugger'], creation_date='2023-11-17 19:59', related_items=[])
 @define(slots=False)
 class RankOrderRastersDebugger:
     """ RankOrderRastersDebugger displays four rasters showing the same spikes but sorted according to four different templates (RL_odd, RL_even, LR_odd, LR_even)
@@ -74,7 +74,7 @@ class RankOrderRastersDebugger:
     # Examples ___________________________________________________________________________________________________________ #
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
 
-    _out = RankOrderRastersDebugger.init_rank_order_debugger(global_spikes_df, active_epochs_dfe, track_templates, RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict)
+    _out = RankOrderRastersDebugger.init_rank_order_debugger(global_spikes_df, active_epochs_df, track_templates, RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict)
 
     # Example 1 __________________________________________________________________________________________________________ #
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.RankOrderRastersDebugger import RankOrderRastersDebugger
@@ -1000,10 +1000,6 @@ class RankOrderRastersDebugger:
             paired_separately_sort_neurons
 
         """
-        from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap_pyqtgraph # used in `plot_kourosh_activity_style_figure`
-        from neuropy.utils.indexing_helpers import paired_incremental_sorting, union_of_arrays, intersection_of_arrays
-        from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import UnitColoringMode, DataSeriesColorHelpers
-        from pyphocorehelpers.gui.Qt.color_helpers import QColor, build_adjusted_color
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import paired_separately_sort_neurons
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import new_plot_raster_plot, NewSimpleRaster
 

@@ -9,6 +9,9 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidget
 ## IMPORTS:
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 from pyphoplacecellanalysis.External.pyqtgraph.widgets.LayoutWidget import LayoutWidget
+## For dock widget
+from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.NestedDockAreaWidget import NestedDockAreaWidget
+from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
 
 
 ## Define the .ui file path
@@ -20,8 +23,27 @@ uiFile = os.path.join(path, 'Spike3DRasterRightSidebarWidget.ui')
 class Spike3DRasterRightSidebarWidget(QtWidgets.QWidget):
     """ A simple container to hold interactive widgets
     
+    btnToggleDockManager
+    btnToggleIntervalManager
     
+    
+    btnAddDockTrack
+    
+    
+    btnToggleCollapseExpand
     """
+    sigToggleIntervalManagerPressed = QtCore.pyqtSignal()
+    sigToggleDockManagerPressed = QtCore.pyqtSignal()
+
+    
+    @property
+    def right_sidebar_contents_container(self) -> LayoutWidget:
+        return self.ui.layout_widget # AttributeError: 'Spike3DRasterRightSidebarWidget' object has no attribute 'ui'
+    
+    @property
+    def right_sidebar_contents_container_dockarea(self) -> NestedDockAreaWidget:
+        return self.ui.dynamic_docked_widget_container    
+
     def __init__(self, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self.ui = uic.loadUi(uiFile, self) # Load the .ui file
@@ -35,8 +57,45 @@ class Spike3DRasterRightSidebarWidget(QtWidgets.QWidget):
 
         # self.ui.btnToggleCollapseExpand # a LayoutWidget
         self.ui.layout_widget.setMinimumWidth(200.0)
+        
+        # ==================================================================================================================== #
+        # Build the nested dock areas via NestedDockAreaWidget                                                                 #
+        # ==================================================================================================================== #
 
+        # Create the dynamic docked widget container
+        self.ui.dynamic_docked_widget_container = NestedDockAreaWidget()
+        self.ui.dynamic_docked_widget_container.setObjectName("dynamic_docked_widget_container")
+        
+        # # Create a layout for the wrapper
+        # self.ui.wrapper_layout = pg.QtWidgets.QVBoxLayout() # parent_widget
+        # self.ui.wrapper_layout.setSpacing(0)
+        # self.ui.wrapper_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Add the container to the wrapper layout
+        # self.ui.wrapper_layout.addWidget(self.ui.dynamic_docked_widget_container)
+        
+        ## Add to the main layout widget
+        # self.ui.layout_widget.addLayout(self.ui.wrapper_layout)
+        
+        self.ui.layout_widget.addWidget(self.ui.dynamic_docked_widget_container)
+        self.ui.layout_widget.setContentsMargins(0, 0, 0, 0)
+    
+        self.ui.dock_items = {}  # Store dock items
+        
+        self.ui.btnToggleDockManager.clicked.connect(self.toggle_dock_manager)
+        self.ui.btnToggleIntervalManager.clicked.connect(self.toggle_interval_manager)
+        
         # self.setVisible(True) # shows the sidebar
+
+    def toggle_dock_manager(self):
+        """ Toggles the visibility of the dock manager """
+        print("toggle_dock_manager()")
+        self.sigToggleDockManagerPressed.emit()
+        
+    def toggle_interval_manager(self):
+        """ Toggles the visibility of the interval manager """
+        print("toggle_interval_manager()")
+        self.sigToggleDockManagerPressed.emit()
 
 
 
@@ -53,16 +112,37 @@ class SpikeRasterRightSidebarOwningMixin:
     @property
     def right_sidebar_contents_container(self) -> LayoutWidget:
         return self.right_sidebar_widget.ui.layout_widget
-
+    
+    @property
+    def right_sidebar_contents_container_dockarea(self) -> NestedDockAreaWidget:
+        return self.right_sidebar_widget.ui.dynamic_docked_widget_container
+    
     
     def toggle_right_sidebar(self):
         is_visible = self.right_sidebar_widget.isVisible()
         self.right_sidebar_widget.setVisible(not is_visible) # collapses and hides the sidebar
         # self.right_sidebar_widget.setVisible(True) # shows the sidebar
 
+    @pyqtExceptionPrintingSlot(bool)
     def set_right_sidebar_visibility(self, is_visible:bool):
         self.right_sidebar_widget.setVisible(is_visible) 
 
+    @pyqtExceptionPrintingSlot()
+    def on_toggle_interval_manager(self):
+        """ Toggles the visibility of the interval manager """
+        print(f'SpikeRasterRightSidebarOwningMixin.on_toggle_interval_manager()')
+        self.build_epoch_intervals_visual_configs_widget()
+        print(f'\tdone.')
+
+
+    @pyqtExceptionPrintingSlot()
+    def on_toggle_dock_manager(self):
+        """ Toggles the visibility of the dock manager """
+        print(f'SpikeRasterRightSidebarOwningMixin.on_toggle_dock_manager()')
+        self.build_dock_area_managing_tree_widget()
+        print(f'\tdone.')
+
+            
 
     @pyqtExceptionPrintingSlot()
     def SpikeRasterRightSidebarOwningMixin_on_init(self):
@@ -75,15 +155,17 @@ class SpikeRasterRightSidebarOwningMixin:
         pass
     
     @pyqtExceptionPrintingSlot()
-    def SpikeRasterRightSidebarOwningMixin_connectSignals(self, right_side_bar_controls):
+    def SpikeRasterRightSidebarOwningMixin_connectSignals(self, right_side_bar_controls: Spike3DRasterRightSidebarWidget):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         right_side_bar_connections = []
         # right_side_bar_connections.append(right_side_bar_controls.animation_time_step_changed.connect(self.on_animation_timestep_valueChanged))
         # right_side_bar_connections.append(right_side_bar_controls.temporal_zoom_factor_changed.connect(self.on_temporal_zoom_factor_valueChanged))
-        # right_side_bar_connections.append(right_side_bar_controls.render_window_duration_changed.connect(self.on_render_window_duration_valueChanged))
+        # right_side_bar_connections.append(right_side_bar_controls.render_window_duration_changed.connect(self.on_render_window_duration_valueChanged))        
+        right_side_bar_connections.append(right_side_bar_controls.sigToggleDockManagerPressed.connect(self.on_toggle_dock_manager))
+        right_side_bar_connections.append(right_side_bar_controls.sigToggleIntervalManagerPressed.connect(self.on_toggle_interval_manager))
+        
         return right_side_bar_connections
         
-
 
 
     @pyqtExceptionPrintingSlot()

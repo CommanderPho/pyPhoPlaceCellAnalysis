@@ -397,8 +397,7 @@ class WCorrShuffle(ComputedResult):
         a_shuffled_decoder.pf.ratemap = a_shuffled_decoder.pf.ratemap.get_by_id(shuffle_aclus)
         neuron_indexed_field_names = ['neuron_IDs', 'neuron_IDs']
         for a_field in neuron_indexed_field_names:
-            setattr(a_shuffled_decoder, a_field, getattr(a_shuffled_decoder, a_field)[shuffle_IDXs])
-
+            setattr(a_shuffled_decoder, a_field, getattr(a_shuffled_decoder, a_field)[shuffle_IDXs]) # #TODO 2025-01-20 20:44: - [ ] IndexError: index 21 is out of bounds for axis 0 with size 16
         a_shuffled_decoder.F[shuffle_IDXs, :] = a_shuffled_decoder.F[shuffle_IDXs, :] # @TODO - is this needed?
 
         return a_shuffled_decoder
@@ -691,8 +690,6 @@ class WCorrShuffle(ComputedResult):
             shuffled_decoders_dict: Dict[str, BasePositionDecoder] = {a_name:cls._shuffle_pf1D_decoder(a_decoder, shuffle_IDXs=a_shuffle_IDXs, shuffle_aclus=shuffled_decoder_specific_neuron_ids_dict[a_name]) for a_name, a_decoder in track_templates.get_decoders_dict().items()}
 
             ## Decode epochs for all four decoders:
-        
-
             if is_pre_compute_mode:
                 decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict = cls._all_templates_perform_pre_built_specific_epochs_decoding(laps_pre_computed_filter_epochs_dict=deepcopy(laps_pre_computed_filter_epochs_dict),
                                                                                                                                                                                 ripple_pre_computed_filter_epochs_dict=deepcopy(ripple_pre_computed_filter_epochs_dict),
@@ -701,7 +698,6 @@ class WCorrShuffle(ComputedResult):
             else:
                 _, (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict) = cls._try_all_templates_decode(spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df), a_directional_merged_decoders_result=alt_directional_merged_decoders_result, shuffled_decoders_dict=shuffled_decoders_dict,
                                                                                                                                                                         skip_merged_decoding=True, **all_templates_decode_kwargs)
-
 
             ## Weighted Correlation
             # decoder_laps_weighted_corr_df_dict = compute_weighted_correlations(decoder_decoded_epochs_result_dict=deepcopy(decoder_laps_filter_epochs_decoder_result_dict))

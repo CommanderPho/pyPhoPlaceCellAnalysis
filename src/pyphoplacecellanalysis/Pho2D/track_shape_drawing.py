@@ -51,7 +51,11 @@ import pyvista as pv # for 3D support in `LinearTrackDimensions3D`
 
 @define(slots=False, repr=True)
 class NotableTrackPositions(UnpackableMixin):
-    """ 2024-04-10 - Just holds the outer/inner x-positions of the platforms which entirely describes one configuration (long/short) of the track. """
+    """ 2024-04-10 - Just holds the outer/inner x-positions of the platforms which entirely describes one configuration (long/short) of the track.
+    
+    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import NotableTrackPositions
+    
+    """
     left_platform_outer: float = field()
     left_platform_inner: float = field()
     right_platform_inner: float = field()
@@ -457,7 +461,7 @@ class LinearTrackDimensions:
         notable_x_positions, notable_y_positions = self.compute_offset_notable_positions(notable_x_positions, notable_y_positions, is_zero_centered=is_zero_centered, offset_point=offset_point)
         return notable_x_positions, notable_y_positions
 
-    def _build_component_rectangles(self, is_zero_centered:bool=False, offset_point=None, include_rendering_properties:bool=True):
+    def _build_component_rectangles(self, is_zero_centered:bool=False, offset_point=None, include_rendering_properties:bool=True, rotate_to_vertical:bool=False):
         major_axis_factor, minor_axis_factor = self.axis_scale_factors
         if include_rendering_properties:
             pen = pg.mkPen({'color': "#FF0", 'width': 2})
@@ -511,16 +515,20 @@ class LinearTrackDimensions:
 
             
         rects = self.compute_offset_rects(self.total_length, self.total_width, rects, is_zero_centered=is_zero_centered, offset_point=offset_point)
+        if rotate_to_vertical:
+            # swap (x,y) and (w, h)
+            rects = [(y, x, h, w, pen, brush) for x, y, w, h, pen, brush in rects]
 
         return rects
         
-    def plot_rects(self, plot_item, offset=None, matplotlib_rect_kwargs_override=None):
+    def plot_rects(self, plot_item, offset=None, matplotlib_rect_kwargs_override=None, rotate_to_vertical:bool=False):
         """ main function to plot 
 
         
         combined_item, rect_items, rects = item.plot_rect(ax, offset=None)
         """
-        rects = self._build_component_rectangles(is_zero_centered=True, offset_point=offset, include_rendering_properties=True)
+        rects = self._build_component_rectangles(is_zero_centered=True, offset_point=offset, include_rendering_properties=True, rotate_to_vertical=rotate_to_vertical)
+
         rect_items = [] # probably do not need
         for x, y, w, h, pen, brush in rects:
             if isinstance(plot_item, PlotItem):
@@ -798,15 +806,20 @@ class LinearTrackInstance:
         return pd.DataFrame({'x': deepcopy(x_arr), 'is_endcap': is_pos_bin_endcap, 'is_on_maze': is_pos_bin_on_maze})
 
 
-    def plot_rects(self, plot_item, matplotlib_rect_kwargs_override=None):
+    def plot_rects(self, plot_item, matplotlib_rect_kwargs_override=None, rotate_to_vertical:bool=False):
         """ main function to plot 
 
         
         combined_item, rect_items, rects = item.plot_rect(ax, offset=None)
         """
         offset_point = self.grid_bin_bounds.center_point # (self.grid_bin_bounds.center_point[0], 0.75)
-        return self.track_dimensions.plot_rects(plot_item=plot_item, offset=offset_point, matplotlib_rect_kwargs_override=matplotlib_rect_kwargs_override)
+        return self.track_dimensions.plot_rects(plot_item=plot_item, offset=offset_point, matplotlib_rect_kwargs_override=matplotlib_rect_kwargs_override, rotate_to_vertical=rotate_to_vertical)
 
+
+    def build_rects(self, include_rendering_properties:bool=False, rotate_to_vertical:bool=False):
+        offset_point = self.grid_bin_bounds.center_point # (self.grid_bin_bounds.center_point[0], 0.75)
+        return self.track_dimensions._build_component_rectangles(is_zero_centered=True, offset_point=offset_point, include_rendering_properties=include_rendering_properties, rotate_to_vertical=rotate_to_vertical)
+        
 
 
 def get_track_length_dict(long_grid_bin_bounds, short_grid_bin_bounds) -> Tuple[Dict[str, float], Dict[str, float]]:
@@ -884,7 +897,7 @@ def test_LinearTrackDimensions_2D_pyqtgraph(long_track_dims=None, short_track_di
     return app, w, cw, (ax0, ax1), (long_track_dims, long_rect_items, long_rects), (short_track_dims, short_rect_items, short_rects)
 
 
-def test_LinearTrackDimensions_2D_Matplotlib(long_track_dims=None, short_track_dims=None, long_offset=None, short_offset=None):
+def test_LinearTrackDimensions_2D_Matplotlib(long_track_dims=None, short_track_dims=None, long_offset=None, short_offset=None, rotate_to_vertical:bool=False):
     """ 
     Usage:
         from pyphoplacecellanalysis.Pho2D.track_shape_drawing import test_LinearTrackDimensions_2D_Matplotlib
@@ -897,10 +910,15 @@ def test_LinearTrackDimensions_2D_Matplotlib(long_track_dims=None, short_track_d
     if short_track_dims is None:
         short_track_dims = LinearTrackDimensions(track_length=100.0)
 
-    fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, figsize=(4, 6))
+    if rotate_to_vertical:
+        figsize=(8,4)
+    else:
+        figsize=(4,8)
+
+    fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, figsize=figsize)
     
-    long_track_dims.plot_rects(ax1, offset=long_offset)
-    short_track_dims.plot_rects(ax2, offset=short_offset)
+    long_track_dims.plot_rects(ax1, offset=long_offset, rotate_to_vertical=rotate_to_vertical)
+    short_track_dims.plot_rects(ax2, offset=short_offset, rotate_to_vertical=rotate_to_vertical)
     # [ax.axis('equal') for ax in (ax1, ax2)]
     # Auto scale views
     ax1.autoscale_view()
@@ -920,7 +938,7 @@ def test_LinearTrackDimensions_2D_Matplotlib(long_track_dims=None, short_track_d
 # General Functions                                                                                                    #
 # ==================================================================================================================== #
 
-
+@function_attributes(short_name=None, tags=['matplotlib', 'grid_bin_bounds'], input_requires=[], output_provides=[], uses=['perform_add_1D_track_bounds_lines'], used_by=['perform_add_1D_track_bounds_lines'], creation_date='2025-01-20 08:06', related_items=[])
 def perform_add_vertical_track_bounds_lines(long_notable_x_platform_positions=None, short_notable_x_platform_positions=None, ax=None, include_long:bool=True, include_short:bool=True):
     """ Plots eight vertical lines across ax representing the (start, stop) of each platform (long_left, short_left, short_right, long_right)
     
@@ -930,31 +948,104 @@ def perform_add_vertical_track_bounds_lines(long_notable_x_platform_positions=No
         long_track_line_collection, short_track_line_collection = perform_add_vertical_track_bounds_lines(grid_bin_bounds=grid_bin_bounds, ax=None)
 
     """
+    return perform_add_1D_track_bounds_lines(long_notable_x_platform_positions=long_notable_x_platform_positions, short_notable_x_platform_positions=short_notable_x_platform_positions, ax=ax, include_long=include_long, include_short=include_short, is_vertical=True)
+
+
+@function_attributes(short_name=None, tags=['grid_bin_bounds', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['perform_add_vertical_track_bounds_lines'], creation_date='2025-01-20 07:50', related_items=[])
+def perform_add_1D_track_bounds_lines(long_notable_x_platform_positions=None, short_notable_x_platform_positions=None, ax=None, include_long:bool=True, include_short:bool=True, is_vertical:bool=True, long_and_short_labels_opposite_side: bool=True):
+    """ Plots eight vertical lines across ax representing the (start, stop) of each platform (long_left, short_left, short_right, long_right)
+        2025-02-11 - also now plots small labels next to each of the lines with their appropriate text name
+        
+    Usage:
+        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import perform_add_1D_track_bounds_lines
+        grid_bin_bounds = deepcopy(long_pf2D.config.grid_bin_bounds)
+        long_track_line_collection, short_track_line_collection = perform_add_1D_track_bounds_lines(grid_bin_bounds=grid_bin_bounds, ax=None, is_vertical=True)
+
+    """
     ## Adds to current axes:
     if ax is None:
         fig = plt.gcf()
         axs = fig.get_axes()
         ax = axs[0]
         
+
+    # Shared/Common ______________________________________________________________________________________________________ #
     long_short_display_config_manager = LongShortDisplayConfigManager()
     
+    if is_vertical:
+       common_ax_bound_kwargs = dict(ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1]) 
+    else:
+        ## Horizontal lines - normal plotting with position along the x-axis:
+        common_ax_bound_kwargs = dict(xmin=ax.get_xbound()[0], xmax=ax.get_xbound()[1])
+
+    const_line_text_label_y_offset: float = 0.05
+    long_notable_x_platform_label_names: List[str] = ['L[0]', 'L[1]', 'L[2]', 'L[3]']
+    short_notable_x_platform_label_names: List[str] = ['S[0]', 'S[1]', 'S[2]', 'S[3]']
+    
+    if long_and_short_labels_opposite_side:
+        # alt_axis_pos_list = [(ax.get_xbound()[1]), (ax.get_xbound()[1])]
+        alt_axis_pos_list = [v for v in list(common_ax_bound_kwargs.values())]
+        
+    else:    
+        # alt_axis_pos_list = (ax.get_xbound()[1]) * [2]
+        alt_axis_pos_list = float(list(common_ax_bound_kwargs.values())[1]) * [2]
+
+    assert len(alt_axis_pos_list) == 2
+
+    # Long Track _________________________________________________________________________________________________________ #
     if (include_long and (long_notable_x_platform_positions is not None)):
         long_epoch_matplotlib_config = long_short_display_config_manager.long_epoch_config.as_matplotlib_kwargs()
         long_kwargs = deepcopy(long_epoch_matplotlib_config)
-        # long_track_line_collection: matplotlib.collections.LineCollection = plt.vlines(long_notable_x_platform_positions, label='long_track_x_pos_lines', ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1], colors=long_kwargs.get('edgecolor', '#0000FFAA'), linewidths=long_kwargs.get('linewidth', 1.0), linestyles='dashed', zorder=-98) # matplotlib.collections.LineCollection
-        long_track_line_collection: matplotlib.collections.LineCollection = ax.vlines(long_notable_x_platform_positions, label='long_track_x_pos_lines', ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1], colors=long_kwargs.get('edgecolor', '#0000FFAA'), linewidths=long_kwargs.get('linewidth', 1.0), linestyles='dashed', zorder=-98) # matplotlib.collections.LineCollection
-
+        assert len(long_notable_x_platform_label_names) == len(long_notable_x_platform_positions)
+        long_const_alt_ax_pos: float = alt_axis_pos_list[0]
+        
+        if is_vertical:
+            # long_track_line_collection: matplotlib.collections.LineCollection = plt.vlines(long_notable_x_platform_positions, label='long_track_x_pos_lines', ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1], colors=long_kwargs.get('edgecolor', '#0000FFAA'), linewidths=long_kwargs.get('linewidth', 1.0), linestyles='dashed', zorder=-98) # matplotlib.collections.LineCollection
+            long_track_line_collection: matplotlib.collections.LineCollection = ax.vlines(long_notable_x_platform_positions, label='long_track_x_pos_lines', **common_ax_bound_kwargs, colors=long_kwargs.get('edgecolor', '#0000FFAA'), linewidths=long_kwargs.get('linewidth', 1.0), linestyles='dashed', zorder=-98) # matplotlib.collections.LineCollection
+            # Iterate through the vlines in the LineCollection and add labels
+            for pos, a_txt_label in zip(long_notable_x_platform_positions, long_notable_x_platform_label_names):
+                # ax.text(pos, ax.get_ylim()[1], a_txt_label, color=long_track_line_collection.get_colors(), fontsize=9, ha='center', va='bottom', zorder=-98)
+                ax.text(pos, long_const_alt_ax_pos, a_txt_label, color=long_track_line_collection.get_colors(), fontsize=9, ha='center', va='bottom', zorder=-98)
+        else:
+            ## Horizontal lines - normal plotting with position along the x-axis:
+            long_track_line_collection: matplotlib.collections.LineCollection = ax.hlines(long_notable_x_platform_positions, label='long_track_x_pos_lines', **common_ax_bound_kwargs, colors=long_kwargs.get('edgecolor', '#0000FFAA'), linewidths=long_kwargs.get('linewidth', 1.0), linestyles='dashed', zorder=-98) # matplotlib.collections.LineCollection
+            # Iterate through the hlines in the LineCollection and add labels
+            for pos, a_txt_label in zip(long_notable_x_platform_positions, long_notable_x_platform_label_names):
+                # ax.text(ax.get_xbound()[1], (pos + const_line_text_label_y_offset), a_txt_label, color=long_track_line_collection.get_colors(), fontsize=9, ha='right', va='bottom', zorder=-98) # could also use `color=long_kwargs.get('edgecolor', '#0000FFAA')`
+                ax.text(long_const_alt_ax_pos, (pos + const_line_text_label_y_offset), a_txt_label, color=long_track_line_collection.get_colors(), fontsize=9, ha='right', va='bottom', zorder=-98) # could also use `color=long_kwargs.get('edgecolor', '#0000FFAA')`
+                
     else:
         long_track_line_collection = None
         
+    # Short Track ________________________________________________________________________________________________________ #
     if (include_short and (short_notable_x_platform_positions is not None)):
         short_epoch_matplotlib_config = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs()
         short_kwargs = deepcopy(short_epoch_matplotlib_config)
-        short_track_line_collection: matplotlib.collections.LineCollection = ax.vlines(short_notable_x_platform_positions, label='short_track_x_pos_lines', ymin=ax.get_ybound()[0], ymax=ax.get_ybound()[1], colors=short_kwargs.get('edgecolor', '#FF0000AA'), linewidths=short_kwargs.get('linewidth', 1.0), linestyles='dashed', zorder=-98) # matplotlib.collections.LineCollection
+        assert len(short_notable_x_platform_label_names) == len(short_notable_x_platform_positions)
+        short_const_alt_ax_pos: float = alt_axis_pos_list[1]
+        
+        if is_vertical:
+            short_track_line_collection: matplotlib.collections.LineCollection = ax.vlines(short_notable_x_platform_positions, label='short_track_x_pos_lines', **common_ax_bound_kwargs, colors=short_kwargs.get('edgecolor', '#FF0000AA'), linewidths=short_kwargs.get('linewidth', 1.0), linestyles='dashed', zorder=-98) # matplotlib.collections.LineCollection
+            # Iterate through the vlines in the LineCollection and add labels
+            assert len(short_notable_x_platform_label_names) == len(short_notable_x_platform_positions)
+            for pos, a_txt_label in zip(short_notable_x_platform_positions, short_notable_x_platform_label_names):
+                # ax.text(pos, ax.get_ylim()[1], a_txt_label, color=short_track_line_collection.get_colors(), fontsize=9, ha='center', va='bottom', zorder=-98)            
+                ax.text(pos, short_const_alt_ax_pos, a_txt_label, color=short_track_line_collection.get_colors(), fontsize=9, ha='center', va='bottom', zorder=-98)            
+
+        else:
+            # Horizontal lines - normal plotting with position along the x-axis:
+            short_track_line_collection: matplotlib.collections.LineCollection = ax.hlines(short_notable_x_platform_positions, label='short_track_x_pos_lines', **common_ax_bound_kwargs, colors=short_kwargs.get('edgecolor', '#FF0000AA'), linewidths=short_kwargs.get('linewidth', 1.0), linestyles='dashed', zorder=-98) # matplotlib.collections.
+            # Iterate through the hlines in the LineCollection and add labels
+            assert len(short_notable_x_platform_label_names) == len(short_notable_x_platform_positions)
+            for pos, a_txt_label in zip(short_notable_x_platform_positions, short_notable_x_platform_label_names):
+                # ax.text(ax.get_xbound()[1], (pos + const_line_text_label_y_offset), a_txt_label, color=short_track_line_collection.get_colors(), fontsize=9, ha='right', va='bottom', zorder=-98)
+                ax.text(short_const_alt_ax_pos, (pos + const_line_text_label_y_offset), a_txt_label, color=short_track_line_collection.get_colors(), fontsize=9, ha='right', va='bottom', zorder=-98)
+
     else:
         short_track_line_collection = None
 
     return long_track_line_collection, short_track_line_collection
+
 
 
 def add_vertical_track_bounds_lines(grid_bin_bounds, ax=None, include_long:bool=True, include_short:bool=True):
@@ -1138,19 +1229,36 @@ def _build_track_1D_verticies(platform_length: float = 22.0, track_length: float
 
 
 
-@function_attributes(short_name=None, tags=['matplotlib', 'track_plotting', '2D', 'ax'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-04-16 16:51', related_items=[])
-def _perform_plot_matplotlib_2D_tracks(long_track_inst: LinearTrackInstance, short_track_inst: LinearTrackInstance, ax=None, perform_autoscale: bool = True):
+@function_attributes(short_name=None, tags=['matplotlib', 'track_plotting', '2D', 'ax'], input_requires=[], output_provides=[], uses=[], used_by=['DecodedTrajectoryMatplotlibPlotter'], creation_date='2024-04-16 16:51', related_items=[])
+def _perform_plot_matplotlib_2D_tracks(long_track_inst: LinearTrackInstance, short_track_inst: LinearTrackInstance, ax=None, perform_autoscale: bool = True, rotate_to_vertical:bool=False):
     """ Plots both the long and the short track on a single matplotlib axes.
     
-    
-    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import _perform_plot_matplotlib_2D_tracks
-    
-    # active_config = curr_active_pipeline.sess.config
-    active_config = global_session.config
+    Usage:
+        from pyphocorehelpers.geometry_helpers import BoundsRect
+        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import _perform_plot_matplotlib_2D_tracks, LinearTrackInstance
 
-    long_track_inst, short_track_inst = LinearTrackInstance.init_tracks_from_session_config(active_config)
+        # active_config = curr_active_pipeline.sess.config
+        active_config = global_session.config
 
-    _perform_plot_matplotlib_2D_tracks
+        fig = plt.figure('test track vertical', clear=True)
+        an_ax = plt.gca()
+
+        rotate_to_vertical: bool = True
+        long_track_inst, short_track_inst = LinearTrackInstance.init_tracks_from_session_config(active_config)
+        long_out = _perform_plot_matplotlib_2D_tracks(long_track_inst=long_track_inst, short_track_inst=short_track_inst, ax=an_ax, rotate_to_vertical=rotate_to_vertical)
+        if not rotate_to_vertical:
+            an_ax.set_xlim(long_track_inst.grid_bin_bounds.xmin, long_track_inst.grid_bin_bounds.xmax)
+            an_ax.set_ylim(long_track_inst.grid_bin_bounds.ymin, long_track_inst.grid_bin_bounds.ymax)
+            fig.set_size_inches(30.5161, 1.13654)
+        else:
+            an_ax.set_ylim(long_track_inst.grid_bin_bounds.xmin, long_track_inst.grid_bin_bounds.xmax)
+            an_ax.set_xlim(long_track_inst.grid_bin_bounds.ymin, long_track_inst.grid_bin_bounds.ymax)
+            fig.set_size_inches(1.13654, 30.5161)
+
+        ax.set_aspect('auto')  # Adjust automatically based on data limits
+        ax.set_adjustable('datalim')  # Ensure the aspect ratio respects the data limits
+        ax.autoscale()  # Autoscale the view to fit data
+
     
     """
     long_short_display_config_manager = LongShortDisplayConfigManager()
@@ -1160,9 +1268,10 @@ def _perform_plot_matplotlib_2D_tracks(long_track_inst: LinearTrackInstance, sho
     short_epoch_matplotlib_config = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs()
     short_kwargs = deepcopy(short_epoch_matplotlib_config)
     short_kwargs = overriding_dict_with(lhs_dict=short_kwargs, **dict(linewidth=2, zorder=-98, alpha=0.5, facecolor='#f5161607', edgecolor=short_kwargs['facecolor'], linestyle='dashed'))
+        
     # BEGIN PLOTTING _____________________________________________________________________________________________________ #
-    long_out_tuple = long_track_inst.plot_rects(plot_item=ax, matplotlib_rect_kwargs_override=long_kwargs)
-    short_out_tuple = short_track_inst.plot_rects(plot_item=ax, matplotlib_rect_kwargs_override=short_kwargs)
+    long_out_tuple = long_track_inst.plot_rects(plot_item=ax, matplotlib_rect_kwargs_override=long_kwargs, rotate_to_vertical=rotate_to_vertical)
+    short_out_tuple = short_track_inst.plot_rects(plot_item=ax, matplotlib_rect_kwargs_override=short_kwargs, rotate_to_vertical=rotate_to_vertical)
 
     # long_path = _build_track_1D_verticies(platform_length=22.0, track_length=170.0, track_1D_height=1.0, platform_1D_height=1.1, track_center_midpoint_x=long_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=-1.0, debug_print=True)
     # short_path = _build_track_1D_verticies(platform_length=22.0, track_length=100.0, track_1D_height=1.0, platform_1D_height=1.1, track_center_midpoint_x=short_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=1.0, debug_print=True)

@@ -254,7 +254,7 @@ def build_scrollable_graphics_layout_widget_with_nested_viewbox_ui(name, window_
 # ==================================================================================================================== #
 @function_attributes(short_name='build_pyqtgraph_epoch_indicator_regions', tags=['pyqtgraph','epoch','render','plot','CustomLinearRegionItem'], input_requires=[], output_provides=[],
     uses=['pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.CustomLinearRegionItem', 'pg.InfLineLabel'], used_by=[], creation_date='2023-04-18 08:37')
-def build_pyqtgraph_epoch_indicator_regions(win: pg.PlotWidget, t_start:float, t_stop:float, epoch_label:str = 'short', movable=False, **kwargs):
+def build_pyqtgraph_epoch_indicator_regions(win: pg.PlotWidget, t_start:float, t_stop:float, epoch_label:str = 'short', movable=False, removable=True, **kwargs):
     """ 2023-04-17 - Build a CustomLinearRegionItem that sits behind the data in a pyqtgraph PlotItem that indicates the timerange of the current epoch. 
 
     Usage:
@@ -267,7 +267,7 @@ def build_pyqtgraph_epoch_indicator_regions(win: pg.PlotWidget, t_start:float, t
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.CustomLinearRegionItem import CustomLinearRegionItem # used in `plot_kourosh_activity_style_figure`
 
     # Add the linear region overlay:
-    epoch_linear_region:CustomLinearRegionItem = CustomLinearRegionItem(**(dict(pen=pg.mkPen('#fff'), brush=pg.mkBrush('#f004'), hoverBrush=pg.mkBrush('#fff4'), hoverPen=pg.mkPen('#f00'))|kwargs), movable=movable) #, clipItem=plots['difference']  bound the LinearRegionItem to the plotted data
+    epoch_linear_region:CustomLinearRegionItem = CustomLinearRegionItem(**(dict(pen=pg.mkPen('#fff'), brush=pg.mkBrush('#f004'), hoverBrush=pg.mkBrush('#fff4'), hoverPen=pg.mkPen('#f00'))|kwargs), movable=movable, removable=removable) #, clipItem=plots['difference']  bound the LinearRegionItem to the plotted data
     epoch_linear_region.setObjectName(f'epoch[{epoch_label}]')
     epoch_linear_region.setZValue(-3) # put it in the back
     epoch_region_label:pg.InfLineLabel = pg.InfLineLabel(epoch_linear_region.lines[0], f"{epoch_label}", position=0.95, rotateAxis=(1,0), anchor=(1, 1)) # add the label for the short epoch

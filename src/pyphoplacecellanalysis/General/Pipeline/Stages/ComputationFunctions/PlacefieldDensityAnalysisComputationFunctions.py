@@ -152,7 +152,10 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
     _is_global = False
 
 
-    @function_attributes(short_name='EloyAnalysis', tags=['pf_density','velocity'], input_requires=["computed_data['pf1D']", "computed_data['pf2D']", "computed_data['pf2D_TwoStepDecoder']['avg_speed_per_pos']"], output_provides=["computed_data['EloyAnalysis']"], uses=[], used_by=[], creation_date='2023-09-12 17:11', related_items=[], 
+    @function_attributes(short_name='EloyAnalysis', tags=['pf_density','velocity'],
+                         input_requires=["computation_result.computed_data['pf1D']", "computation_result.computed_data['pf2D']", "computation_result.computed_data['pf2D_TwoStepDecoder']['avg_speed_per_pos']"],
+                         output_provides=["computation_result.computed_data['EloyAnalysis']"],
+                         uses=[], used_by=[], creation_date='2023-09-12 17:11', related_items=[], 
                          validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['EloyAnalysis'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['EloyAnalysis']['sorted_PFoverlapDensity_2D']), is_global=False)
     def _perform_velocity_vs_pf_density_computation(computation_result: ComputationResult, debug_print=False):
             """ Builds the analysis to test Eloy's Pf-Density/Velocity Hypothesis for 2D Placefields
@@ -252,7 +255,10 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             return computation_result
         
 
-    @function_attributes(short_name='velocity_vs_pf_simplified_count_density', tags=['pf_density', 'velocity', 'simplified'], input_requires=[], output_provides=["computed_data['SimplerNeuronMeetingThresholdFiringAnalysis']"], uses=[], used_by=[], creation_date='2022-07-06 00:00', related_items=[],
+    @function_attributes(short_name='velocity_vs_pf_simplified_count_density', tags=['pf_density', 'velocity', 'simplified'],
+                        input_requires=[],
+                        output_provides=["computation_result.computed_data['SimplerNeuronMeetingThresholdFiringAnalysis']"],
+                        uses=[], used_by=[], creation_date='2022-07-06 00:00', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['SimplerNeuronMeetingThresholdFiringAnalysis'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['SimplerNeuronMeetingThresholdFiringAnalysis']['sorted_n_neurons_meeting_firing_critiera_by_position_bins_2D']), is_global=False)
     def _perform_velocity_vs_pf_simplified_count_density_computation(computation_result: ComputationResult, debug_print=False):
             """ Builds the simplified density analysis suggested by Kamran at the 2022-07-06 lab meeting related analysis to test Eloy's Pf-Density/Velocity Hypothesis for 2D Placefields
@@ -308,7 +314,10 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             computation_result.computed_data['SimplerNeuronMeetingThresholdFiringAnalysis'] = DynamicParameters.init_from_dict({'n_neurons_meeting_firing_critiera_by_position_bins_2D': n_neurons_meeting_firing_critiera_by_position_bins_2D, 'sorted_n_neurons_meeting_firing_critiera_by_position_bins_2D': sorted_n_neurons_meeting_firing_critiera_by_position_bins_2D})
             return computation_result
         
-    @function_attributes(short_name='_DEP_ratemap_peaks', tags=['pf','ratemap', 'peaks', 'DEPRICATED'], input_requires=[], output_provides=["computed_data['RatemapPeaksAnalysis']"], uses=['findpeaks'], used_by=[], creation_date='2023-09-12 17:24', related_items=[],
+    @function_attributes(short_name='_DEP_ratemap_peaks', tags=['pf','ratemap', 'peaks', 'DEPRICATED'],
+                          input_requires=[],
+                          output_provides=["computation_result.computed_data['RatemapPeaksAnalysis']"],
+                          uses=['findpeaks'], used_by=[], creation_date='2023-09-12 17:24', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['RatemapPeaksAnalysis'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['RatemapPeaksAnalysis']['final_filtered_results']), is_global=False)
     def _DEP_perform_pf_find_ratemap_peaks_computation(computation_result: ComputationResult, debug_print=False, peak_score_inclusion_percent_threshold=0.25):
             """ Uses the `findpeaks` library to compute the topographical peak locations and information with the intent of doing an extended pf size/density analysis.
@@ -354,7 +363,10 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
             
             return computation_result
 
-    @function_attributes(short_name='ratemap_peaks_prominence2d', tags=['pf', 'peaks', 'promienence', '2d', 'ratemap', 'Eloy'], input_requires=["computed_data['pf2D']"], output_provides=["computed_data['RatemapPeaksAnalysis']['PeakProminence2D']"], uses=["compute_prominence_contours"], used_by=[], creation_date='2023-09-12 17:21', related_items=[],
+    @function_attributes(short_name='ratemap_peaks_prominence2d', tags=['pf', 'peaks', 'promienence', '2d', 'ratemap', 'Eloy'],
+                          input_requires=["computation_result.computed_data['pf2D']"],
+                          output_provides=["computation_result.computed_data['RatemapPeaksAnalysis']['PeakProminence2D']"],
+                          uses=["compute_prominence_contours"], used_by=[], creation_date='2023-09-12 17:21', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['RatemapPeaksAnalysis'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['RatemapPeaksAnalysis']['PeakProminence2D']), is_global=False)
     def _perform_pf_find_ratemap_peaks_peak_prominence2d_computation(computation_result: ComputationResult, step=0.01, peak_height_multiplier_probe_levels=(0.5, 0.9), minimum_included_peak_height = 0.2, uniform_blur_size = 3, gaussian_blur_sigma = 3, debug_print=False):
             """ Uses the peak_prominence2d package to find the peaks and promenences of 2D placefields
@@ -838,7 +850,10 @@ class PlacefieldDensityAnalysisComputationFunctions(AllFunctionEnumeratingMixin,
 
             return computation_result
 
-    @function_attributes(short_name='placefield_overlap', tags=['overlap'], input_requires=["computation_result.computed_data['pf2D_Decoder']"], output_provides=["['placefield_overlap']"], uses=[], used_by=[], creation_date='2023-09-12 17:20', related_items=[],
+    @function_attributes(short_name='placefield_overlap', tags=['overlap'],
+        input_requires=["computation_result.computed_data['pf2D_Decoder']"],
+        output_provides=["computation_result.computed_data['placefield_overlap']"],
+        uses=[], used_by=[], creation_date='2023-09-12 17:20', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['placefield_overlap'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['placefield_overlap']['all_pairwise_overlaps']), is_global=False)
     def _perform_placefield_overlap_computation(computation_result: ComputationResult, debug_print=False):
             """ Computes the pairwise overlap between every pair of placefields. 

@@ -629,23 +629,6 @@ class LeaveOneOutDecodingAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
         return subset_filter_epochs, subset
     
 
-    # def __attrs_post_init__(self):
-    #     self.z = self.x + self.y
-
-    # def sliced_by_aclus(self, aclus):
-    #     """ returns a copy of itself sliced by the aclus provided. """
-    #     from attrs import asdict, fields, evolve
-    #     aclu_is_included = np.isin(self.original_1D_decoder.neuron_IDs, aclus)  #.shape # (104, 63)
-    #     def _filter_obj_attribute(an_attr, attr_value):
-    #         """ return attributes only if they have n_neurons in their shape metadata """
-    #         return ('n_neurons' in an_attr.metadata.get('shape', ()))            
-    #     _temp_obj_dict = asdict(self, filter=_filter_obj_attribute)
-    #     # Find all fields that contain a 'n_neurons':
-    #     neuron_indexed_attributes = [a_field for a_field in fields(type(self)) if ('n_neurons' in a_field.metadata.get('shape', ()))]
-    #     # neuron_shape_index_for_attributes = [a_field.metadata['shape'].index('n_neurons') for a_field in neuron_indexed_attributes]
-    #     neuron_shape_index_for_attribute_name_dict = {a_field.name:a_field.metadata['shape'].index('n_neurons') for a_field in neuron_indexed_attributes} # need the actual attributes so that we can get the .metadata['shape'] from them and find the n_neurons index location
-    #     _temp_obj_dict = {k:v.take(indices=aclu_is_included, axis=neuron_shape_index_for_attribute_name_dict[k]) for k, v in _temp_obj_dict.items()} # filter the n_neurons axis containing items to get a reduced dictionary
-    #     return evolve(self, **_temp_obj_dict)
 
 
 
@@ -1017,8 +1000,8 @@ def perform_full_session_leave_one_out_decoding_analysis(sess, original_1D_decod
 import numpy as np
 from neuropy.analyses.decoders import radon_transform, old_radon_transform
 
-# _allow_parallel_run_general:bool = True
-_allow_parallel_run_general:bool = False
+_allow_parallel_run_general:bool = True
+# _allow_parallel_run_general:bool = False
 
 
 def old_score_posterior(posterior, n_jobs:int=8):

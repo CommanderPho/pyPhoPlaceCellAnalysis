@@ -88,7 +88,7 @@ class TrialByTrialActivityWindow:
         cls.perform_build_single_cell_formatted_descriptor_string(active_one_step_decoder=override_active_one_step_decoder, aclu=aclu)
         """
         # neuron_i: int = list(self.plots_data.active_one_step_decoder.included_neuron_IDs).index(aclu)
-        curr_extended_id_string: str = active_one_step_decoder.ratemap.get_extended_neuron_id_string(neuron_id=aclu)
+        curr_extended_id_string: str = active_one_step_decoder.ratemap.get_extended_neuron_id_string(neuron_id=aclu) # 2025-01-16 05:42  -- AssertionError: neuron_id: 16 is not in self.neuron_ids: [2, 3, 4, 5, 6, 8, 9, 11, 12, 13, 14, 15, 18, 19, 20, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 38, 39, 40, 43, 44, 47, 48, 51, 52, 53, 55, 56, 57, 58, 59, 60, 61, 62, 63, 66, 67, 68, 69, 70, 71, 72, 75, 77, 79, 80, 81, 82, 83, 84, 85, 86, 87, 89, 90, 91, 92, 93, 95, 98, 101, 102, 103, 104]
         # final_title_str: str = f"aclu: {aclu}: {curr_extended_id_string}" # _build_neuron_identity_label(neuron_extended_id=curr_extended_id_string, brev_mode=None, formatted_max_value_string=None, use_special_overlayed_title=True)
         final_title_str: str = f"aclu: <span style = 'font-size : 14px;' >{aclu}</span>:\n<span style = 'font-size : 11px;' >{curr_extended_id_string}</span>"
         return final_title_str
@@ -350,7 +350,7 @@ class TrialByTrialActivityWindow:
 
         """
         from neuropy.utils.matplotlib_helpers import _determine_best_placefield_2D_layout, _scale_current_placefield_to_acceptable_range, _build_neuron_identity_label # for display_all_pf_2D_pyqtgraph_binned_image_rendering
-        from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager, long_short_display_config_manager, apply_LR_to_RL_adjustment
+        from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DecoderIdentityColors, long_short_display_config_manager, apply_LR_to_RL_adjustment
         from pyphocorehelpers.gui.Qt.color_helpers import ColorFormatConverter, debug_print_color, build_adjusted_color
         from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
@@ -371,20 +371,16 @@ class TrialByTrialActivityWindow:
         active_z_scored_tuning_map_matrix = active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix # shape (n_epochs, n_neurons, n_pos_bins),
         print(f'np.shape(active_z_scored_tuning_map_matrix): {np.shape(active_z_scored_tuning_map_matrix)}')
 
-        # additional_cmap_names = dict(zip(TrackTemplates.get_decoder_names(), ['red', 'purple', 'green', 'orange'])) # {'long_LR': 'red', 'long_RL': 'purple', 'short_LR': 'green', 'short_RL': 'orange'}
-        long_epoch_config = long_short_display_config_manager.long_epoch_config.as_pyqtgraph_kwargs()
-        short_epoch_config = long_short_display_config_manager.short_epoch_config.as_pyqtgraph_kwargs()
-
-        color_dict = {'long_LR': long_epoch_config['brush'].color(), 'long_RL': apply_LR_to_RL_adjustment(long_epoch_config['brush'].color()),
-                        'short_LR': short_epoch_config['brush'].color(), 'short_RL': apply_LR_to_RL_adjustment(short_epoch_config['brush'].color())}
-        additional_cmap_names = {k: ColorFormatConverter.qColor_to_hexstring(v) for k, v in color_dict.items()}
+        color_dict: Dict[types.DecoderName, pg.QtGui.QColor] = DecoderIdentityColors.build_decoder_color_dict(wants_hex_str=False)
+        additional_cmap_names: Dict[types.DecoderName, str] = {k: ColorFormatConverter.qColor_to_hexstring(v) for k, v in color_dict.items()}
 
         ## new
         # additional_cmap_names = {'long_LR': 'royalblue', 'long_RL': 'blue',
         #                 'short_LR': 'crimson', 'short_RL': 'red'}
         
-        additional_cmap_names = {'long_LR': '#4169E1', 'long_RL': '#607B00',
-                        'short_LR': '#DC143C', 'short_RL': '#990099'}
+        # additional_cmap_names = {'long_LR': '#0099ff', 'long_RL': '#7a00ff', 'short_LR': '#f51616', 'short_RL': '#e3f516'}
+
+        additional_cmap_names = {'long_LR': '#4169E1', 'long_RL': '#607B00', 'short_LR': '#DC143C', 'short_RL': '#990099'}
         # additional_cmap_names = {k: ColorFormatConverter.qColor_to_hexstring(v) for k, v in color_dict.items()}
 
         # plot_trial_to_trial_reliability_all_decoders_image_stack
@@ -410,8 +406,7 @@ class TrialByTrialActivityWindow:
         ## INPUTS: directional_active_lap_pf_results_dicts
 
         # enable_stacked_long_and_short: bool = False # not currently working, they have to be overlayed exactly on top of each other
-        # additional_decoder_y_offsets = {'long_LR': 0, 'long_RL': 0,
-        #                 'short_LR': 1, 'short_RL': 1}
+        # additional_decoder_y_offsets = {'long_LR': 0, 'long_RL': 0, 'short_LR': 1, 'short_RL': 1}
         
         for decoder_name, active_trial_by_trial_activity_obj in directional_active_lap_pf_results_dicts.items():  # Replace with actual decoder names
             if decoder_name != 'long_LR':

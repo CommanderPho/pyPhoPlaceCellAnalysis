@@ -133,10 +133,17 @@
     </widget>
     <addaction name="menuDecoded_Epoch_Slices"/>
    </widget>
+   <widget class="QMenu" name="menuStandaloneWindows">
+    <property name="title">
+     <string>Standalone Windows</string>
+    </property>
+    <addaction name="actionSpike3DLauncher"/>
+   </widget>
    <addaction name="menuAdd_Renderable"/>
    <addaction name="menuCreate_Paired_Widget"/>
    <addaction name="menuDocked_Widgets"/>
    <addaction name="menuDecoder"/>
+   <addaction name="menuStandaloneWindows"/>
   </widget>
   <action name="actionAddTimeCurves_Position">
    <property name="text">
@@ -358,6 +365,11 @@
   <action name="actionAddTimeCurves_RelativeEntropySurprise">
    <property name="text">
     <string>Relative Entropy Surprise</string>
+   </property>
+  </action>
+  <action name="actionSpike3DLauncher">
+   <property name="text">
+    <string>Spike3D Launcher</string>
    </property>
   </action>
  </widget>

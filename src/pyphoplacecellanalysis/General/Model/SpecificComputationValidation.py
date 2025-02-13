@@ -1,6 +1,7 @@
 import numpy as np
 from attrs import define, Factory, field, fields
 from typing import Callable, List, Dict, Optional
+from neuropy.utils.indexing_helpers import wrap_in_container_if_needed
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 import networkx as nx
@@ -119,6 +120,21 @@ class SpecificComputationValidator:
         if not self.has_results_spec:
             return []
         return (self.results_specification.requires_global_keys) 
+    
+
+    @property
+    def provides_local_keys(self) -> List[str]:
+        if not self.has_results_spec:
+            return []
+        return (self.results_specification.provides_local_keys) 
+
+
+    @property
+    def requires_local_keys(self) -> List[str]:
+        if not self.has_results_spec:
+            return []
+        return (self.results_specification.requires_local_keys) 
+    
 
 
     @classmethod
@@ -181,6 +197,29 @@ class SpecificComputationValidator:
         if not self.has_results_spec:
             return False
         return np.any(np.isin(provided_global_keys, (self.results_specification.requires_global_keys or [])))
+
+    def is_dependency_in_required_local_keys(self, provided_local_keys: List[str]) -> bool:
+        """ checks if either short_name or computation_name is contained in the name_list provided. """        
+        if not self.has_results_spec:
+            return False
+        return np.any(np.isin(provided_local_keys, (self.results_specification.requires_local_keys or [])))
+
+
+
+    def is_requirement_for_global_keys(self, global_keys: List[str]) -> bool:
+        """ requirements: checks if either short_name or computation_name is contained in the name_list provided. """        
+        if not self.has_results_spec:
+            return False
+        return np.any(np.isin(global_keys, (self.results_specification.provides_global_keys or [])))
+    
+
+    def is_requirement_for_local_keys(self, local_keys: List[str]) -> bool:
+        """ requirements: checks if either short_name or computation_name is contained in the name_list provided. """        
+        if not self.has_results_spec:
+            return False
+        return np.any(np.isin(local_keys, (self.results_specification.provides_local_keys or [])))
+    
+
 
 
 
@@ -395,6 +434,9 @@ class SpecificComputationValidator:
 
             provided_global_keys
         """
+        # When passing a scalar, it gets wrapped in a list; but when passing an already list-like object, it is returned as-is:
+        probe_fn_names = wrap_in_container_if_needed(probe_fn_names, container_constructor=list)
+        
         found_matching_validators = {}
         provided_global_keys = []
         for a_name, a_validator in remaining_comp_specifiers_dict.items():
@@ -416,55 +458,74 @@ class SpecificComputationValidator:
         return remaining_comp_specifiers_dict, found_matching_validators, provided_global_keys
 
     @classmethod
-    def find_immediate_dependencies(cls, remaining_comp_specifiers_dict: Dict[str, "SpecificComputationValidator"], provided_global_keys: List[str], debug_print=False):
-        """
+    def find_immediate_dependencies(cls, remaining_comp_specifiers_dict: Dict[str, "SpecificComputationValidator"], provided_global_keys: List[str], provided_local_keys: List[str], debug_print=False):
+        """ Finds the validators that depend directly on one of the validators in `remaining_comp_specifiers_dict`
+        
+        Updates: remaining_comp_specifiers_dict, provided_global_keys
+        
         Usage:
 
-        remaining_comp_specifiers_dict, dependent_validators, provided_global_keys = SpecificComputationValidator.find_immediate_dependencies(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict, provided_global_keys=provided_global_keys)
+        remaining_comp_specifiers_dict, dependent_validators, (provided_global_keys, provided_local_keys) = SpecificComputationValidator.find_immediate_dependencies(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict, provided_global_keys=provided_global_keys)
         provided_global_keys
 
         """
+        # When passing a scalar, it gets wrapped in a list; but when passing an already list-like object, it is returned as-is:
+        provided_global_keys = wrap_in_container_if_needed(provided_global_keys, container_constructor=list)
+        provided_local_keys = wrap_in_container_if_needed(provided_local_keys, container_constructor=list)
+        
         dependent_validators = {}
         for a_name, a_validator in remaining_comp_specifiers_dict.items():
-            # set(provided_global_keys)
-            # set(a_validator.results_specification.requires_global_keys)
             if a_validator.is_dependency_in_required_global_keys(provided_global_keys):
                 dependent_validators[a_name] = a_validator
-            # (provided_global_keys == (a_validator.results_specification.requires_global_keys or []))
 
+            if provided_local_keys is not None:
+                if a_validator.is_dependency_in_required_local_keys(provided_local_keys):
+                    if a_name not in dependent_validators: ## add only if not already added
+                        dependent_validators[a_name] = a_validator
+                
         for a_name, a_found_validator in dependent_validators.items():
-            new_provided_global_keys = a_found_validator.results_specification.provides_global_keys
+            new_provided_global_keys = a_found_validator.results_specification.provides_global_keys ## find the keys that the requirement provides
             provided_global_keys.extend(new_provided_global_keys)
-            remaining_comp_specifiers_dict.pop(a_name) # remove
+            
+            if provided_local_keys is not None:
+                new_provided_local_keys = a_found_validator.results_specification.provides_local_keys ## find the keys that the requirement provides
+                provided_local_keys.extend(new_provided_local_keys)
+            remaining_comp_specifiers_dict.pop(a_name) # remove from the remaining list
 
         remaining_comp_specifiers_dict = {k:v for k,v in remaining_comp_specifiers_dict.items() if k not in dependent_validators}
 
         if debug_print:
             print(f'len(remaining_comp_specifiers_dict): {len(remaining_comp_specifiers_dict)}, dependent_validators: {dependent_validators}')
-        return remaining_comp_specifiers_dict, dependent_validators, provided_global_keys
+        return remaining_comp_specifiers_dict, dependent_validators, (provided_global_keys, provided_local_keys)
 
     @classmethod
     def find_provided_result_keys(cls, remaining_comp_specifiers_dict: Dict[str, "SpecificComputationValidator"], probe_fn_names: List[str]) -> List[str]:
         """ returns a list of computed properties that the specified functions provide. 
         
         Usage:
-            provided_global_keys = SpecificComputationValidator.find_provided_result_keys(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict,
+            provided_global_keys, provided_local_keys = SpecificComputationValidator.find_provided_result_keys(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict,
                                                                                                 probe_fn_names=['perform_wcorr_shuffle_analysis',  'merged_directional_placefields', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring'],
                                                                                                 )
             provided_global_keys # ['DirectionalMergedDecoders', 'DirectionalDecodersEpochsEvaluations', 'SequenceBased']
 
         """
+        # When passing a scalar, it gets wrapped in a list; but when passing an already list-like object, it is returned as-is:
+        probe_fn_names = wrap_in_container_if_needed(probe_fn_names, container_constructor=list)
+        
         provided_global_keys = []
+        provided_local_keys = []
+        
         for a_name, a_validator in remaining_comp_specifiers_dict.items():
             for a_probe_fn_name in probe_fn_names:
                 if a_validator.does_name_match(a_probe_fn_name):
                     provided_global_keys.extend(a_validator.results_specification.provides_global_keys) # Get each validator's provided keys:
+                    provided_local_keys.extend(a_validator.results_specification.provides_local_keys)
                     
-        return provided_global_keys
+        return (provided_global_keys, provided_local_keys)
     
 
     @classmethod
-    def find_validators_providing_results(cls, remaining_comp_specifiers_dict: Dict[str, "SpecificComputationValidator"], probe_provided_result_keys: List[str], return_flat_list:bool=True) -> List[str]:
+    def find_validators_providing_results(cls, remaining_comp_specifiers_dict: Dict[str, "SpecificComputationValidator"], probe_provided_result_keys: List[str], return_flat_list:bool=True, include_local_computation_fns:bool=True) -> List[str]:
         """ returns a list of computed properties that the specified functions provide. 
         
         Usage:
@@ -479,10 +540,27 @@ class SpecificComputationValidator:
         else:
             found_matching_validators = {}
 
+        # if isinstance(probe_provided_result_keys, str):
+        #     probe_provided_result_keys = [probe_provided_result_keys] ## just a single item, turn it into a single item list
+
+        # When passing a scalar, it gets wrapped in a list; but when passing an already list-like object, it is returned as-is:
+        probe_provided_result_keys = wrap_in_container_if_needed(probe_provided_result_keys, container_constructor=list)
+        
+        assert isinstance(probe_provided_result_keys, (list, tuple)), f" it must be a list! type(probe_provided_result_keys): {type(probe_provided_result_keys)}"
+
         for a_name, a_validator in remaining_comp_specifiers_dict.items():
             for a_probe_result_name in probe_provided_result_keys:
-                if a_probe_result_name in (a_validator.provides_global_keys or []):
-                    ## this validator matches
+                was_validator_found: bool = False
+                if include_local_computation_fns:
+                    if a_probe_result_name in (a_validator.provides_local_keys or []):
+                        was_validator_found = True # found in local fns
+
+                if not was_validator_found:
+                    if a_probe_result_name in (a_validator.provides_global_keys or []):
+                        was_validator_found = True # found in global fns
+
+                if was_validator_found:
+                    ## this validator matches (either global or local if local is allowed):
                     if return_flat_list:
                         # found_matching_validators[a_probe_result_name] = a_validator
                         found_matching_validators_list.append(a_validator)
@@ -497,7 +575,48 @@ class SpecificComputationValidator:
         else:
             return found_matching_validators
     
+
+    # ==================================================================================================================== #
+    # Requirements/Upstream                                                                                                #
+    # ==================================================================================================================== #
+    @classmethod
+    def find_immediate_requirements(cls, remaining_comp_specifiers_dict: Dict[str, "SpecificComputationValidator"], required_global_keys: List[str], required_local_keys: Optional[List[str]]=None, debug_print=False):
+        """ Finds the validators that are directly required for one of the validators in `remaining_comp_specifiers_dict`
+        Usage:
+
+        remaining_comp_specifiers_dict, required_validators, (required_global_keys, required_local_keys) = SpecificComputationValidator.find_immediate_requirements(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict, required_global_keys=required_global_keys)
+        required_global_keys
+
+        """
+        required_global_keys = wrap_in_container_if_needed(required_global_keys, container_constructor=list)
+        required_local_keys = wrap_in_container_if_needed(required_local_keys, container_constructor=list)
         
+        required_validators = {}
+        for a_name, a_validator in remaining_comp_specifiers_dict.items():
+            if a_validator.is_requirement_for_global_keys(required_global_keys):
+                required_validators[a_name] = a_validator
+            if (required_local_keys is not None) and a_validator.is_requirement_for_local_keys(required_local_keys):
+                if a_name not in required_validators:
+                    required_validators[a_name] = a_validator
+                
+
+
+        for a_name, a_found_validator in required_validators.items():
+            new_required_global_keys = a_found_validator.results_specification.requires_global_keys
+            required_global_keys.extend(new_required_global_keys)
+            
+            new_required_local_keys = a_found_validator.results_specification.requires_local_keys
+            required_local_keys.extend(new_required_local_keys)
+
+            remaining_comp_specifiers_dict.pop(a_name) # remove initial now that it's been resolved
+
+        remaining_comp_specifiers_dict = {k:v for k,v in remaining_comp_specifiers_dict.items() if k not in required_validators}
+
+        if debug_print:
+            print(f'len(remaining_comp_specifiers_dict): {len(remaining_comp_specifiers_dict)}, required_validators: {required_validators}')
+        return remaining_comp_specifiers_dict, required_validators, (required_global_keys, required_local_keys)
+
+
 
         
 

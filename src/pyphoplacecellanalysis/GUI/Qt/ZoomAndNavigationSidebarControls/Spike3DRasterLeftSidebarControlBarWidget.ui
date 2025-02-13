@@ -52,7 +52,7 @@ border-color: rgb(0, 0, 0);</string>
     <number>0</number>
    </property>
    <item>
-    <layout class="QVBoxLayout" name="verticalLayout" stretch="0,0,0,0,0,0,0,1,0,0,0">
+    <layout class="QVBoxLayout" name="verticalLayout" stretch="0,0,0,0,0,0,0,0,0,0,0,1,0,0,0">
      <property name="leftMargin">
       <number>2</number>
      </property>
@@ -146,6 +146,62 @@ border-color: rgb(0, 0, 0);</string>
        </property>
        <property name="orientation">
         <enum>Qt::Vertical</enum>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="verticalSpacer">
+       <property name="orientation">
+        <enum>Qt::Vertical</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>20</width>
+         <height>40</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QToolButton" name="btnToggleCrosshairTrace">
+       <property name="toolTip">
+        <string>Crosshair Trace</string>
+       </property>
+       <property name="statusTip">
+        <string>Crosshair Trace</string>
+       </property>
+       <property name="whatsThis">
+        <string>Crosshair Trace</string>
+       </property>
+       <property name="text">
+        <string>Crosshair Trace</string>
+       </property>
+       <property name="icon">
+        <iconset resource="../../../Resources/ActionIcons.qrc">
+         <normaloff>:/Graphics/Icons/graphics/Crosshairs.svg</normaloff>:/Graphics/Icons/graphics/Crosshairs.svg</iconset>
+       </property>
+       <property name="iconSize">
+        <size>
+         <width>24</width>
+         <height>24</height>
+        </size>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="lblCrosshairTraceStaticLabel">
+       <property name="text">
+        <string>Crosshair Trace:</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="lblCrosshairTraceValue">
+       <property name="text">
+        <string/>
        </property>
       </widget>
      </item>

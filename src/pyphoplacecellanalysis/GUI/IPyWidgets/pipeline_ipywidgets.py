@@ -1,6 +1,10 @@
+from copy import deepcopy
 import sys
 from enum import Enum
+from pyphocorehelpers.DataStructure.enum_helpers import OrderedEnum
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from attrs import define, field, Factory
+
 import ipywidgets as widgets
 from IPython.display import display
 import matplotlib
@@ -10,9 +14,11 @@ from pathlib import Path
 # from silx.gui.dialog.ImageFileDialog import ImageFileDialog
 # import silx.io
 
+import pandas as pd
 from pyphocorehelpers.gui.Jupyter.JupyterButtonRowWidget import build_fn_bound_buttons, JupyterButtonRowWidget, JupyterButtonColumnWidget
 from pyphocorehelpers.Filesystem.open_in_system_file_manager import reveal_in_system_file_manager
 from pyphocorehelpers.Filesystem.path_helpers import open_file_with_system_default
+from pyphocorehelpers.assertion_helpers import Assert
 
 
 from pyphocorehelpers.exception_helpers import CapturedException
@@ -22,7 +28,7 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui, QtCore, QtWidgets
 # from pyphoplacecellanalysis.External.pyqtgraph.parametertree.parameterTypes.file import popupFilePicker
 from pyphoplacecellanalysis.External.pyqtgraph.widgets.FileDialog import FileDialog
-from pyphocorehelpers.gui.Jupyter.simple_widgets import fullwidth_path_widget
+from pyphocorehelpers.gui.Jupyter.simple_widgets import fullwidth_path_widget, create_file_browser
 
 
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme # used in perform_pipeline_save
@@ -96,17 +102,29 @@ def try_save_pickle_as(original_file_path, file_confirmed_callback):
     return
 
 
+
 @metadata_attributes(short_name=None, tags=['enum', 'phases'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-06 22:56', related_items=[])
-class CustomProcessingPhases(Enum):
+class CustomProcessingPhases(OrderedEnum):
     """ These phases keep track of groups of computations to run.
 
     from pyphoplacecellanalysis.GUI.IPyWidgets.pipeline_ipywidgets import PipelineJupyterHelpers, CustomProcessingPhases
 
+    CustomProcessingPhases.clean_run
+    CustomProcessingPhases.continued_run
+    CustomProcessingPhases.final_run
+    
+    selector.value
+
 
     """
-    clean_run = "clean_run"
-    continued_run = "continued_run"
-    final_run = "final_run"
+    # Enum members with an additional `_order` attribute for ordering
+    clean_run = ("clean_run", 0)
+    continued_run = ("continued_run", 1)
+    final_run = ("final_run", 2)
+
+    def __init__(self, value, order):
+        self._value_ = value
+        self._order = order
     
     def get_run_configuration(self) -> Dict:
         ## Different run configurations:
@@ -357,7 +375,7 @@ class PipelineJupyterHelpers:
         #     return vbox
         # else:
         #     return selector
-        return selector
+        return selector, on_value_change
 
 
 def interactive_pipeline_files(curr_active_pipeline, defer_display:bool=False) -> JupyterButtonRowWidget:
@@ -449,6 +467,508 @@ def interactive_pipeline_files(curr_active_pipeline, defer_display:bool=False) -
 # 	widget.build_for_pipeline(curr_active_pipeline=curr_active_pipeline)
 # 	widget.show()
 
+import panel as pn
+from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline, PipelineSavingScheme # used in perform_pipeline_save
+
+@define(slots=False)
+class PipelinePickleFileSelectorWidget:
+    """ Allows the user to interactively choose between multiple pickles in the session directory to load
+    
+    
+    Usage:
+    
+    from pyphoplacecellanalysis.GUI.IPyWidgets.pipeline_ipywidgets import PipelinePickleFileSelectorWidget
+    widget = PipelinePickleFileSelectorWidget(directory=basedir)
+
+    # Display the widget
+    widget.local_file_browser_widget.servable()
+    widget.global_file_browser_widget.servable()
+
+    # OUTPUTS: widget, widget.active_local_pkl, widget.active_global_pkl
+
+    """
+    directory: Path = field()
+    selected_local_pkl_files: List[Path] = field(default=Factory(list))
+    selected_global_pkl_files: List[Path] = field(default=Factory(list))
+    # Add new fields for the callback functions
+    on_load_callback: Optional[Callable] = field(default=None)
+    on_save_callback: Optional[Callable] = field(default=None)
+    on_get_global_variable_callback: Optional[Callable] = field(default=None)
+    on_update_global_variable_callback: Optional[Callable] = field(default=None)
+    
+    local_file_browser_widget = field(init=False)
+    global_file_browser_widget = field(init=False)
+    layout: pn.Column = field(init=False)
+    debug_print: bool = field(default=False)
+
+
+    @property
+    def active_local_pkl(self) -> Optional[Path]:
+        """The active_local_pkl property."""
+        if len(self.selected_local_pkl_files) < 1:
+            return None
+        else:
+            return Path(self.selected_local_pkl_files[0])
+        
+    @property
+    def active_global_pkl(self) -> Optional[Path]:
+        """The active_local_pkl property."""
+        if len(self.selected_global_pkl_files) < 1:
+            return None
+        else:
+            return Path(self.selected_global_pkl_files[0])
+
+
+    @property
+    def is_load_button_disabled(self) -> bool:
+        """The is_load_button_disabled property."""
+        return (self.on_load_callback is None) or (self.on_get_global_variable_callback is None) or (self.on_update_global_variable_callback is None) or (self.active_local_pkl is None)
+
+
+    @property
+    def is_save_button_disabled(self) -> bool:
+        """The is_save_button_enabled property."""
+        return (self.on_save_callback is None) or (self.on_get_global_variable_callback is None)
+    
+
+    @property
+    def active_local_file_names_list(self) -> List[str]:
+        """The discovered local filenames."""
+        return self.local_file_browser_widget._data['File Name'].tolist()
+        
+    @property
+    def active_global_file_names_list(self) -> List[str]:
+        """The discovered global filenames."""
+        return self.global_file_browser_widget._data['File Name'].tolist()
+
+
+    def try_extract_custom_suffix(self) -> Optional[str]:
+        """ uses the local pkl first 
+        
+        custom_suffix: str = widget.try_extract_custom_suffix()
+        
+        """
+        if self.active_local_pkl is None:
+            return None
+        else:
+            proposed_load_pkl_path = self.active_local_pkl.resolve()
+            ## infer the `custom_suffix`
+            basename: str = proposed_load_pkl_path.stem # 'loadedSessPickle_withNormalComputedReplays-qclu_[1, 2]-frateThresh_5.0'
+            # custom_suffix
+            pickle_basename_part: str = 'loadedSessPickle' 
+            custom_suffix: str = basename.removeprefix(pickle_basename_part).removesuffix(pickle_basename_part) # '_withNormalComputedReplays-qclu_[1, 2]-frateThresh_5.0'
+            if self.debug_print:
+                print(f'custom_suffix: "{custom_suffix}"')
+            return custom_suffix
+    
+
+    def on_selected_local_sess_pkl_files_changed(self, selected_df: pd.DataFrame):
+        """ captures: file_table, on_selected_files_changed
+        """
+        if self.debug_print:
+            print(f"on_selected_local_sess_pkl_files_changed(selected_df: {selected_df})")
+        full_paths = selected_df['File Path'].to_list()
+        if self.debug_print:
+            print(f'\tfull_paths: {full_paths}')
+        self.selected_local_pkl_files = full_paths
+        self._update_load_save_button_disabled_state()
+        
+
+    def on_selected_global_computation_result_pkl_files_changed(self, selected_df: pd.DataFrame):
+        """ captures: file_table, on_selected_files_changed
+        """
+        if self.debug_print:
+            print(f"on_selected_global_computation_result_pkl_files_changed(selected_df: {selected_df})")
+        full_paths = selected_df['File Path'].to_list()
+        if self.debug_print:
+            print(f'\tfull_paths: {full_paths}')
+        self.selected_global_pkl_files = full_paths
+        self._update_load_save_button_disabled_state()
+
+    def __attrs_post_init__(self):
+        # Create the file browser widget
+        # file_browser_widget = create_file_browser(directory, patterns, page_size=10, widget_height=400, on_selected_files_changed_fn=on_selected_files_changed)
+        self.local_file_browser_widget = create_file_browser(self.directory, ['*loadedSessPickle*.pkl'], page_size=10, widget_height=400, selectable=1, on_selected_files_changed_fn=self.on_selected_local_sess_pkl_files_changed)
+        self.global_file_browser_widget = create_file_browser(self.directory, ['output/*global_computation_results*.pkl'], page_size=10, widget_height=400, selectable=1, on_selected_files_changed_fn=self.on_selected_global_computation_result_pkl_files_changed)
+
+        # Create Load/Save buttons
+        # self.load_button = widgets.Button(description="Load")
+        # self.save_button = widgets.Button(description="Save")
+
+        self.load_button = pn.widgets.Button(name='Load', button_type='primary')
+        self.save_button = pn.widgets.Button(name='Save', button_type='success')
+
+        self.load_button.disabled = self.is_load_button_disabled
+        self.save_button.disabled = self.is_save_button_disabled
+
+        self.load_button.on_click(self._handle_load_click)
+        self.save_button.on_click(self._handle_save_click)
+        
+        # Arrange the Tabulator and buttons in a column
+        self.layout = pn.Column(self.local_file_browser_widget, self.global_file_browser_widget, pn.Row(self.save_button, self.load_button))
+
+        # Display the layout
+        # self.layout.servable()
+
+        # # Add button click handlers
+        # self.load_button.on_click(lambda b: self._handle_load_click())
+        # self.save_button.on_click(lambda b: self._handle_save_click())
+        
+        # # Create button row
+        # self.button_row = widgets.HBox([self.load_button, self.save_button])
+        
+        # # Get the widget objects from the file browsers
+        # local_widget = self.local_file_browser_widget.widget
+        # global_widget = self.global_file_browser_widget.widget
+        
+        # # Combine all widgets
+        # self.widget = widgets.VBox([
+        #     local_widget,
+        #     global_widget,
+        #     self.button_row
+        # ])
+        
+
+    def _update_load_save_button_disabled_state(self):
+        """ updates the .disabled property for the two action buttons """
+        self.load_button.disabled = self.is_load_button_disabled
+        self.save_button.disabled = self.is_save_button_disabled
+
+
+    def _handle_load_click(self, event):
+        print(f'\t._handle_load_click(event: {event})')
+        if self.on_load_callback is not None:
+            # self.on_load_callback(self.active_local_pkl, self.active_global_pkl)
+            self.on_load_callback()
+
+    def _handle_save_click(self, event):
+        print(f'\t._handle_save_click(event: {event})')
+        if self.on_save_callback is not None:
+            # self.on_save_callback(self.active_local_pkl, self.active_global_pkl)
+            self.on_save_callback()
+            
+
+    def servable(self, **kwargs):
+        return self.layout.servable(**kwargs)
+
+
+    ## Main load/save functions
+    @function_attributes(short_name=None, tags=['working', 'ui', 'interactive'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-17 20:34', related_items=['PipelinePickleFileSelectorWidget', 'on_load_global'])
+    def on_load_local(self, global_data_root_parent_path: Path, active_data_mode_name: str, basedir: Path, saving_mode, force_reload: bool):
+        """ Loads custom pipeline pickles that were saved out via `custom_save_filepaths['pipeline_pkl'] = curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, active_pickle_filename=custom_save_filenames['pipeline_pkl'])`
+
+            # INPUTS: global_data_root_parent_path, active_data_mode_name, basedir, saving_mode, force_reload, custom_save_filenames
+            custom_suffix: str = '_withNewKamranExportedReplays'
+
+            custom_suffix: str = '_withNewComputedReplays'
+            custom_suffix: str = '_withNewComputedReplays-qclu_[1, 2]-frateThresh_5.0'
+
+            custom_save_filenames = {
+                'pipeline_pkl':f'loadedSessPickle{custom_suffix}.pkl',
+                'global_computation_pkl':f"global_computation_results{custom_suffix}.pkl",
+                'pipeline_h5':f'pipeline{custom_suffix}.h5',
+            }
+            print(f'custom_save_filenames: {custom_save_filenames}')
+            custom_save_filepaths = {k:v for k, v in custom_save_filenames.items()}
+
+            # ==================================================================================================================== #
+            # PIPELINE LOADING                                                                                                     #
+            # ==================================================================================================================== #
+            # load the custom saved outputs
+            active_pickle_filename = custom_save_filenames['pipeline_pkl'] # 'loadedSessPickle_withParameters.pkl'
+            print(f'active_pickle_filename: "{active_pickle_filename}"')
+            # assert active_pickle_filename.exists()
+            active_session_h5_filename = custom_save_filenames['pipeline_h5'] # 'pipeline_withParameters.h5'
+            print(f'active_session_h5_filename: "{active_session_h5_filename}"')
+
+            ==================================================================================================================== #
+            Load Pipeline                                                                                                        #
+            ==================================================================================================================== #
+            # DO NOT allow recompute if the file doesn't exist!!
+            Computing loaded session pickle file results : "W:/Data/KDIBA/gor01/two/2006-6-07_16-40-19/loadedSessPickle_withNewComputedReplays.pkl"... done.
+            Failure loading W:\Data\KDIBA\gor01\two\2006-6-07_16-40-19\loadedSessPickle_withNewComputedReplays.pkl.
+            proposed_load_pkl_path = basedir.joinpath(active_pickle_filename).resolve()
+
+
+
+
+        Usage:
+
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import on_load_local, on_load_global
+
+
+            curr_active_pipeline, custom_suffix, proposed_load_pkl_path = on_load_local(active_session_pickle_file_widget=active_session_pickle_file_widget, global_data_root_parent_path=global_data_root_parent_path, active_data_mode_name=active_data_mode_name, basedir=basedir, saving_mode=saving_mode, force_reload=force_reload) 
+            curr_active_pipeline = on_load_global(active_session_pickle_file_widget=active_session_pickle_file_widget, curr_active_pipeline=curr_active_pipeline, basedir=basedir, extended_computations_include_includelist=extended_computations_include_includelist, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist,
+                                                skip_global_load=False, force_reload=False, override_global_computation_results_pickle_path=active_session_pickle_file_widget.active_global_pkl)
+
+                                                
+
+        """
+        ## INPUTS: widget.active_global_pkl, widget.active_global_pkl
+        # from pyphocorehelpers.Filesystem.path_helpers import set_posix_windows
+        from pyphoplacecellanalysis.General.Batch.runBatch import BatchSessionCompletionHandler # for `post_compute_validate(...
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline # get_neuron_identities
+        from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_load_session
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme # used in perform_pipeline_save
+        from pyphocorehelpers.Filesystem.path_helpers import set_posix_windows
+
+        proposed_load_pkl_path = self.active_local_pkl.resolve()
+        Assert.path_exists(proposed_load_pkl_path)
+        
+        custom_suffix: str = self.try_extract_custom_suffix()
+        print(f'custom_suffix: "{custom_suffix}"')
+
+        ## OUTPUTS: custom_suffix, proposed_load_pkl_path, (override_global_computation_results_pickle_path, skip_global_load)
+
+
+        ## INPUTS: proposed_load_pkl_path
+        assert proposed_load_pkl_path.exists(), f"for a saved custom the file must exist!"
+
+        epoch_name_includelist=None
+        active_computation_functions_name_includelist=['lap_direction_determination', 'pf_computation','firing_rate_trends', 'position_decoding']
+
+        with set_posix_windows():
+            curr_active_pipeline: NeuropyPipeline = batch_load_session(global_data_root_parent_path, active_data_mode_name, basedir, epoch_name_includelist=epoch_name_includelist,
+                                                    computation_functions_name_includelist=active_computation_functions_name_includelist,
+                                                    saving_mode=saving_mode, force_reload=force_reload,
+                                                    skip_extended_batch_computations=True, debug_print=False, fail_on_exception=True, active_pickle_filename=proposed_load_pkl_path) # , active_pickle_filename = 'loadedSessPickle_withParameters.pkl'
+
+        ## Post Compute Validate 2023-05-16:
+        was_updated = BatchSessionCompletionHandler.post_compute_validate(curr_active_pipeline) ## TODO: need to potentially re-save if was_updated. This will fail because constained versions not ran yet.
+        if was_updated:
+            print(f'was_updated: {was_updated}')
+            try:
+                if saving_mode == PipelineSavingScheme.SKIP_SAVING:
+                    print(f'WARNING: PipelineSavingScheme.SKIP_SAVING but need to save post_compute_validate changes!!')
+                else:
+                    curr_active_pipeline.save_pipeline(saving_mode=saving_mode)
+            except Exception as e:
+                ## TODO: catch/log saving error and indicate that it isn't saved.
+                exception_info = sys.exc_info()
+                e = CapturedException(e, exception_info)
+                print(f'ERROR RE-SAVING PIPELINE after update. error: {e}')
+
+        print(f'Pipeline loaded from custom pickle!!')
+        ## OUTPUT: curr_active_pipeline
+        print(f'''# ==================================================================================================================== #
+        # on_load_local -- COMPLETE -- 
+        # ==================================================================================================================== #''')
+        return curr_active_pipeline, custom_suffix, proposed_load_pkl_path
+
+
+    @function_attributes(short_name=None, tags=['working', 'ui', 'interactive', 'load', 'global'], input_requires=[], output_provides=[], uses=['batch_evaluate_required_computations', 'curr_active_pipeline.load_pickled_global_computation_results'], used_by=[], creation_date='2025-01-17 17:04', related_items=['PipelinePickleFileSelectorWidget', 'on_load_local'])
+    def on_load_global(self, curr_active_pipeline, basedir: Path, extended_computations_include_includelist: List[str], force_recompute_override_computations_includelist: List[str]=[],
+                        skip_global_load: bool = True, saving_mode: PipelineSavingScheme=PipelineSavingScheme.SKIP_SAVING, force_reload: bool = False, override_global_computation_results_pickle_path: Path=None):
+        """
+
+        curr_active_pipeline = on_load_global(active_session_pickle_file_widget, curr_active_pipeline, extended_computations_include_includelist: List[str], skip_global_load: bool = True, force_reload: bool = False, override_global_computation_results_pickle_path: Path=None)
+
+
+        """
+        # from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot
+        from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations, batch_evaluate_required_computations
+        
+        # from pyphoplacecellanalysis.GUI.IPyWidgets.pipeline_ipywidgets import PipelineJupyterHelpers, CustomProcessingPhases
+        from pyphocorehelpers.Filesystem.path_helpers import set_posix_windows
+
+        # ==================================================================================================================== #
+        # Global computations loading:                                                                                            #
+        # ==================================================================================================================== #
+        # Loads saved global computations that were saved out via: `custom_save_filepaths['global_computation_pkl'] = curr_active_pipeline.save_global_computation_results(override_global_pickle_filename=custom_save_filenames['global_computation_pkl'])`
+        ## INPUTS: custom_save_filenames
+        ## INPUTS: curr_active_pipeline, override_global_computation_results_pickle_path, extended_computations_include_includelist
+
+        if self.active_global_pkl is None:
+            skip_global_load = True
+            override_global_computation_results_pickle_path = None
+        else:
+            skip_global_load = False
+            override_global_computation_results_pickle_path = self.active_global_pkl.resolve()
+            Assert.path_exists(override_global_computation_results_pickle_path)
+            override_global_computation_results_pickle_path
+
+
+        # override_global_computation_results_pickle_path = None
+        # override_global_computation_results_pickle_path = custom_save_filenames['global_computation_pkl']
+        print(f'override_global_computation_results_pickle_path: "{override_global_computation_results_pickle_path}"')
+
+        # Pre-load ___________________________________________________________________________________________________________ #
+        force_recompute_global = force_reload
+        needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                            force_recompute=force_recompute_global, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+        print(f'Pre-load global computations: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
+        # valid_computed_results_output_list
+
+        # Try Unpickling Global Computations to update pipeline ______________________________________________________________ #
+        if (not force_reload) and (not skip_global_load): # not just force_reload, needs to recompute whenever the computation fails.
+            try:
+                # INPUTS: override_global_computation_results_pickle_path
+                with set_posix_windows():
+                    sucessfully_updated_keys, successfully_loaded_keys = curr_active_pipeline.load_pickled_global_computation_results(override_global_computation_results_pickle_path=override_global_computation_results_pickle_path,
+                                                                                                    allow_overwrite_existing=True, allow_overwrite_existing_allow_keys=extended_computations_include_includelist, ) # is new
+                    print(f'sucessfully_updated_keys: {sucessfully_updated_keys}\nsuccessfully_loaded_keys: {successfully_loaded_keys}')
+                    did_any_paths_change: bool = curr_active_pipeline.post_load_fixup_sess_basedirs(updated_session_basepath=deepcopy(basedir)) ## use INPUT: basedir
+
+            except FileNotFoundError as e:
+                exception_info = sys.exc_info()
+                e = CapturedException(e, exception_info)
+                print(f'cannot load global results because pickle file does not exist! Maybe it has never been created? {e}')
+            except Exception as e:
+                exception_info = sys.exc_info()
+                e = CapturedException(e, exception_info)
+                print(f'Unhandled exception: cannot load global results: {e}')
+                raise
+
+        # Post-Load __________________________________________________________________________________________________________ #
+        force_recompute_global = force_reload
+        needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                            force_recompute=force_recompute_global, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+        print(f'Post-load global computations: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
+
+        ## fixup missing paths
+        # self.basepath: WindowsPath('/nfs/turbo/umms-kdiba/KDIBA/gor01/one/2006-6-09_1-22-43')
+
+        ## INPUTS: basedir
+        did_any_paths_change: bool = curr_active_pipeline.post_load_fixup_sess_basedirs(updated_session_basepath=deepcopy(basedir)) ## use INPUT: basedir
+
+        # Compute ____________________________________________________________________________________________________________ #
+        curr_active_pipeline.reload_default_computation_functions()
+        force_recompute_global = force_reload
+        # force_recompute_global = True
+        newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                            force_recompute=force_recompute_global, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+        if (len(newly_computed_values) > 0):
+            print(f'newly_computed_values: {newly_computed_values}.')
+            if (saving_mode.value != 'skip_saving'):
+                print(f'Saving global results...')
+                try:
+                    # curr_active_pipeline.global_computation_results.persist_time = datetime.now()
+                    # Try to write out the global computation function results:
+                    curr_active_pipeline.save_global_computation_results()
+                except Exception as e:
+                    exception_info = sys.exc_info()
+                    e = CapturedException(e, exception_info)
+                    print(f'\n\n!!WARNING!!: saving the global results threw the exception: {e}')
+                    print(f'\tthe global results are currently unsaved! proceed with caution and save as soon as you can!\n\n\n')
+            else:
+                print(f'\n\n!!WARNING!!: changes to global results have been made but they will not be saved since saving_mode.value == "skip_saving"')
+                print(f'\tthe global results are currently unsaved! proceed with caution and save as soon as you can!\n\n\n')
+        else:
+            print(f'no changes in global results.')
+
+        # Post-compute _______________________________________________________________________________________________________ #
+        # Post-hoc verification that the computations worked and that the validators reflect that. The list should be empty now.
+        needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                            force_recompute=False, force_recompute_override_computations_includelist=[], debug_print=True)
+        print(f'Post-compute validation: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
+
+
+        # Post-Load __________________________________________________________________________________________________________ #
+        force_recompute_global = force_reload
+        needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                            force_recompute=force_recompute_global, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+        print(f'Post-load global computations: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
+
+
+        print(f'''# ==================================================================================================================== #
+        # on_load_global -- COMPLETE -- 
+        # ==================================================================================================================== #''')
+        return curr_active_pipeline
+
+
+    def _build_load_save_callbacks(self, global_data_root_parent_path: Path, active_data_mode_name: str, basedir: Path, saving_mode, force_reload: bool,
+                                extended_computations_include_includelist: List[str], force_recompute_override_computations_includelist: Optional[List[str]]=None):
+        """ Called to provide the widget with everything needed to actually load the pipeline, which is required before the "Load" button is enabled.
+        
+        
+        _subfn_load, _subfn_save = active_session_pickle_file_widget._build_load_save_callbacks(global_data_root_parent_path=global_data_root_parent_path, active_data_mode_name=active_data_mode_name, basedir=basedir, saving_mode=saving_mode, force_reload=force_reload,
+															 extended_computations_include_includelist=extended_computations_include_includelist, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist)
+
+        """
+        
+        def _subfn_load():
+            """ captures: everything in calling context!
+            Modifies in workspace: ['curr_active_pipeline', 'custom_suffix', 'proposed_load_pkl_path']
+            """
+            curr_active_pipeline, custom_suffix, proposed_load_pkl_path = self.on_load_local(global_data_root_parent_path=global_data_root_parent_path, active_data_mode_name=active_data_mode_name, basedir=basedir, saving_mode=saving_mode, force_reload=force_reload)
+            curr_active_pipeline = self.on_load_global(curr_active_pipeline=curr_active_pipeline, basedir=basedir, extended_computations_include_includelist=extended_computations_include_includelist, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist,
+                                        skip_global_load=False, force_reload=False, override_global_computation_results_pickle_path=self.active_global_pkl)
+            
+            update_global_variable_fn = self.on_update_global_variable_callback
+            assert update_global_variable_fn is not None
+            # Update the global variable
+            update_global_variable_fn('curr_active_pipeline', curr_active_pipeline)
+            update_global_variable_fn('custom_suffix', custom_suffix)
+            update_global_variable_fn('proposed_load_pkl_path', proposed_load_pkl_path)
+            
+
+        def _subfn_save():
+            """ captures: everything in calling context! """
+            get_global_variable_fn = self.on_get_global_variable_callback
+            assert get_global_variable_fn is not None
+            # Get the pipeline
+            curr_active_pipeline = get_global_variable_fn('curr_active_pipeline')
+            curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, override_pickle_path=curr_active_pipeline.pickle_path, active_pickle_filename=curr_active_pipeline.pickle_path.name) #active_pickle_filename=
+            curr_active_pipeline.save_global_computation_results(override_global_pickle_path=curr_active_pipeline.global_computation_results_pickle_path)
+            
+        self.on_load_callback = _subfn_load
+        self.on_save_callback = _subfn_save
+        ## Update button enable states:        
+        self._update_load_save_button_disabled_state()
+        
+        return _subfn_load, _subfn_save
+    
+
+    @function_attributes(short_name=None, tags=['matching', 'pipeline', 'file'], input_requires=[], output_provides=[], uses=[], used_by=['try_select_first_valid_files'], creation_date='2025-02-11 02:40', related_items=[])
+    def try_determine_matching_global_file(self, local_file_name: str) -> Tuple[str, Optional[int]]:
+        """ try to find corresponding global file: for the specified local_file_name 
+        """
+        selected_context_suffix_only: str = local_file_name.removeprefix('loadedSessPickle') # '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_4.0'
+        ## try to find corresponding global file:
+        corresponding_global_file_name: str = f'global_computation_results{selected_context_suffix_only}.pkl'
+        corresponding_global_section_index = None
+        try:
+            corresponding_global_section_index = self.active_global_file_names_list.index(corresponding_global_file_name)
+            if corresponding_global_section_index == -1:
+                corresponding_global_section_index = None
+            # else:
+            #     # return corresponding_global_section_index
+            #     pass
+        except ValueError as e:
+            # index not found
+            corresponding_global_section_index = None
+            # return None
+        except Exception as e:
+            raise e
+        # corresponding_global_section_indicies = [self.active_global_file_names_list.index(corresponding_global_file_name)]
+        return corresponding_global_file_name, corresponding_global_section_index
+    
+    @function_attributes(short_name=None, tags=['select-first', 'startup', 'select', 'gui'], input_requires=[], output_provides=[], uses=['try_determine_matching_global_file'], used_by=[], creation_date='2025-02-11 02:40', related_items=[])
+    def try_select_first_valid_files(self) -> bool:
+        """
+        try selecting the first
+        """
+        if len(self.active_local_file_names_list) < 1:
+            print(f'have 0 local files, cannot select first.')
+            return False
+        
+        ## otherwise it's safe to set the selection
+        self.local_file_browser_widget.selection = [0]
+        # self.global_file_browser_widget.selection = [0]
+        first_selected_local_path: Path = Path(self.selected_local_pkl_files[0])
+        selected_local_file_name: str = first_selected_local_path.stem # 'loadedSessPickle_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_4.0'
+        ## try to find corresponding global file:
+        corresponding_global_file_name, corresponding_global_section_index = self.try_determine_matching_global_file(local_file_name=selected_local_file_name)
+        if corresponding_global_section_index is None:
+            # failed to find
+            self.global_file_browser_widget.selection = [] ## clear global selection
+            return False # failed
+        else:
+            corresponding_global_section_indicies = [corresponding_global_section_index] # single list
+
+        ## set selection to corresponding
+        self.global_file_browser_widget.selection = corresponding_global_section_indicies
+        return True
 
 
 

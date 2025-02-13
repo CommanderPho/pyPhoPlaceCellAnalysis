@@ -97,7 +97,7 @@ class ZhangReconstructionImplementation:
     def compute_unit_specific_bin_specific_spike_counts(spikes_df, time_bin_indicies, debug_print=False):
         """ 
         spikes_df: a dataframe with at least the ['aclu','binned_time'] columns
-        time_bin_indicies: np.ndarray of indicies that will be used for the produced output dataframe of the binned spike counts for each unit. (e.g. time_bin_indicies = time_window_edges_binning_info.bin_indicies[1:]).
+        time_bin_indicies: np.ndarray of indicies that will be used for the produced output dataframe of the binned spike counts for each unit. (e.g. time_bin_indicies = time_window_edges_binning_info.bin_indicies[:-1]).
         
         TODO 2023-05-16 - CHECK - CORRECTNESS - Figure out correct indexing and whether it returns binned data for edges or counts.
         
@@ -141,7 +141,9 @@ class ZhangReconstructionImplementation:
 
         """
         time_window_edges, time_window_edges_binning_info, spikes_df = ZhangReconstructionImplementation.compute_time_bins(spikes_df, max_time_bin_size=max_time_bin_size, debug_print=debug_print) # importantly adds 'binned_time' column to spikes_df
-        unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, time_window_edges_binning_info.bin_indicies[1:], debug_print=debug_print)
+        active_indicies = time_window_edges_binning_info.bin_indicies[1:] # pre-2025-01-13 Old way that led to losing a time bin
+        # active_indicies = time_window_edges_binning_info.bin_indicies[:-1] # 2025-01-14 New way that supposedly uses correct indexing
+        unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, active_indicies, debug_print=debug_print) # 2025-01-13 16:14 replaced [1:] with [:-1]
         return unit_specific_binned_spike_counts, time_window_edges, time_window_edges_binning_info
 
     @classmethod
@@ -207,21 +209,33 @@ class ZhangReconstructionImplementation:
         TODO 2023-05-16 - CHECK - CORRECTNESS - Figure out correct indexing and whether it returns binned data for edges or counts.
         
         """
-        if time_window_edges is None or time_window_edges_binning_info is None:
+        if (time_window_edges is None) or (time_window_edges_binning_info is None):
             # build time_window_edges/time_window_edges_binning_info AND adds 'binned_time' column to spikes_df. # NOTE: the added 'binned_time' column is 1-indexed, which may explain why we use `time_window_edges_binning_info.bin_indicies[1:]` down below
             time_window_edges, time_window_edges_binning_info, spikes_df = ZhangReconstructionImplementation.compute_time_bins(spikes_df, max_time_bin_size=time_bin_size, debug_print=debug_print)
         else:
             # already have time bins (time_window_edges/time_window_edges_binning_info) so just add 'binned_time' column to spikes_df if needed:
+            assert (time_window_edges_binning_info.num_bins == len(time_window_edges)), f"time_window_edges_binning_info.num_bins: {time_window_edges_binning_info.num_bins}, len(time_window_edges): {len(time_window_edges)}"
             if 'binned_time' not in spikes_df.columns:
                 # we must have the 'binned_time' column in spikes_df, so add it if needed
                 spikes_df = spikes_df.spikes.add_binned_time_column(time_window_edges, time_window_edges_binning_info, debug_print=debug_print)
         
         # either way to compute the unit_specific_binned_spike_counts:
-        unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, time_window_edges_binning_info.bin_indicies[1:], debug_print=debug_print) # requires 'binned_time' in spikes_df. TODO 2023-05-16 - ERROR: isn't getting centers. time_window_edges_binning_info.bin_indicies[1:]
+        active_indicies = time_window_edges_binning_info.bin_indicies[1:] # pre-2025-01-13 Old way that led to losing a time bin
+        # active_indicies = time_window_edges_binning_info.bin_indicies[:-1] # 2025-01-14 New way that supposedly uses correct indexing
+        assert np.nanmax(spikes_df['binned_time'].to_numpy()) <= np.nanmax(active_indicies), f"np.nanmax(spikes_df['binned_time'].to_numpy()): {np.nanmax(spikes_df['binned_time'].to_numpy())}, np.nanmax(active_indicies): {np.nanmax(active_indicies)}"
+        # unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, time_window_edges_binning_info.bin_indicies[1:], debug_print=debug_print) # requires 'binned_time' in spikes_df. TODO 2023-05-16 - ERROR: isn't getting centers. time_window_edges_binning_info.bin_indicies[1:]
+        unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, active_indicies, debug_print=debug_print) ## removed `time_window_edges_binning_info.bin_indicies[1:]` on 2025-01-13 16:05 
+        # unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df, time_window_edges_binning_info.bin_indicies, debug_print=debug_print) # ValueError: Shape of passed values is (11816, 80), indices imply (11817, 80)
+        
         unit_specific_binned_spike_counts = unit_specific_binned_spike_counts.T # Want the outputs to have each time window as a column, with a single time window giving a column vector for each neuron
+        
+        assert len(active_indicies) == np.shape(unit_specific_binned_spike_counts.to_numpy())[1], f"len(active_indicies): {len(active_indicies)}, np.shape(unit_specific_binned_spike_counts.to_numpy())[1]: {np.shape(unit_specific_binned_spike_counts.to_numpy())[1]}"
+        
         if debug_print:
             print(f'unit_specific_binned_spike_counts.to_numpy(): {np.shape(unit_specific_binned_spike_counts.to_numpy())}') # (85841, 40)
         return unit_specific_binned_spike_counts.to_numpy(), time_window_edges, time_window_edges_binning_info
+
+
 
     @classmethod
     def _validate_time_binned_spike_counts(cls, time_binning_container, unit_specific_binned_spike_counts):
@@ -327,7 +341,7 @@ class ZhangReconstructionImplementation:
                 # _temp = (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (np.exp(-tau * cell_ratemap)) 
                 # cell_prob = cell_prob * _temp
 
-                cell_prob *= (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (np.exp(-tau * cell_ratemap)) # product equal using *=
+                cell_prob *= (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (np.exp(-tau * cell_ratemap)) # product equal using *= ## #TODO 2025-01-14 18:35: - [ ] numpy.core._exceptions._ArrayMemoryError: Unable to allocate 2.09 GiB for an array with shape (15124, 18557) and data type float64
 
                 # cell_prob.shape (nFlatPositionBins, nTimeBins)
             else:
@@ -675,6 +689,17 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
     epoch_description_list: list[str] = non_serialized_field(default=Factory(list), metadata={'shape': ('n_epochs',)}) # depends on the number of epochs, one for each
     
 
+    ## Optional Helpers
+    pos_bin_edges: Optional[NDArray] = serialized_field(default=None, metadata={'desc':'the position bin edges of the decoder that was used to produce the result', 'shape': ('n_pos_bins+1')})
+
+    @property
+    def n_pos_bins(self) -> Optional[int]:
+        """The n_pos_bins property."""
+        if self.pos_bin_edges is not None:
+            return len(self.pos_bin_edges)-1
+        else:
+            return None
+
     @property
     def active_filter_epochs(self):
         """ for compatibility """
@@ -785,15 +810,45 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         return f"{type(self).__name__}({content}\n)"
 
 
+    # For serialization/pickling: ________________________________________________________________________________________ #
+    def __getstate__(self):
+        # Copy the object's state from self.__dict__ which contains
+        # all our instance attributes (_mapping and _keys_at_init). Always use the dict.copy()
+        # method to avoid modifying the original state.
+        state = self.__dict__.copy()
+        # Remove the unpicklable entries.
+        # del state['file']
+        return state
+
+    def __setstate__(self, state):
+        # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        self.__dict__.update(state)
+        if 'pos_bin_edges' not in state:
+            self.__dict__.update(pos_bin_edges=None) ## default to None (for same unpickling)
+
+
+
+
     def flatten(self):
         """ flattens the result over all epochs to produce one per time bin """
         # returns a flattened version of self over all epochs
         n_timebins = np.sum(self.nbins)
         flat_time_bin_containers = np.hstack(self.time_bin_containers)
         # timebins_p_x_given_n = [].extend(self.p_x_given_n_list)
-        timebins_p_x_given_n = np.hstack(self.p_x_given_n_list) # # .shape: (239, 5) - (n_x_bins, n_epoch_time_bins)  --TO-->  .shape: (63, 4146) - (n_x_bins, n_flattened_all_epoch_time_bins)
+        # timebins_p_x_given_n = np.hstack(self.p_x_given_n_list) # # .shape: (239, 5) - (n_x_bins, n_epoch_time_bins)  --TO-->  .shape: (63, 4146) - (n_x_bins, n_flattened_all_epoch_time_bins)
+        # Determine posterior shape
+        a_posterior = self.p_x_given_n_list[0]
+        posterior_dims = len(np.shape(a_posterior))
+        
+        if posterior_dims == 2:
+            timebins_p_x_given_n = np.hstack(self.p_x_given_n_list)
+        elif posterior_dims == 3:
+            timebins_p_x_given_n = np.concatenate(self.p_x_given_n_list, axis=-1)
+        else:
+            raise ValueError("Unsupported posterior shape: {}".format(np.shape(a_posterior)))
+        
         # TODO 2023-04-13 -can these squished similar way?: most_likely_positions_list, most_likely_position_indicies_list 
-        return n_timebins, flat_time_bin_containers, timebins_p_x_given_n
+        return n_timebins, flat_time_bin_containers, timebins_p_x_given_n # flat_time_bin_containers: seems to be an NDArray of centers or something instead of containers
 
 
     def flatten_to_masked_values(self):
@@ -818,10 +873,28 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             updated_curr_num_bins = a_curr_num_bins + 2 # add two (start/end) bins
             a_centers = self.time_bin_containers[epoch_idx].centers
             a_posterior = self.p_x_given_n_list[epoch_idx]
-            n_pos_bins = np.shape(a_posterior)[0]
+            a_posterior_shape = np.shape(a_posterior)
+            n_pos_bins = a_posterior_shape[0]
+            posterior_dims = len(a_posterior_shape)
+        
+            if posterior_dims == 2:
+                # 1D (x-only) posterior per time bin
+                updated_posterior = np.full((n_pos_bins, updated_curr_num_bins), np.nan)
+            elif posterior_dims == 3:
+                # 2D (x & y) posterior per time bin
+                n_y_pos_bins = a_posterior_shape[1]
+                updated_posterior = np.full((n_pos_bins, n_y_pos_bins, updated_curr_num_bins), np.nan)
+            else:
+                raise ValueError("Unsupported posterior shape: {}".format(a_posterior_shape))
             
-            updated_posterior = np.full((n_pos_bins, updated_curr_num_bins), np.nan)
-            updated_posterior[:,1:-1] = a_posterior
+            if posterior_dims == 2:
+                updated_posterior[:, 1:-1] = a_posterior
+            elif posterior_dims == 3:
+                updated_posterior[:, :, 1:-1] = a_posterior
+            
+
+            # updated_posterior = np.full((n_pos_bins, updated_curr_num_bins), np.nan)
+            # updated_posterior[:,1:-1] = a_posterior ## does not work for 2D posteriors - ValueError: could not broadcast input array from shape (76,40,17) into shape (76,17)
 
             curr_is_masked_bin = np.full((updated_curr_num_bins,), True)
             curr_is_masked_bin[1:-1] = False
@@ -832,13 +905,14 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             updated_timebins_p_x_given_n.append(updated_posterior)
             updated_is_masked_bin.append(curr_is_masked_bin)
 
-    
-        updated_timebins_p_x_given_n = np.hstack(updated_timebins_p_x_given_n) # # .shape: (239, 5) - (n_x_bins, n_epoch_time_bins)  --TO-->  .shape: (63, 4146) - (n_x_bins, n_flattened_all_epoch_time_bins)
+        updated_timebins_p_x_given_n = np.hstack(updated_timebins_p_x_given_n) if posterior_dims == 2 else np.concatenate(updated_timebins_p_x_given_n, axis=-1)
+        # updated_timebins_p_x_given_n = np.hstack(updated_timebins_p_x_given_n) # # .shape: (239, 5) - (n_x_bins, n_epoch_time_bins)  --TO-->  .shape: (63, 4146) - (n_x_bins, n_flattened_all_epoch_time_bins)
         updated_time_bin_containers = np.hstack(np.hstack(updated_time_bin_containers))
         updated_is_masked_bin = np.hstack(updated_is_masked_bin)
 
         assert np.shape(updated_time_bin_containers)[0] == desired_total_n_timebins
-        assert np.shape(updated_timebins_p_x_given_n)[1] == desired_total_n_timebins
+        # assert np.shape(updated_timebins_p_x_given_n)[1] == desired_total_n_timebins
+        assert np.shape(updated_timebins_p_x_given_n)[-1] == desired_total_n_timebins
         assert np.shape(updated_is_masked_bin)[0] == desired_total_n_timebins
 
         return desired_total_n_timebins, updated_is_masked_bin, updated_time_bin_containers, updated_timebins_p_x_given_n
@@ -916,7 +990,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         return subset
     
 
-    @function_attributes(short_name=None, tags=['validate', 'time_bins'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-07 16:35', related_items=[])
+    @function_attributes(short_name=None, tags=['validate', 'time_bins', 'debug'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-07 16:35', related_items=[])
     def validate_time_bins(self):
         """validates a `DecodedFilterEpochsResult` object -- ensuring that all lists are of consistent sizes and that within the lists all the time bins have the correct properties
         """
@@ -1142,18 +1216,19 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             
         return epoch_time_bin_marginals_df
     
+    
 
 # ==================================================================================================================== #
 # Placemap Position Decoders                                                                                           #
 # ==================================================================================================================== #
-
+from neuropy.utils.mixins.binning_helpers import GridBinDebuggableMixin, DebugBinningInfo, BinnedPositionsMixin
 
 # ==================================================================================================================== #
 # Stateless Decoders (New 2023-04-06)                                                                                  #
 # ==================================================================================================================== #
 
 @custom_define(slots=False)
-class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLocationRepresentingMixin, PeakLocationRepresentingMixin, NeuronUnitSlicableObjectProtocol):
+class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLocationRepresentingMixin, PeakLocationRepresentingMixin, NeuronUnitSlicableObjectProtocol, BinnedPositionsMixin):
     """ 2023-04-06 - A simplified data-only version of the decoder that serves to remove all state related to specific computations to make each run independent 
     Stores only the raw inputs that are used to decode, with the user specifying the specifics for a given decoding (like time_time_sizes, etc.
 
@@ -1170,9 +1245,9 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
     F: np.ndarray = non_serialized_field(default=None)
     P_x: np.ndarray = non_serialized_field(default=None)
 
-    setup_on_init:bool = True 
-    post_load_on_init:bool = False
-    debug_print: bool = False
+    setup_on_init:bool = non_serialized_field(default=True)
+    post_load_on_init:bool = non_serialized_field(default=False)
+    debug_print: bool = non_serialized_field(default=False)
 
     # Properties _________________________________________________________________________________________________________ #
 
@@ -1274,6 +1349,17 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         # Return the new instance:
         return new_instance
 
+
+    @classmethod
+    def init_from_placefields(cls, pf: PfND, debug_print=False, **kwargs):
+        """ 2023-04-06 - Creates a new instance of this class from a placefields object. """
+        # Create the new instance:
+        new_instance = cls(pf=deepcopy(pf), debug_print=debug_print, **kwargs)
+        # Return the new instance:
+        return new_instance
+
+
+
     def setup(self):
         self.neuron_IDXs = None
         self.neuron_IDs = None
@@ -1314,7 +1400,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         ## Restrict the PfNDs:
         epoch_replaced_pf1D: PfND = self.pf.replacing_computation_epochs(deepcopy(new_epochs_obj))
         ## apply the neuron_sliced_pf to the decoder:
-        updated_decoder = BasePositionDecoder(epoch_replaced_pf1D, setup_on_init=self.setup_on_init, post_load_on_init=self.post_load_on_init, debug_print=self.debug_print)
+        updated_decoder = BasePositionDecoder(pf=epoch_replaced_pf1D, setup_on_init=self.setup_on_init, post_load_on_init=self.post_load_on_init, debug_print=self.debug_print)
         return updated_decoder
 
 
@@ -1411,7 +1497,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         return self._perform_decoding_specific_epochs(active_decoder=self, filter_epochs_decoder_result=filter_epochs_decoder_result, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
     
 
-	# ==================================================================================================================== #
+    # ==================================================================================================================== #
     # Non-Modifying Methods:                                                                                               #
     # ==================================================================================================================== #
     @function_attributes(short_name='decode', tags=['decode', 'pure'], input_requires=[], output_provides=[], creation_date='2023-03-23 19:10',
@@ -1516,6 +1602,10 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         spkcount = spkcount[0]
         nbins = nbins[0]
         time_bin_container = time_bin_containers_list[0] # neuropy.utils.mixins.binning_helpers.BinningContainer
+        # original_time_bin_container = deepcopy(self.time_binning_container) ## compared to this, we lose the last time_bin (which is partial)
+        # is_time_bin_included_in_new = np.isin(original_time_bin_container.centers, time_bin_container.centers) ## see which of the original time bins vanished in the new `time_bin_container`
+        ## drop previous values for compatibility
+        
         
         most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = self.decode(spkcount, time_bin_size=decoding_time_bin_size, output_flat_versions=output_flat_versions, debug_print=debug_print)
         curr_unit_marginal_x, curr_unit_marginal_y = self.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
@@ -1656,7 +1746,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         return filter_epochs_decoder_result
 
     @classmethod
-    def _perform_decoding_specific_epochs(cls, active_decoder, filter_epochs_decoder_result: DynamicContainer, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DecodedFilterEpochsResult:
+    def _perform_decoding_specific_epochs(cls, active_decoder: "BasePositionDecoder", filter_epochs_decoder_result: DynamicContainer, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DecodedFilterEpochsResult:
         """ Actually performs the computation
         
         NOTE: Uses active_decoder.decode(...) to actually do the decoding
@@ -1667,6 +1757,14 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         _arr_lengths = [len(v) for v in (np.arange(filter_epochs_decoder_result.num_filter_epochs), filter_epochs_decoder_result.spkcount, filter_epochs_decoder_result.nbins, filter_epochs_decoder_result.time_bin_containers)]
         assert np.allclose(_arr_lengths, filter_epochs_decoder_result.num_filter_epochs), f"all arrays should be equal or the zip will be limited to the fewest items, but _arr_lengths: {_arr_lengths}"
         
+
+        ## Set the static decoder properties
+        filter_epochs_decoder_result.pos_bin_edges = deepcopy(active_decoder.xbin)
+
+
+        # active_decoder.neuron_IDs
+        
+
         for i, curr_filter_epoch_spkcount, curr_epoch_num_time_bins, curr_filter_epoch_time_bin_container in zip(np.arange(filter_epochs_decoder_result.num_filter_epochs), filter_epochs_decoder_result.spkcount, filter_epochs_decoder_result.nbins, filter_epochs_decoder_result.time_bin_containers):
             ## New 2022-09-26 method with working time_bin_centers_list returned from epochs_spkcount
             a_time_bin_edges = np.atleast_1d(curr_filter_epoch_time_bin_container.edges)
@@ -1892,7 +1990,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         zero_bin_indicies.shape # (9307,)
         self.most_likely_positions.shape # (11880, 2)
         
-        # NaN out the position bins that were determined without any spikes
+        # NaN out the position bins that were determined to contain 0 spikes
         # Forward fill the now NaN positions with the last good value (for the both axes)
         
         """
@@ -1949,6 +2047,19 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
     #         """
     #         raise NotImplementedError # implementor must override!
 
+
+    # ==================================================================================================================== #
+    # GridBinDebuggableMixin Conformances                                                                                  #
+    # ==================================================================================================================== #
+    def get_debug_binning_info(self) -> DebugBinningInfo:
+        """Returns relevant debug info about the binning configuration
+
+        Returns:
+            DebugBinningInfo: Contains binning dimensions and sizes
+        """  
+        _obj = self.pf.get_debug_binning_info()
+        _obj.nTimeBins = None
+        return _obj
 
 
 
@@ -2262,11 +2373,34 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         TODO 2023-05-16 - CHECK - CORRECTNESS - Figure out correct indexing and whether it returns binned data for edges or counts.
         
         """
+        should_use_safe_time_binning: bool = False
+        
+        if should_use_safe_time_binning:
+            original_time_bin_container = deepcopy(self.time_binning_container) ## compared to this, we lose the last time_bin (which is partial)
+        
+        
         with WrappingMessagePrinter(f'compute_all final_p_x_given_n called. Computing windows...', begin_line_ending='... ', finished_message='compute_all completed.', enable_print=(debug_print or self.debug_print)):
             ## Single sweep decoding:
 
             ## 2022-09-23 - Epochs-style encoding (that works):
-            self.time_binning_container, self.p_x_given_n, self.most_likely_positions, curr_unit_marginal_x, curr_unit_marginal_y, flat_outputs_container = self.hyper_perform_decode(self.spikes_df, decoding_time_bin_size=self.time_bin_size, output_flat_versions=True, debug_print=(debug_print or self.debug_print))
+            self.time_binning_container, self.p_x_given_n, self.most_likely_positions, curr_unit_marginal_x, curr_unit_marginal_y, flat_outputs_container = self.hyper_perform_decode(self.spikes_df, decoding_time_bin_size=self.time_bin_size, output_flat_versions=True, debug_print=(debug_print or self.debug_print)) ## this is where it's getting messed up
+            if should_use_safe_time_binning:
+                num_extra_bins_in_old: int = original_time_bin_container.num_bins - self.time_binning_container.num_bins
+                # np.isin(original_time_bin_container.centers, self.time_binning_container.centers)
+                # is_time_bin_included_in_new = np.isin(original_time_bin_container.centers, self.time_binning_container.centers) ## see which of the original time bins vanished in the new `time_bin_container`
+                ## drop previous values for compatibility
+                if num_extra_bins_in_old > 0:
+                    ## UPDATES: self.is_non_firing_time_bin, self.unit_specific_time_binned_spike_counts
+                    ## find how many time bins to be dropped:
+                    # is_time_bin_included_in_new = np.array([np.isin(v, self.time_binning_container.centers) for v in original_time_bin_container.centers])
+                    old_time_bins_to_remove = original_time_bin_container.centers[-num_extra_bins_in_old:]
+                    assert np.all(np.logical_not([np.isin(v, self.time_binning_container.centers) for v in old_time_bins_to_remove]))
+                    self.unit_specific_time_binned_spike_counts = self.unit_specific_time_binned_spike_counts[:, :-num_extra_bins_in_old]
+                    self.total_spike_counts_per_window = self.total_spike_counts_per_window[:-num_extra_bins_in_old]
+                    
+            # self._setup_time_bin_spike_counts_N_i(debug_print=True) # updates: self.time_binning_container, self.unit_specific_time_binned_spike_counts, self.total_spike_counts_per_window
+            # self.unit_specific_time_binned_spike_counts
+
             self.marginal = DynamicContainer(x=curr_unit_marginal_x, y=curr_unit_marginal_y)
             assert isinstance(self.time_binning_container, BinningContainer) # Should be neuropy.utils.mixins.binning_helpers.BinningContainer
             self.compute_corrected_positions() ## this seems to fail for pf1D
@@ -2282,6 +2416,8 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         # np.shape(self.most_likely_position_flat_indicies) # (85841,)
         # np.shape(self.most_likely_position_indicies) # (2, 85841)
 
+
+    @function_attributes(short_name=None, tags=['BROKEN', 'PROBLEM'], input_requires=['.total_spike_counts_per_window', '.most_likely_positions'], output_provides=[], uses=['._setup_time_bin_spike_counts_N_i'], used_by=[], creation_date='2025-01-14 13:03', related_items=[])
     def compute_corrected_positions(self):
         """ computes the revised most likely positions by taking into account the time-bins that had zero spikes and extrapolating position from the prior successfully decoded time bin
         
@@ -2296,12 +2432,38 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
 
 
         TODO: CRITICAL: CORRECTNESS: 2022-02-25: This was said not to be working for 1D somewhere else in the code, but I don't know if it's working or not. It doesn't seem to be.
+            2025-01-16 04:08 - Indeed, I'm getting errors in the 1D case and it might be the cause of repeatedly bad decoded positions at the end caps
+        
+        Just recompute `self.is_non_firing_time_bin` --> self.total_spike_counts_per_window
+        
+        if np.shape(self.unit_specific_time_binned_spike_counts)[0] > len(self.neuron_IDXs):
+            # Drop the irrelevant indicies:
+            self.unit_specific_time_binned_spike_counts = self.unit_specific_time_binned_spike_counts[self.neuron_IDXs,:] # Drop the irrelevent indicies
+        
+        assert np.shape(self.unit_specific_time_binned_spike_counts)[0] == len(self.neuron_IDXs), f"in _setup_time_bin_spike_counts_N_i(): output should equal self.neuronIDXs but np.shape(self.unit_specific_time_binned_spike_counts)[0]: {np.shape(self.unit_specific_time_binned_spike_counts)[0]} and len(self.neuron_IDXs): {len(self.neuron_IDXs)}"
+        self.total_spike_counts_per_window = np.sum(self.unit_specific_time_binned_spike_counts, axis=0) # gets the total number of spikes during each window (across all placefields)
+        
+
+        self._setup_time_bin_spike_counts_N_i(debug_print=True) # updates: self.time_binning_container, self.unit_specific_time_binned_spike_counts, self.total_spike_counts_per_window
 
         """
         ## Find the bins that don't have any spikes in them:
         # zero_bin_indicies = np.where(self.total_spike_counts_per_window == 0)[0]
         # is_non_firing_bin = self.is_non_firing_time_bin
+        # assert (len(self.is_non_firing_time_bin) == self.num_time_windows), f"len(self.is_non_firing_time_bin): {len(self.is_non_firing_time_bin)}, self.num_time_windows: {self.num_time_windows}" # 2025-01-13 17:43 Added constraint because this is supposed to be correct
         
+        should_use_safe_time_binning: bool = False
+        if should_use_safe_time_binning:
+            if (len(self.is_non_firing_time_bin) != self.num_time_windows):
+                ## time windows aren't correct after computing for some reason, call `self._setup_time_bin_spike_counts_N_i()` to recompute them
+                print(f'WARN: f"len(self.is_non_firing_time_bin): {len(self.is_non_firing_time_bin)}, self.num_time_windows: {self.num_time_windows}", trying to recompute them....')
+                self._setup_time_bin_spike_counts_N_i(debug_print=False) # updates: self.time_binning_container, self.unit_specific_time_binned_spike_counts, self.total_spike_counts_per_window        
+
+            assert (len(self.is_non_firing_time_bin) == self.num_time_windows), f"len(self.is_non_firing_time_bin): {len(self.is_non_firing_time_bin)}, self.num_time_windows: {self.num_time_windows}" # 2025-01-13 17:43 Added constraint because this is supposed to be correct        
+        else:
+            print(f'WARN: not using safe time binning!')
+
+
         is_non_firing_bin = np.where(self.is_non_firing_time_bin)[0] # TEMP: do this to get around the indexing issue. TODO: IndexError: boolean index did not match indexed array along dimension 0; dimension is 11880 but corresponding boolean dimension is 11881
         self.revised_most_likely_positions = self.perform_compute_forward_filled_positions(self.most_likely_positions, is_non_firing_bin=is_non_firing_bin)
         
@@ -2316,6 +2478,18 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
 
         return self.revised_most_likely_positions
 
+    # ==================================================================================================================== #
+    # GridBinDebuggableMixin Conformances                                                                                  #
+    # ==================================================================================================================== #
+    def get_debug_binning_info(self) -> DebugBinningInfo:
+        """Returns relevant debug info about the binning configuration
+
+        Returns:
+            DebugBinningInfo: Contains binning dimensions and sizes
+        """  
+        _obj = self.pf.get_debug_binning_info()
+        _obj.nTimeBins = self.num_time_windows
+        return _obj
 
     # ==================================================================================================================== #
     # Class/Static Methods                                                                                                 #

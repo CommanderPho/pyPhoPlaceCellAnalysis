@@ -1,11 +1,14 @@
-from typing import Optional, Dict, List, Tuple
+from typing import Callable, Optional, Dict, List, Tuple, Union
 from collections import OrderedDict
 from enum import Enum
 from attrs import define, field, Factory
+import numpy as np
 
 # import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 
 from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock, DockDisplayConfig
 from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
@@ -41,13 +44,16 @@ class DockDisplayColors:
 
 
 
-
+@define(slots=False)
 class CustomDockDisplayConfig(DockDisplayConfig):
     """Holds the display and configuration options for a Dock, such as how to format its title bar (color and font), whether it's closable, etc.
 
     custom_get_colors_callback, if provided, is used to get the colors. This function must be of the form:
         get_colors(self, orientation, is_dim) -> return fg_color, bg_color, border_color
     """
+    custom_get_colors_dict: Optional[Dict] = field(default=None)
+    _custom_get_colors_callback_fn: Optional[Callable] = field(default=None, alias='custom_get_colors_callback_fn')
+    dock_group_names: List[str] = field(default=Factory(list), metadata={'desc': 'a list of conceptual "groups" that the dock specified by this config belongs to. Allows closing, moving, etc multiple docks at a time.'})
 
     @property
     def custom_get_colors_callback(self):
@@ -61,21 +67,28 @@ class CustomDockDisplayConfig(DockDisplayConfig):
     @property
     def orientation(self) -> str:
         """The orientation property."""
-        return self._orientation or 'auto'    
+        return (self._orientation or 'auto' )   
     @orientation.setter
     def orientation(self, value):
         self._orientation = value
 
-    def __init__(self, showCloseButton=True, fontSize='10px', corner_radius='2px', custom_get_colors_callback_fn=None, orientation=None, custom_get_colors_dict=None):
-        super(CustomDockDisplayConfig, self).__init__(showCloseButton=showCloseButton, fontSize=fontSize, corner_radius=corner_radius)
-        self._custom_get_colors_callback_fn = custom_get_colors_callback_fn
-        self._orientation = orientation
-        if custom_get_colors_dict is None:
-            custom_get_colors_dict = {False: DockDisplayColors(fg_color='#fff', bg_color='#66cc66', border_color='#54ba54'),
-                True: DockDisplayColors(fg_color='#aaa', bg_color='#44aa44', border_color='#339933'),
+    def __attrs_post_init__(self):
+      if self.custom_get_colors_dict is None:
+            self.custom_get_colors_dict = {False: DockDisplayColors(fg_color='#111', bg_color='#66cc66', border_color='#54ba54'),
+                True: DockDisplayColors(fg_color='#333', bg_color='#44aa44', border_color='#339933'),
             }
+
+    # def __init__(self, showCloseButton=True, fontSize='10px', corner_radius='2px', custom_get_colors_callback_fn=None, orientation=None, custom_get_colors_dict=None):
+    #     super(CustomDockDisplayConfig, self).__init__(showCloseButton=showCloseButton, fontSize=fontSize, corner_radius=corner_radius)
+    #     self._custom_get_colors_callback_fn = custom_get_colors_callback_fn
+    #     self._orientation = orientation
+    #     if custom_get_colors_dict is None:
+    #         custom_get_colors_dict = {False: DockDisplayColors(fg_color='#fff', bg_color='#66cc66', border_color='#54ba54'),
+    #             True: DockDisplayColors(fg_color='#aaa', bg_color='#44aa44', border_color='#339933'),
+    #         }
                         
-        self.custom_get_colors_dict = custom_get_colors_dict
+    #     self.custom_get_colors_dict = custom_get_colors_dict
+
         
 
     def get_colors(self, orientation, is_dim):
@@ -224,29 +237,28 @@ NamedColorScheme = Enum('NamedColorScheme', 'blue green red grey')
 # NamedColorScheme['blue']  # returns <Animal.ant: 1> (string lookup)
 # NamedColorScheme.blue.name  # returns 'ant' (inverse lookup)
 
+@define(slots=False)
 class CustomCyclicColorsDockDisplayConfig(CustomDockDisplayConfig):
     """Holds the display and configuration options for a Dock, such as how to format its title bar (color and font), whether it's closable, etc.
 
     custom_get_colors_callback, if provided, is used to get the colors. This function must be of the form:
         get_colors(self, orientation, is_dim) -> return fg_color, bg_color, border_color
     """
-    @property
-    def named_color_scheme(self):
-        """The named_color_scheme property."""
-        return self._named_color_scheme
-    @named_color_scheme.setter
-    def named_color_scheme(self, value):
-        self._named_color_scheme = value
-    
-    def __init__(self, showCloseButton=True, fontSize='10px', corner_radius='2px', orientation=None, named_color_scheme=NamedColorScheme.red, custom_get_colors_callback_fn=None, custom_get_colors_dict=None):
-        super(CustomCyclicColorsDockDisplayConfig, self).__init__(showCloseButton=showCloseButton, fontSize=fontSize, corner_radius=corner_radius, orientation=orientation, custom_get_colors_callback_fn=custom_get_colors_callback_fn)
-        self._named_color_scheme = named_color_scheme
-        if custom_get_colors_dict is None:
-            # custom_get_colors_dict = {False: DockDisplayColors(fg_color='#fff', bg_color='#66cc66', border_color='#54ba54'),
-            #     True: DockDisplayColors(fg_color='#aaa', bg_color='#44aa44', border_color='#339933'),
-            # }
-            pass                        
-        self.custom_get_colors_dict = custom_get_colors_dict
+    named_color_scheme: NamedColorScheme = field(default=NamedColorScheme.red, alias='named_color_scheme')
+
+    def __attrs_post_init__(self):
+      if self.custom_get_colors_dict is None:
+            pass # don't update it here, default to None
+
+    # def __init__(self, showCloseButton=True, fontSize='10px', corner_radius='2px', orientation=None, named_color_scheme=NamedColorScheme.red, custom_get_colors_callback_fn=None, custom_get_colors_dict=None):
+    #     super(CustomCyclicColorsDockDisplayConfig, self).__init__(showCloseButton=showCloseButton, fontSize=fontSize, corner_radius=corner_radius, orientation=orientation, custom_get_colors_callback_fn=custom_get_colors_callback_fn)
+    #     self.named_color_scheme = named_color_scheme
+    #     if custom_get_colors_dict is None:
+    #         # custom_get_colors_dict = {False: DockDisplayColors(fg_color='#fff', bg_color='#66cc66', border_color='#54ba54'),
+    #         #     True: DockDisplayColors(fg_color='#aaa', bg_color='#44aa44', border_color='#339933'),
+    #         # }
+    #         pass                        
+    #     self.custom_get_colors_dict = custom_get_colors_dict
         
 
     def get_colors(self, orientation, is_dim):
@@ -269,7 +281,7 @@ class CustomCyclicColorsDockDisplayConfig(CustomDockDisplayConfig):
                 else:
                     fg_color = '#fff' # White
 
-                if self._named_color_scheme.name == NamedColorScheme.blue.name:
+                if self.named_color_scheme.name == NamedColorScheme.blue.name:
                     # Blue/Purple-based:
                     if is_dim:
                         bg_color = '#4444aa' # Dark Blue - (240°, 60, 66.66)
@@ -277,7 +289,7 @@ class CustomCyclicColorsDockDisplayConfig(CustomDockDisplayConfig):
                     else:
                         bg_color = '#6666cc' # Default Purple Color - (240°, 50, 80)
                         border_color = '#55B' # Similar Purple Color - (240°, 54.54, 73.33)
-                elif self._named_color_scheme.name == NamedColorScheme.green.name:
+                elif self.named_color_scheme.name == NamedColorScheme.green.name:
                     # Green-based:
                     if is_dim:
                         bg_color = '#44aa44' # (120°, 60%, 67%)
@@ -285,7 +297,7 @@ class CustomCyclicColorsDockDisplayConfig(CustomDockDisplayConfig):
                     else:
                         bg_color = '#66cc66' # (120°, 50, 80)
                         border_color = '#54ba54' # (120°, 55%, 73%)
-                elif self._named_color_scheme.name == NamedColorScheme.red.name:
+                elif self.named_color_scheme.name == NamedColorScheme.red.name:
                     # Red-based:
                     if is_dim:
                         bg_color = '#aa4444' # (0°, 60%, 67%)
@@ -293,7 +305,7 @@ class CustomCyclicColorsDockDisplayConfig(CustomDockDisplayConfig):
                     else:
                         bg_color = '#cc6666' # (0°, 50, 80)
                         border_color = '#ba5454' # (0°, 55%, 73%)
-                elif self._named_color_scheme.name == NamedColorScheme.grey.name:
+                elif self.named_color_scheme.name == NamedColorScheme.grey.name:
                     # Grey-based:
                     if is_dim:
                         bg_color = '#d8d8d8' 
@@ -390,6 +402,76 @@ class DynamicDockDisplayAreaContentMixin:
                 all_collected_widgets.append(a_widget)
                 
         return all_collected_widgets
+    
+
+    def get_flat_dock_identifiers_list(self, debug_print=False) -> List[str]:
+        """ extracts the 'dock' property that is the contents of each added dock item from the self.dynamic_display_dict and returns it as a flat list """
+        all_collected_dock_items_identifiers = []
+        for an_id, an_item in self.dynamic_display_dict.items():
+            if debug_print:
+                print(f'an_id: {an_id}, an_item: {an_item}')
+            for a_sub_id, a_sub_item in an_item.items():
+                if debug_print:
+                    print(f'\ta_sub_id: {a_sub_id}, a_sub_item: {a_sub_item}')
+                a_dock_item = a_sub_item.get('dock', None)
+                all_collected_dock_items_identifiers.append(a_dock_item.name())
+        return all_collected_dock_items_identifiers
+    
+
+    def get_dockGroup_dock_dict(self, debug_print=False) -> Dict[str, List[Dock]]:
+        """ extracts the 'widget' property that is the contents of each added dock item from the self.dynamic_display_dict and returns it as a flat list """
+        flat_dockitems_list = self.get_flat_dockitems_list()
+        grouped_dock_items_dict: Dict[str, List[Dock]] = {}
+        # ungrouped_dock_items_list: List[Dock] = []
+        for a_dock in flat_dockitems_list:
+            ## have a dock
+            if len(a_dock.config.dock_group_names) == 0:
+                ## ungrouped items
+                # grouped_dock_items_dict.append(a_dock)
+                pass
+            else:
+                for a_group_name in a_dock.config.dock_group_names: # a dock can belong to multiple groups
+                    if a_group_name not in grouped_dock_items_dict:
+                        grouped_dock_items_dict[a_group_name] = [] ## initialize to empty list
+                    grouped_dock_items_dict[a_group_name].append(a_dock) ## add the dock to the group
+                
+        return grouped_dock_items_dict
+
+    
+    def get_dockGroup_dock_tree_dict(self, debug_print=False) -> Tuple[List[Union[Dock, Dict[str, List[Dock]]]], Dict]:
+        """ extracts the 'widget' property that is the contents of each added dock item from the self.dynamic_display_dict and returns it as a flat list """
+        flat_dockitems_list = self.get_flat_dockitems_list()
+        tree_out_dock_items_list = []
+        non_grouped_dock_items_dict: List[Dock] = []
+        
+        group_meta_item_dict = {}
+        grouped_dock_items_dict: Dict[str, List[Dock]] = {}
+        # ungrouped_dock_items_list: List[Dock] = []
+        for a_dock in flat_dockitems_list:
+            ## have a dock
+            if len(a_dock.config.dock_group_names) == 0:
+                ## ungrouped items
+                parsed_name: str = str(a_dock.name())
+                is_group_meta_item: bool = (parsed_name.startswith('GROUP[') and parsed_name.endswith(']'))
+                if not is_group_meta_item:
+                    non_grouped_dock_items_dict.append(a_dock)
+                else:
+                    print(f'WARNING: encountered group meta-item for a_dock: {a_dock}, parsed_name: "{parsed_name}", parsed_name: {parsed_name}. Skipping this item')    
+                    group_meta_item_identifier: str = (parsed_name.removeprefix('GROUP[').removesuffix(']'))
+                    print(f'\tgroup_meta_item_identifier: "{group_meta_item_identifier}"')
+                    group_meta_item_dict[group_meta_item_identifier] = a_dock
+            else:
+                for a_group_name in a_dock.config.dock_group_names: # a dock can belong to multiple groups
+                    if a_group_name not in grouped_dock_items_dict:
+                        grouped_dock_items_dict[a_group_name] = [] ## initialize to empty list
+                    grouped_dock_items_dict[a_group_name].append(a_dock) ## add the dock to the group
+                
+        tree_out_dock_items_list.extend(non_grouped_dock_items_dict)
+        tree_out_dock_items_list.append(grouped_dock_items_dict)
+        # for k, v in grouped_dock_items_dict.items():
+        #     tree_out_dock_items_list.append(grouped_dock_items_dict)
+        return tree_out_dock_items_list, group_meta_item_dict
+
     
     def add_display_dock(self, identifier=None, widget=None, dockSize=(300,200), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None, **kwargs):
         """ adds a dynamic display dock with an appropriate widget of type 'viewContentsType' to the dock area container on the main window. 
@@ -498,7 +580,7 @@ class DynamicDockDisplayAreaContentMixin:
         """ returns the first found Dock with the specified title equal to the identifier , or None if it doesn't exist. """
         curr_display_dock_items = self.displayDockArea.findChildren(Dock) # find all dock-type children
         for a_dock_item in curr_display_dock_items:
-            if a_dock_item.title() == identifier:
+            if ((a_dock_item.title() == identifier) or (a_dock_item.name() == identifier)):
                 return a_dock_item #found the correct item, return it
         return None # if never found, return None        
         # dock_item_titles = [a_dock_item.title() for a_dock_item in curr_display_dock_items]
@@ -551,7 +633,7 @@ class DynamicDockDisplayAreaContentMixin:
                     print(f'WARNING: identifier: {identifier} not found in dynamic_display_dict.keys(): {list(self.dynamic_display_dict.keys())}')
                 except Exception as e:
                     # Unhandled exception
-                    raise e
+                    raise
                 
             else:
                 # group was found and valid but already empty prior to remove:
@@ -590,7 +672,76 @@ class DynamicDockDisplayAreaContentMixin:
         test_dock_planning_widget.action_create_new_dock.connect(self.perform_create_new_relative_dock) 
         
         return test_dock_planning_widget, dDisplayItem
+
+    @function_attributes(short_name=None, tags=['docks', 'nested', 'wrapping'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-14 03:41', related_items=[])        
+    def build_wrapping_nested_dock_area(self, flat_group_dockitems_list, dock_group_name: str = 'ContinuousDecode_ - t_bin_size: 0.025'):
+        """ 
+        Builds a wrapping dock area containing several pre-existing dock items
         
+        Usage:
+        
+            grouped_dock_items_dict = active_2d_plot.ui.dynamic_docked_widget_container.get_dockGroup_dock_dict()
+            dock_group_name: str = 'ContinuousDecode_ - t_bin_size: 0.05'
+            flat_group_dockitems_list = grouped_dock_items_dict[dock_group_name]
+            dDisplayItem, nested_dynamic_docked_widget_container = build_wrapping_nested_dock_area(flat_group_dockitems_list, dock_group_name=dock_group_name)
+            nested_dock_items[dock_group_name] = dDisplayItem
+            nested_dynamic_docked_widget_container_widgets[dock_group_name] = nested_dynamic_docked_widget_container
+
+            
+        Example with nesting all dock groups:
+        
+            ## INPUTS: active_2d_plot
+            grouped_dock_items_dict = active_2d_plot.ui.dynamic_docked_widget_container.get_dockGroup_dock_dict()
+            nested_dock_items = {}
+            nested_dynamic_docked_widget_container_widgets = {}
+            for dock_group_name, flat_group_dockitems_list in grouped_dock_items_dict.items():
+                dDisplayItem, nested_dynamic_docked_widget_container = active_2d_plot.ui.dynamic_docked_widget_container.build_wrapping_nested_dock_area(flat_group_dockitems_list, dock_group_name=dock_group_name)
+                nested_dock_items[dock_group_name] = dDisplayItem
+                nested_dynamic_docked_widget_container_widgets[dock_group_name] = nested_dynamic_docked_widget_container
+
+            ## OUTPUTS: nested_dock_items, nested_dynamic_docked_widget_container_widgets
+
+        """
+        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DockDisplayColors, CustomDockDisplayConfig
+        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.NestedDockAreaWidget import NestedDockAreaWidget
+
+        num_child_docks: int = len(flat_group_dockitems_list)
+        total_height: float = np.sum([a_dock.height() for a_dock in flat_group_dockitems_list])
+
+        name=f'GROUP[{dock_group_name}]'
+        dockSize=(500, total_height)
+        dockAddLocationOpts=['bottom']
+
+        display_config = CustomDockDisplayConfig(showCloseButton=True, showCollapseButton=True, showGroupButton=True, orientation='horizontal', corner_radius='0px', fontSize='15px',
+                                                custom_get_colors_dict = {False: DockDisplayColors(fg_color='#5bf', bg_color='#0d001a', border_color='#5467ba'),
+                                                                          True: DockDisplayColors(fg_color='#aaa', bg_color='#35265f', border_color='#423399'),
+            })
+        
+        ## Add the container to hold dynamic matplotlib plot widgets:
+        nested_dynamic_docked_widget_container = NestedDockAreaWidget()
+        nested_dynamic_docked_widget_container.setObjectName("nested_dynamic_docked_widget_container")
+        nested_dynamic_docked_widget_container.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred)
+        nested_dynamic_docked_widget_container.setMinimumHeight(total_height)
+        nested_dynamic_docked_widget_container.setContentsMargins(0, 0, 0, 0)
+        _, dDisplayItem = self.add_display_dock(name, dockSize=dockSize, display_config=display_config, widget=nested_dynamic_docked_widget_container, dockAddLocationOpts=dockAddLocationOpts, autoOrientation=False)
+        dDisplayItem.setOrientation('horizontal', force=True)
+        dDisplayItem.updateStyle()
+        dDisplayItem.update()
+
+        ## Setup children:
+        for a_dock in flat_group_dockitems_list:
+            a_dock_identifier: str = a_dock.name()
+            ## format nested child docks:
+            a_dock.config.showCloseButton = False
+            a_dock.config.showCollapseButton = False
+            a_dock.config.showGroupButton = False
+            a_dock.config.corner_radius='0px'
+            a_dock.updateStyle()
+            nested_dynamic_docked_widget_container.displayDockArea.addDock(dock=a_dock) ## move the dock items as children to the new container
+            
+        return dDisplayItem, nested_dynamic_docked_widget_container
+
+
     @pyqtExceptionPrintingSlot(object, str)
     def perform_create_new_relative_dock(self, calling_widget, relative_position_string):
         """ NOTE: captures win """

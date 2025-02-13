@@ -1061,7 +1061,7 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
 	else:
 		CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}" ## OLD:
 	
-	print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
+	print(f'\tCURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
 
 	callback_outputs = {
 		'active_laps_decoding_time_bin_size': None,
@@ -1087,8 +1087,8 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
 		
 		directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
 		track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
-		print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
-		print(f'included_qclu_values: {included_qclu_values}')
+		print(f'\tminimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
+		print(f'\tincluded_qclu_values: {included_qclu_values}')
 	
 		## INPUTS: curr_active_pipeline, track_templates, global_epoch_name, (long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj)
 		any_decoder_neuron_IDs: NDArray = deepcopy(track_templates.any_decoder_neuron_IDs)
@@ -1271,7 +1271,7 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
 
 		print(f'\t\t done (success).')
 
-	except BaseException as e:
+	except Exception as e:
 		exception_info = sys.exc_info()
 		err = CapturedException(e, exception_info)
 		print(f"WARN: on_complete_success_execution_session: encountered exception {err} while performing .compute_and_export_session_trial_by_trial_performance_completion_function(...) for curr_session_context: {curr_session_context}")
@@ -1412,7 +1412,7 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
 								   should_skip_previous_saved_shuffles:bool=False, with_data_name: Optional[str]=None) -> dict:
 	"""  Computes the shuffled wcorrs and export them to several formats: .mat, .pkl, and .csv
 	
-	from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import reload_exported_kdiba_session_position_info_mat_completion_function
+	from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_session_wcorr_shuffles_completion_function
 	
 	Results can be extracted from batch output by 
 	
@@ -2156,7 +2156,9 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
 
 @function_attributes(short_name=None, tags=['UNFINISHED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def reload_exported_kdiba_session_position_info_mat_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
-	""" 
+	""" Called to update the pipeline's important position info parameters (such as the grid_bin_bounds, positions, etc) from a loaded .mat file
+	
+	
 	from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import reload_exported_kdiba_session_position_info_mat_completion_function
 	
 	Results can be extracted from batch output by 
@@ -2164,6 +2166,7 @@ def reload_exported_kdiba_session_position_info_mat_completion_function(self, gl
 	# Extracts the callback results 'determine_session_t_delta_completion_function':
 	extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('determine_session_t_delta_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
 
+	['basepath', 'session_spec', 'session_name', 'session_context', 'format_name', 'preprocessing_parameters', 'absolute_start_timestamp', 'position_sampling_rate_Hz', 'microseconds_to_seconds_conversion_factor', 'pix2cm', 'x_midpoint', 'loaded_track_limits', 'is_resolved', 'resolved_required_filespecs_dict', 'resolved_optional_filespecs_dict', 'x_unit_midpoint', 'first_valid_pos_time', 'last_valid_pos_time']
 
 	"""
 	from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder
@@ -2181,7 +2184,10 @@ def reload_exported_kdiba_session_position_info_mat_completion_function(self, gl
 	def _update_loaded_track_limits(a_session):
 		""" captures: curr_active_pipeline
 		"""
-		sess_config: SessionConfig = SessionConfig(**deepcopy(a_session.config.__getstate__()))
+		# sess_config: SessionConfig = SessionConfig(**deepcopy(a_session.config.__getstate__()))
+		sess_config: SessionConfig = deepcopy(a_session.config)
+		
+		# 'first_valid_pos_time'
 		a_session.config = sess_config
 		_bak_loaded_track_limits = deepcopy(a_session.config.loaded_track_limits)
 		## Apply fn
@@ -2247,6 +2253,8 @@ def reload_exported_kdiba_session_position_info_mat_completion_function(self, gl
 	print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
 
 	return across_session_results_extended_dict
+
+
 
 
 @function_attributes(short_name=None, tags=['hdf5', 'h5'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
@@ -2675,7 +2683,7 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
 									'determine_session_t_delta_completion_function': determine_session_t_delta_completion_function,
 									'perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function': perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function,
 									'compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function': compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function,
-									'reload_exported_kdiba_session_position_info_mat_completion_function': reload_exported_kdiba_session_position_info_mat_completion_function,
+									# 'reload_exported_kdiba_session_position_info_mat_completion_function': reload_exported_kdiba_session_position_info_mat_completion_function,
 									'export_session_h5_file_completion_function': export_session_h5_file_completion_function,
 									'compute_and_export_session_wcorr_shuffles_completion_function': compute_and_export_session_wcorr_shuffles_completion_function,
 									'compute_and_export_session_instantaneous_spike_rates_completion_function': compute_and_export_session_instantaneous_spike_rates_completion_function,

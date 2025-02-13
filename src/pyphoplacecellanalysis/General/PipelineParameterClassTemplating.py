@@ -52,6 +52,8 @@ class GlobalComputationParametersAttrsClassTemplating:
     # print(_defn_lines)
     # _flat_fields_tuples_list
 
+    
+    #TODO 2025-02-11 02:54: - [ ] returning "pathlib.Path" instead of "Path"
 
     """
     types_override_dict = {'time_bin_size': Optional[float], 'decoding_time_bin_size': Optional[float], 'instantaneous_time_bin_size_seconds': Optional[float],
@@ -107,30 +109,47 @@ class GlobalComputationParametersAttrsClassTemplating:
 
     @function_attributes(short_name=None, tags=['jninja2', 'template', 'private'], input_requires=[], output_provides=[], uses=['cls._build_kwargs_class_defns'], used_by=['main_generate_params_classes'], creation_date='2024-10-07 12:03', related_items=[])
     @classmethod
-    def _subfn_build_attrs_parameters_classes(cls, registered_merged_computation_function_default_kwargs_dict, params_defn_save_path=None, print_defns: bool = True, **render_kwargs):
+    def _subfn_build_attrs_parameters_classes(cls, registered_merged_computation_function_default_kwargs_dict, params_defn_save_path=None, print_defns: bool = True, include_explicit_param_Params_fields: bool=False, **render_kwargs):
         """ builds the parameters classes for the global computations
+        
+        if include_explicit_param_Params_fields:
+        
+            ## PARAMS - these are class properties
+            laps_decoding_time_bin_size_PARAM = param.Number(default=0.25)
+            ripple_decoding_time_bin_size_PARAM  = param.Number(default=0.025)
+            should_validate_lap_decoding_performance_PARAM  = param.Boolean(default=False)
+            
         """
         import sys
         import os
         import platform
         import pkg_resources # for Slurm templating
         from jinja2 import Environment, FileSystemLoader # for Slurm templating
+        
+        # ## Default:
+        # attrs_class_defn_template_filename: str = 'attrs_class_defn_template.py.j2' # used for the 
+        # attrs_container_class_defn_template_filename: str = 'attrs_container_class_defn_template.py.j2' ## used for the individual computation-specific parameter subclasses
+
+        ## with `param.Parameterized` support:
+        attrs_class_defn_template_filename: str = 'attrs_plus_param_class_defn_template.py.j2' # used for the 
+        attrs_container_class_defn_template_filename: str = 'attrs_plus_param_container_class_defn_template.py.j2' ## used for the individual computation-specific parameter subclasses
 
         # Set up Jinja2 environment
         template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
         env = Environment(loader=FileSystemLoader(template_path))
-        attrs_class_defn_template = env.get_template('attrs_class_defn_template.py.j2')
+        attrs_class_defn_template = env.get_template(attrs_class_defn_template_filename)
 
         nested_classes_dict = {}
         imports_dict = {}
-
+        
         for k, v in registered_merged_computation_function_default_kwargs_dict.items():
+            k = k.removeprefix('_') # do not allow starting with underscores
             _param_class_name: str = f'{k}_Parameters'
             # _param_class_name = _param_class_name.removeprefix('_') # remove leading underscores
             
             # nested_classes_dict[k] = CodeConversion.convert_dictionary_to_class_defn(v, _param_class_name, copy_to_clipboard=False, include_initializer_default_values=True)
             _defn_lines, _flat_fields_tuples_list, _base_variable_name_only_values_dict, _base_variable_name_only_types_dict = cls._build_kwargs_class_defns(v)
-            attrs_defn_str: str = attrs_class_defn_template.render(class_name=_param_class_name, fields_tuples_list=_flat_fields_tuples_list, **render_kwargs)
+            attrs_defn_str: str = attrs_class_defn_template.render(class_name=_param_class_name, fields_tuples_list=_flat_fields_tuples_list, should_include_explicit_param_Params_fields=include_explicit_param_Params_fields, **render_kwargs)
             # Remove empty lines using generator expression
             text_without_empty_lines: str = '\n'.join(line for line in attrs_defn_str.split('\n') if line.strip())
             nested_classes_dict[k] = text_without_empty_lines
@@ -158,13 +177,32 @@ class GlobalComputationParametersAttrsClassTemplating:
         # Set up Jinja2 environment
         template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
         env = Environment(loader=FileSystemLoader(template_path))
-        attrs_container_class_defn_template = env.get_template('attrs_container_class_defn_template.py.j2')
-        attrs_container_class_defn_str: str = attrs_container_class_defn_template.render(
+        # attrs_container_class_defn_template = env.get_template('attrs_container_class_defn_template.py.j2')
+        # attrs_container_class_defn_str: str = attrs_container_class_defn_template.render(
+        #     container_class_name="ComputationKWargParameters",
+        #     base_classes=["HDF_SerializationMixin", "AttrsBasedClassHelperMixin", "BaseGlobalComputationParameters"],
+        #     class_names= contained_parameter_type_names,
+        #     container_class_docstring="The base class for computation parameter types."
+        # )
+
+        container_class_should_include_explicit_param_Params_fields: bool = include_explicit_param_Params_fields
+        # container_class_should_include_explicit_param_Params_fields: bool = False
+
+        # `attrs_plus_param_container_class_defn_template.py.j2`: Plus `param.Parameterized` implementation
+        attrs_plus_param_container_class_defn_template = env.get_template(attrs_container_class_defn_template_filename)
+        attrs_container_class_defn_str: str = attrs_plus_param_container_class_defn_template.render(
             container_class_name="ComputationKWargParameters",
-            base_classes=["HDF_SerializationMixin", "AttrsBasedClassHelperMixin", "BaseGlobalComputationParameters"],
+            base_classes=["HDF_SerializationMixin", "AttrsBasedClassHelperMixin", "BaseGlobalComputationParameters"], # , "param.Parameterized"
             class_names= contained_parameter_type_names,
-            container_class_docstring="The base class for computation parameter types."
+            container_class_docstring="The base class for computation parameter types.",
+            should_include_explicit_param_Params_fields=container_class_should_include_explicit_param_Params_fields
         )
+
+
+
+
+
+
         attrs_container_class_defn_str = '\n'.join(line for line in attrs_container_class_defn_str.split('\n') if line.strip())
         # print(f'attrs_container_class_defn_str\n{attrs_container_class_defn_str}\n\n')
 
@@ -198,7 +236,8 @@ class GlobalComputationParametersAttrsClassTemplating:
 
     @classmethod
     def main_generate_params_classes(cls, curr_active_pipeline, print_defns=False):
-        """ 
+        """ Main function called with a `curr_active_pipeline` to explicitly generate the boilerplate parameters classes
+        
         from pyphoplacecellanalysis.General.PipelineParameterClassTemplating import GlobalComputationParametersAttrsClassTemplating
         registered_merged_computation_function_default_kwargs_dict, code_str, nested_classes_dict, (imports_dict, imports_list, imports_string) = GlobalComputationParametersAttrsClassTemplating.main_generate_params_classes(curr_active_pipeline=curr_active_pipeline)
         """        
@@ -206,7 +245,7 @@ class GlobalComputationParametersAttrsClassTemplating:
 
         code_str, nested_classes_dict, imports_dict = cls._subfn_build_attrs_parameters_classes(registered_merged_computation_function_default_kwargs_dict=registered_merged_computation_function_default_kwargs_dict, 
                                                                                                                 params_defn_save_path=None, should_build_hdf_class=True, print_defns=print_defns,
-                                                                                                                additional_bases=["BaseGlobalComputationParameters"])
+                                                                                                                additional_bases=["BaseGlobalComputationParameters"], include_explicit_param_Params_fields=True)
         imports_list = list(imports_dict.keys())
         imports_string: str = 'import ' + ', '.join(imports_list)
         if print_defns:

@@ -22,10 +22,11 @@ A general epochs_dataframe_formatter takes a dataframe and adds the required col
 
 @define(slots=False)
 class General2DRenderTimeEpochs(object):
-    """docstring for General2DRenderTimeEpochs."""
+    """Subclasses render specific epochs as intervals."""
     default_datasource_name: str = 'GeneralEpochs' # class variable
     # default_datasource_name: str = field(default='GeneralEpochs')
     
+    _required_interval_visualization_columns = ['t_start', 't_duration', 'series_vertical_offset', 'series_height', 'pen', 'brush']
     
     @classmethod
     def _update_df_visualization_columns(cls, active_df, y_location=None, height=None, pen_color=None, brush_color=None, **kwargs):
@@ -105,8 +106,13 @@ class General2DRenderTimeEpochs(object):
             general_epochs_interval_datasource = IntervalsDatasource.init_from_epoch_object(active_epochs_obj, active_epochs_df_formatter, datasource_name='intervals_datasource_from_general_Epochs_obj')
             
         elif isinstance(active_epochs_obj, pd.DataFrame):
-            ## NOTE that build_epochs_dataframe_formatter is never called if a dataframe is passed in directly, and the dataframe's columns must be named exactly correctly
-            general_epochs_interval_datasource = IntervalsDatasource(active_epochs_obj, datasource_name='intervals_datasource_from_general_dataframe_obj')
+            ## ensure the time columns are named correctly (['t_start', 't_duration', 't_end'])
+            if not np.isin(cls._required_interval_visualization_columns, active_epochs_obj.columns).all():
+                ## check if it's missing any viz columns:
+                general_epochs_interval_datasource = IntervalsDatasource.init_from_epoch_object(active_epochs_obj, active_epochs_df_formatter, datasource_name='intervals_datasource_from_general_Epochs_obj')
+            else:
+                ## use exactly with existing viz columns (all the dataframe's columns must be named exactly correctly):
+                general_epochs_interval_datasource = IntervalsDatasource(active_epochs_obj, datasource_name='intervals_datasource_from_general_dataframe_obj')
             
         elif isinstance(active_epochs_obj, tuple):
             assert len(active_epochs_obj) == 3
@@ -317,9 +323,13 @@ class Replays_2DRenderTimeEpochs(General2DRenderTimeEpochs):
             # tries 'flat_replay_idx' column if it exists, otherwise tries 'label' column
             replay_idx_column_name = 'flat_replay_idx'
             if replay_idx_column_name not in curr_sess.columns:
-                replay_idx_column_name = 'label' # try "label" instead
-                assert replay_idx_column_name in curr_sess.columns                
-            active_Epochs = (curr_sess['start'].to_numpy(), curr_sess['duration'].to_numpy(), curr_sess[replay_idx_column_name].to_numpy()) 
+                # replay_idx_column_name = 'label' # try "label" instead
+                assert 'label' in curr_sess.columns
+                curr_sess[replay_idx_column_name] = curr_sess['label'].copy() ## make the desired column
+            # END if replay_idx_column_name not in curr_sess....
+
+            # active_Epochs = (curr_sess['start'].to_numpy(), curr_sess['duration'].to_numpy(), curr_sess[replay_idx_column_name].to_numpy()) ## ... make stupid tuples if it's provided a dataframe :[            
+            active_Epochs = curr_sess # pass the dataframe directly
         else:
             raise NotImplementedError
         interval_datasource = cls.build_render_time_epochs_datasource(active_epochs_obj=active_Epochs, **kwargs)
@@ -349,6 +359,36 @@ class Ripples_2DRenderTimeEpochs(General2DRenderTimeEpochs):
 
 ##########################################
 ## New Ripples
+class NewNonPBE_2DRenderTimeEpochs(General2DRenderTimeEpochs):
+    default_datasource_name = 'NewNonPBE'
+    
+    @classmethod
+    def build_epochs_dataframe_formatter(cls, **kwargs):
+        def _add_interval_dataframe_visualization_columns_general_epoch(active_df):
+            ## parameters:
+            y_location = 0.0
+            height = 2.0
+            pen_color = pg.mkColor('cyan')
+            brush_color = pg.mkColor('cyan')
+            brush_color.setAlphaF(0.5)
+            
+            ## Add the missing parameters to the dataframe:
+            active_df = cls._update_df_visualization_columns(active_df, y_location, height, pen_color, brush_color, **kwargs)
+            return active_df
+
+        return _add_interval_dataframe_visualization_columns_general_epoch
+        
+
+
+
+
+
+
+
+
+
+##########################################
+## New Ripples
 class NewRipples_2DRenderTimeEpochs(General2DRenderTimeEpochs):
     default_datasource_name = 'NewRipples'
     
@@ -368,6 +408,11 @@ class NewRipples_2DRenderTimeEpochs(General2DRenderTimeEpochs):
 
         return _add_interval_dataframe_visualization_columns_general_epoch
         
+
+
+
+
+
 
 
 

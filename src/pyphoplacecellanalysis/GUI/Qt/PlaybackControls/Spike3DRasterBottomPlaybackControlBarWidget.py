@@ -81,7 +81,7 @@ move_controls = [self.ui.btnSkipLeft, self.ui.btnLeft, self.ui.spinBoxFrameJumpM
 
 debug_log_controls = [self.ui.txtLogLine, self.ui.btnToggleExternalLogWindow]
 
-standalone_extra_controls = [self.ui.btnHelp]
+standalone_extra_controls = [self.ui.btnHelp, self.ui.btnToggleRightSidebar]
 
 
 # Joystick/Move controls _____________________________________________________________________________________________ #
@@ -120,6 +120,8 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
     series_add_pressed = QtCore.pyqtSignal()
 
     sig_joystick_delta_occured = QtCore.pyqtSignal(float, float) # dx, dy
+
+    sigToggleRightSidebarVisibility = QtCore.pyqtSignal(bool)
 
 
     def __init__(self, parent=None):
@@ -224,6 +226,8 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         # pg.JoystickButton
         self.ui.connections['btnJoystickMove_sigStateChanged'] = self.ui.btnJoystickMove.sigStateChanged.connect(self.on_joystick_delta_state_changed)
         
+
+        self.ui.btnToggleRightSidebar.pressed.connect(self.on_right_sidebar_toggle_button_pressed)
 
     def on_joystick_delta_state_changed(self, joystick_ctrl, new_state):
         print(f"on_joystick_delta_state_changed(joystick_ctrl: {joystick_ctrl} new_state: {new_state})")
@@ -467,7 +471,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         self._update_series_action_buttons(self.has_valid_current_target_series_name) # enable/disable the action buttons
         self.jump_series_selection_changed.emit(curr_jump_series_name)
 
-    @pyqtExceptionPrintingSlot()
+    @QtCore.pyqtSlot()
     def on_jump_next_series_item(self):
         """ seeks the current active_time_Window to the start of the next epoch event (for the epoch event series specified in the bottom bar) 
 
@@ -477,7 +481,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         self.log_print(f'on_jump_next_series_item(): curr_jump_series_name: {curr_jump_series_name}')
         self.jump_target_right.emit(curr_jump_series_name)
 
-    @pyqtExceptionPrintingSlot()
+    @QtCore.pyqtSlot()
     def on_jump_prev_series_item(self):
         """ seeks the current active_time_Window to the start of the next epoch event (for the epoch event series specified in the bottom bar) 
 
@@ -489,7 +493,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         self.jump_target_left.emit(curr_jump_series_name)
 
 
-    @pyqtExceptionPrintingSlot()
+    @QtCore.pyqtSlot()
     def on_series_remove_button_pressed(self):
         """ 
         """
@@ -498,7 +502,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
             self.log_print(f'on_series_remove_button_pressed(): curr_series_name: {curr_series_name}')
         self.series_remove_pressed.emit(curr_series_name)
 
-    @pyqtExceptionPrintingSlot()
+    @QtCore.pyqtSlot()
     def on_series_customize_button_pressed(self):
         """ 
         """
@@ -508,7 +512,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         self.series_customize_pressed.emit(curr_series_name)
 
 
-    @pyqtExceptionPrintingSlot()
+    @QtCore.pyqtSlot()
     def on_action_clear_all_pressed(self):
         """ 
         """
@@ -516,7 +520,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
             self.log_print(f'on_action_clear_all_pressed()')
         self.series_clear_all_pressed.emit()
 
-    @pyqtExceptionPrintingSlot()
+    @QtCore.pyqtSlot()
     def on_action_request_add_intervals_pressed(self):
         """ 
         """
@@ -524,7 +528,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         self.series_add_pressed.emit()
 
 
-    # @pyqtExceptionPrintingSlot()
+    # @QtCore.pyqtSlot()
     # def on_series_extra_button_pressed(self):
     #     """ 
     #     """
@@ -680,7 +684,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
             self.ui._attached_log_window.hide()
 
         self._format_button_toggle_log_window()
-
+        
     @function_attributes(short_name=None, tags=['logging'], input_requires=[], output_provides=[], uses=[], used_by=['add_log_lines'], creation_date='2025-01-06 11:26', related_items=[])
     def add_log_line(self, new_line: str, allow_split_newlines: bool = True, defer_log_changed_event:bool=False):
         """ adds an additional entry to the log """
@@ -709,7 +713,12 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
     def on_help_button_pressed(self):
         self.log_print(f'on_help_button_pressed()')
         
-
+    def on_right_sidebar_toggle_button_pressed(self):
+        print(f'on_right_sidebar_toggle_button_pressed():')
+        should_sidebar_be_visible: bool = self.ui.btnToggleRightSidebar.isChecked()
+        print(f'\tshould_sidebar_be_visible: {should_sidebar_be_visible}')
+        
+        self.sigToggleRightSidebarVisibility.emit(should_sidebar_be_visible)
 
     # ==================================================================================================================== #
     # eventFilter                                                                                                          #
@@ -757,17 +766,17 @@ class SpikeRasterBottomFrameControlsMixin(LoggingBaseClassLoggerOwningMixin):
         return self.bottom_playback_control_bar_widget.logger
 
 
-    @pyqtExceptionPrintingSlot()
+    @QtCore.pyqtSlot()
     def SpikeRasterBottomFrameControlsMixin_on_init(self):
         """ perform any parameters setting/checking during init """
         pass
 
-    @pyqtExceptionPrintingSlot()
+    @QtCore.pyqtSlot()
     def SpikeRasterBottomFrameControlsMixin_on_setup(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         pass
     
-    @pyqtExceptionPrintingSlot()
+    @QtCore.pyqtSlot()
     def SpikeRasterBottomFrameControlsMixin_connectSignals(self, bottom_bar_controls):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         bottom_bar_connections = []
@@ -778,7 +787,7 @@ class SpikeRasterBottomFrameControlsMixin(LoggingBaseClassLoggerOwningMixin):
         return bottom_bar_connections
         
 
-    @pyqtExceptionPrintingSlot()
+    @QtCore.pyqtSlot()
     def SpikeRasterBottomFrameControlsMixin_on_buildUI(self):
         """ perfrom setup/creation of widget/graphical/data objects. Only the core objects are expected to exist on the implementor (root widget, etc) """
         # CALLED:
@@ -792,7 +801,7 @@ class SpikeRasterBottomFrameControlsMixin(LoggingBaseClassLoggerOwningMixin):
         return controls_frame, controls_layout
 
 
-    @pyqtExceptionPrintingSlot()
+    @QtCore.pyqtSlot()
     def SpikeRasterBottomFrameControlsMixin_on_destroy(self):
         """ perfrom teardown/destruction of anything that needs to be manually removed or released """
         # TODO: NOT CALLED
@@ -835,13 +844,13 @@ class SpikeRasterBottomFrameControlsMixin(LoggingBaseClassLoggerOwningMixin):
     #     else:
     #         self.animationThread.terminate()
 
-    # @pyqtExceptionPrintingSlot()
+    # @QtCore.pyqtSlot()
     # def on_jump_left(self):
     #     # Skip back some frames
     #     print(f'SpikeRasterBottomFrameControlsMixin.on_jump_left()')
     #     self.shift_animation_frame_val(-5)
         
-    # @pyqtExceptionPrintingSlot()
+    # @QtCore.pyqtSlot()
     # def on_jump_right(self):
     #     # Skip forward some frames
     #     print(f'SpikeRasterBottomFrameControlsMixin.on_jump_right()')

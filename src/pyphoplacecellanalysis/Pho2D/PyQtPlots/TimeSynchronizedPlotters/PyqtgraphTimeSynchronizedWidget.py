@@ -1,3 +1,4 @@
+from copy import deepcopy
 import numpy as np
 import pandas as pd
 from qtpy import QtCore, QtWidgets
@@ -14,10 +15,11 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.plotting.mixins.plotting_backend_mixin import PlottingBackendSpecifyingMixin, PlottingBackendType
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.CrosshairsTracingMixin import CrosshairsTracingMixin
 
 
 @metadata_attributes(short_name=None, tags=['pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 03:42', related_items=['MatplotlibTimeSynchronizedWidget'])
-class PyqtgraphTimeSynchronizedWidget(PlottingBackendSpecifyingMixin, TimeSynchronizedPlotterBase):
+class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlottingBackendSpecifyingMixin, TimeSynchronizedPlotterBase):
     """ Plots the decoded position at a given moment in time. 
 
     Simple pyqtgraph-based alternative to `MatplotlibTimeSynchronizedWidget`
@@ -32,7 +34,9 @@ class PyqtgraphTimeSynchronizedWidget(PlottingBackendSpecifyingMixin, TimeSynchr
     windowName = 'PyqtgraphTimeSynchronizedWidgetWindow'
     
     enable_debug_print = True
-        
+    
+    sigCrosshairsUpdated = QtCore.Signal(object, str, str) # (self, name, trace_value) - CrosshairsTracingMixin Conformance
+
     @classmethod
     def get_plot_backing_type(cls) -> PlottingBackendType:
         """PlottingBackendSpecifyingMixin conformance: Implementor should return either [PlottingBackendType.Matplotlib, PlottingBackendType.PyQtGraph]."""
@@ -83,7 +87,7 @@ class PyqtgraphTimeSynchronizedWidget(PlottingBackendSpecifyingMixin, TimeSynchr
         super().__init__(application_name=application_name, window_name=(window_name or PyqtgraphTimeSynchronizedWidget.windowName), parent=parent) # Call the inherited classes __init__ method
             
         ## Init containers:
-        self.params = VisualizationParameters(name=name, plot_function_name=plot_function_name, debug_print=False)
+        self.params = VisualizationParameters(name=name, plot_function_name=plot_function_name, debug_print=False, wants_crosshairs=kwargs.get('wants_crosshairs', False), should_force_discrete_to_bins=kwargs.get('should_force_discrete_to_bins', False))
         self.plots_data = RenderPlotsData(name=name)
         self.plots = RenderPlots(name=name)
         self.ui = PhoUIContainer(name=name)
@@ -112,8 +116,21 @@ class PyqtgraphTimeSynchronizedWidget(PlottingBackendSpecifyingMixin, TimeSynchr
         # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
         # self.app = pg.mkQApp(self.applicationName)
         # self.params = VisualizationParameters(self.applicationName)
-        pass
         
+
+        # # Add a trace region (initially hidden)
+        # self.trace_region = pg.LinearRegionItem(movable=True, brush=(0, 0, 255, 50))
+        # self.trace_region.setZValue(10)  # Ensure it appears above the plot
+        # self.trace_region.hide()  # Initially hide the trace region
+        # self.plot_widget.addItem(self.trace_region)
+
+        # # Override the PlotWidget's mouse events
+        # self.plot_widget.scene().sigMouseClicked.connect(self.mouse_clicked)
+        # self.plot_widget.scene().sigMouseMoved.connect(self.mouse_moved)
+        # self.plot_widget.scene().sigMouseReleased.connect(self.mouse_released)
+        # self.dragging = False
+        # self.start_pos = None
+                
 
         # self.params.shared_axis_order = 'row-major'
         # self.params.shared_axis_order = 'column-major'
@@ -124,7 +141,8 @@ class PyqtgraphTimeSynchronizedWidget(PlottingBackendSpecifyingMixin, TimeSynchr
         # self.params.cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
         # self.params.image_margins = 0.0
         # self.params.image_bounds_extent, self.params.x_range, self.params.y_range = pyqtplot_build_image_bounds_extent(self.active_one_step_decoder.xbin, self.active_one_step_decoder.ybin, margin=self.params.image_margins, debug_print=self.enable_debug_print)
-        
+        pass
+
 
     def _buildGraphics(self):
         """ called by self.buildUI() which usually is not overriden. """
@@ -187,9 +205,9 @@ class PyqtgraphTimeSynchronizedWidget(PlottingBackendSpecifyingMixin, TimeSynchr
         if self.enable_debug_print:
             print(f'PyqtgraphTimeSynchronizedWidget.update(t: {t})')
     
-        # Finds the nearest previous decoded position for the time t:
-        self.last_window_index = np.searchsorted(self.time_window_centers, t, side='left') # side='left' ensures that no future values (later than 't') are ever returned
-        self.last_window_time = self.time_window_centers[self.last_window_index] # If there is no suitable index, return either 0 or N (where N is the length of `a`).
+        # # Finds the nearest previous decoded position for the time t:
+        # self.last_window_index = np.searchsorted(self.time_window_centers, t, side='left') # side='left' ensures that no future values (later than 't') are ever returned
+        # self.last_window_time = self.time_window_centers[self.last_window_index] # If there is no suitable index, return either 0 or N (where N is the length of `a`).
         # Update the plots:
         if not defer_render:
             self._update_plots()
@@ -238,6 +256,33 @@ class PyqtgraphTimeSynchronizedWidget(PlottingBackendSpecifyingMixin, TimeSynchr
         #     profiler('Finished calling _update_plots()')
             
 
+
+    # def mouse_clicked(self, event):
+    #     # Only handle middle mouse button
+    #     if event.button() == 2:  # Middle mouse button
+    #         pos = self.plot_widget.plotItem.vb.mapSceneToView(event.scenePos())
+    #         self.start_pos = pos.x()
+    #         self.dragging = True
+    #         self.trace_region.hide()  # Reset trace region visibility
+    #         event.accept()
+
+    # def mouse_moved(self, event):
+    #     if self.dragging and self.start_pos is not None:
+    #         # Update the trace region during dragging
+    #         current_pos = self.plot_widget.plotItem.vb.mapSceneToView(event)
+    #         x_end = current_pos.x()
+    #         self.trace_region.setRegion([min(self.start_pos, x_end), max(self.start_pos, x_end)])
+    #         self.trace_region.show()  # Show the trace region as it's being defined
+
+    # def mouse_released(self, event):
+    #     # Finalize the trace region definition
+    #     if event.button() == 2 and self.dragging:
+    #         self.dragging = False
+    #         self.start_pos = None
+    #         print(f"Trace region set to: {self.trace_region.getRegion()}")
+            
+
+
     def getRootLayout(self) -> QtWidgets.QGridLayout:
         return self.ui.layout
     
@@ -247,9 +292,135 @@ class PyqtgraphTimeSynchronizedWidget(PlottingBackendSpecifyingMixin, TimeSynchr
     def getRootPlotItem(self) -> pg.PlotItem:
         return self.ui.root_plot
     
+    # ==================================================================================================================== #
+    # Misc Functionality                                                                                                   #
+    # ==================================================================================================================== #
     
 
-    
+    # ==================================================================================================================== #
+    # CrosshairsTracingMixin Conformances                                                                                  #
+    # ==================================================================================================================== #
+    def add_crosshairs(self, plot_item, name, matrix=None, xbins=None, ybins=None, enable_y_trace:bool=False):
+        """ adds crosshairs that allow the user to hover a bin and have the label dynamically display the bin (x, y) and value.
+        
+        Uses:
+        self.params.should_force_discrete_to_bins
+        
+        Updates self.plots[name], self.ui.connections[name]
+        
+        Emits: self.sigCrosshairsUpdated
+        
+        """
+        print(f'PyqtgraphTimeSynchronizedWidget.add_crosshairs(plot_item: {plot_item}, name: "{name}", ...):')
+        extant_plots_dict_for_item = self.plots.get(name, {})
+        vLine = extant_plots_dict_for_item.get('crosshairs_vLine', None)
+        has_extant_crosshairs: bool = (vLine is not None)
+         
+        if not has_extant_crosshairs:
+            ## create new:
+            if name not in self.plots:
+                self.plots[name] = {} # initialize new dictionary
+                
+            vLine = pg.InfiniteLine(angle=90, movable=False)
+            self.plots[name]['crosshairs_vLine'] = vLine        
+            plot_item.addItem(vLine, ignoreBounds=True)
+        
+            if enable_y_trace:
+                hLine = pg.InfiniteLine(angle=0, movable=False)
+                self.plots[name]['crosshairs_hLine'] = hLine
+                plot_item.addItem(hLine, ignoreBounds=True)
+        
+            vb = plot_item.vb
+            should_force_discrete_to_bins: bool = self.params.get('crosshairs_discrete', True)
+
+            def mouseMoved(evt):
+                pos = evt[0]  ## using signal proxy turns original arguments into a tuple
+                if plot_item.sceneBoundingRect().contains(pos):
+                    mousePoint = vb.mapSceneToView(pos)
+
+                    if should_force_discrete_to_bins:
+                        x_point = float(int(round(mousePoint.x())))
+                        if enable_y_trace:
+                            y_point = float(int(round(mousePoint.y())))
+
+                        x_point = x_point + 0.5 # Snap point to center. Does not affect indexing because it truncates
+                        if enable_y_trace:
+                            y_point = y_point + 0.5 
+                    else:
+                        x_point = mousePoint.x()
+                        if enable_y_trace:
+                            y_point = mousePoint.y()
+                    
+                    # Note that int(...) truncates towards zero (floor effect)
+                    index_x = int(x_point)
+                    if enable_y_trace:
+                        index_y = int(y_point)
+                    
+
+                    # Getting Value (Z-level from Matrix) ________________________________________________________________________________ #
+                    value_str = '' # empty string by default
+                    if matrix is not None:
+                        matrix_shape = np.shape(matrix)
+                        # is_valid_x_index = (index_x > 0 and index_x < matrix_shape[0])
+                        # is_valid_y_index = (index_y > 0 and index_y < matrix_shape[1])
+                        is_valid_x_index = (index_x >= 0 and index_x < matrix_shape[0])
+                        if enable_y_trace:
+                            is_valid_y_index = (index_y >= 0 and index_y < matrix_shape[1])
+                        
+                        if is_valid_x_index and is_valid_y_index:
+                            if should_force_discrete_to_bins:
+                                if (xbins is not None) and (ybins is not None):
+                                    # Display special xbins/ybins if we have em
+                                    bin_x = xbins[index_x]
+                                    if enable_y_trace:
+                                        bin_y = ybins[index_y]
+                                    value_str = "<span style='font-size: 12pt'>(x[%d]=%0.3f, y[%d]=%0.3f), <span style='color: green'>value=%0.3f</span>" % (index_x, bin_x, index_y, bin_y, matrix[index_x][index_y])
+                                else:
+                                    value_str = "<span style='font-size: 12pt'>(x=%d, y=%d), <span style='color: green'>value=%0.3f</span>" % (index_x, index_y, matrix[index_x][index_y])
+
+                                print(f'value_str: {value_str}')
+                                # self.ui.mainLabel.setText(value_str)
+                            else:
+                                value_str = "<span style='font-size: 12pt'>(x=%0.1f, y=%0.1f), <span style='color: green'>value=%0.3f</span>" % (index_x, index_y, matrix[index_x][index_y])
+                                print(f'value_str: {value_str}')
+                                # self.ui.mainLabel.setText("<span style='font-size: 12pt'>(x=%0.1f, y=%0.1f), <span style='color: green'>value=%0.3f</span>" % (index_x, index_y, matrix[index_x][index_y]))
+                    ## END if matrix is not None ...
+                    
+                    ## Move the lines:
+                    vLine.setPos(x_point)
+                    if enable_y_trace:
+                        hLine.setPos(y_point)
+
+                    ## emit the signal:
+                    self.sigCrosshairsUpdated.emit(self, name, value_str)
+            ## END def mouseMoved(evt)
+            self.ui.connections[name] = pg.SignalProxy(plot_item.scene().sigMouseMoved, rateLimit=60, slot=mouseMoved)
+            
+        else:
+            ## already exists: update it?
+            hLine = extant_plots_dict_for_item.get('crosshairs_hLine', None)
+            pass
+
+
+    def remove_crosshairs(self, plot_item, name=None):
+        print(f'PyqtgraphTimeSynchronizedWidget.remove_crosshairs(plot_item: {plot_item}, name: "{name}"):')
+        raise NotImplementedError(f'')
+
+
+    def update_crosshair_trace(self, wants_crosshairs_trace: bool):
+        """ updates the crosshair trace peferences
+        """
+        print(f'PyqtgraphTimeSynchronizedWidget.update_crosshair_trace(wants_crosshairs_trace: {wants_crosshairs_trace}):')
+        old_value = deepcopy(self.params.wants_crosshairs)
+        did_change: bool = (old_value != wants_crosshairs_trace)
+        if did_change:
+            self.params.wants_crosshairs = wants_crosshairs_trace
+            root_plot_item = self.getRootPlotItem()
+            print(f'\tadding crosshairs...')
+            self.add_crosshairs(plot_item=root_plot_item, name='root_plot_item', matrix=None, xbins=None, ybins=None, enable_y_trace=False)
+            print(f'\tdone.')
+        else:
+            print(f'\tno change!')
 
 # included_epochs = None
 # computation_config = active_session_computation_configs[0]

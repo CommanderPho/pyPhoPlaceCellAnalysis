@@ -1,33 +1,81 @@
 import sys
+import os
 import numpy as np
 
-from pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterLeftSidebarControlBarBase import Ui_leftSideToolbarWidget # Generated file from .ui
+from PyQt5 import QtGui, QtWidgets, uic
+from PyQt5.QtWidgets import QMessageBox, QToolTip, QStackedWidget, QHBoxLayout, QVBoxLayout, QSplitter, QFormLayout, QLabel, QFrame, QPushButton, QTableWidget, QTableWidgetItem
+from PyQt5.QtWidgets import QApplication, QFileSystemModel, QTreeView, QWidget, QHeaderView
+from PyQt5.QtGui import QPainter, QBrush, QPen, QColor, QFont, QIcon
+from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlot, QSize, QDir
+
+# from pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterLeftSidebarControlBarBase import Ui_leftSideToolbarWidget # Generated file from .ui
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
-from qtpy import QtCore, QtWidgets
-
-def trap_exc_during_debug(*args):
-    # when app raises uncaught exception, print info
-    print(args)
+# from qtpy import QtCore, QtWidgets
+# Generated from c:\Users\pho\repos\Spike3DWorkEnv\pyPhoPlaceCellAnalysis\src\pyphoplacecellanalysis\GUI\Qt\ZoomAndNavigationSidebarControls\Spike3DRasterLeftSidebarControlBarBase.ui automatically by PhoPyQtClassGenerator VSCode Extension
 
 
-# install exception hook: without this, uncaught exception would cause application to exit
-sys.excepthook = trap_exc_during_debug
+
+## IMPORTS:
+# 
+
+## Define the .ui file path
+path = os.path.dirname(os.path.abspath(__file__))
+uiFile = os.path.join(path, 'Spike3DRasterLeftSidebarControlBarWidget.ui')
 
 
-class Spike3DRasterLeftSidebarControlBar(QtWidgets.QWidget):
-    """ A controls bar with buttons loaded from a Qt .ui file. """
+# def trap_exc_during_debug(*args):
+#     # when app raises uncaught exception, print info
+#     print(args)
+
+
+# # install exception hook: without this, uncaught exception would cause application to exit
+# sys.excepthook = trap_exc_during_debug
+
+
+class Spike3DRasterLeftSidebarControlBar(QWidget):
+    """ A controls bar with buttons loaded from a Qt .ui file. 
     
-    animation_time_step_changed = QtCore.Signal(float) # returns bool indicating whether is_playing
-    temporal_zoom_factor_changed = QtCore.Signal(float)
-    render_window_duration_changed = QtCore.Signal(float)
+    self.ui.btnToggleCrosshairTrace
+    self.ui.lblCrosshairTraceStaticLabel
+    self.ui.lblCrosshairTraceValue
+    
+    """
+    
+    animation_time_step_changed = pyqtSignal(float) # returns bool indicating whether is_playing
+    temporal_zoom_factor_changed = pyqtSignal(float)
+    render_window_duration_changed = pyqtSignal(float)
         
+    crosshair_trace_toggled = pyqtSignal(bool)
+
+    # @property
+    # def lblCrosshairTraceValue(self):
+    #     """The lblCrosshairTraceValue property."""
+    #     return self.ui.lblCrosshairTraceValue
+
+
+    @property
+    def crosshair_trace_time(self) -> float:
+        """The crosshair_trace_time property."""
+        return self._crosshair_trace_time
+    @crosshair_trace_time.setter
+    def crosshair_trace_time(self, value: float):
+        if value is not None:
+            self.ui.lblCrosshairTraceValue.setText(f"{value}")
+            self.ui.lblCrosshairTraceStaticLabel.setVisible(True)
+            self.ui.lblCrosshairTraceValue.setVisible(True)
+        else:
+            ## Hide it
+            self.ui.lblCrosshairTraceStaticLabel.setVisible(False)
+            self.ui.lblCrosshairTraceValue.setVisible(False)
+
+
     def __init__(self, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
-        self.ui = Ui_leftSideToolbarWidget()
-        self.ui.setupUi(self) # builds the design from the .ui onto this widget.
+        self.ui = uic.loadUi(uiFile, self) # Load the .ui file
         
-        self.initUI()
+        # self.initUI()
         self.show() # Show the GUI
+
 
     def initUI(self):
         # Disable the scroll bar
@@ -40,6 +88,11 @@ class Spike3DRasterLeftSidebarControlBar(QtWidgets.QWidget):
         self.ui.spinAnimationTimeStep.sigValueChanged.connect(self.animation_time_step_valueChanged)
         self.ui.spinTemporalZoomFactor.sigValueChanged.connect(self.temporal_zoom_factor_valueChanged)
         self.ui.spinRenderWindowDuration.sigValueChanged.connect(self.render_window_duration_valueChanged)
+        self.ui.btnToggleCrosshairTrace.clicked.connect(self.crosshair_trace_button_Toggled)
+
+        self.ui.btnToggleCrosshairTrace.setVisible(True)
+        self.ui.lblCrosshairTraceStaticLabel.setVisible(False)
+        self.ui.lblCrosshairTraceValue.setVisible(False)
              
  
     @pyqtExceptionPrintingSlot(object)
@@ -80,8 +133,16 @@ class Spike3DRasterLeftSidebarControlBar(QtWidgets.QWidget):
         # TODO: emit the temporal changed signal:    
         # self.temporal_zoom_factor_changed.emit(float_slider_val)
                         
-    def __str__(self):
-         return
+
+    @pyqtExceptionPrintingSlot()
+    def crosshair_trace_button_Toggled(self):
+        # print(f'sb: {sb}, sb.value(): {str(sb.value())}')
+        # old_value = self.render_window_duration
+        self.crosshair_trace_toggled.emit(self.ui.btnToggleCrosshairTrace.isChecked())
+        
+
+    # def __str__(self):
+    #      return
      
      
 
@@ -120,6 +181,7 @@ class SpikeRasterLeftSidebarControlsMixin:
         left_side_bar_connections.append(left_side_bar_controls.animation_time_step_changed.connect(self.on_animation_timestep_valueChanged))
         left_side_bar_connections.append(left_side_bar_controls.temporal_zoom_factor_changed.connect(self.on_temporal_zoom_factor_valueChanged))
         left_side_bar_connections.append(left_side_bar_controls.render_window_duration_changed.connect(self.on_render_window_duration_valueChanged))
+        left_side_bar_connections.append(left_side_bar_controls.crosshair_trace_toggled.connect(self.on_crosshair_trace_toggled)) # #TODO 2025-02-10 16:50: - [ ] Add handler for enable/disable crosshairs trace
         return left_side_bar_connections
         
             
@@ -186,10 +248,10 @@ class SpikeRasterLeftSidebarControlsMixin:
 
         
     
-     
-if __name__ == "__main__":
-    import sys
-    app = QtWidgets.QApplication(sys.argv)
-    testWidget = Spike3DRasterLeftSidebarControlBar()
-    # testWidget.show()
+## Start Qt event loop
+if __name__ == '__main__':
+    app = QApplication([])
+    widget = Spike3DRasterLeftSidebarControlBar()
+    widget.show()
     sys.exit(app.exec_())
+

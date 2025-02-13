@@ -23,6 +23,23 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 
 __all__ = ['EpochsEditor']
 
+class CustomViewBox(pg.ViewBox):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMouseEnabled(x=True, y=False)
+
+    def mouseClickEvent(self, event):
+        if event.button() == QtCore.Qt.RightButton:
+            print("Right-click detected!")
+            pos = event.scenePos()
+            if self.sceneBoundingRect().contains(pos):
+                mouse_point = self.mapSceneToView(pos)
+                if self.parent() is not None:
+                    self.parent().show_context_menu(event.screenPos(), mouse_point) # AttributeError: 'NoneType' object has no attribute 'show_context_menu'
+        else:
+            super().mouseClickEvent(event)
+
+
 @metadata_attributes(short_name=None, tags=['useful', 'gui', 'utility', 'epochs', 'widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-17 19:25', related_items=[])
 @define(slots=False)
 class EpochsEditor:
@@ -52,15 +69,77 @@ class EpochsEditor:
     pos_df: pd.DataFrame = field(repr=False) # disables super excessive dataframe printing
     curr_laps_df: pd.DataFrame = field()
     on_epoch_region_updated_callback: Optional[Callable] = field()
+    on_epoch_region_selection_toggled_callback: Optional[Callable] = field()
 
     plots: RenderPlots = field(init=False)
     changed_laps_df: pd.DataFrame = field(init=False)
 
+    loaded_track_limits: Optional[Dict] = field(default=None, metadata={'desc':'a dictionary of track limits to be plotted as horizontal lines over the laps'})
+
+
     _pos_variable_names = ('x_smooth', 'velocity_x_smooth', 'acceleration_x_smooth')
     # _pos_variable_names = ('x', 'velocity_x', 'acceleration_x')
 
-    
+    def connect_double_click_event(self):
+        print("Connecting double-click event...")
+        self.plots.viewboxes[0].scene().sigMouseClicked.connect(self.on_mouse_click)
 
+    def on_mouse_click(self, event):
+        print(f"Mouse click detected: {event}")
+        if event.double():
+            print("Double-click detected!")
+            pos = event.scenePos()
+            viewbox = self.plots.viewboxes[0]
+            if viewbox.sceneBoundingRect().contains(pos):
+                mouse_point = viewbox.mapSceneToView(pos)
+                t_start = mouse_point.x()
+                t_end = t_start + 1.0  # Default width of 1.0 units
+                new_epoch_label = f'New Epoch {len(self.curr_laps_df) + 1}'
+                new_epoch = {
+                    'start': t_start,
+                    'stop': t_end,
+                    'lap_id': len(self.curr_laps_df) + 1,
+                    'label': new_epoch_label,
+                    'lap_dir': 1,
+                    'is_LR_dir': True,
+                    'lap_color': DisplayColorsEnum.Laps.LR,
+                    'lap_accent_color': '#c4ff26de',
+                    'is_included': True
+                }
+                print(f"Adding new epoch: {new_epoch}")
+                self.curr_laps_df = self.curr_laps_df.append(new_epoch, ignore_index=True)
+                self.add_epoch_region(new_epoch)
+
+    def show_context_menu(self, screen_pos, mouse_point):
+        context_menu = QtWidgets.QMenu()
+        remove_action = context_menu.addAction("Remove")
+        action = context_menu.exec_(screen_pos)
+        if action == remove_action:
+            self.remove_epoch_at(mouse_point)
+
+    def remove_epoch_at(self, mouse_point):
+        for label, region in self.plots.lap_epoch_widgets.items():
+            if region.getRegion()[0] <= mouse_point.x() <= region.getRegion()[1]:
+                print(f"Removing epoch: {label}")
+                region.setParentItem(None)  # Remove the region from the plot
+                del self.plots.lap_epoch_widgets[label]
+                del self.plots.lap_epoch_labels[label]
+                self.curr_laps_df = self.curr_laps_df[self.curr_laps_df['label'] != label]
+                break
+
+    def add_epoch_region(self, epoch):
+        print(f"Creating epoch region for: {epoch}")
+        v1 = self.plots.viewboxes[0]
+        epoch_linear_region, epoch_region_label = build_pyqtgraph_epoch_indicator_regions(
+            v1, t_start=epoch['start'], t_stop=epoch['stop'], epoch_label=epoch['label'], movable=True,
+            **dict(pen=pg.mkPen(f'{epoch["lap_color"]}d6', width=1.0), brush=pg.mkBrush(f"{epoch['lap_color']}42"),
+                   hoverBrush=pg.mkBrush(f"{epoch['lap_color']}a8"), hoverPen=pg.mkPen(epoch['lap_accent_color'], width=2.5)),
+            custom_bound_data=epoch['lap_id']
+        )
+        self.plots.lap_epoch_widgets[epoch['label']] = epoch_linear_region
+        self.plots.lap_epoch_labels[epoch['label']] = epoch_region_label
+        epoch_linear_region.sigRegionChangeFinished.connect(self.on_epoch_region_updated)
+        epoch_linear_region.sigClicked.connect(self.on_epoch_region_selection_toggled)
 
     @classmethod
     def add_visualization_columns(cls, curr_laps_df: pd.DataFrame) -> pd.DataFrame:
@@ -90,10 +169,21 @@ class EpochsEditor:
             # curr_laps_df.loc[(curr_laps_df['lap_dir'] > 0), 'lap_color'] = DisplayColorsEnum.Laps.LR
             # curr_laps_df.loc[(curr_laps_df['lap_dir'] > 0), 'lap_accent_color'] = '#c4ff26de'
 
+
+        ## add the 'is_included' column
+        if 'is_included' not in curr_laps_df.columns:
+            curr_laps_df['is_included'] = True ## all are included by default
+
+        # curr_laps_df['lap_color'] = DisplayColorsEnum.Laps.RL
+        # curr_laps_df['lap_accent_color'] = '#6227ffde'
+        
+        # curr_laps_df.loc[(curr_laps_df['is_included']), 'lap_color'] = DisplayColorsEnum.Laps.LR
+        # curr_laps_df.loc[(curr_laps_df['is_included']), 'lap_color'] = DisplayColorsEnum.Laps.LR
+
         return curr_laps_df
 
     @classmethod
-    def perform_plot_laps_diagnoser(cls, pos_df: pd.DataFrame, curr_laps_df: pd.DataFrame, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None):
+    def perform_plot_laps_diagnoser(cls, pos_df: pd.DataFrame, curr_laps_df: pd.DataFrame, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None, on_epoch_region_selection_toggled_callback=None, loaded_track_limits=None, grid_bin_bounds=None):
         """
             from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.EpochsEditorItem import perform_plot_laps_diagnoser
             plots_obj = EpochsEditor.perform_plot_laps_diagnoser(pos_df, curr_laps_df, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=_on_epoch_region_updated)
@@ -121,13 +211,51 @@ class EpochsEditor:
         # sub1.addLabel(axis='bottom', text='time')
 
         sub1.nextRow()
-        v1 = sub1.addViewBox()
-        ax_pos = pg.PlotDataItem(x=pos_df.t.to_numpy(), y=pos_df[pos_variable_names[0]].to_numpy(), pen='white', name=pos_variable_names[0])
+        v1 = CustomViewBox()
+        
+        track_lines = dict() 
+
+        if grid_bin_bounds is not None:
+            # Draws the grid_bin_bounds for x-axis thick horizontal lines ______________________________________________________________ #
+            grid_bin_bounds_xlim_start, grid_bin_bounds_xlim_end = grid_bin_bounds[0] ## x-axis
+            grid_bin_bounds_xlim_pen_style_dict = dict(color='#ca0000', width=1.0)
+    
+            track_lines['grid_bin_bounds_xlim_start'] = pg.InfiniteLine(pos=grid_bin_bounds_xlim_start, angle=0, movable=False, pen=pg.mkPen(**grid_bin_bounds_xlim_pen_style_dict), label='grid_bin_bounds_min')
+            track_lines['grid_bin_bounds_xlim_end'] = pg.InfiniteLine(pos=grid_bin_bounds_xlim_end, angle=0, movable=False, pen=pg.mkPen(**grid_bin_bounds_xlim_pen_style_dict), label='grid_bin_bounds_max')
+
+        if loaded_track_limits is not None:
+            # Draws the track boundaries as dotted horizontal lines ______________________________________________________________ #
+            long_xlim_start, long_xlim_end = loaded_track_limits['long_xlim']
+            long_xlim_pen_style_dict = dict(color='#b6b6b6ff', width=0.5, style=pg.QtCore.Qt.DashLine)
+    
+            track_lines['long_xlim_start'] = pg.InfiniteLine(pos=long_xlim_start, angle=0, movable=False, pen=pg.mkPen(**long_xlim_pen_style_dict))
+            track_lines['long_xlim_end'] = pg.InfiniteLine(pos=long_xlim_end, angle=0, movable=False, pen=pg.mkPen(**long_xlim_pen_style_dict))
+                        
+            short_xlim_start, short_xlim_end = loaded_track_limits['short_xlim']
+            short_xlim_pen_style_dict = dict(color='#b6b6b6ff', width=0.5, style=pg.QtCore.Qt.DashLine)
+    
+            track_lines['short_xlim_start'] = pg.InfiniteLine(pos=short_xlim_start, angle=0, movable=False, pen=pg.mkPen(**short_xlim_pen_style_dict), label='loaded_track_limits')
+            track_lines['short_xlim_end'] = pg.InfiniteLine(pos=short_xlim_end, angle=0, movable=False, pen=pg.mkPen(**short_xlim_pen_style_dict))
+    
+
+        ## Add all lines to the viewbox and store them in the additional_items dictionary
+        for k, vline in track_lines.items():
+            v1.addItem(vline)
+            additional_items[f'{k}_line'] = vline
+            
+
+
+
+        # Draws the lap positions as a white line _____________________________________________________________________________________ #
+        ax_pos = pg.PlotDataItem(x=pos_df.t.to_numpy(), y=pos_df[pos_variable_names[0]].to_numpy(), pen='white', name=pos_variable_names[0]) # Draws the laps as white lines
+
+
         v1.setMouseEnabled(x=True, y=False)
         # v1.enableAutoRange(x=False, y=True)
         # v1.setXRange(300, 450)
         # v1.setAutoVisible(x=False, y=True)
         v1.addItem(ax_pos)
+        sub1.addItem(v1)
 
         # legend_size = (80,60) # fixed size legend
         legend_size = None # auto-sizing legend to contents
@@ -149,12 +277,13 @@ class EpochsEditor:
 
         if include_velocity:
             sub1.nextRow()
-            v2 = sub1.addViewBox()
+            v2 = CustomViewBox()
             ax_velocity = pg.PlotDataItem(x=pos_df.t.to_numpy(), y=pos_df[pos_variable_names[1]].to_numpy(), pen='#21b9ffcb', name=pos_variable_names[1])
             
             v2.setMouseEnabled(x=True, y=False)
             v2.setXLink(v1)
             v2.addItem(ax_velocity)
+            sub1.addItem(v2)
             legend.addItem(ax_velocity, pos_variable_names[1])
             position_plots.append(ax_velocity)
             viewboxes.append(v2)
@@ -178,13 +307,26 @@ class EpochsEditor:
             if epoch_linear_region is None:
                 ## Create a new one:
                 # add alpha
-                epoch_linear_region, epoch_region_label = build_pyqtgraph_epoch_indicator_regions(v1, t_start=a_lap.start, t_stop=a_lap.stop, epoch_label=a_lap.label, movable=True, **dict(pen=pg.mkPen(f'{a_lap.lap_color}d6', width=1.0), brush=pg.mkBrush(f"{a_lap.lap_color}42"), hoverBrush=pg.mkBrush(f"{a_lap.lap_color}a8"), hoverPen=pg.mkPen(a_lap.lap_accent_color, width=2.5)), custom_bound_data=a_lap.Index)
-                
+                epoch_linear_region, epoch_region_label = build_pyqtgraph_epoch_indicator_regions(v1, t_start=a_lap.start, t_stop=a_lap.stop, epoch_label=a_lap.label, movable=True, removable=True, **dict(pen=pg.mkPen(f'{a_lap.lap_color}d6', width=1.0), brush=pg.mkBrush(f"{a_lap.lap_color}42"), hoverBrush=pg.mkBrush(f"{a_lap.lap_color}a8"), hoverPen=pg.mkPen(a_lap.lap_accent_color, width=2.5)), 
+                                                                                                  custom_bound_data=a_lap.Index)                
                 lap_epoch_widgets[a_lap.label] = epoch_linear_region
                 lap_epoch_labels[a_lap.label] = epoch_region_label
                 if on_epoch_region_updated_callback is not None:
                     epoch_linear_region.sigRegionChangeFinished.connect(on_epoch_region_updated_callback)
                 
+                if on_epoch_region_selection_toggled_callback is not None:
+                    epoch_linear_region.sigClicked.connect(on_epoch_region_selection_toggled_callback)
+
+
+                # Provide a callback to remove the ROI (and its children) when
+                # "remove" is selected from the context menu.
+                def remove():
+                    v1.removeItem(epoch_linear_region)
+                epoch_linear_region.sigRemoveRequested.connect(remove)
+
+                # epoch_linear_region.getContextMenus(
+                
+
         
         plots = RenderPlots('lap_debugger_plot', win=win,
             sub_layouts=sub_layouts, viewboxes=viewboxes, position_plots=position_plots,
@@ -195,7 +337,7 @@ class EpochsEditor:
 
 
     @classmethod
-    def init_laps_diagnoser(cls, pos_df: pd.DataFrame, curr_laps_df: pd.DataFrame, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None):
+    def init_laps_diagnoser(cls, pos_df: pd.DataFrame, curr_laps_df: pd.DataFrame, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None, on_epoch_region_selection_toggled_callback=None, loaded_track_limits=None, grid_bin_bounds=None):
         """ 
 
         Usage:
@@ -213,15 +355,16 @@ class EpochsEditor:
             epochs_editor = EpochsEditor.init_laps_diagnoser(pos_df, curr_laps_df, include_velocity=True, include_accel=False)
         """
         curr_laps_df = cls.add_visualization_columns(curr_laps_df=curr_laps_df)
-        _obj = cls(pos_df=pos_df, curr_laps_df=curr_laps_df, on_epoch_region_updated_callback=on_epoch_region_updated_callback)
+        _obj = cls(pos_df=pos_df, curr_laps_df=curr_laps_df, on_epoch_region_updated_callback=on_epoch_region_updated_callback, on_epoch_region_selection_toggled_callback=on_epoch_region_selection_toggled_callback, loaded_track_limits=loaded_track_limits)
         _obj.changed_laps_df = _obj.curr_laps_df.iloc[:0,:].copy() # should be in attrs_post_init
-        _obj.plots = cls.perform_plot_laps_diagnoser(pos_df, curr_laps_df, include_velocity=include_velocity, include_accel=include_accel, on_epoch_region_updated_callback=_obj.on_epoch_region_updated)
+        _obj.plots = cls.perform_plot_laps_diagnoser(pos_df, curr_laps_df, include_velocity=include_velocity, include_accel=include_accel, on_epoch_region_updated_callback=_obj.on_epoch_region_updated, on_epoch_region_selection_toggled_callback=_obj.on_epoch_region_selection_toggled, loaded_track_limits=loaded_track_limits, grid_bin_bounds=grid_bin_bounds)
+        _obj.connect_double_click_event()  # Connect the double-click event after plots are initialized
         return _obj
 
 
 
     @classmethod
-    def init_from_session(cls, sess, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None):
+    def init_from_session(cls, sess, include_velocity=True, include_accel=True, on_epoch_region_updated_callback=None, on_epoch_region_selection_toggled_callback=None, grid_bin_bounds=None):
         """ initialize from a session object. Does not modify the session. """
         # pos_df = sess.compute_position_laps() # ensures the laps are computed if they need to be:
         position_obj = copy.deepcopy(sess.position)
@@ -231,15 +374,15 @@ class EpochsEditor:
         # Drop rows with missing data in columns: 't', 'velocity_x_smooth' and 2 other columns. This occurs from smoothing
         pos_df = pos_df.dropna(subset=['t', 'x_smooth', 'velocity_x_smooth', 'acceleration_x_smooth']).reset_index(drop=True)
         curr_laps_df = sess.laps.to_dataframe()
-
-        return cls.init_laps_diagnoser(pos_df=pos_df, curr_laps_df=curr_laps_df, include_velocity=include_velocity, include_accel=include_accel, on_epoch_region_updated_callback=on_epoch_region_updated_callback)
+        loaded_track_limits = copy.deepcopy(sess.config.loaded_track_limits)
+        loaded_track_limits['x_midpoint'] = sess.config.x_midpoint
+        return cls.init_laps_diagnoser(pos_df=pos_df, curr_laps_df=curr_laps_df, include_velocity=include_velocity, include_accel=include_accel, on_epoch_region_updated_callback=on_epoch_region_updated_callback, on_epoch_region_selection_toggled_callback=on_epoch_region_selection_toggled_callback, loaded_track_limits=loaded_track_limits, grid_bin_bounds=grid_bin_bounds)
     
-
 
 
     # @QtCore.pyqtSlot(object)
     def on_epoch_region_updated(self, epoch_region_item):
-        print(f'epoch_region_item: {epoch_region_item}, epoch_region_item.custom_bound_data: {epoch_region_item.custom_bound_data}')
+        print(f'.on_epoch_region_updated(...): epoch_region_item: {epoch_region_item}, epoch_region_item.custom_bound_data: {epoch_region_item.custom_bound_data}')
         epoch_index = epoch_region_item.custom_bound_data
         
         prev_start, prev_stop = self.curr_laps_df.loc[epoch_index].start, self.curr_laps_df.loc[epoch_index].stop
@@ -250,7 +393,7 @@ class EpochsEditor:
         stop_changed = np.logical_not(np.isclose(prev_stop, new_stop))
         either_changed = stop_changed or start_changed
         if either_changed:
-            print(f'either_changed! change_delta: {change_delta}')
+            print(f'\teither_changed! change_delta: {change_delta}')
             self.changed_laps_df.loc[epoch_index, :] = self.curr_laps_df.loc[epoch_index] # copy the existing row
             self.changed_laps_df.loc[epoch_index, 'start'] =  new_start
             self.changed_laps_df.loc[epoch_index, 'stop'] =  new_stop
@@ -258,6 +401,55 @@ class EpochsEditor:
 
         if self.on_epoch_region_updated_callback is not None:
             self.on_epoch_region_updated_callback(epoch_region_item) # pass through the change
+            
+
+
+    def on_epoch_region_selection_toggled(self, epoch_region_item):
+        print(f'.on_epoch_region_selection_toggled(...): epoch_region_item: {epoch_region_item}, epoch_region_item.custom_bound_data: {epoch_region_item.custom_bound_data}')
+        epoch_index = epoch_region_item.custom_bound_data       
+        print(f'\tepoch_index: {epoch_index}')
+         
+        # prev_start, prev_stop = self.curr_laps_df.loc[epoch_index].start, self.curr_laps_df.loc[epoch_index].stop
+        # # curr_laps_df.loc[epoch_index]
+        # new_start, new_stop = epoch_region_item.getRegion()
+        # change_delta = ((prev_start- new_start), (prev_stop-new_stop))
+        # start_changed = np.logical_not(np.isclose(prev_start, new_start))
+        # stop_changed = np.logical_not(np.isclose(prev_stop, new_stop))
+        # either_changed = stop_changed or start_changed
+        # if either_changed:
+        #     print(f'\teither_changed! change_delta: {change_delta}')
+        #     self.changed_laps_df.loc[epoch_index, :] = self.curr_laps_df.loc[epoch_index] # copy the existing row
+        #     self.changed_laps_df.loc[epoch_index, 'start'] =  new_start
+        #     self.changed_laps_df.loc[epoch_index, 'stop'] =  new_stop
+        #     self.changed_laps_df.loc[epoch_index, 'duration'] =  (new_stop - new_start)
+
+        ## Toggle the current item
+        if 'is_included' not in self.curr_laps_df.columns:
+            self.curr_laps_df['is_included'] = True
+
+        ## toggle the current item:
+        self.curr_laps_df.loc[epoch_index, 'is_included'] = (not self.curr_laps_df.loc[epoch_index, 'is_included']) ## toggle
+        print(f"\tself.curr_laps_df.loc[epoch_index, 'is_included']: {self.curr_laps_df.loc[epoch_index, 'is_included']}")
+
+        # if ('lap_color' not in curr_laps_df.columns) or ('lap_accent_color' not in curr_laps_df.columns):
+        #     curr_laps_df['lap_color'] = DisplayColorsEnum.Laps.RL
+        #     curr_laps_df['lap_accent_color'] = '#6227ffde'
+
+        #     # lap_direction_df_key: str = 'lap_dir'
+        #     lap_direction_df_key: str = 'is_LR_dir'
+        #     assert lap_direction_df_key in curr_laps_df.columns, f"lap_direction_df_key ({lap_direction_df_key}) missing from curr_laps_df.columns: {list(curr_laps_df.columns)}"
+        #     curr_laps_df.loc[(curr_laps_df['is_LR_dir']), 'lap_color'] = DisplayColorsEnum.Laps.LR
+        #     curr_laps_df.loc[(curr_laps_df['is_LR_dir']), 'lap_accent_color'] = '#c4ff26de'
+
+        #     # assert 'lap_dir' in curr_laps_df.columns, f"'lap_dir' missing from curr_laps_df.columns: {list(curr_laps_df.columns)}"
+        #     # curr_laps_df.loc[(curr_laps_df['lap_dir'] > 0), 'lap_color'] = DisplayColorsEnum.Laps.LR
+        #     # curr_laps_df.loc[(curr_laps_df['lap_dir'] > 0), 'lap_accent_color'] = '#c4ff26de'
+            
+
+        if self.on_epoch_region_selection_toggled_callback is not None:
+            self.on_epoch_region_selection_toggled_callback(epoch_region_item) # pass through the change
+            
+
 
     def get_user_labeled_epochs_df(self) -> pd.DataFrame:
         """ returns the complete epochs_df with user-labeled changes. returns all epochs, not just the ones modified. """
@@ -266,7 +458,7 @@ class EpochsEditor:
         user_labeled_laps_df.loc[self.changed_laps_df.index, :] = self.changed_laps_df
         user_labeled_laps_df['duration'] = user_labeled_laps_df['stop'] - user_labeled_laps_df['start']
         # Select columns: 'lap_dir', 'start' and 4 other columns
-        user_labeled_laps_df = user_labeled_laps_df.loc[:, ['lap_dir', 'start', 'stop', 'lap_id', 'label', 'duration']]
+        user_labeled_laps_df = user_labeled_laps_df.loc[:, ['lap_dir', 'start', 'stop', 'lap_id', 'label', 'duration', 'is_LR_dir']]
         return user_labeled_laps_df
     
 
@@ -341,6 +533,40 @@ class EpochsEditor:
             
         for a_name, an_idxs in zip(('desc_crossing_ending_idxs', 'asc_crossing_ending_idxs'), (desc_crossing_ending_idxs, asc_crossing_ending_idxs)):
             an_item = self.add_indicies_points_scatter(an_idxs, points_name_str=a_name, points_kwargs=endpoint_ending_kwargs, add_subplot_index=[0,1])
-        
+
+
+if __name__ == "__main__":
+    import sys
+    from PyQt5.QtWidgets import QApplication
+
+    app = QApplication(sys.argv)
+
+    # Example data
+    pos_data = {
+        't': np.linspace(0, 100, 500),
+        'x_smooth': np.sin(np.linspace(0, 10, 500)),
+        'velocity_x_smooth': np.cos(np.linspace(0, 10, 500)),
+        'acceleration_x_smooth': np.sin(np.linspace(0, 10, 500)) * np.cos(np.linspace(0, 10, 500))
+    }
+    pos_df = pd.DataFrame(pos_data)
+
+    laps_data = {
+        'start': [10, 30, 50, 70, 90],
+        'stop': [20, 40, 60, 80, 100],
+        'lap_id': [1, 2, 3, 4, 5],
+        'label': ['Lap 1', 'Lap 2', 'Lap 3', 'Lap 4', 'Lap 5'],
+        'lap_dir': [1, -1, 1, -1, 1],
+        'is_LR_dir': [True, False, True, False, True]
+    }
+    curr_laps_df = pd.DataFrame(laps_data)
+
+    epochs_editor = EpochsEditor.init_laps_diagnoser(pos_df, curr_laps_df, include_velocity=True, include_accel=True)
+    epochs_editor.plots.win.show()  # Ensure the window is shown
+
+    sys.exit(app.exec_())
+
+
+
+
 
 

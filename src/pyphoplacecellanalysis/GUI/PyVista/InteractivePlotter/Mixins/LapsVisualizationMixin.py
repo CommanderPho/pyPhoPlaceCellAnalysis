@@ -4,7 +4,11 @@ import pandas as pd
 import pyvista as pv
 
 class LapsVisualizationMixin:
-    """ Looks like some of this class is independent of the rendering library and some is VTK and PyVista specific """
+    """ Looks like some of this class is independent of the rendering library and some is VTK and PyVista specific
+    
+    from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.Mixins.LapsVisualizationMixin import LapsVisualizationMixin
+    
+    """
     
     @staticmethod
     def lines_from_points(points):

@@ -1,5 +1,5 @@
 from typing import Callable
-from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.LinearRegionItem import LinearRegionItem
 # from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.GraphicsObject import GraphicsObject
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.CustomInfiniteLine import CustomInfiniteLine
@@ -60,10 +60,12 @@ class CustomLinearRegionItem(DraggableGraphicsWidgetMixin, LinearRegionItem):
     
             
     """
-    
+    # sigHoverEvent = QtCore.Signal(object)
+    sigClicked = QtCore.Signal(object, object)
+    sigRemoveRequested = QtCore.Signal(object)
 
     def __init__(self, values=(0, 1), orientation='vertical', brush=None, pen=None, hoverBrush=None, hoverPen=None, movable=True, bounds=None, span=(0, 1), swapMode='sort', clipItem=None,
-                 regionAreaMouseInteractionCriteria: MouseInteractionCriteria=None, endLinesMouseInteractionCriteria: MouseInteractionCriteria=None, custom_bound_data=None):
+                 regionAreaMouseInteractionCriteria: MouseInteractionCriteria=None, endLinesMouseInteractionCriteria: MouseInteractionCriteria=None, custom_bound_data=None, removable=True):
         """Create a new LinearRegionItem.
         
         ==============  =====================================================================
@@ -107,7 +109,8 @@ class CustomLinearRegionItem(DraggableGraphicsWidgetMixin, LinearRegionItem):
         
         # Call parent __init__ function:
         LinearRegionItem.__init__(self, values=values, orientation=orientation, brush=brush, pen=pen, hoverBrush=hoverBrush, hoverPen=hoverPen, movable=movable, bounds=bounds, span=span, swapMode=swapMode, clipItem=clipItem)
-        
+        self.menu = None ## to hold a reference to the context menu
+        self.removable = removable
         self._custom_bound_data = custom_bound_data
         
         ## Setup the mouse action critiera for the background rectangle (excluding the two end-position lines, which are set below):
@@ -115,7 +118,7 @@ class CustomLinearRegionItem(DraggableGraphicsWidgetMixin, LinearRegionItem):
             # Original/Default Conditions
             regionAreaMouseInteractionCriteria = MouseInteractionCriteria(drag=lambda an_evt: (an_evt.button() == QtCore.Qt.MouseButton.LeftButton),
                                                                         hover=lambda an_evt: (an_evt.acceptDrags(QtCore.Qt.MouseButton.LeftButton)),
-                                                                        click=lambda an_evt: (an_evt.button() == QtCore.Qt.MouseButton.RightButton)
+                                                                        click=lambda an_evt: (an_evt.button() == QtCore.Qt.MouseButton.RightButton) ## allow right-clicking
             )
             
             # Actually override drag:
@@ -292,6 +295,16 @@ class CustomLinearRegionItem(DraggableGraphicsWidgetMixin, LinearRegionItem):
             self.moving = False
             self.sigRegionChanged.emit(self)
             self.sigRegionChangeFinished.emit(self)
+        # if ev.button() == QtCore.Qt.MouseButton.RightButton and self.contextMenuEnabled():
+        if click_criteria_fn(ev) and self.contextMenuEnabled():
+            self.raiseContextMenu(ev)
+            ev.accept()
+        elif self.acceptedMouseButtons() & ev.button():
+            ev.accept()
+            self.sigClicked.emit(self, ev)
+        else:
+            ev.ignore()
+            
 
     def hoverEvent(self, ev):
         hover_criteria_fn = self.custom_mouse_hover_criteria_fn
@@ -302,3 +315,40 @@ class CustomLinearRegionItem(DraggableGraphicsWidgetMixin, LinearRegionItem):
         else:
             self.setMouseHover(False)
             
+
+
+    # ==================================================================================================================== #
+    # Context Menus                                                                                                        #
+    # ==================================================================================================================== #
+    def contextMenuEnabled(self):
+        return self.removable
+
+
+    def raiseContextMenu(self, ev):
+        if not self.contextMenuEnabled():
+            return
+        menu = self.getMenu()
+        menu = self.scene().addParentContextMenus(self, menu, ev)
+        pos = ev.screenPos()
+        menu.popup(QtCore.QPoint(int(pos.x()), int(pos.y())))
+
+    def getMenu(self):
+        if self.menu is None:
+            self.menu = QtWidgets.QMenu()
+            self.menu.setTitle("Epoch")
+            remAct = QtGui.QAction("Remove Epoch", self.menu)
+            remAct.triggered.connect(self.removeClicked)
+            self.menu.addAction(remAct)
+            self.menu.remAct = remAct
+        # ROI menu may be requested when showing the handle context menu, so
+        # return the menu but disable it if the ROI isn't removable
+        self.menu.setEnabled(self.contextMenuEnabled())
+        return self.menu
+
+    def removeClicked(self):
+        ## Send remove event only after we have exited the menu event handler
+        QtCore.QTimer.singleShot(0, self._emitRemoveRequest)
+
+    def _emitRemoveRequest(self):
+        self.sigRemoveRequested.emit(self)
+

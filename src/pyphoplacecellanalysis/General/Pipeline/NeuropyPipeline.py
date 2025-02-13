@@ -127,6 +127,14 @@ class PipelineSavingScheme(Enum):
                 return cls._init_from_upper_name_dict().get(name.upper(), fallback_value)
             elif isinstance(name, cls):
                 return name
+            else:
+                inner_name =  getattr(name, 'name', None)
+                if inner_name is not None:
+                    ## the class type is just messed up so isinstance won't work, just use the name
+                    return cls._init_from_upper_name_dict().get(inner_name.upper(), fallback_value)
+                else:
+                    raise NotImplementedError("Invalid parameters provided.")
+
         elif value is not None:
             if isinstance(value, cls):
                 return value
@@ -416,8 +424,8 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
                 finalized_loaded_sess_pickle_path.unlink() # .unlink() deletes a file
                 print(f"\t {finalized_loaded_sess_pickle_path} deleted.")
                 loaded_pipeline = None
-            except BaseException as e:
-                raise e
+            except Exception as e:
+                raise
 
             
 
@@ -574,8 +582,14 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
     @classmethod
     def compare_pipelines(cls, lhs, rhs, debug_print=False):
-        lhs_compare_dict = cls.build_pipeline_compare_dict(lhs)
-        rhs_compare_dict = cls.build_pipeline_compare_dict(rhs)
+        if not isinstance(lhs, dict):
+            lhs_compare_dict = cls.build_pipeline_compare_dict(lhs)
+        else:
+            lhs_compare_dict = lhs
+        if not isinstance(rhs, dict):
+            rhs_compare_dict = cls.build_pipeline_compare_dict(rhs)
+        else:
+            rhs_compare_dict = rhs
         curr_diff = DiffableObject.compute_diff(lhs_compare_dict, rhs_compare_dict)
         if debug_print:
             print(f'curr_diff: {curr_diff}')
@@ -786,8 +800,8 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         """
         #TODO 2023-06-13 17:30: - [ ] The current operation doesn't make sense for PipelineSavingScheme.TEMP_THEN_OVERWRITE: it currently saves the new pipeline to a temporary file before replacing the existing file. This means after the operation there are two identical copies of the same pipeline. 
             # should make a backup of the existing file, not the new one
-        saving_mode = PipelineSavingScheme.init(saving_mode)
-
+        # saving_mode = PipelineSavingScheme.init(saving_mode)
+        saving_mode = PipelineSavingScheme.init(name=saving_mode.name)
         if not saving_mode.shouldSave:
             print(f'WARNING: saving_mode is SKIP_SAVING so pipeline will not be saved despite calling .save_pipeline(...).')
             self.logger.warning(f'WARNING: saving_mode is SKIP_SAVING so pipeline will not be saved despite calling .save_pipeline(...).')

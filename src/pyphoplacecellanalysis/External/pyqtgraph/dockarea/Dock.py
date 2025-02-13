@@ -10,11 +10,38 @@ from .DockDrop import DockDrop
 class DockDisplayConfig(object):
     """Holds the display and configuration options for a Dock, such as how to format its title bar (color and font), whether it's closable, etc."""
     showCloseButton: bool = field(default=True)
+    showCollapseButton: bool = field(default=False)
+    showGroupButton: bool = field(default=False)
+    hideTitleBar: bool = field(default=False)
     fontSize: str = field(default='10px')
     corner_radius: str = field(default='2px')
     # fontSize: str = field(default='10px')
     custom_get_stylesheet_fn: Callable = field(default=None) #(self, orientation, is_dim)
-        
+    _orientation: Optional[str] = field(default=None, alias="orientation", metadata={'valid_values': [None, 'auto', 'vertical', 'horizontal']}) # alias="orientation" just refers to the initializer, it doesn't interfere with the @property
+
+    @property
+    def orientation(self) -> str:
+        """The orientation property."""
+        return (self._orientation or 'horizontal')   
+    @orientation.setter
+    def orientation(self, value):
+        self._orientation = value
+
+    @property
+    def shouldAutoOrient(self) -> bool:
+        """ Whether the dock should auto-orient based on the aspect ratioy."""
+        if self.orientation is None:
+            return True
+        else:
+            return (self.orientation == 'auto') ## only if "auto" instead of ['vertical', 'horizontal']
+    @shouldAutoOrient.setter
+    def shouldAutoOrient(self, value: bool):
+        if value:
+            self.orientation = 'auto' # only if True: change the orientation to 'auto'
+        else:
+            print(f"WARN: setting shouldAutoOrient to False does nothing, as we do not know which concrete value (['vertical', 'horizontal']) is wanted.")
+
+
     def get_colors(self, orientation, is_dim):
         """ point of customization """
         if is_dim:
@@ -73,9 +100,29 @@ class DockDisplayConfig(object):
     
 
 class Dock(QtWidgets.QWidget, DockDrop):
-
+    """ 
+    
+    self.widgetArea: QWidget - the main container for the contents of the dock, aside from the titlebar at the top
+    
+    """
     sigStretchChanged = QtCore.Signal()
     sigClosed = QtCore.Signal(object)
+    ## passthrough signals from `DockLabel`
+    # sigClicked = QtCore.Signal(object, object)
+    sigCollapseClicked = QtCore.Signal(object)
+    sigGroupClicked = QtCore.Signal(object)
+
+    @property
+    def config(self) -> Optional[DockDisplayConfig]:
+        """The config property."""
+        if self.label is None:
+            return None
+        return self.label.config
+    @config.setter
+    def config(self, value: Optional[DockDisplayConfig]):
+        assert self.label is not None
+        self.label.config = value
+
 
     def __init__(self, name, area=None, size=(10, 10), widget=None, hideTitle=False, autoOrientation=True, display_config:Optional[DockDisplayConfig]=None, **kwargs): # , closable=False, fontSize="12px"
         QtWidgets.QWidget.__init__(self)
@@ -87,7 +134,10 @@ class Dock(QtWidgets.QWidget, DockDrop):
         
         if display_config is None:
             print(f"WARNING: Dock.__init__(...): display_config is None... using old-mode fallback. This will be eventually depricated.")
-            display_config = DockDisplayConfig(kwargs.get('closable', False), fontSize=kwargs.get('fontSize', "10px"), corner_radius='2px')
+            display_config = DockDisplayConfig(showCloseButton=kwargs.get('closable', False), fontSize=kwargs.get('fontSize', "10px"), corner_radius='2px', orientation='horizontal')
+            if autoOrientation:
+                display_config.orientation = 'auto' # only if True: change the orientation to 'auto'
+
             # raise NotImplementedError
         else:
             # print(f"WARNING: Dock.__init__(...): display_config is set, so the explicitly passed parameters 'closable' and 'fontSize' will be ignored.")
@@ -95,10 +145,19 @@ class Dock(QtWidgets.QWidget, DockDrop):
         self.label = DockLabel(name, self, display_config)
         if display_config.showCloseButton:
             self.label.sigCloseClicked.connect(self.close)
+        if display_config.showCollapseButton:
+            self.label.sigCollapseClicked.connect(self.on_collapse_btn_clicked)
+        if display_config.showGroupButton:
+            self.label.sigGroupClicked.connect(self.on_group_btn_clicked)
+
+
+        self.contentsHidden = False
         self.labelHidden = False
         self.moveLabel = True  ## If false, the dock is no longer allowed to move the label.
-        self.autoOrient = autoOrientation
-        self.orientation = 'horizontal'
+        # self.autoOrient = autoOrientation
+        # self.orientation = 'horizontal'
+        self.autoOrient = display_config.shouldAutoOrient
+        self.orientation = (display_config.orientation or 'horizontal')
         #self.label.setAlignment(QtCore.Qt.AlignmentFlag.AlignHCenter)
         self.topLayout = QtWidgets.QGridLayout()
         self.topLayout.setContentsMargins(0, 0, 0, 0)
@@ -194,6 +253,52 @@ class Dock(QtWidgets.QWidget, DockDrop):
         self.labelHidden = False
         self.allowedAreas.add('center')
         self.updateStyle()
+        
+
+    def toggleContentVisibility(self):
+        """ toggles the visibility of the contents (everything except the title bar) for this Dock.
+        """
+        new_is_hidden: bool = (not self.contentsHidden)
+        if new_is_hidden:
+            ## now hidden
+            self.hideContents()
+        else:
+            ## now visible
+            self.showContents()
+
+    def setContentVisibility(self, is_visible: bool):
+        """ toggles the visibility of the contents (everything except the title bar) for this Dock.
+        """
+        new_is_hidden: bool = (not is_visible)
+        if new_is_hidden:
+            ## now hidden
+            self.hideContents()
+        else:
+            ## now visible
+            self.showContents()
+
+    def hideContents(self):
+        """
+        Hide the contents (everything except the title bar) for this Dock.
+        """
+        print(f'hideContents()')
+        self.widgetArea.hide()
+        self.contentsHidden = True
+        self.updateStyle()
+        print(f'\tdone.')
+        
+    def showContents(self):
+        """
+        Show the contents (everything except the title bar) for this Dock.
+        """
+        print(f'showContents()')
+        self.widgetArea.show()
+        self.contentsHidden = False
+        self.updateStyle()
+        print(f'\tdone.')
+        
+
+
 
     def title(self):
         """
@@ -334,11 +439,30 @@ class Dock(QtWidgets.QWidget, DockDrop):
     def dropEvent(self, *args):
         DockDrop.dropEvent(self, *args)
 
+    ## pass-through events:
+    def on_collapse_btn_clicked(self):
+        """Remove this dock from the DockArea it lives inside."""
+        self.toggleContentVisibility()
+        self.label.updateCollapseButtonStyle(is_collapse_active=self.contentsHidden)
+        self.sigCollapseClicked.emit(self)
+        
+    def on_group_btn_clicked(self):
+        """Remove this dock from the DockArea it lives inside."""
+        self.sigGroupClicked.emit(self)
+        
+
+
+
+
+
 
 class DockLabel(VerticalLabel):
     """ the label and 'title bar' at the top of the Dock widget that displays the title and allows dragging/closing. """
     sigClicked = QtCore.Signal(object, object)
     sigCloseClicked = QtCore.Signal()
+    sigCollapseClicked = QtCore.Signal()
+    sigGroupClicked = QtCore.Signal()
+    
 
     def __init__(self, text, dock, display_config:DockDisplayConfig):
         self.dim = False
@@ -354,10 +478,28 @@ class DockLabel(VerticalLabel):
         self.mouseMoved = False
         self.setToolTip(self.text())
         self.closeButton = None
+        self.collapseButton = None
+        self.groupButton = None
+        self.num_total_title_bar_buttons: int = int(display_config.showCloseButton) + int(display_config.showCollapseButton) + int(display_config.showGroupButton)
+        # if self.num_total_title_bar_buttons > 1:
+        #     ## use a layout instead
+        #     # self.buttonBarLayout = QtWidgets.
+        #     pass
         if display_config.showCloseButton:
             self.closeButton = QtWidgets.QToolButton(self)
             self.closeButton.clicked.connect(self.sigCloseClicked)
             self.closeButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_TitleBarCloseButton))
+        if display_config.showCollapseButton:
+            self.collapseButton = QtWidgets.QToolButton(self)
+            self.collapseButton.clicked.connect(self.sigCollapseClicked)
+            self.collapseButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_TitleBarMinButton))
+        if display_config.showGroupButton:
+            self.groupButton = QtWidgets.QToolButton(self)
+            self.groupButton.clicked.connect(self.sigGroupClicked)
+            self.groupButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogListView))
+
+
+
 
     def updateStyle(self):
         updated_stylesheet = self.config.get_stylesheet(orientation=self.orientation, is_dim=self.dim)
@@ -405,29 +547,96 @@ class DockLabel(VerticalLabel):
 
     def resizeEvent(self, ev):
         debug_print: bool = False
-        if self.closeButton:
+        num_total_title_bar_buttons: int = self.num_total_title_bar_buttons
+        
+        # if self.closeButton:
+        #     if self.orientation == 'vertical':
+        #         ## sideways mode with bar on left
+        #         size = ev.size().width()
+        #         pos = QtCore.QPoint(0, 0)
+        #     else:
+        #         ## regular mode with bar on top
+        #         size = ev.size().height()
+        #         pos = QtCore.QPoint((ev.size().width() - size), 0)
+        #     self.closeButton.setFixedSize(QtCore.QSize(size, size))
+        #     self.closeButton.move(pos)
+        # ## END if self.closeButton...
+        button_size = None  # Track the common size for all buttons
+        current_x = 0  # Track horizontal positioning for buttons in horizontal layout
+        current_y = 0  # Track vertical positioning for buttons in vertical layout
+
+        # Calculate button sizes and positions
+        if self.closeButton or self.collapseButton or self.groupButton:
             if self.orientation == 'vertical':
                 ## sideways mode with bar on left
-                size = ev.size().width()
-                pos = QtCore.QPoint(0, 0)
+                button_size = ev.size().width()
             else:
                 ## regular mode with bar on top
-                size = ev.size().height()
-                pos = QtCore.QPoint(ev.size().width() - size, 0)
-            self.closeButton.setFixedSize(QtCore.QSize(size, size))
-            self.closeButton.move(pos)
+                button_size = ev.size().height()
+        ## END if self.closeButton or self.collapseButton or self.groupButton...
+        
+        # Position closeButton if it exists
+        if self.closeButton:
+            self.closeButton.setFixedSize(QtCore.QSize(button_size, button_size))
+            if self.orientation == 'vertical':
+                ## sideways mode with bar on left
+                self.closeButton.move(0, current_y)
+                current_y += button_size  # Stack buttons vertically
+            else:
+                ## regular mode with bar on top
+                # button_x = ((ev.size().width() - button_size) - current_x) ## right aligned
+                button_x = current_x ## left aligned
+                self.closeButton.move(button_x, 0)
+                current_x += button_size  # Stack buttons horizontally
         ## END if self.closeButton...
+        
+        # Position collapseButton if it exists
+        if self.collapseButton:
+            self.collapseButton.setFixedSize(QtCore.QSize(button_size, button_size))
+            if self.orientation == 'vertical':
+                ## sideways mode with bar on left
+                self.collapseButton.move(0, current_y)
+                current_y += button_size
+            else:
+                ## regular mode with bar on top
+                # button_x = ((ev.size().width() - button_size) - current_x) ## right aligned
+                button_x = current_x ## left aligned
+                self.collapseButton.move(button_x, 0)
+                current_x += button_size
+        ## END if self.collapseButton...
+        
+        # Position groupButton if it exists
+        if self.groupButton:
+            self.groupButton.setFixedSize(QtCore.QSize(button_size, button_size))
+            if self.orientation == 'vertical':
+                ## sideways mode with bar on left
+                self.groupButton.move(0, current_y)
+            else:
+                ## regular mode with bar on top
+                # button_x = ((ev.size().width() - button_size) - current_x) ## right aligned
+                button_x = current_x ## left aligned
+                self.groupButton.move(button_x, 0)
+                current_x += button_size
+        ## END if self.groupButton...    
+        button_occupied_space = ((button_size if button_size else 0) * num_total_title_bar_buttons)
+
         if self.elided_text_mode is not None:
             # Add elided text logic
             if debug_print:
                 print(f'self.elided_text_mode: {self.elided_text_mode} -- self.orientation: {self.orientation} -- w: {self.width()}, h: {self.height()}')
             font_metrics = QtGui.QFontMetrics(self.font())
+            
             if self.orientation == 'vertical':
                 ## sideways mode with bar on left
-                available_text_space = max(0, self.height() - (size if self.closeButton else 0))
+                # available_text_space = max(0, self.height() - (size if self.closeButton else 0))
+                available_text_space = max(0, self.height() - button_occupied_space)
+                
             else:
                 ## regular mode with bar on top
-                available_text_space = max(0, self.width() - (size if self.closeButton else 0))
+                # available_text_space = max(0, self.width() - (size if self.closeButton else 0))
+                available_text_space = max(0, self.width() - button_occupied_space)
+                
+
             if debug_print:
                 print(f'\tavailable_text_space: {available_text_space}')
             # Skip elision if available space is insufficient
@@ -443,3 +652,23 @@ class DockLabel(VerticalLabel):
                 print(f'self.elided_text_mode == None so skipping eliding -- self.orientation: {self.orientation}')
         ## END if self.elided_text_mode is not None...
         super(DockLabel,self).resizeEvent(ev)
+
+
+    def updateCollapseButtonStyle(self, is_collapse_active: bool):
+        """Updates the collapse button style based on the current state."""
+        if is_collapse_active:
+            self.collapseButton.setStyleSheet("""
+                QToolButton {
+                    background-color: #0078d7; /* Highlighted blue for collapsed state */
+                }
+            """)
+        else:
+            self.collapseButton.setStyleSheet("") ## clear the stylesheet
+                        
+            # self.collapseButton.setStyleSheet("""
+            #     QToolButton {
+            #         background-color: #000000; /* Light gray for collapsed state */
+            #     }
+            # """)
+        # self.collapseButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_TitleBarMinButton))
+        
