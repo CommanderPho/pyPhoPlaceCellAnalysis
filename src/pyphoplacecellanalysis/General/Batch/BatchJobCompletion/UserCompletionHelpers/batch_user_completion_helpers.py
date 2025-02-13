@@ -2157,308 +2157,328 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
 # ==================================================================================================================== #
 
 
-@metadata_attributes(short_name=None, tags=['grid_bin_bounds', 'grid_bin', 'FIXUP', 'post-hoc'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-13 12:33', related_items=['reload_exported_kdiba_session_position_info_mat_completion_function'])
-class PostHocPipelineFixup:
-    """ Fixes the grid_bin_bounds, grid_bin, track_limits, and some other properties and recomputes if needed.
+
+@function_attributes(short_name=None, tags=['UNFINISHED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
+def reload_kdiba_session_position_bounds_and_associated_info_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
+    """ Called to update the pipeline's important position info parameters (such as the grid_bin_bounds, positions, etc) from a loaded .mat file
     
     
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PostHocPipelineFixup
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import reload_kdiba_session_position_bounds_and_associated_info_completion_function
     
-    (did_any_change, change_dict), correct_grid_bin_bounds = PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(curr_active_pipeline=curr_active_pipeline, is_dry_run=True)
+    Results can be extracted from batch output by 
     
-    
-    #TODO 2025-02-13 12:35: - [ ] Format `FINAL_FIX_GRID_BIN_BOUNDS` as a user_ function, replace `reload_exported_kdiba_session_position_info_mat_completion_function` with it.
-    Inspired by `reload_exported_kdiba_session_position_info_mat_completion_function`, but does additional things, and performs needed recomputes.
-    
-    
+    # Extracts the callback results 'determine_session_t_delta_completion_function':
+    extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('determine_session_t_delta_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
+
+    ['basepath', 'session_spec', 'session_name', 'session_context', 'format_name', 'preprocessing_parameters', 'absolute_start_timestamp', 'position_sampling_rate_Hz', 'microseconds_to_seconds_conversion_factor', 'pix2cm', 'x_midpoint', 'loaded_track_limits', 'is_resolved', 'resolved_required_filespecs_dict', 'resolved_optional_filespecs_dict', 'x_unit_midpoint', 'first_valid_pos_time', 'last_valid_pos_time']
+
     """
-    across_session_results_extended_dict_data_name: str = 'PostHocPipelineFixup' # like 'position_info_mat_reload_completion_function'
+    from neuropy.utils.mixins.binning_helpers import safe_limit_num_grid_bin_values
+    from neuropy.core.session.Formats.SessionSpecifications import SessionConfig
+    from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder
+    from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDibaOldDataSessionFormatRegisteredClass
+    from neuropy.core.user_annotations import UserAnnotationsManager
 
-    @classmethod
-    def find_percent_pos_samples_within_grid_bin_bounds(cls, pos_df: pd.DataFrame, grid_bin_bounds):
-        """ sanity-checks the grid_bin_bounds against the pos_df to see what percent of positions fall within the bounds
+    # ==================================================================================================================== #
+    # NOTE: LOCAL CLASS DEFNITION                                                                                          #
+    # ==================================================================================================================== #
+    @metadata_attributes(short_name=None, tags=['grid_bin_bounds', 'grid_bin', 'FIXUP', 'post-hoc'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-13 12:33', related_items=['reload_exported_kdiba_session_position_info_mat_completion_function'])
+    class PostHocPipelineFixup:
+        """ Fixes the grid_bin_bounds, grid_bin, track_limits, and some other properties and recomputes if needed.
         
-        percentage_within_ranges, filtered_df = find_percent_pos_samples_within_grid_bin_bounds(pos_df=pos_df, grid_bin_bounds=correct_grid_bin_bounds)
         
-        percentage_within_ranges, filtered_df = find_percent_pos_samples_within_grid_bin_bounds(pos_df=pos_df, grid_bin_bounds=((0.0, 287.7697841726619), (115.10791366906477, 172.66187050359713)))
-
-        percentage_within_ranges, filtered_df = find_percent_pos_samples_within_grid_bin_bounds(pos_df=pos_df, grid_bin_bounds=((37.0773897438341, 250.69004399129707), (107.8177789584226, 113.7570079192343)))
-
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PostHocPipelineFixup
+        
+        (did_any_change, change_dict), correct_grid_bin_bounds = PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(curr_active_pipeline=curr_active_pipeline, is_dry_run=True)
+        
+        
+        #TODO 2025-02-13 12:35: - [ ] Format `FINAL_FIX_GRID_BIN_BOUNDS` as a user_ function, replace `reload_exported_kdiba_session_position_info_mat_completion_function` with it.
+        Inspired by `reload_exported_kdiba_session_position_info_mat_completion_function`, but does additional things, and performs needed recomputes.
+        
+        
         """
-        (xmin, xmax), (ymin, ymax) = grid_bin_bounds
-        pos_df = pos_df
-        # Filter the DataFrame for rows where 'x' and 'y' are within their respective ranges
-        filtered_df = pos_df[(pos_df['x'] >= xmin) & (pos_df['x'] <= xmax) & 
-                        (pos_df['y'] >= ymin) & (pos_df['y'] <= ymax)]
+        across_session_results_extended_dict_data_name: str = 'PostHocPipelineFixup' # like 'position_info_mat_reload_completion_function'
 
-        # Calculate the percentage of rows within both ranges
-        percentage_within_ranges = (len(filtered_df) / len(pos_df)) * 100
-        print(f'percentage_within_ranges: {percentage_within_ranges}')
-        return percentage_within_ranges, filtered_df
-
-    @function_attributes(short_name=None, tags=['active', 'fix', 'grid_bin_bounds'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-12 03:54', related_items=[])
-    @classmethod
-    def get_hardcoded_known_good_grid_bin_bounds(cls, curr_active_pipeline):
-        """ gets the actually correct grid_bin_bounds, fixing months worth of problems
-        
-        Usage:
-            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import get_hardcoded_known_good_grid_bin_bounds
-            correct_grid_bin_bounds = get_hardcoded_known_good_grid_bin_bounds(curr_active_pipeline)
-            correct_grid_bin_bounds
-
-        """
-        from neuropy.core.user_annotations import UserAnnotationsManager
-        a_session_context = curr_active_pipeline.get_session_context() # IdentifyingContext.try_init_from_session_key(session_str=a_session_uid, separator='|')
-        # session_uid: str = a_session_context.get_description(separator="|", include_property_names=False)
-        # last_valid_pos_time = UserAnnotationsManager.get_hardcoded_specific_session_override_dict().get(a_session_context, {}).get('track_end_t', None)
-        # first_valid_pos_time = UserAnnotationsManager.get_hardcoded_specific_session_override_dict().get(a_session_context, {}).get('track_start_t', None)
-        correct_grid_bin_bounds = UserAnnotationsManager.get_hardcoded_specific_session_override_dict().get(a_session_context, {}).get('grid_bin_bounds', None)
-        assert correct_grid_bin_bounds is not None, f"session: {a_session_context} was not found in overrides!"
-        return deepcopy(correct_grid_bin_bounds) ## returns the correct grid_bin_bounds for the pipeline
-
-
-    @function_attributes(short_name=None, tags=['IMPORTANT', 'hardcoded', 'override', 'grid_bin_bounds'], input_requires=[], output_provides=[], uses=['safe_limit_num_grid_bin_values'], used_by=[], creation_date='2025-02-12 08:17', related_items=[])
-    @classmethod
-    def HARD_OVERRIDE_grid_bin_bounds(cls, curr_active_pipeline, hard_manual_override_grid_bin_bounds = ((0.0, 287.7697841726619), (80.0, 200.0)), desired_grid_bin = (2.0, 2.0), max_allowed_num_bins=(60, 9), is_dry_run: bool=False):
-        """ manually overrides the `grid_bin_bounds` and `grid_bin` in all places needed to ensure they are correct. 
-
-        #TODO 2025-02-12 11:25: - [ ] Are these only the FILTERED sessions, meaning they neglect the `curr_active_pipeline.sess.*` properties?
-
+        @classmethod
+        def find_percent_pos_samples_within_grid_bin_bounds(cls, pos_df: pd.DataFrame, grid_bin_bounds):
+            """ sanity-checks the grid_bin_bounds against the pos_df to see what percent of positions fall within the bounds
             
-        did_any_change, change_dict = HARD_OVERRIDE_grid_bin_bounds(curr_active_pipeline, hard_manual_override_grid_bin_bounds = ((0.0, 287.7697841726619), (80.0, 200.0)))
-        change_dict
-        """
-        from neuropy.utils.mixins.binning_helpers import safe_limit_num_grid_bin_values
-        from neuropy.core.session.Formats.SessionSpecifications import SessionConfig
-        from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder
-        from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDibaOldDataSessionFormatRegisteredClass
-        from neuropy.core.user_annotations import UserAnnotationsManager
-        
-        active_data_mode_name: str = curr_active_pipeline.session_data_type
-        active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
-        active_data_mode_registered_class = active_data_session_types_registered_classes_dict[active_data_mode_name]
-        # active_data_mode_type_properties = known_data_session_type_properties_dict[active_data_mode_name]
+            percentage_within_ranges, filtered_df = find_percent_pos_samples_within_grid_bin_bounds(pos_df=pos_df, grid_bin_bounds=correct_grid_bin_bounds)
+            
+            percentage_within_ranges, filtered_df = find_percent_pos_samples_within_grid_bin_bounds(pos_df=pos_df, grid_bin_bounds=((0.0, 287.7697841726619), (115.10791366906477, 172.66187050359713)))
 
-        if is_dry_run:
-            print(f'NOTE: HARD_OVERRIDE_grid_bin_bounds(...): is_dry_run == True, so changes will be determined but not applied!')
+            percentage_within_ranges, filtered_df = find_percent_pos_samples_within_grid_bin_bounds(pos_df=pos_df, grid_bin_bounds=((37.0773897438341, 250.69004399129707), (107.8177789584226, 113.7570079192343)))
 
-        change_dict = {}
-
-        def _subfn_update_session_config(a_session, is_dry_run: bool=False):
-            """ captures: curr_active_pipeline, hard_manual_override_grid_bin_bounds, change_dict
             """
-            did_any_change: bool = False
+            (xmin, xmax), (ymin, ymax) = grid_bin_bounds
+            pos_df = pos_df
+            # Filter the DataFrame for rows where 'x' and 'y' are within their respective ranges
+            filtered_df = pos_df[(pos_df['x'] >= xmin) & (pos_df['x'] <= xmax) & 
+                            (pos_df['y'] >= ymin) & (pos_df['y'] <= ymax)]
+
+            # Calculate the percentage of rows within both ranges
+            percentage_within_ranges = (len(filtered_df) / len(pos_df)) * 100
+            print(f'percentage_within_ranges: {percentage_within_ranges}')
+            return percentage_within_ranges, filtered_df
+
+        @function_attributes(short_name=None, tags=['active', 'fix', 'grid_bin_bounds'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-12 03:54', related_items=[])
+        @classmethod
+        def get_hardcoded_known_good_grid_bin_bounds(cls, curr_active_pipeline):
+            """ gets the actually correct grid_bin_bounds, fixing months worth of problems
             
-            # sess_config: SessionConfig = SessionConfig(**deepcopy(a_session.config.__getstate__()))
-            a_session_context = a_session.get_context() # IdentifyingContext.try_init_from_session_key(session_str=a_session_uid, separator='|')
-            a_session_override_dict = UserAnnotationsManager.get_hardcoded_specific_session_override_dict().get(a_session_context, {})
-            
-            allowed_sess_Config_override_keys = ['pix2cm', 'real_unit_grid_bin_bounds', 'real_cm_grid_bin_bounds', 'grid_bin_bounds', 'grid_bin', 'track_start_t', 'track_end_t']
+            Usage:
+                from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import get_hardcoded_known_good_grid_bin_bounds
+                correct_grid_bin_bounds = get_hardcoded_known_good_grid_bin_bounds(curr_active_pipeline)
+                correct_grid_bin_bounds
 
-            # loaded_track_limits ________________________________________________________________________________________________ #
-            if not is_dry_run:
-                sess_config: SessionConfig = deepcopy(a_session.config)
-                # 'first_valid_pos_time'
-                a_session.config = sess_config
-                _bak_loaded_track_limits = deepcopy(a_session.config.loaded_track_limits)
-                ## Apply fn
-                a_session = active_data_mode_registered_class._default_kdiba_exported_load_position_info_mat(basepath=curr_active_pipeline.sess.basepath, session_name=curr_active_pipeline.session_name, session=a_session)
-                _new_loaded_track_limits = deepcopy(a_session.config.loaded_track_limits)
-                # did_change: bool = ((_bak_loaded_track_limits is None) or (_new_loaded_track_limits != _bak_loaded_track_limits))
-                # change_dict[f'filtered_sessions["{a_decoder_name}"]'] = {}
-                did_loaded_track_limits_change: bool = ((_bak_loaded_track_limits is None) or np.any((np.array(_new_loaded_track_limits) != np.array(_bak_loaded_track_limits))))
-                change_dict[f'filtered_sessions["{a_decoder_name}"].loaded_track_limits'] = did_loaded_track_limits_change
-                if did_loaded_track_limits_change:
-                    did_any_change = True
-            else:
-                print(f'loaded_track_limits are not correctly checked in is_dry_run==True mode.')
-
-            # all UserAnnotations overrides ______________________________________________________________________________________ #
-            for k, new_val in a_session_override_dict.items():
-                if k in allowed_sess_Config_override_keys:
-                    # session_uid: str = a_session_context.get_description(separator="|", include_property_names=False)
-                    # last_valid_pos_time = UserAnnotationsManager.get_hardcoded_specific_session_override_dict().get(a_session_context, {}).get('track_end_t', None)
-                    # first_valid_pos_time = UserAnnotationsManager.get_hardcoded_specific_session_override_dict().get(a_session_context, {}).get('track_start_t', None)
-                    _old_val = getattr(a_session.config, k, None)
-                    if _old_val is not None:
-                        _old_val = deepcopy(_old_val)
-
-                    will_change: bool = (_old_val != new_val)
-                    change_dict[f'filtered_sessions["{a_decoder_name}"].config.{k}'] = will_change
-                    if not is_dry_run:
-                        setattr(a_session.config, k, deepcopy(new_val))
-                    if will_change:
-                        did_any_change = True
+            """
+            a_session_context = curr_active_pipeline.get_session_context() # IdentifyingContext.try_init_from_session_key(session_str=a_session_uid, separator='|')
+            correct_grid_bin_bounds = UserAnnotationsManager.get_hardcoded_specific_session_override_dict().get(a_session_context, {}).get('grid_bin_bounds', None)
+            assert correct_grid_bin_bounds is not None, f"session: {a_session_context} was not found in overrides!"
+            return deepcopy(correct_grid_bin_bounds) ## returns the correct grid_bin_bounds for the pipeline
 
 
-            # grid_bin_bounds
-            # _old_val = deepcopy(a_session.config.grid_bin_bounds)
-            
-            _old_val = getattr(a_session.config, 'grid_bin_bounds', None)
-            if _old_val is not None:
-                _old_val = deepcopy(_old_val)
-            will_change: bool = (_old_val != hard_manual_override_grid_bin_bounds)
-            change_dict[f'filtered_sessions["{a_decoder_name}"].config.grid_bin_bounds'] = (change_dict.get(f'filtered_sessions["{a_decoder_name}"].config.grid_bin_bounds', False) | will_change)
-            if not is_dry_run:
-                a_session.config.grid_bin_bounds = deepcopy(hard_manual_override_grid_bin_bounds) ## FORCEIPLY UPDATE
-            if will_change:
-                did_any_change = True
-            
-            # grid_bin
-            # _old_val = deepcopy(a_session.config.grid_bin)
-            _old_val = getattr(a_session.config, 'grid_bin', None)
-            if _old_val is not None:
-                _old_val = deepcopy(_old_val)
-            (constrained_grid_bin_sizes, constrained_num_grid_bins) = safe_limit_num_grid_bin_values(hard_manual_override_grid_bin_bounds, desired_grid_bin_sizes=deepcopy(desired_grid_bin), max_allowed_num_bins=max_allowed_num_bins, debug_print=False)
-            will_change: bool = (_old_val != constrained_grid_bin_sizes)
-            change_dict[f'filtered_sessions["{a_decoder_name}"].config.grid_bin'] = (change_dict.get(f'filtered_sessions["{a_decoder_name}"].config.grid_bin', False) | will_change)
-            if not is_dry_run:
-                a_session.config.grid_bin = constrained_grid_bin_sizes
-            if will_change:
-                did_any_change = True
+        @function_attributes(short_name=None, tags=['IMPORTANT', 'hardcoded', 'override', 'grid_bin_bounds'], input_requires=[], output_provides=[], uses=['safe_limit_num_grid_bin_values'], used_by=[], creation_date='2025-02-12 08:17', related_items=[])
+        @classmethod
+        def HARD_OVERRIDE_grid_bin_bounds(cls, curr_active_pipeline, hard_manual_override_grid_bin_bounds = ((0.0, 287.7697841726619), (80.0, 200.0)), desired_grid_bin = (2.0, 2.0), max_allowed_num_bins=(60, 9), is_dry_run: bool=False):
+            """ manually overrides the `grid_bin_bounds` and `grid_bin` in all places needed to ensure they are correct. 
                 
+            did_any_change, change_dict = HARD_OVERRIDE_grid_bin_bounds(curr_active_pipeline, hard_manual_override_grid_bin_bounds = ((0.0, 287.7697841726619), (80.0, 200.0)))
+            change_dict
+            """            
+            active_data_mode_name: str = curr_active_pipeline.session_data_type
+            active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
+            active_data_mode_registered_class = active_data_session_types_registered_classes_dict[active_data_mode_name]
+            # active_data_mode_type_properties = known_data_session_type_properties_dict[active_data_mode_name]
 
-            return did_any_change, a_session
-        
-
-        # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
-        did_any_change: bool = False
-
-        for a_decoder_name, a_config in curr_active_pipeline.active_configs.items():
-            # a_config: InteractivePlaceCellConfig
-            _old_val = deepcopy(a_config.computation_config.pf_params.grid_bin_bounds)
-            will_change: bool = (_old_val != hard_manual_override_grid_bin_bounds)
-            change_dict[f'active_configs["{a_decoder_name}"]'] = will_change
-            grid_bin_bounds = deepcopy(hard_manual_override_grid_bin_bounds) ## FORCEIPLY UPDATE
-            if not is_dry_run:
-                a_config.computation_config.pf_params.grid_bin_bounds = grid_bin_bounds
-            (constrained_grid_bin_sizes, constrained_num_grid_bins) = safe_limit_num_grid_bin_values(grid_bin_bounds, desired_grid_bin_sizes=deepcopy(desired_grid_bin), max_allowed_num_bins=max_allowed_num_bins, debug_print=False)
-            if not is_dry_run:
-                a_config.computation_config.pf_params.grid_bin = constrained_grid_bin_sizes
-            if will_change:
-                did_any_change = True
-                
-        ## THE ONES THAT START WRONG
-        for a_decoder_name, a_config in curr_active_pipeline.computation_results.items():
-            # a_config: InteractivePlaceCellConfig
-            _old_val = deepcopy(a_config.computation_config.pf_params.grid_bin_bounds)
-            will_change: bool = (_old_val != hard_manual_override_grid_bin_bounds)
-            change_dict[f'computation_results["{a_decoder_name}"]'] = will_change
-            grid_bin_bounds = deepcopy(hard_manual_override_grid_bin_bounds) ## FORCEIPLY UPDATE
-            if not is_dry_run:
-                a_config.computation_config.pf_params.grid_bin_bounds = grid_bin_bounds
-            (constrained_grid_bin_sizes, constrained_num_grid_bins) = safe_limit_num_grid_bin_values(grid_bin_bounds, desired_grid_bin_sizes=deepcopy(desired_grid_bin), max_allowed_num_bins=max_allowed_num_bins, debug_print=False)
-            if not is_dry_run:
-                a_config.computation_config.pf_params.grid_bin = constrained_grid_bin_sizes
-            if will_change:
-                did_any_change = True
-        
-        # sessions ___________________________________________________________________________________________________________ #
-        for a_decoder_name, a_filtered_session in curr_active_pipeline.filtered_sessions.items():
-            a_filtered_session = deepcopy(a_filtered_session)
-            # ## update the config
-            # a_filtered_session.config.grid_bin_bounds = deepcopy(hard_manual_override_grid_bin_bounds) ## FORCEIPLY UPDATE ## needs it
-            # (constrained_grid_bin_sizes, constrained_num_grid_bins) = safe_limit_num_grid_bin_values(a_filtered_session.config.grid_bin_bounds, desired_grid_bin_sizes=deepcopy(desired_grid_bin), max_allowed_num_bins=max_allowed_num_bins, debug_print=False)
-            # a_filtered_session.config.grid_bin = constrained_grid_bin_sizes
-
-            # loaded_track_limits, other overrides
-            new_did_change, a_filtered_session = _subfn_update_session_config(a_session=a_filtered_session, is_dry_run=is_dry_run)
-            if new_did_change:
-                print(f'\tfiltered_session[{a_decoder_name}] changed!')
-            did_any_change = did_any_change | new_did_change
-
-
-
-        ### root/unfiltered session:
-        new_did_change, curr_active_pipeline.stage.sess = _subfn_update_session_config(a_session=curr_active_pipeline.sess, is_dry_run=is_dry_run)
-        if new_did_change:
-            print(f'\tcurr_active_pipeline.sess[{a_decoder_name}] changed!')
-        did_any_change = did_any_change | new_did_change
-        
-        # ## just to be safe:
-        # curr_active_pipeline.sess.config.grid_bin_bounds = deepcopy(hard_manual_override_grid_bin_bounds) ## FORCEIPLY UPDATE ## needs it
-        # (constrained_grid_bin_sizes, constrained_num_grid_bins) = safe_limit_num_grid_bin_values(curr_active_pipeline.sess.config.grid_bin_bounds, desired_grid_bin_sizes=deepcopy(desired_grid_bin), max_allowed_num_bins=max_allowed_num_bins, debug_print=False)
-        # curr_active_pipeline.sess.config.grid_bin = constrained_grid_bin_sizes
-        
-        return did_any_change, change_dict
-        
-
-    @function_attributes(short_name=None, tags=['MAIN', 'ESSENTIAL', 'UNUSED', 'grid_bin_bounds', 'grid_bin'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-12 19:50', related_items=[])
-    @classmethod
-    def FINAL_FIX_GRID_BIN_BOUNDS(cls, curr_active_pipeline, force_recompute=False, is_dry_run: bool=False):
-        """ perform all fixes """
-
-        correct_grid_bin_bounds = cls.get_hardcoded_known_good_grid_bin_bounds(curr_active_pipeline)
-        did_any_change, change_dict = cls.HARD_OVERRIDE_grid_bin_bounds(curr_active_pipeline, hard_manual_override_grid_bin_bounds=deepcopy(correct_grid_bin_bounds), is_dry_run=is_dry_run)
-        
-        if (did_any_change or force_recompute) and (not is_dry_run):
-            print(f'change_dict: {change_dict}\n\tat least one grid_bin_bound was changed (or force_recompute==True), recomputing...')
-            ## All invalidated ones:
-            computation_functions_name_includelist=['_perform_baseline_placefield_computation', '_perform_time_dependent_placefield_computation', '_perform_extended_statistics_computation',
-                                                '_perform_position_decoding_computation', 
-                                                '_perform_firing_rate_trends_computation',
-                                                '_perform_pf_find_ratemap_peaks_computation',
-                                                '_perform_time_dependent_pf_sequential_surprise_computation'
-                                                '_perform_two_step_position_decoding_computation',
-                                                # '_perform_recursive_latent_placefield_decoding'
-                                            ]  # '_perform_pf_find_ratemap_peaks_peak_prominence2d_computation'
-
-            # ## Only Essentials:
-            # computation_functions_name_includelist=['_perform_baseline_placefield_computation',
-            #                                         '_perform_time_dependent_placefield_computation',
-            #                                         '_perform_extended_statistics_computation',
-            #                                     '_perform_position_decoding_computation', 
-            #                                     '_perform_firing_rate_trends_computation',
-            #                                     # '_perform_pf_find_ratemap_peaks_computation',
-            #                                     # '_perform_time_dependent_pf_sequential_surprise_computation'
-            #                                     '_perform_two_step_position_decoding_computation',
-            #                                     # '_perform_recursive_latent_placefield_decoding'
-            #                                 ]  # '_perform_pf_find_ratemap_peaks_peak_prominence2d_computation'
-
-            # computation_functions_name_includelist=['_perform_baseline_placefield_computation']
-            # curr_active_pipeline.perform_computations(computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=None, fail_on_exception=True, debug_print=FalTruese, overwrite_extant_results=True) #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
-            # curr_active_pipeline.perform_computations(computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=None, enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True) # , overwrite_extant_results=False #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
-
-            # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-
-            # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pf_computation', 'pfdt_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=False)
-            # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pf_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True)
-
-
-            # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=computation_functions_name_includelist, enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True)
-            curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=computation_functions_name_includelist, fail_on_exception=True, debug_print=True)
-            print(f'\trecomputation complete!')
-            
-        else:
             if is_dry_run:
-                print(f'WARNING: is_dry_run is true so no recompute will be done.')
+                print(f'NOTE: HARD_OVERRIDE_grid_bin_bounds(...): is_dry_run == True, so changes will be determined but not applied!')
+
+            change_dict = {}
+
+            def _subfn_update_session_config(a_session, is_dry_run: bool=False):
+                """ captures: curr_active_pipeline, hard_manual_override_grid_bin_bounds, change_dict
+                """
+                did_any_change: bool = False
+                
+                # sess_config: SessionConfig = SessionConfig(**deepcopy(a_session.config.__getstate__()))
+                a_session_context = a_session.get_context() # IdentifyingContext.try_init_from_session_key(session_str=a_session_uid, separator='|')
+                a_session_override_dict = UserAnnotationsManager.get_hardcoded_specific_session_override_dict().get(a_session_context, {})
+                
+                allowed_sess_Config_override_keys = ['pix2cm', 'real_unit_grid_bin_bounds', 'real_cm_grid_bin_bounds', 'grid_bin_bounds', 'grid_bin', 'track_start_t', 'track_end_t']
+
+                # loaded_track_limits ________________________________________________________________________________________________ #
+                if not is_dry_run:
+                    sess_config: SessionConfig = deepcopy(a_session.config)
+                    # 'first_valid_pos_time'
+                    a_session.config = sess_config
+                    _bak_loaded_track_limits = deepcopy(a_session.config.loaded_track_limits)
+                    ## Apply fn
+                    a_session = active_data_mode_registered_class._default_kdiba_exported_load_position_info_mat(basepath=curr_active_pipeline.sess.basepath, session_name=curr_active_pipeline.session_name, session=a_session)
+                    _new_loaded_track_limits = deepcopy(a_session.config.loaded_track_limits)
+                    # did_change: bool = ((_bak_loaded_track_limits is None) or (_new_loaded_track_limits != _bak_loaded_track_limits))
+                    # change_dict[f'filtered_sessions["{a_decoder_name}"]'] = {}
+                    did_loaded_track_limits_change: bool = ((_bak_loaded_track_limits is None) or np.any((np.array(_new_loaded_track_limits) != np.array(_bak_loaded_track_limits))))
+                    change_dict[f'filtered_sessions["{a_decoder_name}"].loaded_track_limits'] = did_loaded_track_limits_change
+                    if did_loaded_track_limits_change:
+                        did_any_change = True
+                else:
+                    print(f'loaded_track_limits are not correctly checked in is_dry_run==True mode.')
+
+                # all UserAnnotations overrides ______________________________________________________________________________________ #
+                for k, new_val in a_session_override_dict.items():
+                    if k in allowed_sess_Config_override_keys:
+                        _old_val = getattr(a_session.config, k, None)
+                        if _old_val is not None:
+                            _old_val = deepcopy(_old_val)
+
+                        will_change: bool = (_old_val != new_val)
+                        change_dict[f'filtered_sessions["{a_decoder_name}"].config.{k}'] = will_change
+                        if not is_dry_run:
+                            setattr(a_session.config, k, deepcopy(new_val))
+                        if will_change:
+                            did_any_change = True
+
+
+                # grid_bin_bounds ____________________________________________________________________________________________________ #
+                _old_val = getattr(a_session.config, 'grid_bin_bounds', None)
+                if _old_val is not None:
+                    _old_val = deepcopy(_old_val)
+                will_change: bool = (_old_val != hard_manual_override_grid_bin_bounds)
+                change_dict[f'filtered_sessions["{a_decoder_name}"].config.grid_bin_bounds'] = (change_dict.get(f'filtered_sessions["{a_decoder_name}"].config.grid_bin_bounds', False) | will_change)
+                if not is_dry_run:
+                    a_session.config.grid_bin_bounds = deepcopy(hard_manual_override_grid_bin_bounds) ## FORCEIPLY UPDATE
+                if will_change:
+                    did_any_change = True
+                
+                # grid_bin ___________________________________________________________________________________________________________ #
+                _old_val = getattr(a_session.config, 'grid_bin', None)
+                if _old_val is not None:
+                    _old_val = deepcopy(_old_val)
+                (constrained_grid_bin_sizes, constrained_num_grid_bins) = safe_limit_num_grid_bin_values(hard_manual_override_grid_bin_bounds, desired_grid_bin_sizes=deepcopy(desired_grid_bin), max_allowed_num_bins=max_allowed_num_bins, debug_print=False)
+                will_change: bool = (_old_val != constrained_grid_bin_sizes)
+                change_dict[f'filtered_sessions["{a_decoder_name}"].config.grid_bin'] = (change_dict.get(f'filtered_sessions["{a_decoder_name}"].config.grid_bin', False) | will_change)
+                if not is_dry_run:
+                    a_session.config.grid_bin = constrained_grid_bin_sizes
+                if will_change:
+                    did_any_change = True
+                    
+                return did_any_change, a_session
+            
+
+            # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+            did_any_change: bool = False
+
+            for a_decoder_name, a_config in curr_active_pipeline.active_configs.items():
+                # a_config: InteractivePlaceCellConfig
+                _old_val = deepcopy(a_config.computation_config.pf_params.grid_bin_bounds)
+                will_change: bool = (_old_val != hard_manual_override_grid_bin_bounds)
+                change_dict[f'active_configs["{a_decoder_name}"]'] = will_change
+                grid_bin_bounds = deepcopy(hard_manual_override_grid_bin_bounds) ## FORCEIPLY UPDATE
+                if not is_dry_run:
+                    a_config.computation_config.pf_params.grid_bin_bounds = grid_bin_bounds
+                (constrained_grid_bin_sizes, constrained_num_grid_bins) = safe_limit_num_grid_bin_values(grid_bin_bounds, desired_grid_bin_sizes=deepcopy(desired_grid_bin), max_allowed_num_bins=max_allowed_num_bins, debug_print=False)
+                if not is_dry_run:
+                    a_config.computation_config.pf_params.grid_bin = constrained_grid_bin_sizes
+                if will_change:
+                    did_any_change = True
+                    
+            ## THE ONES THAT START WRONG
+            for a_decoder_name, a_config in curr_active_pipeline.computation_results.items():
+                # a_config: InteractivePlaceCellConfig
+                _old_val = deepcopy(a_config.computation_config.pf_params.grid_bin_bounds)
+                will_change: bool = (_old_val != hard_manual_override_grid_bin_bounds)
+                change_dict[f'computation_results["{a_decoder_name}"]'] = will_change
+                grid_bin_bounds = deepcopy(hard_manual_override_grid_bin_bounds) ## FORCEIPLY UPDATE
+                if not is_dry_run:
+                    a_config.computation_config.pf_params.grid_bin_bounds = grid_bin_bounds
+                (constrained_grid_bin_sizes, constrained_num_grid_bins) = safe_limit_num_grid_bin_values(grid_bin_bounds, desired_grid_bin_sizes=deepcopy(desired_grid_bin), max_allowed_num_bins=max_allowed_num_bins, debug_print=False)
+                if not is_dry_run:
+                    a_config.computation_config.pf_params.grid_bin = constrained_grid_bin_sizes
+                if will_change:
+                    did_any_change = True
+            
+            # sessions ___________________________________________________________________________________________________________ #
+            for a_decoder_name, a_filtered_session in curr_active_pipeline.filtered_sessions.items():
+                a_filtered_session = deepcopy(a_filtered_session)
+                # ## update the config
+                # a_filtered_session.config.grid_bin_bounds = deepcopy(hard_manual_override_grid_bin_bounds) ## FORCEIPLY UPDATE ## needs it
+                # (constrained_grid_bin_sizes, constrained_num_grid_bins) = safe_limit_num_grid_bin_values(a_filtered_session.config.grid_bin_bounds, desired_grid_bin_sizes=deepcopy(desired_grid_bin), max_allowed_num_bins=max_allowed_num_bins, debug_print=False)
+                # a_filtered_session.config.grid_bin = constrained_grid_bin_sizes
+
+                # loaded_track_limits, other overrides
+                new_did_change, a_filtered_session = _subfn_update_session_config(a_session=a_filtered_session, is_dry_run=is_dry_run)
+                if new_did_change:
+                    print(f'\tfiltered_session[{a_decoder_name}] changed!')
+                did_any_change = did_any_change | new_did_change
+
+
+
+            ### root/unfiltered session:
+            new_did_change, curr_active_pipeline.stage.sess = _subfn_update_session_config(a_session=curr_active_pipeline.sess, is_dry_run=is_dry_run)
+            if new_did_change:
+                print(f'\tcurr_active_pipeline.sess[{a_decoder_name}] changed!')
+            did_any_change = did_any_change | new_did_change
+            
+            # ## just to be safe:
+            # curr_active_pipeline.sess.config.grid_bin_bounds = deepcopy(hard_manual_override_grid_bin_bounds) ## FORCEIPLY UPDATE ## needs it
+            # (constrained_grid_bin_sizes, constrained_num_grid_bins) = safe_limit_num_grid_bin_values(curr_active_pipeline.sess.config.grid_bin_bounds, desired_grid_bin_sizes=deepcopy(desired_grid_bin), max_allowed_num_bins=max_allowed_num_bins, debug_print=False)
+            # curr_active_pipeline.sess.config.grid_bin = constrained_grid_bin_sizes
+            
+            return did_any_change, change_dict
+            
+
+        @function_attributes(short_name=None, tags=['MAIN', 'ESSENTIAL', 'UNUSED', 'grid_bin_bounds', 'grid_bin'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-12 19:50', related_items=[])
+        @classmethod
+        def FINAL_FIX_GRID_BIN_BOUNDS(cls, curr_active_pipeline, force_recompute=False, is_dry_run: bool=False):
+            """ perform all fixes """
+
+            correct_grid_bin_bounds = cls.get_hardcoded_known_good_grid_bin_bounds(curr_active_pipeline)
+            did_any_change, change_dict = cls.HARD_OVERRIDE_grid_bin_bounds(curr_active_pipeline, hard_manual_override_grid_bin_bounds=deepcopy(correct_grid_bin_bounds), is_dry_run=is_dry_run)
+            
+            if (did_any_change or force_recompute) and (not is_dry_run):
+                print(f'change_dict: {change_dict}\n\tat least one grid_bin_bound was changed (or force_recompute==True), recomputing...')
+                ## All invalidated ones:
+                computation_functions_name_includelist=['_perform_baseline_placefield_computation', '_perform_time_dependent_placefield_computation', '_perform_extended_statistics_computation',
+                                                    '_perform_position_decoding_computation', 
+                                                    '_perform_firing_rate_trends_computation',
+                                                    '_perform_pf_find_ratemap_peaks_computation',
+                                                    '_perform_time_dependent_pf_sequential_surprise_computation'
+                                                    '_perform_two_step_position_decoding_computation',
+                                                    # '_perform_recursive_latent_placefield_decoding'
+                                                ]  # '_perform_pf_find_ratemap_peaks_peak_prominence2d_computation'
+
+                # ## Only Essentials:
+                # computation_functions_name_includelist=['_perform_baseline_placefield_computation',
+                #                                         '_perform_time_dependent_placefield_computation',
+                #                                         '_perform_extended_statistics_computation',
+                #                                     '_perform_position_decoding_computation', 
+                #                                     '_perform_firing_rate_trends_computation',
+                #                                     # '_perform_pf_find_ratemap_peaks_computation',
+                #                                     # '_perform_time_dependent_pf_sequential_surprise_computation'
+                #                                     '_perform_two_step_position_decoding_computation',
+                #                                     # '_perform_recursive_latent_placefield_decoding'
+                #                                 ]  # '_perform_pf_find_ratemap_peaks_peak_prominence2d_computation'
+
+                # computation_functions_name_includelist=['_perform_baseline_placefield_computation']
+                # curr_active_pipeline.perform_computations(computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=None, fail_on_exception=True, debug_print=FalTruese, overwrite_extant_results=True) #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
+                # curr_active_pipeline.perform_computations(computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=None, enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True) # , overwrite_extant_results=False #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
+
+                # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+
+                # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pf_computation', 'pfdt_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=False)
+                # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pf_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True)
+
+
+                # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=computation_functions_name_includelist, enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True)
+                curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=computation_functions_name_includelist, fail_on_exception=True, debug_print=True)
+                print(f'\trecomputation complete!')
+                
             else:
-                print(f'No grid bin bounds were changed. Everything should be up-to-date!')
+                if is_dry_run:
+                    print(f'WARNING: is_dry_run is true so no recompute will be done.')
+                else:
+                    print(f'No grid bin bounds were changed. Everything should be up-to-date!')
 
-        return (did_any_change, change_dict), correct_grid_bin_bounds
+            return (did_any_change, change_dict), correct_grid_bin_bounds
 
 
-    @staticmethod
-    def run_as_batch_user_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, force_recompute=True) -> dict:
-        """ meant to be executed as a _batch_user_completion_function"""
-        (did_any_change, change_dict), correct_grid_bin_bounds = PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(curr_active_pipeline=curr_active_pipeline, force_recompute=True, force_recompute=force_recompute, is_dry_run=False)
+        @staticmethod
+        def run_as_batch_user_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, force_recompute=False) -> dict:
+            """ meant to be executed as a _batch_user_completion_function"""
+            (did_any_change, change_dict), correct_grid_bin_bounds = PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, is_dry_run=False)
 
-        loaded_track_limits = curr_active_pipeline.sess.config.loaded_track_limits
-        a_config_dict = curr_active_pipeline.sess.config.to_dict()
+            loaded_track_limits = curr_active_pipeline.sess.config.loaded_track_limits
+            a_config_dict = curr_active_pipeline.sess.config.to_dict()
 
-        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
-        print(f'\t{curr_session_basedir}:\tloaded_track_limits: {loaded_track_limits}, a_config_dict: {a_config_dict}')  # , t_end: {t_end}
-        
-        callback_outputs = {
-        'correct_grid_bin_bounds': correct_grid_bin_bounds, 'loaded_track_limits': loaded_track_limits, 'change_dict': change_dict, 'config_dict': a_config_dict, #'t_end': t_end   
-        }
-        across_session_results_extended_dict[PostHocPipelineFixup.across_session_results_extended_dict_data_name] = callback_outputs
-        
-        # print(f'>>\t done with {curr_session_context}')
-        print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-        print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+            t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+            print(f'\t{curr_session_basedir}:\tloaded_track_limits: {loaded_track_limits}, a_config_dict: {a_config_dict}')  # , t_end: {t_end}
+            
+            callback_outputs = {
+            'correct_grid_bin_bounds': correct_grid_bin_bounds, 'loaded_track_limits': loaded_track_limits, 'change_dict': change_dict, 'config_dict': a_config_dict, #'t_end': t_end   
+            }
+            across_session_results_extended_dict[PostHocPipelineFixup.across_session_results_extended_dict_data_name] = callback_outputs
+            
+            return across_session_results_extended_dict
 
-        return across_session_results_extended_dict
+
+    # ==================================================================================================================== #
+    # BEGIN FUNCTION BODY                                                                                                  #
+    # ==================================================================================================================== #
+
+
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'reload_kdiba_session_position_bounds_and_associated_info_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+    
+    across_session_results_extended_dict = PostHocPipelineFixup.run_as_batch_user_completion_function(self=self, global_data_root_parent_path=global_data_root_parent_path, curr_session_context=curr_session_context, curr_session_basedir=curr_session_basedir, curr_active_pipeline=curr_active_pipeline, across_session_results_extended_dict=across_session_results_extended_dict, force_recompute=force_recompute)
+
+    # print(f'>>\t done with {curr_session_context}')
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+
+    return across_session_results_extended_dict
+
+
 
 
 
@@ -2993,6 +3013,7 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
                                     'perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function': perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function,
                                     'compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function': compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function,
                                     # 'reload_exported_kdiba_session_position_info_mat_completion_function': reload_exported_kdiba_session_position_info_mat_completion_function,
+                                    'reload_kdiba_session_position_bounds_and_associated_info_completion_function': reload_kdiba_session_position_bounds_and_associated_info_completion_function,
                                     'export_session_h5_file_completion_function': export_session_h5_file_completion_function,
                                     'compute_and_export_session_wcorr_shuffles_completion_function': compute_and_export_session_wcorr_shuffles_completion_function,
                                     'compute_and_export_session_instantaneous_spike_rates_completion_function': compute_and_export_session_instantaneous_spike_rates_completion_function,
