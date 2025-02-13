@@ -70,14 +70,14 @@ class PostHocPipelineFixup:
 
     @function_attributes(short_name=None, tags=['ESSENTIAL', 'UNUSED', 'grid_bin_bounds', 'grid_bin'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-12 19:50', related_items=[])
     @classmethod
-    def FINAL_FIX_GRID_BIN_BOUNDS(cls, curr_active_pipeline):
+    def FINAL_FIX_GRID_BIN_BOUNDS(cls, curr_active_pipeline, force_recompute=False):
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import get_hardcoded_known_good_grid_bin_bounds, HARD_OVERRIDE_grid_bin_bounds, find_percent_pos_samples_within_grid_bin_bounds
 
         correct_grid_bin_bounds = get_hardcoded_known_good_grid_bin_bounds(curr_active_pipeline)
         did_any_change, change_dict = HARD_OVERRIDE_grid_bin_bounds(curr_active_pipeline, hard_manual_override_grid_bin_bounds=deepcopy(correct_grid_bin_bounds))
         
-        if did_any_change:
-            print(f'change_dict: {change_dict}\n\tat least one grid_bin_bound was changed, recomputing...')
+        if did_any_change or force_recompute:
+            print(f'change_dict: {change_dict}\n\tat least one grid_bin_bound was changed (or force_recompute==True), recomputing...')
             ## All invalidated ones:
             computation_functions_name_includelist=['_perform_baseline_placefield_computation', '_perform_time_dependent_placefield_computation', '_perform_extended_statistics_computation',
                                                 '_perform_position_decoding_computation', 
