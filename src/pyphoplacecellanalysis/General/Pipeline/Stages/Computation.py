@@ -270,7 +270,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         self.registered_computation_function_dict = OrderedDict()
 
 
-    def find_registered_computation_functions(self, registered_names_list, search_mode:FunctionsSearchMode=FunctionsSearchMode.ANY, names_list_is_excludelist:bool=False):
+    def find_registered_computation_functions(self, registered_names_list, search_mode:FunctionsSearchMode=FunctionsSearchMode.ANY, names_list_is_excludelist:bool=False, return_found_computation_functions_as_list:bool=True):
         ''' Finds the list of actual function objects associated with the registered_names_list by using the appropriate dictionary of registered functions depending on whether are_global is True or not.
 
         registered_names_list: list<str> - a list of function names to be used to fetch the appropriate functions
@@ -302,8 +302,11 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             # default includelist-style operation:
             active_computation_function_dict = {a_computation_fn_name:a_computation_fn for (a_computation_fn_name, a_computation_fn) in active_registered_computation_function_dict.items() if ((a_computation_fn_name in registered_names_list) or (getattr(a_computation_fn, 'short_name', a_computation_fn.__name__) in registered_names_list))}
 
-        return list(active_computation_function_dict.values())
-        
+        if return_found_computation_functions_as_list:
+            return list(active_computation_function_dict.values())
+        else:
+            ## return the whole dict, allowing one to determine which values are missing
+            return active_computation_function_dict    
 
     ## For serialization/pickling:
     def __getstate__(self):
@@ -398,11 +401,27 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
     @function_attributes(short_name=None, tags=['computation', 'specific'], input_requires=[], output_provides=[], uses=['ComputedPipelineStage._execute_computation_functions'], used_by=[], creation_date='2023-07-21 18:25', related_items=[])
     def run_specific_computations_single_context(self, previous_computation_result, computation_functions_name_includelist, computation_kwargs_list=None, fail_on_exception:bool=False, progress_logger_callback=None, are_global:bool=False, debug_print=False):
         """ re-runs just a specific computation provided by computation_functions_name_includelist """
-        active_computation_functions = self.find_registered_computation_functions(computation_functions_name_includelist, search_mode=FunctionsSearchMode.initFromIsGlobal(are_global))
+        if computation_kwargs_list is not None:
+            ## be sure to prune down the computation_kwargs_list to match only the actually found computations
+            assert len(computation_kwargs_list) == len(computation_functions_name_includelist), f"INITIAL Length mismatch between computation_kwargs_list ({len(computation_kwargs_list)}) and computation_functions_name_includelist ({len(computation_functions_name_includelist)})"
+            computation_kwargs_dict = dict(zip(computation_functions_name_includelist, computation_kwargs_list))
+            active_computation_functions_dict = self.find_registered_computation_functions(computation_functions_name_includelist, search_mode=FunctionsSearchMode.initFromIsGlobal(are_global), return_found_computation_functions_as_list=False)
+            active_found_computation_kwargs_list = [computation_kwargs_dict[k] for k, v in active_computation_functions_dict.items()] ## only the included items
+            active_found_computation_functions = list(active_computation_functions_dict.values())
+            if len(active_found_computation_functions) < len(computation_functions_name_includelist):
+                not_found_computation_functions_names = [k for k in computation_functions_name_includelist if k not in active_found_computation_functions]
+                print(f'WARNING: .run_specific_computations_single_context(...): not_found_computation_functions_names: {not_found_computation_functions_names}! (found {len(active_found_computation_functions)}/{len(computation_functions_name_includelist)} {active_found_computation_functions}). These will be skipped.')
+                if progress_logger_callback is not None:
+                    progress_logger_callback(f'\tWARNING: .run_specific_computations_single_context(...): not_found_computation_functions_names: {not_found_computation_functions_names}! (found {len(active_found_computation_functions)}/{len(computation_functions_name_includelist)} {active_found_computation_functions}). These will be skipped.')            
+        else:
+            active_found_computation_kwargs_list = computation_kwargs_list
+            active_found_computation_functions = self.find_registered_computation_functions(computation_functions_name_includelist, search_mode=FunctionsSearchMode.initFromIsGlobal(are_global), return_found_computation_functions_as_list=True)
+        
         if progress_logger_callback is not None:
-            progress_logger_callback(f'\trun_specific_computations_single_context(including only {len(active_computation_functions)} out of {len(self.registered_computation_function_names)} registered computation functions): active_computation_functions: {active_computation_functions}...')
-        # Perform the computations:
-        return ComputedPipelineStage._execute_computation_functions(active_computation_functions, previous_computation_result=previous_computation_result, computation_kwargs_list=computation_kwargs_list, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, are_global=are_global, debug_print=debug_print)
+            progress_logger_callback(f'\trun_specific_computations_single_context(including only {len(active_found_computation_functions)} out of {len(self.registered_computation_function_names)} registered computation functions): active_computation_functions: {active_found_computation_functions}...')
+            
+        assert len(active_found_computation_kwargs_list) == len(active_found_computation_functions), f"Length mismatch between computation kwargs list ({len(active_found_computation_kwargs_list)}) and computation functions ({len(active_found_computation_functions)})"        # Perform the computations:
+        return ComputedPipelineStage._execute_computation_functions(active_found_computation_functions, previous_computation_result=previous_computation_result, computation_kwargs_list=active_found_computation_kwargs_list, fail_on_exception=fail_on_exception, progress_logger_callback=progress_logger_callback, are_global=are_global, debug_print=debug_print)
 
     # ==================================================================================================================== #
     # Other                                                                                                                #
@@ -1030,7 +1049,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         """ actually performs the provided computations in active_computation_functions """ # computation_kwargs_list=: [{}]
         if computation_kwargs_list is None:
             computation_kwargs_list = [{} for _ in active_computation_functions]
-        assert len(computation_kwargs_list) == len(active_computation_functions)
+        assert len(computation_kwargs_list) == len(active_computation_functions), f"Length mismatch: computation_kwargs_list (len: {len(computation_kwargs_list)}, contents: {computation_kwargs_list}) must match active_computation_functions (len: {len(active_computation_functions)}, contents: {active_computation_functions})"
 
         # computation_times_key_fn = lambda fn: fn
         computation_times_key_fn = lambda fn: str(fn.__name__) # Use only the functions name. I think this makes the .computation_times field picklable
