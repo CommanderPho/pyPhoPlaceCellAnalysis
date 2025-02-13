@@ -769,7 +769,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
         n_time_bins: int = len(a_time_bin_centers)
         masked_shape = np.shape(masked_posterior)
-        Assert.all_equal(n_time_bins, masked_shape[0])
+        # Assert.all_equal(n_time_bins, masked_shape[0])
+        assert n_time_bins == masked_shape[0], f" masked_shape[0]: { masked_shape[0]} != n_time_bins: {n_time_bins}"
         
         heatmaps = []
         # For simplicity, we assume non-single-time-bin mode (as asserted in the calling function).
