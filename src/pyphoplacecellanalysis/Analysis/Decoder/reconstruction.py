@@ -1221,14 +1221,14 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
 # ==================================================================================================================== #
 # Placemap Position Decoders                                                                                           #
 # ==================================================================================================================== #
-
+from neuropy.utils.mixins.binning_helpers import GridBinDebuggableMixin, DebugBinningInfo, BinnedPositionsMixin
 
 # ==================================================================================================================== #
 # Stateless Decoders (New 2023-04-06)                                                                                  #
 # ==================================================================================================================== #
 
 @custom_define(slots=False)
-class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLocationRepresentingMixin, PeakLocationRepresentingMixin, NeuronUnitSlicableObjectProtocol):
+class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLocationRepresentingMixin, PeakLocationRepresentingMixin, NeuronUnitSlicableObjectProtocol, BinnedPositionsMixin):
     """ 2023-04-06 - A simplified data-only version of the decoder that serves to remove all state related to specific computations to make each run independent 
     Stores only the raw inputs that are used to decode, with the user specifying the specifics for a given decoding (like time_time_sizes, etc.
 
@@ -2048,6 +2048,19 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
     #         raise NotImplementedError # implementor must override!
 
 
+    # ==================================================================================================================== #
+    # GridBinDebuggableMixin Conformances                                                                                  #
+    # ==================================================================================================================== #
+    def get_debug_binning_info(self) -> DebugBinningInfo:
+        """Returns relevant debug info about the binning configuration
+
+        Returns:
+            DebugBinningInfo: Contains binning dimensions and sizes
+        """  
+        _obj = self.pf.get_debug_binning_info()
+        _obj.nTimeBins = None
+        return _obj
+
 
 
 # ==================================================================================================================== #
@@ -2465,6 +2478,18 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
 
         return self.revised_most_likely_positions
 
+    # ==================================================================================================================== #
+    # GridBinDebuggableMixin Conformances                                                                                  #
+    # ==================================================================================================================== #
+    def get_debug_binning_info(self) -> DebugBinningInfo:
+        """Returns relevant debug info about the binning configuration
+
+        Returns:
+            DebugBinningInfo: Contains binning dimensions and sizes
+        """  
+        _obj = self.pf.get_debug_binning_info()
+        _obj.nTimeBins = self.num_time_windows
+        return _obj
 
     # ==================================================================================================================== #
     # Class/Static Methods                                                                                                 #
