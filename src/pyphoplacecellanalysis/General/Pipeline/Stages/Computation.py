@@ -406,7 +406,9 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             assert len(computation_kwargs_list) == len(computation_functions_name_includelist), f"INITIAL Length mismatch between computation_kwargs_list ({len(computation_kwargs_list)}) and computation_functions_name_includelist ({len(computation_functions_name_includelist)})"
             computation_kwargs_dict = dict(zip(computation_functions_name_includelist, computation_kwargs_list))
             active_computation_functions_dict = self.find_registered_computation_functions(computation_functions_name_includelist, search_mode=FunctionsSearchMode.initFromIsGlobal(are_global), return_found_computation_functions_as_list=False)
-            active_found_computation_kwargs_list = [computation_kwargs_dict[k] for k, v in active_computation_functions_dict.items()] ## only the included items
+
+
+            active_found_computation_kwargs_list = [computation_kwargs_dict.get(k, (computation_kwargs_dict[getattr(a_computation_fn, 'short_name', a_computation_fn.__name__)])) for k, a_computation_fn in active_computation_functions_dict.items()] ## only the included items -- fallback to shortname if the literal name isn't in there
             active_found_computation_functions = list(active_computation_functions_dict.values())
             if len(active_found_computation_functions) < len(computation_functions_name_includelist):
                 not_found_computation_functions_names = [k for k in computation_functions_name_includelist if k not in active_found_computation_functions]
