@@ -59,12 +59,19 @@ from attrs import define, field, Factory, asdict # used for `ComputedResult`
 
 from neuropy.utils.indexing_helpers import get_values_from_keypaths, set_value_by_keypath, update_nested_dict
 
-
+@metadata_attributes(short_name=None, tags=['grid_bin_bounds', 'grid_bin', 'FIXUP', 'post-hoc'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-13 12:33', related_items=['reload_exported_kdiba_session_position_info_mat_completion_function'])
 class PostHocPipelineFixup:
-    """ 
+    """ Fixes the grid_bin_bounds, grid_bin, track_limits, and some other properties and recomputes if needed.
+    
+    
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PostHocPipelineFixup
     
     (did_any_change, change_dict), correct_grid_bin_bounds = PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(curr_active_pipeline=curr_active_pipeline, is_dry_run=True)
+    
+    
+    #TODO 2025-02-13 12:35: - [ ] Format `FINAL_FIX_GRID_BIN_BOUNDS` as a user_ function, replace `reload_exported_kdiba_session_position_info_mat_completion_function` with it.
+    Inspired by `reload_exported_kdiba_session_position_info_mat_completion_function`, but does additional things, and performs needed recomputes.
+    
     
     """
 
@@ -112,7 +119,7 @@ class PostHocPipelineFixup:
 
 
 
-    @function_attributes(short_name=None, tags=['MAIN', 'IMPORTANT', 'hardcoded', 'override', 'grid_bin_bounds'], input_requires=[], output_provides=[], uses=['safe_limit_num_grid_bin_values'], used_by=[], creation_date='2025-02-12 08:17', related_items=[])
+    @function_attributes(short_name=None, tags=['IMPORTANT', 'hardcoded', 'override', 'grid_bin_bounds'], input_requires=[], output_provides=[], uses=['safe_limit_num_grid_bin_values'], used_by=[], creation_date='2025-02-12 08:17', related_items=[])
     @classmethod
     def HARD_OVERRIDE_grid_bin_bounds(cls, curr_active_pipeline, hard_manual_override_grid_bin_bounds = ((0.0, 287.7697841726619), (80.0, 200.0)), desired_grid_bin = (2.0, 2.0), max_allowed_num_bins=(60, 9), is_dry_run: bool=False):
         """ manually overrides the `grid_bin_bounds` and `grid_bin` in all places needed to ensure they are correct. 
@@ -277,7 +284,7 @@ class PostHocPipelineFixup:
         return did_any_change, change_dict
         
 
-    @function_attributes(short_name=None, tags=['ESSENTIAL', 'UNUSED', 'grid_bin_bounds', 'grid_bin'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-12 19:50', related_items=[])
+    @function_attributes(short_name=None, tags=['MAIN', 'ESSENTIAL', 'UNUSED', 'grid_bin_bounds', 'grid_bin'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-12 19:50', related_items=[])
     @classmethod
     def FINAL_FIX_GRID_BIN_BOUNDS(cls, curr_active_pipeline, force_recompute=False, is_dry_run: bool=False):
         """ perform all fixes """
@@ -333,47 +340,46 @@ class PostHocPipelineFixup:
 
 
 
+# final_relevant_specific_pos_bounds_keypaths_list =  [
+# 'active_session_config.loaded_track_limits.long_xlim',
+# 'active_session_config.loaded_track_limits.long_ylim',
+# 'active_session_config.loaded_track_limits.short_xlim',
+# 'active_session_config.loaded_track_limits.short_ylim',
+# ] + [
+# 'computation_config.pf_params.grid_bin',
+# 'computation_config.pf_params.grid_bin_bounds',
+# 'computation_config.pf_params.smooth',
+# ]
 
-
-
-final_relevant_specific_pos_bounds_keypaths_list =  [
-'active_session_config.loaded_track_limits.long_xlim',
-'active_session_config.loaded_track_limits.long_ylim',
-'active_session_config.loaded_track_limits.short_xlim',
-'active_session_config.loaded_track_limits.short_ylim',
-] + [
-'computation_config.pf_params.grid_bin',
-'computation_config.pf_params.grid_bin_bounds',
-'computation_config.pf_params.smooth',
-]
-
-def _get_grid_bin_bounds_params(out_filtered_sess_configs_dict: benedict):
-    """ Extracts the grid_bin_bounds relevant keys from the dict and returns them
-    captures: `final_relevant_specific_pos_bounds_keypaths_list`
+# @function_attributes(short_name=None, tags=['UNUSED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 00:00', related_items=[])
+# def _get_grid_bin_bounds_params(out_filtered_sess_configs_dict: benedict):
+#     """ Extracts the grid_bin_bounds relevant keys from the dict and returns them
+#     captures: `final_relevant_specific_pos_bounds_keypaths_list`
     
-    Usage:
+#     Usage:
     
-        final_relevant_specific_pos_bounds_params_dict = _get_grid_bin_bounds_params(out_filtered_sess_configs_dict=out_filtered_sess_configs_dict)
-        final_relevant_specific_pos_bounds_params_dict
+#         final_relevant_specific_pos_bounds_params_dict = _get_grid_bin_bounds_params(out_filtered_sess_configs_dict=out_filtered_sess_configs_dict)
+#         final_relevant_specific_pos_bounds_params_dict
 
-    """
-    return {k:get_values_from_keypaths(v, final_relevant_specific_pos_bounds_keypaths_list) for k, v in out_filtered_sess_configs_dict.items()}
+#     """
+#     return {k:get_values_from_keypaths(v, final_relevant_specific_pos_bounds_keypaths_list) for k, v in out_filtered_sess_configs_dict.items()}
 
 
-def _set_grid_bin_bounds_params(out_filtered_sess_configs_dict: benedict, override_parameters_flat_keypaths_dict: Dict[str, Any]) -> benedict:
-    """ updates the dict with the specified overrides
+# @function_attributes(short_name=None, tags=['UNUSED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 00:00', related_items=[])
+# def _set_grid_bin_bounds_params(out_filtered_sess_configs_dict: benedict, override_parameters_flat_keypaths_dict: Dict[str, Any]) -> benedict:
+#     """ updates the dict with the specified overrides
 
-    Usage:    
-        ## update existing values
-        override_parameters_flat_keypaths_dict = {'computation_config.pf_params.grid_bin_bounds': ((0.0, 287.7697841726619), (80.0, 200.0)), }
-        out_filtered_sess_configs_dict = _set_grid_bin_bounds_params(out_filtered_sess_configs_dict=out_filtered_sess_configs_dict, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
+#     Usage:    
+#         ## update existing values
+#         override_parameters_flat_keypaths_dict = {'computation_config.pf_params.grid_bin_bounds': ((0.0, 287.7697841726619), (80.0, 200.0)), }
+#         out_filtered_sess_configs_dict = _set_grid_bin_bounds_params(out_filtered_sess_configs_dict=out_filtered_sess_configs_dict, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
 
-    """
-    if override_parameters_flat_keypaths_dict is None:
-        return None
-    for a_decoder_name, a_config in out_filtered_sess_configs_dict.items():        
-        update_nested_dict(a_config, deepcopy(override_parameters_flat_keypaths_dict))
-    return out_filtered_sess_configs_dict
+#     """
+#     if override_parameters_flat_keypaths_dict is None:
+#         return None
+#     for a_decoder_name, a_config in out_filtered_sess_configs_dict.items():        
+#         update_nested_dict(a_config, deepcopy(override_parameters_flat_keypaths_dict))
+#     return out_filtered_sess_configs_dict
 
 
 
@@ -447,7 +453,12 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 
 @define(slots=False, eq=False, repr=False)
 class Compute_NonPBE_Epochs:
-    """ 
+    """ Relates to using all time on the track except for detected PBEs as the placefield inputs. This includes the laps and the intra-lap times. 
+    Importantly `lap_dir` is poorly defined for the periods between the laps, so something like head-direction might have to be used.
+    
+    #TODO 2025-02-13 12:40: - [ ] Should compute the correct Epochs, add it to the sessions as a new Epoch (I guess as a new FilteredSession context!! 
+    
+    
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import Compute_NonPBE_Epochs
     
     """
