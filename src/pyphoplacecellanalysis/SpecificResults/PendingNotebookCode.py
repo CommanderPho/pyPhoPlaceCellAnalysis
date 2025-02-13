@@ -74,6 +74,7 @@ class PostHocPipelineFixup:
     
     
     """
+    across_session_results_extended_dict_data_name: str = 'PostHocPipelineFixup' # like 'position_info_mat_reload_completion_function'
 
     @classmethod
     def find_percent_pos_samples_within_grid_bin_bounds(cls, pos_df: pd.DataFrame, grid_bin_bounds):
@@ -115,9 +116,6 @@ class PostHocPipelineFixup:
         correct_grid_bin_bounds = UserAnnotationsManager.get_hardcoded_specific_session_override_dict().get(a_session_context, {}).get('grid_bin_bounds', None)
         assert correct_grid_bin_bounds is not None, f"session: {a_session_context} was not found in overrides!"
         return deepcopy(correct_grid_bin_bounds) ## returns the correct grid_bin_bounds for the pipeline
-
-
-
 
     @function_attributes(short_name=None, tags=['IMPORTANT', 'hardcoded', 'override', 'grid_bin_bounds'], input_requires=[], output_provides=[], uses=['safe_limit_num_grid_bin_values'], used_by=[], creation_date='2025-02-12 08:17', related_items=[])
     @classmethod
@@ -338,6 +336,27 @@ class PostHocPipelineFixup:
 
         return (did_any_change, change_dict), correct_grid_bin_bounds
 
+
+    @staticmethod
+    def run_as_batch_user_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, force_recompute=True) -> dict:
+        (did_any_change, change_dict), correct_grid_bin_bounds = PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(curr_active_pipeline=curr_active_pipeline, force_recompute=True, force_recompute=force_recompute, is_dry_run=False)
+
+        loaded_track_limits = curr_active_pipeline.sess.config.loaded_track_limits
+        a_config_dict = curr_active_pipeline.sess.config.to_dict()
+
+        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        print(f'\t{curr_session_basedir}:\tloaded_track_limits: {loaded_track_limits}, a_config_dict: {a_config_dict}')  # , t_end: {t_end}
+        
+        callback_outputs = {
+        'correct_grid_bin_bounds': correct_grid_bin_bounds, 'loaded_track_limits': loaded_track_limits, 'change_dict': change_dict, 'config_dict': a_config_dict, #'t_end': t_end   
+        }
+        across_session_results_extended_dict[PostHocPipelineFixup.across_session_results_extended_dict_data_name] = callback_outputs
+        
+        # print(f'>>\t done with {curr_session_context}')
+        print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+        print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+
+        return across_session_results_extended_dict
 
 
 # final_relevant_specific_pos_bounds_keypaths_list =  [
