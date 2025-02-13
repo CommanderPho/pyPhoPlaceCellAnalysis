@@ -769,7 +769,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
         n_time_bins: int = len(a_time_bin_centers)
         masked_shape = np.shape(masked_posterior)
-        Assert.all_equal(n_time_bins, masked_shape[0])
+        # Assert.all_equal(n_time_bins, masked_shape[0])
+        assert n_time_bins == masked_shape[0], f" masked_shape[0]: { masked_shape[0]} != n_time_bins: {n_time_bins}"
         
         heatmaps = []
         # For simplicity, we assume non-single-time-bin mode (as asserted in the calling function).
@@ -896,7 +897,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             
 
         # For 1D case, retrieve fake y values.
-        if np.ndim(deepcopy(a_p_x_given_n)) < 3:
+        if np.ndim(a_p_x_given_n) < 3:
             fake_y_center = extra_dict['fake_y_center']
             fake_y_arr = extra_dict['fake_y_arr']
             fake_y_lower_bound = extra_dict['fake_y_lower_bound']
@@ -905,6 +906,9 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         else:
             fake_y_center = None
             fake_y_arr = None
+            fake_y_lower_bound = None
+            fake_y_upper_bound = None
+
                     
         # # Add colorbar
         # cbar = plt.colorbar(a_heatmap, ax=an_ax)
