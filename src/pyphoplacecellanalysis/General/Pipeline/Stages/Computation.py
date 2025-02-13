@@ -1832,22 +1832,57 @@ class PipelineWithComputedPipelineStageMixin:
         return upstream_required_validators, (required_global_keys, required_local_keys)
 
 
-    # ACTUALLY USEFUL VERSIONS of the dependencies/requirements functions: _______________________________________________ #
-    def find_invalidated_computations(self, invalidated_probe_fn_names: List[str], invalidated_local_keys: List[str]=None, invalidated_global_keys: List[str]=None, skip_reload_computation_fcns: bool = False, debug_print=False) -> List[str]:
-        """ given one ore more computations that have become invalid, find all the computations that depend on the invalidated value and therefore must be invalidated themselves.
-        
-        Usage:
+    # # ACTUALLY USEFUL VERSIONS of the dependencies/requirements functions: _______________________________________________ #
+    # @function_attributes(short_name=None, tags=['UNFINISHED', 'PROIMISING', 'ai', 'UNTESTED', 'dependencies', 'recompute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-12 19:51', related_items=[])
+    # def find_invalidated_computations(self, invalidated_probe_fn_names: List[str], invalidated_local_keys: List[str]=None, invalidated_global_keys: List[str]=None, skip_reload_computation_fcns: bool = False, debug_print=False) -> List[str]:
+    #     """Given one or more computations that have become invalid, find all computations
+    #     that depend on the invalidated ones so that their computed values will be recomputed.
 
-        """
-        if invalidated_local_keys is not None:
-            raise NotImplementedError(f"invalidated_local_keys mode is not implemented yet, use `find_invalidated_computations(invalidated_probe_fn_names = ['_perform_baseline_placefield_computation', '_perform_time_dependent_placefield_computation', ... your invalidated computation fn names, ...]) mode.")
-        if invalidated_global_keys is not None:
-            raise NotImplementedError(f"invalidated_global_keys mode is not implemented yet, use `find_invalidated_computations(invalidated_probe_fn_names = ['_perform_baseline_placefield_computation', '_perform_time_dependent_placefield_computation', ... your invalidated computation fn names, ...]) mode.")        
+    #     This implementation uses the dependency functionality available in this module:
+    #       - find_provided_result_keys: returns the computed properties that a set of functions provide.
+    #       - find_downstream_dependencies: returns the dependent validators based on provided result keys.
 
-        ## TODO: Finish implementation here
-        invalidated_probe_fn_names = ... # find the dependent results
+    #     NOTE: The invalidated_local_keys and invalidated_global_keys modes are not yet implemented.
         
-        return additional_invalidated_probe_fn_names
+    #     Usage example:
+
+    #         additional_invalidated_probe_fn_names = self.find_invalidated_computations(invalidated_probe_fn_names=['_perform_baseline_placefield_computation'])
+    #         # 'additional_invalidated_probe_fn_names' now contains the original function and all that depend on its outputs.
+    #     """
+    #     if invalidated_local_keys is not None:
+    #         raise NotImplementedError("invalidated_local_keys mode is not implemented yet. "
+    #                                   "Use `find_invalidated_computations(invalidated_probe_fn_names=[...])` instead.")
+    #     if invalidated_global_keys is not None:
+    #         raise NotImplementedError("invalidated_global_keys mode is not implemented yet. "
+    #                                   "Use `find_invalidated_computations(invalidated_probe_fn_names=[...])` instead.")
+
+    #     # Reload the computation functions if needed:
+    #     if not skip_reload_computation_fcns:
+    #         self.reload_default_computation_functions()
+
+    #     if debug_print:
+    #         print("Initial invalidated computation functions:", invalidated_probe_fn_names)
+
+    #     # Determine which result keys are provided by the invalidated computations:
+    #     provided_keys = self.find_provided_result_keys(invalidated_probe_fn_names)
+    #     if debug_print:
+    #         print("Result keys provided by invalidated functions:", provided_keys)
+
+    #     # Now, find all downstream dependencies (validators) that require any of those keys.
+    #     # This returns a tuple: (dependent_validators, (downstream_global_keys, downstream_local_keys))
+    #     dependent_validators, (downstream_global_keys, downstream_local_keys) = self.find_downstream_dependencies(provided_global_keys=provided_keys, provided_local_keys=None, skip_reload_computation_fcns=True, debug_print=debug_print)
+    #     downstream_invalidated = list(dependent_validators.keys())
+
+    #     if debug_print:
+    #         print("Dependent computation functions invalidated by downstream dependency:", downstream_invalidated)
+    #         print("Downstream global keys:", downstream_global_keys)
+    #         print("Downstream local keys:", downstream_local_keys)
+
+    #     # Combine the originally invalidated function names with those found downstream.
+    #     all_invalidated = set(invalidated_probe_fn_names).union(downstream_invalidated)
+    #     additional_invalidated_probe_fn_names = list(all_invalidated)
+    #     return additional_invalidated_probe_fn_names
+        
 
 
 
