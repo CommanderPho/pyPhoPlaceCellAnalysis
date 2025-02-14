@@ -1,5 +1,7 @@
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore
 import numpy as np
+import pandas as pd
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
@@ -54,52 +56,57 @@ class SpikesDataframeWindow(LiveWindowedData):
         return self.timeWindow.active_time_window
     
     @property
-    def window_duration(self):
+    def window_duration(self) -> float:
         """The window_duration property."""
         return self.timeWindow.window_duration
     
     @property
-    def active_window_end_time(self):
+    def active_window_end_time(self) -> float:
         """The active_window_end_time property."""
         return (self.active_window_start_time + self.window_duration)
     
     @property
-    def active_window_start_time(self):
+    def active_window_start_time(self) -> float:
         """The current start time of the sliding time window"""
         return self.timeWindow.active_window_start_time
     
     
     # Require TimeWindow and Datasource:
     @property
-    def active_windowed_df(self):
+    def active_windowed_df(self) -> pd.DataFrame:
         """The dataframe sliced to the current time window (active_time_window)"""
         # return self.df[self.df[self.df.spikes.time_variable_name].between(self.active_time_window[0], self.active_time_window[1])]
         return self.dataSource.get_updated_data_window(self.active_time_window[0], self.active_time_window[1])
 
     @property
-    def active_window_num_spikes(self):
+    def active_window_num_spikes(self) -> int:
         """The number of spikes (across all units) in the active window."""
         return self.active_windowed_df.shape[0]
     
     # Properties belonging to DataframeDatasource:
     @property
-    def total_df_start_end_times(self):
+    def total_df_start_end_times(self) -> Tuple[float, float]:
         """[earliest_df_time, latest_df_time]: The earliest and latest spiketimes in the total df """
         return self.dataSource.total_df_start_end_times
             
     @property
-    def total_data_start_time(self):
+    def total_data_start_time(self) -> float:
         """returns the earliest_df_time: The earliest spiketimes in the total df """
         return self.total_df_start_end_times[0]
     @property
-    def total_data_end_time(self):
+    def total_data_end_time(self) -> float:
         """returns the latest_df_time: The latest spiketimes in the total df """
-        return self.total_df_start_end_times[1]
-            
-            
+        return self.total_df_start_end_times[1]            
+    @property
+    def total_data_duration(self) -> float:
+        """ The duration (in seconds) of all data in self.spikes_window."""
+        return (self.total_data_end_time - self.total_data_start_time)
+    
+
+
     ##### Get/Set Properties ####:
     @property
-    def df(self):
+    def df(self) -> pd.DataFrame:
         """The df property."""
         # return self._df
         return self.dataSource.df
@@ -110,7 +117,7 @@ class SpikesDataframeWindow(LiveWindowedData):
         
     
     # Initializer:
-    def __init__(self, spikes_df, window_duration=15.0, window_start_time=0.0):
+    def __init__(self, spikes_df, window_duration:float=15.0, window_start_time:float=0.0):
         # TimeWindow.__init__(self, window_duration=window_duration, window_start_time=window_start_time)
         # self._df = spikes_df
         
@@ -176,5 +183,31 @@ class SpikesWindowOwningMixin:
         """ """
         return np.ceil(float(self.spikes_window.window_duration)/2.0) # 10 by default 
     
+
+    # @property
+    # def total_data_temporal_axis_length(self) -> float:
+    #     """The equivalent of self.temporal_axis_length but for all data instead of just the active window."""
+    #     return self.temporal_zoom_factor * self.total_data_duration
+    
+
+
+    # ==================================================================================================================== #
+    # SpikesDataframeWindow Passthrus                                                                                      #
+    # ==================================================================================================================== #
+    @property
+    def total_df_start_end_times(self):
+        """[earliest_df_time, latest_df_time]: The earliest and latest spiketimes in the total df """
+        return self.spikes_window.total_df_start_end_times
+    @property
+    def total_data_start_time(self):
+        """returns the earliest_df_time: The earliest spiketimes in the total df """
+        return self.spikes_window.total_data_start_time
+    @property
+    def total_data_end_time(self):
+        """returns the latest_df_time: The latest spiketimes in the total df """
+        return self.spikes_window.total_data_end_time
+            
+
+
     def debug_print_spikes_window(self, prefix_string='spikes_window.', indent_string = '\t'):
         self.spikes_window.debug_print_spikes_window(prefix_string=prefix_string, indent_string=indent_string)
