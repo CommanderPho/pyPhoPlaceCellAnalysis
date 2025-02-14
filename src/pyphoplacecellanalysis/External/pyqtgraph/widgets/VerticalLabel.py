@@ -19,6 +19,10 @@ __all__ = ['VerticalLabel']
             #return QtCore.QSize(16, 50)
 
 class VerticalLabel(QtWidgets.QLabel):
+    """ 
+    
+    VerticalLabel: .forceWidth, .orientation
+    """
     def __init__(self, text, orientation='vertical', forceWidth=True):
         QtWidgets.QLabel.__init__(self, text)
         self.forceWidth = forceWidth
@@ -27,6 +31,7 @@ class VerticalLabel(QtWidgets.QLabel):
         
     def setOrientation(self, o):
         if self.orientation == o:
+            ## no change in orientation values
             return
         self.orientation = o
         self.update()

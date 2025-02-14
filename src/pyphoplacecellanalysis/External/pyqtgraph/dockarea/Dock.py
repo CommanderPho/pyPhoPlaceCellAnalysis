@@ -457,7 +457,10 @@ class Dock(QtWidgets.QWidget, DockDrop):
 
 
 class DockLabel(VerticalLabel):
-    """ the label and 'title bar' at the top of the Dock widget that displays the title and allows dragging/closing. """
+    """ the label and 'title bar' at the top of the Dock widget that displays the title and allows dragging/closing.
+    VerticalLabel: .forceWidth, .orientation
+    
+    """
     sigClicked = QtCore.Signal(object, object)
     sigCloseClicked = QtCore.Signal()
     sigCollapseClicked = QtCore.Signal()
@@ -518,6 +521,11 @@ class DockLabel(VerticalLabel):
             self.updateStyle()
 
     def setOrientation(self, o):
+        """ 
+        sets self.orientation
+        
+        """
+        # self.config.orientation = o ## do not do this, that would update the desired orientation
         VerticalLabel.setOrientation(self, o)
         self.updateStyle()
 
