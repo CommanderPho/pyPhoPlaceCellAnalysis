@@ -7,7 +7,7 @@ import re
 from typing import List, Optional, Dict, Tuple, Any, Union
 from matplotlib import cm, pyplot as plt
 from matplotlib.gridspec import GridSpec
-from neuropy.core import Laps
+from neuropy.core import Laps, Position
 from neuropy.core.user_annotations import UserAnnotationsManager
 from neuropy.utils.dynamic_container import DynamicContainer
 from neuropy.utils.indexing_helpers import union_of_arrays
@@ -182,8 +182,13 @@ def build_subdivided_epochs(curr_active_pipeline, subdivide_bin_size: float = 1.
     global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
     global_subivided_epochs_df = global_subivided_epochs_obj.epochs.to_dataframe() #.rename(columns={'t_rel_seconds':'t'})
     global_subivided_epochs_df['label'] = deepcopy(global_subivided_epochs_df.index.to_numpy())
-    global_pos_df: pd.DataFrame = deepcopy(global_session.position.to_dataframe()) #.rename(columns={'t':'t_rel_seconds'})
+    # global_pos_df: pd.DataFrame = deepcopy(global_session.position.to_dataframe()) #.rename(columns={'t':'t_rel_seconds'})
+    
+    ## Extract Measured Position:
+    global_pos_obj: Position = deepcopy(global_session.position)
+    global_pos_df: pd.DataFrame = global_pos_obj.compute_higher_order_derivatives().position.compute_smoothed_position_info(N=15)
     global_pos_df.time_point_event.adding_epochs_identity_column(epochs_df=global_subivided_epochs_df, epoch_id_key_name='global_subdivision_idx', epoch_label_column_name='label', drop_non_epoch_events=True, should_replace_existing_column=True) # , override_time_variable_name='t_rel_seconds'
+    
     return (global_subivided_epochs_obj, global_subivided_epochs_df), global_pos_df
 
 
