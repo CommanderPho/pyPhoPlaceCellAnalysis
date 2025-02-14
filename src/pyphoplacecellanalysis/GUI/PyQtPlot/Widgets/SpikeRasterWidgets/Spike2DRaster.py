@@ -25,8 +25,9 @@ from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingS
 
 
 # For Dynamic Plot Widget Adding
+from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock
 # from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
-# from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DynamicDockDisplayAreaContentMixin
+from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DynamicDockDisplayAreaOwningMixin, DynamicDockDisplayAreaContentMixin
 from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.NestedDockAreaWidget import NestedDockAreaWidget
 
 # For a specific type of dynamic plot widget
@@ -57,6 +58,7 @@ from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.CustomGraphicsLayoutWidget import CustomViewBox
 
 
+
 class SynchronizedPlotMode(ExtendedEnum):
     """Describes the type of file progress actions that can be performed to get the right verbage.
     Used by `print_file_progress_message(...)`
@@ -76,7 +78,7 @@ class SynchronizedPlotMode(ExtendedEnum):
 
 
 @metadata_attributes(short_name=None, tags=['raster', 'gui'], input_requires=[], output_provides=[], uses=['LiveWindowedData'], used_by=[], creation_date='2024-12-18 12:45', related_items=[])
-class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRasterBase):
+class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRasterBase):
     """ Displays a 2D version of a raster plot with the spikes occuring along a plane. 
     
     Usage:
@@ -1305,6 +1307,16 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         target_graphics_layout_widget.removeItem(separate_plot_item)
 
         
+
+    # ==================================================================================================================== #
+    # DynamicDockDisplayAreaOwningMixin Conformances                                                                       #
+    # ==================================================================================================================== #
+    @property 
+    def dock_manager_widget(self) -> DynamicDockDisplayAreaContentMixin:
+        """Must be implemented by subclasses to return the widget that manages the docks"""
+        raise self.ui.dynamic_docked_widget_container
+
+
     # matplotlib render subplot __________________________________________________________________________________________ #
 
     def _setupUI_matplotlib_render_plots(self):
@@ -1318,7 +1330,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         emit an event so the parent can call `self.update_scrolling_event_filters()` to add the new item
         
         """
-        dDisplayItem = self.ui.dynamic_docked_widget_container.find_display_dock(identifier=name) # Dock
+        dDisplayItem: Dock = self.ui.dynamic_docked_widget_container.find_display_dock(identifier=name) # Dock
         if dDisplayItem is None:
             # No extant matplotlib_view_widget and display_dock currently, create a new one:
             ## TODO: hardcoded single-widget: used to be named `self.ui.matplotlib_view_widget`

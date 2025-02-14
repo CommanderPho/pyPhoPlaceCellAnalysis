@@ -375,7 +375,7 @@ class DynamicDockDisplayAreaContentMixin:
         self.clear_all_display_docks()
 
 
-    def get_flat_dockitems_list(self, debug_print=False):
+    def get_flat_dockitems_list(self, debug_print=False) -> List[Dock]:
         """ extracts the 'dock' property that is the contents of each added dock item from the self.dynamic_display_dict and returns it as a flat list """
         all_collected_dock_items = []
         for an_id, an_item in self.dynamic_display_dict.items():
@@ -389,7 +389,7 @@ class DynamicDockDisplayAreaContentMixin:
                 
         return all_collected_dock_items
 
-    def get_flat_widgets_list(self, debug_print=False):
+    def get_flat_widgets_list(self, debug_print=False) -> List["QtWidgets.QWidget"]:
         """ extracts the 'widget' property that is the contents of each added dock item from the self.dynamic_display_dict and returns it as a flat list """
         all_collected_widgets = []
         for an_id, an_item in self.dynamic_display_dict.items():
@@ -473,7 +473,7 @@ class DynamicDockDisplayAreaContentMixin:
         return tree_out_dock_items_list, group_meta_item_dict
 
     
-    def add_display_dock(self, identifier=None, widget=None, dockSize=(300,200), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None, **kwargs):
+    def add_display_dock(self, identifier=None, widget=None, dockSize=(300,200), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None, **kwargs) -> Tuple["QtWidgets.QWidget", Dock]:
         """ adds a dynamic display dock with an appropriate widget of type 'viewContentsType' to the dock area container on the main window. 
 
         Input:
@@ -542,8 +542,6 @@ class DynamicDockDisplayAreaContentMixin:
             else:
                 raise NotImplementedError
         else:
-
-                
             raise NotImplementedError
         
         # print(f'dockAddLocationOpts: {dockAddLocationOpts}')
@@ -792,3 +790,60 @@ class DynamicDockDisplayAreaContentMixin:
             print(f'\t WARNING: searched all items and could not find the closing_dock_item!!')
  
         
+from typing import Optional
+from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock
+from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DynamicDockDisplayAreaContentMixin
+
+@metadata_attributes(short_name=None, tags=['widget', 'dock', 'dockarea'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-13 18:21', related_items=['PipelineDynamicDockDisplayAreaMixin'])
+class DynamicDockDisplayAreaOwningMixin:
+    """A mixin for widgets that own/contain a child widget implementing DynamicDockDisplayAreaContentMixin.
+    Provides convenient access to dock management functions by delegating to the child widget.
+    
+    Requirements:
+        - Must implement property `dock_manager_widget` that returns the child widget implementing DynamicDockDisplayAreaContentMixin
+        
+        
+    from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock
+    from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DynamicDockDisplayAreaOwningMixin, DynamicDockDisplayAreaContentMixin
+    
+    
+    """
+    # ==================================================================================================================== #
+    # DynamicDockDisplayAreaOwningMixin Conformances                                                                       #
+    # ==================================================================================================================== #
+    @property 
+    def dock_manager_widget(self) -> DynamicDockDisplayAreaContentMixin:
+        """Must be implemented by subclasses to return the widget that manages the docks"""
+        raise NotImplementedError
+        
+    def find_display_dock(self, identifier) -> Optional[Dock]:
+        """Delegates to child widget's find_display_dock"""
+        return self.dock_manager_widget.find_display_dock(identifier)
+        
+    def add_display_dock(self, identifier=None, widget=None, dockSize=(300,200), dockAddLocationOpts=['bottom'], **kwargs):
+        """Delegates to child widget's add_display_dock"""
+        return self.dock_manager_widget.add_display_dock(identifier, widget, dockSize, dockAddLocationOpts, **kwargs)
+        
+    def remove_display_dock(self, identifier):
+        """Delegates to child widget's remove_display_dock"""
+        return self.dock_manager_widget.remove_display_dock(identifier)
+        
+    def rename_display_dock(self, original_identifier, new_identifier):
+        """Delegates to child widget's rename_display_dock"""
+        return self.dock_manager_widget.rename_display_dock(original_identifier, new_identifier)
+        
+    def clear_all_display_docks(self):
+        """Delegates to child widget's clear_all_display_docks"""
+        return self.dock_manager_widget.clear_all_display_docks()
+
+    def get_flat_dockitems_list(self, debug_print=False):
+        """Delegates to child widget's get_flat_dockitems_list"""
+        return self.dock_manager_widget.get_flat_dockitems_list(debug_print)
+
+    def get_flat_widgets_list(self, debug_print=False):
+        """Delegates to child widget's get_flat_widgets_list"""
+        return self.dock_manager_widget.get_flat_widgets_list(debug_print)
+
+    def get_dockGroup_dock_dict(self, debug_print=False):
+        """Delegates to child widget's get_dockGroup_dock_dict"""
+        return self.dock_manager_widget.get_dockGroup_dock_dict(debug_print)
