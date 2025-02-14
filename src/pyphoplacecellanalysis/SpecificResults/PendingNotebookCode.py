@@ -214,22 +214,47 @@ class NonPBEDimensionalDecodingResult(UnpackableMixin, HDF_SerializationMixin, A
     
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import NonPBEDimensionalDecodingResult
     
+    results2D: NonPBEDimensionalDecodingResult = NonPBEDimensionalDecodingResult(ndim=2, 
+    test_epoch_results=test_epoch_specific_decoded_results2D_dict,
+    continuous_results=continuous_specific_decoded_results2D_dict,
+    decoders=new_decoder2D_dict, pfs=new_pf2Ds_dict,
+    subdivided_epochs_results=subdivided_epochs_specific_decoded_results2D_dict, 
+    subdivided_epochs_df=deepcopy(global_subivided_epochs_df), pos_df=global_pos_df)
+
+    # results2D
+    
+    # Unpack all fields in order
+    ndim, pos_df, pfs, decoders, test_epoch_results, continuous_results, subdivided_epochs_df, subdivided_epochs_results = results2D
+    # *test_args = results2D
+    # print(len(test_args))
+    # anUPDATED_TUPLE_2D, UPDATED_subdivided_epochs_specific_decoded_results2D_dict = results2D
+    ndim
+
+
     """
     ndim: int = serialized_attribute_field()  # 1 or 2
+    pos_df: pd.DataFrame = serialized_field()
+    
+    pfs: Dict[types.DecoderName, PfND] = serialized_field()
+    decoders: Dict[types.DecoderName, BasePositionDecoder] = serialized_field()
+
     test_epoch_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = serialized_field()
     continuous_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = serialized_field()
-    decoders: Dict[types.DecoderName, BasePositionDecoder] = serialized_field()
-    pfs: Dict[types.DecoderName, PfND] = serialized_field()
+    
+    subdivided_epochs_df: pd.DataFrame = serialized_field()
     subdivided_epochs_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = serialized_field()
 
-    # Add shared objects:
-    subdivided_epochs_df: pd.DataFrame = serialized_field()
-    pos_df: pd.DataFrame = serialized_field()
 
     def __attrs_post_init__(self):
         assert self.ndim in (1, 2), f"ndim must be 1 or 2, got {self.ndim}"
 
-
+    # ==================================================================================================================== #
+    # UnpackableMixin conformances                                                                                         #
+    # ==================================================================================================================== #
+    # def UnpackableMixin_unpacking_excludes(self) -> List:
+    #     """Excludes ndim from unpacking"""
+    #     return ['ndim']
+    
 
 @define(slots=False, eq=False, repr=False)
 class Compute_NonPBE_Epochs:
