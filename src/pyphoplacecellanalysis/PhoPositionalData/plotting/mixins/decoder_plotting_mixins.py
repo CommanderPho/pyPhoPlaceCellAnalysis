@@ -713,7 +713,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
     @function_attributes(short_name=None, tags=['AI', 'posterior', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 12:00', related_items=[])
     @classmethod
-    def _helper_add_heatmap(cls, an_ax, xbin_centers, a_p_x_given_n, a_time_bin_centers, ybin_centers=None, rotate_to_vertical:bool=False, debug_print:bool=False, posterior_masking_value: float = 0.0025, full_posterior_opacity: float = 1.0,
+    def _helper_add_heatmap(cls, an_ax, xbin_centers, a_p_x_given_n, a_time_bin_centers=None, ybin_centers=None, rotate_to_vertical:bool=False, debug_print:bool=False,
+                            posterior_masking_value: float = 0.0025, full_posterior_opacity: float = 1.0,
                             custom_image_extent=None, cmap = 'viridis', should_perform_reshape: bool=True):
         """
         Helper that handles all the posterior heatmap plotting (for both 1D and 2D cases).
@@ -778,7 +779,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         
         # Adjust for vertical orientation if requested.
         if rotate_to_vertical:
-            image_extent = (y_values.min(), y_values.max(), x_values.min(), x_values.max())
+            ordinate_first_image_extent = (y_values.min(), y_values.max(), x_values.min(), x_values.max())
             # Swap x and y arrays.
             x_values, y_values = y_values, x_values
             if should_perform_reshape:
@@ -789,26 +790,34 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             if debug_print:
                 print(f'Post-swap masked_posterior shape: {np.shape(masked_posterior)}')
         else:
-            image_extent = (x_values.min(), x_values.max(), y_values.min(), y_values.max())
+            ordinate_first_image_extent = (x_values.min(), x_values.max(), y_values.min(), y_values.max())
         
         if custom_image_extent is not None:
             assert len(custom_image_extent) == 4
-            image_extent = deepcopy(custom_image_extent)
+            print(f'using `custom_image_extent`: prev_image_extent: {ordinate_first_image_extent}, custom_image_extent: {custom_image_extent}')
+            ordinate_first_image_extent = deepcopy(custom_image_extent)
 
         ## set after any swapping:
         extra_dict['x_values'] = x_values
         extra_dict['y_values'] = y_values
 
-        n_time_bins: int = len(a_time_bin_centers)
         masked_shape = np.shape(masked_posterior)
-        # Assert.all_equal(n_time_bins, masked_shape[0])
-        assert n_time_bins == masked_shape[0], f" masked_shape[0]: { masked_shape[0]} != n_time_bins: {n_time_bins}"
         
+        if a_time_bin_centers is not None:
+            n_time_bins: int = len(a_time_bin_centers)
+            # Assert.all_equal(n_time_bins, masked_shape[0])
+            assert n_time_bins == masked_shape[0], f" masked_shape[0]: { masked_shape[0]} != n_time_bins: {n_time_bins}"
+        else:
+            n_time_bins: int = masked_shape[0] ## infer from posterior
+
+        extra_dict['n_time_bins'] = n_time_bins
+        plots_data = RenderPlotsData(name='_helper_add_heatmap', ordinate_first_image_extent=deepcopy(ordinate_first_image_extent), **extra_dict)
+
         heatmaps = []
         # For simplicity, we assume non-single-time-bin mode (as asserted in the calling function).
         if not is_2D:
             a_heatmap = an_ax.imshow(masked_posterior, aspect='auto', cmap=cmap, alpha=full_posterior_opacity,
-                                       extent=image_extent, origin='lower', interpolation='none')
+                                       extent=ordinate_first_image_extent, origin='lower', interpolation='none')
             heatmaps.append(a_heatmap)
         else:
             vmin_global = np.nanmin(posterior)
@@ -817,10 +826,10 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             time_step_opacity: float = max(full_posterior_opacity/float(n_time_bins), 0.2)
             for i in np.arange(n_time_bins):
                 a_heatmap = an_ax.imshow(np.squeeze(masked_posterior[i, :, :]), aspect='auto', cmap=cmap, alpha=time_step_opacity,
-                                           extent=image_extent, origin='lower', interpolation='none',
+                                           extent=ordinate_first_image_extent, origin='lower', interpolation='none',
                                            vmin=vmin_global, vmax=vmax_global)
                 heatmaps.append(a_heatmap)
-        return heatmaps, image_extent, extra_dict
+        return heatmaps, ordinate_first_image_extent, plots_data
 
 
     # ==================================================================================================================== #
@@ -927,7 +936,6 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         if debug_print:
             print(f'is_single_time_bin_mode: {is_single_time_bin_mode}, is_2D: {is_2D}')
             
-
         # For 1D case, retrieve fake y values.
         if np.ndim(a_p_x_given_n) < 3:
             fake_y_center = extra_dict['fake_y_center']
@@ -1062,7 +1070,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
         # plot_data = MatplotlibRenderPlots(name='_perform_add_decoded_posterior_and_trajectory')
         # plots = RenderPlots('_perform_add_decoded_posterior_and_trajectory')
-        plots_data = RenderPlotsData(name='_perform_add_decoded_posterior_and_trajectory', image_extent=deepcopy(image_extent))
+        plots_data: RenderPlotsData = deepcopy(extra_dict) # RenderPlotsData(name='_perform_add_decoded_posterior_and_trajectory', image_extent=deepcopy(image_extent))
 
         return heatmaps, (a_meas_pos_line, a_line), (_meas_pos_out_markers, _out_markers), plots_data
 
