@@ -3047,9 +3047,11 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
 
 
 
-
+@metadata_attributes(short_name=None, tags=['archive', 'filesystem', 'greatlakes', 'useful', 'delete'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 class OldFileArchiver:
+    """ Cleans up and deletes old files and temporary pickles to recover disk space.
     
+    """
     @function_attributes(short_name=None, tags=['archive', 'cleanup', 'filesystem'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-02 11:30', related_items=[])
     @classmethod
     def archive_old_files(cls, collected_outputs_directory: Path, excluded_or_outdated_files_list: List[Path], is_dry_run: bool=False):
