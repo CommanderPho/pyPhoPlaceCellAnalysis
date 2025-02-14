@@ -17,7 +17,7 @@ import attrs
 import matplotlib as mpl
 import napari
 from neuropy.core.epoch import Epoch, ensure_dataframe
-from neuropy.analyses.placefields import PfND
+from neuropy.analyses.placefields import HDF_SerializationMixin, PfND
 import numpy as np
 import pandas as pd
 from attrs import asdict, astuple, define, field, Factory
@@ -203,21 +203,28 @@ def build_subdivided_epochs(curr_active_pipeline, subdivide_bin_size: float = 1.
 # 2025-01-27 - New Train/Test Splitting Results                                                                        #
 # ==================================================================================================================== #
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, TrackTemplates, TrainTestSplitResult
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
+from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
+from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
+from attrs import asdict, astuple, define, field, Factory
 
-
-@define
-class NonPBEDimensionalDecodingResult:
-    """Contains all decoding results for either 1D or 2D computations"""
-    ndim: int = field(default=2)  # 1 or 2
-    test_epoch_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = field()
-    continuous_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = field()
-    decoders: Dict[types.DecoderName, BasePositionDecoder] = field()
-    pfs: Dict[types.DecoderName, PfND] = field()
-    subdivided_epochs_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = field()
+@custom_define(slots=False, eq=False)
+class NonPBEDimensionalDecodingResult(UnpackableMixin, HDF_SerializationMixin, AttrsBasedClassHelperMixin):
+    """Contains all decoding results for either 1D or 2D computations
+    
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import NonPBEDimensionalDecodingResult
+    
+    """
+    ndim: int = serialized_attribute_field()  # 1 or 2
+    test_epoch_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = serialized_field()
+    continuous_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = serialized_field()
+    decoders: Dict[types.DecoderName, BasePositionDecoder] = serialized_field()
+    pfs: Dict[types.DecoderName, PfND] = serialized_field()
+    subdivided_epochs_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = serialized_field()
 
     # Add shared objects:
-    subdivided_epochs_df: pd.DataFrame = field()
-    pos_df: pd.DataFrame = field()
+    subdivided_epochs_df: pd.DataFrame = serialized_field()
+    pos_df: pd.DataFrame = serialized_field()
 
     def __attrs_post_init__(self):
         assert self.ndim in (1, 2), f"ndim must be 1 or 2, got {self.ndim}"
@@ -430,54 +437,32 @@ class Compute_NonPBE_Epochs:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_subdivided_epochs
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
 
-        ## 1D Pfs
-        test_epoch_specific_decoded_results1D_dict, continuous_specific_decoded_results1D_dict, new_decoder1D_dict, new_pf1Ds_dict = self.recompute(curr_active_pipeline=curr_active_pipeline, pfND_ndim=1, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size)
-
-        # ## 2D Pfs
-        test_epoch_specific_decoded_results2D_dict, continuous_specific_decoded_results2D_dict, new_decoder2D_dict, new_pf2Ds_dict = self.recompute(curr_active_pipeline=curr_active_pipeline, pfND_ndim=2, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size)
-
-
-        # n_subdivision_epochs: int = int(round(total_global_time_duration / subdivide_bin_size))
+        # Build subdivided epochs first since they're needed for both 1D and 2D
         (global_subivided_epochs_obj, global_subivided_epochs_df), global_pos_df = build_subdivided_epochs(curr_active_pipeline, subdivide_bin_size=subdivide_bin_size)
-
-        ## INPUTS: new_decoder_dict, global_subivided_epochs_obj, epochs_decoding_time_bin_size
-        ## Do Decoding of only the test epochs to validate performance
-        # subdivided_epochs_specific_decoded_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {a_name:a_new_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), filter_epochs=deepcopy(global_subivided_epochs_obj), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False) for a_name, a_new_decoder in new_decoder_dict.items()}
-        subdivided_epochs_specific_decoded_results1D_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {a_name:a_new_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), filter_epochs=deepcopy(global_subivided_epochs_obj), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False) for a_name, a_new_decoder in new_decoder1D_dict.items()} ## 1D
-        ## runs in 2m 50.9s
-
-        subdivided_epochs_specific_decoded_results2D_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {a_name:a_new_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), filter_epochs=deepcopy(global_subivided_epochs_obj), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False) for a_name, a_new_decoder in new_decoder2D_dict.items()} ## 2D
-        ## OUTPUTS: subdivided_epochs_specific_decoded_results1D_dict, subdivided_epochs_specific_decoded_results2D_dict
-
-
-        ## Extract the continuous decoding result:
-        global_continuous_decoded_epochs_result2D: DecodedFilterEpochsResult = continuous_specific_decoded_results2D_dict['global']
-        assert len(global_continuous_decoded_epochs_result2D.p_x_given_n_list) == 1
-        a_continuous_decoded_result2D: SingleEpochDecodedResult = global_continuous_decoded_epochs_result2D.get_result_for_epoch(0)
-        p_x_given_n2D = global_continuous_decoded_epochs_result2D.p_x_given_n_list[0]
-        time_bin_containers = global_continuous_decoded_epochs_result2D.time_bin_containers[0]
-        time_window_centers = time_bin_containers.centers
-        # measured_positions_list = partition_df(global_pos_df, partitionColumn='global_subdivision_idx')
-        # len(measured_positions_list)
-        # measured_positions_list
-
-        ## OUTPUTS: global_continuous_decoded_epochs_result2D, a_continuous_decoded_result2D, p_x_given_n2D
-        # (test_epoch_specific_decoded_results1D_dict, continuous_specific_decoded_results1D_dict, new_decoder1D_dict, new_pf1Ds_dict), subdivided_epochs_specific_decoded_results1D_dict, ## 1D Results
-        # (test_epoch_specific_decoded_results2D_dict, continuous_specific_decoded_results2D_dict, new_decoder2D_dict, new_pf2Ds_dict), subdivided_epochs_specific_decoded_results2D_dict, global_continuous_decoded_epochs_result2D # 2D results
         
-        # Then modify recompute to return:
-        return (
-            NonPBEDimensionalDecodingResult(ndim=1, test_epoch_results=test_epoch_specific_decoded_results1D_dict, 
+        results1D, results2D = None, None
+        
+        if compute_1D:
+            test_epoch_specific_decoded_results1D_dict, continuous_specific_decoded_results1D_dict, new_decoder1D_dict, new_pf1Ds_dict = self.recompute(curr_active_pipeline=curr_active_pipeline, pfND_ndim=1, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size)
+            subdivided_epochs_specific_decoded_results1D_dict = {a_name:a_new_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), filter_epochs=deepcopy(global_subivided_epochs_obj), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False) for a_name, a_new_decoder in new_decoder1D_dict.items()}
+            results1D = NonPBEDimensionalDecodingResult(ndim=1, 
+                test_epoch_results=test_epoch_specific_decoded_results1D_dict, 
                 continuous_results=continuous_specific_decoded_results1D_dict,
                 decoders=new_decoder1D_dict, pfs=new_pf1Ds_dict,
                 subdivided_epochs_results=subdivided_epochs_specific_decoded_results1D_dict, 
-                subdivided_epochs_df=deepcopy(global_subivided_epochs_df), pos_df=global_pos_df),
-            NonPBEDimensionalDecodingResult(ndim=2, test_epoch_results=test_epoch_specific_decoded_results2D_dict,
+                subdivided_epochs_df=deepcopy(global_subivided_epochs_df), pos_df=global_pos_df)
+
+        if compute_2D:
+            test_epoch_specific_decoded_results2D_dict, continuous_specific_decoded_results2D_dict, new_decoder2D_dict, new_pf2Ds_dict = self.recompute(curr_active_pipeline=curr_active_pipeline, pfND_ndim=2, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size)
+            subdivided_epochs_specific_decoded_results2D_dict = {a_name:a_new_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), filter_epochs=deepcopy(global_subivided_epochs_obj), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False) for a_name, a_new_decoder in new_decoder2D_dict.items()}
+            results2D = NonPBEDimensionalDecodingResult(ndim=2, 
+                test_epoch_results=test_epoch_specific_decoded_results2D_dict,
                 continuous_results=continuous_specific_decoded_results2D_dict,
                 decoders=new_decoder2D_dict, pfs=new_pf2Ds_dict,
                 subdivided_epochs_results=subdivided_epochs_specific_decoded_results2D_dict, 
                 subdivided_epochs_df=deepcopy(global_subivided_epochs_df), pos_df=global_pos_df)
-        )
+
+        return results1D, results2D
         
 
 def _single_compute_train_test_split_epochs_decoders(a_decoder: BasePositionDecoder, a_config: Any, an_epoch_training_df: pd.DataFrame, an_epoch_test_df: pd.DataFrame, a_modern_name: str, training_test_suffixes = ['_train', '_test'], debug_print: bool = False): # , debug_output_hdf5_file_path=None, debug_plot: bool = False
