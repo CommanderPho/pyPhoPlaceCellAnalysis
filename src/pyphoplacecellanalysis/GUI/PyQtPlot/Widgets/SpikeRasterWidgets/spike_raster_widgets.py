@@ -137,7 +137,7 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
         # 'DockedWidgets.LongShortDecodedEpochsDockedMatplotlibView',
         # 'DockedWidgets.DirectionalDecodedEpochsDockedMatplotlibView',
         # 'DockedWidgets.TrackTemplatesDecodedEpochsDockedMatplotlibView',
-        'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView',
+        'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView', # [/c:/Users/pho/repos/Spike3DWorkEnv/pyPhoPlaceCellAnalysis/src/pyphoplacecellanalysis/GUI/Qt/Menus/SpecificMenus/DockedWidgets_MenuProvider.py:141](vscode://file/c:/Users/pho/repos/Spike3DWorkEnv/pyPhoPlaceCellAnalysis/src/pyphoplacecellanalysis/GUI/Qt/Menus/SpecificMenus/DockedWidgets_MenuProvider.py:141)`'actionPseudo2DDecodedEpochsDockedMatplotlibView': AddNewDecodedPosteriors_MatplotlibPlotCommand`
         #  'DockedWidgets.ContinuousPseudo2DDecodedMarginalsDockedMatplotlibView',
 
     ]
