@@ -433,6 +433,10 @@ class Compute_NonPBE_Epochs:
     def compute_all(self, curr_active_pipeline, epochs_decoding_time_bin_size: float = 0.025, subdivide_bin_size: float = 0.5, compute_1D: bool = True, compute_2D: bool = True) -> Tuple[Optional[NonPBEDimensionalDecodingResult], Optional[NonPBEDimensionalDecodingResult]]:
         """ computes all pfs, decoders, and then performs decodings on both continuous and subivided epochs.
         
+        ## OUTPUTS: global_continuous_decoded_epochs_result2D, a_continuous_decoded_result2D, p_x_given_n2D
+        # (test_epoch_specific_decoded_results1D_dict, continuous_specific_decoded_results1D_dict, new_decoder1D_dict, new_pf1Ds_dict), subdivided_epochs_specific_decoded_results1D_dict, ## 1D Results
+        # (test_epoch_specific_decoded_results2D_dict, continuous_specific_decoded_results2D_dict, new_decoder2D_dict, new_pf2Ds_dict), subdivided_epochs_specific_decoded_results2D_dict, global_continuous_decoded_epochs_result2D # 2D results
+        
         """
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_subdivided_epochs
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
