@@ -508,19 +508,33 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
     ## MAIN PLOT FUNCTION:
     @function_attributes(short_name=None, tags=['main', 'plot', 'posterior', 'epoch', 'line', 'trajectory'], input_requires=[], output_provides=[], uses=['self._perform_add_decoded_posterior_and_trajectory'], used_by=['plot_epoch_with_slider_widget'], creation_date='2025-01-29 15:52', related_items=[])
-    def plot_epoch(self, an_epoch_idx: int, time_bin_index: Optional[int]=None, include_most_likely_pos_line: Optional[bool]=None, override_ax=None, should_post_hoc_fit_to_image_extent: bool = True, debug_print:bool = False):
+    def plot_epoch(self, an_epoch_idx: int, override_plot_linear_idx: Optional[int]=None, time_bin_index: Optional[int]=None, include_most_likely_pos_line: Optional[bool]=None, override_ax=None, should_post_hoc_fit_to_image_extent: bool = True, posterior_masking_value: float = 0.0025, debug_print:bool = False):
         """ Main plotting function.
              Internally calls `self._perform_add_decoded_posterior_and_trajectory(...)` to do the plotting.
+             
+            IMPORTANT: setting `override_plot_linear_idx=9` means the plot will occur on ax 9 but `an_epoch_idx=ANYTHING`. Allows plotting epochs on any arbitrary axes.
+            
         """
         self.curr_epoch_idx = an_epoch_idx
         self.curr_time_bin_idx = time_bin_index
 
-        a_linear_index: int = an_epoch_idx
-        curr_row = self.row_column_indicies[0][a_linear_index]
-        curr_col = self.row_column_indicies[1][a_linear_index]
-        curr_artist_dict = self.artist_dict_array[curr_row][curr_col]
-        curr_plot_data: RenderPlotsData = self.plots_data_dict_array[curr_row][curr_col]
+        if override_plot_linear_idx is not None:
+            a_linear_index: int = override_plot_linear_idx
+            
+        else:
+            a_linear_index: int = an_epoch_idx
 
+        try:
+            curr_row = self.row_column_indicies[0][a_linear_index]
+            curr_col = self.row_column_indicies[1][a_linear_index]
+            curr_artist_dict = self.artist_dict_array[curr_row][curr_col]
+            curr_plot_data: RenderPlotsData = self.plots_data_dict_array[curr_row][curr_col]
+
+        except IndexError as e:
+            print(f'ERROR: IndexError: {e}:\n\n !!! Did you mean to plot an_epoch_idx={an_epoch_idx} but with an overriden `override_plot_linear_idx`?\n\tThis allows decoupling of the plot and epoch_idx, otherwise it always plots the first epochs.\n')
+            raise
+        except Exception as e:
+            raise
 
         if override_ax is None:
             an_ax = self.axs[curr_row][curr_col] # np.shape(self.axs) - (n_subplots, 2)
@@ -570,7 +584,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         ## Perform the plot:
         curr_artist_dict['prev_heatmaps'], (a_meas_pos_line, a_line), (_meas_pos_out_markers, _out_markers), plots_data = self._perform_add_decoded_posterior_and_trajectory(an_ax, xbin_centers=self.xbin_centers, a_p_x_given_n=a_p_x_given_n,
                                                                             a_time_bin_centers=a_time_bin_centers, a_most_likely_positions=a_most_likely_positions, a_measured_pos_df=a_measured_pos_df, ybin_centers=self.ybin_centers,
-                                                                            include_most_likely_pos_line=include_most_likely_pos_line, time_bin_index=time_bin_index, rotate_to_vertical=self.rotate_to_vertical, should_perform_reshape=True, should_post_hoc_fit_to_image_extent=should_post_hoc_fit_to_image_extent, debug_print=debug_print) # , allow_time_slider=True
+                                                                            include_most_likely_pos_line=include_most_likely_pos_line, time_bin_index=time_bin_index, rotate_to_vertical=self.rotate_to_vertical, should_perform_reshape=True, should_post_hoc_fit_to_image_extent=should_post_hoc_fit_to_image_extent,
+                                                                            posterior_masking_value=posterior_masking_value, debug_print=debug_print) # , allow_time_slider=True
 
 
         ## update the plot_data
