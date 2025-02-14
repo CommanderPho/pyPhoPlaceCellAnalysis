@@ -1311,10 +1311,10 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
     # ==================================================================================================================== #
     # DynamicDockDisplayAreaOwningMixin Conformances                                                                       #
     # ==================================================================================================================== #
-    @property 
+    @property
     def dock_manager_widget(self) -> DynamicDockDisplayAreaContentMixin:
         """Must be implemented by subclasses to return the widget that manages the docks"""
-        raise self.ui.dynamic_docked_widget_container
+        return self.ui.dynamic_docked_widget_container
 
 
     # matplotlib render subplot __________________________________________________________________________________________ #
@@ -1494,7 +1494,7 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
 
 
     @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 13:23', related_items=[])
-    def find_matplotlib_render_plot_widget(self, identifier):
+    def find_matplotlib_render_plot_widget(self, identifier, include_dock=False):
         """ finds the existing dynamically added matplotlib_render_plot_widget. 
         returns (widget, fig, ax)
         """
@@ -1502,15 +1502,26 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
         if active_matplotlib_view_widget is not None:
             if active_matplotlib_view_widget.is_matplotlib_based():
                 ## matplotlib-based:
-                return active_matplotlib_view_widget, active_matplotlib_view_widget.getFigure(), active_matplotlib_view_widget.axes # return all axes instead of just the first one
+                if include_dock:
+                    dock_item = self.find_display_dock(identifier=identifier)
+                    return active_matplotlib_view_widget, active_matplotlib_view_widget.getFigure(), active_matplotlib_view_widget.axes, dock_item # return all axes instead of just the first one
+                else:
+                    return active_matplotlib_view_widget, active_matplotlib_view_widget.getFigure(), active_matplotlib_view_widget.axes # return all axes instead of just the first one
             elif active_matplotlib_view_widget.is_pyqtgraph_based():
                 ## pyqtgraph-based:
-                return active_matplotlib_view_widget, active_matplotlib_view_widget.getRootGraphicsLayoutWidget(), active_matplotlib_view_widget.getRootPlotItem()
+                if include_dock:
+                    dock_item = self.find_display_dock(identifier=identifier)
+                    return active_matplotlib_view_widget, active_matplotlib_view_widget.getRootGraphicsLayoutWidget(), active_matplotlib_view_widget.getRootPlotItem()
+                else:
+                    return active_matplotlib_view_widget, active_matplotlib_view_widget.getRootGraphicsLayoutWidget(), active_matplotlib_view_widget.getRootPlotItem(), dock_item
             else:
                 raise NotImplementedError(f'active_matplotlib_view_widget: {active_matplotlib_view_widget}')
         else:
             print(f'active_matplotlib_view_widget with identifier {identifier} was not found!')
-            return None, None, None
+            if include_dock:
+                return None, None, None, None
+            else:
+                return None, None, None
 
 
     @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 13:27', related_items=[])
