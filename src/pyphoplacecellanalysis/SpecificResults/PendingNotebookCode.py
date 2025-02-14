@@ -61,7 +61,7 @@ from neuropy.utils.indexing_helpers import get_values_from_keypaths, set_value_b
 # ==================================================================================================================== #
 # 2025-02-13 - Misc                                                                                                    #
 # ==================================================================================================================== #
-@function_attributes(short_name=None, tags=['UNFINISHED', 'plotting', 'computing'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-13 14:58', related_items=[])
+@function_attributes(short_name=None, tags=['UNFINISHED', 'plotting', 'computing'], input_requires=[], output_provides=[], uses=['_perform_plot_multi_decoder_meas_pred_position_track'], used_by=[], creation_date='2025-02-13 14:58', related_items=['_perform_plot_multi_decoder_meas_pred_position_track'])
 def add_continuous_decoded_posterior(spike_raster_window, curr_active_pipeline, desired_time_bin_size: float, debug_print=True):
     """ computes the continuously decoded position posteriors (if needed) using the pipeline, then adds them as a new track to the SpikeRaster2D 
     
@@ -317,10 +317,12 @@ class Compute_NonPBE_Epochs:
         pass
     
 
-    def recompute(self, curr_active_pipeline, epochs_decoding_time_bin_size: float = 0.025):
-        """ 
+    def recompute(self, curr_active_pipeline, pfND_ndim: int = 2, epochs_decoding_time_bin_size: float = 0.025):
+        """ For a specified decoding time_bin_size, copies the global pfND
         
         test_epoch_specific_decoded_results_dict, continuous_specific_decoded_results_dict, new_decoder_dict, new_pfs_dict = a_new_NonPBE_Epochs_obj.recompute(curr_active_pipeline=curr_active_pipeline, epochs_decoding_time_bin_size = 0.058)
+        
+        pfND_ndim: 1 - 1D, 2 - 2D
         
         """
         from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch
@@ -338,8 +340,15 @@ class Compute_NonPBE_Epochs:
         long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
         long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name].computed_data for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
         long_computation_config, short_computation_config, global_computation_config = [curr_active_pipeline.computation_results[an_epoch_name].computation_config for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        long_pf1D, short_pf1D, global_pf1D = long_results.pf1D, short_results.pf1D, global_results.pf1D
-        long_pf2D, short_pf2D, global_pf2D = long_results.pf2D, short_results.pf2D, global_results.pf2D
+        
+        if pfND_ndim == 1:
+             ## Uses 1D Placefields
+            print(f'Uses 1D Placefields')
+            long_pfND, short_pfND, global_pfND = long_results.pf1D, short_results.pf1D, global_results.pf1D
+        else:
+            ## Uses 2D Placefields
+            print(f'Uses 2D Placefields')
+            long_pfND, short_pfND, global_pfND = long_results.pf2D, short_results.pf2D, global_results.pf2D
 
         # t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
         # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
@@ -363,10 +372,10 @@ class Compute_NonPBE_Epochs:
         a_new_testing_epoch_obj_dict: Dict[types.DecoderName, Epoch] = self.a_new_testing_epoch_obj_dict
 
         ## INPUTS: (a_new_training_df_dict, a_new_testing_epoch_obj_dict), (a_new_test_df_dict, a_new_testing_epoch_obj_dict)
-        original_pos_dfs_dict: Dict[types.DecoderName, pd.DataFrame] = {'long': deepcopy(long_session.position.to_dataframe()), 'short': deepcopy(short_session.position.to_dataframe()), 'global': deepcopy(global_session.position.to_dataframe())}
+        # original_pos_dfs_dict: Dict[types.DecoderName, pd.DataFrame] = {'long': deepcopy(long_session.position.to_dataframe()), 'short': deepcopy(short_session.position.to_dataframe()), 'global': deepcopy(global_session.position.to_dataframe())}
         # original_pfs_dict: Dict[str, PfND] = {'long_any': deepcopy(long_pf1D_dt), 'short_any': deepcopy(short_pf1D_dt), 'global': deepcopy(global_pf1D_dt)}  ## Uses 1Ddt Placefields
-        # original_pfs_dict: Dict[str, PfND] = {'long': deepcopy(long_pf1D), 'short': deepcopy(short_pf1D), 'global': deepcopy(global_pf1D)} ## Uses 1D Placefields
-        original_pfs_dict: Dict[types.DecoderName, PfND] = {'long': deepcopy(long_pf2D), 'short': deepcopy(short_pf2D), 'global': deepcopy(global_pf2D)} ## Uses 2D Placefields
+
+        original_pfs_dict: Dict[types.DecoderName, PfND] = {'long': deepcopy(long_pfND), 'short': deepcopy(short_pfND), 'global': deepcopy(global_pfND)} ## Uses ND Placefields
 
         # Build new Decoders and Placefields _________________________________________________________________________________ #
         new_decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = {k:BasePositionDecoder(pf=a_pfs).replacing_computation_epochs(epochs=deepcopy(a_new_training_df_dict[k])) for k, a_pfs in original_pfs_dict.items()} ## build new simple decoders
@@ -380,7 +389,6 @@ class Compute_NonPBE_Epochs:
 
         ## Do Continuous Decoding (for all time (`single_global_epoch`), using the decoder from each epoch)
         continuous_specific_decoded_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {a_name:a_new_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), filter_epochs=deepcopy(single_global_epoch), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False) for a_name, a_new_decoder in new_decoder_dict.items()}
-
 
         return test_epoch_specific_decoded_results_dict, continuous_specific_decoded_results_dict, new_decoder_dict, new_pfs_dict
 
@@ -987,7 +995,7 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 
 @function_attributes(short_name=None, tags=['decoder', 'matplotlib', 'plot', 'track', 'performance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-15 17:44', related_items=[])
 def _perform_plot_multi_decoder_meas_pred_position_track(curr_active_pipeline, fig, ax_list, desired_time_bin_size: Optional[float]=None, enable_flat_line_drawing: bool = False, debug_print = False): # , pos_df: pd.DataFrame, laps_df: pd.DataFrame
-    """ Plots a new matplotlib-based track that displays the measured and decoded position (for all four decoders) on the same axes. The "correct" (ground-truth) decoder is highlighted (higher opacity and thicker line) compared to the wrong decoders' estimates.
+    """ Plots a new matplotlib-based track that displays the measured and most-likely decoded decoded position LINES (for all four decoders) **on the same axes**. The "correct" (ground-truth) decoder is highlighted (higher opacity and thicker line) compared to the wrong decoders' estimates.
 
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
