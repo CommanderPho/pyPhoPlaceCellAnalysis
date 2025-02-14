@@ -205,6 +205,24 @@ def build_subdivided_epochs(curr_active_pipeline, subdivide_bin_size: float = 1.
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, TrackTemplates, TrainTestSplitResult
 
 
+@define
+class NonPBEDimensionalDecodingResult:
+    """Contains all decoding results for either 1D or 2D computations"""
+    ndim: int = field(default=2)  # 1 or 2
+    test_epoch_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = field()
+    continuous_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = field()
+    decoders: Dict[types.DecoderName, BasePositionDecoder] = field()
+    pfs: Dict[types.DecoderName, PfND] = field()
+    subdivided_epochs_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = field()
+
+    # Add shared objects:
+    subdivided_epochs_df: pd.DataFrame = field()
+    pos_df: pd.DataFrame = field()
+
+    def __attrs_post_init__(self):
+        assert self.ndim in (1, 2), f"ndim must be 1 or 2, got {self.ndim}"
+
+
 
 @define(slots=False, eq=False, repr=False)
 class Compute_NonPBE_Epochs:
@@ -329,7 +347,8 @@ class Compute_NonPBE_Epochs:
     
 
     def recompute(self, curr_active_pipeline, pfND_ndim: int = 2, epochs_decoding_time_bin_size: float = 0.025):
-        """ For a specified decoding time_bin_size, copies the global pfND
+        """ For a specified decoding time_bin_size and ndim (1D or 2D), copies the global pfND, builds new epoch objects, then decodes both train_test and continuous epochs
+        
         
         test_epoch_specific_decoded_results_dict, continuous_specific_decoded_results_dict, new_decoder_dict, new_pfs_dict = a_new_NonPBE_Epochs_obj.recompute(curr_active_pipeline=curr_active_pipeline, epochs_decoding_time_bin_size = 0.058)
         
@@ -404,14 +423,13 @@ class Compute_NonPBE_Epochs:
         return test_epoch_specific_decoded_results_dict, continuous_specific_decoded_results_dict, new_decoder_dict, new_pfs_dict
 
 
-    def compute_all(self, curr_active_pipeline, epochs_decoding_time_bin_size: float = 0.025, subdivide_bin_size: float = 0.5):
+    def compute_all(self, curr_active_pipeline, epochs_decoding_time_bin_size: float = 0.025, subdivide_bin_size: float = 0.5, compute_1D: bool = True, compute_2D: bool = True) -> Tuple[Optional[NonPBEDimensionalDecodingResult], Optional[NonPBEDimensionalDecodingResult]]:
         """ computes all pfs, decoders, and then performs decodings on both continuous and subivided epochs.
         
         """
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_subdivided_epochs
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
 
-        self = self
         ## 1D Pfs
         test_epoch_specific_decoded_results1D_dict, continuous_specific_decoded_results1D_dict, new_decoder1D_dict, new_pf1Ds_dict = self.recompute(curr_active_pipeline=curr_active_pipeline, pfND_ndim=1, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size)
 
@@ -444,8 +462,23 @@ class Compute_NonPBE_Epochs:
         # measured_positions_list
 
         ## OUTPUTS: global_continuous_decoded_epochs_result2D, a_continuous_decoded_result2D, p_x_given_n2D
-        (test_epoch_specific_decoded_results1D_dict, continuous_specific_decoded_results1D_dict, new_decoder1D_dict, new_pf1Ds_dict), subdivided_epochs_specific_decoded_results1D_dict,
-        (test_epoch_specific_decoded_results2D_dict, continuous_specific_decoded_results2D_dict, new_decoder2D_dict, new_pf2Ds_dict), subdivided_epochs_specific_decoded_results2D_dict, global_continuous_decoded_epochs_result2D
+        # (test_epoch_specific_decoded_results1D_dict, continuous_specific_decoded_results1D_dict, new_decoder1D_dict, new_pf1Ds_dict), subdivided_epochs_specific_decoded_results1D_dict, ## 1D Results
+        # (test_epoch_specific_decoded_results2D_dict, continuous_specific_decoded_results2D_dict, new_decoder2D_dict, new_pf2Ds_dict), subdivided_epochs_specific_decoded_results2D_dict, global_continuous_decoded_epochs_result2D # 2D results
+        
+        # Then modify recompute to return:
+        return (
+            NonPBEDimensionalDecodingResult(ndim=1, test_epoch_results=test_epoch_specific_decoded_results1D_dict, 
+                continuous_results=continuous_specific_decoded_results1D_dict,
+                decoders=new_decoder1D_dict, pfs=new_pf1Ds_dict,
+                subdivided_epochs_results=subdivided_epochs_specific_decoded_results1D_dict, 
+                subdivided_epochs_df=deepcopy(global_subivided_epochs_df), pos_df=global_pos_df),
+            NonPBEDimensionalDecodingResult(ndim=2, test_epoch_results=test_epoch_specific_decoded_results2D_dict,
+                continuous_results=continuous_specific_decoded_results2D_dict,
+                decoders=new_decoder2D_dict, pfs=new_pf2Ds_dict,
+                subdivided_epochs_results=subdivided_epochs_specific_decoded_results2D_dict, 
+                subdivided_epochs_df=deepcopy(global_subivided_epochs_df), pos_df=global_pos_df)
+        )
+        
 
 def _single_compute_train_test_split_epochs_decoders(a_decoder: BasePositionDecoder, a_config: Any, an_epoch_training_df: pd.DataFrame, an_epoch_test_df: pd.DataFrame, a_modern_name: str, training_test_suffixes = ['_train', '_test'], debug_print: bool = False): # , debug_output_hdf5_file_path=None, debug_plot: bool = False
     """ Replaces the config and updates/recomputes the computation epochs
