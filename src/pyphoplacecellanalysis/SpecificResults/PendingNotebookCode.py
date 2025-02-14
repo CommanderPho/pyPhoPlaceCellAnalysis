@@ -56,6 +56,11 @@ from attrs import define, field, Factory, asdict # used for `ComputedResult`
 from neuropy.utils.indexing_helpers import get_values_from_keypaths, set_value_by_keypath, update_nested_dict
 
 
+# ==================================================================================================================== #
+# 2025-02-14 - Drawing Final 2D Time Snapshots on Track                                                                #
+# ==================================================================================================================== #
+
+
 
 
 # ==================================================================================================================== #

@@ -41,7 +41,24 @@ from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import Mat
 
 
 class SingleArtistMultiEpochBatchHelpers:
-    """ 
+    """ Handles draw
+    Consider a decoded posterior computed from 2D placefields. You get a separate 2D position posterior for each time bin, which is difficult to view except in 3D.
+    To present this data in a 2D interface, as a SpikeRasterWindow (SpikeRaster2D) timeline track, for example, it needs to be framed into "snapshot_periods" of reasonable scale given the current display window
+        - this process I call "subdividing" and is done by adding a 'subidvision_idx' column to the dataframe
+    These "snapshot_periods" need to then be rendered as 2D artists next to each other along the x-axis (time). 
+        (x_min, ..., x_max) | (x_min, ..., x_max), | ... | (x_min, ..., x_max) ## where there are `n_frames` repeats
+        
+    
+        #  each containing `n_subdivision_samples`
+        
+    1. compute all-time (erroniously called "continuous" throughout the codebase) decoding, which always contains a single epoch (referring to the entire global epoch)
+    2. subdivide this single epoch into subdivisions of fixed duration: `subdivide_bin_size`
+        There will be `n_subdivision_epochs`: 
+        ```
+        subdivide_bin_size: float = 0.5
+        n_subdivision_epochs: int = int(round(total_global_time_duration / subdivide_bin_size))
+        ```
+        
     
     from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import SingleArtistMultiEpochBatchHelpers
     """
