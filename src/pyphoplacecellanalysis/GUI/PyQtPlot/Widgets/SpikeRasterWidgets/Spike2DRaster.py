@@ -599,7 +599,7 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
         # if ((not self.Includes2DActiveWindowScatter) and use_docked_pyqtgraph_plots):
         #     # use_docked_pyqtgraph_plots == True
         #     name_modifier_suffix='raster_window'
-        #     _raster_tracks_out_dict = self.prepare_pyqtgraph_raster_track(name_modifier_suffix=name_modifier_suffix, should_link_to_main_plot_widget=False)            
+        #     _raster_tracks_out_dict = self.prepare_pyqtgraph_rasterPlot_track(name_modifier_suffix=name_modifier_suffix, should_link_to_main_plot_widget=False)            
         #     _out = _raster_tracks_out_dict[f'rasters{name_modifier_suffix}']
         #     dock_config, time_sync_pyqtgraph_widget, raster_root_graphics_layout_widget, raster_plot_item, rasters_display_outputs_tuple = _out
         #     app, win, plots, plots_data = rasters_display_outputs_tuple
@@ -1603,7 +1603,7 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
     # ==================================================================================================================== #
 
     @function_attributes(short_name=None, tags=['intervals', 'tracks', 'pyqtgraph', 'specific', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 07:29', related_items=[])
-    def prepare_pyqtgraph_interval_tracks(self, enable_interval_overview_track: bool = False, should_remove_all_and_re_add: bool=True, name_modifier_suffix: str='', should_link_to_main_plot_widget:bool=True, debug_print=False):
+    def prepare_pyqtgraph_intervalPlot_tracks(self, enable_interval_overview_track: bool = False, should_remove_all_and_re_add: bool=True, name_modifier_suffix: str='', should_link_to_main_plot_widget:bool=True, debug_print=False):
         """ adds to separate pyqtgraph-backed tracks to the SpikeRaster2D plotter for rendering intervals, and updates `active_2d_plot.params.custom_interval_rendering_plots` so the intervals are rendered on these new tracks in addition to any normal ones
         
         enable_interval_overview_track: bool: if True, renders a track to show all the intervals during the sessions (overview) in addition to the track for the intervals within the current active window
@@ -1688,7 +1688,7 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
 
 
     @function_attributes(short_name=None, tags=['raster', 'tracks', 'pyqtgraph', 'specific', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-09 10:50', related_items=[])
-    def prepare_pyqtgraph_raster_track(self, name_modifier_suffix: str='', should_link_to_main_plot_widget:bool=True, debug_print=False):
+    def prepare_pyqtgraph_rasterPlot_track(self, name_modifier_suffix: str='', should_link_to_main_plot_widget:bool=True, debug_print=False):
         """ adds to separate pyqtgraph-backed tracks to the SpikeRaster2D plotter for rendering a 2D raster `active_2d_plot.params.custom_interval_rendering_plots` so the intervals are rendered on these new tracks in addition to any normal ones
         
         enable_interval_overview_track: bool: if True, renders a track to show all the intervals during the sessions (overview) in addition to the track for the intervals within the current active window
@@ -1704,6 +1704,9 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
         #TODO 2025-01-09 12:04: - [ ] Needs to respond to signals:
         self.on_neuron_colors_changed
 
+        Usage:
+        
+        _raster_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_rasterPlot_track(name_modifier_suffix='raster_window', should_link_to_main_plot_widget=has_main_raster_plot)
         
         """
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, CustomCyclicColorsDockDisplayConfig, NamedColorScheme

@@ -108,12 +108,12 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
     # main_graphics_layout_widget.ci.layout.setRowStretchFactor(2, 2)  # Plot3: highest priority
     # main_graphics_layout_widget.ci.layout.setRowStretchFactor(3, 2)  # Plot3: highest priority
 
-    _interval_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_interval_tracks(enable_interval_overview_track=False, should_link_to_main_plot_widget=has_main_raster_plot)
+    _interval_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_intervalPlot_tracks(enable_interval_overview_track=False, should_link_to_main_plot_widget=has_main_raster_plot)
     interval_window_dock_config, intervals_time_sync_pyqtgraph_widget, intervals_root_graphics_layout_widget, intervals_plot_item = _interval_tracks_out_dict['intervals']
     # dock_config, intervals_overview_time_sync_pyqtgraph_widget, intervals_overview_root_graphics_layout_widget, intervals_overview_plot_item = _interval_tracks_out_dict['interval_overview']
 
     if wants_docked_raster_window_track:
-        _raster_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_raster_track(name_modifier_suffix='raster_window', should_link_to_main_plot_widget=has_main_raster_plot)
+        _raster_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_rasterPlot_track(name_modifier_suffix='raster_window', should_link_to_main_plot_widget=has_main_raster_plot)
 
 
     # Add Renderables ____________________________________________________________________________________________________ #
