@@ -1304,7 +1304,7 @@ from pyphoplacecellanalysis.Pho3D.PyVista.graphs import plot_3d_binned_bars, plo
 
 @define(slots=False)
 class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
-    """ plots a decoded trajectory (path) using pyvista. 
+    """ plots a decoded trajectory (path) using pyvista in 3D. 
     
     Usage:
     from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryPyVistaPlotter
