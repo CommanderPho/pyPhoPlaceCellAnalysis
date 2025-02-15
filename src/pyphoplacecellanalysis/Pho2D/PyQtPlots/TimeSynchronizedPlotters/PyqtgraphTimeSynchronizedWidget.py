@@ -1,4 +1,5 @@
 from copy import deepcopy
+from typing import Optional
 import numpy as np
 import pandas as pd
 from qtpy import QtCore, QtWidgets
@@ -300,7 +301,7 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlottingBackendSpe
     # ==================================================================================================================== #
     # CrosshairsTracingMixin Conformances                                                                                  #
     # ==================================================================================================================== #
-    def add_crosshairs(self, plot_item, name, matrix=None, xbins=None, ybins=None, enable_y_trace:bool=False):
+    def add_crosshairs(self, plot_item, name, matrix=None, xbins=None, ybins=None, enable_y_trace:bool=False, should_force_discrete_to_bins:Optional[bool]=True, **kwargs):
         """ adds crosshairs that allow the user to hover a bin and have the label dynamically display the bin (x, y) and value.
         
         Uses:
@@ -316,6 +317,10 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlottingBackendSpe
         vLine = extant_plots_dict_for_item.get('crosshairs_vLine', None)
         has_extant_crosshairs: bool = (vLine is not None)
          
+        if should_force_discrete_to_bins is not None:
+            self.params.should_force_discrete_to_bins = should_force_discrete_to_bins
+        should_force_discrete_to_bins: bool = self.params.should_force_discrete_to_bins
+        
         if not has_extant_crosshairs:
             ## create new:
             if name not in self.plots:

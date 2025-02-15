@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import List
+from typing import List, Optional
 import numpy as np
 
 import matplotlib
@@ -333,7 +333,7 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
     # ==================================================================================================================== #
     # CrosshairsTracingMixin Conformances                                                                                  #
     # ==================================================================================================================== #
-    def add_crosshairs(self, plot_item, name, matrix=None, xbins=None, ybins=None, enable_y_trace:bool=True, should_force_discrete_to_bins:bool=True):
+    def add_crosshairs(self, plot_item, name, matrix=None, xbins=None, ybins=None, enable_y_trace:bool=True, should_force_discrete_to_bins:Optional[bool]=True, **kwargs):
         """ adds crosshairs that allow the user to hover a bin and have the label dynamically display the bin (x, y) and value.
         
         Uses:
@@ -343,6 +343,31 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
         
         Emits: self.sigCrosshairsUpdated
         
+        
+        
+        Usage:
+        
+        
+        def on_crosshair_updated_signal(self, name, trace_value):
+            # print(f'on_crosshair_updated_signal(self: {self}, name: "{name}", trace_value: "{trace_value}")')
+            left_side_bar_controls = spike_raster_window.ui.leftSideToolbarWidget
+            left_side_bar_controls.crosshair_trace_time = trace_value
+            
+            # self.ui.lblCrosshairTraceStaticLabel.setVisible(True)
+            # self.ui.lblCrosshairTraceValue.setVisible(True)
+
+        track_ts_widget.update_crosshair_trace(wants_crosshairs_trace=True)
+        _crosshairs_updated_conn = track_ts_widget.sigCrosshairsUpdated.connect(on_crosshair_updated_signal)
+
+        
+        
+        # add_crosshairs
+        track_ts_widget.add_crosshairs(track_ax, name='traceHairs', should_force_discrete_to_bins=False, enable_y_trace=True)
+
+        ## cleanup/remove with:
+            track_ts_widget.remove_crosshairs(track_ax, name='traceHairs')
+            track_ts_widget.sigCrosshairsUpdated.disconnect(_crosshairs_updated_conn)
+            
         """
         vertical_crosshair_formatting_dict = deepcopy(self.params.get('vertical_crosshair_formatting_dict', dict(color='green', lw=1, ls='--'))) # dict(color='green', lw=1, ls='--')
         horizontal_crosshair_formatting_dict = deepcopy(self.params.get('horizontal_crosshair_formatting_dict', dict(color='green', lw=1, ls='--'))) # dict(color='green', lw=1, ls='--')
@@ -354,9 +379,9 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
         crosshair_value_format_join_symbol: str = self.params.setdefault('crosshair_value_format_join_symbol', '\n')
         
         if enable_y_trace is not None:
-            self.params.enable_y_trace = enable_y_trace
+            self.params.crosshairs_enable_y_trace = enable_y_trace
         else:
-            assert self.params.enable_y_trace is not None
+            assert self.params.crosshairs_enable_y_trace is not None
         
         ax = plot_item
         print(f'Matplotlib add_crosshairs(ax: {ax}, name: "{name}", ...):')
@@ -468,7 +493,7 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
                 ybins = self.plots_data.get('ybin', None)
                 # has_ybins: bool = (ybins not None)
                 has_ybins: bool = True
-                self.add_crosshairs(plot_item=self.ax, name='root_plot_item', matrix=self.plots_data.get('matrix', None), xbins=self.plots_data.get('xbin', None), ybins=ybins, enable_y_trace=has_ybins)
+                self.add_crosshairs(plot_item=self.ax, name='root_plot_item', matrix=self.plots_data.get('matrix', None), xbins=self.plots_data.get('xbin', None), ybins=ybins, enable_y_trace=has_ybins, should_force_discrete_to_bins=None)
             else:
                 print(f'\tremoving crosshairs...')
                 self.remove_crosshairs(plot_item=self.ax, name='root_plot_item')
