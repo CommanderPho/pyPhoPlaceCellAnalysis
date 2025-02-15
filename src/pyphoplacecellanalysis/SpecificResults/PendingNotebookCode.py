@@ -140,6 +140,7 @@ def add_continuous_decoded_posterior(spike_raster_window, curr_active_pipeline, 
 # ==================================================================================================================== #
 from neuropy.core.epoch import subdivide_epochs, ensure_dataframe, ensure_Epoch
 
+@function_attributes(short_name=None, tags=['subdivision'], input_requires=[], output_provides=[], uses=[], used_by=['Compute_NonPBE_Epochs.compute_all(...)'], creation_date='2025-02-14 21:06', related_items=[])
 def build_subdivided_epochs(curr_active_pipeline, subdivide_bin_size: float = 1.0):
     """ 
     subdivide_bin_size = 1.0 # Specify the size of each sub-epoch in seconds
@@ -169,7 +170,6 @@ def build_subdivided_epochs(curr_active_pipeline, subdivide_bin_size: float = 1.
     df['maze_name'] = 'global'
     # df['interval_type_id'] = 666
 
-      
     subdivided_df: pd.DataFrame = subdivide_epochs(df, subdivide_bin_size)
     subdivided_df['label'] = deepcopy(subdivided_df.index.to_numpy())
     subdivided_df['stop'] = subdivided_df['stop'] - 1e-12
@@ -194,6 +194,13 @@ def build_subdivided_epochs(curr_active_pipeline, subdivide_bin_size: float = 1.
     global_pos_df: pd.DataFrame = global_pos_obj.compute_higher_order_derivatives().position.compute_smoothed_position_info(N=15)
     global_pos_df.time_point_event.adding_epochs_identity_column(epochs_df=global_subivided_epochs_df, epoch_id_key_name='global_subdivision_idx', epoch_label_column_name='label', drop_non_epoch_events=True, should_replace_existing_column=True) # , override_time_variable_name='t_rel_seconds'
     
+    ## Adds the ['subdivision_epoch_start_t'] columns to `stacked_flat_global_pos_df` so we can figure out the appropriate offsets
+    subdivided_epochs_properties_df: pd.DataFrame = deepcopy(global_subivided_epochs_df)
+    subdivided_epochs_properties_df['global_subdivision_idx'] = deepcopy(subdivided_epochs_properties_df.index) ## add explicit 'global_subdivision_idx' column
+    subdivided_epochs_properties_df = subdivided_epochs_properties_df.rename(columns={'start': 'subdivision_epoch_start_t'})[['global_subdivision_idx', 'subdivision_epoch_start_t']]
+    global_pos_df = PandasHelpers.add_explicit_dataframe_columns_from_lookup_df(global_pos_df, subdivided_epochs_properties_df, join_column_name='global_subdivision_idx')
+    global_pos_df.sort_values(by=['t'], inplace=True) # Need to re-sort by timestamps once done
+
     return (global_subivided_epochs_obj, global_subivided_epochs_df), global_pos_df
 
 
@@ -207,6 +214,7 @@ from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, c
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
 from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
 from attrs import asdict, astuple, define, field, Factory
+from neuropy.utils.indexing_helpers import PandasHelpers
 
 @custom_define(slots=False, eq=False)
 class NonPBEDimensionalDecodingResult(UnpackableMixin, HDF_SerializationMixin, AttrsBasedClassHelperMixin):
@@ -247,7 +255,18 @@ class NonPBEDimensionalDecodingResult(UnpackableMixin, HDF_SerializationMixin, A
 
     def __attrs_post_init__(self):
         assert self.ndim in (1, 2), f"ndim must be 1 or 2, got {self.ndim}"
+        
 
+    def add_subdivision_epoch_start_t_to_pos_df(self):
+        ## Adds the ['subdivision_epoch_start_t'] columns to `stacked_flat_global_pos_df` so we can figure out the appropriate offsets
+        pos_df: pd.DataFrame = deepcopy(self.pos_df)
+        subdivided_epochs_df: pd.DataFrame = deepcopy(self.subdivided_epochs_df)
+        subdivided_epochs_df['global_subdivision_idx'] = deepcopy(subdivided_epochs_df.index)
+        subdivided_epochs_df = subdivided_epochs_df.rename(columns={'start': 'subdivision_epoch_start_t'})[['global_subdivision_idx', 'subdivision_epoch_start_t']]
+        pos_df = PandasHelpers.add_explicit_dataframe_columns_from_lookup_df(pos_df, subdivided_epochs_df, join_column_name='global_subdivision_idx')
+        pos_df.sort_values(by=['t'], inplace=True) # Need to re-sort by timestamps once done
+        self.pos_df = pos_df
+        return self.pos_df
 
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
