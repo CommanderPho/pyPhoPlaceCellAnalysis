@@ -1,3 +1,10 @@
+from __future__ import annotations # prevents having to specify types for typehinting as strings
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    ## typehinting only imports here
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import NonPBEDimensionalDecodingResult
+
 from copy import deepcopy
 import param
 import numpy as np
@@ -40,6 +47,14 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionD
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
 
 
+from neuropy.utils.mixins.dict_representable import overriding_dict_with # required for safely_accepts_kwargs
+from pyphocorehelpers.geometry_helpers import point_tuple_mid_point, BoundsRect, is_point_in_rect
+
+
+ 
+
+
+@define(slots=False, eq=False)
 class SingleArtistMultiEpochBatchHelpers:
     """ Handles draw
     Consider a decoded posterior computed from 2D placefields. You get a separate 2D position posterior for each time bin, which is difficult to view except in 3D.
@@ -61,7 +76,154 @@ class SingleArtistMultiEpochBatchHelpers:
         
     
     from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import SingleArtistMultiEpochBatchHelpers
+    
+    
+    
+    
+    USAGE:
+    
+        from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import SingleArtistMultiEpochBatchHelpers
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
+
+        track_name: str = 'SingleArtistMultiEpochBatchTrack'
+        spike_raster_plt_2d: Spike2DRaster = spike_raster_window.spike_raster_plt_2d
+        track_ts_widget, track_fig, track_ax_list = spike_raster_plt_2d.add_new_matplotlib_render_plot_widget(name=track_name)
+        track_ax = track_ax_list[0]
+        batch_plot_helper: SingleArtistMultiEpochBatchHelpers = SingleArtistMultiEpochBatchHelpers(active_ax=track_ax, ...)
+        
+        ## sync up the widgets
+        spike_raster_plt_2d.sync_matplotlib_render_plot_widget(track_name, sync_mode=SynchronizedPlotMode.TO_WINDOW)
+
+        
     """
+    results2D: "NonPBEDimensionalDecodingResult" = field()    
+
+    active_ax = field()
+    subdivide_bin_size: float = field()
+    rotate_to_vertical: bool = field(default=True)
+    
+    desired_epoch_start_idx: int = field(default=0)
+    desired_epoch_end_idx: Optional[int] = field(default=None)
+
+    stacked_flat_global_pos_df: pd.DataFrame = field(default=None, init=False)
+
+    @property
+    def num_filter_epochs(self) -> int:
+        """number of subdivision epochs."""
+        return self.results2D.num_filter_epochs
+
+    @property
+    def num_horizontal_repeats(self) -> int:
+        """number of repeats along the absecessa."""
+        return (self.num_filter_epochs-1)
+
+    @property
+    def a_result2D(self) -> DecodedFilterEpochsResult:
+        return self.results2D.subdivided_epochs_results['global']
+
+    @property
+    def a_new_global2D_decoder(self) -> DecodedFilterEpochsResult:
+        return self.results2D.decoders['global']
+
+    # @property
+    # def a_result2D(self) -> DecodedFilterEpochsResult:
+    #     return self.results2D.subdivided_epochs_results['global']
+
+    @property
+    def desired_start_time_seconds(self) -> float:
+        return self.desired_epoch_start_idx * self.subdivide_bin_size
+    
+    @property
+    def desired_end_time_seconds(self) -> float:
+        return self.subdivide_bin_size * self.desired_epoch_end_idx
+    
+    @property
+    def desired_time_duration(self) -> float:
+        return self.desired_end_time_seconds - self.desired_start_time_seconds
+
+
+    def __attrs_post_init__(self):
+        # Add post-init logic here
+        pass
+
+
+    # ==================================================================================================================== #
+    # Track Position                                                                                                       #
+    # ==================================================================================================================== #
+    
+    @function_attributes(short_name=None, tags=['ALMOST_FINISHED', 'NOT_YET_FINISHED', '2025-02-14_TO_REFACTOR_FROM_NOTEBOOK'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-14 22:02', related_items=[])
+    def add_track_positions(self, **kwargs):
+        """ Add the measured positions 
+        
+        From `#### 2025-02-14 - Perform plotting of Measured Positions (using `stacked_flat_global_pos_df['global_subdivision_x_data_offset']`)`
+        
+        """
+        # raise NotImplementedError(f'2025-02-14_TO_REFACTOR_FROM_NOTEBOOK')
+        ## INPUTS: a_result2D, a_new_global2D_decoder
+        
+        # rotate_to_vertical: bool = False
+        should_expand_first_dim: bool=True
+
+        print(f'desired_epoch_start_idx: {self.desired_epoch_start_idx}, desired_epoch_end_idx: {self.desired_epoch_end_idx}')
+        print(f'desired_start_time_seconds: {self.desired_start_time_seconds}, desired_end_time_seconds: {self.desired_end_time_seconds}')
+
+
+        ## finalize building the data for single-artist plotting (does not plot anything)
+        (n_xbins, n_ybins, n_tbins), (flattened_n_xbins, flattened_n_ybins, flattened_n_tbins), (stacked_p_x_given_n, stacked_flat_time_bin_centers, stacked_flat_xbin_centers, stacked_flat_ybin_centers) = self.complete_build_stacked_flat_arrays(a_result=self.a_result2D, a_new_global_decoder=self.a_new_global2D_decoder,
+                                                                                                                                                                                                                    desired_epoch_start_idx=self.desired_epoch_start_idx, desired_epoch_end_idx=self.desired_epoch_end_idx,
+                                                                                                                                                                                                                    rotate_to_vertical=self.rotate_to_vertical, should_expand_first_dim=should_expand_first_dim)
+        
+
+
+        if self.stacked_flat_global_pos_df is None:
+            self.stacked_flat_global_pos_df = deepcopy(self.results2D.pos_df)
+
+        ## slice `stacked_flat_global_pos_df` by desired start/end indicies too:
+        self.stacked_flat_global_pos_df = self.stacked_flat_global_pos_df[np.logical_and((self.stacked_flat_global_pos_df['global_subdivision_idx'] >= self.desired_epoch_start_idx), (self.stacked_flat_global_pos_df['global_subdivision_idx'] < self.desired_epoch_end_idx))]
+
+        (n_xbins, n_ybins, n_tbins), (flattened_n_xbins, flattened_n_ybins, flattened_n_tbins)
+        # np.shape(stacked_p_x_given_n) # (1, 171, 6)
+        xbin_edges = deepcopy(self.a_new_global2D_decoder.xbin)
+        ybin_edges = deepcopy(self.a_new_global2D_decoder.ybin)
+        xmin, xmax, ymin, ymax = xbin_edges[0], xbin_edges[-1], ybin_edges[0], ybin_edges[-1]
+        self.stacked_flat_global_pos_df = self.stacked_flat_global_pos_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges)
+        ## OUTPUTS: (desired_epoch_start_idx, desired_epoch_end_idx), (desired_start_time_seconds, desired_end_time_seconds), desired_time_duration
+
+        ## INPUTS: stacked_flat_global_pos_df, active_ax
+        inverse_xbin_width: float = np.ptp(xbin_edges) ## data_coords scale
+        inverse_xbin_height: float = np.ptp(ybin_edges)
+        
+        ## Perform the real plotting:
+        x = self.stacked_flat_global_pos_df['global_subdivision_x_data_offset'].to_numpy()
+        y = self.stacked_flat_global_pos_df['y'].to_numpy() / inverse_xbin_width ## needs to be inversely mapped from 0, 1
+
+        measured_pos_line_artist = self.active_ax.plot(x, y, color='r', label='measured_pos')[0]
+        
+        # y_axis_kwargs = dict(ymin=0.0, ymax=1.0)
+        y_axis_kwargs = dict(ymin=xbin_edges[0], ymax=xbin_edges[-1])
+        subdivision_epoch_separator_vlines = self.active_ax.vlines(self.results2D.subdivided_epochs_df['start'].to_numpy(), **y_axis_kwargs, colors='white', linestyles='solid', label='subdivision_epoch_separator_vlines') # , data=None
+
+        return (measured_pos_line_artist, subdivision_epoch_separator_vlines)
+
+
+    # ==================================================================================================================== #
+    # Decoded Position Posteriors                                                                                          #
+    # ==================================================================================================================== #
+    
+    @function_attributes(short_name=None, tags=['NOT_YET_FINISHED', '2025-02-14_TO_REFACTOR_FROM_NOTEBOOK'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-14 22:02', related_items=[])
+    def add_position_posteriors(self, **kwargs):
+        """ add the decoded posteriors as heatmaps
+
+        Corresponding to `#### 2025-02-14 - Perform plotting of Decoded Posteriors` in notebook
+        
+        """
+        raise NotImplementedError(f'2025-02-14_TO_REFACTOR_FROM_NOTEBOOK')
+    
+
+    # ==================================================================================================================== #
+    # Utility                                                                                                              #
+    # ==================================================================================================================== #
+
     @function_attributes(short_name=None, tags=['reshape', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 05:57', related_items=[])
     @classmethod
     def reshape_p_x_given_n_for_single_artist_display(cls, updated_timebins_p_x_given_n: NDArray, rotate_to_vertical: bool = True, should_expand_first_dim: bool=True, debug_print=False) -> NDArray:
@@ -428,6 +590,110 @@ class SingleArtistMultiEpochBatchHelpers:
         
         return track_shape_patch_collection_artists
 
+
+    def add_track_shapes(self, global_session):
+        """ 
+        global_session: needed to build track shapes
+        
+        
+        track_shape_patch_collection_artists = batch_plot_helper.add_track_shapes(global_session=global_session)
+        
+        """
+        from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager, long_short_display_config_manager
+        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance, _perform_plot_matplotlib_2D_tracks
+
+        rotate_to_vertical: bool = True
+        perform_autoscale: bool = False
+        
+
+        ## INPUTS: track_ax, rotate_to_vertical, perform_autoscale
+        # subdivide_bin_size: float = self.subdivide_bin_size
+        ## Slice a subset of the data epochs:
+        desired_epoch_start_idx: int = self.desired_epoch_start_idx
+        # desired_epoch_end_idx: int = 20
+        # desired_epoch_end_idx: int = int(round(1/subdivide_bin_size)) * 60 * 8 # 8 minutes
+        if self.desired_epoch_end_idx is not None:
+            desired_epoch_end_idx: int = self.desired_epoch_end_idx
+        else:
+            raise NotImplementedError('oops')
+        print(f'desired_epoch_start_idx: {desired_epoch_start_idx}, desired_epoch_end_idx: {desired_epoch_end_idx}')
+        
+        num_horizontal_repeats: int = self.num_horizontal_repeats
+        # ==================================================================================================================== #
+        # BEGIN FUNCTION BODY                                                                                                  #
+        # ==================================================================================================================== #
+
+        long_track_inst, short_track_inst = LinearTrackInstance.init_tracks_from_session_config(deepcopy(global_session.config))
+
+        long_short_display_config_manager = LongShortDisplayConfigManager()
+        long_epoch_matplotlib_config = long_short_display_config_manager.long_epoch_config.as_matplotlib_kwargs()
+        long_kwargs = deepcopy(long_epoch_matplotlib_config)
+        long_kwargs = overriding_dict_with(lhs_dict=long_kwargs, **dict(linewidth=2, zorder=-99, alpha=0.5, facecolor='#0099ff07', edgecolor=long_kwargs['facecolor'], linestyle='dashed'))
+        short_epoch_matplotlib_config = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs()
+        short_kwargs = deepcopy(short_epoch_matplotlib_config)
+        short_kwargs = overriding_dict_with(lhs_dict=short_kwargs, **dict(linewidth=2, zorder=-98, alpha=0.5, facecolor='#f5161607', edgecolor=short_kwargs['facecolor'], linestyle='dashed'))
+        track_kwargs_dict = {'long': long_kwargs, 'short': short_kwargs}
+
+        # BEGIN PLOTTING _____________________________________________________________________________________________________ #
+        # long_out_tuple = long_track_inst.plot_rects(plot_item=track_ax, matplotlib_rect_kwargs_override=long_kwargs, rotate_to_vertical=rotate_to_vertical, offset=None)
+        # short_out_tuple = short_track_inst.plot_rects(plot_item=track_ax, matplotlib_rect_kwargs_override=short_kwargs, rotate_to_vertical=rotate_to_vertical, offset=None)
+        # long_combined_item, long_rect_items, long_rects = long_out_tuple
+        # short_combined_item, short_rect_items, short_rects = short_out_tuple
+
+        long_rects = long_track_inst.build_rects(include_rendering_properties=False, rotate_to_vertical=rotate_to_vertical)
+        short_rects = short_track_inst.build_rects(include_rendering_properties=False, rotate_to_vertical=rotate_to_vertical)
+        track_single_rects_dict = {'long': long_rects, 'short': short_rects}
+
+        # long_path = _build_track_1D_verticies(platform_length=22.0, track_length=170.0, track_1D_height=1.0, platform_1D_height=1.1, track_center_midpoint_x=long_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=-1.0, debug_print=True)
+        # short_path = _build_track_1D_verticies(platform_length=22.0, track_length=100.0, track_1D_height=1.0, platform_1D_height=1.1, track_center_midpoint_x=short_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=1.0, debug_print=True)
+
+        # ## Plot the tracks:
+        # long_patch = patches.PathPatch(long_path, **long_track_color, alpha=0.5, lw=2)
+        # ax.add_patch(long_patch)
+
+        # short_patch = patches.PathPatch(short_path, **short_track_color, alpha=0.5, lw=2)
+        # ax.add_patch(short_patch)
+        # if perform_autoscale:
+        #     track_ax.autoscale()
+        
+        # x_offset: float = -131.142
+        # long_rect_arr = SingleArtistMultiEpochBatchHelpers.rect_tuples_to_NDArray(long_rects, x_offset=x_offset)
+        # short_rect_arr = SingleArtistMultiEpochBatchHelpers.rect_tuples_to_NDArray(short_rects, x_offset=x_offset)
+
+
+        # num_horizontal_repeats: int = 20 ## hardcoded
+        track_all_normalized_rect_arr_dict = SingleArtistMultiEpochBatchHelpers.track_dict_all_stacked_rect_arr_normalization(track_single_rects_dict, num_horizontal_repeats=num_horizontal_repeats)
+        ## INPUTS: filtered_num_horizontal_repeats
+        inverse_normalized_track_all_rect_arr_dict = SingleArtistMultiEpochBatchHelpers.track_dict_all_stacked_rect_arr_inverse_normalization(track_all_normalized_rect_arr_dict, ax=self.active_ax, num_active_horizontal_repeats=num_horizontal_repeats)
+
+        ## OUTPUTS: track_all_normalized_rect_arr_dict, inverse_normalized_track_all_rect_arr_dict
+        # track_all_normalized_rect_arr_dict
+
+        # ## Slice a subset of the data epochs:
+        # desired_epoch_start_idx: int = 0
+        # # desired_epoch_end_idx: int = 20
+        # desired_epoch_end_idx: int = int(round(1/subdivide_bin_size)) * 60 * 8 # 8 minutes
+        # print(f'desired_epoch_start_idx: {desired_epoch_start_idx}, desired_epoch_end_idx: {desired_epoch_end_idx}')
+
+        filtered_epoch_range = np.arange(start=desired_epoch_start_idx, stop=desired_epoch_end_idx)
+        filtered_num_horizontal_repeats: int = len(filtered_epoch_range)
+        filtered_num_output_rect_total_elements: int = filtered_num_horizontal_repeats * 3 # 3 parts to each track plot
+        ## OUTPUTS: filtered_epoch_range, filtered_num_horizontal_repeats, filtered_num_output_rect_total_elements
+        filtered_num_output_rect_total_elements
+
+        track_all_rect_arr_dict = {k:v[(desired_epoch_start_idx*3):(desired_epoch_end_idx*3), :] for k, v in track_all_normalized_rect_arr_dict.items()}
+        # track_all_rect_arr_dict = {k:v[desired_epoch_start_idx:desired_epoch_end_idx, :] for k, v in track_all_rect_arr_dict.items()}
+        # track_all_rect_arr_dict
+
+        ## INPUTS: filtered_num_horizontal_repeats
+        inverse_normalized_track_all_rect_arr_dict = SingleArtistMultiEpochBatchHelpers.track_dict_all_stacked_rect_arr_inverse_normalization(track_all_rect_arr_dict, ax=self.active_ax, num_active_horizontal_repeats=filtered_num_horizontal_repeats)
+        ## OUTPUTS: inverse_normalized_track_all_rect_arr_dict
+        ## INPUTS: track_kwargs_dict, inverse_normalized_track_all_rect_arr_dict
+        track_shape_patch_collection_artists = SingleArtistMultiEpochBatchHelpers.add_batch_track_shapes(ax=self.active_ax, inverse_normalized_track_all_rect_arr_dict=inverse_normalized_track_all_rect_arr_dict, track_kwargs_dict=track_kwargs_dict) # start (x0: 0.0, 20 of them span to exactly x=1.0)
+        # track_shape_patch_collection_artists = SingleArtistMultiEpochBatchHelpers.add_batch_track_shapes(ax=ax, inverse_normalized_track_all_rect_arr_dict=inverse_normalized_track_all_rect_arr_dict, track_kwargs_dict=track_kwargs_dict, transform=ax.transData) # start (x0: 31.0, 20 of them span to about x=1000.0)
+        # track_shape_patch_collection_artists = SingleArtistMultiEpochBatchHelpers.add_batch_track_shapes(ax=ax, inverse_normalized_track_all_rect_arr_dict=inverse_normalized_track_all_rect_arr_dict, track_kwargs_dict=track_kwargs_dict, transform=ax.transAxes) # start (x0: 31.0, 20 of them span to about x=1000.0)
+        self.active_ax.get_figure().canvas.draw_idle()
+        return track_shape_patch_collection_artists
 
 
 @define(slots=False)
