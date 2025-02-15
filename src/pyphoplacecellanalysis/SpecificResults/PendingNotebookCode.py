@@ -248,6 +248,12 @@ class NonPBEDimensionalDecodingResult(UnpackableMixin, HDF_SerializationMixin, A
     def __attrs_post_init__(self):
         assert self.ndim in (1, 2), f"ndim must be 1 or 2, got {self.ndim}"
 
+
+    # HDFMixin Conformances ______________________________________________________________________________________________ #
+    def to_hdf(self, file_path, key: str, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path"""
+        super().to_hdf(file_path, key=key, **kwargs)
+        
     # ==================================================================================================================== #
     # UnpackableMixin conformances                                                                                         #
     # ==================================================================================================================== #
