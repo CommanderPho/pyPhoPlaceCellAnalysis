@@ -50,7 +50,13 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
         """PlottingBackendSpecifyingMixin conformance: Implementor should return either [PlottingBackendType.Matplotlib, PlottingBackendType.PyQtGraph]."""
         return PlottingBackendType.Matplotlib
 
-    
+
+    @property
+    def active_plot_target(self):
+        """The active_plot_target property."""
+        return self.ax
+        
+
     def __init__(self, name='CustomMatplotlibWidget', plot_function_name=None, disable_toolbar=True, scrollable_figure=True, size=(5.0, 4.0), dpi=72, **kwargs):
         """_summary_
 

@@ -38,6 +38,12 @@ class TimeSynchronizedPlotterBase(QtWidgets.QWidget):
         return self.active_time_dependent_placefields.last_t
 
 
+    @property
+    def active_plot_target(self):
+        """The active_plot_target property."""
+        raise NotImplementedError(f'subclass must override!')
+    
+
     def __init__(self, application_name=None, window_name=None, parent=None):
         """_summary_
         """

@@ -78,6 +78,14 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlottingBackendSpe
         raise NotImplementedError(f'Parent property that should not be accessed!')
 
 
+
+    @property
+    def active_plot_target(self):
+        """The active_plot_target property."""
+        return self.getRootPlotItem()
+    
+
+
     def __init__(self, name='PyqtgraphTimeSynchronizedWidget', plot_function_name=None, scrollable_figure=True, application_name=None, window_name=None, parent=None, **kwargs):
         """_summary_
         , disable_toolbar=True, size=(5.0, 4.0), dpi=72
@@ -91,7 +99,7 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlottingBackendSpe
         self.params = VisualizationParameters(name=name, plot_function_name=plot_function_name, debug_print=False, wants_crosshairs=kwargs.get('wants_crosshairs', False), should_force_discrete_to_bins=kwargs.get('should_force_discrete_to_bins', False))
         self.plots_data = RenderPlotsData(name=name)
         self.plots = RenderPlots(name=name)
-        self.ui = PhoUIContainer(name=name)
+        self.ui = PhoUIContainer(name=name, connections=None)
         self.ui.connections = PhoUIContainer(name=name)
 
         self.params.name = name
@@ -114,6 +122,8 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlottingBackendSpe
         self._update_plots()
         
     def setup(self):
+        assert hasattr(self.ui, 'connections')
+        
         # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
         # self.app = pg.mkQApp(self.applicationName)
         # self.params = VisualizationParameters(self.applicationName)
