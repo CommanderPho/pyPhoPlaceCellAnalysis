@@ -681,7 +681,7 @@ class DynamicDockDisplayAreaContentMixin:
         
         return test_dock_planning_widget, dDisplayItem
 
-    @function_attributes(short_name=None, tags=['docks', 'nested', 'wrapping'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-14 03:41', related_items=[])        
+    @function_attributes(short_name=None, tags=['docks', 'nested', 'wrapping'], input_requires=[], output_provides=[], uses=['self.add_display_dock(...)', 'NestedDockAreaWidget','CustomDockDisplayConfig'], used_by=['layout_dockGroups'], creation_date='2025-01-14 03:41', related_items=[])        
     def build_wrapping_nested_dock_area(self, flat_group_dockitems_list, dock_group_name: str = 'ContinuousDecode_ - t_bin_size: 0.025'):
         """ 
         Builds a wrapping dock area containing several pre-existing dock items
@@ -720,7 +720,7 @@ class DynamicDockDisplayAreaContentMixin:
         dockSize=(500, total_height)
         dockAddLocationOpts=['bottom']
 
-        display_config = CustomDockDisplayConfig(showCloseButton=True, showCollapseButton=True, showGroupButton=True, orientation='horizontal', corner_radius='0px', fontSize='15px',
+        display_config = CustomDockDisplayConfig(showCloseButton=True, showCollapseButton=True, showGroupButton=True, showOrientationButton=True, orientation='horizontal', corner_radius='0px', fontSize='15px',
                                                 custom_get_colors_dict = {False: DockDisplayColors(fg_color='#5bf', bg_color='#0d001a', border_color='#5467ba'),
                                                                           True: DockDisplayColors(fg_color='#aaa', bg_color='#35265f', border_color='#423399'),
             })
