@@ -110,7 +110,7 @@ class SingleArtistMultiEpochBatchHelpers:
     @property
     def num_filter_epochs(self) -> int:
         """number of subdivision epochs."""
-        return self.results2D.num_filter_epochs
+        return self.a_result2D.num_filter_epochs
 
     @property
     def num_horizontal_repeats(self) -> int:
