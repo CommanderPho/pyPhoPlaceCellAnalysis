@@ -460,12 +460,12 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
                     value_str = crosshair_value_format_join_symbol.join(value_str_arr) ## build the final value output string from the value_str_arr
                     # print(f'value_str: {value_str}')
                     old_x_point = vLine.get_xdata()
-                    did_position_change = (did_position_change or (old_x_point != x_point))
+                    did_position_change = (did_position_change or np.any(old_x_point != x_point))
                     vLine.set_xdata(x_point)
                                         
                     if self.params.crosshairs_enable_y_trace: 
                         old_y_point = self.plots[name]['crosshairs_hLine'].get_ydata()
-                        did_position_change = (did_position_change or (old_y_point != y_point))
+                        did_position_change = (did_position_change or np.any(old_y_point != y_point))
                         self.plots[name]['crosshairs_hLine'].set_ydata(y_point)
                         
                     # if self.params.crosshairs_enable_y_trace: self.plots[name]['crosshairs_hLine'].set_ydata(y_point)

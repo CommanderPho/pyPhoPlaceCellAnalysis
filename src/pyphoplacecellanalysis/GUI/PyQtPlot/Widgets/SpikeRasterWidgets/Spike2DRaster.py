@@ -2045,22 +2045,46 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
     def toggle_crosshair_traces_enabled(self, are_crosshairs_enabled):
         print(f'SpikeRaster2D.on_crosshair_trace_toggled(is_crosshairs_enabled={are_crosshairs_enabled})')
         if are_crosshairs_enabled:
-            for a_ts_widget in self.get_flat_widgets_list():
+            # for a_ts_widget in self.get_flat_widgets_list():
+            for an_identifier, (a_dock_item, a_ts_widget) in self.get_flat_dock_item_tuple_dict().items():
                 if hasattr(a_ts_widget, 'add_crosshairs'):
                     # add_crosshairs
                     try:
                     a_ts_widget.add_crosshairs(a_ts_widget.active_plot_target, name='traceHairs', should_force_discrete_to_bins=False, enable_y_trace=True)
+                        print(f'an_identifier: "{an_identifier}"')
+                        if an_identifier not in self.ui.connections['tracks']:
+                            self.ui.connections['tracks'][an_identifier] = {} ## make new dict to hold connections
+                            
+                        if 'sigCrosshairsUpdated' not in self.ui.connections['tracks'][an_identifier]:
+                            ## enable crosshairs callback
+                            print(f'adding crosshairs callback for item: "{an_identifier}"')
+                            self.ui.connections['tracks'][an_identifier]['sigCrosshairsUpdated'] = None
+                            # self.on_child_crosshair_updated_signal
+                            _crosshairs_updated_conn = a_ts_widget.sigCrosshairsUpdated.connect(lambda a_child_widget, an_identifier, a_trace_value: self.on_child_crosshair_updated_signal(an_identifier, a_trace_value))
+                            self.ui.connections['tracks'][an_identifier]['sigCrosshairsUpdated'] = _crosshairs_updated_conn ## set just as the raw connection so we can disconnect
+                            # self.ui.connections['tracks'][an_identifier]['sigCrosshairsUpdated'] = (_crosshairs_updated_conn, a_ts_widget.sigCrosshairsUpdated) ## set a tuple so we can disconnect
+                            print(f'\tdone.')
+                        else:
+                            print(f'already have a crosshairs callback for item {an_identifier}')
+                            
                     except Exception as e:
                         print(f'failed to add crosshair traces for widget: {a_ts_widget}.\n\tError: {e}\n\tSkipping.')
                     
                     
         else:
             ## disable crosshairs
-            for a_ts_widget in self.get_flat_widgets_list():
+            # for a_ts_widget in self.get_flat_widgets_list():
+            for an_identifier, (a_dock_item, a_ts_widget) in self.get_flat_dock_item_tuple_dict().items():
                 if hasattr(a_ts_widget, 'remove_crosshairs'):
                     # remove_crosshairs:
                     try:
                     a_ts_widget.remove_crosshairs(a_ts_widget.active_plot_target, name='traceHairs')
+                        an_existing_crosshairs_updated_conn = self.ui.connections['tracks'].get(an_identifier, {}).pop('sigCrosshairsUpdated', None)
+                        if an_existing_crosshairs_updated_conn is not None:
+                            print(f'found connection to remove for an_identifier: {an_identifier}, an_existing_crosshairs_updated_conn: {an_existing_crosshairs_updated_conn}')
+                            a_ts_widget.sigCrosshairsUpdated.disconnect(an_existing_crosshairs_updated_conn) ## disconnect
+                            print(f'\t connection removed!')                        
+                        
                     except Exception as e:
                         print(f'failed to remove crosshair traces for widget: {a_ts_widget}.\n\tError: {e}\n\tSkipping.')
                         # raise e
