@@ -402,7 +402,14 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
                 self.plots[name]['crosshairs_hLine'] = hLine
 
             def mouseMoved(event):
+                """ called when the mouse is moved"""
+                are_crosshairs_currently_visible: bool = vLine.get_visible()
+                new_desired_visibility_is_visible: bool = True
+                did_visibility_change: bool = False
+                did_position_change: bool = False
+                
                 if event.inaxes == ax:
+                    # Mouse is inside the axes - show and update crosshairs
                     x_point = event.xdata
                     if self.params.crosshairs_enable_y_trace: y_point = event.ydata
                     if self.params.should_force_discrete_to_bins:
@@ -448,15 +455,40 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
                              value_str_arr.extend([f"x={x_point:.1f}", f"y={y_point:.1f}"] if self.params.crosshairs_enable_y_trace else [f"x={x_point:.1f}", ])       
                              
                         value_str = crosshair_value_format_join_symbol.join(value_str_arr)
-                        
-
 
                     # END if matrix is not None
                     value_str = crosshair_value_format_join_symbol.join(value_str_arr) ## build the final value output string from the value_str_arr
                     # print(f'value_str: {value_str}')
+                    old_x_point = vLine.get_xdata()
+                    did_position_change = (did_position_change or (old_x_point != x_point))
                     vLine.set_xdata(x_point)
-                    if self.params.crosshairs_enable_y_trace: self.plots[name]['crosshairs_hLine'].set_ydata(y_point)
+                                        
+                    if self.params.crosshairs_enable_y_trace: 
+                        old_y_point = self.plots[name]['crosshairs_hLine'].get_ydata()
+                        did_position_change = (did_position_change or (old_y_point != y_point))
+                        self.plots[name]['crosshairs_hLine'].set_ydata(y_point)
+                        
+                    # if self.params.crosshairs_enable_y_trace: self.plots[name]['crosshairs_hLine'].set_ydata(y_point)
                     self.sigCrosshairsUpdated.emit(self, name, value_str) ## emit the `sigCrosshairsUpdated` event
+                                     
+                    new_desired_visibility_is_visible = True
+                else:
+                    # Mouse left the axes - hide crosshairs
+                    new_desired_visibility_is_visible = False
+                    
+                # Check vertical line visibility
+                are_crosshairs_currently_visible: bool = vLine.get_visible()
+                did_visibility_change: bool = (are_crosshairs_currently_visible != new_desired_visibility_is_visible)
+
+                if did_visibility_change:
+                    ## update visibility
+                    vLine.set_visible(new_desired_visibility_is_visible)
+                    if self.params.crosshairs_enable_y_trace:
+                        self.plots[name]['crosshairs_hLine'].set_visible(new_desired_visibility_is_visible)
+                        
+                ## END if did_visibility_change
+                needs_redraw: bool = (did_position_change or did_visibility_change)
+                if needs_redraw:
                     ax.figure.canvas.draw_idle()
             ## END def mouseMoved(event)
             cid = ax.figure.canvas.mpl_connect('motion_notify_event', mouseMoved)
