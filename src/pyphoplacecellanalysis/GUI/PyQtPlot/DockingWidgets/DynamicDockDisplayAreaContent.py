@@ -482,6 +482,23 @@ class DynamicDockDisplayAreaContentMixin:
         return tree_out_dock_items_list, group_meta_item_dict
 
 
+    @function_attributes(short_name=None, tags=['dockGroup', 'layout', 'sizing'], input_requires=[], output_provides=[], uses=['get_dockGroup_dock_dict', 'build_wrapping_nested_dock_area'], used_by=[], creation_date='2025-02-17 10:26', related_items=[])
+    def layout_dockGroups(self):
+        """ fetches the dockGroup items and perform layout """
+            ## Dock all Grouped results from `'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView'`
+        ## INPUTS: active_2d_plot
+        grouped_dock_items_dict: Dict[str, List[Dock]] = self.get_dockGroup_dock_dict()
+        nested_dock_items = {}
+        nested_dynamic_docked_widget_container_widgets = {}
+        for dock_group_name, flat_group_dockitems_list in grouped_dock_items_dict.items():
+            dDisplayItem, nested_dynamic_docked_widget_container = self.build_wrapping_nested_dock_area(flat_group_dockitems_list, dock_group_name=dock_group_name)
+            nested_dock_items[dock_group_name] = dDisplayItem # Dock
+            nested_dynamic_docked_widget_container_widgets[dock_group_name] = nested_dynamic_docked_widget_container # nested_dynamic_docked_widget_container
+
+        ## OUTPUTS: nested_dock_items, nested_dynamic_docked_widget_container_widgets
+        return nested_dock_items, nested_dynamic_docked_widget_container_widgets
+    
+
     # ==================================================================================================================== #
     # Main Creation/Find/Deletion Functions                                                                                #
     # ==================================================================================================================== #
