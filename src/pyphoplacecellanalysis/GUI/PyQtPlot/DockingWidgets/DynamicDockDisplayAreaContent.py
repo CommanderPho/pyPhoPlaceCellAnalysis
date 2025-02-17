@@ -407,6 +407,7 @@ class DynamicDockDisplayAreaContentMixin:
         return all_collected_widgets
     
 
+    
     def get_flat_dock_identifiers_list(self, debug_print=False) -> List[str]:
         """ extracts the 'dock' property that is the contents of each added dock item from the self.dynamic_display_dict and returns it as a flat list """
         all_collected_dock_items_identifiers = []
@@ -421,6 +422,10 @@ class DynamicDockDisplayAreaContentMixin:
         return all_collected_dock_items_identifiers
     
 
+    # ==================================================================================================================== #
+    # dockGroup                                                                                                            #
+    # ==================================================================================================================== #
+    @function_attributes(short_name=None, tags=['dockGroup'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 00:00', related_items=[])
     def get_dockGroup_dock_dict(self, debug_print=False) -> Dict[str, List[Dock]]:
         """ extracts the 'widget' property that is the contents of each added dock item from the self.dynamic_display_dict and returns it as a flat list """
         flat_dockitems_list = self.get_flat_dockitems_list() ## get the non-grouped dockitems
