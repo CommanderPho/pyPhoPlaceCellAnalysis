@@ -423,6 +423,21 @@ class DynamicDockDisplayAreaContentMixin:
         return all_collected_dock_items_identifiers
     
 
+
+    def get_flat_dock_item_tuple_dict(self, debug_print=False) -> Dict[str, Tuple[Dock, Optional["QtWidgets.QWidget"]]]:
+        """ extracts the 'dock' property that is the contents of each added dock item from the self.dynamic_display_dict and returns it as a flat list """
+        # all_collected_dock_items_identifiers = self.get_flat_dock_identifiers_list()
+        out_dict = {}
+        for an_id, an_item in self.dynamic_display_dict.items():
+            for a_sub_id, a_sub_item in an_item.items():
+                a_dock_item = a_sub_item.get('dock', None)
+                a_widget = a_sub_item.get('widget', None)
+                assert (a_sub_id == a_dock_item.name()), f"a_dock_item.name(): '{a_dock_item.name()}' != a_sub_id: '{a_sub_id}'"
+                out_dict[a_dock_item.name()] = (a_dock_item, a_widget)
+        return out_dict
+    
+    
+
     # ==================================================================================================================== #
     # dockGroup                                                                                                            #
     # ==================================================================================================================== #
@@ -861,13 +876,21 @@ class DynamicDockDisplayAreaOwningMixin:
         """Delegates to child widget's clear_all_display_docks"""
         return self.dock_manager_widget.clear_all_display_docks()
 
+
+    def get_flat_dock_identifiers_list(self, debug_print=False) -> List[str]:
+        """Delegates to child widget's get_flat_widgets_list"""
+        return self.dock_manager_widget.get_flat_dock_identifiers_list(debug_print=debug_print)
+
     def get_flat_dockitems_list(self, debug_print=False) -> List[Dock]:
         """Delegates to child widget's get_flat_dockitems_list"""
-        return self.dock_manager_widget.get_flat_dockitems_list(debug_print)
+        return self.dock_manager_widget.get_flat_dockitems_list(debug_print=debug_print)
 
     def get_flat_widgets_list(self, debug_print=False) -> List["QtWidgets.QWidget"]:
         """Delegates to child widget's get_flat_widgets_list"""
-        return self.dock_manager_widget.get_flat_widgets_list(debug_print)
+        return self.dock_manager_widget.get_flat_widgets_list(debug_print=debug_print)
+    
+    def get_flat_dock_item_tuple_dict(self, debug_print=False) -> Dict[str, Tuple[Dock, Optional["QtWidgets.QWidget"]]]:
+        return self.dock_manager_widget.get_flat_dock_item_tuple_dict(debug_print=debug_print)
 
     def get_dockGroup_dock_dict(self, debug_print=False) -> Dict[str, List[Dock]]:
         """Delegates to child widget's get_dockGroup_dock_dict"""
