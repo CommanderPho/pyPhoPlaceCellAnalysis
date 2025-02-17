@@ -201,6 +201,18 @@ def build_subdivided_epochs(curr_active_pipeline, subdivide_bin_size: float = 1.
     global_pos_df = PandasHelpers.add_explicit_dataframe_columns_from_lookup_df(global_pos_df, subdivided_epochs_properties_df, join_column_name='global_subdivision_idx')
     global_pos_df.sort_values(by=['t'], inplace=True) # Need to re-sort by timestamps once done
 
+    if global_pos_df.attrs is None:
+        global_pos_df.attrs = {}
+        
+    global_pos_df.attrs.update({'subdivide_bin_size': subdivide_bin_size})
+    
+    if global_subivided_epochs_df.attrs is None:
+        global_subivided_epochs_df.attrs = {}
+        
+    global_subivided_epochs_df.attrs.update({'subdivide_bin_size': subdivide_bin_size})
+
+
+    
     return (global_subivided_epochs_obj, global_subivided_epochs_df), global_pos_df
 
 
