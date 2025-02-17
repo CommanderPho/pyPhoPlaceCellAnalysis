@@ -90,6 +90,8 @@ class Spike3DRasterLeftSidebarControlBar(QWidget):
         self.ui.spinRenderWindowDuration.sigValueChanged.connect(self.render_window_duration_valueChanged)
         self.ui.btnToggleCrosshairTrace.clicked.connect(self.crosshair_trace_button_Toggled)
 
+
+        self.ui.verticalSliderZoom.setVisible(False)
         self.ui.btnToggleCrosshairTrace.setVisible(True)
         self.ui.lblCrosshairTraceStaticLabel.setVisible(False)
         self.ui.lblCrosshairTraceValue.setVisible(False)
