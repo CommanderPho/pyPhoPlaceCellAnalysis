@@ -646,11 +646,36 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         old_value = spike_raster_window.params.is_crosshair_trace_enabled
         did_update: bool = (old_value != updated_is_crosshair_trace_enabled)
         spike_raster_window.params.is_crosshair_trace_enabled = updated_is_crosshair_trace_enabled
-        if self.spike_raster_plt_2d is not None:
-            ## set SpikeRaster2D's is_crosshair_trace_enabled
-            self.spike_raster_plt_2d
         
-
+        if updated_is_crosshair_trace_enabled:
+            ## enable crosshairs callback        
+            if self.spike_raster_plt_2d is not None:
+                ## set SpikeRaster2D's is_crosshair_trace_enabled
+                # self.spike_raster_plt_2d.sigCrosshairsUpdated.connect(self.on_crosshair_updated_signal)        
+                # Rate limited version:
+                if not hasattr(self, 'spike_3d_to_2d_window_crosshair_connection'):
+                    ## create new connection:
+                    self.spike_3d_to_2d_window_crosshair_connection = None
+                    self.spike_3d_to_2d_window_crosshair_connection = self.connection_man.connect_drivable_to_driver(drivable=self, driver=self.spike_raster_plt_2d,
+                                                                custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.sigCrosshairsUpdated, delay=0.2, rateLimit=30, slot=drivable.spikes_window.on_crosshair_updated_signal)))
+        else:
+            print(f'should disable crosshairs.')
+            if hasattr(self, 'spike_3d_to_2d_window_crosshair_connection'):
+                if self.spike_3d_to_2d_window_crosshair_connection is not None:
+                    ## remove it
+                    self.connection_man.disconnect(self.spike_3d_to_2d_window_crosshair_connection)
+                    self.spike_3d_to_2d_window_crosshair_connection = None
+                    delattr(self, 'spike_3d_to_2d_window_crosshair_connection') ## remove the attribute
+                
+            
+    def on_crosshair_updated_signal(self, child, name, trace_value):
+        """ called when the crosshair is updated"""
+        # print(f'on_crosshair_updated_signal(self: {self}, name: "{name}", trace_value: "{trace_value}")')
+        left_side_bar_controls = spike_raster_window.ui.leftSideToolbarWidget
+        left_side_bar_controls.crosshair_trace_time = trace_value
+        
+        # self.ui.lblCrosshairTraceStaticLabel.setVisible(True)
+        # self.ui.lblCrosshairTraceValue.setVisible(True)
 
 
     ########################################################
