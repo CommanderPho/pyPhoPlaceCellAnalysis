@@ -1322,6 +1322,8 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
     def _setupUI_matplotlib_render_plots(self):
         # performs required setup to enable dynamically added matplotlib render subplots.
         self.ui.matplotlib_view_widgets = {} # empty dictionary
+        self.ui.connections['tracks'] = {}
+        
 
     @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=['FigureWidgetDockDisplayConfig'], used_by=[], creation_date='2023-10-17 13:26', related_items=['add_new_embedded_pyqtgraph_render_plot_widget'])
     def add_new_matplotlib_render_plot_widget(self, row=1, col=0, name='matplotlib_view_widget', dockSize=(500,50), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None, return_dock_object:bool=False) -> Tuple[MatplotlibTimeSynchronizedWidget, Figure, List[Axis]]:
@@ -1361,7 +1363,16 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
             dDisplayItem.setOrientation('horizontal', force=True)
             dDisplayItem.updateStyle()
             dDisplayItem.update()
+
+            ## add the connections dictionary:
+            assert 'tracks' in self.ui.connections
+            assert name not in self.ui.connections['tracks'], f"list(self.ui.connections['tracks'].keys()): {list(self.ui.connections['tracks'].keys())} already contains name: {name}"
+            self.ui.connections['tracks'][name] = {} ## make new dict to hold connections
             
+            
+            
+
+
             #TODO 2024-12-18 08:54: - [ ] Where the red must be coming in
             ## Add the plot:
             fig = self.ui.matplotlib_view_widgets[name].getFigure()
@@ -1371,6 +1382,12 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
             ## emit the signal
             self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name])
             
+
+            ## enable crosshairs callback
+            self.ui.connections['tracks'][name]['sigCrosshairsUpdated'] = None
+            # self.on_child_crosshair_updated_signal
+            _crosshairs_updated_conn = self.ui.matplotlib_view_widgets[name].sigCrosshairsUpdated.connect(lambda a_child_widget, an_identifier, a_trace_value: self.on_child_crosshair_updated_signal(child_identifier=an_identifier, trace_value=a_trace_value))
+            self.ui.connections['tracks'][name]['sigCrosshairsUpdated'] = (_crosshairs_updated_conn, self.ui.matplotlib_view_widgets[name].sigCrosshairsUpdated) ## set a tuple so we can disconnect
 
         else:
             # Already had the widget
@@ -1443,6 +1460,12 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
             dDisplayItem.updateStyle()
             dDisplayItem.update()
             
+            ## add the connections dictionary:
+            assert 'tracks' in self.ui.connections
+            assert name not in self.ui.connections['tracks'], f"list(self.ui.connections['tracks'].keys()): {list(self.ui.connections['tracks'].keys())} already contains name: {name}"
+            self.ui.connections['tracks'][name] = {} ## make new dict to hold connections
+            
+
             ## Add the plot:
             root_graphics_layout_widget = self.ui.matplotlib_view_widgets[name].getRootGraphicsLayoutWidget()
             plot_item = self.ui.matplotlib_view_widgets[name].getRootPlotItem()
@@ -1535,6 +1558,16 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
         if active_matplotlib_view_widget is not None:
             ## TODO: remove the connection from self.ui.connections[identifier]?
             self.sync_matplotlib_render_plot_widget(identifier, sync_mode=SynchronizedPlotMode.NO_SYNC)
+            
+            active_track_connections_dict = self.ui.connections['tracks'].get(identifier, {})
+            for a_connection_key, (a_connection, a_driving_signal) in active_track_connections_dict.items():
+                if a_connection is not None:
+                    # have an existing sync connection, need to disconnect it.
+                    print(f'disconnecting a_connection for "{identifier}": {a_connection}')
+                    a_driving_signal.disconnect(a_connection)
+                    # print(f'WARNING: connection exists!')
+
+
             ## Remove the widget itself:
             # self.ui.dynamic_docked_widget_container
             self.ui.layout.removeWidget(active_matplotlib_view_widget) # Remove the matplotlib widget
@@ -1552,31 +1585,35 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
         """ syncs a matplotlib render plot widget with a specified identifier with either the global window, the active time window, or disables sync with the Spike2DRaster. """
         # Requires specifying the identifier
         active_matplotlib_view_widget = self.ui.matplotlib_view_widgets.get(identifier, None)
-        if active_matplotlib_view_widget is not None:
+        active_track_connections_dict = self.ui.connections['tracks'].get(identifier, {})
+        
+        if (active_matplotlib_view_widget is not None) and (active_track_connections_dict is not None):
             if sync_mode.name == SynchronizedPlotMode.NO_SYNC.name:
                 # disable syncing
-                sync_connection = self.ui.connections.get(identifier, None)
+                sync_connection = active_track_connections_dict.get('sync', None)
                 if sync_connection is not None:
                     # have an existing sync connection, need to disconnect it.
                     print(f'disconnecting window_scrolled for "{identifier}"')
                     self.window_scrolled.disconnect(sync_connection)
                     # print(f'WARNING: connection exists!')
-                    self.ui.connections[identifier] = None
-                    del self.ui.connections[identifier] # remove the connection after disconnecting it.
-
+                    active_track_connections_dict['sync'] = None
+                    del active_track_connections_dict['sync'] # remove the connection after disconnecting it.
+                    
+                self.ui.connections['tracks'][identifier] = active_track_connections_dict ## update the instance's connection dict
                 return None
             elif sync_mode.name == SynchronizedPlotMode.TO_GLOBAL_DATA.name:
                 ## Synchronize just once to the global data:
                 # disable active window syncing if it's enabled:
-                sync_connection = self.ui.connections.get(identifier, None)
+                sync_connection = active_track_connections_dict.get('sync', None)
                 if sync_connection is not None:
                     # have an existing sync connection, need to disconnect it.
                     print(f'disconnecting window_scrolled for "{identifier}"')
                     self.window_scrolled.disconnect(sync_connection)
                     # print(f'WARNING: connection exists!')
-                    self.ui.connections[identifier] = None
-                    del self.ui.connections[identifier] # remove the connection after disconnecting it.
+                    active_track_connections_dict['sync'] = None
+                    del active_track_connections_dict['sync'] # remove the connection after disconnecting it.
 
+                self.ui.connections['tracks'][identifier] = active_track_connections_dict ## update the instance's connection dict
                 # Perform Initial (one-time) update from source -> controlled:
                 active_matplotlib_view_widget.on_window_changed(self.spikes_window.total_df_start_end_times[0], self.spikes_window.total_df_start_end_times[1])
                 return None
@@ -1585,13 +1622,14 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
                 # Perform Initial (one-time) update from source -> controlled:
                 active_matplotlib_view_widget.on_window_changed(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
                 sync_connection = self.window_scrolled.connect(active_matplotlib_view_widget.on_window_changed)
-                self.ui.connections[identifier] = sync_connection # add the connection to the connections array
+                active_track_connections_dict['sync'] = sync_connection # add the connection to the connections array
+                self.ui.connections['tracks'][identifier] = active_track_connections_dict ## update the instance's connection dict
                 return sync_connection # return the connection
             else:
                 raise NotImplementedError
 
         else:
-            print(f'active_matplotlib_view_widget with identifier {identifier} was not found!')
+            print(f'active_matplotlib_view_widget or active_track_connections_dict with identifier {identifier} was not found!')
             return None
 
     
@@ -1999,6 +2037,33 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
         self.debug_print_spike_raster_2D_specific_plots_info(indent_string = '\t')
         debug_print_axes_locations(self)
 
+
+    # ==================================================================================================================== #
+    # Crosshairs/Tracing Functions                                                                                         #
+    # ==================================================================================================================== #
+
+    def toggle_crosshair_traces_enabled(self, are_crosshairs_enabled):
+        print(f'SpikeRaster2D.on_crosshair_trace_toggled(is_crosshairs_enabled={are_crosshairs_enabled})')
+        if are_crosshairs_enabled:
+            for a_ts_widget in self.get_flat_widgets_list():
+                if hasattr(a_ts_widget, 'add_crosshairs'):
+                    # add_crosshairs
+                    a_ts_widget.add_crosshairs(a_ts_widget.active_plot_target, name='traceHairs', should_force_discrete_to_bins=False, enable_y_trace=True)
+                    
+        else:
+            ## disable crosshairs
+            for a_ts_widget in self.get_flat_widgets_list():
+                if hasattr(a_ts_widget, 'remove_crosshairs'):
+                    # remove_crosshairs:
+                    a_ts_widget.remove_crosshairs(a_ts_widget.active_plot_target, name='traceHairs')
+                                
+            
+
+
+    def on_child_crosshair_updated_signal(self, child_identifier, trace_value):
+        """ called when a child (with crosshairs enabled) updates its crosshairs trace. """
+        # print(f'SpikeRaster2D.on_child_crosshair_updated_signal(self: {self}, child_identifier: "{child_identifier}", trace_value: "{trace_value}")')
+        self.sigCrosshairsUpdated.emit(self, child_identifier, trace_value)
 
 
 @define(slots=False)
