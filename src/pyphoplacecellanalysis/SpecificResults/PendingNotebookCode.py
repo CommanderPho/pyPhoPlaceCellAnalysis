@@ -499,6 +499,16 @@ class Compute_NonPBE_Epochs:
         # (test_epoch_specific_decoded_results1D_dict, continuous_specific_decoded_results1D_dict, new_decoder1D_dict, new_pf1Ds_dict), subdivided_epochs_specific_decoded_results1D_dict, ## 1D Results
         # (test_epoch_specific_decoded_results2D_dict, continuous_specific_decoded_results2D_dict, new_decoder2D_dict, new_pf2Ds_dict), subdivided_epochs_specific_decoded_results2D_dict, global_continuous_decoded_epochs_result2D # 2D results
         
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import Compute_NonPBE_Epochs
+
+            long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+            a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = Compute_NonPBE_Epochs.init_from_pipeline(curr_active_pipeline=curr_active_pipeline)
+            ## apply the new epochs to the session:
+            curr_active_pipeline.filtered_sessions[global_epoch_name].non_PBE_epochs = deepcopy(a_new_NonPBE_Epochs_obj.global_epoch_only_non_PBE_epoch_df)
+
+            results1D, results2D = a_new_NonPBE_Epochs_obj.compute_all(curr_active_pipeline, epochs_decoding_time_bin_size=0.025, subdivide_bin_size=0.50, compute_1D=True, compute_2D=True)
+        
         """
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_subdivided_epochs
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
@@ -530,6 +540,8 @@ class Compute_NonPBE_Epochs:
 
         return results1D, results2D
         
+
+    
 
 def _single_compute_train_test_split_epochs_decoders(a_decoder: BasePositionDecoder, a_config: Any, an_epoch_training_df: pd.DataFrame, an_epoch_test_df: pd.DataFrame, a_modern_name: str, training_test_suffixes = ['_train', '_test'], debug_print: bool = False): # , debug_output_hdf5_file_path=None, debug_plot: bool = False
     """ Replaces the config and updates/recomputes the computation epochs

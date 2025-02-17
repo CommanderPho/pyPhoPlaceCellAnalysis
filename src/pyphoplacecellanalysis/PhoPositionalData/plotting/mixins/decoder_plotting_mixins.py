@@ -322,6 +322,9 @@ class SingleArtistMultiEpochBatchHelpers:
         
         track_shape_patch_collection_artists = batch_plot_helper.add_track_shapes(global_session=global_session)
         
+        Usage:
+            track_shape_patch_collection_artists = batch_plot_helper.add_track_shapes(global_session=global_session) ## does not seem to successfully synchronize to window
+        
         """
         from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager, long_short_display_config_manager
         from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance, _perform_plot_matplotlib_2D_tracks
