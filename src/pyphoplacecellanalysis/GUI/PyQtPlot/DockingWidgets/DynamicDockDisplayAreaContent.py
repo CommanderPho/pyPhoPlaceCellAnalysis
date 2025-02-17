@@ -339,7 +339,7 @@ class DynamicDockDisplayAreaContentMixin:
     """
     
     @property
-    def dynamic_display_dict(self) -> OrderedDict:
+    def dynamic_display_dict(self) -> Dict[str, Dict[str, Dict]]:
         """The dynamic_display_dict property."""
         return self._dynamic_display_output_dict
     @dynamic_display_dict.setter
@@ -357,7 +357,7 @@ class DynamicDockDisplayAreaContentMixin:
     @pyqtExceptionPrintingSlot()
     def DynamicDockDisplayAreaContentMixin_on_init(self):
         """ perform any parameters setting/checking during init """
-        self._dynamic_display_output_dict = OrderedDict() # for DynamicDockDisplayAreaContentMixin
+        self._dynamic_display_output_dict = dict() # for DynamicDockDisplayAreaContentMixin
 
     @pyqtExceptionPrintingSlot()
     def DynamicDockDisplayAreaContentMixin_on_setup(self):
@@ -382,6 +382,7 @@ class DynamicDockDisplayAreaContentMixin:
         """ extracts the 'dock' property that is the contents of each added dock item from the self.dynamic_display_dict and returns it as a flat list """
         all_collected_dock_items = []
         for an_id, an_item in self.dynamic_display_dict.items():
+            # an_item can be either a Dock itself of a DockGroup
             if debug_print:
                 print(f'an_id: {an_id}, an_item: {an_item}')
             for a_sub_id, a_sub_item in an_item.items():
@@ -851,6 +852,6 @@ class DynamicDockDisplayAreaOwningMixin:
         """Delegates to child widget's get_flat_widgets_list"""
         return self.dock_manager_widget.get_flat_widgets_list(debug_print)
 
-    def get_dockGroup_dock_dict(self, debug_print=False):
+    def get_dockGroup_dock_dict(self, debug_print=False) -> Dict[str, List[Dock]]:
         """Delegates to child widget's get_dockGroup_dock_dict"""
         return self.dock_manager_widget.get_dockGroup_dock_dict(debug_print)
