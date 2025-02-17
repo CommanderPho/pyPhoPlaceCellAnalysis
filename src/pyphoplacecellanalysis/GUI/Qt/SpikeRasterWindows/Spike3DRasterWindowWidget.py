@@ -311,6 +311,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.GlobalConnectionManagerAccessingMixin_on_setup()
         
         # self.ui.additional_connections = {} # NOTE: self.ui.additional_connections has been removed in favor of self.connection_man
+        self.ui.additional_connections = {}
         
         ## Create the animation properties:
         self.playback_controller = TimeWindowPlaybackController()
@@ -335,6 +336,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.ui.right_side_bar_connections = self.SpikeRasterRightSidebarOwningMixin_connectSignals(self.ui.rightSideContainerWidget)
 
         
+        
+
         ## Setup the right side bar:
         rightSideContainerWidget = self.ui.rightSideContainerWidget
         self.ui.rightSideContainerWidget.setVisible(False) # collapses and hides the sidebar
@@ -651,26 +654,39 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             ## enable crosshairs callback        
             if self.spike_raster_plt_2d is not None:
                 ## set SpikeRaster2D's is_crosshair_trace_enabled
+                extant_conn = self.ui.additional_connections.get('spike_3d_to_2d_window_crosshair_connection', None)
+                
                 # self.spike_raster_plt_2d.sigCrosshairsUpdated.connect(self.on_crosshair_updated_signal)        
                 # Rate limited version:
-                if not hasattr(self, 'spike_3d_to_2d_window_crosshair_connection'):
+                if extant_conn is None:
                     ## create new connection:
-                    self.spike_3d_to_2d_window_crosshair_connection = None
-                    self.spike_3d_to_2d_window_crosshair_connection = self.connection_man.connect_drivable_to_driver(drivable=self, driver=self.spike_raster_plt_2d,
-                                                                            custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.sigCrosshairsUpdated, delay=0.2, rateLimit=30, slot=drivable.on_crosshair_updated_signal)))
+                    # spike_3d_to_2d_window_crosshair_connection = self.connection_man.connect_drivable_to_driver(drivable=self, driver=self.spike_raster_plt_2d,
+                    #                                                         custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.sigCrosshairsUpdated, delay=0.2, rateLimit=30, slot=drivable.on_crosshair_updated_signal)))
+                    # spike_3d_to_2d_window_crosshair_connection = self.spike_raster_plt_2d.sigCrosshairsUpdated.connect(self.on_crosshair_updated_signal) ## create the new connection
+                    spike_3d_to_2d_window_crosshair_connection = self.spike_raster_plt_2d.sigCrosshairsUpdated.connect(lambda a_child_widget, an_identifier, a_trace_value: self.on_crosshair_updated_signal(an_identifier, a_trace_value))
+                    self.ui.additional_connections['spike_3d_to_2d_window_crosshair_connection'] = spike_3d_to_2d_window_crosshair_connection
+                else:
+                    print(f'already had extant connection!')
         else:
             print(f'should disable crosshairs.')
-            if hasattr(self, 'spike_3d_to_2d_window_crosshair_connection'):
-                if self.spike_3d_to_2d_window_crosshair_connection is not None:
-                    ## remove it
-                    self.connection_man.disconnect(self.spike_3d_to_2d_window_crosshair_connection)
-                    self.spike_3d_to_2d_window_crosshair_connection = None
-                    delattr(self, 'spike_3d_to_2d_window_crosshair_connection') ## remove the attribute
+            extant_conn = self.ui.additional_connections.pop('spike_3d_to_2d_window_crosshair_connection', None)            
+            if extant_conn is not None:
+                ## remove it
+                # self.connection_man.disconnect(self.spike_3d_to_2d_window_crosshair_connection)
+                self.spike_raster_plt_2d.sigCrosshairsUpdated.disconnect(extant_conn)
+                # self.spike_3d_to_2d_window_crosshair_connection = None
+                # delattr(self, 'spike_3d_to_2d_window_crosshair_connection') ## remove the attribute
+
                 
-            
-    def on_crosshair_updated_signal(self, child, name, trace_value):
+        if self.spike_raster_plt_2d is not None:
+            ## inform spike_raster_plt_2d that traces should be enabled
+            self.spike_raster_plt_2d.toggle_crosshair_traces_enabled(updated_is_crosshair_trace_enabled)            
+
+
+    # def on_crosshair_updated_signal(self, child, name, trace_value):
+    def on_crosshair_updated_signal(self, name, trace_value):
         """ called when the crosshair is updated"""
-        print(f'on_crosshair_updated_signal(self: {self}, name: "{name}", trace_value: "{trace_value}")')
+        print(f'Spike3DRasterWindowWidget.on_crosshair_updated_signal(self: {self}, name: "{name}", trace_value: "{trace_value}")')
         left_side_bar_controls = self.ui.leftSideToolbarWidget
         left_side_bar_controls.crosshair_trace_time = trace_value
         

@@ -56,7 +56,8 @@ class Spike3DRasterLeftSidebarControlBar(QWidget):
     @property
     def crosshair_trace_time(self) -> float:
         """The crosshair_trace_time property."""
-        return self._crosshair_trace_time
+        # return self.ui.lblCrosshairTraceValue.getText()
+        return None
     @crosshair_trace_time.setter
     def crosshair_trace_time(self, value: float):
         if value is not None:
@@ -89,7 +90,7 @@ class Spike3DRasterLeftSidebarControlBar(QWidget):
         self.ui.spinTemporalZoomFactor.sigValueChanged.connect(self.temporal_zoom_factor_valueChanged)
         self.ui.spinRenderWindowDuration.sigValueChanged.connect(self.render_window_duration_valueChanged)
         self.ui.btnToggleCrosshairTrace.clicked.connect(self.crosshair_trace_button_Toggled)
-
+        # self.ui.btnToggleCrosshairTrace.clicked.
 
         self.ui.verticalSliderZoom.setVisible(False)
         self.ui.btnToggleCrosshairTrace.setVisible(True)
@@ -138,7 +139,7 @@ class Spike3DRasterLeftSidebarControlBar(QWidget):
 
     @pyqtExceptionPrintingSlot()
     def crosshair_trace_button_Toggled(self):
-        # print(f'sb: {sb}, sb.value(): {str(sb.value())}')
+        print(f'crosshair_trace_button_Toggled(): self.ui.btnToggleCrosshairTrace.isChecked(): {self.ui.btnToggleCrosshairTrace.isChecked()}')
         # old_value = self.render_window_duration
         self.crosshair_trace_toggled.emit(self.ui.btnToggleCrosshairTrace.isChecked())
         

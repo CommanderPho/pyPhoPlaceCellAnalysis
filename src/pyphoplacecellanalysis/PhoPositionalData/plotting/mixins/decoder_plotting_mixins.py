@@ -429,7 +429,12 @@ class SingleArtistMultiEpochBatchHelpers:
 
     def redraw(self):
         """ re-draws the attached axes """
-        self.track_ax.get_figure().canvas.draw_idle()
+        self.active_ax.get_figure().canvas.draw_idle()
+        
+    def clear_all_artists(self):
+        """ clears all added artists. """
+        self.active_ax.clear()
+        self.redraw()
         
 
     @function_attributes(short_name=None, tags=['reshape', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 05:57', related_items=[])
