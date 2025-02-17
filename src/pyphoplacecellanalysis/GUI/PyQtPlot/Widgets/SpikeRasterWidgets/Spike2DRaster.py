@@ -2048,15 +2048,22 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
             for a_ts_widget in self.get_flat_widgets_list():
                 if hasattr(a_ts_widget, 'add_crosshairs'):
                     # add_crosshairs
+                    try:
                     a_ts_widget.add_crosshairs(a_ts_widget.active_plot_target, name='traceHairs', should_force_discrete_to_bins=False, enable_y_trace=True)
+                    except Exception as e:
+                        print(f'failed to add crosshair traces for widget: {a_ts_widget}.\n\tError: {e}\n\tSkipping.')
+                    
                     
         else:
             ## disable crosshairs
             for a_ts_widget in self.get_flat_widgets_list():
                 if hasattr(a_ts_widget, 'remove_crosshairs'):
                     # remove_crosshairs:
+                    try:
                     a_ts_widget.remove_crosshairs(a_ts_widget.active_plot_target, name='traceHairs')
-                                
+                    except Exception as e:
+                        print(f'failed to remove crosshair traces for widget: {a_ts_widget}.\n\tError: {e}\n\tSkipping.')
+                        # raise e
             
 
 
