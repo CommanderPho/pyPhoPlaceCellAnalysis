@@ -242,7 +242,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # self.ui.splitter.setStretchFactor(0, 5) # have the top widget by 3x the height as the bottom widget
         # self.ui.splitter.setStretchFactor(1, 1) # have the top widget by 3x the height as the bottom widget        
         
-        self.params = VisualizationParameters(self.applicationName, _menu_action_history_list=[])
+        self.params = VisualizationParameters(self.applicationName, _menu_action_history_list=[], type_of_3d_plotter=type_of_3d_plotter, is_crosshair_trace_enabled=False)
         self.params.type_of_3d_plotter = type_of_3d_plotter
         self.params._menu_action_history_list = []
         # Helper Mixins: INIT:
@@ -643,9 +643,9 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     def on_crosshair_trace_toggled(self, updated_is_crosshair_trace_enabled):
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.on_crosshair_trace_toggled(updated_is_crosshair_trace_enabled: {updated_is_crosshair_trace_enabled})')
-        old_value = spike_raster_window.params.is_crosshair_trace_enabled
+        old_value = self.params.is_crosshair_trace_enabled
         did_update: bool = (old_value != updated_is_crosshair_trace_enabled)
-        spike_raster_window.params.is_crosshair_trace_enabled = updated_is_crosshair_trace_enabled
+        self.params.is_crosshair_trace_enabled = updated_is_crosshair_trace_enabled
         
         if updated_is_crosshair_trace_enabled:
             ## enable crosshairs callback        
@@ -657,7 +657,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
                     ## create new connection:
                     self.spike_3d_to_2d_window_crosshair_connection = None
                     self.spike_3d_to_2d_window_crosshair_connection = self.connection_man.connect_drivable_to_driver(drivable=self, driver=self.spike_raster_plt_2d,
-                                                                custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.sigCrosshairsUpdated, delay=0.2, rateLimit=30, slot=drivable.spikes_window.on_crosshair_updated_signal)))
+                                                                            custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.sigCrosshairsUpdated, delay=0.2, rateLimit=30, slot=drivable.on_crosshair_updated_signal)))
         else:
             print(f'should disable crosshairs.')
             if hasattr(self, 'spike_3d_to_2d_window_crosshair_connection'):
@@ -670,8 +670,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             
     def on_crosshair_updated_signal(self, child, name, trace_value):
         """ called when the crosshair is updated"""
-        # print(f'on_crosshair_updated_signal(self: {self}, name: "{name}", trace_value: "{trace_value}")')
-        left_side_bar_controls = spike_raster_window.ui.leftSideToolbarWidget
+        print(f'on_crosshair_updated_signal(self: {self}, name: "{name}", trace_value: "{trace_value}")')
+        left_side_bar_controls = self.ui.leftSideToolbarWidget
         left_side_bar_controls.crosshair_trace_time = trace_value
         
         # self.ui.lblCrosshairTraceStaticLabel.setVisible(True)
