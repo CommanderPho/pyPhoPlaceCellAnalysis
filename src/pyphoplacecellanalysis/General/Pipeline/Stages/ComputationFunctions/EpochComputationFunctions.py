@@ -1054,7 +1054,7 @@ class KnownFilterEpochs(ExtendedEnum):
                     
             elif filter_epochs.name == cls.NON_PBE.name:
                 ## non-PBEs-Epochs Decoding:
-                active_filter_epochs = deepcopy(sess.non_PBE) # epoch object
+                active_filter_epochs = deepcopy(sess.non_pbe) # epoch object
                 if not isinstance(active_filter_epochs, pd.DataFrame):
                     active_filter_epochs = active_filter_epochs.to_dataframe()
                 active_filter_epochs = post_process_epochs_fn(active_filter_epochs)
@@ -1147,7 +1147,7 @@ class KnownFilterEpochs(ExtendedEnum):
                 
 
             elif filter_epochs.name == KnownFilterEpochs.NON_PBE.name:
-                active_filter_epochs = deepcopy(sess.non_PBE) # epoch object
+                active_filter_epochs = deepcopy(sess.non_pbe) # epoch object
                 if not isinstance(active_filter_epochs, pd.DataFrame):
                     active_filter_epochs = active_filter_epochs.to_dataframe()
                 active_filter_epochs = active_filter_epochs.epochs.get_non_overlapping_df()
