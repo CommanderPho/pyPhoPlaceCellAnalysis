@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     ## typehinting only imports here
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import NonPBEDimensionalDecodingResult
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import NonPBEDimensionalDecodingResult
 
 from copy import deepcopy
 import param
@@ -119,7 +119,7 @@ class SingleArtistMultiEpochBatchHelpers:
         curr_artist_dict, image_extent, plots_data = batch_plot_helper.add_position_posteriors(posterior_masking_value=0.0025, override_ax=None, debug_print=True, defer_draw=False)
 
     """
-    results2D: "NonPBEDimensionalDecodingResult" = field()    
+    results2D: "NonPBEDimensionalDecodingResult" = field()
 
     active_ax = field()
     subdivide_bin_size: float = field()
