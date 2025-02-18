@@ -2364,29 +2364,64 @@ class PipelineWithComputedPipelineStageMixin:
 
 
     @function_attributes(short_name=None, tags=['fixup', 'deserialization', 'filesystem', 'post-load', 'cross-platform'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-14 09:41', related_items=[])
-    def post_load_fixup_sess_basedirs(self, updated_session_basepath: Path):
+    def post_load_fixup_sess_basedirs(self, updated_session_basepath: Path, force_update: bool = False):
         """ after loading from pickle from another computer, fixes up the session's basepaths so they actually exist.
         
         Updates:
-            self.sess.config.basepath
-            self.filtered_sessions[an_epoch_name].config.basepath
+            self.sess.config.basepath, self.sess.filePrefix
+            self.filtered_sessions[an_epoch_name].config.basepath, self.filtered_sessions[an_epoch_name].filePrefix
             
         """
+        # from pyphocorehelpers.Filesystem.path_helpers import find_matching_parent_path, convert_filelist_to_new_parent
+
+        ## so we can update .basepath and .fileprefix
+        # _old_session_basepath = deepcopy(self.sess.basepath)
+        
+        # known_global_data_root_parent_paths = [Path(r'W:\Data'), Path(r'/media/MAX/Data'), Path(r'/Volumes/MoverNew/data'), Path(r'/home/halechr/turbo/Data'), Path(r'/nfs/turbo/umms-kdiba/Data')]
+        # prev_global_data_root_parent_path = find_matching_parent_path(known_global_data_root_parent_paths, _old_session_basepath) # TODO: assumes all have the same root, which is a valid assumption so far. ## prev_global_data_root_parent_path should contain the matching path from the list.
+        # new_desired_global_data_root_parent_path = find_matching_parent_path(known_global_data_root_parent_paths, updated_session_basepath)
+        # assert prev_global_data_root_parent_path is not None, f"No matching root parent path could be found!!"
+        
+        # filelist_to_convert = {'basepath': self.sess.basepath, 'filePrefix': self.sess.filePrefix}
+        # updated_filelist = convert_filelist_to_new_parent(list(filelist_to_convert.values()), original_parent_path=prev_global_data_root_parent_path, dest_parent_path=new_desired_global_data_root_parent_path)
+        # converted_filelist_dict = dict(zip(list(filelist_to_convert.keys()), updated_filelist))
+        
+        # source_parent_path = Path(r'/media/MAX/cloud/turbo/Data')
+        # dest_parent_path = Path(r'/media/MAX/Data')
+        # # # Build the destination filelist from the source_filelist and the two paths:
+        # filelist_dest = convert_filelist_to_new_parent([self.sess.basepath, self.sess.filePrefix], original_parent_path=source_parent_path, dest_parent_path=dest_parent_path)
+        # filelist_dest
+                
         did_fixup_any_missing_basepath: bool = False
         Assert.path_exists(updated_session_basepath)
         is_missing_basepath = (not self.sess.basepath.exists())
-        if is_missing_basepath:
+        if is_missing_basepath or force_update:
             self.sess.config.basepath = deepcopy(updated_session_basepath)
             did_fixup_any_missing_basepath = True
+            if self.sess.filePrefix is not None:
+                ## fixup the prefix too
+                filePrefix = deepcopy(self.sess.basepath).joinpath(self.sess.filePrefix.name) ## get the filename, but ignore the rest
+                # Assert.path_exists(filePrefix)
+                self.sess.filePrefix = filePrefix.resolve()
+                
             
+        # is_missing_filePrefix = (not self.sess.filePrefix.exists())
+        # if is_missing_filePrefix:
+        #     self.sess.config.filePrefix = deepcopy(updated_session_basepath)
+        #     did_fixup_any_missing_basepath = True
+        
         for a_name, a_sess in self.filtered_sessions.items():
             is_missing_basepath = (not a_sess.basepath.exists())
-            if is_missing_basepath:
+            if is_missing_basepath or force_update:
                 print(f"sess[{a_name}] is missing basepath: {a_sess.basepath}. updating.")
                 a_sess.config.basepath = deepcopy(updated_session_basepath)
                 did_fixup_any_missing_basepath = True
+                if a_sess.filePrefix is not None:
+                    ## fixup the prefix too
+                    filePrefix = deepcopy(a_sess.basepath).joinpath(a_sess.filePrefix.name) ## get the filename, but ignore the rest
+                    # Assert.path_exists(filePrefix)
+                    a_sess.filePrefix = filePrefix.resolve()
         ## END for a_name, a_se...
-        
         return did_fixup_any_missing_basepath               
 
 
