@@ -115,7 +115,7 @@ from neuropy.utils.indexing_helpers import PandasHelpers
 
 
 @custom_define(slots=False, eq=False)
-class NonPBEDimensionalDecodingResult(UnpackableMixin, HDF_SerializationMixin, AttrsBasedClassHelperMixin):
+class NonPBEDimensionalDecodingResult(UnpackableMixin, ComputedResult):
     """Contains all decoding results for either 1D or 2D computations
     
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import NonPBEDimensionalDecodingResult
@@ -138,6 +138,8 @@ class NonPBEDimensionalDecodingResult(UnpackableMixin, HDF_SerializationMixin, A
 
 
     """
+    _VersionedResultMixin_version: str = "2024.02.18_0" # to be updated in your IMPLEMENTOR to indicate its version
+    
     ndim: int = serialized_attribute_field()  # 1 or 2
     pos_df: pd.DataFrame = serialized_field()
     
@@ -175,6 +177,33 @@ class NonPBEDimensionalDecodingResult(UnpackableMixin, HDF_SerializationMixin, A
         self.pos_df = pos_df
         return self.pos_df
 
+
+    ## For serialization/pickling:
+    def __getstate__(self):
+        # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
+        state = self.__dict__.copy()
+        # # Remove the unpicklable entries.
+        # _non_pickled_fields = ['curr_active_pipeline', 'track_templates']
+        # for a_non_pickleable_field in _non_pickled_fields:
+        #     del state[a_non_pickleable_field]
+        return state
+
+
+    def __setstate__(self, state):
+        # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        # For `VersionedResultMixin`
+        self._VersionedResultMixin__setstate__(state)
+        
+        # _non_pickled_field_restore_defaults = dict(zip(['curr_active_pipeline', 'track_templates'], [None, None]))
+        # for a_field_name, a_default_restore_value in _non_pickled_field_restore_defaults.items():
+        #     if a_field_name not in state:
+        #         state[a_field_name] = a_default_restore_value
+
+        self.__dict__.update(state)
+        # # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
+        # super(WCorrShuffle, self).__init__() # from
+
+
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
@@ -188,8 +217,8 @@ class NonPBEDimensionalDecodingResult(UnpackableMixin, HDF_SerializationMixin, A
     #     return ['ndim']
     
 
-@define(slots=False, eq=False, repr=False)
-class Compute_NonPBE_Epochs:
+@custom_define(slots=False, eq=False, repr=False)
+class Compute_NonPBE_Epochs(ComputedResult):
     """ Relates to using all time on the track except for detected PBEs as the placefield inputs. This includes the laps and the intra-lap times. 
     Importantly `lap_dir` is poorly defined for the periods between the laps, so something like head-direction might have to be used.
     
@@ -200,16 +229,18 @@ class Compute_NonPBE_Epochs:
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import Compute_NonPBE_Epochs
     
     """
-    single_global_epoch_df: pd.DataFrame = field()
-    global_epoch_only_non_PBE_epoch_df: pd.DataFrame = field()
-    # a_new_global_training_df: pd.DataFrame = field()
-    # a_new_global_test_df: pd.DataFrame = field()
-
-    a_new_training_df_dict: Dict[types.DecoderName, pd.DataFrame] = field()
-    a_new_test_df_dict: Dict[types.DecoderName, pd.DataFrame] = field()
+    _VersionedResultMixin_version: str = "2024.02.18_0" # to be updated in your IMPLEMENTOR to indicate its version
     
-    a_new_training_epoch_obj_dict: Dict[types.DecoderName, Epoch] = field(init=False)
-    a_new_testing_epoch_obj_dict: Dict[types.DecoderName, Epoch] = field(init=False)
+    single_global_epoch_df: pd.DataFrame = serialized_field()
+    global_epoch_only_non_PBE_epoch_df: pd.DataFrame = serialized_field()
+    # a_new_global_training_df: pd.DataFrame = serialized_field()
+    # a_new_global_test_df: pd.DataFrame = serialized_field()
+
+    a_new_training_df_dict: Dict[types.DecoderName, pd.DataFrame] = serialized_field()
+    a_new_test_df_dict: Dict[types.DecoderName, pd.DataFrame] = serialized_field()
+    
+    a_new_training_epoch_obj_dict: Dict[types.DecoderName, Epoch] = serialized_field(init=False)
+    a_new_testing_epoch_obj_dict: Dict[types.DecoderName, Epoch] = serialized_field(init=False)
     
 
     # subdivide_bin_size: float = 0.5
@@ -608,6 +639,36 @@ class Compute_NonPBE_Epochs:
         return (global_subivided_epochs_obj, global_subivided_epochs_df), global_pos_df
 
 
+    ## For serialization/pickling:
+    def __getstate__(self):
+        # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
+        state = self.__dict__.copy()
+        # # Remove the unpicklable entries.
+        # _non_pickled_fields = ['curr_active_pipeline', 'track_templates']
+        # for a_non_pickleable_field in _non_pickled_fields:
+        #     del state[a_non_pickleable_field]
+        return state
+
+
+    def __setstate__(self, state):
+        # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        # For `VersionedResultMixin`
+        self._VersionedResultMixin__setstate__(state)
+        
+        # _non_pickled_field_restore_defaults = dict(zip(['curr_active_pipeline', 'track_templates'], [None, None]))
+        # for a_field_name, a_default_restore_value in _non_pickled_field_restore_defaults.items():
+        #     if a_field_name not in state:
+        #         state[a_field_name] = a_default_restore_value
+
+        self.__dict__.update(state)
+        # # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
+        # super(WCorrShuffle, self).__init__() # from
+
+
+    # HDFMixin Conformances ______________________________________________________________________________________________ #
+    def to_hdf(self, file_path, key: str, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path"""
+        super().to_hdf(file_path, key=key, **kwargs)
 
 
 
