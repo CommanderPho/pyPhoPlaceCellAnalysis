@@ -148,7 +148,7 @@ class Spike3DRasterLeftSidebarControlBar(QWidget):
 
     # @pyqtExceptionPrintingSlot()
     def crosshair_trace_button_Toggled(self):
-        print(f'crosshair_trace_button_Toggled(): self.ui.btnToggleCrosshairTrace.isChecked(): {self.ui.btnToggleCrosshairTrace.isChecked()}')
+        print(f'Spike3DRasterLeftSidebarControlBar.crosshair_trace_button_Toggled(): self.ui.btnToggleCrosshairTrace.isChecked(): {self.ui.btnToggleCrosshairTrace.isChecked()}')
         wants_crosshair_trace_visible: bool = self.ui.btnToggleCrosshairTrace.isChecked()
         self.ui.lblCrosshairTraceStaticLabel.setVisible(wants_crosshair_trace_visible)
         self.ui.lblCrosshairTraceValue.setVisible(wants_crosshair_trace_visible)

@@ -2015,24 +2015,24 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
                     # add_crosshairs
                     try:
                         a_ts_widget.add_crosshairs(a_ts_widget.active_plot_target, name='traceHairs', should_force_discrete_to_bins=False, enable_y_trace=True)
-                        print(f'an_identifier: "{an_identifier}"')
+                        print(f'\tan_identifier: "{an_identifier}"')
                         if an_identifier not in self.ui.connections['tracks']:
                             self.ui.connections['tracks'][an_identifier] = {} ## make new dict to hold connections
                             
                         if 'sigCrosshairsUpdated' not in self.ui.connections['tracks'][an_identifier]:
                             ## enable crosshairs callback
-                            print(f'adding crosshairs callback for item: "{an_identifier}"')
+                            print(f'\t\tadding crosshairs callback for item: "{an_identifier}"')
                             self.ui.connections['tracks'][an_identifier]['sigCrosshairsUpdated'] = None
                             # self.on_child_crosshair_updated_signal
                             _crosshairs_updated_conn = a_ts_widget.sigCrosshairsUpdated.connect(lambda a_child_widget, an_identifier, a_trace_value: self.on_child_crosshair_updated_signal(an_identifier, a_trace_value))
                             self.ui.connections['tracks'][an_identifier]['sigCrosshairsUpdated'] = _crosshairs_updated_conn ## set just as the raw connection so we can disconnect
                             # self.ui.connections['tracks'][an_identifier]['sigCrosshairsUpdated'] = (_crosshairs_updated_conn, a_ts_widget.sigCrosshairsUpdated) ## set a tuple so we can disconnect
-                            print(f'\tdone.')
+                            print(f'\t\tdone.')
                         else:
-                            print(f'already have a crosshairs callback for item {an_identifier}')
+                            print(f'\talready have a crosshairs callback for item {an_identifier}')
                             
                     except Exception as e:
-                        print(f'failed to add crosshair traces for widget: {a_ts_widget}.\n\tError: {e}\n\tSkipping.')
+                        print(f'\tfailed to add crosshair traces for widget: {a_ts_widget}.\n\tError: {e}\n\tSkipping.')
                     
                     
         else:
@@ -2045,19 +2045,20 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
                         a_ts_widget.remove_crosshairs(a_ts_widget.active_plot_target, name='traceHairs')
                         an_existing_crosshairs_updated_conn = self.ui.connections['tracks'].get(an_identifier, {}).pop('sigCrosshairsUpdated', None)
                         if an_existing_crosshairs_updated_conn is not None:
-                            print(f'found connection to remove for an_identifier: {an_identifier}, an_existing_crosshairs_updated_conn: {an_existing_crosshairs_updated_conn}')
+                            print(f'\tfound connection to remove for an_identifier: {an_identifier}, an_existing_crosshairs_updated_conn: {an_existing_crosshairs_updated_conn}')
                             a_ts_widget.sigCrosshairsUpdated.disconnect(an_existing_crosshairs_updated_conn) ## disconnect
-                            print(f'\t connection removed!')                        
+                            print(f'\t\tconnection removed!')                        
                         
                     except Exception as e:
-                        print(f'failed to remove crosshair traces for widget: {a_ts_widget}.\n\tError: {e}\n\tSkipping.')
+                        print(f'\tfailed to remove crosshair traces for widget: {a_ts_widget}.\n\tError: {e}\n\tSkipping.')
                         # raise e
                                 
             
 
     def on_child_crosshair_updated_signal(self, child_identifier, trace_value):
         """ called when a child (with crosshairs enabled) updates its crosshairs trace. """
-        # print(f'SpikeRaster2D.on_child_crosshair_updated_signal(self: {self}, child_identifier: "{child_identifier}", trace_value: "{trace_value}")')
+        if self.debug_print:
+            print(f'SpikeRaster2D.on_child_crosshair_updated_signal(self: {self}, child_identifier: "{child_identifier}", trace_value: "{trace_value}")')
         self.sigCrosshairsUpdated.emit(self, child_identifier, trace_value)
 
 

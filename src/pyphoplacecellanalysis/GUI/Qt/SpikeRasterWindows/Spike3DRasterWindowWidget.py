@@ -665,12 +665,13 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
                     # spike_3d_to_2d_window_crosshair_connection = self.connection_man.connect_drivable_to_driver(drivable=self, driver=self.spike_raster_plt_2d,
                     #                                                         custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.sigCrosshairsUpdated, delay=0.2, rateLimit=30, slot=drivable.on_crosshair_updated_signal)))
                     # spike_3d_to_2d_window_crosshair_connection = self.spike_raster_plt_2d.sigCrosshairsUpdated.connect(self.on_crosshair_updated_signal) ## create the new connection
-                    spike_3d_to_2d_window_crosshair_connection = self.spike_raster_plt_2d.sigCrosshairsUpdated.connect(lambda a_child_widget, an_identifier, a_trace_value: self.on_crosshair_updated_signal(an_identifier, a_trace_value))
+                    # spike_3d_to_2d_window_crosshair_connection = self.spike_raster_plt_2d.sigCrosshairsUpdated.connect(lambda a_child_widget, an_identifier, a_trace_value: self.on_crosshair_updated_signal(an_identifier, a_trace_value))
+                    spike_3d_to_2d_window_crosshair_connection = self.spike_raster_plt_2d.sigCrosshairsUpdated.connect(lambda a_child_widget, an_identifier, a_trace_value: self.on_owned_child_crosshair_updated_signal(a_child_widget, an_identifier, a_trace_value))
                     self.ui.additional_connections['spike_3d_to_2d_window_crosshair_connection'] = spike_3d_to_2d_window_crosshair_connection
                 else:
-                    print(f'already had extant connection!')
+                    print(f'\talready had extant connection!')
         else:
-            print(f'should disable crosshairs.')
+            print(f'\tshould disable crosshairs.')
             extant_conn = self.ui.additional_connections.pop('spike_3d_to_2d_window_crosshair_connection', None)            
             if extant_conn is not None:
                 ## remove it
@@ -685,10 +686,21 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             self.spike_raster_plt_2d.toggle_crosshair_traces_enabled(updated_is_crosshair_trace_enabled)            
 
 
+
+    def on_owned_child_crosshair_updated_signal(self, child, name, trace_value):
+        """ called when the crosshair is updated"""
+        print(f'Spike3DRasterWindowWidget.on_owned_child_crosshair_updated_signal(child: {child}, name: "{name}", trace_value: "{trace_value}")')
+        left_side_bar_controls = self.ui.leftSideToolbarWidget
+        left_side_bar_controls.crosshair_trace_time = trace_value
+        
+        # self.ui.lblCrosshairTraceStaticLabel.setVisible(True)
+        # self.ui.lblCrosshairTraceValue.setVisible(True)
+        
+
     # def on_crosshair_updated_signal(self, child, name, trace_value):
     def on_crosshair_updated_signal(self, name, trace_value):
         """ called when the crosshair is updated"""
-        print(f'Spike3DRasterWindowWidget.on_crosshair_updated_signal(self: {self}, name: "{name}", trace_value: "{trace_value}")')
+        print(f'Spike3DRasterWindowWidget.on_crosshair_updated_signal(name: "{name}", trace_value: "{trace_value}")')
         left_side_bar_controls = self.ui.leftSideToolbarWidget
         left_side_bar_controls.crosshair_trace_time = trace_value
         
