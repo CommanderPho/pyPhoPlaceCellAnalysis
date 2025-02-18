@@ -597,75 +597,35 @@ class Compute_NonPBE_Epochs(ComputedResult):
             results1D, results2D = a_new_NonPBE_Epochs_obj.compute_all(curr_active_pipeline, epochs_decoding_time_bin_size=0.025, subdivide_bin_size=0.50, compute_1D=True, compute_2D=True)
         
         """
-        import concurrent.futures
-        from copy import deepcopy
-
-        # Precompute the subdivided epochs and global position (shared between 1D and 2D tasks)
+        # from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
+        
+        # Build subdivided epochs first since they're needed for both 1D and 2D
         (global_subivided_epochs_obj, global_subivided_epochs_df), global_pos_df = self.__class__.build_subdivided_epochs(curr_active_pipeline, subdivide_bin_size=subdivide_bin_size)
-
+        
         results1D, results2D = None, None
+        
+        if compute_1D:
+            test_epoch_specific_decoded_results1D_dict, continuous_specific_decoded_results1D_dict, new_decoder1D_dict, new_pf1Ds_dict = self.recompute(curr_active_pipeline=curr_active_pipeline, pfND_ndim=1, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size)
+            subdivided_epochs_specific_decoded_results1D_dict = {a_name:a_new_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), filter_epochs=deepcopy(global_subivided_epochs_obj), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False) for a_name, a_new_decoder in new_decoder1D_dict.items()}
+            results1D = NonPBEDimensionalDecodingResult(ndim=1, 
+                test_epoch_results=test_epoch_specific_decoded_results1D_dict, 
+                continuous_results=continuous_specific_decoded_results1D_dict,
+                decoders=new_decoder1D_dict, pfs=new_pf1Ds_dict,
+                subdivided_epochs_results=subdivided_epochs_specific_decoded_results1D_dict, 
+                subdivided_epochs_df=deepcopy(global_subivided_epochs_df), pos_df=global_pos_df)
 
-        # Define a helper function for the recompute step so it can be submitted to the executor
-        def compute_component(ndim: int):
-            return self.recompute(curr_active_pipeline=curr_active_pipeline, pfND_ndim=ndim, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size)
-
-        # Using a ThreadPoolExecutor to run these computations concurrently.
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            futures = {}
-            if compute_1D:
-                futures['1D'] = executor.submit(compute_component, 1)
-            if compute_2D:
-                futures['2D'] = executor.submit(compute_component, 2)
-
-            # Wait for the finished jobs and retrieve the results.
-            for key, future in futures.items():
-                result = future.result()
-                if key == '1D':
-                    test_epoch_specific_decoded_results1D_dict, continuous_specific_decoded_results1D_dict, new_decoder1D_dict, new_pf1Ds_dict = result
-                    subdivided_epochs_specific_decoded_results1D_dict = {
-                        a_name: a_new_decoder.decode_specific_epochs(
-                            spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)),
-                            filter_epochs=deepcopy(global_subivided_epochs_obj),
-                            decoding_time_bin_size=epochs_decoding_time_bin_size,
-                            debug_print=False
-                        )
-                        for a_name, a_new_decoder in new_decoder1D_dict.items()
-                    }
-                    results1D = NonPBEDimensionalDecodingResult(
-                        ndim=1,
-                        test_epoch_results=test_epoch_specific_decoded_results1D_dict,
-                        continuous_results=continuous_specific_decoded_results1D_dict,
-                        decoders=new_decoder1D_dict,
-                        pfs=new_pf1Ds_dict,
-                        subdivided_epochs_results=subdivided_epochs_specific_decoded_results1D_dict,
-                        subdivided_epochs_df=deepcopy(global_subivided_epochs_df),
-                        pos_df=global_pos_df
-                    )
-                elif key == '2D':
-                    test_epoch_specific_decoded_results2D_dict, continuous_specific_decoded_results2D_dict, new_decoder2D_dict, new_pf2Ds_dict = result
-                    subdivided_epochs_specific_decoded_results2D_dict = {
-                        a_name: a_new_decoder.decode_specific_epochs(
-                            spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)),
-                            filter_epochs=deepcopy(global_subivided_epochs_obj),
-                            decoding_time_bin_size=epochs_decoding_time_bin_size,
-                            debug_print=False
-                        )
-                        for a_name, a_new_decoder in new_decoder2D_dict.items()
-                    }
-                    results2D = NonPBEDimensionalDecodingResult(
-                        ndim=2,
-                        test_epoch_results=test_epoch_specific_decoded_results2D_dict,
-                        continuous_results=continuous_specific_decoded_results2D_dict,
-                        decoders=new_decoder2D_dict,
-                        pfs=new_pf2Ds_dict,
-                        subdivided_epochs_results=subdivided_epochs_specific_decoded_results2D_dict,
-                        subdivided_epochs_df=deepcopy(global_subivided_epochs_df),
-                        pos_df=global_pos_df
-                    )
+        if compute_2D:
+            test_epoch_specific_decoded_results2D_dict, continuous_specific_decoded_results2D_dict, new_decoder2D_dict, new_pf2Ds_dict = self.recompute(curr_active_pipeline=curr_active_pipeline, pfND_ndim=2, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size)
+            subdivided_epochs_specific_decoded_results2D_dict = {a_name:a_new_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), filter_epochs=deepcopy(global_subivided_epochs_obj), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False) for a_name, a_new_decoder in new_decoder2D_dict.items()}
+            results2D = NonPBEDimensionalDecodingResult(ndim=2, 
+                test_epoch_results=test_epoch_specific_decoded_results2D_dict,
+                continuous_results=continuous_specific_decoded_results2D_dict,
+                decoders=new_decoder2D_dict, pfs=new_pf2Ds_dict,
+                subdivided_epochs_results=subdivided_epochs_specific_decoded_results2D_dict, 
+                subdivided_epochs_df=deepcopy(global_subivided_epochs_df), pos_df=global_pos_df)
 
         return results1D, results2D
-    
-
         
     @classmethod
     @function_attributes(short_name=None, tags=['subdivision'], input_requires=[], output_provides=[], uses=[], used_by=['cls.compute_all(...)'], creation_date='2025-02-11 00:00', related_items=[])
