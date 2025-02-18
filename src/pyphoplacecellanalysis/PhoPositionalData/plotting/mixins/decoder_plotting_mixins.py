@@ -360,7 +360,7 @@ class SingleArtistMultiEpochBatchHelpers:
     # Decoded Position Posteriors                                                                                          #
     # ==================================================================================================================== #
     
-    @function_attributes(short_name=None, tags=['NOT_YET_FINISHED', '2025-02-14_TO_REFACTOR_FROM_NOTEBOOK'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-14 22:02', related_items=[])
+    @function_attributes(short_name=None, tags=['WORKING', '2025-02-14_TO_REFACTOR_FROM_NOTEBOOK'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-14 22:02', related_items=[])
     def add_position_posteriors(self, posterior_masking_value=0.0025, debug_print=False, defer_draw:bool=False, **kwargs):
         """ add the decoded posteriors as heatmaps
 
@@ -378,108 +378,6 @@ class SingleArtistMultiEpochBatchHelpers:
         # ==================================================================================================================== #
         # Perform Plotting of Posteriors                                                                                       #
         # ==================================================================================================================== #
-        # stacked_flat_global_pos_df = self.stacked_flat_global_pos_df
-        # desired_time_duration = self.desired_time_duration
-        # desired_start_time_seconds = self.desired_start_time_seconds
-        # desired_end_time_seconds = self.desired_end_time_seconds
-        # a_new_global2D_decoder = self.a_new_global2D_decoder
-        # a_result2D = self.a_result2D
-        # results2D = self
-        # global_pos_df = self.pos_df
-        # subdivide_bin_size = self.subdivide_bin_size
-        # active_ax = self.active_ax
-        # stacked_flat_xbin_centers = self.stacked_flat_xbin_centers
-        # stacked_flat_ybin_centers = self.stacked_flat_ybin_centers
-        # stacked_flat_time_bin_centers = self.stacked_flat_time_bin_centers
-        # stacked_p_x_given_n = self.stacked_p_x_given_n
-        # self.stacked_flat_global_pos_df = self.stacked_flat_global_pos_df
-        # desired_time_duration = self.desired_time_duration
-        # self.desired_start_time_seconds = self.desired_start_time_seconds
-        # self.desired_end_time_seconds = self.desired_end_time_seconds
-
-        # results2D
-
-        ## INPUTS: subdivided_epochs_specific_decoded_results_dict, new_decoder_dict, global_pos_df
-        # # a_result = test_epoch_specific_decoded_results_dict['global']
-        # # a_result2D: DecodedFilterEpochsResult = deepcopy(subdivided_epochs_specific_decoded_results2D_dict['global'])
-        # a_new_global2D_decoder = deepcopy(new_decoder2D_dict['global'])
-        # # delattr(a_result, 'measured_positions_list')
-        # a_result2D.measured_positions_list = deepcopy([global_pos_df[global_pos_df['global_subdivision_idx'] == epoch_idx] for epoch_idx in np.arange(a_result2D.num_filter_epochs)]) ## add a List[pd.DataFrame] to plot as the measured positions
-        # ## ybin_centers is wrong!
-        # # ybin_centers
-
-        # global_pos_df = deepcopy(results2D.pos_df)
-
-        # results2D.subdivided_epochs_df
-
-        ## INPUTS: results2D
-        # self.a_result2D: DecodedFilterEpochsResult = deepcopy(self.subdivided_epochs_results['global'])
-        # self.a_new_global2D_decoder = deepcopy(self.decoders['global'])
-        # delattr(a_result, 'measured_positions_list')
-        # self.a_result2D.measured_positions_list = deepcopy([self.pos_df[self.pos_df['global_subdivision_idx'] == epoch_idx] for epoch_idx in np.arange(self.a_result2D.num_filter_epochs)]) ## add a List[pd.DataFrame] to plot as the measured positions
-
-
-        # ## INPUTS: a_result2D, a_new_global2D_decoder
-        # rotate_to_vertical: bool = True
-        # # rotate_to_vertical: bool = False
-        # should_expand_first_dim: bool=True
-        # desired_epoch_start_idx: int = 0
-        # # desired_epoch_end_idx: int = 20
-        # desired_epoch_end_idx: int = int(round(1/self.subdivide_bin_size)) * 60 * 8 # 8 minutes
-        # desired_start_time_seconds: float = (desired_epoch_start_idx * self.subdivide_bin_size)
-        # desired_end_time_seconds: float = self.subdivide_bin_size * desired_epoch_end_idx
-        # print(f'desired_epoch_start_idx: {desired_epoch_start_idx}, desired_epoch_end_idx: {desired_epoch_end_idx}')
-        # print(f'desired_start_time_seconds: {desired_start_time_seconds}, desired_end_time_seconds: {desired_end_time_seconds}')
-        # desired_time_duration: float = desired_end_time_seconds - desired_start_time_seconds
-
-
-        # ## finalize building the data for single-artist plotting (does not plot anything)
-        # (n_xbins, n_ybins, n_tbins), (flattened_n_xbins, flattened_n_ybins, flattened_n_tbins), (stacked_p_x_given_n, stacked_flat_time_bin_centers, stacked_flat_xbin_centers, stacked_flat_ybin_centers) = SingleArtistMultiEpochBatchHelpers.complete_build_stacked_flat_arrays(a_result=self.a_result2D, a_new_global_decoder=self.a_new_global2D_decoder,
-        #                                                                                                                                                                                                                                                                         desired_epoch_start_idx=desired_epoch_start_idx, desired_epoch_end_idx=desired_epoch_end_idx,
-        #                                                                                                                                                                                                                                                                         rotate_to_vertical=rotate_to_vertical, should_expand_first_dim=should_expand_first_dim)
-        # ## slice `stacked_flat_global_pos_df` by desired start/end indicies too:
-        # stacked_flat_global_pos_df: pd.DataFrame = deepcopy(self.pos_df)
-        # stacked_flat_global_pos_df = stacked_flat_global_pos_df[np.logical_and((stacked_flat_global_pos_df['global_subdivision_idx'] >= desired_epoch_start_idx), (stacked_flat_global_pos_df['global_subdivision_idx'] < desired_epoch_end_idx))]
-
-        # (n_xbins, n_ybins, n_tbins), (flattened_n_xbins, flattened_n_ybins, flattened_n_tbins)
-        # np.shape(stacked_p_x_given_n) # (1, 171, 6)
-        # # stacked_flat_global_pos_df
-
-        # self.xbin_edges = deepcopy(self.a_new_global2D_decoder.xbin)
-        # self.ybin_edges = deepcopy(self.a_new_global2D_decoder.ybin)
-        # xmin, xmax, ymin, ymax = self.xbin_edges[0], self.xbin_edges[-1], self.ybin_edges[0], self.ybin_edges[-1]
-        # self.stacked_flat_global_pos_df = self.stacked_flat_global_pos_df.position.adding_binned_position_columns(xbin_edges=self.xbin_edges, ybin_edges=self.ybin_edges)
-        # self.stacked_flat_global_pos_df
-        ## OUTPUTS: (desired_epoch_start_idx, desired_epoch_end_idx), (desired_start_time_seconds, desired_end_time_seconds), desired_time_duration
-
-
-        # ## INPUTS: a_new_global2D_decoder, a_result2D
-        # ## OUTPUTS: stacked_p_x_given_n, stacked_flat_time_bin_centers
-        # # n_axes: int = 1
-        # ## INPUTS: directional_laps_results, decoder_ripple_filter_epochs_decoder_result_dict
-        # # xbin = deepcopy(a_new_global_decoder.xbin)
-        # xbin_centers = deepcopy(self.a_new_global2D_decoder.xbin_centers)
-        # ybin_centers = deepcopy(self.a_new_global2D_decoder.ybin_centers)
-        # # ybin = deepcopy(a_new_global_decoder.ybin)
-        # num_filter_epochs: int = self.a_result2D.num_filter_epochs
-        # print(f'num_filter_epochs: {num_filter_epochs}')
-        
-
-        # an_epoch_idx = 0
-        # assert len(xbin_centers) == np.shape(self.a_result2D.p_x_given_n_list[an_epoch_idx])[0], f"np.shape(a_result.p_x_given_n_list[an_epoch_idx]): {np.shape(self.a_result2D.p_x_given_n_list[an_epoch_idx])}, len(xbin_centers): {len(xbin_centers)}"
-
-        # a_p_x_given_n = self.a_result2D.p_x_given_n_list[an_epoch_idx] # (76, 40, n_epoch_t_bins)
-        # a_most_likely_positions = self.a_result2D.most_likely_positions_list[an_epoch_idx] # (n_epoch_t_bins, n_pos_dims) 
-        # a_time_bin_edges = self.a_result2D.time_bin_edges[an_epoch_idx] # (n_epoch_t_bins+1, )
-        # a_time_bin_centers = self.a_result2D.time_bin_containers[an_epoch_idx].centers # (n_epoch_t_bins, )
-        # has_measured_positions: bool = hasattr(self.a_result2D, 'measured_positions_list')
-        # if has_measured_positions:
-        #     a_measured_pos_df: pd.DataFrame = self.a_result2D.measured_positions_list[an_epoch_idx]
-        #     # assert len(a_measured_pos_df) == len(a_time_bin_centers)
-        # else:
-        #     a_measured_pos_df = None
-            
-
         
         ## INPUTS: stacked_p_x_given_n, stacked_flat_time_bin_centers, stacked_flat_xbin_centers, stacked_flat_ybin_centers
         a_xbin_centers = deepcopy(self.stacked_flat_xbin_centers)
@@ -488,14 +386,6 @@ class SingleArtistMultiEpochBatchHelpers:
         # a_p_x_given_n = deepcopy(stacked_p_x_given_n).swapaxes(-2, -1)
         if debug_print:
             print(f'np.shape(a_p_x_given_n): {np.shape(a_p_x_given_n)}')
-        # print(f'np.shape(a_p_x_given_n.T): {np.shape(a_p_x_given_n.T)}')
-        # a_measured_pos_df = None
-        # a_most_likely_positions = None
-        # a_time_bin_centers = np.squeeze(deepcopy(stacked_flat_time_bin_centers))
-        # a_time_bin_centers = deepcopy(stacked_flat_time_bin_centers).T
-        # a_time_bin_centers = deepcopy(self.stacked_flat_time_bin_centers)
-        # print(f'np.shape(a_time_bin_centers): {np.shape(a_time_bin_centers)}')
-        # a_measured_pos_df = None
 
         ## restrict to subrange
         # ==================================================================================================================== #
@@ -574,9 +464,10 @@ class SingleArtistMultiEpochBatchHelpers:
         if debug_print:
             print(f'filtered_num_output_rect_total_elements: {filtered_num_output_rect_total_elements}')
         
-
-
+        ## Update `batch_plot_helper.custom_image_extent`
+        self.custom_image_extent = [self.desired_start_time_seconds, self.desired_end_time_seconds, 0.0, 1.0] ## n
         num_horizontal_repeats: int = self.num_horizontal_repeats
+        
         # ==================================================================================================================== #
         # BEGIN FUNCTION BODY                                                                                                  #
         # ==================================================================================================================== #
@@ -622,7 +513,11 @@ class SingleArtistMultiEpochBatchHelpers:
         # num_horizontal_repeats: int = 20 ## hardcoded
         self.track_all_normalized_rect_arr_dict = SingleArtistMultiEpochBatchHelpers.track_dict_all_stacked_rect_arr_normalization(self.track_single_rects_dict, num_horizontal_repeats=num_horizontal_repeats)
         ## INPUTS: filtered_num_horizontal_repeats
-        self.inverse_normalized_track_all_rect_arr_dict = SingleArtistMultiEpochBatchHelpers.track_dict_all_stacked_rect_arr_inverse_normalization(self.track_all_normalized_rect_arr_dict, ax=active_ax, num_active_horizontal_repeats=num_horizontal_repeats)
+        # self.inverse_normalized_track_all_rect_arr_dict = SingleArtistMultiEpochBatchHelpers.track_dict_all_stacked_rect_arr_inverse_normalization(self.track_all_normalized_rect_arr_dict, ax=active_ax, num_active_horizontal_repeats=num_horizontal_repeats)
+        self.inverse_normalized_track_all_rect_arr_dict = SingleArtistMultiEpochBatchHelpers.track_dict_all_stacked_rect_arr_inverse_normalization_from_custom_extent(self.track_all_normalized_rect_arr_dict, custom_image_extent=self.custom_image_extent, num_active_horizontal_repeats=num_horizontal_repeats)
+
+
+
 
         ## OUTPUTS: track_all_normalized_rect_arr_dict, inverse_normalized_track_all_rect_arr_dict
         # track_all_normalized_rect_arr_dict
@@ -633,14 +528,13 @@ class SingleArtistMultiEpochBatchHelpers:
         # desired_epoch_end_idx: int = int(round(1/subdivide_bin_size)) * 60 * 8 # 8 minutes
         # print(f'desired_epoch_start_idx: {desired_epoch_start_idx}, desired_epoch_end_idx: {desired_epoch_end_idx}')
 
-
-
         track_all_rect_arr_dict = {k:v[(desired_epoch_start_idx*3):(desired_epoch_end_idx*3), :] for k, v in self.track_all_normalized_rect_arr_dict.items()}
         # track_all_rect_arr_dict = {k:v[desired_epoch_start_idx:desired_epoch_end_idx, :] for k, v in track_all_rect_arr_dict.items()}
         # track_all_rect_arr_dict
 
         ## INPUTS: filtered_num_horizontal_repeats
-        self.inverse_normalized_track_all_rect_arr_dict = SingleArtistMultiEpochBatchHelpers.track_dict_all_stacked_rect_arr_inverse_normalization(track_all_rect_arr_dict, ax=active_ax, num_active_horizontal_repeats=filtered_num_horizontal_repeats)
+        # self.inverse_normalized_track_all_rect_arr_dict = SingleArtistMultiEpochBatchHelpers.track_dict_all_stacked_rect_arr_inverse_normalization(track_all_rect_arr_dict, ax=active_ax, num_active_horizontal_repeats=filtered_num_horizontal_repeats)
+        self.inverse_normalized_track_all_rect_arr_dict = SingleArtistMultiEpochBatchHelpers.track_dict_all_stacked_rect_arr_inverse_normalization_from_custom_extent(track_all_rect_arr_dict, custom_image_extent=self.custom_image_extent, num_active_horizontal_repeats=filtered_num_horizontal_repeats)
         ## OUTPUTS: inverse_normalized_track_all_rect_arr_dict
         ## INPUTS: track_kwargs_dict, inverse_normalized_track_all_rect_arr_dict
         track_shape_patch_collection_artists = SingleArtistMultiEpochBatchHelpers.add_batch_track_shapes(ax=active_ax, inverse_normalized_track_all_rect_arr_dict=self.inverse_normalized_track_all_rect_arr_dict, track_kwargs_dict=track_kwargs_dict) # start (x0: 0.0, 20 of them span to exactly x=1.0)
@@ -905,9 +799,53 @@ class SingleArtistMultiEpochBatchHelpers:
         return track_all_normalized_rect_arr_dict
     
 
-    @function_attributes(short_name=None, tags=['new', 'active', 'inverse'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 08:41', related_items=[])
+    # @function_attributes(short_name=None, tags=['new', 'active', 'inverse'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 08:41', related_items=[])
+    # @classmethod
+    # def track_dict_all_stacked_rect_arr_inverse_normalization(cls, track_all_rect_arr_dict, ax, num_active_horizontal_repeats: int) -> Dict[str, NDArray]:
+    #     """ 
+    #     Usage:
+        
+    #         all_long_rect_arr = rect_tuples_to_horizontally_stacked_NDArray(long_rects, num_horizontal_repeats=(a_result.num_filter_epochs-1))
+    #         all_short_rect_arr = rect_tuples_to_horizontally_stacked_NDArray(short_rects, num_horizontal_repeats=(a_result.num_filter_epochs-1))
+
+    #     """
+    #     xlim = ax.get_xlim()
+    #     ylim = ax.get_ylim()
+
+    #     ax_width: float = np.diff(xlim)[0] ## how wide the current window is
+    #     ax_height: float = np.diff(ylim)[0]
+
+    #     # (xlim, ylim)
+    #     # (ax_width, ax_height)
+
+    #     inverse_normalization_factor_width: float = ax_width / num_active_horizontal_repeats
+    #     inverse_normalization_factor_height: float = 1.0 / ax_height
+
+    #     # (inverse_normalization_factor_width, inverse_normalization_factor_height)
+        
+    #     ## OUTPUTS: inverse_normalization_factor_width, inverse_normalization_factor_height
+
+    #     # ax.get_width()
+    #     inverse_normalized_track_all_rect_arr_dict = {}
+
+    #     for k, test_arr in track_all_rect_arr_dict.items():
+    #         new_test_arr = deepcopy(test_arr)
+    #         new_test_arr[:, 2] *= inverse_normalization_factor_width # scale by the width
+    #         new_test_arr[:, 0] *= inverse_normalization_factor_width
+
+    #         new_test_arr[:, 3] *= inverse_normalization_factor_height # scale by the width
+    #         new_test_arr[:, 1] *= inverse_normalization_factor_height
+
+    #         inverse_normalized_track_all_rect_arr_dict[k] = new_test_arr
+            
+    #     return inverse_normalized_track_all_rect_arr_dict
+    #     ## OUTPUTS: inverse_normalized_track_all_rect_arr_dict
+    
+
+
+    @function_attributes(short_name=None, tags=['NEWEST', 'active', 'inverse', 'extent'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-17 22:02', related_items=[])
     @classmethod
-    def track_dict_all_stacked_rect_arr_inverse_normalization(cls, track_all_rect_arr_dict, ax, num_active_horizontal_repeats: int) -> Dict[str, NDArray]:
+    def track_dict_all_stacked_rect_arr_inverse_normalization_from_custom_extent(cls, track_all_rect_arr_dict, custom_image_extent: List[float], num_active_horizontal_repeats: int) -> Dict[str, NDArray]:
         """ 
         Usage:
         
@@ -915,12 +853,18 @@ class SingleArtistMultiEpochBatchHelpers:
             all_short_rect_arr = rect_tuples_to_horizontally_stacked_NDArray(short_rects, num_horizontal_repeats=(a_result.num_filter_epochs-1))
 
         """
-        xlim = ax.get_xlim()
-        ylim = ax.get_ylim()
-
-        ax_width: float = np.diff(xlim)[0]
-        ax_height: float = np.diff(ylim)[0]
-
+        assert len(custom_image_extent), f"custom_image_extent: {custom_image_extent} but should be of the form: [x0, y0, width, height]"
+        # ax_width: float = custom_image_extent[2] ## how wide the current window is
+        # ax_height: float = custom_image_extent[3]
+        # x0, y0, ax_width, ax_height = custom_image_extent
+        
+        x0, x1, y0, y1 = custom_image_extent
+        ax_width: float = x1 - x0
+        ax_height: float = y1 - y0
+        
+        # assert x0 == 0.0, f"x0 should be equal to zero (no offsets allowed) but instead it is equal to {x0}"
+        # assert y0 == 0.0, f"y0 should be equal to zero (no offsets allowed) but instead it is equal to {y0}"
+        
         # (xlim, ylim)
         # (ax_width, ax_height)
 
@@ -936,6 +880,10 @@ class SingleArtistMultiEpochBatchHelpers:
 
         for k, test_arr in track_all_rect_arr_dict.items():
             new_test_arr = deepcopy(test_arr)
+            # ## subtract out the offset
+            # new_test_arr[:, 0] -= x0
+            # new_test_arr[:, 1] -= y0
+            
             new_test_arr[:, 2] *= inverse_normalization_factor_width # scale by the width
             new_test_arr[:, 0] *= inverse_normalization_factor_width
 
@@ -945,7 +893,6 @@ class SingleArtistMultiEpochBatchHelpers:
             inverse_normalized_track_all_rect_arr_dict[k] = new_test_arr
             
         return inverse_normalized_track_all_rect_arr_dict
-        ## OUTPUTS: inverse_normalized_track_all_rect_arr_dict
     
 
 
