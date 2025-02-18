@@ -124,7 +124,7 @@ class SingleArtistMultiEpochBatchHelpers:
         return self.results2D.subdivided_epochs_results['global']
 
     @property
-    def a_new_global2D_decoder(self) -> DecodedFilterEpochsResult:
+    def a_new_global2D_decoder(self) -> BasePositionDecoder:
         return self.results2D.decoders['global']
 
     # @property
@@ -621,7 +621,7 @@ class SingleArtistMultiEpochBatchHelpers:
 
 
     @classmethod
-    def complete_build_stacked_flat_arrays(cls, a_result, a_new_global_decoder, desired_epoch_start_idx:int=0, desired_epoch_end_idx: Optional[int] = None, rotate_to_vertical: bool = True, should_expand_first_dim: bool=True):
+    def complete_build_stacked_flat_arrays(cls, a_result: "DecodedFilterEpochsResult", a_new_global_decoder, desired_epoch_start_idx:int=0, desired_epoch_end_idx: Optional[int] = None, rotate_to_vertical: bool = True, should_expand_first_dim: bool=True):
         """ 
         a_result: DecodedFilterEpochsResult = subdivided_epochs_specific_decoded_results_dict['global']
         a_new_global_decoder = new_decoder_dict['global']
@@ -692,6 +692,70 @@ class SingleArtistMultiEpochBatchHelpers:
         ## OUPTUTS: (n_xbins, n_ybins, n_tbins), (flattened_n_xbins, flattened_n_ybins, flattened_n_tbins), (stacked_flat_time_bin_centers, stacked_flat_xbin_centers, stacked_flat_ybin_centers)
         return (n_xbins, n_ybins, n_tbins), (flattened_n_xbins, flattened_n_ybins, flattened_n_tbins), (stacked_p_x_given_n, stacked_flat_time_bin_centers, stacked_flat_xbin_centers, stacked_flat_ybin_centers)
 
+
+    @classmethod
+    @function_attributes(short_name=None, tags=['masked_rows', 'nan', 'position_lines', 'stacked_flat_global_pos_df'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-17 23:56', related_items=[])
+    def add_nan_masked_rows_to_stacked_flat_global_pos_df(cls, stacked_flat_global_pos_df: pd.DataFrame, time_cmap='viridis') -> pd.DataFrame:
+        """ seperates each 'global_subdivision_idx' change in the df by adding two NaN rows with ['is_masked_bin'] = True 
+        Usage:
+        
+            new_stacked_flat_global_pos_df = SingleArtistMultiEpochBatchHelpers.add_nan_masked_rows_to_stacked_flat_global_pos_df(stacked_flat_global_pos_df=stacked_flat_global_pos_df)
+            new_stacked_flat_global_pos_df
+        """
+        if isinstance(time_cmap, str):
+            time_cmap = plt.get_cmap(time_cmap)  # Choose a colormap
+        
+        new_stacked_flat_global_pos_df = deepcopy(stacked_flat_global_pos_df)
+        # print(list(new_stacked_flat_global_pos_df.columns))
+        column_names_to_copy = ['t', 'global_subdivision_idx', 'subdivision_epoch_start_t']
+        column_names_to_update = ['t', 'dt', 'is_masked_bin']
+        nan_column_names = ['x', 'y', 'lin_pos', 'speed', 'lap', 'lap_dir', 'velocity_x', 'acceleration_x', 'velocity_y', 'acceleration_y', 'x_smooth', 'y_smooth', 'velocity_x_smooth', 'acceleration_x_smooth', 'velocity_y_smooth', 'acceleration_y_smooth', 'binned_x', 'binned_y', 'global_subdivision_x_unit_offset', 'global_subdivision_x_data_offset', 'x_scaled', 'x_smooth_scaled', 'y_scaled']
+        # nan_column_names = ['x', 'y', 'lin_pos', 'speed', 'lap', 'lap_dir', 'x_smooth', 'y_smooth', 'binned_x', 'binned_y', 'global_subdivision_x_unit_offset', 'global_subdivision_x_data_offset', 'x_scaled', 'x_smooth_scaled', 'y_scaled']
+        included_nan_column_names = [k for k in nan_column_names if k in new_stacked_flat_global_pos_df.columns]
+
+        new_stacked_flat_global_pos_df['is_masked_bin'] = False
+        new_stacked_flat_global_pos_df['color'] = '#000000'
+
+        # norm = plt.Normalize(t.min(), t.max())
+        color_formatting_dict = {}
+
+        dfs = []
+        prev = None
+        global_subdivision_idx_group_start_t = None
+        # global_subdivision_idx_group_start_item = None
+        for _, row in new_stacked_flat_global_pos_df.iterrows():
+            # is_global_subdivision_idx_changing: bool = (row['global_subdivision_idx'] != prev['global_subdivision_idx'])
+            if (prev is not None) and (row['global_subdivision_idx'] != prev['global_subdivision_idx']):
+                new_row = prev.copy()
+                new_row['t'] = prev['t'] + 1e-6
+                new_row[included_nan_column_names] = np.nan
+                new_row['is_masked_bin'] = True
+                dfs.append(new_row.to_frame().T) 
+                ## add following row - I'd also like to add a duplicate of the next_row but with new_row['t'] = next['t'] - 1e-6
+                new_next = row.copy()
+                new_next['t'] = row['t'] - 1e-6
+                new_next[included_nan_column_names] = np.nan
+                new_next['is_masked_bin'] = True
+                dfs.append(new_next.to_frame().T)
+                ## last row:
+                # if global_subdivision_idx_group_start_item is not None:
+                if global_subdivision_idx_group_start_t is not None:
+                    ## existing global_subdivision_idx_group is finishing
+                    global_subdivision_idx_group_end_t = prev['t']
+                    # norm = plt.Normalize(t.min(), t.max())
+                    norm = plt.Normalize(global_subdivision_idx_group_start_t, global_subdivision_idx_group_end_t)
+                    color_formatting_dict[prev['global_subdivision_idx']] = (norm, (global_subdivision_idx_group_start_t, global_subdivision_idx_group_end_t), )
+
+                ## first row
+                # global_subdivision_idx_group_start_item = row.copy()
+                global_subdivision_idx_group_start_t = row['t']
+                global_subdivision_idx_group_end_t = None
+
+            dfs.append(row.to_frame().T)
+            prev = row
+            
+        new_stacked_flat_global_pos_df = pd.concat(dfs, ignore_index=True)
+        return new_stacked_flat_global_pos_df, color_formatting_dict
 
     # ==================================================================================================================== #
     # Batch Track Shape Plotting                                                                                           #
@@ -1528,73 +1592,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         if (a_measured_pos_df is not None):
             a_meas_pos_line, _meas_pos_out_markers = cls._perform_plot_measured_position_line_helper(an_ax, a_measured_pos_df, a_time_bin_centers, fake_y_lower_bound, fake_y_upper_bound, rotate_to_vertical=rotate_to_vertical, debug_print=debug_print)
                
-        # if (a_measured_pos_df is not None):
-        #     if debug_print:
-        #         print(f'plotting measured positions...')
-        #     a_measured_time_bin_centers: NDArray = np.atleast_1d([np.squeeze(a_measured_pos_df['t'].to_numpy())]) # np.atleast_1d([np.squeeze(a_measured_pos_df['t'].to_numpy())])                
-        #     if not is_2D:
-        #         measured_fake_y_num_samples: int = len(a_measured_pos_df)
-        #         measured_fake_y_arr = np.linspace(fake_y_lower_bound, fake_y_upper_bound, measured_fake_y_num_samples)
-        #         x = np.atleast_1d([a_measured_pos_df['x'].to_numpy()])
-        #         y = np.atleast_1d([measured_fake_y_arr])
-        #     else:
-        #         # 2D:
-        #         x = np.squeeze(a_measured_pos_df['x'].to_numpy())
-        #         y = np.squeeze(a_measured_pos_df['y'].to_numpy())
-                
-        #     if is_single_time_bin_mode:
-        #         ## restrict to single time bin if is_single_time_bin_mode:
-        #         if debug_print:
-        #             print(f'\tis_single_time_bin_mode, so restricting to specific time bin: {time_bin_index}')
-        #         assert (time_bin_index < n_time_bins)
-        #         a_curr_tbin_center: float = a_time_bin_centers[time_bin_index] ## it's a real time
-        #         is_measured_t_bin_included = (a_measured_pos_df['t'].to_numpy() <= a_curr_tbin_center) ## find all bins less than the current index
-        #         a_measured_time_bin_centers = np.atleast_1d([np.squeeze(a_measured_pos_df['t'].to_numpy()[is_measured_t_bin_included])]) ## could just slice `a_measured_time_bin_centers`, but we don't
-        #         x = np.atleast_1d([x[is_measured_t_bin_included]])
-        #         y = np.atleast_1d([y[is_measured_t_bin_included]])
-                
-        #     # if debug_print:
-        #     #     print(f'\tnp.shape(a_measured_time_bin_centers): {np.shape(a_measured_time_bin_centers)}')
-        #     #     print(f'\tnp.shape(x): {np.shape(x)}')
-        #     #     print(f'\tnp.shape(y): {np.shape(y)}')
-                
-        #     ## squeeze back down so all are rank 1 - (n_epoch_t_bins, )
-        #     a_measured_time_bin_centers = np.squeeze(a_measured_time_bin_centers)
-        #     x = np.squeeze(x)
-        #     y = np.squeeze(y)
             
-        #     if debug_print:
-        #         print(f'\tFinal Shapes:')
-        #         print(f'\tnp.shape(x): {np.shape(x)}, np.shape(y): {np.shape(y)}, np.shape(a_measured_time_bin_centers): {np.shape(a_measured_time_bin_centers)}')
-                
-        #     if not rotate_to_vertical:
-        #         pos_kwargs = dict(x=x, y=y)
-        #     else:
-        #         # vertical:
-        #         pos_kwargs = dict(x=y, y=x) ## swap x and y
-                
-        #     add_markers = True
-        #     # time_cmap = 'Reds'
-        #     # time_cmap = 'gist_gray'
-            
-        #     colors = [(0, 0.6, 0), (0, 0, 0)] # first color is black, last is green
-        #     time_cmap = LinearSegmentedColormap.from_list("GreenToBlack", colors, N=25)
-
-        #     if not is_2D: # 1D case
-        #         # a_line = _helper_add_gradient_line(an_ax, t=a_time_bin_centers, x=a_most_likely_positions, y=np.full_like(a_time_bin_centers, fake_y_center))
-        #         a_meas_pos_line, _meas_pos_out_markers = cls._helper_add_gradient_line(an_ax, t=a_measured_time_bin_centers, **pos_kwargs, add_markers=add_markers, time_cmap=time_cmap, zorder=0)
-        #     else:
-        #         # 2D case
-        #         if debug_print:
-        #             print(f'a_measured_time_bin_centers: {a_measured_time_bin_centers}')
-        #         a_meas_pos_line, _meas_pos_out_markers = cls._helper_add_gradient_line(an_ax, t=a_measured_time_bin_centers, **pos_kwargs, add_markers=add_markers, time_cmap=time_cmap, zorder=0)
-                
-        #     # _out_markers = ax.scatter(x=x, y=y, c=colors_arr)
-            
-        # else:
-        #     a_meas_pos_line, _meas_pos_out_markers = None, None
-            
-
         # Add Gradient Most Likely Position Line _____________________________________________________________________________ #
         if include_most_likely_pos_line:
             if not is_2D:
