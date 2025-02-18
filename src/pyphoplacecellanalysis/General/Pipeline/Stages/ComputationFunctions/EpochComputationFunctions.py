@@ -34,10 +34,12 @@ from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
 from attrs import asdict, astuple, define, field, Factory
 from neuropy.utils.indexing_helpers import PandasHelpers
 from neuropy.core.epoch import EpochsAccessor, Epoch, ensure_dataframe
+from neuropy.core.position import Position
 # import portion as P # Required for interval search: portion~=2.3.0
 from pyphocorehelpers.indexing_helpers import partition_df_dict, partition_df
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
+
 
 
 # ### For _perform_recursive_latent_placefield_decoding
@@ -259,6 +261,67 @@ class Compute_NonPBE_Epochs(ComputedResult):
         self.pos_df.attrs['subdivide_bin_size'] = value
 
 
+
+    @classmethod
+    def _compute_non_PBE_epochs_from_sess(cls, sess, track_identity: Optional[str]=None, interval_datasource_name: Optional[str]=None, **additional_df_metdata) -> pd.DataFrame:
+        """ Builds a dictionary of train/test-split epochs for ['long', 'short', 'global'] periods
+        
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _adding_global_non_PBE_epochs
+        
+        a_new_training_df, a_new_test_df, a_new_training_df_dict, a_new_test_df_dict = Compute_NonPBE_Epochs._compute_non_PBE_epochs_from_sess(sess=long_session)
+        a_new_training_df
+        a_new_test_df
+
+            
+        sess.pbe
+        sess.epochs
+        curr_active_pipeline.find_LongShortDelta_times()
+        
+        Usage:
+        
+            t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+            , t_start: float, t_delta: float, t_end: float
+        
+        """                
+        PBE_df: pd.DataFrame = ensure_dataframe(deepcopy(sess.pbe))
+        ## Build up a new epoch -- this works successfully for filter epochs as well, although 'maze' label is incorrect
+        epochs_df: pd.DataFrame = deepcopy(sess.epochs).epochs.adding_global_epoch_row()
+        global_epoch_only_df: pd.DataFrame = epochs_df.epochs.label_slice('maze')
+
+        # t_start, t_stop = epochs_df.epochs.t_start, epochs_df.epochs.t_stop
+        global_epoch_only_non_PBE_epoch_df: pd.DataFrame = global_epoch_only_df.epochs.subtracting(PBE_df)
+        global_epoch_only_non_PBE_epoch_df = global_epoch_only_non_PBE_epoch_df.epochs.modify_each_epoch_by(additive_factor=-0.008, final_output_minimum_epoch_duration=0.040)
+
+        # 'global'
+        # f'global_NonPBE_TRAIN'
+
+        df_metadata = {}
+        if track_identity is not None:
+            df_metadata['track_identity'] = track_identity
+        if interval_datasource_name is not None:
+            df_metadata['interval_datasource_name'] = interval_datasource_name
+            
+        df_metadata.update(**additional_df_metdata)        
+        # for a_df_metadata_key, a_v in additional_df_metdata.items():
+            
+
+        ## Add the metadata:
+        if len(df_metadata) > 0:
+            global_epoch_only_non_PBE_epoch_df = global_epoch_only_non_PBE_epoch_df.epochs.adding_or_updating_metadata(**df_metadata)
+        
+        ## Add the maze_id column to the epochs:
+        
+        # a_new_global_training_df = a_new_global_training_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
+        # a_new_global_test_df = a_new_global_test_df.epochs.adding_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
+
+        # maze_id_to_maze_name_map = {-1:'none', 0:'long', 1:'short'}
+        # a_new_global_training_df['maze_name'] = a_new_global_training_df['maze_id'].map(maze_id_to_maze_name_map)
+        # a_new_global_test_df['maze_name'] = a_new_global_test_df['maze_id'].map(maze_id_to_maze_name_map)
+        return global_epoch_only_non_PBE_epoch_df
+    
+
+
+
     @function_attributes(short_name=None, tags=['epochs', 'non-PBE', 'session'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-28 04:10', related_items=[]) 
     @classmethod
     def _adding_global_non_PBE_epochs_to_sess(cls, sess, t_start: float, t_delta: float, t_end: float, training_data_portion: float = 5.0/6.0) -> Tuple[Dict[types.DecoderName, pd.DataFrame], Dict[types.DecoderName, pd.DataFrame]]:
@@ -290,6 +353,8 @@ class Compute_NonPBE_Epochs(ComputedResult):
         global_epoch_only_non_PBE_epoch_df: pd.DataFrame = global_epoch_only_df.epochs.subtracting(PBE_df)
         global_epoch_only_non_PBE_epoch_df= global_epoch_only_non_PBE_epoch_df.epochs.modify_each_epoch_by(additive_factor=-0.008, final_output_minimum_epoch_duration=0.040)
         
+
+        ## this training/test isn't required:
         a_new_global_training_df, a_new_global_test_df = global_epoch_only_non_PBE_epoch_df.epochs.split_into_training_and_test(training_data_portion=training_data_portion, group_column_name ='label', additional_epoch_identity_column_names=['label'], skip_get_non_overlapping=False, debug_print=False) # a_laps_training_df, a_laps_test_df both comeback good here.
         ## Drop test epochs that are too short:
         a_new_global_test_df = a_new_global_test_df.epochs.modify_each_epoch_by(final_output_minimum_epoch_duration=0.100) # 100ms minimum test epochs
@@ -619,8 +684,6 @@ class Compute_NonPBE_Epochs(ComputedResult):
 
         
         """
-        
-        
         ## OUTPUTS: test_epoch_specific_decoded_results_dict, continuous_specific_decoded_results_dict
 
         ## INPUTS: new_decoder_dict
@@ -655,7 +718,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
         # global_pos_df: pd.DataFrame = deepcopy(global_session.position.to_dataframe()) #.rename(columns={'t':'t_rel_seconds'})
         
         ## Extract Measured Position:
-        global_pos_obj: Position = deepcopy(global_session.position)
+        global_pos_obj: "Position" = deepcopy(global_session.position)
         global_pos_df: pd.DataFrame = global_pos_obj.compute_higher_order_derivatives().position.compute_smoothed_position_info(N=15)
         global_pos_df.time_point_event.adding_epochs_identity_column(epochs_df=global_subivided_epochs_df, epoch_id_key_name='global_subdivision_idx', epoch_label_column_name='label', drop_non_epoch_events=True, should_replace_existing_column=True) # , override_time_variable_name='t_rel_seconds'
         
@@ -1122,6 +1185,17 @@ class KnownFilterEpochs(ExtendedEnum):
                     active_filter_epochs = active_filter_epochs[active_filter_epochs.duration >= min_epoch_included_duration] # only include those epochs which are greater than or equal to two decoding time bins
                 epoch_description_list = [f'{default_figure_name} {epoch_tuple.label}' for epoch_tuple in active_filter_epochs[['label']].itertuples()]
                 
+
+            elif filter_epochs.name == KnownFilterEpochs.NON_PBE.name:
+                active_filter_epochs = deepcopy(sess.non_PBE) # epoch object
+                if not isinstance(active_filter_epochs, pd.DataFrame):
+                    active_filter_epochs = active_filter_epochs.to_dataframe()
+                active_filter_epochs = active_filter_epochs.epochs.get_non_overlapping_df()
+                if min_epoch_included_duration is not None:
+                    active_filter_epochs = active_filter_epochs[active_filter_epochs.duration >= min_epoch_included_duration] # only include those epochs which are greater than or equal to two decoding time bins
+                epoch_description_list = [f'{default_figure_name} {epoch_tuple.label}' for epoch_tuple in active_filter_epochs[['label']].itertuples()]
+                
+
             else:
                 print(f'filter_epochs "{filter_epochs.name}" could not be parsed into KnownFilterEpochs but is string.')
                 raise NotImplementedError

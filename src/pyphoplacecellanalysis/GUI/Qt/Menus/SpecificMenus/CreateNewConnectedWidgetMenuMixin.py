@@ -78,7 +78,8 @@ class CreateNewConnectedWidgetMenuHelper(object):
             'actionDecoded_Epoch_Slices_Laps': CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='lap', display_output=display_output), ## MUST MATCH THE VALUES IN `KnownFilterEpochs` Launches in an external window
             'actionDecoded_Epoch_Slices_PBEs': CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='pbe', display_output=display_output), ## Launches in an external window
             'actionDecoded_Epoch_Slices_Ripple': CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='ripple', display_output=display_output), ## Launches in an external window
-            'actionDecoded_Epoch_Slices_Replay': CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='replay', display_output=display_output) ## Launches in an external window
+            'actionDecoded_Epoch_Slices_Replay': CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='replay', display_output=display_output), ## Launches in an external window
+            'actionDecoded_Epoch_Slices_NonPBEs': CreateNewStackedDecodedEpochSlicesPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, filter_epochs='non_pbe', display_output=display_output) ## Launches in an external window
         }
         
         for a_name, a_build_command in action_command_map.items():
@@ -135,12 +136,14 @@ class CreateNewConnectedWidgetMenuHelper(object):
             "actionDecoded_Epoch_Slices_PBEs",
             "actionDecoded_Epoch_Slices_Ripple",
             "actionDecoded_Epoch_Slices_Replay",
+            "actionDecoded_Epoch_Slices_NonPBEs",
             "actionDecoded_Epoch_Slices_Custom"]
 
             decoding_action_titles = ["Laps",
             "PBEs",
             "Ripple",
             "Replay",
+            "NonPBEs",
             "Custom..."]
 
             # curr_action_key = PhoMenuHelper.add_action_item(a_main_window, "Stacked Laps", name="actionDecoded_Epoch_Slices_Laps", actions_dict=a_main_window.ui.menus.global_window_menus.create_new_connected_widget.actions_dict)
