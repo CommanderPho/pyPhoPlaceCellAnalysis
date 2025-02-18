@@ -642,8 +642,10 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.render_window_duration = updated_val
         # TODO 2023-03-29 19:14: - [ ] need to set self.render_window_duration.timeWindow.window_duration = updated_val
         
-    @pyqtExceptionPrintingSlot(bool)
-    def on_crosshair_trace_toggled(self, updated_is_crosshair_trace_enabled):
+    # @pyqtExceptionPrintingSlot(bool)
+    def on_crosshair_trace_toggled(self):
+        # def on_crosshair_trace_toggled(self, updated_is_crosshair_trace_enabled):
+        updated_is_crosshair_trace_enabled: bool = self.ui.leftSideToolbarWidget.ui.btnToggleCrosshairTrace.isChecked()
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.on_crosshair_trace_toggled(updated_is_crosshair_trace_enabled: {updated_is_crosshair_trace_enabled})')
         old_value = self.params.is_crosshair_trace_enabled
@@ -677,8 +679,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
                 # self.spike_3d_to_2d_window_crosshair_connection = None
                 # delattr(self, 'spike_3d_to_2d_window_crosshair_connection') ## remove the attribute
 
-                
-        if self.spike_raster_plt_2d is not None:
+
+        if (self.spike_raster_plt_2d is not None):
             ## inform spike_raster_plt_2d that traces should be enabled
             self.spike_raster_plt_2d.toggle_crosshair_traces_enabled(updated_is_crosshair_trace_enabled)            
 
