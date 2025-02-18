@@ -265,6 +265,15 @@ class NonPBEDimensionalDecodingResult(UnpackableMixin, HDF_SerializationMixin, A
     subdivided_epochs_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = serialized_field()
 
 
+
+    @property
+    def a_result2D(self) -> DecodedFilterEpochsResult:
+        return self.subdivided_epochs_results['global']
+
+    @property
+    def a_new_global2D_decoder(self) -> BasePositionDecoder:
+        return self.decoders['global']
+
     def __attrs_post_init__(self):
         assert self.ndim in (1, 2), f"ndim must be 1 or 2, got {self.ndim}"
         
