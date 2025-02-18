@@ -694,14 +694,14 @@ def validate_has_non_PBE_epoch_results(curr_active_pipeline, computation_filter_
 class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     _computationGroupName = 'epoch_computations'
     _computationGlobalResultGroupName = 'EpochComputations'
-    _computationPrecidence = 1005
+    _computationPrecidence = 1006
     _is_global = True
 
     @function_attributes(short_name='non_PBE_epochs', tags=['epochs', 'nonPBE'],
                         input_requires=['DirectionalLaps'], output_provides=['EpochComputations'], uses=[], used_by=[], creation_date='2025-02-18 09:45', related_items=[],
         requires_global_keys=['DirectionalLaps'], provides_global_keys=['EpochComputations'],
         validate_computation_test=validate_has_non_PBE_epoch_results, is_global=True)
-    def perform_compute_non_PBE_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, training_data_portion: float=(5.0/6.0), epochs_decoding_time_bin_size: float = 0.020, subdivide_bin_size:float=0.200, drop_previous_result_and_compute_fresh:bool=False):
+    def perform_compute_non_PBE_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, training_data_portion: float=(5.0/6.0), epochs_decoding_time_bin_size: float = 0.020, subdivide_bin_size:float=0.200, compute_1D: bool = True, compute_2D: bool = True, drop_previous_result_and_compute_fresh:bool=False):
         """ Performs the computation of the spearman and pearson correlations for the ripple and lap epochs.
 
         Requires:
@@ -736,7 +736,8 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
 
         if ('EpochComputations' not in global_computation_results.computed_data) or (not hasattr(global_computation_results.computed_data, 'EpochComputations')):
             # initialize
-            global_computation_results.computed_data['EpochComputations'] = EpochComputationsComputationsContainer(a_new_NonPBE_Epochs_obj=None, results1D=None, results2D=None, is_global=True)
+            global_computation_results.computed_data['EpochComputations'] = EpochComputationsComputationsContainer(training_data_portion=training_data_portion, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, subdivide_bin_size=subdivide_bin_size,
+                                                                                                                   a_new_NonPBE_Epochs_obj=None, results1D=None, results2D=None, is_global=True)
 
         # global_computation_results.computed_data['EpochComputations'].included_qclu_values = included_qclu_values
         if (not hasattr(global_computation_results.computed_data['EpochComputations'], 'a_new_NonPBE_Epochs_obj') or (global_computation_results.computed_data['EpochComputations'].a_new_NonPBE_Epochs_obj is None)):
@@ -745,17 +746,16 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
             global_computation_results.computed_data['EpochComputations'].a_new_NonPBE_Epochs_obj = a_new_NonPBE_Epochs_obj
         else:
             ## get the existing one:
-            a_new_NonPBE_Epochs_obj = global_computation_results.computed_data['EpochComputations'].a_new_NonPBE_Epochs_obj
+            a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = global_computation_results.computed_data['EpochComputations'].a_new_NonPBE_Epochs_obj
         
         ## apply the new epochs to the session:
         owning_pipeline_reference.filtered_sessions[global_epoch_name].non_PBE = deepcopy(a_new_NonPBE_Epochs_obj.global_epoch_only_non_PBE_epoch_df)
 
-        results1D, results2D = a_new_NonPBE_Epochs_obj.compute_all(owning_pipeline_reference, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, subdivide_bin_size=subdivide_bin_size, compute_1D=True, compute_2D=True)
-            
-        if results1D is not None:
+        results1D, results2D = a_new_NonPBE_Epochs_obj.compute_all(owning_pipeline_reference, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, subdivide_bin_size=subdivide_bin_size, compute_1D=compute_1D, compute_2D=compute_2D)
+        if (results1D is not None) and compute_1D:
             global_computation_results.computed_data['SequenceBased'].results1D = results1D
 
-        if results2D is not None:
+        if (results2D is not None) and compute_2D:
             global_computation_results.computed_data['SequenceBased'].results2D = results2D
             
 
