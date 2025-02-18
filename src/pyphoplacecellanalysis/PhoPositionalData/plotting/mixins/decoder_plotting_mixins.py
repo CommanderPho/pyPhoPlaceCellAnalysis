@@ -129,10 +129,6 @@ class SingleArtistMultiEpochBatchHelpers:
     def a_new_global2D_decoder(self) -> BasePositionDecoder:
         return self.results2D.decoders['global']
 
-    # @property
-    # def a_result2D(self) -> DecodedFilterEpochsResult:
-    #     return self.results2D.subdivided_epochs_results['global']
-
     @property
     def desired_start_time_seconds(self) -> float:
         return self.desired_epoch_start_idx * self.subdivide_bin_size
@@ -1191,6 +1187,67 @@ class SingleArtistMultiEpochBatchHelpers:
         return track_shape_patch_collection_artists
 
 
+@function_attributes(short_name=None, tags=['multi-ax', 'inefficient'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-18 03:22', related_items=[])
+def multi_DecodedTrajectoryMatplotlibPlotter_side_by_side(a_result2D: DecodedFilterEpochsResult, a_new_global_decoder2D: BasePositionDecoder, global_session, n_axes: int = 10, posterior_masking_value: float = 0.020):
+    """ 
+    Usage:
+        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance, _perform_plot_matplotlib_2D_tracks
+        from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter
+        from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
+        from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import multi_DecodedTrajectoryMatplotlibPlotter_side_by_side
+
+        n_axes: int = 10
+        posterior_masking_value: float = 0.02 # for 2D
+        a_decoded_traj_plotter, (fig, axs, decoded_epochs_pages) = multi_DecodedTrajectoryMatplotlibPlotter_side_by_side(a_result2D=results2D.a_result2D, a_new_global_decoder2D=results2D.a_new_global2D_decoder,
+                                                                                                                        global_session=global_session, n_axes=n_axes, posterior_masking_value=posterior_masking_value)
+
+
+                                                                                                                  
+    """
+    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance, _perform_plot_matplotlib_2D_tracks
+    from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter
+    from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
+
+    # posterior_masking_value: float = 0.02 # for 2D
+
+    # n_axes: int = 25
+    ## INPUTS: directional_laps_results, decoder_ripple_filter_epochs_decoder_result_dict, a_result2D
+    xbin = deepcopy(a_new_global_decoder2D.xbin)
+    xbin_centers = deepcopy(a_new_global_decoder2D.xbin_centers)
+    ybin_centers = deepcopy(a_new_global_decoder2D.ybin_centers)
+    ybin = deepcopy(a_new_global_decoder2D.ybin)
+    num_filter_epochs: int = a_result2D.num_filter_epochs
+    a_decoded_traj_plotter = DecodedTrajectoryMatplotlibPlotter(a_result=a_result2D, xbin=xbin, xbin_centers=xbin_centers, ybin=ybin, ybin_centers=ybin_centers, rotate_to_vertical=True)
+    fig, axs, decoded_epochs_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(global_session, curr_num_subplots=n_axes, active_page_index=0, plot_actual_lap_lines=False, use_theoretical_tracks_instead=True, fixed_columns=n_axes)
+    # perform_update_title_subtitle(fig=fig, ax=None, title_string="DecodedTrajectoryMatplotlibPlotter - plot_decoded_trajectories_2d") # , subtitle_string="TEST - SUBTITLE"
+
+    # a_decoded_traj_plotter.fig = fig
+    # a_decoded_traj_plotter.axs = axes
+    ## INPUTS: desired_epoch_start_idx
+    # desired_epoch_start_idx: int = 0
+    desired_epoch_start_idx: int = 214
+    desired_epoch_end_idx: int = desired_epoch_start_idx + 10 ## 10 frames before the 8 minute mark
+    # desired_epoch_end_idx: int = 20
+    # desired_epoch_end_idx: int = int(round(1/subdivide_bin_size)) * 60 * 8 # 8 minutes
+    # desired_epoch_start_idx: int = desired_epoch_end_idx - 10 ## 10 frames before the 8 minute mark
+    print(f'desired_epoch_start_idx: {desired_epoch_start_idx}, desired_epoch_end_idx: {desired_epoch_end_idx}')
+
+    for i in np.arange(n_axes):
+        print(f'plotting epoch[{i}]')
+        ax = a_decoded_traj_plotter.axs[0][i]
+        # Disable autoscaling to prevent later additions from changing limits
+        # ax.set_autoscale_on(False)
+        an_epoch_idx: int = desired_epoch_start_idx + i
+        # a_decoded_traj_plotter.plot_epoch(an_epoch_idx=i, include_most_likely_pos_line=None, time_bin_index=None)
+        # a_decoded_traj_plotter.plot_epoch(an_epoch_idx=an_epoch_idx, time_bin_index=None, include_most_likely_pos_line=None, override_ax=ax, should_post_hoc_fit_to_image_extent=False, posterior_masking_value=posterior_masking_value, debug_print=False)
+        # a_decoded_traj_plotter.plot_epoch(an_epoch_idx=an_epoch_idx, override_plot_linear_idx=i, time_bin_index=0, include_most_likely_pos_line=None, posterior_masking_value=posterior_masking_value, override_ax=ax, should_post_hoc_fit_to_image_extent=False, debug_print=False)
+        a_decoded_traj_plotter.plot_epoch(an_epoch_idx=an_epoch_idx, override_plot_linear_idx=i, time_bin_index=None, include_most_likely_pos_line=None, posterior_masking_value=posterior_masking_value, override_ax=ax, should_post_hoc_fit_to_image_extent=False, debug_print=False) ## OVERRIDE Epoch IDX
+
+    a_decoded_traj_plotter.fig.canvas.draw_idle()
+
+    return a_decoded_traj_plotter, (fig, axs, decoded_epochs_pages)
+
+
 @define(slots=False)
 class DecodedTrajectoryPlotter:
     """ Abstract Base Class for something that plots a decoded 1D or 2D trajectory. 
@@ -1728,7 +1785,9 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         # Add Gradiant Measured Position (recorded laps) Line ________________________________________________________________ #         
         if (a_measured_pos_df is not None):
             a_meas_pos_line, _meas_pos_out_markers = cls._perform_plot_measured_position_line_helper(an_ax, a_measured_pos_df, a_time_bin_centers, fake_y_lower_bound, fake_y_upper_bound, rotate_to_vertical=rotate_to_vertical, debug_print=debug_print)
-               
+        else:
+            a_meas_pos_line = None
+            _meas_pos_out_markers = None
             
         # Add Gradient Most Likely Position Line _____________________________________________________________________________ #
         if include_most_likely_pos_line:
@@ -2058,8 +2117,6 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
         slider_epoch_kwargs = dict()
         if self.enable_plot_all_time_bins_in_epoch_mode:
             slider_epoch_kwargs = slider_epoch_kwargs | dict(event_type="always")
-
-        
 
         if self.slider_epoch is None:
             def _on_slider_value_did_change_epoch_idx(value):
