@@ -52,8 +52,7 @@ from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import Mat
 from neuropy.utils.mixins.dict_representable import overriding_dict_with # required for safely_accepts_kwargs
 from pyphocorehelpers.geometry_helpers import point_tuple_mid_point, BoundsRect, is_point_in_rect
 
-
- 
+from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.EpochRenderTimebinSelectorWidget.EpochRenderTimebinSelectorWidget import EpochTimebinningIndexingDatasource # used in `DecodedTrajectoryPlotter` to conform to `EpochTimebinningIndexingDatasource` protocol
 
 
 @define(slots=False, eq=False)
@@ -91,12 +90,34 @@ class SingleArtistMultiEpochBatchHelpers:
         spike_raster_plt_2d: Spike2DRaster = spike_raster_window.spike_raster_plt_2d
         track_ts_widget, track_fig, track_ax_list = spike_raster_plt_2d.add_new_matplotlib_render_plot_widget(name=track_name)
         track_ax = track_ax_list[0]
-        batch_plot_helper: SingleArtistMultiEpochBatchHelpers = SingleArtistMultiEpochBatchHelpers(active_ax=track_ax, ...)
-        
-        ## sync up the widgets
-        spike_raster_plt_2d.sync_matplotlib_render_plot_widget(track_name, sync_mode=SynchronizedPlotMode.TO_WINDOW)
+        desired_epoch_start_idx: int = 0
+        # desired_epoch_end_idx: int = int(round(1/subdivide_bin_size)) * 60 * 8 # 8 minutes
+        desired_epoch_end_idx: Optional[int] = None
 
+        ## INPUTS: subdivide_bin_size, results2D
+        batch_plot_helper: SingleArtistMultiEpochBatchHelpers = SingleArtistMultiEpochBatchHelpers(results2D=results2D, active_ax=track_ax, subdivide_bin_size=subdivide_bin_size, desired_epoch_start_idx=desired_epoch_start_idx, desired_epoch_end_idx=desired_epoch_end_idx)
+        plots_data = batch_plot_helper.add_all_track_plots(global_session=global_session)
         
+    
+            
+    Usage -- Individual Components:
+        desired_epoch_start_idx: int = 0
+        # desired_epoch_end_idx: int = int(round(1/subdivide_bin_size)) * 60 * 8 # 8 minutes
+        desired_epoch_end_idx: Optional[int] = None
+
+        ## INPUTS: subdivide_bin_size, results2D
+        batch_plot_helper: SingleArtistMultiEpochBatchHelpers = SingleArtistMultiEpochBatchHelpers(results2D=results2D, active_ax=track_ax, subdivide_bin_size=subdivide_bin_size, desired_epoch_start_idx=desired_epoch_start_idx, desired_epoch_end_idx=desired_epoch_end_idx)
+
+        batch_plot_helper.shared_build_flat_stacked_data(force_recompute=True, debug_print=True)
+
+        track_shape_patch_collection_artists = batch_plot_helper.add_track_shapes(global_session=global_session, override_ax=None) ## does not seem to successfully synchronize to window
+        # track_shape_patch_collection_artists = batch_plot_helper.add_track_shapes(global_session=global_session, override_ax=track_shapes_dock_track_ax) ## does not seem to successfully synchronize to window
+
+        measured_pos_line_artist, subdivision_epoch_separator_vlines = batch_plot_helper.add_track_positions(override_ax=None)
+        # measured_pos_line_artist, subdivision_epoch_separator_vlines = batch_plot_helper.add_track_positions(override_ax=measured_pos_dock_track_ax)
+
+        curr_artist_dict, image_extent, plots_data = batch_plot_helper.add_position_posteriors(posterior_masking_value=0.0025, override_ax=None, debug_print=True, defer_draw=False)
+
     """
     results2D: "NonPBEDimensionalDecodingResult" = field()    
 
@@ -1249,7 +1270,7 @@ def multi_DecodedTrajectoryMatplotlibPlotter_side_by_side(a_result2D: DecodedFil
 
 
 @define(slots=False)
-class DecodedTrajectoryPlotter:
+class DecodedTrajectoryPlotter(EpochTimebinningIndexingDatasource):
     """ Abstract Base Class for something that plots a decoded 1D or 2D trajectory. 
     
     """
@@ -1271,6 +1292,32 @@ class DecodedTrajectoryPlotter:
         return len(self.a_result.time_bin_containers[self.curr_epoch_idx].centers)
 
 
+    # ==================================================================================================================== #
+    # EpochTimebinningIndexingDatasource Conformances                                                                      #
+    # ==================================================================================================================== #
+    @function_attributes(short_name=None, tags=['EpochTimebinningIndexingDatasource'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-18 05:15', related_items=['EpochTimebinningIndexingDatasource'])
+    def get_epochs(self) -> NDArray:
+        """ returns the number of time_bins for the specified epoch index """
+        return np.arange(self.num_filter_epochs)
+        
+    @function_attributes(short_name=None, tags=['EpochTimebinningIndexingDatasource'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-18 05:15', related_items=['EpochTimebinningIndexingDatasource'])
+    def get_num_epochs(self) -> int:
+        """ returns the number of time_bins for the specified epoch index """
+        return self.num_filter_epochs
+        
+
+    @function_attributes(short_name=None, tags=['EpochTimebinningIndexingDatasource'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-18 05:15', related_items=['EpochTimebinningIndexingDatasource'])
+    def get_time_bins_for_epoch_index(self, an_epoch_idx: int) -> NDArray:
+        """ returns the number of time_bins for the specified epoch index """
+        if self.a_result is None:
+            return [] # None
+        if an_epoch_idx is None:
+            return [] # None
+            
+        time_bin_centers = self.a_result.time_bin_containers[an_epoch_idx].centers
+        n_curr_time_bins: int = len(time_bin_centers)
+        return np.arange(n_curr_time_bins)
+    
 
 
 @define(slots=False)
@@ -2065,7 +2112,7 @@ from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.PhoInteractivePlotter
 from pyphoplacecellanalysis.Pho3D.PyVista.graphs import plot_3d_binned_bars, plot_3d_stem_points, plot_point_labels
 
 
-@define(slots=False)
+@define(slots=False, eq=False)
 class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
     """ plots a decoded trajectory (path) using pyvista in 3D. 
     
@@ -2200,11 +2247,6 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
             self.slider_epoch.GetRepresentation().SetValue(int(value)) # set to 0
             self.on_update_slider_epoch_idx(value=int(value))
             print(f'\tdone.')
-
-
-
-
-
 
     def on_update_slider_epoch_idx(self, value: int):
         """ called when the epoch_idx slider changes. 

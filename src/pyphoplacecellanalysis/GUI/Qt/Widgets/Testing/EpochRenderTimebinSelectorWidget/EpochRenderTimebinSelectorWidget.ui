@@ -354,6 +354,9 @@ QToolButton:!checked{
           <property name="keyboardTracking">
            <bool>false</bool>
           </property>
+          <property name="maximum">
+           <number>99999</number>
+          </property>
          </widget>
         </item>
        </layout>
@@ -381,7 +384,7 @@ QToolButton:!checked{
        </widget>
       </item>
       <item>
-       <layout class="QHBoxLayout" name="horizontalLayout_4" stretch="0,1">
+       <layout class="QHBoxLayout" name="horizontalLayout_4" stretch="0,1,0,0">
         <item>
          <widget class="QLabel" name="label">
           <property name="text">
@@ -391,6 +394,9 @@ QToolButton:!checked{
         </item>
         <item>
          <widget class="QSpinBox" name="spinBox_TimeBinIndex">
+          <property name="enabled">
+           <bool>true</bool>
+          </property>
           <property name="toolTip">
            <string>Time Bin Index</string>
           </property>
@@ -411,6 +417,38 @@ QToolButton:!checked{
           </property>
           <property name="keyboardTracking">
            <bool>false</bool>
+          </property>
+          <property name="maximum">
+           <number>999999</number>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="horizontalSpacer">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>5</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="checkBox_allTimeBinIndexes">
+          <property name="toolTip">
+           <string>Use All time bins within the epoch</string>
+          </property>
+          <property name="statusTip">
+           <string>Use All time bins within the epoch</string>
+          </property>
+          <property name="whatsThis">
+           <string>Use All time bins within the epoch</string>
+          </property>
+          <property name="text">
+           <string>all</string>
           </property>
          </widget>
         </item>
@@ -483,6 +521,38 @@ QToolButton:!checked{
     <hint type="destinationlabel">
      <x>69</x>
      <y>86</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>checkBox_allTimeBinIndexes</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>spinBox_TimeBinIndex</receiver>
+   <slot>setDisabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>170</x>
+     <y>122</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>106</x>
+     <y>121</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>checkBox_allTimeBinIndexes</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>horizontalSlider_TimeBinIndex</receiver>
+   <slot>setDisabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>170</x>
+     <y>122</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>108</x>
+     <y>144</y>
     </hint>
    </hints>
   </connection>
