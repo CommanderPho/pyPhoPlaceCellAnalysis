@@ -317,6 +317,13 @@ class Compute_NonPBE_Epochs:
     
 
     # subdivide_bin_size: float = 0.5
+    @property
+    def subdivide_bin_size(self) -> float:
+        """The subdivide_bin_size property."""
+        return self.pos_df.attrs['subdivide_bin_size']
+    @subdivide_bin_size.setter
+    def subdivide_bin_size(self, value):
+        self.pos_df.attrs['subdivide_bin_size'] = value
 
 
     @function_attributes(short_name=None, tags=['epochs', 'non-PBE'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-28 04:10', related_items=[]) 
