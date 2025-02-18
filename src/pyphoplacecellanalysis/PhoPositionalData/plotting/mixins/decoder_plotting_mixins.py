@@ -367,7 +367,7 @@ class SingleArtistMultiEpochBatchHelpers:
         Corresponding to `#### 2025-02-14 - Perform plotting of Decoded Posteriors` in notebook
         
         
-        curr_artist_dict, image_extent, plots_data = 
+        curr_artist_dict, image_extent, plots_data = batch_plot_helper.add_position_posteriors(posterior_masking_value=0.0025, debug_print=True, defer_draw=False)
         """
         if not self.has_data_been_built:
             ## finalize building the data for single-artist plotting (does not plot anything)
@@ -392,12 +392,10 @@ class SingleArtistMultiEpochBatchHelpers:
         # stacked_flat_ybin_centers = self.stacked_flat_ybin_centers
         # stacked_flat_time_bin_centers = self.stacked_flat_time_bin_centers
         # stacked_p_x_given_n = self.stacked_p_x_given_n
-
-
-        self.stacked_flat_global_pos_df = self.stacked_flat_global_pos_df
-        desired_time_duration = self.desired_time_duration
-        self.desired_start_time_seconds = self.desired_start_time_seconds
-        self.desired_end_time_seconds = self.desired_end_time_seconds
+        # self.stacked_flat_global_pos_df = self.stacked_flat_global_pos_df
+        # desired_time_duration = self.desired_time_duration
+        # self.desired_start_time_seconds = self.desired_start_time_seconds
+        # self.desired_end_time_seconds = self.desired_end_time_seconds
 
         # results2D
 
@@ -529,11 +527,18 @@ class SingleArtistMultiEpochBatchHelpers:
     # ==================================================================================================================== #
 
     @function_attributes(short_name=None, tags=['track_shapes'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-17 11:31', related_items=[])
-    def add_track_shapes(self, global_session, defer_draw:bool=False):
+    def add_track_shapes(self, global_session, override_ax=None, debug_print:bool=True, defer_draw:bool=False):
         """ 
         global_session: needed to build track shapes
         
         
+        Uses:
+        
+            self.track_all_normalized_rect_arr_dict
+            self.inverse_normalized_track_all_rect_arr_dict
+        
+            
+            
         track_shape_patch_collection_artists = batch_plot_helper.add_track_shapes(global_session=global_session)
         
         Usage:
@@ -541,12 +546,16 @@ class SingleArtistMultiEpochBatchHelpers:
         
         """
         from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager, long_short_display_config_manager
-        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance, _perform_plot_matplotlib_2D_tracks
+        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
+
+        if override_ax is None:
+            active_ax = self.active_ax
+        else:
+            active_ax = override_ax
 
         rotate_to_vertical: bool = True
         perform_autoscale: bool = False
         
-
         ## INPUTS: track_ax, rotate_to_vertical, perform_autoscale
         # subdivide_bin_size: float = self.subdivide_bin_size
         ## Slice a subset of the data epochs:
@@ -558,7 +567,15 @@ class SingleArtistMultiEpochBatchHelpers:
         else:
             raise NotImplementedError('oops')
         print(f'desired_epoch_start_idx: {desired_epoch_start_idx}, desired_epoch_end_idx: {desired_epoch_end_idx}')
+        filtered_epoch_range: NDArray = np.arange(start=desired_epoch_start_idx, stop=desired_epoch_end_idx)
+        filtered_num_horizontal_repeats: int = len(filtered_epoch_range)
+        filtered_num_output_rect_total_elements: int = filtered_num_horizontal_repeats * 3 # 3 parts to each track plot
+        ## OUTPUTS: filtered_epoch_range, filtered_num_horizontal_repeats, filtered_num_output_rect_total_elements
+        if debug_print:
+            print(f'filtered_num_output_rect_total_elements: {filtered_num_output_rect_total_elements}')
         
+
+
         num_horizontal_repeats: int = self.num_horizontal_repeats
         # ==================================================================================================================== #
         # BEGIN FUNCTION BODY                                                                                                  #
@@ -583,7 +600,7 @@ class SingleArtistMultiEpochBatchHelpers:
 
         long_rects = long_track_inst.build_rects(include_rendering_properties=False, rotate_to_vertical=rotate_to_vertical)
         short_rects = short_track_inst.build_rects(include_rendering_properties=False, rotate_to_vertical=rotate_to_vertical)
-        track_single_rects_dict = {'long': long_rects, 'short': short_rects}
+        self.track_single_rects_dict = {'long': long_rects, 'short': short_rects}
 
         # long_path = _build_track_1D_verticies(platform_length=22.0, track_length=170.0, track_1D_height=1.0, platform_1D_height=1.1, track_center_midpoint_x=long_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=-1.0, debug_print=True)
         # short_path = _build_track_1D_verticies(platform_length=22.0, track_length=100.0, track_1D_height=1.0, platform_1D_height=1.1, track_center_midpoint_x=short_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=1.0, debug_print=True)
@@ -603,9 +620,9 @@ class SingleArtistMultiEpochBatchHelpers:
 
 
         # num_horizontal_repeats: int = 20 ## hardcoded
-        track_all_normalized_rect_arr_dict = SingleArtistMultiEpochBatchHelpers.track_dict_all_stacked_rect_arr_normalization(track_single_rects_dict, num_horizontal_repeats=num_horizontal_repeats)
+        self.track_all_normalized_rect_arr_dict = SingleArtistMultiEpochBatchHelpers.track_dict_all_stacked_rect_arr_normalization(self.track_single_rects_dict, num_horizontal_repeats=num_horizontal_repeats)
         ## INPUTS: filtered_num_horizontal_repeats
-        inverse_normalized_track_all_rect_arr_dict = SingleArtistMultiEpochBatchHelpers.track_dict_all_stacked_rect_arr_inverse_normalization(track_all_normalized_rect_arr_dict, ax=self.active_ax, num_active_horizontal_repeats=num_horizontal_repeats)
+        self.inverse_normalized_track_all_rect_arr_dict = SingleArtistMultiEpochBatchHelpers.track_dict_all_stacked_rect_arr_inverse_normalization(self.track_all_normalized_rect_arr_dict, ax=active_ax, num_active_horizontal_repeats=num_horizontal_repeats)
 
         ## OUTPUTS: track_all_normalized_rect_arr_dict, inverse_normalized_track_all_rect_arr_dict
         # track_all_normalized_rect_arr_dict
@@ -616,26 +633,25 @@ class SingleArtistMultiEpochBatchHelpers:
         # desired_epoch_end_idx: int = int(round(1/subdivide_bin_size)) * 60 * 8 # 8 minutes
         # print(f'desired_epoch_start_idx: {desired_epoch_start_idx}, desired_epoch_end_idx: {desired_epoch_end_idx}')
 
-        filtered_epoch_range = np.arange(start=desired_epoch_start_idx, stop=desired_epoch_end_idx)
-        filtered_num_horizontal_repeats: int = len(filtered_epoch_range)
-        filtered_num_output_rect_total_elements: int = filtered_num_horizontal_repeats * 3 # 3 parts to each track plot
-        ## OUTPUTS: filtered_epoch_range, filtered_num_horizontal_repeats, filtered_num_output_rect_total_elements
-        filtered_num_output_rect_total_elements
 
-        track_all_rect_arr_dict = {k:v[(desired_epoch_start_idx*3):(desired_epoch_end_idx*3), :] for k, v in track_all_normalized_rect_arr_dict.items()}
+
+        track_all_rect_arr_dict = {k:v[(desired_epoch_start_idx*3):(desired_epoch_end_idx*3), :] for k, v in self.track_all_normalized_rect_arr_dict.items()}
         # track_all_rect_arr_dict = {k:v[desired_epoch_start_idx:desired_epoch_end_idx, :] for k, v in track_all_rect_arr_dict.items()}
         # track_all_rect_arr_dict
 
         ## INPUTS: filtered_num_horizontal_repeats
-        inverse_normalized_track_all_rect_arr_dict = SingleArtistMultiEpochBatchHelpers.track_dict_all_stacked_rect_arr_inverse_normalization(track_all_rect_arr_dict, ax=self.active_ax, num_active_horizontal_repeats=filtered_num_horizontal_repeats)
+        self.inverse_normalized_track_all_rect_arr_dict = SingleArtistMultiEpochBatchHelpers.track_dict_all_stacked_rect_arr_inverse_normalization(track_all_rect_arr_dict, ax=active_ax, num_active_horizontal_repeats=filtered_num_horizontal_repeats)
         ## OUTPUTS: inverse_normalized_track_all_rect_arr_dict
         ## INPUTS: track_kwargs_dict, inverse_normalized_track_all_rect_arr_dict
-        track_shape_patch_collection_artists = SingleArtistMultiEpochBatchHelpers.add_batch_track_shapes(ax=self.active_ax, inverse_normalized_track_all_rect_arr_dict=inverse_normalized_track_all_rect_arr_dict, track_kwargs_dict=track_kwargs_dict) # start (x0: 0.0, 20 of them span to exactly x=1.0)
-        # track_shape_patch_collection_artists = SingleArtistMultiEpochBatchHelpers.add_batch_track_shapes(ax=ax, inverse_normalized_track_all_rect_arr_dict=inverse_normalized_track_all_rect_arr_dict, track_kwargs_dict=track_kwargs_dict, transform=ax.transData) # start (x0: 31.0, 20 of them span to about x=1000.0)
-        # track_shape_patch_collection_artists = SingleArtistMultiEpochBatchHelpers.add_batch_track_shapes(ax=ax, inverse_normalized_track_all_rect_arr_dict=inverse_normalized_track_all_rect_arr_dict, track_kwargs_dict=track_kwargs_dict, transform=ax.transAxes) # start (x0: 31.0, 20 of them span to about x=1000.0)
+        track_shape_patch_collection_artists = SingleArtistMultiEpochBatchHelpers.add_batch_track_shapes(ax=active_ax, inverse_normalized_track_all_rect_arr_dict=self.inverse_normalized_track_all_rect_arr_dict, track_kwargs_dict=track_kwargs_dict) # start (x0: 0.0, 20 of them span to exactly x=1.0)
+        # track_shape_patch_collection_artists = SingleArtistMultiEpochBatchHelpers.add_batch_track_shapes(ax=active_ax, inverse_normalized_track_all_rect_arr_dict=inverse_normalized_track_all_rect_arr_dict, track_kwargs_dict=track_kwargs_dict, transform=ax.transData) # start (x0: 31.0, 20 of them span to about x=1000.0)
+        # track_shape_patch_collection_artists = SingleArtistMultiEpochBatchHelpers.add_batch_track_shapes(ax=active_ax, inverse_normalized_track_all_rect_arr_dict=inverse_normalized_track_all_rect_arr_dict, track_kwargs_dict=track_kwargs_dict, transform=ax.transAxes) # start (x0: 31.0, 20 of them span to about x=1000.0)
         
         if not defer_draw:
-            self.redraw()
+            if override_ax is None:
+                self.redraw()
+            else:
+                override_ax.get_figure().canvas.draw_idle()
 
         return track_shape_patch_collection_artists
 
