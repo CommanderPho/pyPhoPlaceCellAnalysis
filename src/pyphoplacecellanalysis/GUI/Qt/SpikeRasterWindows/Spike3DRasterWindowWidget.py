@@ -1111,8 +1111,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         """
         print(f'spikes_raster_window._perform_build_attached_visible_interval_info_widget()')
         
-
-        is_visible: bool = self.right_sidebar_widget.getVisible() 
+        is_visible: bool = self.right_sidebar_widget.isVisible() 
         if not is_visible:
             print(f'\tright_sidebar_widget is not Visible, so skipping `._perform_build_attached_visible_interval_info_widget()` update.')
             return None, None
