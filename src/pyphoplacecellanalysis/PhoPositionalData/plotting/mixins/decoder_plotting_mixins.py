@@ -348,7 +348,35 @@ class SingleArtistMultiEpochBatchHelpers:
         y = self.stacked_flat_global_pos_df[y_axis_col_name].to_numpy() ## needs to be inversely mapped from 0, 1        
 
         measured_pos_line_artist = active_ax.plot(x, y, color='r', label='measured_pos')[0]
-        
+
+
+        # ==================================================================================================================== #
+        # New 2025-02-18 01:17                                                                                                 #
+        # ==================================================================================================================== #
+        time_cmap_start_end_colors = [(0, 0.6, 0), (0, 0, 0)]  # first is green, second is black
+        time_cmap = LinearSegmentedColormap.from_list("GreenToBlack", time_cmap_start_end_colors, N=25) # Create a colormap (green to black).
+
+        stacked_flat_global_pos_df = SingleArtistMultiEpochBatchHelpers.add_color_over_global_subdivision_idx_positions_to_stacked_flat_global_pos_df(stacked_flat_global_pos_df=stacked_flat_global_pos_df, time_cmap=time_cmap)
+        # stacked_flat_global_pos_df
+        new_stacked_flat_global_pos_df = SingleArtistMultiEpochBatchHelpers.add_nan_masked_rows_to_stacked_flat_global_pos_df(stacked_flat_global_pos_df=stacked_flat_global_pos_df)
+        # new_stacked_flat_global_pos_df, color_formatting_dict = add_nan_masked_rows_to_stacked_flat_global_pos_df(stacked_flat_global_pos_df=stacked_flat_global_pos_df)
+
+        # active_stacked_flat_global_pos_df = deepcopy(stacked_flat_global_pos_df)
+        active_stacked_flat_global_pos_df = deepcopy(new_stacked_flat_global_pos_df)
+        # extracted_colors_arr_flat: NDArray = active_stacked_flat_global_pos_df['color'].to_numpy()
+        extracted_colors_arr: NDArray = np.array(active_stacked_flat_global_pos_df['color'].to_list()).astype(float) # .shape # (16299, 4)
+
+
+        # extracted_colors_arr.T.shape # (16299,)
+        # a_time_bin_centers = deepcopy(active_stacked_flat_global_pos_df['t'].to_numpy().astype(float))
+        # a_time_bin_centers
+
+        measured_pos_dock_track_ax = active_ax
+        measured_pos_dock_track_ax.set_facecolor('white')
+        measured_pos_line_artist = measured_pos_dock_track_ax.scatter(active_stacked_flat_global_pos_df["global_subdivision_x_data_offset"], active_stacked_flat_global_pos_df["y_scaled"], color=active_stacked_flat_global_pos_df["color"].tolist())
+        measured_pos_line_artist
+
+
         # y_axis_kwargs = dict(ymin=0.0, ymax=1.0)
         y_axis_kwargs = dict(ymin=self.xbin_edges[0], ymax=self.xbin_edges[-1])
         subdivision_epoch_separator_vlines = active_ax.vlines(self.results2D.subdivided_epochs_df['start'].to_numpy(), **y_axis_kwargs, colors='white', linestyles='solid', label='subdivision_epoch_separator_vlines') # , data=None
@@ -697,6 +725,10 @@ class SingleArtistMultiEpochBatchHelpers:
     @function_attributes(short_name=None, tags=['masked_rows', 'nan', 'position_lines', 'stacked_flat_global_pos_df'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-17 23:56', related_items=[])
     def add_nan_masked_rows_to_stacked_flat_global_pos_df(cls, stacked_flat_global_pos_df: pd.DataFrame) -> pd.DataFrame:
         """ seperates each 'global_subdivision_idx' change in the df by adding two NaN rows with ['is_masked_bin'] = True 
+
+        stacked_flat_global_pos_df['global_subdivision_idx'] ## find rows in the dataframe where the 'global_subdivision_idx' column changes values
+        ## insert a new row into the dataframe between the two changing rows: where the new row's 't' = (prev_row_t + 1e-6)
+
         Usage:
         
             new_stacked_flat_global_pos_df = SingleArtistMultiEpochBatchHelpers.add_nan_masked_rows_to_stacked_flat_global_pos_df(stacked_flat_global_pos_df=stacked_flat_global_pos_df)
@@ -756,7 +788,8 @@ class SingleArtistMultiEpochBatchHelpers:
             dfs.append(row.to_frame().T)
             prev = row
             
-        new_stacked_flat_global_pos_df = pd.concat(dfs, ignore_index=True)
+        new_stacked_flat_global_pos_df = pd.concat(dfs, ignore_index=True).infer_objects()
+        ## convert columns back from 'object' to 'float64'
         return new_stacked_flat_global_pos_df
 
     @classmethod
@@ -1499,19 +1532,22 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         
         Returns a tuple (a_meas_pos_line, _meas_pos_out_markers) that are produced by the gradient line helper.
         """
+        # a_valid_only_measured_pos_df = deepcopy(a_measured_pos_df)
+        a_valid_only_measured_pos_df = deepcopy(a_measured_pos_df).dropna(subset=['t','x','y'])
+
         # Get measured time bins from the dataframe
-        a_measured_time_bin_centers: NDArray = np.atleast_1d([np.squeeze(a_measured_pos_df['t'].to_numpy())])
+        a_measured_time_bin_centers: NDArray = np.atleast_1d([np.squeeze(a_valid_only_measured_pos_df['t'].to_numpy())]).astype(float)
         # Determine X and Y positions based on dimensionality.
         if rotate_to_vertical is False:
             # 1D: construct fake y values.
-            measured_fake_y_num_samples: int = len(a_measured_pos_df)
+            measured_fake_y_num_samples: int = len(a_valid_only_measured_pos_df)
             measured_fake_y_arr = np.linspace(fake_y_lower_bound, fake_y_upper_bound, measured_fake_y_num_samples)
-            x = np.atleast_1d([a_measured_pos_df['x'].to_numpy()])
-            y = np.atleast_1d([measured_fake_y_arr])
+            x = np.atleast_1d([a_valid_only_measured_pos_df['x'].to_numpy()]).astype(float)
+            y = np.atleast_1d([measured_fake_y_arr]).astype(float)
         else:
             # 2D: take columns as is.
-            x = np.squeeze(a_measured_pos_df['x'].to_numpy())
-            y = np.squeeze(a_measured_pos_df['y'].to_numpy())
+            x = np.squeeze(a_valid_only_measured_pos_df['x'].to_numpy()).astype(float)
+            y = np.squeeze(a_valid_only_measured_pos_df['y'].to_numpy()).astype(float)
         
         # If in single-time-bin mode, restrict positions to those with t <= current time bin center.
         # n_time_bins: int = len(a_time_bin_centers)
@@ -1521,9 +1557,9 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         # For now, we only handle the non-restricted case.
         
         # Squeeze arrays down to rank 1.
-        a_measured_time_bin_centers = np.squeeze(a_measured_time_bin_centers)
-        x = np.squeeze(x)
-        y = np.squeeze(y)
+        a_measured_time_bin_centers = np.squeeze(a_measured_time_bin_centers).astype(float)
+        x = np.squeeze(x).astype(float)
+        y = np.squeeze(y).astype(float)
         if debug_print:
             print(f'\tFinal Shapes:')
             print(f'\tnp.shape(x): {np.shape(x)}, np.shape(y): {np.shape(y)}, np.shape(a_measured_time_bin_centers): {np.shape(a_measured_time_bin_centers)}')
