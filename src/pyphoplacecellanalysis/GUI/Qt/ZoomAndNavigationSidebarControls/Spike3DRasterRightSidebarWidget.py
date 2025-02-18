@@ -125,6 +125,7 @@ class SpikeRasterRightSidebarOwningMixin:
 
     @pyqtExceptionPrintingSlot(bool)
     def set_right_sidebar_visibility(self, is_visible:bool):
+        """ called when the right sidebar is made Visible or non_visible"""
         self.right_sidebar_widget.setVisible(is_visible) 
 
     @pyqtExceptionPrintingSlot()

@@ -1110,126 +1110,132 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
         """
         print(f'spikes_raster_window._perform_build_attached_visible_interval_info_widget()')
-        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DockDisplayColors, CustomDockDisplayConfig
-        from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.StackedDynamicTablesWidget import TableManager
-            
         
-        ## get the updated data:
-        # included_series_names=['Replays', 'Laps', 'PBEs']
-        included_series_names=None
-        dataframes_dict: Dict[str, pd.DataFrame] = self.find_event_intervals_in_active_window(included_series_names=included_series_names)
 
-        ## see if widgets need to be build or can just be updated:
-        needs_init: bool = False
-        
-        if (not hasattr(self.ui.rightSideContainerWidget.ui, 'visible_intervals_info_widget_container')):
-            needs_init = True
+        is_visible: bool = self.right_sidebar_widget.getVisible() 
+        if not is_visible:
+            print(f'\tright_sidebar_widget is not Visible, so skipping `._perform_build_attached_visible_interval_info_widget()` update.')
+            return None, None
         else:
-            if (self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container is None):
+            from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DockDisplayColors, CustomDockDisplayConfig
+            from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.StackedDynamicTablesWidget import TableManager
+                            
+            ## get the updated data:
+            # included_series_names=['Replays', 'Laps', 'PBEs']
+            included_series_names=None
+            dataframes_dict: Dict[str, pd.DataFrame] = self.find_event_intervals_in_active_window(included_series_names=included_series_names)
+
+            ## see if widgets need to be build or can just be updated:
+            needs_init: bool = False
+            
+            if (not hasattr(self.ui.rightSideContainerWidget.ui, 'visible_intervals_info_widget_container')):
                 needs_init = True
+            else:
+                if (self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container is None):
+                    needs_init = True
 
 
-        if needs_init:
-            if self.debug_print:
-                print(f'\t has no .visible_intervals_info_widget_container so NEEDS INIT!')
-            assert not hasattr(self.ui.rightSideContainerWidget.ui, 'visible_intervals_info_widget_container')
-            self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container = {} # initialize
+            if needs_init:
+                if self.debug_print:
+                    print(f'\t has no .visible_intervals_info_widget_container so NEEDS INIT!')
+                assert not hasattr(self.ui.rightSideContainerWidget.ui, 'visible_intervals_info_widget_container')
+                self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container = {} # initialize
+                
+                ## Render in right sidebar:
+                updated_ui_dict = {'ctrl_layout': None, 'dynamic_tables_container_widget': None, 'dynamic_tables_container_VBoxLayout': None, 'bottom_spacer_widget': None, 'manager': None} # , 'tables_dict': {}
+                root_ctrl_layout_widget = pg.LayoutWidget() ## ROOT layout widget
+                updated_ui_dict['ctrl_layout'] = root_ctrl_layout_widget
+
+                # Main Tables container:
+                updated_ui_dict['dynamic_tables_container_widget'] = pg.QtWidgets.QWidget()
+                updated_ui_dict['dynamic_tables_container_widget'].setObjectName('tables_container')
+                updated_ui_dict['dynamic_tables_container_widget'].setSizePolicy(pg.QtWidgets.QSizePolicy.Expanding, pg.QtWidgets.QSizePolicy.Expanding)
+
+                manager = TableManager(updated_ui_dict['dynamic_tables_container_widget'])
+                updated_ui_dict['manager'] = manager
+
+                tables_layout = manager.wrapper_layout
+                tables_layout.setObjectName('tables_container_VBoxLayout')
+                updated_ui_dict['dynamic_tables_container_VBoxLayout'] = tables_layout
+
+
+                ## add the table vertical layout:
+                root_ctrl_layout_widget.addWidget(updated_ui_dict['dynamic_tables_container_widget'], row=1, col=1)
+                # Add permanent expanding spacer at the bottom
+                # Create an empty widget and set its size policy to expanding
+                bottom_spacer_widget = pg.QtWidgets.QWidget()
+                bottom_spacer_widget.setObjectName('bottom_spacer')
+                bottom_spacer_widget.setSizePolicy(pg.QtWidgets.QSizePolicy.Expanding, pg.QtWidgets.QSizePolicy.Expanding)
+
+                updated_ui_dict['bottom_spacer_widget'] = bottom_spacer_widget # pg.QtWidgets.QSpacerItem(0, 0, pg.QtWidgets.QSizePolicy.Minimum, pg.QtWidgets.QSizePolicy.Expanding)
+                # ctrl_layout.layout.addItem(spacer, ctrl_layout.layout.rowCount(), 0, 1, 1)
+                root_ctrl_layout_widget.addWidget(updated_ui_dict['bottom_spacer_widget'], row=2, col=1)
+
+                manager.update_tables(dataframes_dict)
+
+                self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container = updated_ui_dict # {k:v for k, v in updated_ui_dict.items()}
+                if self.debug_print:
+                    print(f'\t done.')
+                # VisibleIntervalTable
+                rightSideContainerWidget = self.ui.rightSideContainerWidget # pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterRightSidebarWidget.Spike3DRasterRightSidebarWidget
+                right_sidebar_contents_container_dockarea = rightSideContainerWidget.right_sidebar_contents_container_dockarea
+
+                # New Dock-based way _________________________________________________________________________________________________ #
+                name: str = 'VisibleWindowIntervalTables'
+                display_config = CustomDockDisplayConfig(showCloseButton=True, showCollapseButton=True, orientation='horizontal', custom_get_colors_dict={False: DockDisplayColors(fg_color='#111', bg_color='#c5c5c5', border_color='#a7babd'),
+                        True: DockDisplayColors(fg_color='#333', bg_color='#757575', border_color='#424242'),
+                    })
+                
+                # Create new widget
+                # No extant table widget and display_dock currently, create a new one:
+                dDisplayItem = right_sidebar_contents_container_dockarea.find_display_dock(identifier=name) # Dock
+                assert dDisplayItem is None
+                
+                # Add to dynamic dock container 
+                _, dDisplayItem = right_sidebar_contents_container_dockarea.add_display_dock(name, display_config=display_config, widget=root_ctrl_layout_widget, dockAddLocationOpts=['bottom'], autoOrientation=False)
+                dDisplayItem.setOrientation('horizontal', force=True)
+                dDisplayItem.updateStyle()
+                dDisplayItem.update()
+                
+                rightSideContainerWidget.dock_items[name] = dDisplayItem
             
-            ## Render in right sidebar:
-            updated_ui_dict = {'ctrl_layout': None, 'dynamic_tables_container_widget': None, 'dynamic_tables_container_VBoxLayout': None, 'bottom_spacer_widget': None, 'manager': None} # , 'tables_dict': {}
-            root_ctrl_layout_widget = pg.LayoutWidget() ## ROOT layout widget
-            updated_ui_dict['ctrl_layout'] = root_ctrl_layout_widget
-
-            # Main Tables container:
-            updated_ui_dict['dynamic_tables_container_widget'] = pg.QtWidgets.QWidget()
-            updated_ui_dict['dynamic_tables_container_widget'].setObjectName('tables_container')
-            updated_ui_dict['dynamic_tables_container_widget'].setSizePolicy(pg.QtWidgets.QSizePolicy.Expanding, pg.QtWidgets.QSizePolicy.Expanding)
-
-            manager = TableManager(updated_ui_dict['dynamic_tables_container_widget'])
-            updated_ui_dict['manager'] = manager
-
-            tables_layout = manager.wrapper_layout
-            tables_layout.setObjectName('tables_container_VBoxLayout')
-            updated_ui_dict['dynamic_tables_container_VBoxLayout'] = tables_layout
 
 
-            ## add the table vertical layout:
-            root_ctrl_layout_widget.addWidget(updated_ui_dict['dynamic_tables_container_widget'], row=1, col=1)
-            # Add permanent expanding spacer at the bottom
-            # Create an empty widget and set its size policy to expanding
-            bottom_spacer_widget = pg.QtWidgets.QWidget()
-            bottom_spacer_widget.setObjectName('bottom_spacer')
-            bottom_spacer_widget.setSizePolicy(pg.QtWidgets.QSizePolicy.Expanding, pg.QtWidgets.QSizePolicy.Expanding)
+                # Connect ____________________________________________________________________________________________________________ #
+                ## TODO: use `self.connection_man`?
+                # Rate limited version:`
+                self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container['connections'] = {'update_connection': self.connection_man.connect_drivable_to_driver(drivable=self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container['manager'], driver=self.spike_raster_plt_2d,
+                                                                custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.002, rateLimit=24, slot=self.on_update_right_sidebar_visible_interval_info_tables))),
+                                                            'rendered_interval_list_changed': self.spike_raster_plt_2d.sigRenderedIntervalsListChanged.connect(lambda interval_list: self.on_update_right_sidebar_visible_interval_info_tables()),
+                                                            'interval_entered_window': pg.SignalProxy(self.spike_raster_plt_2d.sigOnIntervalEnteredWindow, delay=0.002, rateLimit=2, slot=(lambda _: self.on_update_right_sidebar_visible_interval_info_tables())),
+                                                            'interval_exited_window': pg.SignalProxy(self.spike_raster_plt_2d.sigOnIntervalExitedindow, delay=0.002, rateLimit=2, slot=(lambda _: self.on_update_right_sidebar_visible_interval_info_tables())),
+                }
+                
 
-            updated_ui_dict['bottom_spacer_widget'] = bottom_spacer_widget # pg.QtWidgets.QSpacerItem(0, 0, pg.QtWidgets.QSizePolicy.Minimum, pg.QtWidgets.QSizePolicy.Expanding)
-            # ctrl_layout.layout.addItem(spacer, ctrl_layout.layout.rowCount(), 0, 1, 1)
-            root_ctrl_layout_widget.addWidget(updated_ui_dict['bottom_spacer_widget'], row=2, col=1)
+                ## Dock all Grouped results from `'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView'`
+                ## INPUTS: active_2d_plot
+                grouped_dock_items_dict = right_sidebar_contents_container_dockarea.get_dockGroup_dock_dict()
+                nested_dock_items = {}
+                nested_dynamic_docked_widget_container_widgets = {}
+                for dock_group_name, flat_group_dockitems_list in grouped_dock_items_dict.items():
+                    dDisplayItem, nested_dynamic_docked_widget_container = right_sidebar_contents_container_dockarea.build_wrapping_nested_dock_area(flat_group_dockitems_list, dock_group_name=dock_group_name)
+                    nested_dock_items[dock_group_name] = dDisplayItem
+                    nested_dynamic_docked_widget_container_widgets[dock_group_name] = nested_dynamic_docked_widget_container
 
-            manager.update_tables(dataframes_dict)
 
-            self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container = updated_ui_dict # {k:v for k, v in updated_ui_dict.items()}
-            if self.debug_print:
-                print(f'\t done.')
-            # VisibleIntervalTable
-            rightSideContainerWidget = self.ui.rightSideContainerWidget # pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterRightSidebarWidget.Spike3DRasterRightSidebarWidget
-            right_sidebar_contents_container_dockarea = rightSideContainerWidget.right_sidebar_contents_container_dockarea
-
-            # New Dock-based way _________________________________________________________________________________________________ #
-            name: str = 'VisibleWindowIntervalTables'
-            display_config = CustomDockDisplayConfig(showCloseButton=True, showCollapseButton=True, orientation='horizontal', custom_get_colors_dict={False: DockDisplayColors(fg_color='#111', bg_color='#c5c5c5', border_color='#a7babd'),
-                    True: DockDisplayColors(fg_color='#333', bg_color='#757575', border_color='#424242'),
-                })
-            
-            # Create new widget
-            # No extant table widget and display_dock currently, create a new one:
-            dDisplayItem = right_sidebar_contents_container_dockarea.find_display_dock(identifier=name) # Dock
-            assert dDisplayItem is None
-            
-            # Add to dynamic dock container 
-            _, dDisplayItem = right_sidebar_contents_container_dockarea.add_display_dock(name, display_config=display_config, widget=root_ctrl_layout_widget, dockAddLocationOpts=['bottom'], autoOrientation=False)
-            dDisplayItem.setOrientation('horizontal', force=True)
-            dDisplayItem.updateStyle()
-            dDisplayItem.update()
-            
-            rightSideContainerWidget.dock_items[name] = dDisplayItem
+                ## show it
+                self.set_right_sidebar_visibility(True)
         
+            else:
+                if self.debug_print:
+                    print(f'\t does not need init, just update')
+                extant_dict = self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container
+                
+                extant_manager = extant_dict['manager']
+                extant_manager.update_tables(dataframes_dict)
+                
 
-
-            # Connect ____________________________________________________________________________________________________________ #
-            ## TODO: use `self.connection_man`?
-            # Rate limited version:`
-            self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container['connections'] = {'update_connection': self.connection_man.connect_drivable_to_driver(drivable=self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container['manager'], driver=self.spike_raster_plt_2d,
-                                                        custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.002, rateLimit=24, slot=self.on_update_right_sidebar_visible_interval_info_tables))),
-                                                        'rendered_interval_list_changed': self.spike_raster_plt_2d.sigRenderedIntervalsListChanged.connect(lambda interval_list: self.on_update_right_sidebar_visible_interval_info_tables()),
-                                                        'interval_entered_window': pg.SignalProxy(self.spike_raster_plt_2d.sigOnIntervalEnteredWindow, delay=0.002, rateLimit=2, slot=(lambda _: self.on_update_right_sidebar_visible_interval_info_tables())),
-                                                        'interval_exited_window': pg.SignalProxy(self.spike_raster_plt_2d.sigOnIntervalExitedindow, delay=0.002, rateLimit=2, slot=(lambda _: self.on_update_right_sidebar_visible_interval_info_tables())),
-            }
-            
-
-            ## Dock all Grouped results from `'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView'`
-            ## INPUTS: active_2d_plot
-            grouped_dock_items_dict = right_sidebar_contents_container_dockarea.get_dockGroup_dock_dict()
-            nested_dock_items = {}
-            nested_dynamic_docked_widget_container_widgets = {}
-            for dock_group_name, flat_group_dockitems_list in grouped_dock_items_dict.items():
-                dDisplayItem, nested_dynamic_docked_widget_container = right_sidebar_contents_container_dockarea.build_wrapping_nested_dock_area(flat_group_dockitems_list, dock_group_name=dock_group_name)
-                nested_dock_items[dock_group_name] = dDisplayItem
-                nested_dynamic_docked_widget_container_widgets[dock_group_name] = nested_dynamic_docked_widget_container
-
-
-            ## show it
-            self.set_right_sidebar_visibility(True)
-    
-        else:
-            if self.debug_print:
-                print(f'\t does not need init, just update')
-            extant_dict = self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container
-            
-            extant_manager = extant_dict['manager']
-            extant_manager.update_tables(dataframes_dict)
-            
-
-        return self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container, self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container['ctrl_layout']
+            return self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container, self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container['ctrl_layout']
     
 
     def on_update_right_sidebar_visible_interval_info_tables(self):
