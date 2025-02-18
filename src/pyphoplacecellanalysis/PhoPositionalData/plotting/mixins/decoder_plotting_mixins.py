@@ -20,6 +20,8 @@ epoch_split_key: TypeAlias = str # a string that describes a split epoch, such a
 DecoderName = NewType('DecoderName', str)
 from neuropy.core.neuron_identities import NeuronIdentityAccessingMixin
 from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
+from neuropy.utils.indexing_helpers import PandasHelpers
+
 from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
 from pyphocorehelpers.DataStructure.general_parameter_containers import RenderPlotsData, VisualizationParameters
 
@@ -267,7 +269,7 @@ class SingleArtistMultiEpochBatchHelpers:
             # self.stacked_flat_global_pos_df['y'] -= self.y0_offset ## zero-out the x0 by subtracting out the minimal xbin_edge
 
             self.stacked_flat_global_pos_df['x_scaled'] = (self.stacked_flat_global_pos_df['x'] - self.y0_offset) / (self.y1_offset - self.y0_offset)
-            self.stacked_flat_global_pos_df['x_smooth_scaled'] = (self.stacked_flat_global_pos_df['x_smooth'] - self.y0_offset) / (self.y1_offset - self.y0_offset)
+            # self.stacked_flat_global_pos_df['x_smooth_scaled'] = (self.stacked_flat_global_pos_df['x_smooth'] - self.y0_offset) / (self.y1_offset - self.y0_offset)
             self.stacked_flat_global_pos_df['y_scaled'] = (self.stacked_flat_global_pos_df['y'] - self.x0_offset) / (self.x1_offset - self.x0_offset)
 
             # ## scale-down to [0.0, 1.0] scale
@@ -278,7 +280,35 @@ class SingleArtistMultiEpochBatchHelpers:
             # stacked_flat_global_pos_df['y'] *= inverse_normalization_factor_height ## scale to [0, 1]
 
             # stacked_flat_global_pos_df['x'] += stacked_flat_global_pos_df['global_subdivision_x_offset']
-                
+
+
+
+            # ==================================================================================================================== #
+            # 2025-02-18 01:21 New from Notebook                                                                                   #
+            # ==================================================================================================================== #
+            # self.stacked_flat_global_pos_df = deepcopy(batch_plot_helper.stacked_flat_global_pos_df)
+
+
+
+            # stacked_flat_global_pos_df['y_scaled'] = (stacked_flat_global_pos_df['y'] - batch_plot_helper.y0_offset) / (batch_plot_helper.y1_offset - batch_plot_helper.y0_offset)
+            # stacked_flat_global_pos_df['x_smooth_scaled'] = (stacked_flat_global_pos_df['x_smooth'] - batch_plot_helper.y0_offset) / (batch_plot_helper.y1_offset - batch_plot_helper.y0_offset)
+            # stacked_flat_global_pos_df['x_scaled'] = (stacked_flat_global_pos_df['x'] - batch_plot_helper.x0_offset) / (batch_plot_helper.x1_offset - batch_plot_helper.x0_offset)
+
+
+
+
+            ## swap axes:
+            # self.stacked_flat_global_pos_df['y_temp'] = deepcopy(self.stacked_flat_global_pos_df['y'])
+            # self.stacked_flat_global_pos_df['y'] = deepcopy(self.stacked_flat_global_pos_df['x'])
+            # self.stacked_flat_global_pos_df['x'] = deepcopy(self.stacked_flat_global_pos_df['y_temp'])
+            # self.stacked_flat_global_pos_df.drop(columns=['y_temp'], inplace=True)
+
+            # self.stacked_flat_global_pos_df['y_scaled_temp'] = deepcopy(self.stacked_flat_global_pos_df['y_scaled'])
+            # self.stacked_flat_global_pos_df['y_scaled'] = deepcopy(self.stacked_flat_global_pos_df['x_scaled'])
+            # self.stacked_flat_global_pos_df['x_scaled'] = deepcopy(self.stacked_flat_global_pos_df['y_scaled_temp'])
+            # self.stacked_flat_global_pos_df.drop(columns=['y_scaled_temp'], inplace=True)
+            self.stacked_flat_global_pos_df = PandasHelpers.swap_columns(self.stacked_flat_global_pos_df, lhs_col_name='x', rhs_col_name='y') 
+            self.stacked_flat_global_pos_df = PandasHelpers.swap_columns(self.stacked_flat_global_pos_df, lhs_col_name='x_scaled', rhs_col_name='y_scaled') 
 
         else:
             raise NotImplementedError()
@@ -336,36 +366,40 @@ class SingleArtistMultiEpochBatchHelpers:
             print(f'desired_start_time_seconds: {self.desired_start_time_seconds}, desired_end_time_seconds: {self.desired_end_time_seconds}')
 
 
-        # y_axis_col_name: str = 'y'
-        y_axis_col_name: str = 'y_scaled'
-
         assert 'global_subdivision_x_data_offset' in self.stacked_flat_global_pos_df
-        assert y_axis_col_name in self.stacked_flat_global_pos_df
         
-        ## Perform the real plotting:
-        x = self.stacked_flat_global_pos_df['global_subdivision_x_data_offset'].to_numpy()
-        # y = self.stacked_flat_global_pos_df[y_axis_col_name].to_numpy() / self.inverse_xbin_width ## needs to be inversely mapped from 0, 1
-        y = self.stacked_flat_global_pos_df[y_axis_col_name].to_numpy() ## needs to be inversely mapped from 0, 1        
+        # ==================================================================================================================== #
+        # Old (non-working) pre 2025-02-17                                                                                     #
+        # ==================================================================================================================== #
+        # # y_axis_col_name: str = 'y'
+        # y_axis_col_name: str = 'y_scaled'
 
-        measured_pos_line_artist = active_ax.plot(x, y, color='r', label='measured_pos')[0]
+        # assert y_axis_col_name in self.stacked_flat_global_pos_df
+        
+        # ## Perform the real plotting:
+        # x = self.stacked_flat_global_pos_df['global_subdivision_x_data_offset'].to_numpy()
+        # # y = self.stacked_flat_global_pos_df[y_axis_col_name].to_numpy() / self.inverse_xbin_width ## needs to be inversely mapped from 0, 1
+        # y = self.stacked_flat_global_pos_df[y_axis_col_name].to_numpy() ## needs to be inversely mapped from 0, 1        
+
+        # measured_pos_line_artist = active_ax.plot(x, y, color='r', label='measured_pos')[0]
 
 
         # ==================================================================================================================== #
         # New 2025-02-18 01:17                                                                                                 #
         # ==================================================================================================================== #
+        
         time_cmap_start_end_colors = [(0, 0.6, 0), (0, 0, 0)]  # first is green, second is black
         time_cmap = LinearSegmentedColormap.from_list("GreenToBlack", time_cmap_start_end_colors, N=25) # Create a colormap (green to black).
 
-        stacked_flat_global_pos_df = SingleArtistMultiEpochBatchHelpers.add_color_over_global_subdivision_idx_positions_to_stacked_flat_global_pos_df(stacked_flat_global_pos_df=stacked_flat_global_pos_df, time_cmap=time_cmap)
+        self.stacked_flat_global_pos_df = SingleArtistMultiEpochBatchHelpers.add_color_over_global_subdivision_idx_positions_to_stacked_flat_global_pos_df(stacked_flat_global_pos_df=self.stacked_flat_global_pos_df, time_cmap=time_cmap)
         # stacked_flat_global_pos_df
-        new_stacked_flat_global_pos_df = SingleArtistMultiEpochBatchHelpers.add_nan_masked_rows_to_stacked_flat_global_pos_df(stacked_flat_global_pos_df=stacked_flat_global_pos_df)
+        new_stacked_flat_global_pos_df = SingleArtistMultiEpochBatchHelpers.add_nan_masked_rows_to_stacked_flat_global_pos_df(stacked_flat_global_pos_df=self.stacked_flat_global_pos_df)
         # new_stacked_flat_global_pos_df, color_formatting_dict = add_nan_masked_rows_to_stacked_flat_global_pos_df(stacked_flat_global_pos_df=stacked_flat_global_pos_df)
 
         # active_stacked_flat_global_pos_df = deepcopy(stacked_flat_global_pos_df)
         active_stacked_flat_global_pos_df = deepcopy(new_stacked_flat_global_pos_df)
         # extracted_colors_arr_flat: NDArray = active_stacked_flat_global_pos_df['color'].to_numpy()
         extracted_colors_arr: NDArray = np.array(active_stacked_flat_global_pos_df['color'].to_list()).astype(float) # .shape # (16299, 4)
-
 
         # extracted_colors_arr.T.shape # (16299,)
         # a_time_bin_centers = deepcopy(active_stacked_flat_global_pos_df['t'].to_numpy().astype(float))
@@ -374,11 +408,9 @@ class SingleArtistMultiEpochBatchHelpers:
         measured_pos_dock_track_ax = active_ax
         measured_pos_dock_track_ax.set_facecolor('white')
         measured_pos_line_artist = measured_pos_dock_track_ax.scatter(active_stacked_flat_global_pos_df["global_subdivision_x_data_offset"], active_stacked_flat_global_pos_df["y_scaled"], color=active_stacked_flat_global_pos_df["color"].tolist())
-        measured_pos_line_artist
 
-
-        # y_axis_kwargs = dict(ymin=0.0, ymax=1.0)
-        y_axis_kwargs = dict(ymin=self.xbin_edges[0], ymax=self.xbin_edges[-1])
+        y_axis_kwargs = dict(ymin=0.0, ymax=1.0)
+        # y_axis_kwargs = dict(ymin=self.xbin_edges[0], ymax=self.xbin_edges[-1])
         subdivision_epoch_separator_vlines = active_ax.vlines(self.results2D.subdivided_epochs_df['start'].to_numpy(), **y_axis_kwargs, colors='white', linestyles='solid', label='subdivision_epoch_separator_vlines') # , data=None
 
         if not defer_draw:
@@ -746,15 +778,10 @@ class SingleArtistMultiEpochBatchHelpers:
         
         # bad_color = '#000000'
         bad_color = (0.0, 0.0, 0.0, 0.0)
-        # new_stacked_flat_global_pos_df['color'] = '#000000'
-
-        # norm = plt.Normalize(t.min(), t.max())
         color_formatting_dict = {}
 
         dfs = []
         prev = None
-        # global_subdivision_idx_group_start_t = None
-        # global_subdivision_idx_group_start_item = None
         for _, row in new_stacked_flat_global_pos_df.iterrows():
             # is_global_subdivision_idx_changing: bool = (row['global_subdivision_idx'] != prev['global_subdivision_idx'])
             if (prev is not None) and (row['global_subdivision_idx'] != prev['global_subdivision_idx']):
@@ -771,19 +798,6 @@ class SingleArtistMultiEpochBatchHelpers:
                 new_next['is_masked_bin'] = True
                 new_next['color'] = deepcopy(bad_color)
                 dfs.append(new_next.to_frame().T)
-                ## last row:
-                # if global_subdivision_idx_group_start_item is not None:
-                # if global_subdivision_idx_group_start_t is not None:
-                #     ## existing global_subdivision_idx_group is finishing
-                #     global_subdivision_idx_group_end_t = prev['t']
-                #     # norm = plt.Normalize(t.min(), t.max())
-                #     norm = plt.Normalize(global_subdivision_idx_group_start_t, global_subdivision_idx_group_end_t)
-                #     color_formatting_dict[prev['global_subdivision_idx']] = (norm, (global_subdivision_idx_group_start_t, global_subdivision_idx_group_end_t), )
-
-                ## first row
-                # global_subdivision_idx_group_start_item = row.copy()
-                # global_subdivision_idx_group_start_t = row['t']
-                # global_subdivision_idx_group_end_t = None
 
             dfs.append(row.to_frame().T)
             prev = row
