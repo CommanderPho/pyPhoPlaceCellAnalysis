@@ -33,6 +33,9 @@ from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, po
 from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
 from attrs import asdict, astuple, define, field, Factory
 from neuropy.utils.indexing_helpers import PandasHelpers
+from neuropy.core.epoch import EpochsAccessor, Epoch, ensure_dataframe
+# import portion as P # Required for interval search: portion~=2.3.0
+from pyphocorehelpers.indexing_helpers import partition_df_dict, partition_df
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
 
@@ -277,11 +280,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
             t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
             
         
-        """
-        from neuropy.core.epoch import EpochsAccessor, Epoch, ensure_dataframe
-        # import portion as P # Required for interval search: portion~=2.3.0
-        from pyphocorehelpers.indexing_helpers import partition_df_dict, partition_df
-                
+        """                
         PBE_df: pd.DataFrame = ensure_dataframe(deepcopy(sess.pbe))
         ## Build up a new epoch
         epochs_df: pd.DataFrame = deepcopy(sess.epochs).epochs.adding_global_epoch_row()
