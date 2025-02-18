@@ -139,8 +139,11 @@ class SingleArtistMultiEpochBatchHelpers:
     
     @property
     def desired_end_time_seconds(self) -> float:
-        return self.subdivide_bin_size * self.desired_epoch_end_idx
-    
+        if self.desired_epoch_end_idx is not None:
+            return self.subdivide_bin_size * self.desired_epoch_end_idx
+        else:
+            return self.subdivide_bin_size * (self.num_filter_epochs-1)
+        
     @property
     def desired_time_duration(self) -> float:
         return self.desired_end_time_seconds - self.desired_start_time_seconds
@@ -148,7 +151,10 @@ class SingleArtistMultiEpochBatchHelpers:
 
     def __attrs_post_init__(self):
         # Add post-init logic here
+        # if self.desired_epoch_end_idx is None:
+        #     ## determine the correct end-index            
         pass
+    
 
     @function_attributes(short_name=None, tags=['data'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-17 16:07', related_items=[])
     def shared_build_flat_stacked_data(self, debug_print=False, should_expand_first_dim: bool=True, force_recompute:bool=False, **kwargs):
@@ -199,17 +205,23 @@ class SingleArtistMultiEpochBatchHelpers:
 
         if force_recompute is True:
             print(f'force_recompute == True, so `self.stacked_flat_global_pos_df` will be rebuilt from scratch from `self.results2D.pos_df`...')
+            self.has_data_been_built = False
+    
         if (self.stacked_flat_global_pos_df is None) or force_recompute:
             self.stacked_flat_global_pos_df = deepcopy(self.results2D.pos_df)
 
         ## slice `stacked_flat_global_pos_df` by desired start/end indicies too:
-        self.stacked_flat_global_pos_df = self.stacked_flat_global_pos_df[np.logical_and((self.stacked_flat_global_pos_df['global_subdivision_idx'] >= self.desired_epoch_start_idx), (self.stacked_flat_global_pos_df['global_subdivision_idx'] < self.desired_epoch_end_idx))]
+        if (self.desired_epoch_end_idx is not None):
+            self.stacked_flat_global_pos_df = self.stacked_flat_global_pos_df[np.logical_and((self.stacked_flat_global_pos_df['global_subdivision_idx'] >= self.desired_epoch_start_idx), (self.stacked_flat_global_pos_df['global_subdivision_idx'] < self.desired_epoch_end_idx))]
+        else:
+            self.stacked_flat_global_pos_df = self.stacked_flat_global_pos_df[(self.stacked_flat_global_pos_df['global_subdivision_idx'] >= self.desired_epoch_start_idx)]
+
 
         # (self.n_xbins, self.n_ybins, self.n_tbins), (self.flattened_n_xbins, self.flattened_n_ybins, self.flattened_n_tbins)
         # np.shape(stacked_p_x_given_n) # (1, 171, 6)
         self.xbin_edges = deepcopy(self.a_new_global2D_decoder.xbin)
         self.ybin_edges = deepcopy(self.a_new_global2D_decoder.ybin)
-        xmin, xmax, ymin, ymax = self.xbin_edges[0], self.xbin_edges[-1], self.ybin_edges[0], self.ybin_edges[-1]
+        # xmin, xmax, ymin, ymax = self.xbin_edges[0], self.xbin_edges[-1], self.ybin_edges[0], self.ybin_edges[-1]
         self.stacked_flat_global_pos_df = self.stacked_flat_global_pos_df.position.adding_binned_position_columns(xbin_edges=self.xbin_edges, ybin_edges=self.ybin_edges)
         ## OUTPUTS: (desired_epoch_start_idx, desired_epoch_end_idx), (desired_start_time_seconds, desired_end_time_seconds), desired_time_duration
 
@@ -221,23 +233,23 @@ class SingleArtistMultiEpochBatchHelpers:
             print(f".ybin: {self.ybin_edges}")
 
         self.x0_offset: float =  self.xbin_edges[0]
-        self.y0_offset: float =  self.ybin_edges[0]
-
         self.x1_offset: float =  self.xbin_edges[-1]
+        
+        self.y0_offset: float =  self.ybin_edges[0]       
         self.y1_offset: float =  self.ybin_edges[-1]
 
         if debug_print:
             print(f'x0_offset: {self.x0_offset}, y0_offset: {self.y0_offset}')
 
-        (np.nanmin(self.stacked_flat_global_pos_df['x']), np.nanmax(self.stacked_flat_global_pos_df['x']))
-        (np.nanmin(self.stacked_flat_global_pos_df['y']), np.nanmax(self.stacked_flat_global_pos_df['y']))
+        # (np.nanmin(self.stacked_flat_global_pos_df['x']), np.nanmax(self.stacked_flat_global_pos_df['x']))
+        # (np.nanmin(self.stacked_flat_global_pos_df['y']), np.nanmax(self.stacked_flat_global_pos_df['y']))
         
         ## INPUTS: (desired_epoch_start_idx, desired_epoch_end_idx), (desired_start_time_seconds, desired_end_time_seconds), desired_time_duration
         if debug_print:
             print(f'desired_time_duration: {self.desired_time_duration}, (desired_start_time_seconds: {self.desired_start_time_seconds}, desired_end_time_seconds: {self.desired_end_time_seconds})')
         ## INPUTS: x0_offset, y0_offset
         # custom_image_extent = np.array([0.0, 1.0, 0.0, 1.0])
-        max_global_subdivision_idx = np.nanmax(self.stacked_flat_global_pos_df['global_subdivision_idx']) ## TODO: could allow not starting on zero, but let's not
+        max_global_subdivision_idx: int = np.nanmax(self.stacked_flat_global_pos_df['global_subdivision_idx']) ## TODO: could allow not starting on zero, but let's not
         active_num_global_subdivisions: int = max_global_subdivision_idx + 1   
         if debug_print:
             print(f'active_num_global_subdivisions: {active_num_global_subdivisions}')
@@ -298,17 +310,17 @@ class SingleArtistMultiEpochBatchHelpers:
 
 
             ## swap axes:
-            # self.stacked_flat_global_pos_df['y_temp'] = deepcopy(self.stacked_flat_global_pos_df['y'])
-            # self.stacked_flat_global_pos_df['y'] = deepcopy(self.stacked_flat_global_pos_df['x'])
-            # self.stacked_flat_global_pos_df['x'] = deepcopy(self.stacked_flat_global_pos_df['y_temp'])
-            # self.stacked_flat_global_pos_df.drop(columns=['y_temp'], inplace=True)
+            self.stacked_flat_global_pos_df['y_temp'] = deepcopy(self.stacked_flat_global_pos_df['y'])
+            self.stacked_flat_global_pos_df['y'] = deepcopy(self.stacked_flat_global_pos_df['x'])
+            self.stacked_flat_global_pos_df['x'] = deepcopy(self.stacked_flat_global_pos_df['y_temp'])
+            self.stacked_flat_global_pos_df.drop(columns=['y_temp'], inplace=True)
 
-            # self.stacked_flat_global_pos_df['y_scaled_temp'] = deepcopy(self.stacked_flat_global_pos_df['y_scaled'])
-            # self.stacked_flat_global_pos_df['y_scaled'] = deepcopy(self.stacked_flat_global_pos_df['x_scaled'])
-            # self.stacked_flat_global_pos_df['x_scaled'] = deepcopy(self.stacked_flat_global_pos_df['y_scaled_temp'])
-            # self.stacked_flat_global_pos_df.drop(columns=['y_scaled_temp'], inplace=True)
-            self.stacked_flat_global_pos_df = PandasHelpers.swap_columns(self.stacked_flat_global_pos_df, lhs_col_name='x', rhs_col_name='y') 
-            self.stacked_flat_global_pos_df = PandasHelpers.swap_columns(self.stacked_flat_global_pos_df, lhs_col_name='x_scaled', rhs_col_name='y_scaled') 
+            self.stacked_flat_global_pos_df['y_scaled_temp'] = deepcopy(self.stacked_flat_global_pos_df['y_scaled'])
+            self.stacked_flat_global_pos_df['y_scaled'] = deepcopy(self.stacked_flat_global_pos_df['x_scaled'])
+            self.stacked_flat_global_pos_df['x_scaled'] = deepcopy(self.stacked_flat_global_pos_df['y_scaled_temp'])
+            self.stacked_flat_global_pos_df.drop(columns=['y_scaled_temp'], inplace=True)
+            # self.stacked_flat_global_pos_df = PandasHelpers.swap_columns(self.stacked_flat_global_pos_df, lhs_col_name='x', rhs_col_name='y') 
+            # self.stacked_flat_global_pos_df = PandasHelpers.swap_columns(self.stacked_flat_global_pos_df, lhs_col_name='x_scaled', rhs_col_name='y_scaled') 
 
         else:
             raise NotImplementedError()
@@ -399,15 +411,19 @@ class SingleArtistMultiEpochBatchHelpers:
         # active_stacked_flat_global_pos_df = deepcopy(stacked_flat_global_pos_df)
         active_stacked_flat_global_pos_df = deepcopy(new_stacked_flat_global_pos_df)
         # extracted_colors_arr_flat: NDArray = active_stacked_flat_global_pos_df['color'].to_numpy()
-        extracted_colors_arr: NDArray = np.array(active_stacked_flat_global_pos_df['color'].to_list()).astype(float) # .shape # (16299, 4)
+        # extracted_colors_arr: NDArray = np.array(active_stacked_flat_global_pos_df['color'].to_list()).astype(float) # .shape # (16299, 4)
 
         # extracted_colors_arr.T.shape # (16299,)
         # a_time_bin_centers = deepcopy(active_stacked_flat_global_pos_df['t'].to_numpy().astype(float))
         # a_time_bin_centers
 
         measured_pos_dock_track_ax = active_ax
-        measured_pos_dock_track_ax.set_facecolor('white')
+        # measured_pos_dock_track_ax.set_facecolor('white')
+        measured_pos_dock_track_ax.set_facecolor('#333333')
+        
         measured_pos_line_artist = measured_pos_dock_track_ax.scatter(active_stacked_flat_global_pos_df["global_subdivision_x_data_offset"], active_stacked_flat_global_pos_df["y_scaled"], color=active_stacked_flat_global_pos_df["color"].tolist())
+        measured_pos_line_artist.set_alpha(0.85)
+        measured_pos_line_artist.set_sizes([14])
 
         y_axis_kwargs = dict(ymin=0.0, ymax=1.0)
         # y_axis_kwargs = dict(ymin=self.xbin_edges[0], ymax=self.xbin_edges[-1])
@@ -475,7 +491,7 @@ class SingleArtistMultiEpochBatchHelpers:
         # Delegate the posterior plotting functionality.
         curr_artist_dict['prev_heatmaps'], image_extent, plots_data = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap(active_ax,
                                                         xbin_centers=a_xbin_centers, ybin_centers=a_ybin_centers, a_time_bin_centers=None, a_p_x_given_n=a_p_x_given_n,
-                                                        posterior_masking_value=posterior_masking_value, rotate_to_vertical=False, debug_print=True, should_perform_reshape=False, custom_image_extent=custom_image_extent)
+                                                        posterior_masking_value=posterior_masking_value, rotate_to_vertical=False, debug_print=True, should_perform_reshape=False, custom_image_extent=custom_image_extent, extant_plot_data=kwargs.get('extant_plot_data', None))
 
 
         if not defer_draw:
@@ -517,7 +533,7 @@ class SingleArtistMultiEpochBatchHelpers:
         else:
             active_ax = override_ax
 
-        
+        is_filtered: bool = False
         ## INPUTS: track_ax, rotate_to_vertical, perform_autoscale
         # subdivide_bin_size: float = self.subdivide_bin_size
         ## Slice a subset of the data epochs:
@@ -526,15 +542,22 @@ class SingleArtistMultiEpochBatchHelpers:
         # desired_epoch_end_idx: int = int(round(1/subdivide_bin_size)) * 60 * 8 # 8 minutes
         if self.desired_epoch_end_idx is not None:
             desired_epoch_end_idx: int = self.desired_epoch_end_idx
+            filtered_epoch_range: NDArray = np.arange(start=desired_epoch_start_idx, stop=desired_epoch_end_idx)
+            filtered_num_horizontal_repeats: int = len(filtered_epoch_range)
+                        
+            is_filtered = (filtered_num_horizontal_repeats < self.num_horizontal_repeats)
         else:
-            raise NotImplementedError('oops')
+            # raise NotImplementedError('oops')
+            # desired_epoch_end_idx: int = self.num_filter_epochs
+            desired_epoch_end_idx: int = None
+            filtered_num_horizontal_repeats: int = self.num_horizontal_repeats
+            
+        is_filtered = (filtered_num_horizontal_repeats < self.num_horizontal_repeats)
         print(f'desired_epoch_start_idx: {desired_epoch_start_idx}, desired_epoch_end_idx: {desired_epoch_end_idx}')
-        filtered_epoch_range: NDArray = np.arange(start=desired_epoch_start_idx, stop=desired_epoch_end_idx)
-        filtered_num_horizontal_repeats: int = len(filtered_epoch_range)
-        filtered_num_output_rect_total_elements: int = filtered_num_horizontal_repeats * 3 # 3 parts to each track plot
+        # filtered_num_output_rect_total_elements: int = filtered_num_horizontal_repeats * 3 # 3 parts to each track plot
         ## OUTPUTS: filtered_epoch_range, filtered_num_horizontal_repeats, filtered_num_output_rect_total_elements
-        if debug_print:
-            print(f'filtered_num_output_rect_total_elements: {filtered_num_output_rect_total_elements}')
+        # if debug_print:
+        #     print(f'filtered_num_output_rect_total_elements: {filtered_num_output_rect_total_elements}')
         
         ## Update `batch_plot_helper.custom_image_extent`
         self.custom_image_extent = [self.desired_start_time_seconds, self.desired_end_time_seconds, 0.0, 1.0] ## n
@@ -595,19 +618,22 @@ class SingleArtistMultiEpochBatchHelpers:
         # track_all_normalized_rect_arr_dict
 
         # ## Slice a subset of the data epochs:
-        # desired_epoch_start_idx: int = 0
-        # # desired_epoch_end_idx: int = 20
-        # desired_epoch_end_idx: int = int(round(1/subdivide_bin_size)) * 60 * 8 # 8 minutes
-        # print(f'desired_epoch_start_idx: {desired_epoch_start_idx}, desired_epoch_end_idx: {desired_epoch_end_idx}')
+        if is_filtered:
+            # desired_epoch_start_idx: int = 0
+            # # desired_epoch_end_idx: int = 20
+            # desired_epoch_end_idx: int = int(round(1/subdivide_bin_size)) * 60 * 8 # 8 minutes
+            # print(f'desired_epoch_start_idx: {desired_epoch_start_idx}, desired_epoch_end_idx: {desired_epoch_end_idx}')
 
-        track_all_rect_arr_dict = {k:v[(desired_epoch_start_idx*3):(desired_epoch_end_idx*3), :] for k, v in self.track_all_normalized_rect_arr_dict.items()}
-        # track_all_rect_arr_dict = {k:v[desired_epoch_start_idx:desired_epoch_end_idx, :] for k, v in track_all_rect_arr_dict.items()}
-        # track_all_rect_arr_dict
+            track_all_rect_arr_dict = {k:v[(desired_epoch_start_idx*3):(desired_epoch_end_idx*3), :] for k, v in self.track_all_normalized_rect_arr_dict.items()}
+            # track_all_rect_arr_dict = {k:v[desired_epoch_start_idx:desired_epoch_end_idx, :] for k, v in track_all_rect_arr_dict.items()}
+            # track_all_rect_arr_dict
 
-        ## INPUTS: filtered_num_horizontal_repeats
-        # self.inverse_normalized_track_all_rect_arr_dict = SingleArtistMultiEpochBatchHelpers.track_dict_all_stacked_rect_arr_inverse_normalization(track_all_rect_arr_dict, ax=active_ax, num_active_horizontal_repeats=filtered_num_horizontal_repeats)
-        self.inverse_normalized_track_all_rect_arr_dict = SingleArtistMultiEpochBatchHelpers.track_dict_all_stacked_rect_arr_inverse_normalization_from_custom_extent(track_all_rect_arr_dict, custom_image_extent=self.custom_image_extent, num_active_horizontal_repeats=filtered_num_horizontal_repeats)
-        ## OUTPUTS: inverse_normalized_track_all_rect_arr_dict
+            ## INPUTS: filtered_num_horizontal_repeats
+            # self.inverse_normalized_track_all_rect_arr_dict = SingleArtistMultiEpochBatchHelpers.track_dict_all_stacked_rect_arr_inverse_normalization(track_all_rect_arr_dict, ax=active_ax, num_active_horizontal_repeats=filtered_num_horizontal_repeats)
+            self.inverse_normalized_track_all_rect_arr_dict = SingleArtistMultiEpochBatchHelpers.track_dict_all_stacked_rect_arr_inverse_normalization_from_custom_extent(track_all_rect_arr_dict, custom_image_extent=self.custom_image_extent, num_active_horizontal_repeats=filtered_num_horizontal_repeats)
+            ## OUTPUTS: inverse_normalized_track_all_rect_arr_dict
+            
+
         ## INPUTS: track_kwargs_dict, inverse_normalized_track_all_rect_arr_dict
         track_shape_patch_collection_artists = SingleArtistMultiEpochBatchHelpers.add_batch_track_shapes(ax=active_ax, inverse_normalized_track_all_rect_arr_dict=self.inverse_normalized_track_all_rect_arr_dict, track_kwargs_dict=track_kwargs_dict) # start (x0: 0.0, 20 of them span to exactly x=1.0)
         # track_shape_patch_collection_artists = SingleArtistMultiEpochBatchHelpers.add_batch_track_shapes(ax=active_ax, inverse_normalized_track_all_rect_arr_dict=inverse_normalized_track_all_rect_arr_dict, track_kwargs_dict=track_kwargs_dict, transform=ax.transData) # start (x0: 31.0, 20 of them span to about x=1000.0)
@@ -623,7 +649,41 @@ class SingleArtistMultiEpochBatchHelpers:
 
 
 
+    @function_attributes(short_name=None, tags=['MAIN', 'WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-18 02:29', related_items=[])
+    def add_all_track_plots(self, global_session, override_ax=None, posterior_masking_value=0.0025, debug_print=False, defer_draw:bool=False, **kwargs) -> RenderPlotsData:
+        """ performs all plotting on the same axes """
+        
+        self.shared_build_flat_stacked_data(force_recompute=True, debug_print=debug_print)
+        
+        # plot_data = MatplotlibRenderPlots(name='_perform_add_decoded_posterior_and_trajectory')
+        # plots = RenderPlots('_perform_add_decoded_posterior_and_trajectory')
+        plots_data: RenderPlotsData = RenderPlotsData(name='SingleArtistMultiEpochBatchHelpers', image_extent=None, curr_artist_dict=None,
+                                                      track_shape_patch_collection_artists=None,
+                                                      measured_pos_line_artist=None, subdivision_epoch_separator_vlines=None,
+                                                       ) #deepcopy(extra_dict) # RenderPlotsData(name='_perform_add_decoded_posterior_and_trajectory', image_extent=deepcopy(image_extent))
 
+
+        plots_data.track_shape_patch_collection_artists = self.add_track_shapes(global_session=global_session, override_ax=override_ax, defer_draw=True, debug_print=debug_print) ## does not seem to successfully synchronize to window
+        # track_shape_patch_collection_artists = batch_plot_helper.add_track_shapes(global_session=global_session, override_ax=track_shapes_dock_track_ax) ## does not seem to successfully synchronize to window
+        plots_data.curr_artist_dict, plots_data.image_extent, plots_data = self.add_position_posteriors(posterior_masking_value=posterior_masking_value, override_ax=override_ax, debug_print=debug_print, defer_draw=True, extant_plot_data=plots_data)
+
+        measured_pos_line_artist, subdivision_epoch_separator_vlines = self.add_track_positions(override_ax=override_ax, debug_print=debug_print, defer_draw=True)
+        # measured_pos_line_artist, subdivision_epoch_separator_vlines = batch_plot_helper.add_track_positions(override_ax=measured_pos_dock_track_ax)
+        plots_data.measured_pos_line_artist = measured_pos_line_artist
+        plots_data.subdivision_epoch_separator_vlines = subdivision_epoch_separator_vlines
+        
+        # plots_data.curr_artist_dict['measured_pos_line_artist'] = measured_pos_line_artist
+        # plots_data.curr_artist_dict['subdivision_epoch_separator_vlines'] = subdivision_epoch_separator_vlines
+        
+        # plot_obj = RasterPlots()
+        
+        if not defer_draw:
+            if override_ax is None:
+                self.redraw()
+            else:
+                override_ax.get_figure().canvas.draw_idle()
+
+        return plots_data
 
     # ==================================================================================================================== #
     # Utility                                                                                                              #
@@ -1416,7 +1476,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     @classmethod
     def _helper_add_heatmap(cls, an_ax, xbin_centers, a_p_x_given_n, a_time_bin_centers=None, ybin_centers=None, rotate_to_vertical:bool=False, debug_print:bool=False,
                             posterior_masking_value: float = 0.0025, full_posterior_opacity: float = 1.0,
-                            custom_image_extent=None, cmap = 'viridis', should_perform_reshape: bool=True):
+                            custom_image_extent=None, cmap = 'viridis', should_perform_reshape: bool=True, extant_plot_data: Optional[RenderPlotsData]=None):
         """
         Helper that handles all the posterior heatmap plotting (for both 1D and 2D cases).
         
@@ -1512,7 +1572,13 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             n_time_bins: int = masked_shape[0] ## infer from posterior
 
         extra_dict['n_time_bins'] = n_time_bins
-        plots_data = RenderPlotsData(name='_helper_add_heatmap', ordinate_first_image_extent=deepcopy(ordinate_first_image_extent), **extra_dict)
+        if extant_plot_data is None:
+            plots_data = RenderPlotsData(name='_helper_add_heatmap', ordinate_first_image_extent=deepcopy(ordinate_first_image_extent), **extra_dict)
+        else:
+            plots_data = extant_plot_data
+            plots_data['ordinate_first_image_extent'] = deepcopy(ordinate_first_image_extent)
+            plots_data.update(**extra_dict) ## update the existing
+            
 
         heatmaps = []
         # For simplicity, we assume non-single-time-bin mode (as asserted in the calling function).
