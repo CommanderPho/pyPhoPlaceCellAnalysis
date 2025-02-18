@@ -758,9 +758,9 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
     _computationPrecidence = 1006
     _is_global = True
 
-    @function_attributes(short_name='non_PBE_epochs', tags=['epochs', 'nonPBE'],
-                        input_requires=['DirectionalLaps'], output_provides=['EpochComputations'], uses=[], used_by=[], creation_date='2025-02-18 09:45', related_items=[],
-        requires_global_keys=['DirectionalLaps'], provides_global_keys=['EpochComputations'],
+    @function_attributes(short_name='non_PBE_epochs_results', tags=['epochs', 'nonPBE'],
+        input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-18 09:45', related_items=[],
+        requires_global_keys=[], provides_global_keys=['EpochComputations'],
         validate_computation_test=validate_has_non_PBE_epoch_results, is_global=True)
     def perform_compute_non_PBE_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, training_data_portion: float=(5.0/6.0), epochs_decoding_time_bin_size: float = 0.020, subdivide_bin_size:float=0.200, compute_1D: bool = True, compute_2D: bool = True, drop_previous_result_and_compute_fresh:bool=False):
         """ Performs the computation of the spearman and pearson correlations for the ripple and lap epochs.
