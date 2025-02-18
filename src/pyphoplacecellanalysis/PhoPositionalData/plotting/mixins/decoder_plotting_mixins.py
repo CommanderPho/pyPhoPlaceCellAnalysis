@@ -695,16 +695,13 @@ class SingleArtistMultiEpochBatchHelpers:
 
     @classmethod
     @function_attributes(short_name=None, tags=['masked_rows', 'nan', 'position_lines', 'stacked_flat_global_pos_df'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-17 23:56', related_items=[])
-    def add_nan_masked_rows_to_stacked_flat_global_pos_df(cls, stacked_flat_global_pos_df: pd.DataFrame, time_cmap='viridis') -> pd.DataFrame:
+    def add_nan_masked_rows_to_stacked_flat_global_pos_df(cls, stacked_flat_global_pos_df: pd.DataFrame) -> pd.DataFrame:
         """ seperates each 'global_subdivision_idx' change in the df by adding two NaN rows with ['is_masked_bin'] = True 
         Usage:
         
             new_stacked_flat_global_pos_df = SingleArtistMultiEpochBatchHelpers.add_nan_masked_rows_to_stacked_flat_global_pos_df(stacked_flat_global_pos_df=stacked_flat_global_pos_df)
             new_stacked_flat_global_pos_df
-        """
-        if isinstance(time_cmap, str):
-            time_cmap = plt.get_cmap(time_cmap)  # Choose a colormap
-        
+        """        
         new_stacked_flat_global_pos_df = deepcopy(stacked_flat_global_pos_df)
         # print(list(new_stacked_flat_global_pos_df.columns))
         column_names_to_copy = ['t', 'global_subdivision_idx', 'subdivision_epoch_start_t']
@@ -714,14 +711,17 @@ class SingleArtistMultiEpochBatchHelpers:
         included_nan_column_names = [k for k in nan_column_names if k in new_stacked_flat_global_pos_df.columns]
 
         new_stacked_flat_global_pos_df['is_masked_bin'] = False
-        new_stacked_flat_global_pos_df['color'] = '#000000'
+        
+        # bad_color = '#000000'
+        bad_color = (0.0, 0.0, 0.0, 0.0)
+        # new_stacked_flat_global_pos_df['color'] = '#000000'
 
         # norm = plt.Normalize(t.min(), t.max())
         color_formatting_dict = {}
 
         dfs = []
         prev = None
-        global_subdivision_idx_group_start_t = None
+        # global_subdivision_idx_group_start_t = None
         # global_subdivision_idx_group_start_item = None
         for _, row in new_stacked_flat_global_pos_df.iterrows():
             # is_global_subdivision_idx_changing: bool = (row['global_subdivision_idx'] != prev['global_subdivision_idx'])
@@ -730,32 +730,53 @@ class SingleArtistMultiEpochBatchHelpers:
                 new_row['t'] = prev['t'] + 1e-6
                 new_row[included_nan_column_names] = np.nan
                 new_row['is_masked_bin'] = True
+                new_row['color'] = deepcopy(bad_color)
                 dfs.append(new_row.to_frame().T) 
                 ## add following row - I'd also like to add a duplicate of the next_row but with new_row['t'] = next['t'] - 1e-6
                 new_next = row.copy()
                 new_next['t'] = row['t'] - 1e-6
                 new_next[included_nan_column_names] = np.nan
                 new_next['is_masked_bin'] = True
+                new_next['color'] = deepcopy(bad_color)
                 dfs.append(new_next.to_frame().T)
                 ## last row:
                 # if global_subdivision_idx_group_start_item is not None:
-                if global_subdivision_idx_group_start_t is not None:
-                    ## existing global_subdivision_idx_group is finishing
-                    global_subdivision_idx_group_end_t = prev['t']
-                    # norm = plt.Normalize(t.min(), t.max())
-                    norm = plt.Normalize(global_subdivision_idx_group_start_t, global_subdivision_idx_group_end_t)
-                    color_formatting_dict[prev['global_subdivision_idx']] = (norm, (global_subdivision_idx_group_start_t, global_subdivision_idx_group_end_t), )
+                # if global_subdivision_idx_group_start_t is not None:
+                #     ## existing global_subdivision_idx_group is finishing
+                #     global_subdivision_idx_group_end_t = prev['t']
+                #     # norm = plt.Normalize(t.min(), t.max())
+                #     norm = plt.Normalize(global_subdivision_idx_group_start_t, global_subdivision_idx_group_end_t)
+                #     color_formatting_dict[prev['global_subdivision_idx']] = (norm, (global_subdivision_idx_group_start_t, global_subdivision_idx_group_end_t), )
 
                 ## first row
                 # global_subdivision_idx_group_start_item = row.copy()
-                global_subdivision_idx_group_start_t = row['t']
-                global_subdivision_idx_group_end_t = None
+                # global_subdivision_idx_group_start_t = row['t']
+                # global_subdivision_idx_group_end_t = None
 
             dfs.append(row.to_frame().T)
             prev = row
             
         new_stacked_flat_global_pos_df = pd.concat(dfs, ignore_index=True)
-        return new_stacked_flat_global_pos_df, color_formatting_dict
+        return new_stacked_flat_global_pos_df
+
+    @classmethod
+    @function_attributes(short_name=None, tags=['masked_rows', 'nan', 'position_lines', 'stacked_flat_global_pos_df'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-17 23:56', related_items=[])
+    def add_color_over_global_subdivision_idx_positions_to_stacked_flat_global_pos_df(cls, stacked_flat_global_pos_df: pd.DataFrame, time_cmap='viridis') -> pd.DataFrame:
+        """ seperates each 'global_subdivision_idx' change in the df by adding two NaN rows with ['is_masked_bin'] = True 
+        Usage:
+        
+            stacked_flat_global_pos_df = SingleArtistMultiEpochBatchHelpers.add_color_over_global_subdivision_idx_positions_to_stacked_flat_global_pos_df(stacked_flat_global_pos_df=stacked_flat_global_pos_df, time_cmap='viridis')
+            stacked_flat_global_pos_df
+        """
+        if isinstance(time_cmap, str):
+            time_cmap = plt.get_cmap(time_cmap)  # Choose a colormap
+
+        group_min = stacked_flat_global_pos_df.groupby('global_subdivision_idx')['t'].transform('min')
+        group_max = stacked_flat_global_pos_df.groupby('global_subdivision_idx')['t'].transform('max')
+        normed = (stacked_flat_global_pos_df['t'] - group_min) / (group_max - group_min)
+        stacked_flat_global_pos_df['color'] = normed.apply(lambda x: time_cmap(x)) ## updates the 'color' column
+        return stacked_flat_global_pos_df
+
 
     # ==================================================================================================================== #
     # Batch Track Shape Plotting                                                                                           #
