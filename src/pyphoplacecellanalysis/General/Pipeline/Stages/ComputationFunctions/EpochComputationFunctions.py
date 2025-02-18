@@ -253,7 +253,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
         self.pos_df.attrs['subdivide_bin_size'] = value
 
 
-    @function_attributes(short_name=None, tags=['epochs', 'non-PBE'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-28 04:10', related_items=[]) 
+    @function_attributes(short_name=None, tags=['epochs', 'non-PBE', 'session'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-28 04:10', related_items=[]) 
     @classmethod
     def _adding_global_non_PBE_epochs_to_sess(cls, sess, t_start: float, t_delta: float, t_end: float, training_data_portion: float = 5.0/6.0) -> Tuple[Dict[types.DecoderName, pd.DataFrame], Dict[types.DecoderName, pd.DataFrame]]:
         """ Builds a dictionary of train/test-split epochs for ['long', 'short', 'global'] periods
@@ -333,7 +333,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
 
 
 
-    @function_attributes(short_name=None, tags=['epochs', 'non-PBE'], input_requires=[], output_provides=[], uses=['cls._adding_global_non_PBE_epochs_to_sess(...)'], used_by=[], creation_date='2025-01-28 04:10', related_items=[]) 
+    @function_attributes(short_name=None, tags=['epochs', 'non-PBE', 'pipeline'], input_requires=[], output_provides=[], uses=['cls._adding_global_non_PBE_epochs_to_sess(...)'], used_by=[], creation_date='2025-01-28 04:10', related_items=[]) 
     @classmethod
     def _adding_global_non_PBE_epochs(cls, curr_active_pipeline, training_data_portion: float = 5.0/6.0) -> Tuple[Dict[types.DecoderName, pd.DataFrame], Dict[types.DecoderName, pd.DataFrame]]:
         """ Builds a dictionary of train/test-split epochs for ['long', 'short', 'global'] periods
@@ -530,7 +530,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
             results1D, results2D = a_new_NonPBE_Epochs_obj.compute_all(curr_active_pipeline, epochs_decoding_time_bin_size=0.025, subdivide_bin_size=0.50, compute_1D=True, compute_2D=True)
         
         """
-        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
+        # from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
         
         # Build subdivided epochs first since they're needed for both 1D and 2D
@@ -814,10 +814,10 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
 
         results1D, results2D = a_new_NonPBE_Epochs_obj.compute_all(owning_pipeline_reference, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, subdivide_bin_size=subdivide_bin_size, compute_1D=compute_1D, compute_2D=compute_2D)
         if (results1D is not None) and compute_1D:
-            global_computation_results.computed_data['SequenceBased'].results1D = results1D
+            global_computation_results.computed_data['EpochComputations'].results1D = results1D
 
         if (results2D is not None) and compute_2D:
-            global_computation_results.computed_data['SequenceBased'].results2D = results2D
+            global_computation_results.computed_data['EpochComputations'].results2D = results2D
             
 
         global_computation_results.computed_data['EpochComputations'].a_new_NonPBE_Epochs_obj = a_new_NonPBE_Epochs_obj
