@@ -1746,10 +1746,12 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         return filter_epochs_decoder_result
 
     @classmethod
-    def _perform_decoding_specific_epochs(cls, active_decoder: "BasePositionDecoder", filter_epochs_decoder_result: DynamicContainer, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DecodedFilterEpochsResult:
+    def _perform_decoding_specific_epochs(cls, active_decoder: "BasePositionDecoder", filter_epochs_decoder_result: DynamicContainer, use_single_time_bin_per_epoch: bool=False, enable_slow_debugging_time_bin_validation: bool=False, debug_print=False) -> DecodedFilterEpochsResult:
         """ Actually performs the computation
         
         NOTE: Uses active_decoder.decode(...) to actually do the decoding
+        
+        NOTE: when `enable_slow_debugging_time_bin_validation==True, this function takes more than twice as long due to a deepcopy!
         
         """
         # Looks like we're iterating over each epoch in filter_epochs:
@@ -1869,9 +1871,10 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         assert np.all([(len(filter_epochs_decoder_result.most_likely_positions_list[i]) == len(filter_epochs_decoder_result.time_bin_containers[i].centers)) for i, a_n_bins in enumerate(filter_epochs_decoder_result.nbins)])
 
         out_result: DecodedFilterEpochsResult = DecodedFilterEpochsResult(**filter_epochs_decoder_result.to_dict()) # dump the dynamic dict as kwargs into the class
-        out_result.validate_time_bins() ## one last full check! raises assertions if any time bins are still off
         
-        
+        if enable_slow_debugging_time_bin_validation:
+            out_result.validate_time_bins() ## one last full check! raises assertions if any time bins are still off. Actually very slow!
+            
         return out_result
     
 
