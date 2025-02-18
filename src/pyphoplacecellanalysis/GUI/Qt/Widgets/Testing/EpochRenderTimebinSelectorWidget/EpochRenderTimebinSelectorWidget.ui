@@ -8,7 +8,7 @@
     <x>0</x>
     <y>0</y>
     <width>218</width>
-    <height>128</height>
+    <height>160</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -55,7 +55,7 @@ border-color: rgb(0, 0, 0);</string>
    <property name="spacing">
     <number>0</number>
    </property>
-   <item row="0" column="0">
+   <item row="0" column="1">
     <widget class="QGroupBox" name="groupBox">
      <property name="enabled">
       <bool>true</bool>
@@ -254,6 +254,9 @@ QToolButton:!checked{
         </property>
         <item>
          <widget class="QDoubleSpinBox" name="doubleSpinBoxHeight">
+          <property name="enabled">
+           <bool>false</bool>
+          </property>
           <property name="toolTip">
            <string>Height</string>
           </property>
@@ -282,6 +285,9 @@ QToolButton:!checked{
         </item>
         <item>
          <widget class="QDoubleSpinBox" name="doubleSpinBoxOffset">
+          <property name="enabled">
+           <bool>false</bool>
+          </property>
           <property name="toolTip">
            <string>Position Offset</string>
           </property>
@@ -317,6 +323,42 @@ QToolButton:!checked{
        </layout>
       </item>
       <item>
+       <layout class="QHBoxLayout" name="horizontalLayout_3" stretch="0,1">
+        <item>
+         <widget class="QLabel" name="label_2">
+          <property name="text">
+           <string>epoch idx</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QSpinBox" name="spinBox_EpochIndex">
+          <property name="toolTip">
+           <string>Epoch Index</string>
+          </property>
+          <property name="statusTip">
+           <string>Epoch Index</string>
+          </property>
+          <property name="whatsThis">
+           <string>Epoch Index</string>
+          </property>
+          <property name="frame">
+           <bool>false</bool>
+          </property>
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+          <property name="buttonSymbols">
+           <enum>QAbstractSpinBox::NoButtons</enum>
+          </property>
+          <property name="keyboardTracking">
+           <bool>false</bool>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
        <widget class="QSlider" name="horizontalSlider_EpochIndex">
         <property name="toolTip">
          <string>Epoch Index</string>
@@ -327,6 +369,9 @@ QToolButton:!checked{
         <property name="whatsThis">
          <string>Epoch Index</string>
         </property>
+        <property name="pageStep">
+         <number>1</number>
+        </property>
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
         </property>
@@ -334,6 +379,42 @@ QToolButton:!checked{
          <enum>QSlider::TicksAbove</enum>
         </property>
        </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout_4" stretch="0,1">
+        <item>
+         <widget class="QLabel" name="label">
+          <property name="text">
+           <string>tbin idx</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QSpinBox" name="spinBox_TimeBinIndex">
+          <property name="toolTip">
+           <string>Time Bin Index</string>
+          </property>
+          <property name="statusTip">
+           <string>Time Bin Index</string>
+          </property>
+          <property name="whatsThis">
+           <string>Time Bin Index</string>
+          </property>
+          <property name="frame">
+           <bool>false</bool>
+          </property>
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+          <property name="buttonSymbols">
+           <enum>QAbstractSpinBox::NoButtons</enum>
+          </property>
+          <property name="keyboardTracking">
+           <bool>false</bool>
+          </property>
+         </widget>
+        </item>
+       </layout>
       </item>
       <item>
        <widget class="QSlider" name="horizontalSlider_TimeBinIndex">
@@ -345,6 +426,9 @@ QToolButton:!checked{
         </property>
         <property name="whatsThis">
          <string>Time Bin Index</string>
+        </property>
+        <property name="pageStep">
+         <number>1</number>
         </property>
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
@@ -369,5 +453,38 @@ QToolButton:!checked{
  <resources>
   <include location="../../../../../Resources/ActionIcons.qrc"/>
  </resources>
- <connections/>
+ <connections>
+  <connection>
+   <sender>horizontalSlider_EpochIndex</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>spinBox_EpochIndex</receiver>
+   <slot>setValue(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>108</x>
+     <y>112</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>148</x>
+     <y>86</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>horizontalSlider_TimeBinIndex</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>spinBox_TimeBinIndex</receiver>
+   <slot>setValue(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>108</x>
+     <y>141</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>69</x>
+     <y>86</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
 </ui>
