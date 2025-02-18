@@ -1326,7 +1326,7 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
         
 
     @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=['FigureWidgetDockDisplayConfig'], used_by=[], creation_date='2023-10-17 13:26', related_items=['add_new_embedded_pyqtgraph_render_plot_widget'])
-    def add_new_matplotlib_render_plot_widget(self, row=1, col=0, name='matplotlib_view_widget', dockSize=(500,50), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None, return_dock_object:bool=False) -> Tuple[MatplotlibTimeSynchronizedWidget, Figure, List[Axis]]:
+    def add_new_matplotlib_render_plot_widget(self, row=1, col=0, name='matplotlib_view_widget', dockSize=(500,50), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None, return_dock_object:bool=False, sync_mode:Optional[SynchronizedPlotMode]=None) -> Tuple[MatplotlibTimeSynchronizedWidget, Figure, List[Axis]]:
         """ creates a new dynamic MatplotlibTimeSynchronizedWidget, a container widget that holds a matplotlib figure, and adds it as a row to the main layout
         
         emit an event so the parent can call `self.update_scrolling_event_filters()` to add the new item
@@ -1388,6 +1388,9 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
             an_ax.patch.set_facecolor('black')
             an_ax.patch.set_alpha(0.1)
     
+        if sync_mode is not None:
+            ## sync up the widgets
+            self.sync_matplotlib_render_plot_widget(identifier=name, sync_mode=sync_mode)
 
         # self.sync_matplotlib_render_plot_widget()
         if not return_dock_object:
@@ -1397,7 +1400,7 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
     
 
     @function_attributes(short_name=None, tags=['pyqtgraph_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget', 'pyqtgraph', 'docked_widget'], input_requires=[], output_provides=[], uses=['PyqtgraphTimeSynchronizedWidget'], used_by=[], creation_date='2024-12-31 03:35', related_items=['add_new_matplotlib_render_plot_widget'])
-    def add_new_embedded_pyqtgraph_render_plot_widget(self, name='pyqtgraph_view_widget', dockSize=(500,50), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None) -> Tuple[PyqtgraphTimeSynchronizedWidget, Any, Any, Dock]:
+    def add_new_embedded_pyqtgraph_render_plot_widget(self, name='pyqtgraph_view_widget', dockSize=(500,50), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None, sync_mode:Optional[SynchronizedPlotMode]=None) -> Tuple[PyqtgraphTimeSynchronizedWidget, Any, Any, Dock]:
         """ creates a new dynamic PyqtgraphTimeSynchronizedWidget, a container widget that holds a matplotlib figure, and adds it as a row to the main layout
         
         based off of `add_new_matplotlib_render_plot_widget`, but to support embedded pyqtgraph plots instead of matplotlib plots
@@ -1452,7 +1455,10 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
             ## emit the signal
             self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name])
             
-
+            if sync_mode is not None:
+                ## sync up the widgets
+                self.sync_matplotlib_render_plot_widget(identifier=name, sync_mode=sync_mode)
+                
         else:
             # Already had the widget
             print(f'already had the valid pyqtgraph view widget and its display dock. Returning extant.')
