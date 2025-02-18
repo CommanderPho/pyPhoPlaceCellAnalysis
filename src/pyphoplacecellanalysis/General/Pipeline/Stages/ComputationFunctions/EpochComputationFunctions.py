@@ -34,6 +34,9 @@ from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
 from attrs import asdict, astuple, define, field, Factory
 from neuropy.utils.indexing_helpers import PandasHelpers
 
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
+
+
 # ### For _perform_recursive_latent_placefield_decoding
 # from neuropy.utils import position_util
 # from neuropy.core import Position
@@ -447,7 +450,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
         # from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult, SingleEpochDecodedResult
         # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
+        
         
          # 25ms
         # epochs_decoding_time_bin_size: float = 0.050 # 50ms
@@ -530,7 +533,6 @@ class Compute_NonPBE_Epochs(ComputedResult):
             results1D, results2D = a_new_NonPBE_Epochs_obj.compute_all(curr_active_pipeline, epochs_decoding_time_bin_size=0.025, subdivide_bin_size=0.50, compute_1D=True, compute_2D=True)
         
         """
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
         import concurrent.futures
         from copy import deepcopy
 
