@@ -11,9 +11,8 @@ import pandas as pd
 from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
 from neuropy.utils.dynamic_container import DynamicContainer # for _perform_two_step_position_decoding_computation
 from neuropy.utils.efficient_interval_search import get_non_overlapping_epochs # used in _subfn_compute_decoded_epochs to get only the valid (non-overlapping) epochs
-from neuropy.core.epoch import Epoch, ensure_dataframe
+from neuropy.core.epoch import Epoch, subdivide_epochs, ensure_dataframe, ensure_Epoch
 from neuropy.analyses.placefields import HDF_SerializationMixin, PfND
-
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
@@ -38,15 +37,87 @@ from neuropy.utils.indexing_helpers import PandasHelpers
 # from neuropy.analyses.placefields import perform_compute_placefields
 
 """-------------- Specific Computation Functions to be registered --------------"""
+# [/c:/Users/pho/repos/Spike3DWorkEnv/NeuroPy/neuropy/core/session/Formats/Specific/KDibaOldDataSessionFormat.py:142](vscode://file/c:/Users/pho/repos/Spike3DWorkEnv/NeuroPy/neuropy/core/session/Formats/Specific/KDibaOldDataSessionFormat.py:142)
+# ```python
+#     @classmethod
+#     def POSTLOAD_estimate_laps_and_replays(cls, sess):
+#         """ a POSTLOAD function: after loading, estimates the laps and replays objects (replacing those loaded). """
+#         print(f'POSTLOAD_estimate_laps_and_replays()...')
+        
+#         # 2023-05-16 - Laps conformance function (TODO 2023-05-16 - factor out?)
+#         # lap_estimation_parameters = DynamicContainer(N=20, should_backup_extant_laps_obj=True) # Passed as arguments to `sess.replace_session_laps_with_estimates(...)`
+
+#         lap_estimation_parameters = sess.config.preprocessing_parameters.epoch_estimation_parameters.laps
+#         assert lap_estimation_parameters is not None
+
+#         use_direction_dependent_laps: bool = lap_estimation_parameters.pop('use_direction_dependent_laps', True)
+#         sess.replace_session_laps_with_estimates(**lap_estimation_parameters, should_plot_laps_2d=False) # , time_variable_name=None
+#         ## add `use_direction_dependent_laps` back in:
+#         lap_estimation_parameters.use_direction_dependent_laps = use_direction_dependent_laps
+
+#         ## Apply the laps as the limiting computation epochs:
+#         # computation_config.pf_params.computation_epochs = sess.laps.as_epoch_obj().get_non_overlapping().filtered_by_duration(1.0, 30.0)
+#         if use_direction_dependent_laps:
+#             print(f'.POSTLOAD_estimate_laps_and_replays(...): WARN: {use_direction_dependent_laps}')
+#             # TODO: I think this is okay here.
+
+
+#         # Get the non-lap periods using PortionInterval's complement method:
+#         non_running_periods = Epoch.from_PortionInterval(sess.laps.as_epoch_obj().to_PortionInterval().complement()) # TODO 2023-05-24- Truncate to session .t_start, .t_stop as currently includes infinity, but it works fine.
+        
+
+#         # ## TODO 2023-05-19 - FIX SLOPPY PBE HANDLING
+#         PBE_estimation_parameters = sess.config.preprocessing_parameters.epoch_estimation_parameters.PBEs
+#         assert PBE_estimation_parameters is not None
+#         PBE_estimation_parameters.require_intersecting_epoch = non_running_periods # 2023-10-06 - Require PBEs to occur during the non-running periods, REQUIRED BY KAMRAN contrary to my idea of what PBE is.
+        
+#         new_pbe_epochs = sess.compute_pbe_epochs(sess, active_parameters=PBE_estimation_parameters)
+#         sess.pbe = new_pbe_epochs
+#         updated_spk_df = sess.compute_spikes_PBEs()
+
+#         # 2023-05-16 - Replace loaded replays (which are bad) with estimated ones:
+        
+        
+        
+#         # num_pre = session.replay.
+#         replay_estimation_parameters = sess.config.preprocessing_parameters.epoch_estimation_parameters.replays
+#         assert replay_estimation_parameters is not None
+#         ## Update the parameters with the session-specific values that couldn't be determined until after the session was loaded:
+#         replay_estimation_parameters.require_intersecting_epoch = non_running_periods
+#         replay_estimation_parameters.min_inclusion_fr_active_thresh = 1.0
+#         replay_estimation_parameters.min_num_unique_aclu_inclusions = 5
+#         sess.replace_session_replays_with_estimates(**replay_estimation_parameters)
+        
+#         # ### Get both laps and existing replays as PortionIntervals to check for overlaps:
+#         # replays = sess.replay.epochs.to_PortionInterval()
+#         # laps = sess.laps.as_epoch_obj().to_PortionInterval() #.epochs.to_PortionInterval()
+#         # non_lap_replays = Epoch.from_PortionInterval(replays.difference(laps)) ## Exclude anything that occcurs during the laps themselves.
+#         # sess.replay = non_lap_replays.to_dataframe() # Update the session's replay epochs from those that don't intersect the laps.
+
+#         # print(f'len(replays): {len(replays)}, len(laps): {len(laps)}, len(non_lap_replays): {non_lap_replays.n_epochs}')
+        
+
+#         # TODO 2023-05-22: Write the parameters somewhere:
+#         replays = sess.replay.epochs.to_PortionInterval()
+
+#         ## This is the inverse approach of the new method, which loads the parameters from `sess.config.preprocessing_parameters`
+#         # sess.config.preprocessing_parameters = DynamicContainer(epoch_estimation_parameters=DynamicContainer.init_from_dict({
+#         #     'laps': lap_estimation_parameters,
+#         #     'PBEs': PBE_estimation_parameters,
+#         #     'replays': replay_estimation_parameters
+#         # }))
+
+#         return sess
+# ```
 
 class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     _computationPrecidence = 2 # must be done after PlacefieldComputations, DefaultComputationFunctions
     _is_global = False
 
     @computation_precidence_specifying_function(overriden_computation_precidence=-0.1)
-    @function_attributes(short_name='lap_direction_determination', tags=['laps'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-24 13:04', related_items=[],
-        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].sess.laps.to_dataframe(), curr_active_pipeline.computation_results[computation_filter_name].sess.laps.to_dataframe()['is_LR_dir']), is_global=False)
-    def _perform_lap_direction_determination(computation_result: ComputationResult, **kwargs):
+    @function_attributes(short_name='compute_non_PBE_epochs', tags=['epochs', 'nonPBE'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-18 09:45', related_items=[],
+        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['firing_rate_trends'], curr_active_pipeline.computation_results[computation_filter_name].computed_data['extended_stats']['time_binned_position_df']), is_global=False)
+    def _perform_compute_non_PBE_epochs(computation_result: ComputationResult, **kwargs):
         """ Adds the 'is_LR_dir' column to the laps dataframe and updates 'lap_dir' if needed.        
         """
         computation_result.sess.laps.update_lap_dir_from_smoothed_velocity(pos_input=computation_result.sess.position) # confirmed in-place
@@ -54,43 +125,44 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
         # curr_sess.laps.update_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end) # this doesn't make sense for the filtered sessions unfortunately.
         return computation_result # no changes except to the internal sessions
     
-    @function_attributes(short_name='_perform_specific_epochs_decoding', tags=['BasePositionDecoder', 'computation', 'decoder', 'epoch'],
-                          input_requires=[ "computation_result.computed_data['pf1D_Decoder']", "computation_result.computed_data['pf2D_Decoder']"], output_provides=["computation_result.computed_data['specific_epochs_decoding']"],
-                          uses=[], used_by=[], creation_date='2023-04-07 02:16',
-        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['specific_epochs_decoding']), is_global=False)
-    def _perform_specific_epochs_decoding(computation_result: ComputationResult, active_config, decoder_ndim:int=2, filter_epochs='ripple', decoding_time_bin_size=0.02, **kwargs):
-        """ TODO: meant to be used by `_display_plot_decoded_epoch_slices` but needs a smarter way to cache the computations and etc. 
-        Eventually to replace `pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError._compute_specific_decoded_epochs`
 
-        Usage:
-            ## Test _perform_specific_epochs_decoding
-            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions
-            computation_result = curr_active_pipeline.computation_results['maze1_PYR']
-            computation_result = EpochComputationFunctions._perform_specific_epochs_decoding(computation_result, curr_active_pipeline.active_configs['maze1_PYR'], filter_epochs='ripple', decoding_time_bin_size=0.02)
-            filter_epochs_decoder_result, active_filter_epochs, default_figure_name = computation_result.computed_data['specific_epochs_decoding'][('Ripples', 0.02)]
+    # @function_attributes(short_name='_perform_specific_epochs_decoding', tags=['BasePositionDecoder', 'computation', 'decoder', 'epoch'],
+    #                       input_requires=[ "computation_result.computed_data['pf1D_Decoder']", "computation_result.computed_data['pf2D_Decoder']"], output_provides=["computation_result.computed_data['specific_epochs_decoding']"],
+    #                       uses=[], used_by=[], creation_date='2023-04-07 02:16',
+    #     validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['specific_epochs_decoding']), is_global=False)
+    # def _perform_specific_epochs_decoding(computation_result: ComputationResult, active_config, decoder_ndim:int=2, filter_epochs='ripple', decoding_time_bin_size=0.02, **kwargs):
+    #     """ TODO: meant to be used by `_display_plot_decoded_epoch_slices` but needs a smarter way to cache the computations and etc. 
+    #     Eventually to replace `pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError._compute_specific_decoded_epochs`
 
-        """
-        ## BEGIN_FUNCTION_BODY _perform_specific_epochs_decoding:
-        ## Check for previous computations:
-        needs_compute = True # default to needing to recompute.
-        computation_tuple_key = (filter_epochs, decoding_time_bin_size, decoder_ndim) # used to be (default_figure_name, decoding_time_bin_size) only
+    #     Usage:
+    #         ## Test _perform_specific_epochs_decoding
+    #         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions
+    #         computation_result = curr_active_pipeline.computation_results['maze1_PYR']
+    #         computation_result = EpochComputationFunctions._perform_specific_epochs_decoding(computation_result, curr_active_pipeline.active_configs['maze1_PYR'], filter_epochs='ripple', decoding_time_bin_size=0.02)
+    #         filter_epochs_decoder_result, active_filter_epochs, default_figure_name = computation_result.computed_data['specific_epochs_decoding'][('Ripples', 0.02)]
 
-        curr_result = computation_result.computed_data.get('specific_epochs_decoding', {})
-        found_result = curr_result.get(computation_tuple_key, None)
-        if found_result is not None:
-            # Unwrap and reuse the result:
-            filter_epochs_decoder_result, active_filter_epochs, default_figure_name = found_result # computation_result.computed_data['specific_epochs_decoding'][('Laps', decoding_time_bin_size)]
-            needs_compute = False # we don't need to recompute
+    #     """
+    #     ## BEGIN_FUNCTION_BODY _perform_specific_epochs_decoding:
+    #     ## Check for previous computations:
+    #     needs_compute = True # default to needing to recompute.
+    #     computation_tuple_key = (filter_epochs, decoding_time_bin_size, decoder_ndim) # used to be (default_figure_name, decoding_time_bin_size) only
 
-        if needs_compute:
-            ## Do the computation:
-            filter_epochs_decoder_result, active_filter_epochs, default_figure_name = _subfn_compute_decoded_epochs(computation_result, active_config, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, decoder_ndim=decoder_ndim)
+    #     curr_result = computation_result.computed_data.get('specific_epochs_decoding', {})
+    #     found_result = curr_result.get(computation_tuple_key, None)
+    #     if found_result is not None:
+    #         # Unwrap and reuse the result:
+    #         filter_epochs_decoder_result, active_filter_epochs, default_figure_name = found_result # computation_result.computed_data['specific_epochs_decoding'][('Laps', decoding_time_bin_size)]
+    #         needs_compute = False # we don't need to recompute
 
-            ## Cache the computation result via the tuple key: (default_figure_name, decoding_time_bin_size) e.g. ('Laps', 0.02) or ('Ripples', 0.02)
-            curr_result[computation_tuple_key] = (filter_epochs_decoder_result, active_filter_epochs, default_figure_name)
+    #     if needs_compute:
+    #         ## Do the computation:
+    #         filter_epochs_decoder_result, active_filter_epochs, default_figure_name = _subfn_compute_decoded_epochs(computation_result, active_config, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, decoder_ndim=decoder_ndim)
 
-        computation_result.computed_data['specific_epochs_decoding'] = curr_result
-        return computation_result
+    #         ## Cache the computation result via the tuple key: (default_figure_name, decoding_time_bin_size) e.g. ('Laps', 0.02) or ('Ripples', 0.02)
+    #         curr_result[computation_tuple_key] = (filter_epochs_decoder_result, active_filter_epochs, default_figure_name)
+
+    #     computation_result.computed_data['specific_epochs_decoding'] = curr_result
+    #     return computation_result
 
 
 
@@ -219,6 +291,10 @@ class Compute_NonPBE_Epochs:
         a_new_test_df
 
             
+        curr_active_pipeline.sess.pbe
+        curr_active_pipeline.sess.epochs
+        curr_active_pipeline.find_LongShortDelta_times()
+        
         """
         from neuropy.core.epoch import EpochsAccessor, Epoch, ensure_dataframe
         # import portion as P # Required for interval search: portion~=2.3.0
@@ -378,7 +454,7 @@ class Compute_NonPBE_Epochs:
         return test_epoch_specific_decoded_results_dict, continuous_specific_decoded_results_dict, new_decoder_dict, new_pfs_dict
 
 
-
+    @function_attributes(short_name=None, tags=['MAIN', 'compute'], input_requires=[], output_provides=[], uses=['self.__class__.build_subdivided_epochs(...)'], used_by=[], creation_date='2025-02-18 09:40', related_items=[])
     def compute_all(self, curr_active_pipeline, epochs_decoding_time_bin_size: float = 0.025, subdivide_bin_size: float = 0.5, compute_1D: bool = True, compute_2D: bool = True) -> Tuple[Optional[NonPBEDimensionalDecodingResult], Optional[NonPBEDimensionalDecodingResult]]:
         """ computes all pfs, decoders, and then performs decodings on both continuous and subivided epochs.
         
@@ -397,13 +473,11 @@ class Compute_NonPBE_Epochs:
             results1D, results2D = a_new_NonPBE_Epochs_obj.compute_all(curr_active_pipeline, epochs_decoding_time_bin_size=0.025, subdivide_bin_size=0.50, compute_1D=True, compute_2D=True)
         
         """
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_subdivided_epochs
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
         
-
         # Build subdivided epochs first since they're needed for both 1D and 2D
-        (global_subivided_epochs_obj, global_subivided_epochs_df), global_pos_df = build_subdivided_epochs(curr_active_pipeline, subdivide_bin_size=subdivide_bin_size)
+        (global_subivided_epochs_obj, global_subivided_epochs_df), global_pos_df = self.__class__.build_subdivided_epochs(curr_active_pipeline, subdivide_bin_size=subdivide_bin_size)
         
         results1D, results2D = None, None
         
@@ -429,6 +503,84 @@ class Compute_NonPBE_Epochs:
 
         return results1D, results2D
         
+    @classmethod
+    @function_attributes(short_name=None, tags=['subdivision'], input_requires=[], output_provides=[], uses=[], used_by=['cls.compute_all(...)'], creation_date='2025-02-11 00:00', related_items=[])
+    def build_subdivided_epochs(cls, curr_active_pipeline, subdivide_bin_size: float = 1.0):
+        """ 
+        subdivide_bin_size = 1.0 # Specify the size of each sub-epoch in seconds
+        
+        Usage:
+        
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_subdivided_epochs
+            
+            subdivide_bin_size: float = 1.0
+            (global_subivided_epochs_obj, global_subivided_epochs_df), global_pos_df = Compute_NonPBE_Epochs.build_subdivided_epochs(curr_active_pipeline, subdivide_bin_size=subdivide_bin_size)
+            ## Do Decoding of only the test epochs to validate performance
+            subdivided_epochs_specific_decoded_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {a_name:a_new_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), filter_epochs=deepcopy(global_subivided_epochs_obj), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False) for a_name, a_new_decoder in new_decoder_dict.items()}
+
+        
+        """
+        
+        
+        ## OUTPUTS: test_epoch_specific_decoded_results_dict, continuous_specific_decoded_results_dict
+
+        ## INPUTS: new_decoder_dict
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
+        single_global_epoch_df: pd.DataFrame = pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})
+        # single_global_epoch_df['label'] = single_global_epoch_df.index.to_numpy()
+        single_global_epoch: Epoch = Epoch(single_global_epoch_df)
+
+        df: pd.DataFrame = ensure_dataframe(deepcopy(single_global_epoch)) 
+        df['maze_name'] = 'global'
+        # df['interval_type_id'] = 666
+
+        subdivided_df: pd.DataFrame = subdivide_epochs(df, subdivide_bin_size)
+        subdivided_df['label'] = deepcopy(subdivided_df.index.to_numpy())
+        subdivided_df['stop'] = subdivided_df['stop'] - 1e-12
+        global_subivided_epochs_obj = ensure_Epoch(subdivided_df)
+
+        # ## Do Decoding of only the test epochs to validate performance
+        # subdivided_epochs_specific_decoded_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {a_name:a_new_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), filter_epochs=deepcopy(global_subivided_epochs_obj), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False) for a_name, a_new_decoder in new_decoder_dict.items()}
+
+        ## OUTPUTS: subdivided_epochs_specific_decoded_results_dict
+        # takes 4min 30 sec to run
+
+        ## Adds the 'global_subdivision_idx' column to 'global_pos_df' so it can get the measured positions by plotting
+        # INPUTS: global_subivided_epochs_obj, original_pos_dfs_dict
+        # global_subivided_epochs_obj
+        global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
+        global_subivided_epochs_df = global_subivided_epochs_obj.epochs.to_dataframe() #.rename(columns={'t_rel_seconds':'t'})
+        global_subivided_epochs_df['label'] = deepcopy(global_subivided_epochs_df.index.to_numpy())
+        # global_pos_df: pd.DataFrame = deepcopy(global_session.position.to_dataframe()) #.rename(columns={'t':'t_rel_seconds'})
+        
+        ## Extract Measured Position:
+        global_pos_obj: Position = deepcopy(global_session.position)
+        global_pos_df: pd.DataFrame = global_pos_obj.compute_higher_order_derivatives().position.compute_smoothed_position_info(N=15)
+        global_pos_df.time_point_event.adding_epochs_identity_column(epochs_df=global_subivided_epochs_df, epoch_id_key_name='global_subdivision_idx', epoch_label_column_name='label', drop_non_epoch_events=True, should_replace_existing_column=True) # , override_time_variable_name='t_rel_seconds'
+        
+        ## Adds the ['subdivision_epoch_start_t'] columns to `stacked_flat_global_pos_df` so we can figure out the appropriate offsets
+        subdivided_epochs_properties_df: pd.DataFrame = deepcopy(global_subivided_epochs_df)
+        subdivided_epochs_properties_df['global_subdivision_idx'] = deepcopy(subdivided_epochs_properties_df.index) ## add explicit 'global_subdivision_idx' column
+        subdivided_epochs_properties_df = subdivided_epochs_properties_df.rename(columns={'start': 'subdivision_epoch_start_t'})[['global_subdivision_idx', 'subdivision_epoch_start_t']]
+        global_pos_df = PandasHelpers.add_explicit_dataframe_columns_from_lookup_df(global_pos_df, subdivided_epochs_properties_df, join_column_name='global_subdivision_idx')
+        global_pos_df.sort_values(by=['t'], inplace=True) # Need to re-sort by timestamps once done
+
+        if global_pos_df.attrs is None:
+            global_pos_df.attrs = {}
+            
+        global_pos_df.attrs.update({'subdivide_bin_size': subdivide_bin_size})
+        
+        if global_subivided_epochs_df.attrs is None:
+            global_subivided_epochs_df.attrs = {}
+            
+        global_subivided_epochs_df.attrs.update({'subdivide_bin_size': subdivide_bin_size})
+
+
+        
+        return (global_subivided_epochs_obj, global_subivided_epochs_df), global_pos_df
+
 
 
 from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum
@@ -437,6 +589,7 @@ class KnownFilterEpochs(ExtendedEnum):
     """Describes the type of file progress actions that can be performed to get the right verbage.
     Used by `_subfn_compute_decoded_epochs(...)`
    
+    
     """
     LAP = "lap"
     PBE = "pbe"
