@@ -588,7 +588,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         # need to block signals:
         # self.ui.doubleSpinBox_ActiveWindowStartTime.blockSignals(True)
         # self.ui.doubleSpinBox_ActiveWindowEndTime.blockSignals(True)
-        if start_t is not None:
+        if (start_t is not None):
             self.ui.doubleSpinBox_ActiveWindowStartTime.setValue(start_t)
             # self.ui.jumpToHourMinSecTimeEdit.blockSignals(True)
             # self.ui.jumpToHourMinSecTimeEdit.setValue(
@@ -601,7 +601,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
             # self.time_edit.setTime(start_time_obj)
             # self.ui.jumpToHourMinSecTimeEdit.blockSignals(False)
 
-        if end_t is not None:
+        if (end_t is not None):
             self.ui.doubleSpinBox_ActiveWindowEndTime.setValue(end_t)
         # self.ui.doubleSpinBox_ActiveWindowStartTime.blockSignals(False) # unblock the signals when done
         # self.ui.doubleSpinBox_ActiveWindowEndTime.blockSignals(False)
@@ -714,7 +714,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         self.log_print(f'on_help_button_pressed()')
         
     def on_right_sidebar_toggle_button_pressed(self):
-        print(f'on_right_sidebar_toggle_button_pressed():')
+        print(f'Spike3DRasterBottomPlaybackControlBar.on_right_sidebar_toggle_button_pressed():')
         should_sidebar_be_visible: bool = self.ui.btnToggleRightSidebar.isChecked()
         print(f'\tshould_sidebar_be_visible: {should_sidebar_be_visible}')
         
