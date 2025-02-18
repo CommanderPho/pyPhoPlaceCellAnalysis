@@ -689,7 +689,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
     def on_owned_child_crosshair_updated_signal(self, child, name, trace_value):
         """ called when the crosshair is updated"""
-        print(f'Spike3DRasterWindowWidget.on_owned_child_crosshair_updated_signal(child: {child}, name: "{name}", trace_value: "{trace_value}")')
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.on_owned_child_crosshair_updated_signal(child: {child}, name: "{name}", trace_value: "{trace_value}")')
         left_side_bar_controls = self.ui.leftSideToolbarWidget
         left_side_bar_controls.crosshair_trace_time = trace_value
         
@@ -700,7 +701,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     # def on_crosshair_updated_signal(self, child, name, trace_value):
     def on_crosshair_updated_signal(self, name, trace_value):
         """ called when the crosshair is updated"""
-        print(f'Spike3DRasterWindowWidget.on_crosshair_updated_signal(name: "{name}", trace_value: "{trace_value}")')
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.on_crosshair_updated_signal(name: "{name}", trace_value: "{trace_value}")')
         left_side_bar_controls = self.ui.leftSideToolbarWidget
         left_side_bar_controls.crosshair_trace_time = trace_value
         
@@ -733,7 +735,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         ## Find the events beyond that time:
         filtered_times_df = selected_rendered_interval_series_times_df[(selected_rendered_interval_series_times_df['t_start'].to_numpy() > curr_time_window[0])] #.first(0) #.iat[0,:]
         next_target_jump_time = filtered_times_df['t_start'].to_numpy()[0]
-        print(f'curr_time_window: {curr_time_window}, next_target_jump_time: {next_target_jump_time}')
+        if self.enable_debug_print:
+            print(f'curr_time_window: {curr_time_window}, next_target_jump_time: {next_target_jump_time}')
         # jump_change_time = next_target_jump_time - curr_time_window[0]
         # print(f'jump_change_time: {jump_change_time}')
         ## Update the window:
@@ -756,7 +759,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         ## Find the events beyond that time:
         filtered_times_df = selected_rendered_interval_series_times_df[(selected_rendered_interval_series_times_df['t_start'].to_numpy() < curr_time_window[0])]
         next_target_jump_time = filtered_times_df['t_start'].to_numpy()[-1]
-        print(f'curr_time_window: {curr_time_window}, next_target_jump_time: {next_target_jump_time}')
+        if self.enable_debug_print:
+            print(f'curr_time_window: {curr_time_window}, next_target_jump_time: {next_target_jump_time}')
         # jump_change_time = next_target_jump_time - curr_time_window[0]
         # print(f'jump_change_time: {jump_change_time}')
         ## Update the window:
