@@ -212,8 +212,8 @@ class SingleArtistMultiEpochBatchHelpers:
         ## OUTPUTS: (desired_epoch_start_idx, desired_epoch_end_idx), (desired_start_time_seconds, desired_end_time_seconds), desired_time_duration
 
         ## INPUTS: stacked_flat_global_pos_df, active_ax
-        self.inverse_xbin_width: float = np.ptp(self.xbin_edges) ## data_coords scale
-        self.inverse_xbin_height: float = np.ptp(self.ybin_edges)
+        self.inverse_bin_width: float = np.ptp(self.xbin_edges) ## data_coords scale
+        self.inverse_bin_height: float = np.ptp(self.ybin_edges)
         if debug_print:
             print(f".xbin: {self.xbin_edges}")
             print(f".ybin: {self.ybin_edges}")
@@ -261,7 +261,6 @@ class SingleArtistMultiEpochBatchHelpers:
             
             # self.stacked_flat_global_pos_df['y'] -= self.y0_offset ## zero-out the x0 by subtracting out the minimal xbin_edge
 
-
             ## As imported 2025-02-17:
             # self.stacked_flat_global_pos_df['x'] -= self.x0_offset ## zero-out the x0 by subtracting out the minimal xbin_edge
             # self.stacked_flat_global_pos_df['x_smooth'] -= self.x0_offset ## zero-out the x0 by subtracting out the minimal xbin_edge
@@ -301,7 +300,7 @@ class SingleArtistMultiEpochBatchHelpers:
     # ==================================================================================================================== #
     
     @function_attributes(short_name=None, tags=['ALMOST_FINISHED', 'NOT_YET_FINISHED', '2025-02-14_TO_REFACTOR_FROM_NOTEBOOK'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-14 22:02', related_items=[])
-    def add_track_positions(self, debug_print=False, defer_draw:bool=False, **kwargs):
+    def add_track_positions(self, override_ax=None, debug_print=False, defer_draw:bool=False, **kwargs):
         """ Add the measured positions 
         
         From `#### 2025-02-14 - Perform plotting of Measured Positions (using `stacked_flat_global_pos_df['global_subdivision_x_data_offset']`)`
@@ -323,6 +322,11 @@ class SingleArtistMultiEpochBatchHelpers:
             
             
         """
+        if override_ax is None:
+            active_ax = self.active_ax
+        else:
+            active_ax = override_ax        
+
         if not self.has_data_been_built:
             ## finalize building the data for single-artist plotting (does not plot anything)
             self.shared_build_flat_stacked_data(debug_print=debug_print, should_expand_first_dim=True, **kwargs)
@@ -338,20 +342,22 @@ class SingleArtistMultiEpochBatchHelpers:
         assert 'global_subdivision_x_data_offset' in self.stacked_flat_global_pos_df
         assert y_axis_col_name in self.stacked_flat_global_pos_df
         
-
         ## Perform the real plotting:
         x = self.stacked_flat_global_pos_df['global_subdivision_x_data_offset'].to_numpy()
         # y = self.stacked_flat_global_pos_df[y_axis_col_name].to_numpy() / self.inverse_xbin_width ## needs to be inversely mapped from 0, 1
         y = self.stacked_flat_global_pos_df[y_axis_col_name].to_numpy() ## needs to be inversely mapped from 0, 1        
 
-        measured_pos_line_artist = self.active_ax.plot(x, y, color='r', label='measured_pos')[0]
+        measured_pos_line_artist = active_ax.plot(x, y, color='r', label='measured_pos')[0]
         
         # y_axis_kwargs = dict(ymin=0.0, ymax=1.0)
         y_axis_kwargs = dict(ymin=self.xbin_edges[0], ymax=self.xbin_edges[-1])
-        subdivision_epoch_separator_vlines = self.active_ax.vlines(self.results2D.subdivided_epochs_df['start'].to_numpy(), **y_axis_kwargs, colors='white', linestyles='solid', label='subdivision_epoch_separator_vlines') # , data=None
+        subdivision_epoch_separator_vlines = active_ax.vlines(self.results2D.subdivided_epochs_df['start'].to_numpy(), **y_axis_kwargs, colors='white', linestyles='solid', label='subdivision_epoch_separator_vlines') # , data=None
 
         if not defer_draw:
-            self.redraw()
+            if override_ax is None:
+                self.redraw()
+            else:
+                override_ax.get_figure().canvas.draw_idle()
 
         return (measured_pos_line_artist, subdivision_epoch_separator_vlines)
 
@@ -361,7 +367,7 @@ class SingleArtistMultiEpochBatchHelpers:
     # ==================================================================================================================== #
     
     @function_attributes(short_name=None, tags=['WORKING', '2025-02-14_TO_REFACTOR_FROM_NOTEBOOK'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-14 22:02', related_items=[])
-    def add_position_posteriors(self, posterior_masking_value=0.0025, debug_print=False, defer_draw:bool=False, **kwargs):
+    def add_position_posteriors(self, override_ax=None, posterior_masking_value=0.0025, debug_print=False, defer_draw:bool=False, **kwargs):
         """ add the decoded posteriors as heatmaps
 
         Corresponding to `#### 2025-02-14 - Perform plotting of Decoded Posteriors` in notebook
@@ -369,6 +375,11 @@ class SingleArtistMultiEpochBatchHelpers:
         
         curr_artist_dict, image_extent, plots_data = batch_plot_helper.add_position_posteriors(posterior_masking_value=0.0025, debug_print=True, defer_draw=False)
         """
+        if override_ax is None:
+            active_ax = self.active_ax
+        else:
+            active_ax = override_ax           
+
         if not self.has_data_been_built:
             ## finalize building the data for single-artist plotting (does not plot anything)
             self.shared_build_flat_stacked_data(should_expand_first_dim=True, **kwargs)
@@ -397,19 +408,22 @@ class SingleArtistMultiEpochBatchHelpers:
 
         curr_artist_dict = {}
         ## Perform the plot:
-        # curr_artist_dict['prev_heatmaps'], (a_meas_pos_line, a_line), (_meas_pos_out_markers, _out_markers), plots_data = DecodedTrajectoryMatplotlibPlotter._perform_add_decoded_posterior_and_trajectory(ax, xbin_centers=a_xbin_centers, a_p_x_given_n=a_p_x_given_n,
+        # curr_artist_dict['prev_heatmaps'], (a_meas_pos_line, a_line), (_meas_pos_out_markers, _out_markers), plots_data = DecodedTrajectoryMatplotlibPlotter._perform_add_decoded_posterior_and_trajectory(active_ax, xbin_centers=a_xbin_centers, a_p_x_given_n=a_p_x_given_n,
         #                                                                     a_time_bin_centers=a_time_bin_centers, a_most_likely_positions=a_most_likely_positions, a_measured_pos_df=a_measured_pos_df, ybin_centers=a_ybin_centers,
         #                                                                     include_most_likely_pos_line=None, time_bin_index=None, rotate_to_vertical=True, should_perform_reshape=False, should_post_hoc_fit_to_image_extent=False, debug_print=True) # , allow_time_slider=True
 
         # Delegate the posterior plotting functionality.
-        curr_artist_dict['prev_heatmaps'], image_extent, plots_data = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap(self.active_ax,
+        curr_artist_dict['prev_heatmaps'], image_extent, plots_data = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap(active_ax,
                                                         xbin_centers=a_xbin_centers, ybin_centers=a_ybin_centers, a_time_bin_centers=None, a_p_x_given_n=a_p_x_given_n,
                                                         posterior_masking_value=posterior_masking_value, rotate_to_vertical=False, debug_print=True, should_perform_reshape=False, custom_image_extent=custom_image_extent)
 
 
         if not defer_draw:
-            self.redraw()
-            
+            if override_ax is None:
+                self.redraw()
+            else:
+                override_ax.get_figure().canvas.draw_idle()
+                
         return curr_artist_dict, image_extent, plots_data
 
     # ==================================================================================================================== #
@@ -443,8 +457,6 @@ class SingleArtistMultiEpochBatchHelpers:
         else:
             active_ax = override_ax
 
-        rotate_to_vertical: bool = True
-        perform_autoscale: bool = False
         
         ## INPUTS: track_ax, rotate_to_vertical, perform_autoscale
         # subdivide_bin_size: float = self.subdivide_bin_size
@@ -489,8 +501,8 @@ class SingleArtistMultiEpochBatchHelpers:
         # long_combined_item, long_rect_items, long_rects = long_out_tuple
         # short_combined_item, short_rect_items, short_rects = short_out_tuple
 
-        long_rects = long_track_inst.build_rects(include_rendering_properties=False, rotate_to_vertical=rotate_to_vertical)
-        short_rects = short_track_inst.build_rects(include_rendering_properties=False, rotate_to_vertical=rotate_to_vertical)
+        long_rects = long_track_inst.build_rects(include_rendering_properties=False, rotate_to_vertical=self.rotate_to_vertical)
+        short_rects = short_track_inst.build_rects(include_rendering_properties=False, rotate_to_vertical=self.rotate_to_vertical)
         self.track_single_rects_dict = {'long': long_rects, 'short': short_rects}
 
         # long_path = _build_track_1D_verticies(platform_length=22.0, track_length=170.0, track_1D_height=1.0, platform_1D_height=1.1, track_center_midpoint_x=long_track.grid_bin_bounds.center_point[0], track_center_midpoint_y=-1.0, debug_print=True)
