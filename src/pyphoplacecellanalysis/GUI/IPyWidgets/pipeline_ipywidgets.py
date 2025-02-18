@@ -144,6 +144,30 @@ class CustomProcessingPhases(OrderedEnum):
         return _out_run_config
     
 
+    @classmethod
+    def get_extended_computations_include_includelist_phase_dict(cls) -> Dict[str, "CustomProcessingPhases"]:
+        return{'lap_direction_determination':CustomProcessingPhases.clean_run, 'pf_computation':CustomProcessingPhases.clean_run, 'pfdt_computation':CustomProcessingPhases.clean_run,
+                                        'position_decoding':CustomProcessingPhases.clean_run, 'position_decoding_two_step':CustomProcessingPhases.final_run, 
+                                        'firing_rate_trends':CustomProcessingPhases.continued_run,
+            # 'pf_dt_sequential_surprise':CustomProcessingPhases.final_run,  # commented out 2024-11-05
+            'extended_stats':CustomProcessingPhases.continued_run,
+            'long_short_decoding_analyses':CustomProcessingPhases.continued_run, 'jonathan_firing_rate_analysis':CustomProcessingPhases.continued_run, 'long_short_fr_indicies_analyses':CustomProcessingPhases.continued_run, 'short_long_pf_overlap_analyses':CustomProcessingPhases.final_run, 'long_short_post_decoding':CustomProcessingPhases.continued_run, 
+            # 'ratemap_peaks_prominence2d':CustomProcessingPhases.final_run, # commented out 2024-11-05
+            'long_short_inst_spike_rate_groups':CustomProcessingPhases.continued_run,
+            'long_short_endcap_analysis':CustomProcessingPhases.continued_run,
+            # 'spike_burst_detection':CustomProcessingPhases.continued_run,
+            'split_to_directional_laps':CustomProcessingPhases.clean_run,
+            'merged_directional_placefields':CustomProcessingPhases.continued_run,
+            'rank_order_shuffle_analysis':CustomProcessingPhases.final_run,
+            'directional_train_test_split':CustomProcessingPhases.final_run,
+            'directional_decoders_decode_continuous':CustomProcessingPhases.continued_run,
+            'directional_decoders_evaluate_epochs':CustomProcessingPhases.continued_run,
+            'directional_decoders_epoch_heuristic_scoring':CustomProcessingPhases.continued_run,
+            'extended_pf_peak_information':CustomProcessingPhases.final_run,
+            'perform_wcorr_shuffle_analysis':CustomProcessingPhases.final_run,
+        }
+
+
 @metadata_attributes(short_name=None, tags=['jupyter'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-06 22:56', related_items=['CustomProcessingPhases'])
 class PipelineJupyterHelpers:
     """ 
