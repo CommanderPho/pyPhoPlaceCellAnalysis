@@ -421,6 +421,10 @@ class SingleArtistMultiEpochBatchHelpers:
         time_cmap = LinearSegmentedColormap.from_list("GreenToBlack", time_cmap_start_end_colors, N=25) # Create a colormap (green to black).
 
         self.stacked_flat_global_pos_df = SingleArtistMultiEpochBatchHelpers.add_color_over_global_subdivision_idx_positions_to_stacked_flat_global_pos_df(stacked_flat_global_pos_df=self.stacked_flat_global_pos_df, time_cmap=time_cmap)
+        
+        # ensure the 'y_scaled' actually are scaled between [0.0, 1.0]
+        self.stacked_flat_global_pos_df["y_scaled"] = (self.stacked_flat_global_pos_df["y_scaled"] - self.stacked_flat_global_pos_df["y_scaled"].min()) / (self.stacked_flat_global_pos_df["y_scaled"].max() - self.stacked_flat_global_pos_df["y_scaled"].min())
+        
         # stacked_flat_global_pos_df
         new_stacked_flat_global_pos_df = SingleArtistMultiEpochBatchHelpers.add_nan_masked_rows_to_stacked_flat_global_pos_df(stacked_flat_global_pos_df=self.stacked_flat_global_pos_df)
         # new_stacked_flat_global_pos_df, color_formatting_dict = add_nan_masked_rows_to_stacked_flat_global_pos_df(stacked_flat_global_pos_df=stacked_flat_global_pos_df)
@@ -437,6 +441,9 @@ class SingleArtistMultiEpochBatchHelpers:
         measured_pos_dock_track_ax = active_ax
         # measured_pos_dock_track_ax.set_facecolor('white')
         measured_pos_dock_track_ax.set_facecolor('#333333')
+        
+
+
         
         measured_pos_line_artist = measured_pos_dock_track_ax.scatter(active_stacked_flat_global_pos_df["global_subdivision_x_data_offset"], active_stacked_flat_global_pos_df["y_scaled"], color=active_stacked_flat_global_pos_df["color"].tolist())
         measured_pos_line_artist.set_alpha(0.85)
@@ -2230,8 +2237,6 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
                 self.slider_epoch_time_bin_playback_checkbox = self.interactive_plotter.interactive_checkbox_actor
 
 
-
-
     def update_ui(self):
         """ called to update the epoch_time_bin slider when the epoch_index slider is changed. 
         """
@@ -2317,6 +2322,7 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
         (self.plotActors, self.data_dict), (self.plotActors_CenterLabels, self.data_dict_CenterLabels) = DecoderRenderingPyVistaMixin.perform_plot_posterior_fn(self.p,
                                                                                                 xbin=self.xbin, ybin=self.ybin, xbin_centers=self.xbin_centers, ybin_centers=self.ybin_centers,
                                                                                                 time_bin_centers=a_time_bin_centers, posterior_p_x_given_n=a_posterior_p_x_given_n, enable_point_labels=self.enable_point_labels, active_plot_fn=self.active_plot_fn)
+
 
     def perform_clear_existing_decoded_trajectory_plots(self):
         ## remove existing actors
