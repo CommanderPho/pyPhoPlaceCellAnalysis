@@ -1050,6 +1050,7 @@ class DirectionalLapsHelpers:
         else:
             return args
 
+    @function_attributes(short_name=None, tags=['fixup'], input_requires=[], output_provides=[], uses=[], used_by=['.fixup_directional_pipeline_if_needed'], creation_date='2025-02-19 13:21', related_items=[])
     @classmethod
     def post_fixup_filtered_contexts(cls, curr_active_pipeline, debug_print=False) -> bool:
         """ 2023-10-24 - tries to update misnamed `curr_active_pipeline.filtered_contexts`
@@ -1105,7 +1106,7 @@ class DirectionalLapsHelpers:
         # end for
         return was_updated
 
-
+    @function_attributes(short_name=None, tags=[], input_requires=[], output_provides=[], uses=['.has_duplicated_memory_references'], used_by=['.fixup_directional_pipeline_if_needed'], creation_date='2025-02-19 13:22', related_items=[])
     @classmethod
     def fix_computation_epochs_if_needed(cls, curr_active_pipeline, debug_print=False):
         """2023-11-10 - WORKING NOW - decouples (if they refer to shared memory locations, which was causing a bug) the configs and constrains the computation_epochs to the relevant long/short periods. Will need recomputations if was_modified """
@@ -1157,9 +1158,9 @@ class DirectionalLapsHelpers:
 
         return was_modified
 
-
+    @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=['.post_fixup_filtered_contexts', '.fix_computation_epochs_if_needed'], used_by=[], creation_date='2025-02-19 13:22', related_items=[])
     @classmethod
-    def fixup_directional_pipeline_if_needed(cls, curr_active_pipeline, debug_print=False):
+    def fixup_directional_pipeline_if_needed(cls, curr_active_pipeline, debug_print=False) -> bool:
         """2023-11-29 - Updates the filtered context and decouples the configs and constrains the computation_epochs to the relevant long/short periods as needed. Will need recomputations if was_modified """
         #TODO 2023-11-10 23:32: - [ ] WORKING NOW!
         # 2023-11-10 21:15: - [X] Not yet finished! Does not work due to shared memory issue. Changes to the first two affect the next two
