@@ -2363,6 +2363,78 @@ class PipelineWithComputedPipelineStageMixin:
         return split_save_folder, split_save_paths, split_save_output_types, failed_keys
 
 
+    @function_attributes(short_name=None, tags=['save', 'pickle', 'custom', 'filename', 'filesystem', 'custom'], input_requires=[], output_provides=[], uses=['save_pipeline', 'save_global_computation_results'], used_by=[], creation_date='2025-02-19 07:18', related_items=[])
+    def try_save_pipeline_with_custom_user_modifiers(self, user_prefix: str = '', user_suffix: str = '', is_dryrun: bool=False) -> Tuple[List[str], bool]:
+        """ tries to save the pipeline with the user-specified custom suffix/prefix 
+
+        Usage:
+            user_custom_modified_filenames, did_save_success = try_save_pipeline_with_custom_user_modifiers(curr_active_pipeline=curr_active_pipeline, user_prefix='', user_suffix='2025-02-19')
+        """
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
+        
+        # @function_attributes(short_name=None, tags=['filesystem', 'custom', 'save', 'pickle', 'user'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-19 07:10', related_items=[])
+        def _build_filepaths_with_user_modifiers(custom_save_filepaths: List[str], user_prefix: str = '', user_suffix: str = '') -> List[str]:
+            """ modifiy paths and return lists of filenames """
+            ## convert to lists if they aren't so they have no effect (don't add uneeded separators like '_' for empty lists):
+            if not isinstance(user_prefix, (list, tuple)):
+                if user_prefix != '':
+                    user_prefix = [user_prefix] # single element list
+                else:
+                    user_prefix = [] ## empty so no effect	
+
+            if not isinstance(user_suffix, (list, tuple)):
+                if user_suffix != '':
+                    user_suffix = [user_suffix] # single element list
+                else:
+                    user_suffix = [] ## empty so no effect
+
+
+            user_custom_modified_filepaths = {k:Path(v).resolve() for k, v in custom_save_filepaths.items()} ## convert to real paths
+            user_custom_modified_filestems = {k:'_'.join([*user_prefix, f"{v.stem}", *user_suffix]) for k, v in user_custom_modified_filepaths.items()}
+            user_custom_modified_filenames = {k:v.resolve().with_stem(user_custom_modified_filestems[k]).name for k, v in user_custom_modified_filepaths.items()}
+            return user_custom_modified_filenames
+
+        # @function_attributes(short_name=None, tags=['filesystem', 'save', 'write', 'pickle', 'pipeline', 'custom'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-19 07:11', related_items=['_build_filepaths_with_user_modifiers'])
+        def _try_user_custom_save_pipeline(curr_active_pipeline, user_custom_modified_filenames):
+            """ tries to save the pipeline 
+            captures: is_dryrun
+            """
+            try:
+                print(f'trying to save the pipeline with custom filename: {user_custom_modified_filenames["pipeline_pkl"]}...')
+                # curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, override_pickle_path=curr_active_pipeline.pickle_path, active_pickle_filename='loadedSessPickle_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0_2025-01-20.pkl') #active_pickle_filename=
+                if not is_dryrun:
+                    curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, active_pickle_filename=user_custom_modified_filenames['pipeline_pkl']) #active_pickle_filename=    
+                else:
+                    print(f'\tis_dryrun == True, so not actually saving.')
+            except Exception as e:
+                print(f'ERROR: failed saving with exception: {e}.\n\t !! Aborting and not continuing to try and save global.')
+                # raise
+                return False
+            
+            try:
+                print(f'trying to save the global computations pipeline with custom filename: {user_custom_modified_filenames["global_computation_pkl"]}...')
+                if not is_dryrun:
+                    curr_active_pipeline.save_global_computation_results(override_global_pickle_filename=user_custom_modified_filenames['global_computation_pkl'])
+                else:
+                    print(f'\tis_dryrun == True, so not actually saving.')
+            except Exception as e:
+                print(f'ERROR: failed saving global_comps with exception: {e}')
+                # raise
+                return False
+            
+            return True
+
+        # ==================================================================================================================== #
+        # BEGIN FUNCTION BODY                                                                                                  #
+        # ==================================================================================================================== #
+        custom_save_filepaths, custom_save_filenames, custom_suffix = self.get_custom_pipeline_filenames_from_parameters()
+        user_custom_modified_filenames = _build_filepaths_with_user_modifiers(custom_save_filepaths=custom_save_filepaths, user_prefix=user_prefix, user_suffix=user_suffix)
+        did_save_success: bool = _try_user_custom_save_pipeline(curr_active_pipeline=self, user_custom_modified_filenames=user_custom_modified_filenames)
+        return (user_custom_modified_filenames, did_save_success)
+
+
+
+
     @function_attributes(short_name=None, tags=['fixup', 'deserialization', 'filesystem', 'post-load', 'cross-platform'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-14 09:41', related_items=[])
     def post_load_fixup_sess_basedirs(self, updated_session_basepath: Path, force_update: bool = False):
         """ after loading from pickle from another computer, fixes up the session's basepaths so they actually exist.
