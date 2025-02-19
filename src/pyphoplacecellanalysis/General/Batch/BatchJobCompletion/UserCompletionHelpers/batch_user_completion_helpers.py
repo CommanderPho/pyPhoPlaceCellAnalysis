@@ -2430,12 +2430,27 @@ class PostHocPipelineFixup:
     # ==================================================================================================================== #
     # Filepaths                                                                                                            #
     # ==================================================================================================================== #
-    
+    @function_attributes(short_name=None, tags=['non_pbe', 'epochs', 'sessions'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-19 00:00', related_items=[])
+    @classmethod
+    def FINAL_UPDATE_FILEPATHS(cls, curr_active_pipeline, force_update:bool=True) -> bool:
+        """ perform all fixes """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import Compute_NonPBE_Epochs
 
-
+        did_fixup_any_missing_basepath = curr_active_pipeline.post_load_fixup_sess_basedirs(updated_session_basepath=deepcopy(curr_active_pipeline.sess.basepath), force_update=force_update)
+        return did_fixup_any_missing_basepath
+        
     # ==================================================================================================================== #
     # Non-PBE Epochs                                                                                                       #
     # ==================================================================================================================== #
+    @function_attributes(short_name=None, tags=['non_pbe', 'epochs', 'sessions'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-19 00:00', related_items=[])
+    @classmethod
+    def FINAL_UPDATE_NON_PBE_EPOCHS(cls, curr_active_pipeline) -> bool:
+        """ perform all fixes """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import Compute_NonPBE_Epochs
+
+        did_any_non_pbe_epochs_change, curr_active_pipeline.stage.sess, curr_active_pipeline.stage.filtered_sessions = Compute_NonPBE_Epochs.update_session_non_pbe_epochs(curr_active_pipeline.sess, filtered_sessions=curr_active_pipeline.filtered_sessions)
+
+        return did_any_non_pbe_epochs_change
 
 
 
@@ -2443,7 +2458,15 @@ class PostHocPipelineFixup:
     @staticmethod
     def run_as_batch_user_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, force_recompute=False) -> dict:
         """ meant to be executed as a _batch_user_completion_function"""
-        (did_any_change, change_dict), correct_grid_bin_bounds = PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, is_dry_run=False)
+        did_any_change: bool = False
+        (did_any_grid_bin_change, change_dict), correct_grid_bin_bounds = PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, is_dry_run=False)
+
+        did_fixup_any_missing_basepath = PostHocPipelineFixup.FINAL_UPDATE_FILEPATHS(curr_active_pipeline=curr_active_pipeline)
+
+        did_any_non_pbe_epochs_change = PostHocPipelineFixup.FINAL_UPDATE_NON_PBE_EPOCHS(curr_active_pipeline=curr_active_pipeline)
+        
+        did_any_change = (did_any_grid_bin_change or did_fixup_any_missing_basepath or did_any_non_pbe_epochs_change)
+        
 
         loaded_track_limits = curr_active_pipeline.sess.config.loaded_track_limits
         a_config_dict = curr_active_pipeline.sess.config.to_dict()
@@ -2452,7 +2475,8 @@ class PostHocPipelineFixup:
         print(f'\t{curr_session_basedir}:\tloaded_track_limits: {loaded_track_limits}, a_config_dict: {a_config_dict}')  # , t_end: {t_end}
         
         callback_outputs = {
-        'correct_grid_bin_bounds': correct_grid_bin_bounds, 'loaded_track_limits': loaded_track_limits, 'change_dict': change_dict, 'config_dict': a_config_dict, #'t_end': t_end   
+        'correct_grid_bin_bounds': correct_grid_bin_bounds, 'loaded_track_limits': loaded_track_limits, 'change_dict': change_dict, 'config_dict': a_config_dict, #'t_end': t_end 
+        'did_any_grid_bin_change': did_any_grid_bin_change, 'did_fixup_any_missing_basepath': did_fixup_any_missing_basepath, 'did_any_non_pbe_epochs_change': did_any_non_pbe_epochs_change, 'did_any_change': did_any_change,
         }
         across_session_results_extended_dict[PostHocPipelineFixup.across_session_results_extended_dict_data_name] = callback_outputs
         
