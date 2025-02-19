@@ -2408,7 +2408,7 @@ class PostHocPipelineFixup:
 
     @function_attributes(short_name=None, tags=['MAIN', 'ESSENTIAL', 'UNUSED', 'grid_bin_bounds', 'grid_bin'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-12 19:50', related_items=[])
     @classmethod
-    def FINAL_FIX_GRID_BIN_BOUNDS(cls, curr_active_pipeline, force_recompute:bool=False, is_dry_run: bool=False):
+    def FINAL_FIX_GRID_BIN_BOUNDS(cls, curr_active_pipeline, force_recompute:bool=False, is_dry_run: bool=False, debug_skip_computations_only:bool=True):
         """ perform all fixes regarding the grid_bin_bounds and grid_bin """
         print(f'\t !!!||||||||||||||||||> RUNNING `PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(...)`:')
         correct_grid_bin_bounds = cls.get_hardcoded_known_good_grid_bin_bounds(curr_active_pipeline)
@@ -2420,6 +2420,9 @@ class PostHocPipelineFixup:
             else:
                 print(f'only_changing_change_keys: {only_changing_change_keys}\n\tat least one grid_bin_bound was changed, recomputing...')
 
+            if debug_skip_computations_only:
+                print(f'2025-02-19 17:52 WARNING!!!! debug_skip_computations_only == True should only be for testing, not doing comps.')
+            else:
             if (not is_dry_run):
                 ## if not dry_run, do the recomputations:
                 ## All invalidated ones:
@@ -2459,6 +2462,8 @@ class PostHocPipelineFixup:
                 print(f'\trecomputation complete!')
             else:
                  print(f'\tWARNING: is_dry_run is true so no recompute will be done.')
+                ## END if debug_skip_computations_only....
+                
         else:
             ## no changes and not force_recompute
             print(f'No grid bin bounds were changed. Everything should be up-to-date!')
