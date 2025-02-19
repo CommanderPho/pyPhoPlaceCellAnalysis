@@ -1,6 +1,7 @@
 from copy import deepcopy
 import sys
 from enum import Enum
+import panel as pn
 from pyphocorehelpers.DataStructure.enum_helpers import OrderedEnum
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from attrs import define, field, Factory
@@ -31,7 +32,7 @@ from pyphoplacecellanalysis.External.pyqtgraph.widgets.FileDialog import FileDia
 from pyphocorehelpers.gui.Jupyter.simple_widgets import fullwidth_path_widget, create_file_browser
 
 
-from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme # used in perform_pipeline_save
+from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipeline, PipelineSavingScheme # used in perform_pipeline_save
 
 
 @define(slots=False)
