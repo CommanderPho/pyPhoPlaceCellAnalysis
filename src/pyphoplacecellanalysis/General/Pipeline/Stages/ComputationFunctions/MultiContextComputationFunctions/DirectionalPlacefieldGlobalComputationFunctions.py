@@ -7987,33 +7987,41 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
     @classmethod
     def add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epochs(cls, curr_active_pipeline, active_2d_plot, debug_print=False, **kwargs):
         """ adds all computed time_bin_sizes in `curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'].continuously_decoded_result_cache_dict` from the global_computation_results as new matplotlib plot rows. """
-        
-        ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
-        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
-        pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder        
-        # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
-        continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
-
-        # all_time_bin_sizes_output_dict = {'non_marginalized_raw_result': [], 'marginal_over_direction': [], 'marginal_over_track_ID': []}
-        # flat_all_time_bin_sizes_output_tuples_list: List[Tuple] = []
         flat_all_time_bin_sizes_output_tuples_dict: Dict[str, Tuple] = {}
-        for time_bin_size, a_continuously_decoded_dict in continuously_decoded_result_cache_dict.items():
-            # a_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult]
-            if debug_print:
-                print(f'time_bin_size: {time_bin_size}')
+        
+        try:
+            ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
+            directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+            pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder        
+            # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+            continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
 
-            info_string: str = f" - t_bin_size: {time_bin_size}"
-            # output_dict = _cmd.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals(curr_active_pipeline=_cmd._active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, **enable_rows_config_kwargs)
-            output_dict = cls.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, a_pseudo2D_decoder=pseudo2D_decoder, debug_print=debug_print, **kwargs)
-            for a_key, an_output_tuple in output_dict.items():
-                identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = an_output_tuple                
-                # if a_key not in all_time_bin_sizes_output_dict:
-                #     all_time_bin_sizes_output_dict[a_key] = [] ## init empty list
-                # all_time_bin_sizes_output_dict[a_key].append(an_output_tuple)
-                
-                assert (identifier_name not in flat_all_time_bin_sizes_output_tuples_dict), f"identifier_name: {identifier_name} already in flat_all_time_bin_sizes_output_tuples_dict: {list(flat_all_time_bin_sizes_output_tuples_dict.keys())}"
-                flat_all_time_bin_sizes_output_tuples_dict[identifier_name] = an_output_tuple
-                
+            # all_time_bin_sizes_output_dict = {'non_marginalized_raw_result': [], 'marginal_over_direction': [], 'marginal_over_track_ID': []}
+            # flat_all_time_bin_sizes_output_tuples_list: List[Tuple] = []
+            
+            for time_bin_size, a_continuously_decoded_dict in continuously_decoded_result_cache_dict.items():
+                # a_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult]
+                if debug_print:
+                    print(f'time_bin_size: {time_bin_size}')
+
+                info_string: str = f" - t_bin_size: {time_bin_size}"
+                # output_dict = _cmd.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals(curr_active_pipeline=_cmd._active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, **enable_rows_config_kwargs)
+                output_dict = cls.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, a_pseudo2D_decoder=pseudo2D_decoder, debug_print=debug_print, **kwargs)
+                for a_key, an_output_tuple in output_dict.items():
+                    identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = an_output_tuple                
+                    # if a_key not in all_time_bin_sizes_output_dict:
+                    #     all_time_bin_sizes_output_dict[a_key] = [] ## init empty list
+                    # all_time_bin_sizes_output_dict[a_key].append(an_output_tuple)
+                    
+                    assert (identifier_name not in flat_all_time_bin_sizes_output_tuples_dict), f"identifier_name: {identifier_name} already in flat_all_time_bin_sizes_output_tuples_dict: {list(flat_all_time_bin_sizes_output_tuples_dict.keys())}"
+                    flat_all_time_bin_sizes_output_tuples_dict[identifier_name] = an_output_tuple
+        except (KeyError, AttributeError) as e:
+            # KeyError: 'DirectionalDecodersDecoded'
+            print(f'add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epochs(...) failed to add any tracks, perhaps because the pipeline is missing any computed "DirectionalDecodersDecoded" global results. Skipping.')
+            pass                   
+
+        except Exception as e:
+            raise
             
         ## OUTPUTS: all_time_bin_sizes_output_dict
         return flat_all_time_bin_sizes_output_tuples_dict
