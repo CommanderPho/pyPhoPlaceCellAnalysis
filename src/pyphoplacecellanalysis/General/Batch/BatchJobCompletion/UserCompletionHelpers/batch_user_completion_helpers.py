@@ -2267,7 +2267,7 @@ class PostHocPipelineFixup:
                 if did_loaded_track_limits_change:
                     did_any_change = True
             else:
-                print(f'loaded_track_limits are not correctly checked in is_dry_run==True mode.')
+                print(f'WARN: loaded_track_limits are not correctly checked in is_dry_run==True mode.')
 
             # all UserAnnotations overrides ______________________________________________________________________________________ #
             for k, new_val in a_session_override_dict.items():
@@ -2375,13 +2375,17 @@ class PostHocPipelineFixup:
     @function_attributes(short_name=None, tags=['MAIN', 'ESSENTIAL', 'UNUSED', 'grid_bin_bounds', 'grid_bin'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-12 19:50', related_items=[])
     @classmethod
     def FINAL_FIX_GRID_BIN_BOUNDS(cls, curr_active_pipeline, force_recompute=False, is_dry_run: bool=False):
-        """ perform all fixes """
-
+        """ perform all fixes regarding the grid_bin_bounds and grid_bin """
+        print(f'\t !!!||||||||||||||||||> RUNNING `PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(...)`:')
         correct_grid_bin_bounds = cls.get_hardcoded_known_good_grid_bin_bounds(curr_active_pipeline)
         did_any_change, change_dict = cls.HARD_OVERRIDE_grid_bin_bounds(curr_active_pipeline, hard_manual_override_grid_bin_bounds=deepcopy(correct_grid_bin_bounds), is_dry_run=is_dry_run)
         
         if (did_any_change or force_recompute) and (not is_dry_run):
-            print(f'change_dict: {change_dict}\n\tat least one grid_bin_bound was changed (or force_recompute==True), recomputing...')
+            if force_recompute:
+                print(f'change_dict: {change_dict}\n\t(force_recompute==True), recomputing...')
+            else:
+                print(f'change_dict: {change_dict}\n\tat least one grid_bin_bound was changed, recomputing...')
+
             ## All invalidated ones:
             computation_functions_name_includelist=['_perform_baseline_placefield_computation', '_perform_time_dependent_placefield_computation', '_perform_extended_statistics_computation',
                                                 '_perform_position_decoding_computation', 
@@ -2433,9 +2437,8 @@ class PostHocPipelineFixup:
     @function_attributes(short_name=None, tags=['non_pbe', 'epochs', 'sessions'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-19 00:00', related_items=[])
     @classmethod
     def FINAL_UPDATE_FILEPATHS(cls, curr_active_pipeline, force_update:bool=True) -> bool:
-        """ perform all fixes """
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import Compute_NonPBE_Epochs
-
+        """ perform all fixes regarding the pipeline's loaded session's .basepath and any paths in its configs """
+        print(f'\t =================> RUNNING `PostHocPipelineFixup.FINAL_UPDATE_FILEPATHS(...)`:')
         did_fixup_any_missing_basepath = curr_active_pipeline.post_load_fixup_sess_basedirs(updated_session_basepath=deepcopy(curr_active_pipeline.sess.basepath), force_update=force_update)
         return did_fixup_any_missing_basepath
         
@@ -2445,9 +2448,9 @@ class PostHocPipelineFixup:
     @function_attributes(short_name=None, tags=['non_pbe', 'epochs', 'sessions'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-19 00:00', related_items=[])
     @classmethod
     def FINAL_UPDATE_NON_PBE_EPOCHS(cls, curr_active_pipeline) -> bool:
-        """ perform all fixes """
+        """ perform all fixes regarding computation of the non-PBE epochs """
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import Compute_NonPBE_Epochs
-
+        print(f'\t =================> RUNNING `PostHocPipelineFixup.FINAL_UPDATE_NON_PBE_EPOCHS(...)`:')
         did_any_non_pbe_epochs_change, curr_active_pipeline.stage.sess, curr_active_pipeline.stage.filtered_sessions = Compute_NonPBE_Epochs.update_session_non_pbe_epochs(curr_active_pipeline.sess, filtered_sessions=curr_active_pipeline.filtered_sessions)
 
         return did_any_non_pbe_epochs_change
@@ -2460,6 +2463,8 @@ class PostHocPipelineFixup:
         """ meant to be executed as a _batch_user_completion_function"""
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsHelpers, DirectionalLapsResult
 
+        print(f'\t !!!||||||||||||||||||> RUNNING `PostHocPipelineFixup.run_as_batch_user_completion_function(...)`:')
+        print(f'starting `PostHocPipelineFixup.run_as_batch_user_completion_function(...)`...')
 
         did_any_change: bool = False
         (did_any_grid_bin_change, change_dict), correct_grid_bin_bounds = PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, is_dry_run=False)
@@ -2471,12 +2476,12 @@ class PostHocPipelineFixup:
         # Fix the computation epochs to be constrained to the proper long/short intervals:
         # was_directional_pipeline_modified = DirectionalLapsResult.fix_computation_epochs_if_needed(curr_active_pipeline=curr_active_pipeline)
         was_directional_pipeline_modified = DirectionalLapsHelpers.fixup_directional_pipeline_if_needed(curr_active_pipeline)
-        print(f'DirectionalLapsResult.init_from_pipeline_natural_epochs(...): was_modified: {was_modified}')
+        print(f'\tDirectionalLapsResult.init_from_pipeline_natural_epochs(...): was_modified: {was_directional_pipeline_modified}')
         
         # curr_active_pipeline, directional_lap_specific_configs = DirectionalLapsHelpers.split_to_directional_laps(curr_active_pipeline=curr_active_pipeline, add_created_configs_to_pipeline=True)
 
         did_any_change = (did_any_grid_bin_change or did_fixup_any_missing_basepath or did_any_non_pbe_epochs_change or was_directional_pipeline_modified)
-        
+        print(f'\tPostHocPipelineFixup.run_as_batch_user_completion_function(...): did_any_change: {did_any_change}')
 
         loaded_track_limits = curr_active_pipeline.sess.config.loaded_track_limits
         a_config_dict = curr_active_pipeline.sess.config.to_dict()
@@ -2488,8 +2493,10 @@ class PostHocPipelineFixup:
         'correct_grid_bin_bounds': correct_grid_bin_bounds, 'loaded_track_limits': loaded_track_limits, 'change_dict': change_dict, 'config_dict': a_config_dict, #'t_end': t_end 
         'did_any_grid_bin_change': did_any_grid_bin_change, 'did_fixup_any_missing_basepath': did_fixup_any_missing_basepath, 'did_any_non_pbe_epochs_change': did_any_non_pbe_epochs_change, 'was_directional_pipeline_modified': was_directional_pipeline_modified, 'did_any_change': did_any_change,
         }
+        print(f'\t\tcallback will be assigned to `across_session_results_extended_dict[{PostHocPipelineFixup.across_session_results_extended_dict_data_name}]`:')
+        print(f'\t\t\tcallback_outputs: {callback_outputs}')
         across_session_results_extended_dict[PostHocPipelineFixup.across_session_results_extended_dict_data_name] = callback_outputs
-        
+        print('\tdone.')
         return across_session_results_extended_dict
 
 
