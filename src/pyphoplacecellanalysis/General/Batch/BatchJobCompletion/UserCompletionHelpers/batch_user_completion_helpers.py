@@ -1584,7 +1584,7 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['wcorr', 'shuffle', 'replay', 'epochs', 'alternative_replays'], input_requires=[], output_provides=[], uses=['compute_all_replay_epoch_variations', 'overwrite_replay_epochs_and_recompute'], used_by=[], creation_date='2024-06-28 01:50', related_items=[])
+@function_attributes(short_name=None, tags=['wcorr', 'shuffle', 'replay', 'epochs', 'alternative_replays'], input_requires=[], output_provides=[], uses=['compute_all_replay_epoch_variations', 'BatchCompletionHelpers.overwrite_replay_epochs_and_recompute'], used_by=[], creation_date='2024-06-28 01:50', related_items=[])
 def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                                                       included_qclu_values = [1,2,4,6,7,9], minimum_inclusion_fr_Hz=5.0, ripple_decoding_time_bin_size: float = 0.025, num_wcorr_shuffles: int = 2048, drop_previous_result_and_compute_fresh:bool=True, enable_plot_wcorr_hist_figure:bool=False) -> dict:
     """  Computes several different alternative replay-detection variants and computes and exports the shuffled wcorrs for each of them
@@ -2458,14 +2458,24 @@ class PostHocPipelineFixup:
     @staticmethod
     def run_as_batch_user_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, force_recompute=False) -> dict:
         """ meant to be executed as a _batch_user_completion_function"""
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsHelpers, DirectionalLapsResult
+
+
         did_any_change: bool = False
         (did_any_grid_bin_change, change_dict), correct_grid_bin_bounds = PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, is_dry_run=False)
 
         did_fixup_any_missing_basepath = PostHocPipelineFixup.FINAL_UPDATE_FILEPATHS(curr_active_pipeline=curr_active_pipeline)
 
         did_any_non_pbe_epochs_change = PostHocPipelineFixup.FINAL_UPDATE_NON_PBE_EPOCHS(curr_active_pipeline=curr_active_pipeline)
+
+        # Fix the computation epochs to be constrained to the proper long/short intervals:
+        # was_directional_pipeline_modified = DirectionalLapsResult.fix_computation_epochs_if_needed(curr_active_pipeline=curr_active_pipeline)
+        was_directional_pipeline_modified = DirectionalLapsHelpers.fixup_directional_pipeline_if_needed(curr_active_pipeline)
+        print(f'DirectionalLapsResult.init_from_pipeline_natural_epochs(...): was_modified: {was_modified}')
         
-        did_any_change = (did_any_grid_bin_change or did_fixup_any_missing_basepath or did_any_non_pbe_epochs_change)
+        # curr_active_pipeline, directional_lap_specific_configs = DirectionalLapsHelpers.split_to_directional_laps(curr_active_pipeline=curr_active_pipeline, add_created_configs_to_pipeline=True)
+
+        did_any_change = (did_any_grid_bin_change or did_fixup_any_missing_basepath or did_any_non_pbe_epochs_change or was_directional_pipeline_modified)
         
 
         loaded_track_limits = curr_active_pipeline.sess.config.loaded_track_limits
@@ -2476,7 +2486,7 @@ class PostHocPipelineFixup:
         
         callback_outputs = {
         'correct_grid_bin_bounds': correct_grid_bin_bounds, 'loaded_track_limits': loaded_track_limits, 'change_dict': change_dict, 'config_dict': a_config_dict, #'t_end': t_end 
-        'did_any_grid_bin_change': did_any_grid_bin_change, 'did_fixup_any_missing_basepath': did_fixup_any_missing_basepath, 'did_any_non_pbe_epochs_change': did_any_non_pbe_epochs_change, 'did_any_change': did_any_change,
+        'did_any_grid_bin_change': did_any_grid_bin_change, 'did_fixup_any_missing_basepath': did_fixup_any_missing_basepath, 'did_any_non_pbe_epochs_change': did_any_non_pbe_epochs_change, 'was_directional_pipeline_modified': was_directional_pipeline_modified, 'did_any_change': did_any_change,
         }
         across_session_results_extended_dict[PostHocPipelineFixup.across_session_results_extended_dict_data_name] = callback_outputs
         
@@ -2485,7 +2495,7 @@ class PostHocPipelineFixup:
 
 
 @function_attributes(short_name=None, tags=['UNFINISHED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
-def kdiba_session_post_fixup_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
+def kdiba_session_post_fixup_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, force_recompute:bool=True) -> dict:
     """ Called to update the pipeline's important position info parameters (such as the grid_bin_bounds, positions, etc) from a loaded .mat file
     
     
