@@ -704,6 +704,34 @@ class Compute_NonPBE_Epochs(ComputedResult):
         return (global_subivided_epochs_obj, global_subivided_epochs_df), global_pos_df
 
 
+    @classmethod
+    @function_attributes(short_name=None, tags=['non_PBE', 'epochs', 'update', 'pipeline'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-18 18:49', related_items=[])
+    def update_session_non_pbe_epochs(cls, sess, filtered_sessions=None):
+        """Updates non_PBE epochs for both main session and filtered sessions
+        
+        Usage: 
+        
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import Compute_NonPBE_Epochs
+
+            curr_active_pipeline.stage.sess, curr_active_pipeline.stage.filtered_sessions = Compute_NonPBE_Epochs.update_session_non_pbe_epochs(curr_active_pipeline.sess, filtered_sessions=curr_active_pipeline.filtered_sessions)
+
+        """
+        from neuropy.core.session.dataSession import DataSession
+        
+        # Update main session
+        sess.non_pbe = DataSession.compute_non_PBE_epochs(sess, save_on_compute=True)
+        
+        # Update filtered sessions if provided
+        if filtered_sessions is not None:
+            for filter_name, filtered_session in filtered_sessions.items():
+                # filter_epoch = filtered_session.epochs.get_named_timerange(filter_name)
+                # filtered_session.non_pbe = sess.non_pbe.filtered_by_epoch(filter_epoch)
+                filtered_session.non_pbe = sess.non_pbe.time_slice(t_start=filtered_session.t_start, t_stop=filtered_session.t_stop)
+                
+        return sess, filtered_sessions
+
+
+
     ## For serialization/pickling:
     def __getstate__(self):
         # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
