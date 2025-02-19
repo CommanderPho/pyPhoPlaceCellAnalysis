@@ -59,10 +59,10 @@
      <addaction name="actionAddTimeIntervals_SessionEpochs"/>
      <addaction name="actionAddTimeIntervals_Laps"/>
      <addaction name="actionAddTimeIntervals_PBEs"/>
+     <addaction name="actionAddTimeIntervals_NonPBEs"/>
      <addaction name="actionAddTimeIntervals_Ripples"/>
      <addaction name="actionAddTimeIntervals_Replays"/>
      <addaction name="actionAddTimeIntervals_Bursts"/>
-     <addaction name="actionAddTimeIntervals_NonPBEs"/>
      <addaction name="actionAddTimeIntervals_Custom"/>
      <addaction name="separator"/>
      <addaction name="actionClear_all_Time_Intervals"/>
