@@ -2436,13 +2436,18 @@ class PipelineWithComputedPipelineStageMixin:
 
 
     @function_attributes(short_name=None, tags=['fixup', 'deserialization', 'filesystem', 'post-load', 'cross-platform'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-14 09:41', related_items=[])
-    def post_load_fixup_sess_basedirs(self, updated_session_basepath: Path, force_update: bool = False):
+    def post_load_fixup_sess_basedirs(self, updated_session_basepath: Path, force_update: bool = False) -> bool:
         """ after loading from pickle from another computer, fixes up the session's basepaths so they actually exist.
         
         Updates:
             self.sess.config.basepath, self.sess.filePrefix
             self.filtered_sessions[an_epoch_name].config.basepath, self.filtered_sessions[an_epoch_name].filePrefix
             
+
+        Usage:
+
+
+            did_fixup_any_missing_basepath = 
         """
         # from pyphocorehelpers.Filesystem.path_helpers import find_matching_parent_path, convert_filelist_to_new_parent
 
