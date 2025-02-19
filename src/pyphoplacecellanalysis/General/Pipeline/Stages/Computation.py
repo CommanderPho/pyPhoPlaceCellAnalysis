@@ -1143,6 +1143,9 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             computation_kwargs_list = [{} for _ in active_computation_functions]
         assert len(computation_kwargs_list) == len(active_computation_functions), f"Length mismatch: computation_kwargs_list (len: {len(computation_kwargs_list)}, contents: {computation_kwargs_list}) must match active_computation_functions (len: {len(active_computation_functions)}, contents: {active_computation_functions})"
 
+        ## finally, replace all `None` values with empty lists ({}) if no special kwargs are desired, as None will fail when `**computation_kwargs_list[i]` is called if left alone.
+        computation_kwargs_list = [{} if item is None else item for item in computation_kwargs_list]
+
         # computation_times_key_fn = lambda fn: fn
         computation_times_key_fn = lambda fn: str(fn.__name__) # Use only the functions name. I think this makes the .computation_times field picklable
         
@@ -1168,7 +1171,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                 for i, f in enumerate(active_computation_functions):
                     if progress_logger_callback is not None:
                         progress_logger_callback(f'Executing [{i}/{total_num_funcs}]: {f}')
-                    previous_computation_result = f(previous_computation_result, **computation_kwargs_list[i]) # call the function `f` directly here
+                    previous_computation_result = f(previous_computation_result, **computation_kwargs_list[i]) # call the function `f` directly here ## #TODO 2025-02-19 13:51: - [ ] was getting`TypeError: pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.PlacefieldComputations.PlacefieldComputations._perform_baseline_placefield_computation() argument after ** must be a mapping, not NoneType` which I fixed by replacing any None in the list with {}
                     # Log the computation copmlete time:
                     computation_times[computation_times_key_fn(f)] = datetime.now()
                 
