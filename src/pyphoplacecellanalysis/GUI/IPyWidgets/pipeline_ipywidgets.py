@@ -518,6 +518,7 @@ class PipelinePickleFileSelectorWidget:
     # Add new fields for the callback functions
     on_load_callback: Optional[Callable] = field(default=None)
     on_save_callback: Optional[Callable] = field(default=None)
+    on_compute_callback: Optional[Callable] = field(default=None)
     on_get_global_variable_callback: Optional[Callable] = field(default=None)
     on_update_global_variable_callback: Optional[Callable] = field(default=None)
     
@@ -555,6 +556,11 @@ class PipelinePickleFileSelectorWidget:
         """The is_save_button_enabled property."""
         return (self.on_save_callback is None) or (self.on_get_global_variable_callback is None)
     
+    @property 
+    def is_compute_button_disabled(self) -> bool:
+        """The is_compute_button_disabled property."""
+        return (self.on_compute_callback is None) or (self.on_get_global_variable_callback is None)
+
 
     @property
     def active_local_file_names_list(self) -> List[str]:
@@ -610,6 +616,7 @@ class PipelinePickleFileSelectorWidget:
         self.selected_global_pkl_files = full_paths
         self._update_load_save_button_disabled_state()
 
+
     def __attrs_post_init__(self):
         # Create the file browser widget
         # file_browser_widget = create_file_browser(directory, patterns, page_size=10, widget_height=400, on_selected_files_changed_fn=on_selected_files_changed)
@@ -622,42 +629,26 @@ class PipelinePickleFileSelectorWidget:
 
         self.load_button = pn.widgets.Button(name='Load', button_type='primary')
         self.save_button = pn.widgets.Button(name='Save', button_type='success')
-
+        self.compute_button = pn.widgets.Button(name='Compute', button_type='warning')  # Add compute button
+        
         self.load_button.disabled = self.is_load_button_disabled
         self.save_button.disabled = self.is_save_button_disabled
-
+        self.compute_button.disabled = self.is_compute_button_disabled  # Add compute button state
+        
         self.load_button.on_click(self._handle_load_click)
         self.save_button.on_click(self._handle_save_click)
+        self.compute_button.on_click(self._handle_compute_click)  # Add compute handler
         
-        # Arrange the Tabulator and buttons in a column
-        self.layout = pn.Column(self.local_file_browser_widget, self.global_file_browser_widget, pn.Row(self.save_button, self.load_button))
-
-        # Display the layout
-        # self.layout.servable()
-
-        # # Add button click handlers
-        # self.load_button.on_click(lambda b: self._handle_load_click())
-        # self.save_button.on_click(lambda b: self._handle_save_click())
-        
-        # # Create button row
-        # self.button_row = widgets.HBox([self.load_button, self.save_button])
-        
-        # # Get the widget objects from the file browsers
-        # local_widget = self.local_file_browser_widget.widget
-        # global_widget = self.global_file_browser_widget.widget
-        
-        # # Combine all widgets
-        # self.widget = widgets.VBox([
-        #     local_widget,
-        #     global_widget,
-        #     self.button_row
-        # ])
+        # Update layout to include compute button
+        self.layout = pn.Column(self.local_file_browser_widget, self.global_file_browser_widget, 
+                            pn.Row(self.save_button, self.load_button, self.compute_button))
         
 
     def _update_load_save_button_disabled_state(self):
         """ updates the .disabled property for the two action buttons """
         self.load_button.disabled = self.is_load_button_disabled
         self.save_button.disabled = self.is_save_button_disabled
+        self.compute_button.disabled = self.is_compute_button_disabled
 
 
     def _handle_load_click(self, event):
@@ -672,6 +663,11 @@ class PipelinePickleFileSelectorWidget:
             # self.on_save_callback(self.active_local_pkl, self.active_global_pkl)
             self.on_save_callback()
             
+    def _handle_compute_click(self, event):
+        print(f'\t._handle_compute_click(event: {event})')
+        if self.on_compute_callback is not None:
+            self.on_compute_callback()
+
 
     def servable(self, **kwargs):
         return self.layout.servable(**kwargs)
@@ -906,10 +902,11 @@ class PipelinePickleFileSelectorWidget:
         """ Called to provide the widget with everything needed to actually load the pipeline, which is required before the "Load" button is enabled.
         
         
-        _subfn_load, _subfn_save = active_session_pickle_file_widget._build_load_save_callbacks(global_data_root_parent_path=global_data_root_parent_path, active_data_mode_name=active_data_mode_name, basedir=basedir, saving_mode=saving_mode, force_reload=force_reload,
+        _subfn_load, _subfn_save, _subfn_compute = active_session_pickle_file_widget._build_load_save_callbacks(global_data_root_parent_path=global_data_root_parent_path, active_data_mode_name=active_data_mode_name, basedir=basedir, saving_mode=saving_mode, force_reload=force_reload,
 															 extended_computations_include_includelist=extended_computations_include_includelist, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist)
 
         """
+        from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_extended_computations, batch_evaluate_required_computations
         
         def _subfn_load():
             """ captures: everything in calling context!
@@ -933,16 +930,48 @@ class PipelinePickleFileSelectorWidget:
             assert get_global_variable_fn is not None
             # Get the pipeline
             curr_active_pipeline = get_global_variable_fn('curr_active_pipeline')
+            assert curr_active_pipeline.pickle_path is not None, f"curr_active_pipeline.pickle_path is None! Must be set before knowing where to save to!"
             curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, override_pickle_path=curr_active_pipeline.pickle_path, active_pickle_filename=curr_active_pipeline.pickle_path.name) #active_pickle_filename=
+            assert curr_active_pipeline.global_computation_results_pickle_path is not None, f"curr_active_pipeline.global_computation_results_pickle_path is None! Must be set before knowing where to save to!"
             curr_active_pipeline.save_global_computation_results(override_global_pickle_path=curr_active_pipeline.global_computation_results_pickle_path)
             
+
+        def _subfn_compute():
+            """Performs computations in clean_run mode"""
+            get_global_variable_fn = self.on_get_global_variable_callback
+            assert get_global_variable_fn is not None
+            curr_active_pipeline = get_global_variable_fn('curr_active_pipeline')
+            
+            # Reload computation functions and perform computations
+            curr_active_pipeline.reload_default_computation_functions()
+            newly_computed_values = batch_extended_computations(curr_active_pipeline, 
+                                                            include_includelist=extended_computations_include_includelist,
+                                                            include_global_functions=True,
+                                                            fail_on_exception=False,
+                                                            progress_print=True,
+                                                            force_recompute=True,
+                                                            force_recompute_override_computations_includelist=force_recompute_override_computations_includelist,
+                                                            debug_print=False)
+            
+            if len(newly_computed_values) > 0:
+                print(f'newly_computed_values: {newly_computed_values}')
+                _subfn_save() ## call _subfn_save() to attempt to save out the results
+                # curr_active_pipeline.save_global_computation_results()
+                
+        # ==================================================================================================================== #
+        # BEGIN MAIN FUNCTION BODY                                                                                             #
+        # ==================================================================================================================== #
+
         self.on_load_callback = _subfn_load
         self.on_save_callback = _subfn_save
+        self.on_compute_callback = _subfn_compute
+    
         ## Update button enable states:        
         self._update_load_save_button_disabled_state()
         
-        return _subfn_load, _subfn_save
+        return _subfn_load, _subfn_save, _subfn_compute
     
+
 
     @function_attributes(short_name=None, tags=['matching', 'pipeline', 'file'], input_requires=[], output_provides=[], uses=[], used_by=['try_select_first_valid_files'], creation_date='2025-02-11 02:40', related_items=[])
     def try_determine_matching_global_file(self, local_file_name: str) -> Tuple[str, Optional[int]]:
