@@ -2262,7 +2262,7 @@ class PostHocPipelineFixup:
                 _new_loaded_track_limits = deepcopy(a_session.config.loaded_track_limits)
                 # did_change: bool = ((_bak_loaded_track_limits is None) or (_new_loaded_track_limits != _bak_loaded_track_limits))
                 # change_dict[f'filtered_sessions["{a_decoder_name}"]'] = {}
-                did_loaded_track_limits_change: bool = ((_bak_loaded_track_limits is None) or np.any((np.array(_new_loaded_track_limits) != np.array(_bak_loaded_track_limits))))
+                did_loaded_track_limits_change: bool = ((_bak_loaded_track_limits is None) or np.any([np.array(_bak_loaded_track_limits.get(k, [])) != np.array(v) for k, v in _new_loaded_track_limits.items()]))
                 change_dict[f'filtered_sessions["{a_decoder_name}"].loaded_track_limits'] = did_loaded_track_limits_change
                 if did_loaded_track_limits_change:
                     did_any_change = True
