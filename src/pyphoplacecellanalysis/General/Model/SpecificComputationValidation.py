@@ -812,7 +812,10 @@ class ComputationValidatorsTreeWidget:
         ])
         self.accordion.set_title(0, f'Local Functions ({len(local_validators)})')
         self.accordion.set_title(1, f'Global Functions ({len(global_validators)})')
-        
+
+        # Expand both sections by default:
+        self.accordion.selected_index = None  # Initially set to None to expand all
+
         self.main_container.children = [self.accordion]
         
     def create_section_widget(self, validators: Dict, section_name: str) -> widgets.VBox:
