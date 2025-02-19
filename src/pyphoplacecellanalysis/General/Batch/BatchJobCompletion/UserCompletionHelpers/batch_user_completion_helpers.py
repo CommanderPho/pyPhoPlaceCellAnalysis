@@ -2308,7 +2308,7 @@ class PostHocPipelineFixup:
                 did_any_change = True
                 
             return did_any_change, a_session
-        
+        # END def _subfn_update_session_config(....
 
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
         did_any_change: bool = False
@@ -2380,53 +2380,54 @@ class PostHocPipelineFixup:
         correct_grid_bin_bounds = cls.get_hardcoded_known_good_grid_bin_bounds(curr_active_pipeline)
         did_any_change, change_dict = cls.HARD_OVERRIDE_grid_bin_bounds(curr_active_pipeline, hard_manual_override_grid_bin_bounds=deepcopy(correct_grid_bin_bounds), is_dry_run=is_dry_run)
         
-        if (did_any_change or force_recompute) and (not is_dry_run):
+        if (did_any_change or force_recompute):
             if force_recompute:
                 print(f'change_dict: {change_dict}\n\t(force_recompute==True), (did_any_change: {did_any_change}) recomputing...')
             else:
                 print(f'change_dict: {change_dict}\n\tat least one grid_bin_bound was changed, recomputing...')
 
-            ## All invalidated ones:
-            computation_functions_name_includelist=['_perform_baseline_placefield_computation', '_perform_time_dependent_placefield_computation', '_perform_extended_statistics_computation',
-                                                '_perform_position_decoding_computation', 
-                                                '_perform_firing_rate_trends_computation',
-                                                '_perform_pf_find_ratemap_peaks_computation',
-                                                '_perform_time_dependent_pf_sequential_surprise_computation'
-                                                '_perform_two_step_position_decoding_computation',
-                                                # '_perform_recursive_latent_placefield_decoding'
-                                            ]  # '_perform_pf_find_ratemap_peaks_peak_prominence2d_computation'
+            if (not is_dry_run):
+                ## if not dry_run, do the recomputations:
+                ## All invalidated ones:
+                computation_functions_name_includelist=['_perform_baseline_placefield_computation', '_perform_time_dependent_placefield_computation', '_perform_extended_statistics_computation',
+                                                    '_perform_position_decoding_computation', 
+                                                    '_perform_firing_rate_trends_computation',
+                                                    '_perform_pf_find_ratemap_peaks_computation',
+                                                    '_perform_time_dependent_pf_sequential_surprise_computation'
+                                                    '_perform_two_step_position_decoding_computation',
+                                                    # '_perform_recursive_latent_placefield_decoding'
+                                                ]  # '_perform_pf_find_ratemap_peaks_peak_prominence2d_computation'
 
-            # ## Only Essentials:
-            # computation_functions_name_includelist=['_perform_baseline_placefield_computation',
-            #                                         '_perform_time_dependent_placefield_computation',
-            #                                         '_perform_extended_statistics_computation',
-            #                                     '_perform_position_decoding_computation', 
-            #                                     '_perform_firing_rate_trends_computation',
-            #                                     # '_perform_pf_find_ratemap_peaks_computation',
-            #                                     # '_perform_time_dependent_pf_sequential_surprise_computation'
-            #                                     '_perform_two_step_position_decoding_computation',
-            #                                     # '_perform_recursive_latent_placefield_decoding'
-            #                                 ]  # '_perform_pf_find_ratemap_peaks_peak_prominence2d_computation'
+                # ## Only Essentials:
+                # computation_functions_name_includelist=['_perform_baseline_placefield_computation',
+                #                                         '_perform_time_dependent_placefield_computation',
+                #                                         '_perform_extended_statistics_computation',
+                #                                     '_perform_position_decoding_computation', 
+                #                                     '_perform_firing_rate_trends_computation',
+                #                                     # '_perform_pf_find_ratemap_peaks_computation',
+                #                                     # '_perform_time_dependent_pf_sequential_surprise_computation'
+                #                                     '_perform_two_step_position_decoding_computation',
+                #                                     # '_perform_recursive_latent_placefield_decoding'
+                #                                 ]  # '_perform_pf_find_ratemap_peaks_peak_prominence2d_computation'
 
-            # computation_functions_name_includelist=['_perform_baseline_placefield_computation']
-            # curr_active_pipeline.perform_computations(computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=None, fail_on_exception=True, debug_print=FalTruese, overwrite_extant_results=True) #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
-            # curr_active_pipeline.perform_computations(computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=None, enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True) # , overwrite_extant_results=False #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
+                # computation_functions_name_includelist=['_perform_baseline_placefield_computation']
+                # curr_active_pipeline.perform_computations(computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=None, fail_on_exception=True, debug_print=FalTruese, overwrite_extant_results=True) #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
+                # curr_active_pipeline.perform_computations(computation_functions_name_includelist=computation_functions_name_includelist, computation_functions_name_excludelist=None, enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True) # , overwrite_extant_results=False #, overwrite_extant_results=False  ], fail_on_exception=True, debug_print=False)
 
-            # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+                # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
 
-            # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pf_computation', 'pfdt_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=False)
-            # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pf_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True)
+                # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pf_computation', 'pfdt_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=False)
+                # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pf_computation'], enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True)
 
 
-            # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=computation_functions_name_includelist, enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True)
-            curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=computation_functions_name_includelist, fail_on_exception=True, debug_print=True)
-            print(f'\trecomputation complete!')
-            
-        else:
-            if is_dry_run:
-                print(f'WARNING: is_dry_run is true so no recompute will be done.')
+                # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=computation_functions_name_includelist, enabled_filter_names=[global_epoch_name], fail_on_exception=True, debug_print=True)
+                curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=computation_functions_name_includelist, fail_on_exception=True, debug_print=True)
+                print(f'\trecomputation complete!')
             else:
-                print(f'No grid bin bounds were changed. Everything should be up-to-date!')
+                 print(f'\tWARNING: is_dry_run is true so no recompute will be done.')
+        else:
+            ## no changes and not force_recompute
+            print(f'No grid bin bounds were changed. Everything should be up-to-date!')
 
         return (did_any_change, change_dict), correct_grid_bin_bounds
 
