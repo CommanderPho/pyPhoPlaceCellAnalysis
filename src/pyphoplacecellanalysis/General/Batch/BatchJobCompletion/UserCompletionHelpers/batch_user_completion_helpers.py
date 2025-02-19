@@ -2379,12 +2379,12 @@ class PostHocPipelineFixup:
         print(f'\t !!!||||||||||||||||||> RUNNING `PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(...)`:')
         correct_grid_bin_bounds = cls.get_hardcoded_known_good_grid_bin_bounds(curr_active_pipeline)
         did_any_change, change_dict = cls.HARD_OVERRIDE_grid_bin_bounds(curr_active_pipeline, hard_manual_override_grid_bin_bounds=deepcopy(correct_grid_bin_bounds), is_dry_run=is_dry_run)
-        
+        only_changing_change_keys = [k for k, v in change_dict.items() if v is True]
         if (did_any_change or force_recompute):
             if force_recompute:
-                print(f'change_dict: {change_dict}\n\t(force_recompute==True), (did_any_change: {did_any_change}) recomputing...')
+                print(f'only_changing_change_keys: {only_changing_change_keys}\n\t(force_recompute==True), (did_any_change: {did_any_change}) recomputing...')
             else:
-                print(f'change_dict: {change_dict}\n\tat least one grid_bin_bound was changed, recomputing...')
+                print(f'only_changing_change_keys: {only_changing_change_keys}\n\tat least one grid_bin_bound was changed, recomputing...')
 
             if (not is_dry_run):
                 ## if not dry_run, do the recomputations:
@@ -2460,7 +2460,7 @@ class PostHocPipelineFixup:
 
     @metadata_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-19 07:24', related_items=[])
     @staticmethod
-    def run_as_batch_user_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, force_recompute: bool=False) -> dict:
+    def run_as_batch_user_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, force_recompute: bool=False, is_dry_run: bool=False) -> dict:
         """ meant to be executed as a _batch_user_completion_function"""
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsHelpers, DirectionalLapsResult
 
@@ -2468,7 +2468,7 @@ class PostHocPipelineFixup:
         print(f'starting `PostHocPipelineFixup.run_as_batch_user_completion_function(...)`...')
 
         did_any_change: bool = False
-        (did_any_grid_bin_change, change_dict), correct_grid_bin_bounds = PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, is_dry_run=False)
+        (did_any_grid_bin_change, change_dict), correct_grid_bin_bounds = PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, is_dry_run=is_dry_run)
 
         did_fixup_any_missing_basepath = PostHocPipelineFixup.FINAL_UPDATE_FILEPATHS(curr_active_pipeline=curr_active_pipeline)
 
@@ -2503,7 +2503,7 @@ class PostHocPipelineFixup:
 
 
 @function_attributes(short_name=None, tags=['UNFINISHED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
-def kdiba_session_post_fixup_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, force_recompute:bool=True) -> dict:
+def kdiba_session_post_fixup_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, force_recompute:bool=True, is_dry_run: bool=False) -> dict:
     """ Called to update the pipeline's important position info parameters (such as the grid_bin_bounds, positions, etc) from a loaded .mat file
     
     
@@ -2525,9 +2525,12 @@ def kdiba_session_post_fixup_completion_function(self, global_data_root_parent_p
 
 
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-    print(f'kdiba_session_post_fixup_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+    print(f'kdiba_session_post_fixup_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ..., is_dry_run: {is_dry_run})')
+    if is_dry_run:
+        print(f'WARN: is_dry_run == True')
     
-    across_session_results_extended_dict = PostHocPipelineFixup.run_as_batch_user_completion_function(self=self, global_data_root_parent_path=global_data_root_parent_path, curr_session_context=curr_session_context, curr_session_basedir=curr_session_basedir, curr_active_pipeline=curr_active_pipeline, across_session_results_extended_dict=across_session_results_extended_dict, force_recompute=force_recompute)
+    across_session_results_extended_dict = PostHocPipelineFixup.run_as_batch_user_completion_function(self=self, global_data_root_parent_path=global_data_root_parent_path, curr_session_context=curr_session_context, curr_session_basedir=curr_session_basedir, curr_active_pipeline=curr_active_pipeline, across_session_results_extended_dict=across_session_results_extended_dict,
+                                                                                                       force_recompute=force_recompute, is_dry_run=is_dry_run)
 
     # print(f'>>\t done with {curr_session_context}')
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
