@@ -127,6 +127,97 @@ def get_all_batch_computation_names():
 
 
 
+from collections import OrderedDict
+from typing import Callable, Optional
+from attrs import define, field
+
+from pyphocorehelpers.programming_helpers import SourceCodeParsing
+
+
+def has_good_str_value(a_str_val) -> bool:
+    return ((a_str_val is not None) and (len(a_str_val) > 0))
+
+@metadata_attributes(short_name=None, tags=['computation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-19 13:12', related_items=['pyphoplacecellanalysis.General.Pipeline.Stages.Display.DisplayFunctionItem'])
+@define(slots=False)
+class ComputationFunctionItem:
+    """ For helping to render a UI computation function tree, similar to DisplayFunctionItem.
+        It holds metadata about a computation function.
+
+    Based off of `pyphoplacecellanalysis.General.Pipeline.Stages.Display.DisplayFunctionItem` on 2025-02-19 13:13 
+
+    from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import ComputationFunctionItem
+
+    """
+    name: str = field()
+    fn_callable: Callable = field()
+
+    is_global: bool = field()
+    short_name: str = field()
+    docs: str = field()
+    icon_path: Optional[str] = field()
+    vscode_jump_link: Optional[str] = field()
+
+
+    @classmethod
+    def init_from_fn_object(cls, a_fn, icon_path=None):
+        _obj = cls(name=a_fn.__name__, fn_callable=a_fn, is_global=getattr(a_fn,'is_global', False), short_name=(getattr(a_fn,'short_name', a_fn.__name__) or a_fn.__name__),
+            docs=a_fn.__doc__, icon_path=icon_path, vscode_jump_link=SourceCodeParsing.build_vscode_jump_link(a_fcn_handle=a_fn))
+        return _obj
+
+    @property
+    def best_display_name(self) -> str:
+        """ returns the best name for display """
+        if has_good_str_value(self.short_name):
+            return self.short_name
+        else:
+            return self.name
+        
+
+    @property
+    def longform_description(self) -> str:
+        """The longform_description property."""
+        out_str_arr = []
+
+        if has_good_str_value(self.short_name):
+            out_str_arr.append(f"short_name: {self.short_name}") # short name first, then
+            out_str_arr.append(f"name: {self.name}") # full name
+        else:
+            out_str_arr.append(f"name: {self.name}") # just name
+
+        if has_good_str_value(self.docs):
+            out_str_arr.append(f"docs: {self.docs}")
+            
+        if has_good_str_value(self.vscode_jump_link):
+            out_str_arr.append(f"link: {self.vscode_jump_link}")
+            
+        out_str = '\n'.join(out_str_arr)
+        return out_str
+    
+    @property
+    def longform_description_formatted_html(self) -> str:
+        """HTML-formatted (with bold labels) longform text for use in QTextBrowser via .setHtml(...)"""
+        out_str_arr = []
+
+        if has_good_str_value(self.short_name):
+            out_str_arr.append(f"<b style='color:white;'>short_name</b>: {self.short_name}") # short name first, then
+            out_str_arr.append(f"<b style='color:white;'>name</b>: {self.name}") # full name
+        else:
+            out_str_arr.append(f"<b style='color:white;'>name</b>: {self.name}") # just name
+
+        if has_good_str_value(self.docs):
+            out_str_arr.append(f"<b style='color:white;'>docs</b>: {self.docs}")
+            
+        if has_good_str_value(self.vscode_jump_link):
+            # Create the HTML-formatted link
+            html_link: str = f'<a href="{self.vscode_jump_link}">{self.vscode_jump_link}</a>'
+            out_str_arr.append(f"<b style='color:white;'>link</b>: {html_link}")
+            
+        out_str = '<br>'.join(out_str_arr) # linebreaks with HTML's <br>
+        return out_str
+
+
+
+
 # ==================================================================================================================== #
 # PIPELINE STAGE                                                                                                       #
 # ==================================================================================================================== #
