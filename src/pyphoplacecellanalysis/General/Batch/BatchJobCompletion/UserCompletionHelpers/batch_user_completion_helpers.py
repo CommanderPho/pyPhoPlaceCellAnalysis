@@ -2374,7 +2374,7 @@ class PostHocPipelineFixup:
 
     @function_attributes(short_name=None, tags=['MAIN', 'ESSENTIAL', 'UNUSED', 'grid_bin_bounds', 'grid_bin'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-12 19:50', related_items=[])
     @classmethod
-    def FINAL_FIX_GRID_BIN_BOUNDS(cls, curr_active_pipeline, force_recompute=False, is_dry_run: bool=False):
+    def FINAL_FIX_GRID_BIN_BOUNDS(cls, curr_active_pipeline, force_recompute:bool=False, is_dry_run: bool=False):
         """ perform all fixes regarding the grid_bin_bounds and grid_bin """
         print(f'\t !!!||||||||||||||||||> RUNNING `PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(...)`:')
         correct_grid_bin_bounds = cls.get_hardcoded_known_good_grid_bin_bounds(curr_active_pipeline)
@@ -2382,7 +2382,7 @@ class PostHocPipelineFixup:
         
         if (did_any_change or force_recompute) and (not is_dry_run):
             if force_recompute:
-                print(f'change_dict: {change_dict}\n\t(force_recompute==True), recomputing...')
+                print(f'change_dict: {change_dict}\n\t(force_recompute==True), (did_any_change: {did_any_change}) recomputing...')
             else:
                 print(f'change_dict: {change_dict}\n\tat least one grid_bin_bound was changed, recomputing...')
 
@@ -2459,7 +2459,7 @@ class PostHocPipelineFixup:
 
     @metadata_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-19 07:24', related_items=[])
     @staticmethod
-    def run_as_batch_user_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, force_recompute=False) -> dict:
+    def run_as_batch_user_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, force_recompute: bool=False) -> dict:
         """ meant to be executed as a _batch_user_completion_function"""
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsHelpers, DirectionalLapsResult
 
