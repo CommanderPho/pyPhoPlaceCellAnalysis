@@ -2378,7 +2378,7 @@ class PostHocPipelineFixup:
         
         # sessions ___________________________________________________________________________________________________________ #
         for a_decoder_name, a_filtered_session in curr_active_pipeline.filtered_sessions.items():
-            a_filtered_session = deepcopy(a_filtered_session)
+            # a_filtered_session = deepcopy(a_filtered_session)
             # ## update the config
             # a_filtered_session.config.grid_bin_bounds = deepcopy(hard_manual_override_grid_bin_bounds) ## FORCEIPLY UPDATE ## needs it
             # (constrained_grid_bin_sizes, constrained_num_grid_bins) = safe_limit_num_grid_bin_values(a_filtered_session.config.grid_bin_bounds, desired_grid_bin_sizes=deepcopy(desired_grid_bin), max_allowed_num_bins=max_allowed_num_bins, debug_print=False)
