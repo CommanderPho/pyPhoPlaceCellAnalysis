@@ -2240,6 +2240,34 @@ class PostHocPipelineFixup:
 
         change_dict = {}
 
+
+        def _sub_sub_fn_did_potentially_arr_or_None_variable_change(_old_val, new_val) -> bool:
+            """ compares two variables, accounting for Nones, list-likes, and more """
+            # For array/tuple type config values:
+            if (_old_val is None) and (new_val is None):
+                return False
+            elif (_old_val is None) and (new_val is not None):
+                return True
+            elif (_old_val is not None) and (new_val is None):
+                return True
+            else:
+                ## both are not None
+                assert (_old_val is not None) and (new_val is not None)
+                if (isinstance(_old_val, (np.ndarray, tuple, list)) or isinstance(new_val, (np.ndarray, tuple, list))):
+                    # Convert to numpy arrays if needed
+                    _old_val_array = np.array(deepcopy(_old_val))
+                    new_val_array = np.array(new_val)
+                    return (not np.all(np.isclose(_old_val_array, new_val_array)))
+                else:
+                    # For non-array types, use direct comparison
+                    will_change: bool = (_old_val != new_val) # Python's != operator returns True when comparing None with any non-None value
+                    ## warn for direct comparison
+                    if will_change:
+                        print(f'DEBUGWARN - direct comparison used for variables \n\tnew_val: {new_val} and \n\t{_old_val: _old_val}. and found (will_change == True)')
+                    return will_change
+        
+
+
         def _subfn_update_session_config(a_session, is_dry_run: bool=False):
             """ captures: curr_active_pipeline, hard_manual_override_grid_bin_bounds, change_dict
             """
@@ -2258,7 +2286,9 @@ class PostHocPipelineFixup:
                 a_session.config = sess_config
                 _bak_loaded_track_limits = deepcopy(a_session.config.loaded_track_limits)
                 ## Apply fn
-                a_session = active_data_mode_registered_class._default_kdiba_exported_load_position_info_mat(basepath=curr_active_pipeline.sess.basepath, session_name=curr_active_pipeline.session_name, session=a_session)
+                a_session = active_data_mode_registered_class._default_kdiba_exported_load_position_info_mat(basepath=curr_active_pipeline.sess.basepath, session_name=curr_active_pipeline.session_name, session=a_session) ## does this reset the overrides?
+                ## do we want the UserAnnotations here?
+                
                 _new_loaded_track_limits = deepcopy(a_session.config.loaded_track_limits)
                 # did_change: bool = ((_bak_loaded_track_limits is None) or (_new_loaded_track_limits != _bak_loaded_track_limits))
                 # change_dict[f'filtered_sessions["{a_decoder_name}"]'] = {}
@@ -2273,12 +2303,37 @@ class PostHocPipelineFixup:
             for k, new_val in a_session_override_dict.items():
                 if k in allowed_sess_Config_override_keys:
                     _old_val = getattr(a_session.config, k, None)
-                    if _old_val is not None:
+                    if (_old_val is not None):
                         _old_val = deepcopy(_old_val)
 
-                    will_change: bool = (_old_val != new_val)
-                    change_dict[f'filtered_sessions["{a_decoder_name}"].config.{k}'] = will_change
-                    if not is_dry_run:
+                    # if (new_val is not None):
+                    #     will_change: bool = (_old_val != new_val) # Python's != operator returns True when comparing None with any non-None value
+                    # else:
+                    #     # new_val is None
+                    #     will_change: bool = (_old_val is not None) ## it is changed if the old value was something other than None.
+                                            
+                    # For array/tuple type config values:
+                    if isinstance(_old_val, (np.ndarray, tuple, list)) or isinstance(new_val, (np.ndarray, tuple, list)):
+                        # Convert to numpy arrays if needed
+                        _old_val_array = np.array(_old_val) if _old_val is not None else None
+                        new_val_array = np.array(new_val) if new_val is not None else None
+                        
+                        if (_old_val_array is not None) and (new_val_array is not None):
+                            will_change: bool = (not np.all(np.isclose(_old_val_array, new_val_array)))
+                        else:
+                            will_change: bool = (not ((_old_val_array is None) and (new_val_array is None))) ## it is changed if the old value was something other than None.
+                    else:
+                        # For non-array types, use direct comparison
+                        if new_val is not None:
+                            will_change: bool = (_old_val != new_val) # Python's != operator returns True when comparing None with any non-None value
+                        else:
+                            will_change: bool = (_old_val is not None) ## it is changed if the old value was something other than None.
+
+                    _curr_key: str = f'filtered_sessions["{a_decoder_name}"].config.{k}'
+                    if will_change:
+                        print(f'\t {_curr_key} changing! {_old_val} -> {new_val}.')
+                    change_dict[_curr_key] = will_change
+                    if will_change and (not is_dry_run):
                         setattr(a_session.config, k, deepcopy(new_val))
                     if will_change:
                         did_any_change = True
@@ -2288,7 +2343,11 @@ class PostHocPipelineFixup:
             _old_val = getattr(a_session.config, 'grid_bin_bounds', None)
             if _old_val is not None:
                 _old_val = deepcopy(_old_val)
-            will_change: bool = (_old_val != hard_manual_override_grid_bin_bounds)
+            # will_change: bool = (_old_val != hard_manual_override_grid_bin_bounds)
+            if (_old_val is not None) and (hard_manual_override_grid_bin_bounds is not None):
+                will_change: bool = (not np.all(np.isclose(_old_val, hard_manual_override_grid_bin_bounds))) # (_old_val != constrained_grid_bin_sizes)
+            else:
+                will_change: bool = (not ((_old_val is None) and (hard_manual_override_grid_bin_bounds is None))) # xor - if XOR either is None, it is a change, otherwise it isn't
             change_dict[f'filtered_sessions["{a_decoder_name}"].config.grid_bin_bounds'] = (change_dict.get(f'filtered_sessions["{a_decoder_name}"].config.grid_bin_bounds', False) | will_change)
             if not is_dry_run:
                 a_session.config.grid_bin_bounds = deepcopy(hard_manual_override_grid_bin_bounds) ## FORCEIPLY UPDATE
@@ -2300,7 +2359,10 @@ class PostHocPipelineFixup:
             if _old_val is not None:
                 _old_val = deepcopy(_old_val)
             (constrained_grid_bin_sizes, constrained_num_grid_bins) = safe_limit_num_grid_bin_values(hard_manual_override_grid_bin_bounds, desired_grid_bin_sizes=deepcopy(desired_grid_bin), max_allowed_num_bins=max_allowed_num_bins, debug_print=False)
-            will_change: bool = (_old_val != constrained_grid_bin_sizes)
+            if (_old_val is not None) and (constrained_grid_bin_sizes is not None):
+                will_change: bool = (not np.all(np.isclose(_old_val, constrained_grid_bin_sizes))) # (_old_val != constrained_grid_bin_sizes)
+            else:
+                will_change: bool = (not ((_old_val is None) and (constrained_grid_bin_sizes is None))) # xor - if XOR either is None, it is a change, otherwise it isn't
             change_dict[f'filtered_sessions["{a_decoder_name}"].config.grid_bin'] = (change_dict.get(f'filtered_sessions["{a_decoder_name}"].config.grid_bin', False) | will_change)
             if not is_dry_run:
                 a_session.config.grid_bin = constrained_grid_bin_sizes
