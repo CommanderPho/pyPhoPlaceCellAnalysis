@@ -1172,3 +1172,27 @@ class KnownFilterEpochs(ExtendedEnum):
 
         return active_filter_epochs, default_figure_name, epoch_description_list
 
+
+
+
+
+		# ## non_PBE Epochs:
+		# active_file_suffix = '.non_pbe.npy'
+		# found_datafile = Epoch.from_file(fp.with_suffix(active_file_suffix))
+		# if (not force_recompute) and (found_datafile is not None):
+		# 	print('Loading success: {}.'.format(active_file_suffix))
+		# 	session.non_pbe = found_datafile
+		# else:
+		# 	# Otherwise load failed, perform the fallback computation
+		# 	if not force_recompute:
+		# 		print('Failure loading {}. Must recompute.\n'.format(active_file_suffix))
+		# 	else:
+		# 		print(f'force_recompute is True, recomputing...')
+		# 	try:
+		# 		# active_pbe_parameters = kwargs.pop('pbe_epoch_detection_params', session.config.preprocessing_parameters.epoch_estimation_parameters.PBEs)
+		# 		active_non_pbe_parameters = {} # session.config.preprocessing_parameters.epoch_estimation_parameters.PBEs
+		# 		session.non_pbe = DataSession.compute_non_PBE_epochs(session, active_parameters=active_non_pbe_parameters, save_on_compute=True)
+		# 	except (ValueError, AttributeError) as e:
+		# 		print(f'Computation failed with error {e}. Skipping .non_pbe')
+		# 		session.non_pbe = None
+                
