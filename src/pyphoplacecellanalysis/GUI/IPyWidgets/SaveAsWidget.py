@@ -37,19 +37,13 @@ from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipel
 
 @define(slots=False)
 class PipelineBackupWidget:
-    """Allows saving backups of the currently loaded pipeline with custom filenames.
-    Includes progress indication and detailed error feedback.
-    
-    Usage:
-	    from pyphoplacecellanalysis.GUI.IPyWidgets.SaveAsWidget import PipelineBackupWidget
-        backup_widget = PipelineBackupWidget(curr_active_pipeline)
-        backup_widget.servable()
-    """
     curr_active_pipeline: NeuropyPipeline = field()
     on_get_global_variable_callback: Optional[Callable] = field(default=None)
     debug_print: bool = field(default=False)
     
+    prefix_input: pn.widgets.TextInput = field(init=False)
     filename_input: pn.widgets.TextInput = field(init=False)
+    suffix_input: pn.widgets.TextInput = field(init=False)
     save_button: pn.widgets.Button = field(init=False)
     progress: pn.widgets.Progress = field(init=False)
     status_indicator: pn.pane.Markdown = field(init=False)
@@ -59,12 +53,35 @@ class PipelineBackupWidget:
         curr_pipeline_path = Path(self.curr_active_pipeline.pickle_path)
         suggested_backup = f"{curr_pipeline_path.stem}_backup{curr_pipeline_path.suffix}"
         
+        self.prefix_input = pn.widgets.TextInput(
+            name='User Prefix',
+            value='',
+            placeholder='Optional prefix...',
+            width=150
+        )
+        
         self.filename_input = pn.widgets.TextInput(
             name='Backup Filename',
             value=suggested_backup,
-            placeholder='Enter backup filename...'
+            placeholder='Enter backup filename...',
+            width=800
         )
         
+        self.suffix_input = pn.widgets.TextInput(
+            name='User Suffix',
+            value='',
+            placeholder='Optional suffix...',
+            width=150
+        )
+        
+        # Create a row for the filename inputs
+        filename_row = pn.Row(
+            self.prefix_input,
+            self.filename_input,
+            self.suffix_input
+        )
+        
+        # Rest of the widget setup remains the same
         self.save_button = pn.widgets.Button(
             name='Save Backup',
             button_type='success',
@@ -72,7 +89,6 @@ class PipelineBackupWidget:
         )
         self.save_button.on_click(self._handle_save_backup)
         
-        # Add progress bar and status indicator
         self.progress = pn.widgets.Progress(
             name='Save Progress',
             value=0,
@@ -84,11 +100,27 @@ class PipelineBackupWidget:
         
         self.layout = pn.Column(
             pn.pane.Markdown("### Pipeline Backup"),
-            self.filename_input,
+            filename_row,
             self.save_button,
             self.progress,
             self.status_indicator
         )
+
+    def _get_full_backup_filename(self) -> str:
+        """Combines prefix, filename, and suffix to create the full backup filename"""
+        prefix = self.prefix_input.value.strip()
+        main_name = self.filename_input.value.strip()
+        suffix = self.suffix_input.value.strip()
+        
+        # Split the main filename into stem and extension
+        path = Path(main_name)
+        stem = path.stem
+        ext = path.suffix
+        
+        # Combine parts with underscores if they exist
+        full_stem = '_'.join(filter(None, [prefix, stem, suffix]))
+        return full_stem + ext
+
 
     def _update_status(self, message: str, is_error: bool = False, is_success: bool = False):
         """Updates the status display with appropriate styling"""

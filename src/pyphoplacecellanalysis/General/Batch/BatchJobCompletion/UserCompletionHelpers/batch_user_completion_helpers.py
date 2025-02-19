@@ -2180,6 +2180,9 @@ class PostHocPipelineFixup:
     """
     across_session_results_extended_dict_data_name: str = 'PostHocPipelineFixup' # like 'position_info_mat_reload_completion_function'
 
+    # ==================================================================================================================== #
+    # `grid_bin_bounds` and `grid_bin`                                                                                     #
+    # ==================================================================================================================== #
     @classmethod
     def find_percent_pos_samples_within_grid_bin_bounds(cls, pos_df: pd.DataFrame, grid_bin_bounds):
         """ sanity-checks the grid_bin_bounds against the pos_df to see what percent of positions fall within the bounds
@@ -2424,6 +2427,19 @@ class PostHocPipelineFixup:
         return (did_any_change, change_dict), correct_grid_bin_bounds
 
 
+    # ==================================================================================================================== #
+    # Filepaths                                                                                                            #
+    # ==================================================================================================================== #
+    
+
+
+    # ==================================================================================================================== #
+    # Non-PBE Epochs                                                                                                       #
+    # ==================================================================================================================== #
+
+
+
+    @metadata_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-19 07:24', related_items=[])
     @staticmethod
     def run_as_batch_user_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, force_recompute=False) -> dict:
         """ meant to be executed as a _batch_user_completion_function"""
