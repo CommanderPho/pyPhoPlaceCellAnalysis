@@ -2165,12 +2165,12 @@ from neuropy.core.user_annotations import UserAnnotationsManager
 # ==================================================================================================================== #
 # NOTE: LOCAL CLASS DEFNITION                                                                                          #
 # ==================================================================================================================== #
-@metadata_attributes(short_name=None, tags=['grid_bin_bounds', 'grid_bin', 'FIXUP', 'post-hoc'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-13 12:33', related_items=['reload_exported_kdiba_session_position_info_mat_completion_function'])
+@metadata_attributes(short_name=None, tags=['grid_bin_bounds', 'grid_bin', 'FIXUP', 'post-hoc'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-13 12:33', related_items=['kdiba_session_post_fixup_completion_function'])
 class PostHocPipelineFixup:
     """ Fixes the grid_bin_bounds, grid_bin, track_limits, and some other properties and recomputes if needed.
             
-    #TODO 2025-02-13 12:35: - [ ] Format `FINAL_FIX_GRID_BIN_BOUNDS` as a user_ function, replace `reload_exported_kdiba_session_position_info_mat_completion_function` with it.
-    Inspired by `reload_exported_kdiba_session_position_info_mat_completion_function`, but does additional things, and performs needed recomputes.
+    #TODO 2025-02-13 12:35: - [ ] Format `FINAL_FIX_GRID_BIN_BOUNDS` as a user_ function, replace `kdiba_session_post_fixup_completion_function` with it.
+    Inspired by `kdiba_session_post_fixup_completion_function`, but does additional things, and performs needed recomputes.
             
     Usage:
         from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import PostHocPipelineFixup
@@ -2485,11 +2485,11 @@ class PostHocPipelineFixup:
 
 
 @function_attributes(short_name=None, tags=['UNFINISHED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
-def reload_kdiba_session_position_bounds_and_associated_info_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
+def kdiba_session_post_fixup_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
     """ Called to update the pipeline's important position info parameters (such as the grid_bin_bounds, positions, etc) from a loaded .mat file
     
     
-    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import reload_kdiba_session_position_bounds_and_associated_info_completion_function
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import kdiba_session_post_fixup_completion_function
     
     Results can be extracted from batch output by 
     
@@ -2507,7 +2507,7 @@ def reload_kdiba_session_position_bounds_and_associated_info_completion_function
 
 
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-    print(f'reload_kdiba_session_position_bounds_and_associated_info_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+    print(f'kdiba_session_post_fixup_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
     
     across_session_results_extended_dict = PostHocPipelineFixup.run_as_batch_user_completion_function(self=self, global_data_root_parent_path=global_data_root_parent_path, curr_session_context=curr_session_context, curr_session_basedir=curr_session_basedir, curr_active_pipeline=curr_active_pipeline, across_session_results_extended_dict=across_session_results_extended_dict, force_recompute=force_recompute)
 
@@ -2523,11 +2523,11 @@ def reload_kdiba_session_position_bounds_and_associated_info_completion_function
 
 
 # @function_attributes(short_name=None, tags=['UNFINISHED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
-# def reload_exported_kdiba_session_position_info_mat_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
+# def kdiba_session_post_fixup_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
 #     """ Called to update the pipeline's important position info parameters (such as the grid_bin_bounds, positions, etc) from a loaded .mat file
     
     
-#     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import reload_exported_kdiba_session_position_info_mat_completion_function
+#     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import kdiba_session_post_fixup_completion_function
     
 #     Results can be extracted from batch output by 
     
@@ -2542,7 +2542,7 @@ def reload_kdiba_session_position_bounds_and_associated_info_completion_function
 #     from neuropy.core.session.Formats.SessionSpecifications import SessionConfig
 
 #     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-#     print(f'reload_exported_kdiba_session_position_info_mat_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+#     print(f'kdiba_session_post_fixup_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
 #     active_data_mode_name: str = curr_active_pipeline.session_data_type
 #     active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
 #     active_data_mode_registered_class = active_data_session_types_registered_classes_dict[active_data_mode_name]
@@ -2628,7 +2628,7 @@ def reload_kdiba_session_position_bounds_and_associated_info_completion_function
 @function_attributes(short_name=None, tags=['hdf5', 'h5'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def export_session_h5_file_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
     """  Export the pipeline's HDF5 as 'pipeline_results.h5'
-    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import reload_exported_kdiba_session_position_info_mat_completion_function
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import kdiba_session_post_fixup_completion_function
     
     Results can be extracted from batch output by 
     
@@ -2882,7 +2882,7 @@ def determine_session_t_delta_completion_function(self, global_data_root_parent_
 def compute_and_export_session_extended_placefield_peak_information_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                                              save_hdf:bool=True, save_across_session_hdf:bool=False) -> dict:
     """  Extracts peak information for the placefields for each neuron
-    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import reload_exported_kdiba_session_position_info_mat_completion_function
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import kdiba_session_post_fixup_completion_function
     
     Results can be extracted from batch output by 
     
@@ -3051,8 +3051,8 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
                                     'determine_session_t_delta_completion_function': determine_session_t_delta_completion_function,
                                     'perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function': perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function,
                                     'compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function': compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function,
-                                    # 'reload_exported_kdiba_session_position_info_mat_completion_function': reload_exported_kdiba_session_position_info_mat_completion_function,
-                                    'reload_kdiba_session_position_bounds_and_associated_info_completion_function': reload_kdiba_session_position_bounds_and_associated_info_completion_function,
+                                    # 'kdiba_session_post_fixup_completion_function': kdiba_session_post_fixup_completion_function,
+                                    'kdiba_session_post_fixup_completion_function': kdiba_session_post_fixup_completion_function,
                                     'export_session_h5_file_completion_function': export_session_h5_file_completion_function,
                                     'compute_and_export_session_wcorr_shuffles_completion_function': compute_and_export_session_wcorr_shuffles_completion_function,
                                     'compute_and_export_session_instantaneous_spike_rates_completion_function': compute_and_export_session_instantaneous_spike_rates_completion_function,
