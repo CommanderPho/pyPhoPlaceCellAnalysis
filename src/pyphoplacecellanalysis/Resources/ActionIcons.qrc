@@ -49,6 +49,8 @@
     <file>Icons/actions/eye-half.png</file>
   </qresource>
   <qresource prefix="Graphics">
+    <file>Icons/Icon/CalculationsWindow@22w.png</file>
+    <file>Icons/Icon/LauncherWidget@22w.png</file>
     <file>Icons/graphics/long_short_laps.png</file>
     <file>Icons/graphics/TrialByTrialReliabilityImageArray.png</file>
     <file>Icons/graphics/yellow_blue_plot_icon.png</file>
