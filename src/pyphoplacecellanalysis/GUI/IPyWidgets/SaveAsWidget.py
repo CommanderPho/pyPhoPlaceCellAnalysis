@@ -37,6 +37,17 @@ from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import NeuropyPipel
 
 @define(slots=False)
 class PipelineBackupWidget:
+    """ allows the user to specify a unique file save path for the pipeline's local/global pkl files
+    
+
+    Usage:    
+        from pyphoplacecellanalysis.GUI.IPyWidgets.SaveAsWidget import PipelineBackupWidget
+
+        backup_widget = PipelineBackupWidget(curr_active_pipeline)
+        backup_widget.servable()
+
+
+    """
     curr_active_pipeline: NeuropyPipeline = field()
     on_get_global_variable_callback: Optional[Callable] = field(default=None)
     debug_print: bool = field(default=False)
