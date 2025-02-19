@@ -44,6 +44,7 @@ class PipelineBackupWidget:
     prefix_input: pn.widgets.TextInput = field(init=False)
     filename_input: pn.widgets.TextInput = field(init=False)
     suffix_input: pn.widgets.TextInput = field(init=False)
+    filename_preview: pn.pane.Markdown = field(init=False)
     save_button: pn.widgets.Button = field(init=False)
     progress: pn.widgets.Progress = field(init=False)
     status_indicator: pn.pane.Markdown = field(init=False)
@@ -81,6 +82,21 @@ class PipelineBackupWidget:
             self.suffix_input
         )
         
+        # Add filename preview
+        self.filename_preview = pn.pane.Markdown("", styles={
+            'background': '#2a2a2a',  # Dark background
+            'color': '#ffffff',       # White text
+            'padding': '8px',
+            'border-radius': '4px',   # Rounded corners
+            'font-family': 'monospace'
+        })
+        self._update_filename_preview()
+        
+        # Add watchers for input changes
+        self.prefix_input.param.watch(self._update_filename_preview, 'value')
+        self.filename_input.param.watch(self._update_filename_preview, 'value')
+        self.suffix_input.param.watch(self._update_filename_preview, 'value')
+        
         # Rest of the widget setup remains the same
         self.save_button = pn.widgets.Button(
             name='Save Backup',
@@ -101,10 +117,16 @@ class PipelineBackupWidget:
         self.layout = pn.Column(
             pn.pane.Markdown("### Pipeline Backup"),
             filename_row,
+            self.filename_preview,
             self.save_button,
             self.progress,
             self.status_indicator
         )
+
+    def _update_filename_preview(self, *events):
+        """Updates the preview of the final filename"""
+        full_filename = self._get_full_backup_filename()
+        self.filename_preview.object = f"<b>Final filename:</b> {full_filename}"
 
     def _get_full_backup_filename(self) -> str:
         """Combines prefix, filename, and suffix to create the full backup filename"""
@@ -136,54 +158,45 @@ class PipelineBackupWidget:
         if self.debug_print:
             print(f'_handle_save_backup(event: {event})')
             
-        backup_filename = self.filename_input.value
         self.progress.visible = True
         self.progress.value = 0
         self._update_status("Starting backup...")
         
         try:
-            # Setup paths
-            curr_path = Path(self.curr_active_pipeline.pickle_path)
-            backup_path = curr_path.parent.joinpath(backup_filename)
-            global_backup_filename = f"global_computation_results_{Path(backup_filename).stem}.pkl"
-            global_backup_path = curr_path.parent.joinpath('output', global_backup_filename)
-            
-            # Ensure output directory exists
-            global_backup_path.parent.mkdir(parents=True, exist_ok=True)
+            # Use the pipeline's built-in custom save function
+            user_prefix = self.prefix_input.value.strip()
+            user_suffix = self.suffix_input.value.strip()
             
             self.progress.value = 25
-            self._update_status("Saving pipeline...")
+            self._update_status("Saving pipeline with custom modifiers...")
             
-            # Save pipeline with safeSaveData
-            try:
-                self.curr_active_pipeline.save_pipeline(
-                    saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE,
-                    override_pickle_path=backup_path
-                )
-                self.progress.value = 50
-                self._update_status("Pipeline saved, saving global results...")
-                
-                # Save global results
-                self.curr_active_pipeline.save_global_computation_results(
-                    override_global_pickle_path=global_backup_path
-                )
-                self.progress.value = 100
-                
-                success_message = f'Successfully saved pipeline backup:<br/>Pipeline: {backup_path}<br/>Global Results: {global_backup_path}'
+            # Get the custom filenames and save
+            user_custom_modified_filenames, did_save_success = self.curr_active_pipeline.try_save_pipeline_with_custom_user_modifiers(
+                user_prefix=user_prefix,
+                user_suffix=user_suffix,
+                is_dryrun=False
+            )
+            
+            self.progress.value = 100
+            
+            if did_save_success:
+                success_message = f'Successfully saved pipeline backup:<br/>Files: {user_custom_modified_filenames}'
                 self._update_status(success_message, is_success=True)
+            else:
+                self._update_status("Save operation failed", is_error=True)
                 
-            except Exception as e:
-                exception_info = sys.exc_info()
-                err = CapturedException(e, exception_info)
-                error_message = f'Error during save:<br/>{str(err)}'
-                self._update_status(error_message, is_error=True)
-                raise
-                
+        except Exception as e:
+            exception_info = sys.exc_info()
+            err = CapturedException(e, exception_info)
+            error_message = f'Error during save:<br/>{str(err)}'
+            self._update_status(error_message, is_error=True)
+            raise
+            
         finally:
-            # Hide progress after 2 seconds
             def hide_progress():
                 self.progress.visible = False
             pn.state.onload(lambda: pn.state.add_timeout(2000, hide_progress))
+
 
     def servable(self, **kwargs):
         """Display the widget"""
