@@ -2292,7 +2292,8 @@ class PostHocPipelineFixup:
                 _new_loaded_track_limits = deepcopy(a_session.config.loaded_track_limits)
                 # did_change: bool = ((_bak_loaded_track_limits is None) or (_new_loaded_track_limits != _bak_loaded_track_limits))
                 # change_dict[f'filtered_sessions["{a_decoder_name}"]'] = {}
-                did_loaded_track_limits_change: bool = ((_bak_loaded_track_limits is None) or np.any([np.array(_bak_loaded_track_limits.get(k, [])) != np.array(v) for k, v in _new_loaded_track_limits.items()]))
+                # did_loaded_track_limits_change: bool = ((_bak_loaded_track_limits is None) or np.any([np.array(_bak_loaded_track_limits.get(k, [])) != np.array(v) for k, v in _new_loaded_track_limits.items()]))
+                did_loaded_track_limits_change: bool = (((_bak_loaded_track_limits is None) and (_new_loaded_track_limits is not None)) or np.any([_sub_sub_fn_did_potentially_arr_or_None_variable_change(np.array(_bak_loaded_track_limits.get(k, [])), np.array(v)) for k, v in _new_loaded_track_limits.items()]))
                 change_dict[f'filtered_sessions["{a_decoder_name}"].loaded_track_limits'] = did_loaded_track_limits_change
                 if did_loaded_track_limits_change:
                     did_any_change = True
@@ -2303,32 +2304,7 @@ class PostHocPipelineFixup:
             for k, new_val in a_session_override_dict.items():
                 if k in allowed_sess_Config_override_keys:
                     _old_val = getattr(a_session.config, k, None)
-                    if (_old_val is not None):
-                        _old_val = deepcopy(_old_val)
-
-                    # if (new_val is not None):
-                    #     will_change: bool = (_old_val != new_val) # Python's != operator returns True when comparing None with any non-None value
-                    # else:
-                    #     # new_val is None
-                    #     will_change: bool = (_old_val is not None) ## it is changed if the old value was something other than None.
-                                            
-                    # For array/tuple type config values:
-                    if isinstance(_old_val, (np.ndarray, tuple, list)) or isinstance(new_val, (np.ndarray, tuple, list)):
-                        # Convert to numpy arrays if needed
-                        _old_val_array = np.array(_old_val) if _old_val is not None else None
-                        new_val_array = np.array(new_val) if new_val is not None else None
-                        
-                        if (_old_val_array is not None) and (new_val_array is not None):
-                            will_change: bool = (not np.all(np.isclose(_old_val_array, new_val_array)))
-                        else:
-                            will_change: bool = (not ((_old_val_array is None) and (new_val_array is None))) ## it is changed if the old value was something other than None.
-                    else:
-                        # For non-array types, use direct comparison
-                        if new_val is not None:
-                            will_change: bool = (_old_val != new_val) # Python's != operator returns True when comparing None with any non-None value
-                        else:
-                            will_change: bool = (_old_val is not None) ## it is changed if the old value was something other than None.
-
+                    will_change: bool = _sub_sub_fn_did_potentially_arr_or_None_variable_change(_old_val, new_val)
                     _curr_key: str = f'filtered_sessions["{a_decoder_name}"].config.{k}'
                     if will_change:
                         print(f'\t {_curr_key} changing! {_old_val} -> {new_val}.')
@@ -2344,10 +2320,7 @@ class PostHocPipelineFixup:
             if _old_val is not None:
                 _old_val = deepcopy(_old_val)
             # will_change: bool = (_old_val != hard_manual_override_grid_bin_bounds)
-            if (_old_val is not None) and (hard_manual_override_grid_bin_bounds is not None):
-                will_change: bool = (not np.all(np.isclose(_old_val, hard_manual_override_grid_bin_bounds))) # (_old_val != constrained_grid_bin_sizes)
-            else:
-                will_change: bool = (not ((_old_val is None) and (hard_manual_override_grid_bin_bounds is None))) # xor - if XOR either is None, it is a change, otherwise it isn't
+            will_change: bool = _sub_sub_fn_did_potentially_arr_or_None_variable_change(_old_val, hard_manual_override_grid_bin_bounds)
             change_dict[f'filtered_sessions["{a_decoder_name}"].config.grid_bin_bounds'] = (change_dict.get(f'filtered_sessions["{a_decoder_name}"].config.grid_bin_bounds', False) | will_change)
             if not is_dry_run:
                 a_session.config.grid_bin_bounds = deepcopy(hard_manual_override_grid_bin_bounds) ## FORCEIPLY UPDATE
@@ -2359,10 +2332,7 @@ class PostHocPipelineFixup:
             if _old_val is not None:
                 _old_val = deepcopy(_old_val)
             (constrained_grid_bin_sizes, constrained_num_grid_bins) = safe_limit_num_grid_bin_values(hard_manual_override_grid_bin_bounds, desired_grid_bin_sizes=deepcopy(desired_grid_bin), max_allowed_num_bins=max_allowed_num_bins, debug_print=False)
-            if (_old_val is not None) and (constrained_grid_bin_sizes is not None):
-                will_change: bool = (not np.all(np.isclose(_old_val, constrained_grid_bin_sizes))) # (_old_val != constrained_grid_bin_sizes)
-            else:
-                will_change: bool = (not ((_old_val is None) and (constrained_grid_bin_sizes is None))) # xor - if XOR either is None, it is a change, otherwise it isn't
+            will_change: bool = _sub_sub_fn_did_potentially_arr_or_None_variable_change(_old_val, constrained_grid_bin_sizes)
             change_dict[f'filtered_sessions["{a_decoder_name}"].config.grid_bin'] = (change_dict.get(f'filtered_sessions["{a_decoder_name}"].config.grid_bin', False) | will_change)
             if not is_dry_run:
                 a_session.config.grid_bin = constrained_grid_bin_sizes
@@ -2378,7 +2348,8 @@ class PostHocPipelineFixup:
         for a_decoder_name, a_config in curr_active_pipeline.active_configs.items():
             # a_config: InteractivePlaceCellConfig
             _old_val = deepcopy(a_config.computation_config.pf_params.grid_bin_bounds)
-            will_change: bool = (_old_val != hard_manual_override_grid_bin_bounds)
+            # will_change: bool = (_old_val != hard_manual_override_grid_bin_bounds)
+            will_change: bool = _sub_sub_fn_did_potentially_arr_or_None_variable_change(_old_val, hard_manual_override_grid_bin_bounds)
             change_dict[f'active_configs["{a_decoder_name}"]'] = will_change
             grid_bin_bounds = deepcopy(hard_manual_override_grid_bin_bounds) ## FORCEIPLY UPDATE
             if not is_dry_run:
@@ -2393,7 +2364,8 @@ class PostHocPipelineFixup:
         for a_decoder_name, a_config in curr_active_pipeline.computation_results.items():
             # a_config: InteractivePlaceCellConfig
             _old_val = deepcopy(a_config.computation_config.pf_params.grid_bin_bounds)
-            will_change: bool = (_old_val != hard_manual_override_grid_bin_bounds)
+            # will_change: bool = (_old_val != hard_manual_override_grid_bin_bounds)
+            will_change: bool = _sub_sub_fn_did_potentially_arr_or_None_variable_change(_old_val, hard_manual_override_grid_bin_bounds)
             change_dict[f'computation_results["{a_decoder_name}"]'] = will_change
             grid_bin_bounds = deepcopy(hard_manual_override_grid_bin_bounds) ## FORCEIPLY UPDATE
             if not is_dry_run:
