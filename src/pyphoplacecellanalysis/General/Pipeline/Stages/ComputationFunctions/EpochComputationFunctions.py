@@ -184,14 +184,14 @@ class NonPBEDimensionalDecodingResult(UnpackableMixin, ComputedResult):
     test_epoch_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = serialized_field()
     continuous_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = serialized_field()
     
-    frame_divide_epochs_df: pd.DataFrame = serialized_field()
-    frame_divide_epochs_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = serialized_field()
+    frame_divided_epochs_df: pd.DataFrame = serialized_field()
+    frame_divided_epochs_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = serialized_field()
 
 
 
     @property
     def a_result2D(self) -> DecodedFilterEpochsResult:
-        return self.frame_divide_epochs_results['global']
+        return self.frame_divided_epochs_results['global']
 
     @property
     def a_new_global2D_decoder(self) -> BasePositionDecoder:
@@ -204,7 +204,7 @@ class NonPBEDimensionalDecodingResult(UnpackableMixin, ComputedResult):
     def add_frame_division_epoch_start_t_to_pos_df(self):
         ## Adds the ['frame_division_epoch_start_t'] columns to `stacked_flat_global_pos_df` so we can figure out the appropriate offsets
         pos_df: pd.DataFrame = deepcopy(self.pos_df)
-        frame_divided_epochs_df: pd.DataFrame = deepcopy(self.frame_divide_epochs_df)
+        frame_divided_epochs_df: pd.DataFrame = deepcopy(self.frame_divided_epochs_df)
         frame_divided_epochs_df['global_frame_division_idx'] = deepcopy(frame_divided_epochs_df.index)
         frame_divided_epochs_df = frame_divided_epochs_df.rename(columns={'start': 'frame_division_epoch_start_t'})[['global_frame_division_idx', 'frame_division_epoch_start_t']]
         pos_df = PandasHelpers.add_explicit_dataframe_columns_from_lookup_df(pos_df, frame_divided_epochs_df, join_column_name='global_frame_division_idx')

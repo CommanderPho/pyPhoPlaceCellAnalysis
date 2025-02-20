@@ -157,7 +157,7 @@ class SingleArtistMultiEpochBatchHelpers:
 
     @property
     def a_result2D(self) -> DecodedFilterEpochsResult:
-        return self.results2D.frame_divide_epochs_results['global']
+        return self.results2D.frame_divided_epochs_results['global']
 
     @property
     def a_new_global2D_decoder(self) -> BasePositionDecoder:
@@ -464,7 +464,7 @@ class SingleArtistMultiEpochBatchHelpers:
 
         y_axis_kwargs = dict(ymin=0.0, ymax=1.0)
         # y_axis_kwargs = dict(ymin=self.xbin_edges[0], ymax=self.xbin_edges[-1])
-        frame_division_epoch_separator_vlines = active_ax.vlines(self.results2D.frame_divide_epochs_df['start'].to_numpy(), **y_axis_kwargs, colors='white', linestyles='solid', label='frame_division_epoch_separator_vlines') # , data=None
+        frame_division_epoch_separator_vlines = active_ax.vlines(self.results2D.frame_divided_epochs_df['start'].to_numpy(), **y_axis_kwargs, colors='white', linestyles='solid', label='frame_division_epoch_separator_vlines') # , data=None
 
         if not defer_draw:
             if override_ax is None:

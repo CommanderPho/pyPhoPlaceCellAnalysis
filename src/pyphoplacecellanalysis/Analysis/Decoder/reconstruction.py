@@ -1775,7 +1775,8 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
 
         ## Set the static decoder properties
         filter_epochs_decoder_result.pos_bin_edges = deepcopy(active_decoder.xbin)
-
+        assert len(_arr_lengths) > 0, f"no epochs?!?!"
+        n_epochs: int = _arr_lengths[0] ## all the same, so any of them works
 
         # active_decoder.neuron_IDs
         
