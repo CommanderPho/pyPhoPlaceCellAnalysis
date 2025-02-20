@@ -2496,15 +2496,16 @@ class PostHocPipelineFixup:
         return did_any_non_pbe_epochs_change
 
 
-
-    @metadata_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-19 07:24', related_items=[])
-    @staticmethod
-    def run_as_batch_user_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, force_recompute: bool=False, is_dry_run: bool=False) -> dict:
-        """ meant to be executed as a _batch_user_completion_function"""
+    # ==================================================================================================================== #
+    # ALL/MAIN                                                                                                             #
+    # ==================================================================================================================== #
+    @function_attributes(short_name=None, tags=['MAIN', 'epochs', 'sessions'], input_requires=[], output_provides=[], uses=[], used_by=['run_as_batch_user_completion_function'], creation_date='2025-02-19 15:00', related_items=[])
+    @classmethod
+    def FINAL_UPDATE_ALL(cls, curr_active_pipeline, force_recompute:bool=True, is_dry_run: bool=False) -> bool:
+        """ perform all known fixes to the pipeline and return whether any fixes were needed/performed """
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsHelpers, DirectionalLapsResult
-
-        print(f'\t !!!||||||||||||||||||> RUNNING `PostHocPipelineFixup.run_as_batch_user_completion_function(...)`:')
-        print(f'starting `PostHocPipelineFixup.run_as_batch_user_completion_function(...)`...')
+        print(f'\t !!!||||||||||||||||||> RUNNING `PostHocPipelineFixup.FINAL_UPDATE_ALL(...)`:')
+        print(f'starting `PostHocPipelineFixup.FINAL_UPDATE_ALL(...)`...')
 
         did_any_change: bool = False
         (did_any_grid_bin_change, change_dict), correct_grid_bin_bounds = PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, is_dry_run=is_dry_run)
@@ -2521,6 +2522,21 @@ class PostHocPipelineFixup:
         # curr_active_pipeline, directional_lap_specific_configs = DirectionalLapsHelpers.split_to_directional_laps(curr_active_pipeline=curr_active_pipeline, add_created_configs_to_pipeline=True)
 
         did_any_change = (did_any_grid_bin_change or did_fixup_any_missing_basepath or did_any_non_pbe_epochs_change or was_directional_pipeline_modified)
+        print(f'\tPostHocPipelineFixup.FINAL_UPDATE_ALL(...): did_any_change: {did_any_change}')
+        return did_any_change
+
+
+    @metadata_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-19 07:24', related_items=[])
+    @staticmethod
+    def run_as_batch_user_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, force_recompute: bool=False, is_dry_run: bool=False) -> dict:
+        """ meant to be executed as a _batch_user_completion_function"""
+        # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsHelpers, DirectionalLapsResult
+
+        print(f'\t !!!||||||||||||||||||> RUNNING `PostHocPipelineFixup.run_as_batch_user_completion_function(...)`:')
+        print(f'starting `PostHocPipelineFixup.run_as_batch_user_completion_function(...)`...')
+
+        did_any_change: bool = PostHocPipelineFixup.FINAL_UPDATE_ALL(curr_active_pipeline, force_recompute=force_recompute, is_dry_run=is_dry_run)
+        
         print(f'\tPostHocPipelineFixup.run_as_batch_user_completion_function(...): did_any_change: {did_any_change}')
 
         loaded_track_limits = curr_active_pipeline.sess.config.loaded_track_limits
@@ -2530,8 +2546,10 @@ class PostHocPipelineFixup:
         print(f'\t{curr_session_basedir}:\tloaded_track_limits: {loaded_track_limits}, a_config_dict: {a_config_dict}')  # , t_end: {t_end}
         
         callback_outputs = {
-        'correct_grid_bin_bounds': correct_grid_bin_bounds, 'loaded_track_limits': loaded_track_limits, 'change_dict': change_dict, 'config_dict': a_config_dict, #'t_end': t_end 
-        'did_any_grid_bin_change': did_any_grid_bin_change, 'did_fixup_any_missing_basepath': did_fixup_any_missing_basepath, 'did_any_non_pbe_epochs_change': did_any_non_pbe_epochs_change, 'was_directional_pipeline_modified': was_directional_pipeline_modified, 'did_any_change': did_any_change,
+        # 'correct_grid_bin_bounds': correct_grid_bin_bounds, 'loaded_track_limits': loaded_track_limits, 'change_dict': change_dict,
+        'config_dict': a_config_dict, #'t_end': t_end 
+        # 'did_any_grid_bin_change': did_any_grid_bin_change, 'did_fixup_any_missing_basepath': did_fixup_any_missing_basepath, 'did_any_non_pbe_epochs_change': did_any_non_pbe_epochs_change, 'was_directional_pipeline_modified': was_directional_pipeline_modified,
+        'did_any_change': did_any_change,
         }
         print(f'\t\tcallback will be assigned to `across_session_results_extended_dict[{PostHocPipelineFixup.across_session_results_extended_dict_data_name}]`:')
         print(f'\t\t\tcallback_outputs: {callback_outputs}')
@@ -2541,7 +2559,7 @@ class PostHocPipelineFixup:
 
 
 
-@function_attributes(short_name=None, tags=['UNFINISHED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
+@function_attributes(short_name=None, tags=['IMPORTANT', 'PostHocPipelineFixup', 'non_PBE'], input_requires=[], output_provides=[], uses=['PostHocPipelineFixup'], used_by=[], creation_date='2025-02-19 00:00', related_items=['PostHocPipelineFixup'])
 def kdiba_session_post_fixup_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, force_recompute:bool=True, is_dry_run: bool=False) -> dict:
     """ Called to update the pipeline's important position info parameters (such as the grid_bin_bounds, positions, etc) from a loaded .mat file
     
