@@ -65,14 +65,14 @@ class SingleArtistMultiEpochBatchHelpers:
         (x_min, ..., x_max) | (x_min, ..., x_max), | ... | (x_min, ..., x_max) ## where there are `n_frames` repeats
         
     
-        #  each containing `n_subdivision_samples`
+        #  each containing `n_frame_division_samples`
         
     1. compute all-time (erroniously called "continuous" throughout the codebase) decoding, which always contains a single epoch (referring to the entire global epoch)
-    2. subdivide this single epoch into subdivisions of fixed duration: `subdivide_bin_size`
-        There will be `n_subdivision_epochs`: 
+    2. frame_divide this single epoch into frame_divisions of fixed duration: `frame_divide_bin_size`
+        There will be `n_frame_division_epochs`: 
         ```
-        subdivide_bin_size: float = 0.5
-        n_subdivision_epochs: int = int(round(total_global_time_duration / subdivide_bin_size))
+        frame_divide_bin_size: float = 0.5
+        n_frame_division_epochs: int = int(round(total_global_time_duration / frame_divide_bin_size))
         ```
         
     
@@ -91,30 +91,30 @@ class SingleArtistMultiEpochBatchHelpers:
         track_ts_widget, track_fig, track_ax_list = spike_raster_plt_2d.add_new_matplotlib_render_plot_widget(name=track_name)
         track_ax = track_ax_list[0]
         desired_epoch_start_idx: int = 0
-        # desired_epoch_end_idx: int = int(round(1/subdivide_bin_size)) * 60 * 8 # 8 minutes
+        # desired_epoch_end_idx: int = int(round(1/frame_divide_bin_size)) * 60 * 8 # 8 minutes
         desired_epoch_end_idx: Optional[int] = None
 
-        ## INPUTS: subdivide_bin_size, results2D
-        batch_plot_helper: SingleArtistMultiEpochBatchHelpers = SingleArtistMultiEpochBatchHelpers(results2D=results2D, active_ax=track_ax, subdivide_bin_size=subdivide_bin_size, desired_epoch_start_idx=desired_epoch_start_idx, desired_epoch_end_idx=desired_epoch_end_idx)
+        ## INPUTS: frame_divide_bin_size, results2D
+        batch_plot_helper: SingleArtistMultiEpochBatchHelpers = SingleArtistMultiEpochBatchHelpers(results2D=results2D, active_ax=track_ax, frame_divide_bin_size=frame_divide_bin_size, desired_epoch_start_idx=desired_epoch_start_idx, desired_epoch_end_idx=desired_epoch_end_idx)
         plots_data = batch_plot_helper.add_all_track_plots(global_session=global_session)
         
     
             
     Usage -- Individual Components:
         desired_epoch_start_idx: int = 0
-        # desired_epoch_end_idx: int = int(round(1/subdivide_bin_size)) * 60 * 8 # 8 minutes
+        # desired_epoch_end_idx: int = int(round(1/frame_divide_bin_size)) * 60 * 8 # 8 minutes
         desired_epoch_end_idx: Optional[int] = None
 
-        ## INPUTS: subdivide_bin_size, results2D
-        batch_plot_helper: SingleArtistMultiEpochBatchHelpers = SingleArtistMultiEpochBatchHelpers(results2D=results2D, active_ax=track_ax, subdivide_bin_size=subdivide_bin_size, desired_epoch_start_idx=desired_epoch_start_idx, desired_epoch_end_idx=desired_epoch_end_idx)
+        ## INPUTS: frame_divide_bin_size, results2D
+        batch_plot_helper: SingleArtistMultiEpochBatchHelpers = SingleArtistMultiEpochBatchHelpers(results2D=results2D, active_ax=track_ax, frame_divide_bin_size=frame_divide_bin_size, desired_epoch_start_idx=desired_epoch_start_idx, desired_epoch_end_idx=desired_epoch_end_idx)
 
         batch_plot_helper.shared_build_flat_stacked_data(force_recompute=True, debug_print=True)
 
         track_shape_patch_collection_artists = batch_plot_helper.add_track_shapes(global_session=global_session, override_ax=None) ## does not seem to successfully synchronize to window
         # track_shape_patch_collection_artists = batch_plot_helper.add_track_shapes(global_session=global_session, override_ax=track_shapes_dock_track_ax) ## does not seem to successfully synchronize to window
 
-        measured_pos_line_artist, subdivision_epoch_separator_vlines = batch_plot_helper.add_track_positions(override_ax=None)
-        # measured_pos_line_artist, subdivision_epoch_separator_vlines = batch_plot_helper.add_track_positions(override_ax=measured_pos_dock_track_ax)
+        measured_pos_line_artist, frame_division_epoch_separator_vlines = batch_plot_helper.add_track_positions(override_ax=None)
+        # measured_pos_line_artist, frame_division_epoch_separator_vlines = batch_plot_helper.add_track_positions(override_ax=measured_pos_dock_track_ax)
 
         curr_artist_dict, image_extent, plots_data = batch_plot_helper.add_position_posteriors(posterior_masking_value=0.0025, override_ax=None, debug_print=True, defer_draw=False)
 
@@ -122,7 +122,7 @@ class SingleArtistMultiEpochBatchHelpers:
     results2D: "NonPBEDimensionalDecodingResult" = field()
 
     active_ax = field()
-    subdivide_bin_size: float = field()
+    frame_divide_bin_size: float = field()
     rotate_to_vertical: bool = field(default=True)
     
     desired_epoch_start_idx: int = field(default=0)
@@ -134,7 +134,7 @@ class SingleArtistMultiEpochBatchHelpers:
 
     @property
     def num_filter_epochs(self) -> int:
-        """number of subdivision epochs."""
+        """number of frame_division epochs."""
         return self.a_result2D.num_filter_epochs
 
     @property
@@ -144,7 +144,7 @@ class SingleArtistMultiEpochBatchHelpers:
 
     @property
     def a_result2D(self) -> DecodedFilterEpochsResult:
-        return self.results2D.subdivided_epochs_results['global']
+        return self.results2D.frame_divide_epochs_results['global']
 
     @property
     def a_new_global2D_decoder(self) -> BasePositionDecoder:
@@ -152,14 +152,14 @@ class SingleArtistMultiEpochBatchHelpers:
 
     @property
     def desired_start_time_seconds(self) -> float:
-        return self.desired_epoch_start_idx * self.subdivide_bin_size
+        return self.desired_epoch_start_idx * self.frame_divide_bin_size
     
     @property
     def desired_end_time_seconds(self) -> float:
         if self.desired_epoch_end_idx is not None:
-            return self.subdivide_bin_size * self.desired_epoch_end_idx
+            return self.frame_divide_bin_size * self.desired_epoch_end_idx
         else:
-            return self.subdivide_bin_size * (self.num_filter_epochs-1)
+            return self.frame_divide_bin_size * (self.num_filter_epochs-1)
         
     @property
     def desired_time_duration(self) -> float:
@@ -177,7 +177,7 @@ class SingleArtistMultiEpochBatchHelpers:
     def shared_build_flat_stacked_data(self, debug_print=False, should_expand_first_dim: bool=True, force_recompute:bool=False, **kwargs):
         """ finalize building the data for single-artist plotting (does not plot anything)
         
-        From `#### 2025-02-14 - Perform plotting of Measured Positions (using `stacked_flat_global_pos_df['global_subdivision_x_data_offset']`)`
+        From `#### 2025-02-14 - Perform plotting of Measured Positions (using `stacked_flat_global_pos_df['global_frame_division_x_data_offset']`)`
         Uses:
             self.a_new_global2D_decoder
             self.stacked_flat_global_pos_df
@@ -229,9 +229,9 @@ class SingleArtistMultiEpochBatchHelpers:
 
         ## slice `stacked_flat_global_pos_df` by desired start/end indicies too:
         if (self.desired_epoch_end_idx is not None):
-            self.stacked_flat_global_pos_df = self.stacked_flat_global_pos_df[np.logical_and((self.stacked_flat_global_pos_df['global_subdivision_idx'] >= self.desired_epoch_start_idx), (self.stacked_flat_global_pos_df['global_subdivision_idx'] < self.desired_epoch_end_idx))]
+            self.stacked_flat_global_pos_df = self.stacked_flat_global_pos_df[np.logical_and((self.stacked_flat_global_pos_df['global_frame_division_idx'] >= self.desired_epoch_start_idx), (self.stacked_flat_global_pos_df['global_frame_division_idx'] < self.desired_epoch_end_idx))]
         else:
-            self.stacked_flat_global_pos_df = self.stacked_flat_global_pos_df[(self.stacked_flat_global_pos_df['global_subdivision_idx'] >= self.desired_epoch_start_idx)]
+            self.stacked_flat_global_pos_df = self.stacked_flat_global_pos_df[(self.stacked_flat_global_pos_df['global_frame_division_idx'] >= self.desired_epoch_start_idx)]
 
 
         # (self.n_xbins, self.n_ybins, self.n_tbins), (self.flattened_n_xbins, self.flattened_n_ybins, self.flattened_n_tbins)
@@ -266,25 +266,25 @@ class SingleArtistMultiEpochBatchHelpers:
             print(f'desired_time_duration: {self.desired_time_duration}, (desired_start_time_seconds: {self.desired_start_time_seconds}, desired_end_time_seconds: {self.desired_end_time_seconds})')
         ## INPUTS: x0_offset, y0_offset
         # custom_image_extent = np.array([0.0, 1.0, 0.0, 1.0])
-        max_global_subdivision_idx: int = np.nanmax(self.stacked_flat_global_pos_df['global_subdivision_idx']) ## TODO: could allow not starting on zero, but let's not
-        active_num_global_subdivisions: int = max_global_subdivision_idx + 1   
+        max_global_frame_division_idx: int = np.nanmax(self.stacked_flat_global_pos_df['global_frame_division_idx']) ## TODO: could allow not starting on zero, but let's not
+        active_num_global_frame_divisions: int = max_global_frame_division_idx + 1   
         if debug_print:
-            print(f'active_num_global_subdivisions: {active_num_global_subdivisions}')
-        single_global_subdivision_axes_coords_width: float = 1.0 / float(active_num_global_subdivisions)
-        single_global_subdivision_axes_coords_duration: float = float(self.desired_time_duration) / float(active_num_global_subdivisions) ## how "long" a single frame spans along the t axis (in seconds)
+            print(f'active_num_global_frame_divisions: {active_num_global_frame_divisions}')
+        single_global_frame_division_axes_coords_width: float = 1.0 / float(active_num_global_frame_divisions)
+        single_global_frame_division_axes_coords_duration: float = float(self.desired_time_duration) / float(active_num_global_frame_divisions) ## how "long" a single frame spans along the t axis (in seconds)
 
 
-        assert 'subdivision_epoch_start_t' in self.stacked_flat_global_pos_df
+        assert 'frame_division_epoch_start_t' in self.stacked_flat_global_pos_df
         if debug_print:
-            print(f'single_global_subdivision_axes_coords_width: {single_global_subdivision_axes_coords_width}\nsingle_global_subdivision_axes_coords_duration: {single_global_subdivision_axes_coords_duration}')
-        self.stacked_flat_global_pos_df['global_subdivision_x_unit_offset'] = (self.stacked_flat_global_pos_df['global_subdivision_idx'].astype(float) * single_global_subdivision_axes_coords_width) # in unit coordinates
-        # stacked_flat_global_pos_df['global_subdivision_x_data_offset'] = (stacked_flat_global_pos_df['global_subdivision_x_unit_offset'].astype(float) * single_global_subdivision_axes_coords_duration) # in data coordinates (along the t-axis)
-        self.stacked_flat_global_pos_df['global_subdivision_x_data_offset'] = (self.stacked_flat_global_pos_df['global_subdivision_x_unit_offset'].astype(float) * self.stacked_flat_global_pos_df['subdivision_epoch_start_t'].astype(float)) # in data coordinates (along the t-axis)
+            print(f'single_global_frame_division_axes_coords_width: {single_global_frame_division_axes_coords_width}\nsingle_global_frame_division_axes_coords_duration: {single_global_frame_division_axes_coords_duration}')
+        self.stacked_flat_global_pos_df['global_frame_division_x_unit_offset'] = (self.stacked_flat_global_pos_df['global_frame_division_idx'].astype(float) * single_global_frame_division_axes_coords_width) # in unit coordinates
+        # stacked_flat_global_pos_df['global_frame_division_x_data_offset'] = (stacked_flat_global_pos_df['global_frame_division_x_unit_offset'].astype(float) * single_global_frame_division_axes_coords_duration) # in data coordinates (along the t-axis)
+        self.stacked_flat_global_pos_df['global_frame_division_x_data_offset'] = (self.stacked_flat_global_pos_df['global_frame_division_x_unit_offset'].astype(float) * self.stacked_flat_global_pos_df['frame_division_epoch_start_t'].astype(float)) # in data coordinates (along the t-axis)
 
         ## Actually update 'x' or 'y' inplace in the dataframe:
         if self.rotate_to_vertical:
             # stacked_flat_global_pos_df['x'] -= a_new_global_decoder.xbin[0] ## zero-out the x0 by subtracting out the minimal xbin_edge
-            # stacked_flat_global_pos_df['x'] += stacked_flat_global_pos_df['global_subdivision_x_offset']
+            # stacked_flat_global_pos_df['x'] += stacked_flat_global_pos_df['global_frame_division_x_offset']
             
             # ## As imported pre-2025-02-16:
             # self.stacked_flat_global_pos_df['x'] -= self.x0_offset ## zero-out the x0 by subtracting out the minimal xbin_edge
@@ -308,7 +308,7 @@ class SingleArtistMultiEpochBatchHelpers:
             
             # stacked_flat_global_pos_df['y'] *= inverse_normalization_factor_height ## scale to [0, 1]
 
-            # stacked_flat_global_pos_df['x'] += stacked_flat_global_pos_df['global_subdivision_x_offset']
+            # stacked_flat_global_pos_df['x'] += stacked_flat_global_pos_df['global_frame_division_x_offset']
 
 
 
@@ -341,12 +341,12 @@ class SingleArtistMultiEpochBatchHelpers:
 
         else:
             raise NotImplementedError()
-            self.stacked_flat_global_pos_df['y'] += self.stacked_flat_global_pos_df['global_subdivision_x_offset']
+            self.stacked_flat_global_pos_df['y'] += self.stacked_flat_global_pos_df['global_frame_division_x_offset']
             self.stacked_flat_global_pos_df['y_scaled'] = (self.stacked_flat_global_pos_df['y'] - self.y0_offset) / (self.y1_offset - self.y0_offset)
 
 
-        ## OUTPUTS: single_global_subdivision_axes_coords_width, single_global_subdivision_axes_coords_duration
-        ## UPDATES: stacked_flat_global_pos_df['global_subdivision_x_data_offset']
+        ## OUTPUTS: single_global_frame_division_axes_coords_width, single_global_frame_division_axes_coords_duration
+        ## UPDATES: stacked_flat_global_pos_df['global_frame_division_x_data_offset']
         
 
 
@@ -362,7 +362,7 @@ class SingleArtistMultiEpochBatchHelpers:
     def add_track_positions(self, override_ax=None, debug_print=False, defer_draw:bool=False, **kwargs):
         """ Add the measured positions 
         
-        From `#### 2025-02-14 - Perform plotting of Measured Positions (using `stacked_flat_global_pos_df['global_subdivision_x_data_offset']`)`
+        From `#### 2025-02-14 - Perform plotting of Measured Positions (using `stacked_flat_global_pos_df['global_frame_division_x_data_offset']`)`
         Uses:
             self.inverse_xbin_width
             self.stacked_flat_global_pos_df
@@ -377,7 +377,7 @@ class SingleArtistMultiEpochBatchHelpers:
             
         Usage:
         
-            measured_pos_line_artist, subdivision_epoch_separator_vlines = batch_plot_helper.add_track_positions()
+            measured_pos_line_artist, frame_division_epoch_separator_vlines = batch_plot_helper.add_track_positions()
             
             
         """
@@ -395,7 +395,7 @@ class SingleArtistMultiEpochBatchHelpers:
             print(f'desired_start_time_seconds: {self.desired_start_time_seconds}, desired_end_time_seconds: {self.desired_end_time_seconds}')
 
 
-        assert 'global_subdivision_x_data_offset' in self.stacked_flat_global_pos_df
+        assert 'global_frame_division_x_data_offset' in self.stacked_flat_global_pos_df
         
         # ==================================================================================================================== #
         # Old (non-working) pre 2025-02-17                                                                                     #
@@ -406,7 +406,7 @@ class SingleArtistMultiEpochBatchHelpers:
         # assert y_axis_col_name in self.stacked_flat_global_pos_df
         
         # ## Perform the real plotting:
-        # x = self.stacked_flat_global_pos_df['global_subdivision_x_data_offset'].to_numpy()
+        # x = self.stacked_flat_global_pos_df['global_frame_division_x_data_offset'].to_numpy()
         # # y = self.stacked_flat_global_pos_df[y_axis_col_name].to_numpy() / self.inverse_xbin_width ## needs to be inversely mapped from 0, 1
         # y = self.stacked_flat_global_pos_df[y_axis_col_name].to_numpy() ## needs to be inversely mapped from 0, 1        
 
@@ -420,7 +420,7 @@ class SingleArtistMultiEpochBatchHelpers:
         time_cmap_start_end_colors = [(0, 0.6, 0), (0, 0, 0)]  # first is green, second is black
         time_cmap = LinearSegmentedColormap.from_list("GreenToBlack", time_cmap_start_end_colors, N=25) # Create a colormap (green to black).
 
-        self.stacked_flat_global_pos_df = SingleArtistMultiEpochBatchHelpers.add_color_over_global_subdivision_idx_positions_to_stacked_flat_global_pos_df(stacked_flat_global_pos_df=self.stacked_flat_global_pos_df, time_cmap=time_cmap)
+        self.stacked_flat_global_pos_df = SingleArtistMultiEpochBatchHelpers.add_color_over_global_frame_division_idx_positions_to_stacked_flat_global_pos_df(stacked_flat_global_pos_df=self.stacked_flat_global_pos_df, time_cmap=time_cmap)
         
         # ensure the 'y_scaled' actually are scaled between [0.0, 1.0]
         self.stacked_flat_global_pos_df["y_scaled"] = (self.stacked_flat_global_pos_df["y_scaled"] - self.stacked_flat_global_pos_df["y_scaled"].min()) / (self.stacked_flat_global_pos_df["y_scaled"].max() - self.stacked_flat_global_pos_df["y_scaled"].min())
@@ -445,13 +445,13 @@ class SingleArtistMultiEpochBatchHelpers:
 
 
         
-        measured_pos_line_artist = measured_pos_dock_track_ax.scatter(active_stacked_flat_global_pos_df["global_subdivision_x_data_offset"], active_stacked_flat_global_pos_df["y_scaled"], color=active_stacked_flat_global_pos_df["color"].tolist())
+        measured_pos_line_artist = measured_pos_dock_track_ax.scatter(active_stacked_flat_global_pos_df["global_frame_division_x_data_offset"], active_stacked_flat_global_pos_df["y_scaled"], color=active_stacked_flat_global_pos_df["color"].tolist())
         measured_pos_line_artist.set_alpha(0.85)
         measured_pos_line_artist.set_sizes([14])
 
         y_axis_kwargs = dict(ymin=0.0, ymax=1.0)
         # y_axis_kwargs = dict(ymin=self.xbin_edges[0], ymax=self.xbin_edges[-1])
-        subdivision_epoch_separator_vlines = active_ax.vlines(self.results2D.subdivided_epochs_df['start'].to_numpy(), **y_axis_kwargs, colors='white', linestyles='solid', label='subdivision_epoch_separator_vlines') # , data=None
+        frame_division_epoch_separator_vlines = active_ax.vlines(self.results2D.frame_divide_epochs_df['start'].to_numpy(), **y_axis_kwargs, colors='white', linestyles='solid', label='frame_division_epoch_separator_vlines') # , data=None
 
         if not defer_draw:
             if override_ax is None:
@@ -459,7 +459,7 @@ class SingleArtistMultiEpochBatchHelpers:
             else:
                 override_ax.get_figure().canvas.draw_idle()
 
-        return (measured_pos_line_artist, subdivision_epoch_separator_vlines)
+        return (measured_pos_line_artist, frame_division_epoch_separator_vlines)
 
 
     # ==================================================================================================================== #
@@ -559,11 +559,11 @@ class SingleArtistMultiEpochBatchHelpers:
 
         is_filtered: bool = False
         ## INPUTS: track_ax, rotate_to_vertical, perform_autoscale
-        # subdivide_bin_size: float = self.subdivide_bin_size
+        # frame_divide_bin_size: float = self.frame_divide_bin_size
         ## Slice a subset of the data epochs:
         desired_epoch_start_idx: int = self.desired_epoch_start_idx
         # desired_epoch_end_idx: int = 20
-        # desired_epoch_end_idx: int = int(round(1/subdivide_bin_size)) * 60 * 8 # 8 minutes
+        # desired_epoch_end_idx: int = int(round(1/frame_divide_bin_size)) * 60 * 8 # 8 minutes
         if self.desired_epoch_end_idx is not None:
             desired_epoch_end_idx: int = self.desired_epoch_end_idx
             filtered_epoch_range: NDArray = np.arange(start=desired_epoch_start_idx, stop=desired_epoch_end_idx)
@@ -645,7 +645,7 @@ class SingleArtistMultiEpochBatchHelpers:
         if is_filtered:
             # desired_epoch_start_idx: int = 0
             # # desired_epoch_end_idx: int = 20
-            # desired_epoch_end_idx: int = int(round(1/subdivide_bin_size)) * 60 * 8 # 8 minutes
+            # desired_epoch_end_idx: int = int(round(1/frame_divide_bin_size)) * 60 * 8 # 8 minutes
             # print(f'desired_epoch_start_idx: {desired_epoch_start_idx}, desired_epoch_end_idx: {desired_epoch_end_idx}')
 
             track_all_rect_arr_dict = {k:v[(desired_epoch_start_idx*3):(desired_epoch_end_idx*3), :] for k, v in self.track_all_normalized_rect_arr_dict.items()}
@@ -683,7 +683,7 @@ class SingleArtistMultiEpochBatchHelpers:
         # plots = RenderPlots('_perform_add_decoded_posterior_and_trajectory')
         plots_data: RenderPlotsData = RenderPlotsData(name='SingleArtistMultiEpochBatchHelpers', image_extent=None, curr_artist_dict=None,
                                                       track_shape_patch_collection_artists=None,
-                                                      measured_pos_line_artist=None, subdivision_epoch_separator_vlines=None,
+                                                      measured_pos_line_artist=None, frame_division_epoch_separator_vlines=None,
                                                        ) #deepcopy(extra_dict) # RenderPlotsData(name='_perform_add_decoded_posterior_and_trajectory', image_extent=deepcopy(image_extent))
 
 
@@ -691,13 +691,13 @@ class SingleArtistMultiEpochBatchHelpers:
         # track_shape_patch_collection_artists = batch_plot_helper.add_track_shapes(global_session=global_session, override_ax=track_shapes_dock_track_ax) ## does not seem to successfully synchronize to window
         plots_data.curr_artist_dict, plots_data.image_extent, plots_data = self.add_position_posteriors(posterior_masking_value=posterior_masking_value, override_ax=override_ax, debug_print=debug_print, defer_draw=True, extant_plot_data=plots_data)
 
-        measured_pos_line_artist, subdivision_epoch_separator_vlines = self.add_track_positions(override_ax=override_ax, debug_print=debug_print, defer_draw=True)
-        # measured_pos_line_artist, subdivision_epoch_separator_vlines = batch_plot_helper.add_track_positions(override_ax=measured_pos_dock_track_ax)
+        measured_pos_line_artist, frame_division_epoch_separator_vlines = self.add_track_positions(override_ax=override_ax, debug_print=debug_print, defer_draw=True)
+        # measured_pos_line_artist, frame_division_epoch_separator_vlines = batch_plot_helper.add_track_positions(override_ax=measured_pos_dock_track_ax)
         plots_data.measured_pos_line_artist = measured_pos_line_artist
-        plots_data.subdivision_epoch_separator_vlines = subdivision_epoch_separator_vlines
+        plots_data.frame_division_epoch_separator_vlines = frame_division_epoch_separator_vlines
         
         # plots_data.curr_artist_dict['measured_pos_line_artist'] = measured_pos_line_artist
-        # plots_data.curr_artist_dict['subdivision_epoch_separator_vlines'] = subdivision_epoch_separator_vlines
+        # plots_data.curr_artist_dict['frame_division_epoch_separator_vlines'] = frame_division_epoch_separator_vlines
         
         # plot_obj = RasterPlots()
         
@@ -767,10 +767,10 @@ class SingleArtistMultiEpochBatchHelpers:
     @classmethod
     def complete_build_stacked_flat_arrays(cls, a_result: "DecodedFilterEpochsResult", a_new_global_decoder, desired_epoch_start_idx:int=0, desired_epoch_end_idx: Optional[int] = None, rotate_to_vertical: bool = True, should_expand_first_dim: bool=True):
         """ 
-        a_result: DecodedFilterEpochsResult = subdivided_epochs_specific_decoded_results_dict['global']
+        a_result: DecodedFilterEpochsResult = frame_divided_epochs_specific_decoded_results_dict['global']
         a_new_global_decoder = new_decoder_dict['global']
         # delattr(a_result, 'measured_positions_list')
-        a_result.measured_positions_list = deepcopy([global_pos_df[global_pos_df['global_subdivision_idx'] == epoch_idx] for epoch_idx in np.arange(a_result.num_filter_epochs)]) ## add a List[pd.DataFrame] to plot as the measured positions
+        a_result.measured_positions_list = deepcopy([global_pos_df[global_pos_df['global_frame_division_idx'] == epoch_idx] for epoch_idx in np.arange(a_result.num_filter_epochs)]) ## add a List[pd.DataFrame] to plot as the measured positions
         rotate_to_vertical: bool = True
         should_expand_first_dim: bool=True
         (n_xbins, n_ybins, n_tbins), (flattened_n_xbins, flattened_n_ybins, flattened_n_tbins), (stacked_p_x_given_n, stacked_flat_time_bin_centers, stacked_flat_xbin_centers, stacked_flat_ybin_centers) = SingleArtistMultiEpochBatchHelpers.complete_build_stacked_flat_arrays(a_result=a_result, a_new_global_decoder=a_new_global_decoder, rotate_to_vertical=rotate_to_vertical, should_expand_first_dim=should_expand_first_dim)
@@ -840,9 +840,9 @@ class SingleArtistMultiEpochBatchHelpers:
     @classmethod
     @function_attributes(short_name=None, tags=['masked_rows', 'nan', 'position_lines', 'stacked_flat_global_pos_df'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-17 23:56', related_items=[])
     def add_nan_masked_rows_to_stacked_flat_global_pos_df(cls, stacked_flat_global_pos_df: pd.DataFrame) -> pd.DataFrame:
-        """ seperates each 'global_subdivision_idx' change in the df by adding two NaN rows with ['is_masked_bin'] = True 
+        """ seperates each 'global_frame_division_idx' change in the df by adding two NaN rows with ['is_masked_bin'] = True 
 
-        stacked_flat_global_pos_df['global_subdivision_idx'] ## find rows in the dataframe where the 'global_subdivision_idx' column changes values
+        stacked_flat_global_pos_df['global_frame_division_idx'] ## find rows in the dataframe where the 'global_frame_division_idx' column changes values
         ## insert a new row into the dataframe between the two changing rows: where the new row's 't' = (prev_row_t + 1e-6)
 
         Usage:
@@ -852,10 +852,10 @@ class SingleArtistMultiEpochBatchHelpers:
         """        
         new_stacked_flat_global_pos_df = deepcopy(stacked_flat_global_pos_df)
         # print(list(new_stacked_flat_global_pos_df.columns))
-        column_names_to_copy = ['t', 'global_subdivision_idx', 'subdivision_epoch_start_t']
+        column_names_to_copy = ['t', 'global_frame_division_idx', 'frame_division_epoch_start_t']
         column_names_to_update = ['t', 'dt', 'is_masked_bin']
-        nan_column_names = ['x', 'y', 'lin_pos', 'speed', 'lap', 'lap_dir', 'velocity_x', 'acceleration_x', 'velocity_y', 'acceleration_y', 'x_smooth', 'y_smooth', 'velocity_x_smooth', 'acceleration_x_smooth', 'velocity_y_smooth', 'acceleration_y_smooth', 'binned_x', 'binned_y', 'global_subdivision_x_unit_offset', 'global_subdivision_x_data_offset', 'x_scaled', 'x_smooth_scaled', 'y_scaled']
-        # nan_column_names = ['x', 'y', 'lin_pos', 'speed', 'lap', 'lap_dir', 'x_smooth', 'y_smooth', 'binned_x', 'binned_y', 'global_subdivision_x_unit_offset', 'global_subdivision_x_data_offset', 'x_scaled', 'x_smooth_scaled', 'y_scaled']
+        nan_column_names = ['x', 'y', 'lin_pos', 'speed', 'lap', 'lap_dir', 'velocity_x', 'acceleration_x', 'velocity_y', 'acceleration_y', 'x_smooth', 'y_smooth', 'velocity_x_smooth', 'acceleration_x_smooth', 'velocity_y_smooth', 'acceleration_y_smooth', 'binned_x', 'binned_y', 'global_frame_division_x_unit_offset', 'global_frame_division_x_data_offset', 'x_scaled', 'x_smooth_scaled', 'y_scaled']
+        # nan_column_names = ['x', 'y', 'lin_pos', 'speed', 'lap', 'lap_dir', 'x_smooth', 'y_smooth', 'binned_x', 'binned_y', 'global_frame_division_x_unit_offset', 'global_frame_division_x_data_offset', 'x_scaled', 'x_smooth_scaled', 'y_scaled']
         included_nan_column_names = [k for k in nan_column_names if k in new_stacked_flat_global_pos_df.columns]
 
         new_stacked_flat_global_pos_df['is_masked_bin'] = False
@@ -867,8 +867,8 @@ class SingleArtistMultiEpochBatchHelpers:
         dfs = []
         prev = None
         for _, row in new_stacked_flat_global_pos_df.iterrows():
-            # is_global_subdivision_idx_changing: bool = (row['global_subdivision_idx'] != prev['global_subdivision_idx'])
-            if (prev is not None) and (row['global_subdivision_idx'] != prev['global_subdivision_idx']):
+            # is_global_frame_division_idx_changing: bool = (row['global_frame_division_idx'] != prev['global_frame_division_idx'])
+            if (prev is not None) and (row['global_frame_division_idx'] != prev['global_frame_division_idx']):
                 new_row = prev.copy()
                 new_row['t'] = prev['t'] + 1e-6
                 new_row[included_nan_column_names] = np.nan
@@ -892,18 +892,18 @@ class SingleArtistMultiEpochBatchHelpers:
 
     @classmethod
     @function_attributes(short_name=None, tags=['masked_rows', 'nan', 'position_lines', 'stacked_flat_global_pos_df'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-17 23:56', related_items=[])
-    def add_color_over_global_subdivision_idx_positions_to_stacked_flat_global_pos_df(cls, stacked_flat_global_pos_df: pd.DataFrame, time_cmap='viridis') -> pd.DataFrame:
-        """ seperates each 'global_subdivision_idx' change in the df by adding two NaN rows with ['is_masked_bin'] = True 
+    def add_color_over_global_frame_division_idx_positions_to_stacked_flat_global_pos_df(cls, stacked_flat_global_pos_df: pd.DataFrame, time_cmap='viridis') -> pd.DataFrame:
+        """ seperates each 'global_frame_division_idx' change in the df by adding two NaN rows with ['is_masked_bin'] = True 
         Usage:
         
-            stacked_flat_global_pos_df = SingleArtistMultiEpochBatchHelpers.add_color_over_global_subdivision_idx_positions_to_stacked_flat_global_pos_df(stacked_flat_global_pos_df=stacked_flat_global_pos_df, time_cmap='viridis')
+            stacked_flat_global_pos_df = SingleArtistMultiEpochBatchHelpers.add_color_over_global_frame_division_idx_positions_to_stacked_flat_global_pos_df(stacked_flat_global_pos_df=stacked_flat_global_pos_df, time_cmap='viridis')
             stacked_flat_global_pos_df
         """
         if isinstance(time_cmap, str):
             time_cmap = plt.get_cmap(time_cmap)  # Choose a colormap
 
-        group_min = stacked_flat_global_pos_df.groupby('global_subdivision_idx')['t'].transform('min')
-        group_max = stacked_flat_global_pos_df.groupby('global_subdivision_idx')['t'].transform('max')
+        group_min = stacked_flat_global_pos_df.groupby('global_frame_division_idx')['t'].transform('min')
+        group_max = stacked_flat_global_pos_df.groupby('global_frame_division_idx')['t'].transform('max')
         normed = (stacked_flat_global_pos_df['t'] - group_min) / (group_max - group_min)
         stacked_flat_global_pos_df['color'] = normed.apply(lambda x: time_cmap(x)) ## updates the 'color' column
         return stacked_flat_global_pos_df
@@ -1256,7 +1256,7 @@ def multi_DecodedTrajectoryMatplotlibPlotter_side_by_side(a_result2D: DecodedFil
     desired_epoch_start_idx: int = 214
     desired_epoch_end_idx: int = desired_epoch_start_idx + 10 ## 10 frames before the 8 minute mark
     # desired_epoch_end_idx: int = 20
-    # desired_epoch_end_idx: int = int(round(1/subdivide_bin_size)) * 60 * 8 # 8 minutes
+    # desired_epoch_end_idx: int = int(round(1/frame_divide_bin_size)) * 60 * 8 # 8 minutes
     # desired_epoch_start_idx: int = desired_epoch_end_idx - 10 ## 10 frames before the 8 minute mark
     print(f'desired_epoch_start_idx: {desired_epoch_start_idx}, desired_epoch_end_idx: {desired_epoch_end_idx}')
 
