@@ -1561,6 +1561,200 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         return custom_curr_unit_marginal_list
 
 
+    @function_attributes(short_name=None, tags=['ACTIVE', 'general', 'non_PBE'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-20 16:16', related_items=[])
+    @classmethod
+    def build_generalized_non_marginalized_raw_posteriors(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], unique_decoder_names: List[str], debug_print=False) -> List[DynamicContainer]:
+        """ works for an all-directional coder with an arbitrary (but specified as `unique_decoder_names`) n_decoders items
+        
+        Requires: filter_epochs_decoder_result.p_x_given_n_list
+        
+        Usage:
+            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
+
+            from neuropy.core.epoch import EpochsAccessor, Epoch, ensure_dataframe
+            from pyphocorehelpers.indexing_helpers import partition_df_dict, partition_df        
+            # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _adding_global_non_PBE_epochs
+            # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import Compute_NonPBE_Epochs
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer, NonPBEDimensionalDecodingResult, Compute_NonPBE_Epochs, KnownFilterEpochs
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import estimate_memory_requirements_bytes
+            from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch
+            from neuropy.analyses.placefields import PfND
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
+            from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
+            from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch
+            from neuropy.analyses.placefields import PfND
+            from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewDecodedPosteriors_MatplotlibPlotCommand, AddNewDecodedEpochMarginal_MatplotlibPlotCommand
+            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
+            from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, CustomCyclicColorsDockDisplayConfig, NamedColorScheme
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewDecodedEpochMarginal_MatplotlibPlotCommand
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
+            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+
+
+            long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+
+            ## Unpack from pipeline:
+            nonPBE_results: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+            a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = nonPBE_results.a_new_NonPBE_Epochs_obj
+            results1D: NonPBEDimensionalDecodingResult = nonPBE_results.results1D
+            results2D: NonPBEDimensionalDecodingResult = nonPBE_results.results2D
+
+            epochs_decoding_time_bin_size = nonPBE_results.epochs_decoding_time_bin_size
+            frame_divide_bin_size = nonPBE_results.frame_divide_bin_size
+
+
+            ## INPUTS: results1D, results1D.continuous_results, a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs
+
+            included_epoch_names: List[str] = ['long', 'short']
+            # results1D.pfs
+            # results1D.decoders # BasePositionDecoder
+            # single_global_epoch_df: pd.DataFrame = Epoch(deepcopy(a_new_NonPBE_Epochs_obj.single_global_epoch_df))
+            single_global_epoch: Epoch = Epoch(deepcopy(a_new_NonPBE_Epochs_obj.single_global_epoch_df))
+            # PfND
+
+            pfs: Dict[types.DecoderName, PfND] = {k:deepcopy(v) for k, v in results1D.pfs.items() if k in included_epoch_names}
+            decoders: Dict[types.DecoderName, BasePositionDecoder] = {k:deepcopy(v) for k, v in results1D.decoders.items() if k in included_epoch_names}
+            continuous_decoded_results_dict: Dict[str, DecodedFilterEpochsResult] = {k:deepcopy(v) for k, v in results1D.continuous_results.items() if k in included_epoch_names}
+            # DirectionalPseudo2DDecodersResult(
+
+            ## Combine the non-directional PDFs and renormalize to get the directional PDF:
+            non_PBE_all_directional_pf1D: PfND = PfND.build_merged_directional_placefields(pfs, debug_print=False)
+            non_PBE_all_directional_pf1D_Decoder: BasePositionDecoder = BasePositionDecoder(non_PBE_all_directional_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
+            # non_PBE_all_directional_pf1D_Decoder
+
+            # takes 6.3 seconds
+            ## Do Continuous Decoding (for all time (`single_global_epoch`), using the decoder from each epoch) -- slowest dict comp
+            pseudo2D_continuous_specific_decoded_results: DecodedFilterEpochsResult = non_PBE_all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)),
+                                                                                                                                                                        filter_epochs=deepcopy(single_global_epoch),
+                                                                                                                                                                        decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False)
+
+                                                                                                                                                                        
+            ## OUTPUTS: pseudo2D_continuous_specific_decoded_results, non_PBE_all_directional_pf1D, non_PBE_all_directional_pf1D_Decoder
+            # 3.3s
+
+            #@ build_generalized_non_marginalized_raw_posteriors
+            # ==================================================================================================================== #
+            # Compute Marginals over TrackID                                                                                       #
+            # ==================================================================================================================== #
+            pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = pseudo2D_continuous_specific_decoded_results
+            assert len(pseudo2D_decoder_continuously_decoded_result.p_x_given_n_list) == 1
+
+            unique_decoder_names = ['long', 'short']
+            # NOTE: non_marginalized_raw_result is a marginal_over_track_ID since there are only two elements
+            non_PBE_marginal_over_track_ID = DirectionalPseudo2DDecodersResult.build_generalized_non_marginalized_raw_posteriors(pseudo2D_decoder_continuously_decoded_result, unique_decoder_names=unique_decoder_names)[0]['p_x_given_n']
+            # non_marginalized_raw_result = DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors(pseudo2D_decoder_continuously_decoded_result)[0]['p_x_given_n']
+            # marginal_over_direction = DirectionalPseudo2DDecodersResult.build_custom_marginal_over_direction(pseudo2D_decoder_continuously_decoded_result)[0]['p_x_given_n']
+            # marginal_over_track_ID = DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(pseudo2D_decoder_continuously_decoded_result)[0]['p_x_given_n']
+
+            time_bin_containers = pseudo2D_decoder_continuously_decoded_result.time_bin_containers[0]
+            time_window_centers = time_bin_containers.centers
+            # p_x_given_n.shape # (62, 4, 209389)
+
+
+
+            ## Main INPUT: continuous_specific_decoded_results_dict
+            display_output = {}
+
+
+            _output_dict = AddNewDecodedPosteriors_MatplotlibPlotCommand.prepare_and_perform_custom_decoder_decoded_epochs(curr_active_pipeline=None, active_2d_plot=active_2d_plot,
+                                                                                                                            continuously_decoded_dict=continuous_decoded_results_dict, info_string='non-PBE-pseudo2D marginals', # results1D.continuous_results
+                                                                                                                            xbin=deepcopy(results1D.decoders['global'].xbin), debug_print=False)
+
+
+
+                                                                                                                            
+
+            # ==================================================================================================================== #
+            # Plot the Decodings and their Marginals over TrackID as new Tracks                                                    #
+            # ==================================================================================================================== #
+
+            ## Manually call `AddNewDecodedEpochMarginal_MatplotlibPlotCommand` to add the custom marginals track to the active SpikeRaster3DWindow
+            # list(curr_active_pipeline.display_output.keys())
+
+            # active_display_fn_identifying_ctx = IdentifyingContext(format_name= 'kdiba', animal= 'gor01', exper_name= 'one', session_name= '2006-6-09_1-22-43', filter_name= 'maze_any', lap_dir= 'any', display_fn_name= 'display_spike_rasters_window')
+            # active_display_fn_identifying_ctx = IdentifyingContext(format_name= 'kdiba', animal= 'gor01', exper_name= 'one', session_name= '2006-6-09_1-22-43', filter_name= 'maze_any', lap_dir= 'any', display_fn_name= '_display_spike_rasters_pyqtplot_2D')
+            # display_output = curr_active_pipeline.display_output[active_display_fn_identifying_ctx]
+            # display_output
+            # active_config_name: str = 'maze_any'
+            ## INPUTS: active_config_name, active_display_fn_identifying_ctx, display_output
+
+
+            # output_references = _build_additional_window_menus(spike_raster_window, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx)
+            # _docked_menu_provider.DockedWidgets_MenuProvider_on_buildUI(spike_raster_window=spike_raster_window, owning_pipeline_reference=owning_pipeline_reference, context=active_display_fn_identifying_ctx, active_config_name=active_config_name, display_output=owning_pipeline_reference.display_output[active_display_fn_identifying_ctx])
+
+            # _cmd = AddNewDecodedEpochMarginal_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline,
+            #                                                          active_config_name=active_config_name, active_context=active_display_fn_identifying_ctx, display_output=display_output, action_identifier='actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView')
+            # _cmd
+
+            # ## To begin, the destination plot must have a matplotlib widget plot to render to:
+            # # print(f'AddNewDecodedEpochMarginal_MatplotlibPlotCommand.execute(...)')
+            # active_2d_plot = _cmd._spike_raster_window.spike_raster_plt_2d
+            # enable_rows_config_kwargs = dict(enable_non_marginalized_raw_result=_cmd.enable_non_marginalized_raw_result, enable_marginal_over_direction=_cmd.enable_marginal_over_direction, enable_marginal_over_track_ID=_cmd.enable_marginal_over_track_ID)
+
+            # # output_dict = self.add_pseudo2D_decoder_decoded_epoch_marginals(self._active_pipeline, active_2d_plot, **enable_rows_config_kwargs)
+            # output_dict = AddNewDecodedEpochMarginal_MatplotlibPlotCommand.add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epoch_marginals(_cmd._active_pipeline, active_2d_plot, **enable_rows_config_kwargs)
+
+            time_bin_size = epochs_decoding_time_bin_size
+            info_string: str = f" - t_bin_size: {time_bin_size}"
+
+            dock_config = CustomCyclicColorsDockDisplayConfig(showCloseButton=True, named_color_scheme=NamedColorScheme.grey)
+
+            output_dict = {}
+            a_posterior_name: str = 'non-PBE_marginal_over_track_ID'
+            assert non_PBE_marginal_over_track_ID.shape[0] == 2, f"expected the 2 marginalized pseudo-y bins for the decoder in non_PBE_marginal_over_track_ID.shape[1]. but found non_PBE_marginal_over_track_ID.shape: {non_PBE_marginal_over_track_ID.shape}"
+            output_dict[a_posterior_name] = AddNewDecodedEpochMarginal_MatplotlibPlotCommand._perform_add_new_decoded_posterior_marginal_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=dock_config,
+                                                                                                a_variable_name=a_posterior_name, xbin=np.arange(2), time_window_centers=time_window_centers, a_1D_posterior=non_PBE_marginal_over_track_ID, extended_dock_title_info=info_string)
+
+            ## Draw the "Long", "Short" labels
+            identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = output_dict[a_posterior_name]
+            label_artists_dict = {}
+            for i, ax in enumerate(matplotlib_fig_axes):
+                label_artists_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['long', 'short'], enable_draw_decoder_colored_lines=False)
+            output_dict[a_posterior_name] = (identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, label_artists_dict)
+
+
+        0: LR
+        1: RL
+        
+        """
+        p_x_given_n_list = cls.get_proper_p_x_given_n_list(filter_epochs_decoder_result)
+        n_decoders: int = len(unique_decoder_names)
+        
+        custom_curr_unit_marginal_list = []
+        
+        for a_p_x_given_n in p_x_given_n_list:
+            # an_array = all_directional_laps_filter_epochs_decoder_result.p_x_given_n_list[0] # .shape # (62, 4, 236)
+            curr_array_shape = np.shape(a_p_x_given_n) # .shape # (62, 4, 236) - (n_pos_bins, 4, n_epoch_t_bins[i])
+            if debug_print:
+                print(f'a_p_x_given_n.shape: {curr_array_shape}')
+
+            assert curr_array_shape[1] == n_decoders, f"only works with the all-directional decoder with unique_decoder_names: {unique_decoder_names} "
+
+            if debug_print:
+                print(f'np.shape(a_p_x_given_n): {np.shape(curr_array_shape)}')
+                
+            curr_unit_marginal_x = DynamicContainer(p_x_given_n=a_p_x_given_n, most_likely_positions_1D=None)
+            
+            if debug_print:
+                print(f'np.shape(curr_unit_posterior_list.p_x_given_n): {np.shape(curr_unit_marginal_x.p_x_given_n)}')
+            
+            # y-axis marginal:
+            curr_unit_marginal_x.p_x_given_n = np.squeeze(np.sum(a_p_x_given_n, axis=0)) # sum over all x. Result should be (n_decoders, n_epoch_t_bins[i])
+            curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n / np.sum(curr_unit_marginal_x.p_x_given_n, axis=0, keepdims=True) # sum over all four decoders for each time_bin (so there's a normalized distribution at each timestep)
+
+            ## Ensures that the marginal posterior is at least 2D:
+            if curr_unit_marginal_x.p_x_given_n.ndim == 0:
+                curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n.reshape(1, 1)
+            elif curr_unit_marginal_x.p_x_given_n.ndim == 1:
+                curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n[:, np.newaxis]
+                if debug_print:
+                    print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_x.p_x_given_n.shape}')
+            custom_curr_unit_marginal_list.append(curr_unit_marginal_x)
+        return custom_curr_unit_marginal_list
+
+
 
     @classmethod
     def build_non_marginalized_raw_posteriors(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], debug_print=False) -> List[DynamicContainer]:
