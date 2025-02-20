@@ -55,7 +55,7 @@ class FilterablePipelineStage:
         """The is_filtered property."""
         raise NotImplementedError
 
-
+    # @function_attributes(short_name=None, tags=['filter', 'filtered_sessions'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-20 06:51', related_items=[])
     def filter_sessions(self, active_session_filter_configurations, changed_filters_ignore_list=None, debug_print=False, progress_logger=None):
         """ 
             changed_filters_ignore_list: <list> a list of names of changed filters which will be ignored if they exists
