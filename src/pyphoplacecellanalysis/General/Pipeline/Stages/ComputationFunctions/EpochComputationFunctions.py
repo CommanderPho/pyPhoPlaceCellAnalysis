@@ -503,6 +503,15 @@ class Compute_NonPBE_Epochs(ComputedResult):
         return cls._adding_global_non_PBE_epochs_to_sess(sess=curr_active_pipeline.sess, t_start=t_start, t_delta=t_delta, t_end=t_end, training_data_portion=training_data_portion)
     
 
+    @function_attributes(short_name=None, tags=['UNFINISHED', 'UNUSED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-20 09:32', related_items=[])
+    @classmethod
+    def _build_filtered_sessions_for_PBE_epochs(cls, curr_active_pipeline):
+        """ builds 3 new filtered sessions ('long_nonPBE', 'short_nonPBE', 'global_nonPBE') and adds them to curr_active_pipeline.filtered_sessions
+        Note that running-direction (LR v. RL) doesn't make sense for this.
+        """
+        pass
+        
+    
 
     @classmethod
     def init_from_pipeline(cls, curr_active_pipeline, training_data_portion: float = 5.0/6.0):
