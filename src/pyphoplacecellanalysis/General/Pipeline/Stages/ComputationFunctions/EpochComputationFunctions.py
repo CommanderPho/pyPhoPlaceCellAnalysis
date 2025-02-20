@@ -185,8 +185,8 @@ class NonPBEDimensionalDecodingResult(UnpackableMixin, ComputedResult):
     test_epoch_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = serialized_field()
     continuous_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = serialized_field()
     
-    frame_divided_epochs_df: pd.DataFrame = serialized_field()
-    frame_divided_epochs_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = serialized_field()
+    frame_divided_epochs_df: pd.DataFrame = serialized_field(metadata={'desc': 'used for rendering a series of successive 2D decoded posteriors as "frames" on a 1D timeline.'})
+    frame_divided_epochs_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = serialized_field(metadata={'desc': 'used for rendering a series of successive 2D decoded posteriors as "frames" on a 1D timeline.'})
 
 
 
