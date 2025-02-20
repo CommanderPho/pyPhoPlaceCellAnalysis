@@ -917,7 +917,7 @@ from pyphocorehelpers.programming_helpers import MemoryManagement # used in `Epo
 
 
 
-def estimate_memory_requirements(epochs_decoding_time_bin_size: float, frame_divide_bin_size: float, n_flattened_position_bins: Optional[int]=None, n_neurons: Optional[int]=None, session_duration: Optional[float]=None, n_maze_contexts: int=9) -> Tuple[int, dict]:
+def estimate_memory_requirements_bytes(epochs_decoding_time_bin_size: float, frame_divide_bin_size: float, n_flattened_position_bins: Optional[int]=None, n_neurons: Optional[int]=None, session_duration: Optional[float]=None, n_maze_contexts: int=9) -> Tuple[int, dict]:
     """Estimates memory requirements for non-PBE epoch computations
     
     Args:
@@ -951,23 +951,23 @@ def estimate_memory_requirements(epochs_decoding_time_bin_size: float, frame_div
     bytes_per_float = 8  # float64
     
     # Calculate memory for each major array type
-    memory_breakdown = {
+    itemized_memory_breakdown = {
         'spike_counts': (n_time_bins * n_neurons) * bytes_per_float,
         'firing_rates': (n_max_decoded_bins * n_neurons) * bytes_per_float, 
         'position_decoded': (n_max_decoded_bins * 2) * bytes_per_float,  
-        'posterior': (n_max_decoded_bins * n_flattened_position_bins) * bytes_per_float,
-        'posterior_intermediate_computation': (n_max_decoded_bins * n_flattened_position_bins * n_neurons) * bytes_per_float, 
+        # 'posterior': (n_max_decoded_bins * n_flattened_position_bins) * bytes_per_float,
+        # 'posterior_intermediate_computation': (n_max_decoded_bins * n_flattened_position_bins * n_neurons) * bytes_per_float, 
         'occupancy': n_flattened_position_bins * bytes_per_float, 
-        'worst_case_scenario': (n_max_decoded_bins * n_flattened_position_bins * n_neurons * n_maze_contexts) * bytes_per_float, 
+        'worst_case_scenario': (n_max_decoded_bins * n_flattened_position_bins * n_neurons) * bytes_per_float, 
     }
-    
+    # itemized_memory_breakdown_GB = {k:(v/1e9) for k, v in itemized_memory_breakdown.items()}
     # Account for multiple maze contexts
-    total_memory = sum(memory_breakdown.values()) * n_maze_contexts
+    total_memory = sum(itemized_memory_breakdown.values()) * n_maze_contexts
     
     # Add 20% overhead for temporary arrays and computations
     total_memory_with_overhead = int(total_memory * 1.2)
     
-    return total_memory_with_overhead, memory_breakdown
+    return total_memory_with_overhead, itemized_memory_breakdown
 
 
 # 'epoch_computations', '
@@ -982,7 +982,7 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
         requires_global_keys=[], provides_global_keys=['EpochComputations'],
         validate_computation_test=validate_has_non_PBE_epoch_results, is_global=True)
     def perform_compute_non_PBE_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, training_data_portion: float=(5.0/6.0), epochs_decoding_time_bin_size: float = 0.020, frame_divide_bin_size:float=5.0,
-                                        compute_1D: bool = True, compute_2D: bool = False, drop_previous_result_and_compute_fresh:bool=False, skip_training_test_split: bool = True):
+                                        compute_1D: bool = True, compute_2D: bool = False, drop_previous_result_and_compute_fresh:bool=False, skip_training_test_split: bool = True, debug_print_memory_breakdown: bool=False):
         """ Performs the computation of the spearman and pearson correlations for the ripple and lap epochs.
 
         Requires:
@@ -998,7 +998,8 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
 
         """
         print(f'perform_compute_non_PBE_epochs(..., training_data_portion={training_data_portion}, epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}, frame_divide_bin_size: {frame_divide_bin_size})')
-        
+
+
         long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()        
         try:
             available_MB: int = MemoryManagement.get_available_system_memory_MB() # Get available memory in MegaBytes
@@ -1008,18 +1009,41 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
             # Estimate memory requirements
             # active_sess = owning_pipeline_reference.sess
             active_sess = owning_pipeline_reference.filtered_sessions[global_epoch_name]
-            active_pf2D = computation_results[global_epoch_name].computed_data.pf2D
-            n_flattened_position_bins: int = active_pf2D.n_flattened_position_bins            
+            
+            def _subfn_perform_estimate_required_memory(specific_n_flattened_position_bins: int, n_dim_str: str):
+                """ captures: epochs_decoding_time_bin_size, frame_divide_bin_size, active_sess
+                """
+                required_memory_bytes, itemized_mem_breakdown = estimate_memory_requirements_bytes(epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, frame_divide_bin_size=frame_divide_bin_size, n_flattened_position_bins=specific_n_flattened_position_bins, n_neurons=active_sess.neurons.n_neurons, session_duration=active_sess.duration)
+                required_memory_GB: int = required_memory_bytes / 1e9 # Gigabytes
+                itemized_mem_breakdown = {f"{k}_{n_dim_str}":v for k, v in itemized_mem_breakdown.items()}
+                return required_memory_GB, itemized_mem_breakdown
 
-            required_memory, breakdown = estimate_memory_requirements(epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, frame_divide_bin_size=frame_divide_bin_size, n_flattened_position_bins=n_flattened_position_bins, n_neurons=active_sess.neurons.n_neurons, session_duration=active_sess.duration)
-            required_memory_GB: int = required_memory / 1e9 # Gigabytes
-            print(f"Total memory required: {required_memory_GB:.2f} GB")
-            print("Memory breakdown (GB):")
-            for k, v in breakdown.items():
-                print(f"\t{k}: {v/1e9:.3f}")
+            itemized_mem_breakdown = {}
+            total_required_memory_GB: int = 0
+            if compute_1D:
+                n_flattened_position_bins_1D: int = computation_results[global_epoch_name].computed_data.pf1D.n_flattened_position_bins
+                required_memory_GB_1D, breakdown1D = _subfn_perform_estimate_required_memory(specific_n_flattened_position_bins=n_flattened_position_bins_1D, n_dim_str="1D")
+                itemized_mem_breakdown.update(breakdown1D)
+                total_required_memory_GB += required_memory_GB_1D
+            if compute_2D:
+                n_flattened_position_bins_2D: int = computation_results[global_epoch_name].computed_data.pf2D.n_flattened_position_bins
+                required_memory_GB_2D, breakdown2D = _subfn_perform_estimate_required_memory(specific_n_flattened_position_bins=n_flattened_position_bins_2D, n_dim_str="2D")
+                itemized_mem_breakdown.update(breakdown2D)
+                total_required_memory_GB += required_memory_GB_2D
+            
+
+            if debug_print_memory_breakdown:
+                    print("Memory breakdown (GB):")
+                    for k, v in itemized_mem_breakdown.items():
+                        print(f"\t{k}: {v/1e9:.3f}")
                 
-            if required_memory_GB > available_GB:
-                raise MemoryError(f"Estimated Insufficient Memory: Operation would require {required_memory_GB:.2f} GB (have {available_GB:.2f} GB available.")
+            print(f"Total memory required: {total_required_memory_GB:.2f} GB")
+            if total_required_memory_GB > available_GB:
+                print("Memory breakdown (GB):")
+                for k, v in itemized_mem_breakdown.items():
+                    print(f"\t{k}: {v/1e9:.3f}")
+                        
+                raise MemoryError(f"Estimated Insufficient Memory: Operation would require {total_required_memory_GB:.2f} GB (have {available_GB:.2f} GB available.")
                 # return global_computation_results
                 
             # ==================================================================================================================== #
