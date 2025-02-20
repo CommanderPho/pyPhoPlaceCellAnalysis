@@ -63,8 +63,9 @@ class ProcessingScriptPhases(Enum):
         
         """
         from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import export_session_h5_file_completion_function, curr_runtime_context_header_template, export_rank_order_results_completion_function, figures_rank_order_results_completion_function, determine_session_t_delta_completion_function, perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function, compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function, compute_and_export_session_wcorr_shuffles_completion_function, compute_and_export_session_instantaneous_spike_rates_completion_function, compute_and_export_session_extended_placefield_peak_information_completion_function, compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function, backup_previous_session_files_completion_function, compute_and_export_session_trial_by_trial_performance_completion_function, save_custom_session_files_completion_function, compute_and_export_cell_first_spikes_characteristics_completion_function, figures_plot_cell_first_spikes_characteristics_completion_function
-        # from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import  reload_exported_kdiba_session_position_info_mat_completion_function
-
+        # from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import  kdiba_session_post_fixup_completion_function
+        from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import  kdiba_session_post_fixup_completion_function
+        
         if self.value == ProcessingScriptPhases.figure_run.value:
             # figure stage:
             phase_figure_custom_user_completion_functions_dict = {
@@ -80,14 +81,15 @@ class ProcessingScriptPhases(Enum):
                 # "determine_session_t_delta_completion_function": determine_session_t_delta_completion_function,
                 # 'perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function': perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function, # ran 2024-05-22 12:58am
                 # 'compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function': compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function, # ran 2024-05-22 12:58am
-                # 'reload_exported_kdiba_session_position_info_mat_completion_function': reload_exported_kdiba_session_position_info_mat_completion_function,
+                # 'kdiba_session_post_fixup_completion_function': kdiba_session_post_fixup_completion_function,
+                # 'kdiba_session_post_fixup_completion_function': kdiba_session_post_fixup_completion_function,
                 # 'export_session_h5_file_completion_function': export_session_h5_file_completion_function,
                 }
             
             phase0_any_run_custom_user_completion_functions_dict = {
                 # 'backup_previous_session_files_completion_function': backup_previous_session_files_completion_function, # disabled 2024-10-29
                 # "determine_session_t_delta_completion_function": determine_session_t_delta_completion_function,  # ran 2024-05-28 6am
-                # 'reload_exported_kdiba_session_position_info_mat_completion_function': reload_exported_kdiba_session_position_info_mat_completion_function, 2025-01-15 10:16 REMOVED
+                # 'kdiba_session_post_fixup_completion_function': kdiba_session_post_fixup_completion_function, 2025-01-15 10:16 REMOVED
             }
 
             # Unused:
@@ -180,6 +182,7 @@ class ProcessingScriptPhases(Enum):
             'directional_decoders_decode_continuous',
             'directional_decoders_evaluate_epochs',
             'directional_decoders_epoch_heuristic_scoring',
+            'non_PBE_epochs_results', # #TODO 2025-02-18 20:15: - [ ] Added to compute the new non_PBE results
         ]
 
         phase3_extended_computations_include_includelist=['lap_direction_determination', 'pf_computation', 
@@ -200,6 +203,7 @@ class ProcessingScriptPhases(Enum):
             'directional_decoders_epoch_heuristic_scoring',
             'extended_pf_peak_information',
             'perform_wcorr_shuffle_analysis',
+            'non_PBE_epochs_results', #TODO 2025-02-19 21:29: - [ ] Not fully working due to memory errors on Apogee at least
         ]
 
         _out_run_config = {}

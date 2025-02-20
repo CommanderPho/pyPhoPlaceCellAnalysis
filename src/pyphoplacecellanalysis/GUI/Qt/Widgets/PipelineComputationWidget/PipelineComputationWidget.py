@@ -22,6 +22,8 @@ from pyphocorehelpers.gui.Qt.table_helpers import TableSizingHelpers
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 
+from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import ComputationFunctionItem
+
 ## Define the .ui file path
 path = os.path.dirname(os.path.abspath(__file__))
 uiFile = os.path.join(path, 'PipelineComputationWidget.ui')
@@ -49,6 +51,11 @@ class PipelineComputationWidget(TableContextMenuProviderDelegate, PipelineOwning
     #     """The gridLayout_MainContent property."""
     #     return self.ui.gridLayout_MainContent
     
+    @property
+    def curr_active_pipeline(self):
+        """ PipelineOwningMixin: The owning_pipeline property."""
+        return self.owning_pipeline
+
 
     def __init__(self, parent=None, owning_pipeline=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
@@ -251,6 +258,7 @@ class PipelineComputationWidget(TableContextMenuProviderDelegate, PipelineOwning
     def rebuild_data_from_pipeline(self):
         """ uses `self._owning_pipeline` to update all self.params.* variables used in creating/updating tables
         """
+
         ## Process curr_active_pipeline
         any_recent, epoch_latest, self.params.epoch_each, (global_latest, self.params.global_comp) = self._owning_pipeline.get_computation_times(debug_print=False)
         self.params.all_validators = self._owning_pipeline.get_merged_computation_function_validators()

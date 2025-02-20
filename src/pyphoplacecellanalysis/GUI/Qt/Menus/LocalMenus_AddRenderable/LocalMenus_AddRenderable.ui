@@ -59,6 +59,7 @@
      <addaction name="actionAddTimeIntervals_SessionEpochs"/>
      <addaction name="actionAddTimeIntervals_Laps"/>
      <addaction name="actionAddTimeIntervals_PBEs"/>
+     <addaction name="actionAddTimeIntervals_NonPBEs"/>
      <addaction name="actionAddTimeIntervals_Ripples"/>
      <addaction name="actionAddTimeIntervals_Replays"/>
      <addaction name="actionAddTimeIntervals_Bursts"/>
@@ -128,6 +129,7 @@
      <addaction name="actionDecoded_Epoch_Slices_PBEs"/>
      <addaction name="actionDecoded_Epoch_Slices_Ripple"/>
      <addaction name="actionDecoded_Epoch_Slices_Replay"/>
+     <addaction name="actionDecoded_Epoch_Slices_NonPBEs"/>
      <addaction name="separator"/>
      <addaction name="actionDecoded_Epoch_Slices_Custom"/>
     </widget>
@@ -370,6 +372,16 @@
   <action name="actionSpike3DLauncher">
    <property name="text">
     <string>Spike3D Launcher</string>
+   </property>
+  </action>
+  <action name="actionAddTimeIntervals_NonPBEs">
+   <property name="text">
+    <string>Non-PBEs</string>
+   </property>
+  </action>
+  <action name="actionDecoded_Epoch_Slices_NonPBEs">
+   <property name="text">
+    <string>Non-PBEs</string>
    </property>
   </action>
  </widget>

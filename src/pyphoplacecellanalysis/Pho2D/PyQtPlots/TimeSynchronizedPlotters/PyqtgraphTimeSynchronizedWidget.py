@@ -1,4 +1,5 @@
 from copy import deepcopy
+from typing import Optional
 import numpy as np
 import pandas as pd
 from qtpy import QtCore, QtWidgets
@@ -77,6 +78,14 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlottingBackendSpe
         raise NotImplementedError(f'Parent property that should not be accessed!')
 
 
+
+    @property
+    def active_plot_target(self):
+        """The active_plot_target property."""
+        return self.getRootPlotItem()
+    
+
+
     def __init__(self, name='PyqtgraphTimeSynchronizedWidget', plot_function_name=None, scrollable_figure=True, application_name=None, window_name=None, parent=None, **kwargs):
         """_summary_
         , disable_toolbar=True, size=(5.0, 4.0), dpi=72
@@ -90,7 +99,7 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlottingBackendSpe
         self.params = VisualizationParameters(name=name, plot_function_name=plot_function_name, debug_print=False, wants_crosshairs=kwargs.get('wants_crosshairs', False), should_force_discrete_to_bins=kwargs.get('should_force_discrete_to_bins', False))
         self.plots_data = RenderPlotsData(name=name)
         self.plots = RenderPlots(name=name)
-        self.ui = PhoUIContainer(name=name)
+        self.ui = PhoUIContainer(name=name, connections=None)
         self.ui.connections = PhoUIContainer(name=name)
 
         self.params.name = name
@@ -113,6 +122,8 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlottingBackendSpe
         self._update_plots()
         
     def setup(self):
+        assert hasattr(self.ui, 'connections')
+        
         # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
         # self.app = pg.mkQApp(self.applicationName)
         # self.params = VisualizationParameters(self.applicationName)
@@ -300,7 +311,7 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlottingBackendSpe
     # ==================================================================================================================== #
     # CrosshairsTracingMixin Conformances                                                                                  #
     # ==================================================================================================================== #
-    def add_crosshairs(self, plot_item, name, matrix=None, xbins=None, ybins=None, enable_y_trace:bool=False):
+    def add_crosshairs(self, plot_item, name, matrix=None, xbins=None, ybins=None, enable_y_trace:bool=False, should_force_discrete_to_bins:Optional[bool]=True, **kwargs):
         """ adds crosshairs that allow the user to hover a bin and have the label dynamically display the bin (x, y) and value.
         
         Uses:
@@ -316,6 +327,10 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlottingBackendSpe
         vLine = extant_plots_dict_for_item.get('crosshairs_vLine', None)
         has_extant_crosshairs: bool = (vLine is not None)
          
+        if should_force_discrete_to_bins is not None:
+            self.params.should_force_discrete_to_bins = should_force_discrete_to_bins
+        should_force_discrete_to_bins: bool = self.params.should_force_discrete_to_bins
+        
         if not has_extant_crosshairs:
             ## create new:
             if name not in self.plots:

@@ -12,6 +12,9 @@ class DockDisplayConfig(object):
     showCloseButton: bool = field(default=True)
     showCollapseButton: bool = field(default=False)
     showGroupButton: bool = field(default=False)
+    showOrientationButton: bool = field(default=False)
+    
+
     hideTitleBar: bool = field(default=False)
     fontSize: str = field(default='10px')
     corner_radius: str = field(default='2px')
@@ -98,6 +101,10 @@ class DockDisplayConfig(object):
             }""" % (bg_color, fg_color, self.corner_radius, self.corner_radius, border_color, self.fontSize)
 
     
+buttonIconOrientation = {'horizontal': QtWidgets.QStyle.StandardPixmap.SP_ToolBarHorizontalExtensionButton, 'vertical': QtWidgets.QStyle.StandardPixmap.SP_ToolBarVerticalExtensionButton}
+buttonIconShade = {'shade': QtWidgets.QStyle.StandardPixmap.SP_TitleBarShadeButton, 'unshade': QtWidgets.QStyle.StandardPixmap.SP_TitleBarUnshadeButton}
+
+
 
 class Dock(QtWidgets.QWidget, DockDrop):
     """ 
@@ -111,6 +118,8 @@ class Dock(QtWidgets.QWidget, DockDrop):
     # sigClicked = QtCore.Signal(object, object)
     sigCollapseClicked = QtCore.Signal(object)
     sigGroupClicked = QtCore.Signal(object)
+    sigToggleOrientationClicked = QtCore.Signal(object, bool)
+    
 
     @property
     def config(self) -> Optional[DockDisplayConfig]:
@@ -149,7 +158,8 @@ class Dock(QtWidgets.QWidget, DockDrop):
             self.label.sigCollapseClicked.connect(self.on_collapse_btn_clicked)
         if display_config.showGroupButton:
             self.label.sigGroupClicked.connect(self.on_group_btn_clicked)
-
+        if display_config.showOrientationButton:
+            self.label.sigToggleOrientationClicked.connect(self.on_orientation_btn_toggled)
 
         self.contentsHidden = False
         self.labelHidden = False
@@ -450,6 +460,20 @@ class Dock(QtWidgets.QWidget, DockDrop):
         """Remove this dock from the DockArea it lives inside."""
         self.sigGroupClicked.emit(self)
         
+    def on_orientation_btn_toggled(self, is_checked):
+        """Remove this dock from the DockArea it lives inside."""
+        if is_checked:
+            print(f'changing to horizontal.')
+            new_icon_name = buttonIconOrientation['horizontal']
+        else:
+            print(f'changing to vertical')
+            new_icon_name = buttonIconOrientation['vertical']
+        
+        icon = QtWidgets.QApplication.style().standardIcon(new_icon_name)
+        self.label.orientationButton.setIcon(icon)
+        self.sigToggleOrientationClicked.emit(self)
+        
+
 
 
 
@@ -457,12 +481,15 @@ class Dock(QtWidgets.QWidget, DockDrop):
 
 
 class DockLabel(VerticalLabel):
-    """ the label and 'title bar' at the top of the Dock widget that displays the title and allows dragging/closing. """
+    """ the label and 'title bar' at the top of the Dock widget that displays the title and allows dragging/closing.
+    VerticalLabel: .forceWidth, .orientation
+    
+    """
     sigClicked = QtCore.Signal(object, object)
     sigCloseClicked = QtCore.Signal()
     sigCollapseClicked = QtCore.Signal()
     sigGroupClicked = QtCore.Signal()
-    
+    sigToggleOrientationClicked = QtCore.Signal(bool)
 
     def __init__(self, text, dock, display_config:DockDisplayConfig):
         self.dim = False
@@ -480,6 +507,7 @@ class DockLabel(VerticalLabel):
         self.closeButton = None
         self.collapseButton = None
         self.groupButton = None
+        self.orientationButton = None
         self.num_total_title_bar_buttons: int = int(display_config.showCloseButton) + int(display_config.showCollapseButton) + int(display_config.showGroupButton)
         # if self.num_total_title_bar_buttons > 1:
         #     ## use a layout instead
@@ -497,7 +525,13 @@ class DockLabel(VerticalLabel):
             self.groupButton = QtWidgets.QToolButton(self)
             self.groupButton.clicked.connect(self.sigGroupClicked)
             self.groupButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogListView))
-
+        if display_config.showOrientationButton:
+            self.orientationButton = QtWidgets.QToolButton(self)
+            self.orientationButton.setCheckable(True)
+            # self.orientationButton.clicked.connect(self.sigToggleOrientationClicked)
+            self.orientationButton.toggled.connect(self.sigToggleOrientationClicked)
+            self.orientationButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_ToolBarHorizontalExtensionButton))
+            # self.orientationButton.setIcon(QtWidgets.QApplication.style().????(QtWidgets.QStyle.StandardPixmap.SP_ToolBarVerticalExtensionButton))
 
 
 
@@ -518,6 +552,11 @@ class DockLabel(VerticalLabel):
             self.updateStyle()
 
     def setOrientation(self, o):
+        """ 
+        sets self.orientation
+        
+        """
+        # self.config.orientation = o ## do not do this, that would update the desired orientation
         VerticalLabel.setOrientation(self, o)
         self.updateStyle()
 
@@ -548,19 +587,7 @@ class DockLabel(VerticalLabel):
     def resizeEvent(self, ev):
         debug_print: bool = False
         num_total_title_bar_buttons: int = self.num_total_title_bar_buttons
-        
-        # if self.closeButton:
-        #     if self.orientation == 'vertical':
-        #         ## sideways mode with bar on left
-        #         size = ev.size().width()
-        #         pos = QtCore.QPoint(0, 0)
-        #     else:
-        #         ## regular mode with bar on top
-        #         size = ev.size().height()
-        #         pos = QtCore.QPoint((ev.size().width() - size), 0)
-        #     self.closeButton.setFixedSize(QtCore.QSize(size, size))
-        #     self.closeButton.move(pos)
-        # ## END if self.closeButton...
+
         button_size = None  # Track the common size for all buttons
         current_x = 0  # Track horizontal positioning for buttons in horizontal layout
         current_y = 0  # Track vertical positioning for buttons in vertical layout
@@ -605,6 +632,20 @@ class DockLabel(VerticalLabel):
                 current_x += button_size
         ## END if self.collapseButton...
         
+        # Position orientationButton if it exists
+        if self.orientationButton:
+            self.orientationButton.setFixedSize(QtCore.QSize(button_size, button_size))
+            if self.orientation == 'vertical':
+                ## sideways mode with bar on left
+                self.orientationButton.move(0, current_y)
+            else:
+                ## regular mode with bar on top
+                # button_x = ((ev.size().width() - button_size) - current_x) ## right aligned
+                button_x = current_x ## left aligned
+                self.orientationButton.move(button_x, 0)
+                current_x += button_size
+        ## END if self.orientationButton...   
+
         # Position groupButton if it exists
         if self.groupButton:
             self.groupButton.setFixedSize(QtCore.QSize(button_size, button_size))
@@ -617,7 +658,10 @@ class DockLabel(VerticalLabel):
                 button_x = current_x ## left aligned
                 self.groupButton.move(button_x, 0)
                 current_x += button_size
-        ## END if self.groupButton...    
+        ## END if self.groupButton...   
+        
+
+
         button_occupied_space = ((button_size if button_size else 0) * num_total_title_bar_buttons)
 
         if self.elided_text_mode is not None:

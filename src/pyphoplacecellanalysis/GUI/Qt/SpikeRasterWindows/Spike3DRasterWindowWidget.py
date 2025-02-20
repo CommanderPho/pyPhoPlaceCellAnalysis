@@ -242,7 +242,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # self.ui.splitter.setStretchFactor(0, 5) # have the top widget by 3x the height as the bottom widget
         # self.ui.splitter.setStretchFactor(1, 1) # have the top widget by 3x the height as the bottom widget        
         
-        self.params = VisualizationParameters(self.applicationName, _menu_action_history_list=[])
+        self.params = VisualizationParameters(self.applicationName, _menu_action_history_list=[], type_of_3d_plotter=type_of_3d_plotter, is_crosshair_trace_enabled=False)
         self.params.type_of_3d_plotter = type_of_3d_plotter
         self.params._menu_action_history_list = []
         # Helper Mixins: INIT:
@@ -311,6 +311,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.GlobalConnectionManagerAccessingMixin_on_setup()
         
         # self.ui.additional_connections = {} # NOTE: self.ui.additional_connections has been removed in favor of self.connection_man
+        self.ui.additional_connections = {}
         
         ## Create the animation properties:
         self.playback_controller = TimeWindowPlaybackController()
@@ -335,6 +336,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.ui.right_side_bar_connections = self.SpikeRasterRightSidebarOwningMixin_connectSignals(self.ui.rightSideContainerWidget)
 
         
+        
+
         ## Setup the right side bar:
         rightSideContainerWidget = self.ui.rightSideContainerWidget
         self.ui.rightSideContainerWidget.setVisible(False) # collapses and hides the sidebar
@@ -639,18 +642,72 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.render_window_duration = updated_val
         # TODO 2023-03-29 19:14: - [ ] need to set self.render_window_duration.timeWindow.window_duration = updated_val
         
-    @pyqtExceptionPrintingSlot(bool)
-    def on_crosshair_trace_toggled(self, updated_is_crosshair_trace_enabled):
+    # @pyqtExceptionPrintingSlot(bool)
+    def on_crosshair_trace_toggled(self):
+        # def on_crosshair_trace_toggled(self, updated_is_crosshair_trace_enabled):
+        updated_is_crosshair_trace_enabled: bool = self.ui.leftSideToolbarWidget.ui.btnToggleCrosshairTrace.isChecked()
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.on_crosshair_trace_toggled(updated_is_crosshair_trace_enabled: {updated_is_crosshair_trace_enabled})')
-        old_value = spike_raster_window.params.is_crosshair_trace_enabled
+        old_value = self.params.is_crosshair_trace_enabled
         did_update: bool = (old_value != updated_is_crosshair_trace_enabled)
-        spike_raster_window.params.is_crosshair_trace_enabled = updated_is_crosshair_trace_enabled
-        if self.spike_raster_plt_2d is not None:
-            ## set SpikeRaster2D's is_crosshair_trace_enabled
-            self.spike_raster_plt_2d
+        self.params.is_crosshair_trace_enabled = updated_is_crosshair_trace_enabled
+        
+        if updated_is_crosshair_trace_enabled:
+            ## enable crosshairs callback        
+            if self.spike_raster_plt_2d is not None:
+                ## set SpikeRaster2D's is_crosshair_trace_enabled
+                extant_conn = self.ui.additional_connections.get('spike_3d_to_2d_window_crosshair_connection', None)
+                
+                # self.spike_raster_plt_2d.sigCrosshairsUpdated.connect(self.on_crosshair_updated_signal)        
+                # Rate limited version:
+                if extant_conn is None:
+                    ## create new connection:
+                    # spike_3d_to_2d_window_crosshair_connection = self.connection_man.connect_drivable_to_driver(drivable=self, driver=self.spike_raster_plt_2d,
+                    #                                                         custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.sigCrosshairsUpdated, delay=0.2, rateLimit=30, slot=drivable.on_crosshair_updated_signal)))
+                    # spike_3d_to_2d_window_crosshair_connection = self.spike_raster_plt_2d.sigCrosshairsUpdated.connect(self.on_crosshair_updated_signal) ## create the new connection
+                    # spike_3d_to_2d_window_crosshair_connection = self.spike_raster_plt_2d.sigCrosshairsUpdated.connect(lambda a_child_widget, an_identifier, a_trace_value: self.on_crosshair_updated_signal(an_identifier, a_trace_value))
+                    spike_3d_to_2d_window_crosshair_connection = self.spike_raster_plt_2d.sigCrosshairsUpdated.connect(lambda a_child_widget, an_identifier, a_trace_value: self.on_owned_child_crosshair_updated_signal(a_child_widget, an_identifier, a_trace_value))
+                    self.ui.additional_connections['spike_3d_to_2d_window_crosshair_connection'] = spike_3d_to_2d_window_crosshair_connection
+                else:
+                    print(f'\talready had extant connection!')
+        else:
+            print(f'\tshould disable crosshairs.')
+            extant_conn = self.ui.additional_connections.pop('spike_3d_to_2d_window_crosshair_connection', None)            
+            if extant_conn is not None:
+                ## remove it
+                # self.connection_man.disconnect(self.spike_3d_to_2d_window_crosshair_connection)
+                self.spike_raster_plt_2d.sigCrosshairsUpdated.disconnect(extant_conn)
+                # self.spike_3d_to_2d_window_crosshair_connection = None
+                # delattr(self, 'spike_3d_to_2d_window_crosshair_connection') ## remove the attribute
+
+
+        if (self.spike_raster_plt_2d is not None):
+            ## inform spike_raster_plt_2d that traces should be enabled
+            self.spike_raster_plt_2d.toggle_crosshair_traces_enabled(updated_is_crosshair_trace_enabled)            
+
+
+
+    def on_owned_child_crosshair_updated_signal(self, child, name, trace_value):
+        """ called when the crosshair is updated"""
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.on_owned_child_crosshair_updated_signal(child: {child}, name: "{name}", trace_value: "{trace_value}")')
+        left_side_bar_controls = self.ui.leftSideToolbarWidget
+        left_side_bar_controls.crosshair_trace_time = trace_value
+        
+        # self.ui.lblCrosshairTraceStaticLabel.setVisible(True)
+        # self.ui.lblCrosshairTraceValue.setVisible(True)
         
 
+    # def on_crosshair_updated_signal(self, child, name, trace_value):
+    def on_crosshair_updated_signal(self, name, trace_value):
+        """ called when the crosshair is updated"""
+        if self.enable_debug_print:
+            print(f'Spike3DRasterWindowWidget.on_crosshair_updated_signal(name: "{name}", trace_value: "{trace_value}")')
+        left_side_bar_controls = self.ui.leftSideToolbarWidget
+        left_side_bar_controls.crosshair_trace_time = trace_value
+        
+        # self.ui.lblCrosshairTraceStaticLabel.setVisible(True)
+        # self.ui.lblCrosshairTraceValue.setVisible(True)
 
 
     ########################################################
@@ -678,7 +735,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         ## Find the events beyond that time:
         filtered_times_df = selected_rendered_interval_series_times_df[(selected_rendered_interval_series_times_df['t_start'].to_numpy() > curr_time_window[0])] #.first(0) #.iat[0,:]
         next_target_jump_time = filtered_times_df['t_start'].to_numpy()[0]
-        print(f'curr_time_window: {curr_time_window}, next_target_jump_time: {next_target_jump_time}')
+        if self.enable_debug_print:
+            print(f'curr_time_window: {curr_time_window}, next_target_jump_time: {next_target_jump_time}')
         # jump_change_time = next_target_jump_time - curr_time_window[0]
         # print(f'jump_change_time: {jump_change_time}')
         ## Update the window:
@@ -701,7 +759,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         ## Find the events beyond that time:
         filtered_times_df = selected_rendered_interval_series_times_df[(selected_rendered_interval_series_times_df['t_start'].to_numpy() < curr_time_window[0])]
         next_target_jump_time = filtered_times_df['t_start'].to_numpy()[-1]
-        print(f'curr_time_window: {curr_time_window}, next_target_jump_time: {next_target_jump_time}')
+        if self.enable_debug_print:
+            print(f'curr_time_window: {curr_time_window}, next_target_jump_time: {next_target_jump_time}')
         # jump_change_time = next_target_jump_time - curr_time_window[0]
         # print(f'jump_change_time: {jump_change_time}')
         ## Update the window:
@@ -1051,126 +1110,131 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
         """
         print(f'spikes_raster_window._perform_build_attached_visible_interval_info_widget()')
-        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DockDisplayColors, CustomDockDisplayConfig
-        from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.StackedDynamicTablesWidget import TableManager
-            
         
-        ## get the updated data:
-        # included_series_names=['Replays', 'Laps', 'PBEs']
-        included_series_names=None
-        dataframes_dict: Dict[str, pd.DataFrame] = self.find_event_intervals_in_active_window(included_series_names=included_series_names)
-
-        ## see if widgets need to be build or can just be updated:
-        needs_init: bool = False
-        
-        if (not hasattr(self.ui.rightSideContainerWidget.ui, 'visible_intervals_info_widget_container')):
-            needs_init = True
+        is_visible: bool = self.right_sidebar_widget.isVisible() 
+        if not is_visible:
+            print(f'\tright_sidebar_widget is not Visible, so skipping `._perform_build_attached_visible_interval_info_widget()` update.')
+            return None, None
         else:
-            if (self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container is None):
+            from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DockDisplayColors, CustomDockDisplayConfig
+            from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.StackedDynamicTablesWidget import TableManager
+                            
+            ## get the updated data:
+            # included_series_names=['Replays', 'Laps', 'PBEs']
+            included_series_names=None
+            dataframes_dict: Dict[str, pd.DataFrame] = self.find_event_intervals_in_active_window(included_series_names=included_series_names)
+
+            ## see if widgets need to be build or can just be updated:
+            needs_init: bool = False
+            
+            if (not hasattr(self.ui.rightSideContainerWidget.ui, 'visible_intervals_info_widget_container')):
                 needs_init = True
+            else:
+                if (self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container is None):
+                    needs_init = True
 
 
-        if needs_init:
-            if self.debug_print:
-                print(f'\t has no .visible_intervals_info_widget_container so NEEDS INIT!')
-            assert not hasattr(self.ui.rightSideContainerWidget.ui, 'visible_intervals_info_widget_container')
-            self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container = {} # initialize
+            if needs_init:
+                if self.debug_print:
+                    print(f'\t has no .visible_intervals_info_widget_container so NEEDS INIT!')
+                assert not hasattr(self.ui.rightSideContainerWidget.ui, 'visible_intervals_info_widget_container')
+                self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container = {} # initialize
+                
+                ## Render in right sidebar:
+                updated_ui_dict = {'ctrl_layout': None, 'dynamic_tables_container_widget': None, 'dynamic_tables_container_VBoxLayout': None, 'bottom_spacer_widget': None, 'manager': None} # , 'tables_dict': {}
+                root_ctrl_layout_widget = pg.LayoutWidget() ## ROOT layout widget
+                updated_ui_dict['ctrl_layout'] = root_ctrl_layout_widget
+
+                # Main Tables container:
+                updated_ui_dict['dynamic_tables_container_widget'] = pg.QtWidgets.QWidget()
+                updated_ui_dict['dynamic_tables_container_widget'].setObjectName('tables_container')
+                updated_ui_dict['dynamic_tables_container_widget'].setSizePolicy(pg.QtWidgets.QSizePolicy.Expanding, pg.QtWidgets.QSizePolicy.Expanding)
+
+                manager = TableManager(updated_ui_dict['dynamic_tables_container_widget'])
+                updated_ui_dict['manager'] = manager
+
+                tables_layout = manager.wrapper_layout
+                tables_layout.setObjectName('tables_container_VBoxLayout')
+                updated_ui_dict['dynamic_tables_container_VBoxLayout'] = tables_layout
+
+
+                ## add the table vertical layout:
+                root_ctrl_layout_widget.addWidget(updated_ui_dict['dynamic_tables_container_widget'], row=1, col=1)
+                # Add permanent expanding spacer at the bottom
+                # Create an empty widget and set its size policy to expanding
+                bottom_spacer_widget = pg.QtWidgets.QWidget()
+                bottom_spacer_widget.setObjectName('bottom_spacer')
+                bottom_spacer_widget.setSizePolicy(pg.QtWidgets.QSizePolicy.Expanding, pg.QtWidgets.QSizePolicy.Expanding)
+
+                updated_ui_dict['bottom_spacer_widget'] = bottom_spacer_widget # pg.QtWidgets.QSpacerItem(0, 0, pg.QtWidgets.QSizePolicy.Minimum, pg.QtWidgets.QSizePolicy.Expanding)
+                # ctrl_layout.layout.addItem(spacer, ctrl_layout.layout.rowCount(), 0, 1, 1)
+                root_ctrl_layout_widget.addWidget(updated_ui_dict['bottom_spacer_widget'], row=2, col=1)
+
+                manager.update_tables(dataframes_dict)
+
+                self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container = updated_ui_dict # {k:v for k, v in updated_ui_dict.items()}
+                if self.debug_print:
+                    print(f'\t done.')
+                # VisibleIntervalTable
+                rightSideContainerWidget = self.ui.rightSideContainerWidget # pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterRightSidebarWidget.Spike3DRasterRightSidebarWidget
+                right_sidebar_contents_container_dockarea = rightSideContainerWidget.right_sidebar_contents_container_dockarea
+
+                # New Dock-based way _________________________________________________________________________________________________ #
+                name: str = 'VisibleWindowIntervalTables'
+                display_config = CustomDockDisplayConfig(showCloseButton=True, showCollapseButton=True, orientation='horizontal', custom_get_colors_dict={False: DockDisplayColors(fg_color='#111', bg_color='#c5c5c5', border_color='#a7babd'),
+                        True: DockDisplayColors(fg_color='#333', bg_color='#757575', border_color='#424242'),
+                    })
+                
+                # Create new widget
+                # No extant table widget and display_dock currently, create a new one:
+                dDisplayItem = right_sidebar_contents_container_dockarea.find_display_dock(identifier=name) # Dock
+                assert dDisplayItem is None
+                
+                # Add to dynamic dock container 
+                _, dDisplayItem = right_sidebar_contents_container_dockarea.add_display_dock(name, display_config=display_config, widget=root_ctrl_layout_widget, dockAddLocationOpts=['bottom'], autoOrientation=False)
+                dDisplayItem.setOrientation('horizontal', force=True)
+                dDisplayItem.updateStyle()
+                dDisplayItem.update()
+                
+                rightSideContainerWidget.dock_items[name] = dDisplayItem
             
-            ## Render in right sidebar:
-            updated_ui_dict = {'ctrl_layout': None, 'dynamic_tables_container_widget': None, 'dynamic_tables_container_VBoxLayout': None, 'bottom_spacer_widget': None, 'manager': None} # , 'tables_dict': {}
-            root_ctrl_layout_widget = pg.LayoutWidget() ## ROOT layout widget
-            updated_ui_dict['ctrl_layout'] = root_ctrl_layout_widget
-
-            # Main Tables container:
-            updated_ui_dict['dynamic_tables_container_widget'] = pg.QtWidgets.QWidget()
-            updated_ui_dict['dynamic_tables_container_widget'].setObjectName('tables_container')
-            updated_ui_dict['dynamic_tables_container_widget'].setSizePolicy(pg.QtWidgets.QSizePolicy.Expanding, pg.QtWidgets.QSizePolicy.Expanding)
-
-            manager = TableManager(updated_ui_dict['dynamic_tables_container_widget'])
-            updated_ui_dict['manager'] = manager
-
-            tables_layout = manager.wrapper_layout
-            tables_layout.setObjectName('tables_container_VBoxLayout')
-            updated_ui_dict['dynamic_tables_container_VBoxLayout'] = tables_layout
 
 
-            ## add the table vertical layout:
-            root_ctrl_layout_widget.addWidget(updated_ui_dict['dynamic_tables_container_widget'], row=1, col=1)
-            # Add permanent expanding spacer at the bottom
-            # Create an empty widget and set its size policy to expanding
-            bottom_spacer_widget = pg.QtWidgets.QWidget()
-            bottom_spacer_widget.setObjectName('bottom_spacer')
-            bottom_spacer_widget.setSizePolicy(pg.QtWidgets.QSizePolicy.Expanding, pg.QtWidgets.QSizePolicy.Expanding)
+                # Connect ____________________________________________________________________________________________________________ #
+                ## TODO: use `self.connection_man`?
+                # Rate limited version:`
+                self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container['connections'] = {'update_connection': self.connection_man.connect_drivable_to_driver(drivable=self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container['manager'], driver=self.spike_raster_plt_2d,
+                                                                custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.002, rateLimit=24, slot=self.on_update_right_sidebar_visible_interval_info_tables))),
+                                                            'rendered_interval_list_changed': self.spike_raster_plt_2d.sigRenderedIntervalsListChanged.connect(lambda interval_list: self.on_update_right_sidebar_visible_interval_info_tables()),
+                                                            'interval_entered_window': pg.SignalProxy(self.spike_raster_plt_2d.sigOnIntervalEnteredWindow, delay=0.002, rateLimit=2, slot=(lambda _: self.on_update_right_sidebar_visible_interval_info_tables())),
+                                                            'interval_exited_window': pg.SignalProxy(self.spike_raster_plt_2d.sigOnIntervalExitedindow, delay=0.002, rateLimit=2, slot=(lambda _: self.on_update_right_sidebar_visible_interval_info_tables())),
+                }
+                
 
-            updated_ui_dict['bottom_spacer_widget'] = bottom_spacer_widget # pg.QtWidgets.QSpacerItem(0, 0, pg.QtWidgets.QSizePolicy.Minimum, pg.QtWidgets.QSizePolicy.Expanding)
-            # ctrl_layout.layout.addItem(spacer, ctrl_layout.layout.rowCount(), 0, 1, 1)
-            root_ctrl_layout_widget.addWidget(updated_ui_dict['bottom_spacer_widget'], row=2, col=1)
+                ## Dock all Grouped results from `'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView'`
+                ## INPUTS: active_2d_plot
+                grouped_dock_items_dict = right_sidebar_contents_container_dockarea.get_dockGroup_dock_dict()
+                nested_dock_items = {}
+                nested_dynamic_docked_widget_container_widgets = {}
+                for dock_group_name, flat_group_dockitems_list in grouped_dock_items_dict.items():
+                    dDisplayItem, nested_dynamic_docked_widget_container = right_sidebar_contents_container_dockarea.build_wrapping_nested_dock_area(flat_group_dockitems_list, dock_group_name=dock_group_name)
+                    nested_dock_items[dock_group_name] = dDisplayItem
+                    nested_dynamic_docked_widget_container_widgets[dock_group_name] = nested_dynamic_docked_widget_container
 
-            manager.update_tables(dataframes_dict)
 
-            self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container = updated_ui_dict # {k:v for k, v in updated_ui_dict.items()}
-            if self.debug_print:
-                print(f'\t done.')
-            # VisibleIntervalTable
-            rightSideContainerWidget = self.ui.rightSideContainerWidget # pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterRightSidebarWidget.Spike3DRasterRightSidebarWidget
-            right_sidebar_contents_container_dockarea = rightSideContainerWidget.right_sidebar_contents_container_dockarea
-
-            # New Dock-based way _________________________________________________________________________________________________ #
-            name: str = 'VisibleWindowIntervalTables'
-            display_config = CustomDockDisplayConfig(showCloseButton=True, showCollapseButton=True, orientation='horizontal', custom_get_colors_dict={False: DockDisplayColors(fg_color='#111', bg_color='#c5c5c5', border_color='#a7babd'),
-                    True: DockDisplayColors(fg_color='#333', bg_color='#757575', border_color='#424242'),
-                })
-            
-            # Create new widget
-            # No extant table widget and display_dock currently, create a new one:
-            dDisplayItem = right_sidebar_contents_container_dockarea.find_display_dock(identifier=name) # Dock
-            assert dDisplayItem is None
-            
-            # Add to dynamic dock container 
-            _, dDisplayItem = right_sidebar_contents_container_dockarea.add_display_dock(name, display_config=display_config, widget=root_ctrl_layout_widget, dockAddLocationOpts=['bottom'], autoOrientation=False)
-            dDisplayItem.setOrientation('horizontal', force=True)
-            dDisplayItem.updateStyle()
-            dDisplayItem.update()
-            
-            rightSideContainerWidget.dock_items[name] = dDisplayItem
+                ## show it
+                self.set_right_sidebar_visibility(True)
         
+            else:
+                if self.debug_print:
+                    print(f'\t does not need init, just update')
+                extant_dict = self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container
+                
+                extant_manager = extant_dict['manager']
+                extant_manager.update_tables(dataframes_dict)
+                
 
-
-            # Connect ____________________________________________________________________________________________________________ #
-            ## TODO: use `self.connection_man`?
-            # Rate limited version:`
-            self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container['connections'] = {'update_connection': self.connection_man.connect_drivable_to_driver(drivable=self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container['manager'], driver=self.spike_raster_plt_2d,
-                                                        custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.002, rateLimit=24, slot=self.on_update_right_sidebar_visible_interval_info_tables))),
-                                                        'rendered_interval_list_changed': self.spike_raster_plt_2d.sigRenderedIntervalsListChanged.connect(lambda interval_list: self.on_update_right_sidebar_visible_interval_info_tables()),
-                                                        'interval_entered_window': pg.SignalProxy(self.spike_raster_plt_2d.sigOnIntervalEnteredWindow, delay=0.002, rateLimit=2, slot=(lambda _: self.on_update_right_sidebar_visible_interval_info_tables())),
-                                                        'interval_exited_window': pg.SignalProxy(self.spike_raster_plt_2d.sigOnIntervalExitedindow, delay=0.002, rateLimit=2, slot=(lambda _: self.on_update_right_sidebar_visible_interval_info_tables())),
-            }
-            
-
-            ## Dock all Grouped results from `'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView'`
-            ## INPUTS: active_2d_plot
-            grouped_dock_items_dict = right_sidebar_contents_container_dockarea.get_dockGroup_dock_dict()
-            nested_dock_items = {}
-            nested_dynamic_docked_widget_container_widgets = {}
-            for dock_group_name, flat_group_dockitems_list in grouped_dock_items_dict.items():
-                dDisplayItem, nested_dynamic_docked_widget_container = right_sidebar_contents_container_dockarea.build_wrapping_nested_dock_area(flat_group_dockitems_list, dock_group_name=dock_group_name)
-                nested_dock_items[dock_group_name] = dDisplayItem
-                nested_dynamic_docked_widget_container_widgets[dock_group_name] = nested_dynamic_docked_widget_container
-
-
-            ## show it
-            self.set_right_sidebar_visibility(True)
-    
-        else:
-            if self.debug_print:
-                print(f'\t does not need init, just update')
-            extant_dict = self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container
-            
-            extant_manager = extant_dict['manager']
-            extant_manager.update_tables(dataframes_dict)
-            
-
-        return self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container, self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container['ctrl_layout']
+            return self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container, self.ui.rightSideContainerWidget.ui.visible_intervals_info_widget_container['ctrl_layout']
     
 
     def on_update_right_sidebar_visible_interval_info_tables(self):

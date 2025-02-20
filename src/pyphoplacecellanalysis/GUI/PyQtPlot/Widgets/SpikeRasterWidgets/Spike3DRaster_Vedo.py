@@ -102,12 +102,12 @@ class Spike3DRaster_Vedo(VedoSpecificTimeCurvesMixin, SpikeRasterBase):
     
     
     @property
-    def total_data_duration(self):
+    def total_data_duration(self) -> float:
         """ The duration (in seconds) of all data in self.spikes_window."""
         return (self.spikes_window.total_data_end_time - self.spikes_window.total_data_start_time)
     
     @property
-    def total_data_temporal_axis_length(self):
+    def total_data_temporal_axis_length(self) -> float:
         """The equivalent of self.temporal_axis_length but for all data instead of just the active window."""
         return self.temporal_zoom_factor * self.total_data_duration
     

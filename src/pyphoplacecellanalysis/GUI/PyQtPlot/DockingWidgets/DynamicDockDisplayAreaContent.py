@@ -329,6 +329,9 @@ class DynamicDockDisplayAreaContentMixin:
     
     Creates: 
         self.displayDockArea: a pg.Dock(...) object containing dynamically created Docks/Widgets for display of display nodes.
+        self._dynamic_display_output_dict
+        self.ui.dock_helper_widgets
+        
         
     Known Usages:
         PhoDockAreaContainingWindow, NestedDockAreaWidget, Spike2DRaster
@@ -336,7 +339,7 @@ class DynamicDockDisplayAreaContentMixin:
     """
     
     @property
-    def dynamic_display_dict(self) -> OrderedDict:
+    def dynamic_display_dict(self) -> Dict[str, Dict[str, Dict]]:
         """The dynamic_display_dict property."""
         return self._dynamic_display_output_dict
     @dynamic_display_dict.setter
@@ -354,7 +357,7 @@ class DynamicDockDisplayAreaContentMixin:
     @pyqtExceptionPrintingSlot()
     def DynamicDockDisplayAreaContentMixin_on_init(self):
         """ perform any parameters setting/checking during init """
-        self._dynamic_display_output_dict = OrderedDict() # for DynamicDockDisplayAreaContentMixin
+        self._dynamic_display_output_dict = dict() # for DynamicDockDisplayAreaContentMixin
 
     @pyqtExceptionPrintingSlot()
     def DynamicDockDisplayAreaContentMixin_on_setup(self):
@@ -375,10 +378,11 @@ class DynamicDockDisplayAreaContentMixin:
         self.clear_all_display_docks()
 
 
-    def get_flat_dockitems_list(self, debug_print=False):
+    def get_flat_dockitems_list(self, debug_print=False) -> List[Dock]:
         """ extracts the 'dock' property that is the contents of each added dock item from the self.dynamic_display_dict and returns it as a flat list """
         all_collected_dock_items = []
         for an_id, an_item in self.dynamic_display_dict.items():
+            # an_item can be either a Dock itself of a DockGroup
             if debug_print:
                 print(f'an_id: {an_id}, an_item: {an_item}')
             for a_sub_id, a_sub_item in an_item.items():
@@ -389,7 +393,7 @@ class DynamicDockDisplayAreaContentMixin:
                 
         return all_collected_dock_items
 
-    def get_flat_widgets_list(self, debug_print=False):
+    def get_flat_widgets_list(self, debug_print=False) -> List["QtWidgets.QWidget"]:
         """ extracts the 'widget' property that is the contents of each added dock item from the self.dynamic_display_dict and returns it as a flat list """
         all_collected_widgets = []
         for an_id, an_item in self.dynamic_display_dict.items():
@@ -404,6 +408,7 @@ class DynamicDockDisplayAreaContentMixin:
         return all_collected_widgets
     
 
+    
     def get_flat_dock_identifiers_list(self, debug_print=False) -> List[str]:
         """ extracts the 'dock' property that is the contents of each added dock item from the self.dynamic_display_dict and returns it as a flat list """
         all_collected_dock_items_identifiers = []
@@ -418,9 +423,28 @@ class DynamicDockDisplayAreaContentMixin:
         return all_collected_dock_items_identifiers
     
 
+
+    def get_flat_dock_item_tuple_dict(self, debug_print=False) -> Dict[str, Tuple[Dock, Optional["QtWidgets.QWidget"]]]:
+        """ extracts the 'dock' property that is the contents of each added dock item from the self.dynamic_display_dict and returns it as a flat list """
+        # all_collected_dock_items_identifiers = self.get_flat_dock_identifiers_list()
+        out_dict = {}
+        for an_id, an_item in self.dynamic_display_dict.items():
+            for a_sub_id, a_sub_item in an_item.items():
+                a_dock_item = a_sub_item.get('dock', None)
+                a_widget = a_sub_item.get('widget', None)
+                assert (a_sub_id == a_dock_item.name()), f"a_dock_item.name(): '{a_dock_item.name()}' != a_sub_id: '{a_sub_id}'"
+                out_dict[a_dock_item.name()] = (a_dock_item, a_widget)
+        return out_dict
+    
+    
+
+    # ==================================================================================================================== #
+    # dockGroup                                                                                                            #
+    # ==================================================================================================================== #
+    @function_attributes(short_name=None, tags=['dockGroup'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 00:00', related_items=[])
     def get_dockGroup_dock_dict(self, debug_print=False) -> Dict[str, List[Dock]]:
         """ extracts the 'widget' property that is the contents of each added dock item from the self.dynamic_display_dict and returns it as a flat list """
-        flat_dockitems_list = self.get_flat_dockitems_list()
+        flat_dockitems_list = self.get_flat_dockitems_list() ## get the non-grouped dockitems
         grouped_dock_items_dict: Dict[str, List[Dock]] = {}
         # ungrouped_dock_items_list: List[Dock] = []
         for a_dock in flat_dockitems_list:
@@ -437,7 +461,7 @@ class DynamicDockDisplayAreaContentMixin:
                 
         return grouped_dock_items_dict
 
-    
+    @function_attributes(short_name=None, tags=['dockGroup'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 00:00', related_items=[])
     def get_dockGroup_dock_tree_dict(self, debug_print=False) -> Tuple[List[Union[Dock, Dict[str, List[Dock]]]], Dict]:
         """ extracts the 'widget' property that is the contents of each added dock item from the self.dynamic_display_dict and returns it as a flat list """
         flat_dockitems_list = self.get_flat_dockitems_list()
@@ -472,8 +496,29 @@ class DynamicDockDisplayAreaContentMixin:
         #     tree_out_dock_items_list.append(grouped_dock_items_dict)
         return tree_out_dock_items_list, group_meta_item_dict
 
+
+    @function_attributes(short_name=None, tags=['dockGroup', 'layout', 'sizing'], input_requires=[], output_provides=[], uses=['get_dockGroup_dock_dict', 'build_wrapping_nested_dock_area'], used_by=[], creation_date='2025-02-17 10:26', related_items=[])
+    def layout_dockGroups(self):
+        """ fetches the dockGroup items and perform layout """
+            ## Dock all Grouped results from `'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView'`
+        ## INPUTS: active_2d_plot
+        grouped_dock_items_dict: Dict[str, List[Dock]] = self.get_dockGroup_dock_dict()
+        nested_dock_items = {}
+        nested_dynamic_docked_widget_container_widgets = {}
+        for dock_group_name, flat_group_dockitems_list in grouped_dock_items_dict.items():
+            dDisplayItem, nested_dynamic_docked_widget_container = self.build_wrapping_nested_dock_area(flat_group_dockitems_list, dock_group_name=dock_group_name)
+            nested_dock_items[dock_group_name] = dDisplayItem # Dock
+            nested_dynamic_docked_widget_container_widgets[dock_group_name] = nested_dynamic_docked_widget_container # nested_dynamic_docked_widget_container
+
+        ## OUTPUTS: nested_dock_items, nested_dynamic_docked_widget_container_widgets
+        return nested_dock_items, nested_dynamic_docked_widget_container_widgets
     
-    def add_display_dock(self, identifier=None, widget=None, dockSize=(300,200), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None, **kwargs):
+
+    # ==================================================================================================================== #
+    # Main Creation/Find/Deletion Functions                                                                                #
+    # ==================================================================================================================== #
+    
+    def add_display_dock(self, identifier=None, widget=None, dockSize=(300,200), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None, **kwargs) -> Tuple["QtWidgets.QWidget", Dock]:
         """ adds a dynamic display dock with an appropriate widget of type 'viewContentsType' to the dock area container on the main window. 
 
         Input:
@@ -485,7 +530,6 @@ class DynamicDockDisplayAreaContentMixin:
 
         """
         # Add the sample display dock items to the nested dynamic display dock:
-        display_dock_area = self.displayDockArea
         # curr_display_dock_items = display_dock_area.children()
         # curr_num_display_dock_items = len(curr_display_dock_items)
 
@@ -501,9 +545,7 @@ class DynamicDockDisplayAreaContentMixin:
             # no extant items found
             unique_identifier = identifier
 
-        # Build the new dock item:        
-        # dDisplayItem = Dock(unique_identifier, size=dockSize, closable=dockIsClosable, widget=widget, display_config=CustomDockDisplayConfig()) # add the new display item
-        
+
         if display_config is None:
             display_config = CustomDockDisplayConfig()
 
@@ -513,7 +555,7 @@ class DynamicDockDisplayAreaContentMixin:
             else:
                 kwargs['autoOrientation'] = False
             
-        # {'autoOrientation':True}
+        # Build the new dock item:
         dDisplayItem = Dock(unique_identifier, size=dockSize, widget=widget, display_config=display_config, **kwargs) # add the new display item
         if isinstance(dockAddLocationOpts, str):
             print(f'WARN: dockAddLocationOpts should be a tuple containing a string (like `("left", )`), not a string itself! Interpretting dockAddLocationOpts: "{dockAddLocationOpts}" as `dockAddLocationOpts = ("{dockAddLocationOpts}", )`')
@@ -542,14 +584,12 @@ class DynamicDockDisplayAreaContentMixin:
             else:
                 raise NotImplementedError
         else:
-
-                
             raise NotImplementedError
         
         # print(f'dockAddLocationOpts: {dockAddLocationOpts}')
         
         # display_dock_area.addDock(dDisplayItem, *dockAddLocationOpts)
-        display_dock_area.addDock(*dockAddLocationOpts)
+        self.displayDockArea.addDock(*dockAddLocationOpts)
         
         # Set the dock item's widget to the new_view_widget
         # if widget is not None:
@@ -673,7 +713,7 @@ class DynamicDockDisplayAreaContentMixin:
         
         return test_dock_planning_widget, dDisplayItem
 
-    @function_attributes(short_name=None, tags=['docks', 'nested', 'wrapping'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-14 03:41', related_items=[])        
+    @function_attributes(short_name=None, tags=['docks', 'nested', 'wrapping'], input_requires=[], output_provides=[], uses=['self.add_display_dock(...)', 'NestedDockAreaWidget','CustomDockDisplayConfig'], used_by=['layout_dockGroups'], creation_date='2025-01-14 03:41', related_items=[])        
     def build_wrapping_nested_dock_area(self, flat_group_dockitems_list, dock_group_name: str = 'ContinuousDecode_ - t_bin_size: 0.025'):
         """ 
         Builds a wrapping dock area containing several pre-existing dock items
@@ -712,7 +752,7 @@ class DynamicDockDisplayAreaContentMixin:
         dockSize=(500, total_height)
         dockAddLocationOpts=['bottom']
 
-        display_config = CustomDockDisplayConfig(showCloseButton=True, showCollapseButton=True, showGroupButton=True, orientation='horizontal', corner_radius='0px', fontSize='15px',
+        display_config = CustomDockDisplayConfig(showCloseButton=True, showCollapseButton=True, showGroupButton=True, showOrientationButton=True, orientation='horizontal', corner_radius='0px', fontSize='15px',
                                                 custom_get_colors_dict = {False: DockDisplayColors(fg_color='#5bf', bg_color='#0d001a', border_color='#5467ba'),
                                                                           True: DockDisplayColors(fg_color='#aaa', bg_color='#35265f', border_color='#423399'),
             })
@@ -792,3 +832,66 @@ class DynamicDockDisplayAreaContentMixin:
             print(f'\t WARNING: searched all items and could not find the closing_dock_item!!')
  
         
+
+
+@metadata_attributes(short_name=None, tags=['widget', 'dock', 'dockarea'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-13 18:21', related_items=['PipelineDynamicDockDisplayAreaMixin'])
+class DynamicDockDisplayAreaOwningMixin:
+    """A mixin for widgets that own/contain a child widget implementing DynamicDockDisplayAreaContentMixin.
+    Provides convenient access to dock management functions by delegating to the child widget.
+    
+    Requirements:
+        - Must implement property `dock_manager_widget` that returns the child widget implementing DynamicDockDisplayAreaContentMixin
+        
+        
+    from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock
+    from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DynamicDockDisplayAreaOwningMixin, DynamicDockDisplayAreaContentMixin
+    
+    
+    """
+    # ==================================================================================================================== #
+    # DynamicDockDisplayAreaOwningMixin Conformances                                                                       #
+    # ==================================================================================================================== #
+    @property 
+    def dock_manager_widget(self) -> DynamicDockDisplayAreaContentMixin:
+        """Must be implemented by subclasses to return the widget that manages the docks"""
+        raise NotImplementedError
+        
+    def find_display_dock(self, identifier) -> Optional[Dock]:
+        """Delegates to child widget's find_display_dock"""
+        return self.dock_manager_widget.find_display_dock(identifier)
+        
+    def add_display_dock(self, identifier=None, widget=None, dockSize=(300,200), dockAddLocationOpts=['bottom'], **kwargs):
+        """Delegates to child widget's add_display_dock"""
+        return self.dock_manager_widget.add_display_dock(identifier, widget, dockSize, dockAddLocationOpts, **kwargs)
+        
+    def remove_display_dock(self, identifier):
+        """Delegates to child widget's remove_display_dock"""
+        return self.dock_manager_widget.remove_display_dock(identifier)
+        
+    def rename_display_dock(self, original_identifier, new_identifier):
+        """Delegates to child widget's rename_display_dock"""
+        return self.dock_manager_widget.rename_display_dock(original_identifier, new_identifier)
+        
+    def clear_all_display_docks(self):
+        """Delegates to child widget's clear_all_display_docks"""
+        return self.dock_manager_widget.clear_all_display_docks()
+
+
+    def get_flat_dock_identifiers_list(self, debug_print=False) -> List[str]:
+        """Delegates to child widget's get_flat_widgets_list"""
+        return self.dock_manager_widget.get_flat_dock_identifiers_list(debug_print=debug_print)
+
+    def get_flat_dockitems_list(self, debug_print=False) -> List[Dock]:
+        """Delegates to child widget's get_flat_dockitems_list"""
+        return self.dock_manager_widget.get_flat_dockitems_list(debug_print=debug_print)
+
+    def get_flat_widgets_list(self, debug_print=False) -> List["QtWidgets.QWidget"]:
+        """Delegates to child widget's get_flat_widgets_list"""
+        return self.dock_manager_widget.get_flat_widgets_list(debug_print=debug_print)
+    
+    def get_flat_dock_item_tuple_dict(self, debug_print=False) -> Dict[str, Tuple[Dock, Optional["QtWidgets.QWidget"]]]:
+        return self.dock_manager_widget.get_flat_dock_item_tuple_dict(debug_print=debug_print)
+
+    def get_dockGroup_dock_dict(self, debug_print=False) -> Dict[str, List[Dock]]:
+        """Delegates to child widget's get_dockGroup_dock_dict"""
+        return self.dock_manager_widget.get_dockGroup_dock_dict(debug_print)

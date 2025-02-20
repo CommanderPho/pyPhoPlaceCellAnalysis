@@ -764,3 +764,102 @@ def find_immediate_dependencies(remaining_comp_specifiers_dict, provided_global_
     return remaining_comp_specifiers_dict, dependent_validators, provided_global_keys
 
 
+
+
+
+
+
+
+
+
+# ==================================================================================================================== #
+# Specific Computation Validator Widget                                                                                #
+# ==================================================================================================================== #
+
+import ipywidgets as widgets
+from IPython.display import display, HTML
+from typing import Dict, List, Optional
+import inspect
+
+
+class ComputationValidatorsTreeWidget:
+    """ 
+    from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import ComputationValidatorsTreeWidget
+    
+    # Create and display the widget
+    validator_widget = ComputationValidatorsTreeWidget(curr_active_pipeline)
+    validator_widget.display()
+
+    """
+    def __init__(self, curr_active_pipeline):
+        self.pipeline = curr_active_pipeline
+        self.setup_widget()
+        
+    def setup_widget(self):
+        self.main_container = widgets.VBox(layout={'border': '1px solid gray', 'padding': '8px'})
+        validators_dict = self.pipeline.get_merged_computation_function_validators()
+        
+        # Separate and sort validators
+        local_validators = {name: v for name, v in validators_dict.items() if not v.is_global}
+        global_validators = {name: v for name, v in validators_dict.items() if v.is_global}
+        local_validators = dict(sorted(local_validators.items(), key=lambda x: x[1].computation_precidence))
+        global_validators = dict(sorted(global_validators.items(), key=lambda x: x[1].computation_precidence))
+        
+        # Create main sections
+        self.accordion = widgets.Accordion([
+            self.create_section_widget(local_validators, "Local Functions"),
+            self.create_section_widget(global_validators, "Global Functions")
+        ])
+        self.accordion.set_title(0, f'Local Functions ({len(local_validators)})')
+        self.accordion.set_title(1, f'Global Functions ({len(global_validators)})')
+
+        # Expand both sections by default:
+        self.accordion.selected_index = None  # Initially set to None to expand all
+
+        self.main_container.children = [self.accordion]
+        
+    def create_section_widget(self, validators: Dict, section_name: str) -> widgets.VBox:
+        validator_rows = []
+        
+        for name, validator in validators.items():
+            # Create expandable accordion for each validator
+            validator_details = []
+            
+            # Basic info row
+            basic_info = widgets.HBox([
+                widgets.HTML(f"<b>{validator.short_name}</b>"),
+                widgets.HTML(f"<span style='color: #666'>{validator.computation_fn_name}</span>"),
+                widgets.HTML(f"<span style='color: #999'>Priority: {validator.computation_precidence}</span>")
+            ], layout={'padding': '4px'})
+            validator_details.append(basic_info)
+            
+            # Dependencies section
+            spec = validator.results_specification
+            deps_box = widgets.VBox([
+                widgets.HTML("<b>Dependencies:</b>"),
+                widgets.HTML(f"<span style='color: #2962FF'>Required Global: {', '.join(spec.requires_global_keys) or 'None'}</span>"),
+                widgets.HTML(f"<span style='color: #1565C0'>Required Local: {', '.join(spec.requires_local_keys) or 'None'}</span>"),
+                widgets.HTML(f"<span style='color: #2E7D32'>Provides Global: {', '.join(spec.provides_global_keys) or 'None'}</span>"),
+                widgets.HTML(f"<span style='color: #388E3C'>Provides Local: {', '.join(spec.provides_local_keys) or 'None'}</span>")
+            ], layout={'padding': '4px', 'margin': '4px', 'border': '1px solid #ddd'})
+            validator_details.append(deps_box)
+            
+            # Function kwargs if any
+            if validator.computation_fn_kwargs:
+                kwargs_box = widgets.VBox([
+                    widgets.HTML("<b>Computation kwargs:</b>"),
+                    widgets.HTML(f"<pre>{str(validator.computation_fn_kwargs)}</pre>")
+                ], layout={'padding': '4px', 'margin': '4px', 'border': '1px solid #ddd'})
+                validator_details.append(kwargs_box)
+            
+            # Combine into accordion section
+            section = widgets.VBox(validator_details, 
+                                 layout={'border': '1px solid #ccc',
+                                        'margin': '2px',
+                                        'padding': '4px'})
+            validator_rows.append(section)
+            
+        return widgets.VBox(validator_rows)
+        
+    def display(self):
+        display(self.main_container)

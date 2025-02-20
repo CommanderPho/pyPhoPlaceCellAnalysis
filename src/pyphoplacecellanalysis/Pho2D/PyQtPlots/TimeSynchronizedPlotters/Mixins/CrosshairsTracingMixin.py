@@ -1,4 +1,5 @@
 from copy import deepcopy
+from typing import Optional
 import numpy as np
 import pandas as pd
 from qtpy import QtCore, QtWidgets
@@ -22,7 +23,7 @@ class CrosshairsTracingMixin:
     sigCrosshairsUpdated = QtCore.Signal(object, str, str) # (self, name, trace_value) - CrosshairsTracingMixin Conformance
     
 
-    def add_crosshairs(self, plot_item, name, matrix=None, xbins=None, ybins=None, enable_y_trace:bool=False):
+    def add_crosshairs(self, plot_item, name, matrix=None, xbins=None, ybins=None, enable_y_trace:bool=False, should_force_discrete_to_bins:Optional[bool]=True, **kwargs):
         """ adds crosshairs that allow the user to hover a bin and have the label dynamically display the bin (x, y) and value."""
         raise NotImplementedError(f'must override in implementor')
     

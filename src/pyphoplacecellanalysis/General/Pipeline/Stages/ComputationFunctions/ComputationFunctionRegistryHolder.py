@@ -109,8 +109,7 @@ class ComputationFunctionRegistryHolder(RegistryHolder):
         return cls.get_ordered_registry_items_functions(include_local=False, include_global=True, **kwargs)
 
     @classmethod
-    def get_all_computation_fn_names(cls,
-                                        non_global_all_exclude_list=['EloyAnalysis', '_DEP_ratemap_peaks', '_perform_specific_epochs_decoding', 'extended_stats', 'placefield_overlap', 'recursive_latent_pf_decoding', 'velocity_vs_pf_simplified_count_density'],
+    def get_all_computation_fn_names(cls, non_global_all_exclude_list=['EloyAnalysis', '_DEP_ratemap_peaks', '_perform_specific_epochs_decoding', 'extended_stats', 'placefield_overlap', 'recursive_latent_pf_decoding', 'velocity_vs_pf_simplified_count_density'],
                                         global_all_exclude_list=['PBE_stats']) -> Tuple[List[str], List[str]]:
         """ Gets the hardcoded or dynamically loaded computation names
         

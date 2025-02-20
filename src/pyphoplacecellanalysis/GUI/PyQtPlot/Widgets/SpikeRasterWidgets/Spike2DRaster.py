@@ -25,8 +25,9 @@ from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingS
 
 
 # For Dynamic Plot Widget Adding
+from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock
 # from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
-# from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DynamicDockDisplayAreaContentMixin
+from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DynamicDockDisplayAreaOwningMixin, DynamicDockDisplayAreaContentMixin
 from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.NestedDockAreaWidget import NestedDockAreaWidget
 
 # For a specific type of dynamic plot widget
@@ -57,6 +58,7 @@ from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.CustomGraphicsLayoutWidget import CustomViewBox
 
 
+
 class SynchronizedPlotMode(ExtendedEnum):
     """Describes the type of file progress actions that can be performed to get the right verbage.
     Used by `print_file_progress_message(...)`
@@ -76,7 +78,7 @@ class SynchronizedPlotMode(ExtendedEnum):
 
 
 @metadata_attributes(short_name=None, tags=['raster', 'gui'], input_requires=[], output_provides=[], uses=['LiveWindowedData'], used_by=[], creation_date='2024-12-18 12:45', related_items=[])
-class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRasterBase):
+class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRasterBase):
     """ Displays a 2D version of a raster plot with the spikes occuring along a plane. 
     
     Usage:
@@ -597,7 +599,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         # if ((not self.Includes2DActiveWindowScatter) and use_docked_pyqtgraph_plots):
         #     # use_docked_pyqtgraph_plots == True
         #     name_modifier_suffix='raster_window'
-        #     _raster_tracks_out_dict = self.prepare_pyqtgraph_raster_track(name_modifier_suffix=name_modifier_suffix, should_link_to_main_plot_widget=False)            
+        #     _raster_tracks_out_dict = self.prepare_pyqtgraph_rasterPlot_track(name_modifier_suffix=name_modifier_suffix, should_link_to_main_plot_widget=False)            
         #     _out = _raster_tracks_out_dict[f'rasters{name_modifier_suffix}']
         #     dock_config, time_sync_pyqtgraph_widget, raster_root_graphics_layout_widget, raster_plot_item, rasters_display_outputs_tuple = _out
         #     app, win, plots, plots_data = rasters_display_outputs_tuple
@@ -1305,20 +1307,32 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         target_graphics_layout_widget.removeItem(separate_plot_item)
 
         
+
+    # ==================================================================================================================== #
+    # DynamicDockDisplayAreaOwningMixin Conformances                                                                       #
+    # ==================================================================================================================== #
+    @property
+    def dock_manager_widget(self) -> DynamicDockDisplayAreaContentMixin:
+        """Must be implemented by subclasses to return the widget that manages the docks"""
+        return self.ui.dynamic_docked_widget_container
+
+
     # matplotlib render subplot __________________________________________________________________________________________ #
 
     def _setupUI_matplotlib_render_plots(self):
         # performs required setup to enable dynamically added matplotlib render subplots.
         self.ui.matplotlib_view_widgets = {} # empty dictionary
+        self.ui.connections['tracks'] = {}
+        
 
     @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=['FigureWidgetDockDisplayConfig'], used_by=[], creation_date='2023-10-17 13:26', related_items=['add_new_embedded_pyqtgraph_render_plot_widget'])
-    def add_new_matplotlib_render_plot_widget(self, row=1, col=0, name='matplotlib_view_widget', dockSize=(500,50), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None) -> Tuple[MatplotlibTimeSynchronizedWidget, Figure, List[Axis]]:
+    def add_new_matplotlib_render_plot_widget(self, row=1, col=0, name='matplotlib_view_widget', dockSize=(500,50), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None, return_dock_object:bool=False, sync_mode:Optional[SynchronizedPlotMode]=None) -> Tuple[MatplotlibTimeSynchronizedWidget, Figure, List[Axis]]:
         """ creates a new dynamic MatplotlibTimeSynchronizedWidget, a container widget that holds a matplotlib figure, and adds it as a row to the main layout
         
         emit an event so the parent can call `self.update_scrolling_event_filters()` to add the new item
         
         """
-        dDisplayItem = self.ui.dynamic_docked_widget_container.find_display_dock(identifier=name) # Dock
+        dDisplayItem: Dock = self.ui.dynamic_docked_widget_container.find_display_dock(identifier=name) # Dock
         if dDisplayItem is None:
             # No extant matplotlib_view_widget and display_dock currently, create a new one:
             ## TODO: hardcoded single-widget: used to be named `self.ui.matplotlib_view_widget`
@@ -1374,13 +1388,19 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             an_ax.patch.set_facecolor('black')
             an_ax.patch.set_alpha(0.1)
     
+        if sync_mode is not None:
+            ## sync up the widgets
+            self.sync_matplotlib_render_plot_widget(identifier=name, sync_mode=sync_mode)
 
         # self.sync_matplotlib_render_plot_widget()
-        return self.ui.matplotlib_view_widgets[name], fig, ax
+        if not return_dock_object:
+            return self.ui.matplotlib_view_widgets[name], fig, ax
+        else:
+            return self.ui.matplotlib_view_widgets[name], fig, ax, dDisplayItem
     
 
     @function_attributes(short_name=None, tags=['pyqtgraph_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget', 'pyqtgraph', 'docked_widget'], input_requires=[], output_provides=[], uses=['PyqtgraphTimeSynchronizedWidget'], used_by=[], creation_date='2024-12-31 03:35', related_items=['add_new_matplotlib_render_plot_widget'])
-    def add_new_embedded_pyqtgraph_render_plot_widget(self, name='pyqtgraph_view_widget', dockSize=(500,50), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None) -> Tuple[PyqtgraphTimeSynchronizedWidget, Any, Any, Any]:
+    def add_new_embedded_pyqtgraph_render_plot_widget(self, name='pyqtgraph_view_widget', dockSize=(500,50), dockAddLocationOpts=['bottom'], display_config:CustomDockDisplayConfig=None, sync_mode:Optional[SynchronizedPlotMode]=None) -> Tuple[PyqtgraphTimeSynchronizedWidget, Any, Any, Dock]:
         """ creates a new dynamic PyqtgraphTimeSynchronizedWidget, a container widget that holds a matplotlib figure, and adds it as a row to the main layout
         
         based off of `add_new_matplotlib_render_plot_widget`, but to support embedded pyqtgraph plots instead of matplotlib plots
@@ -1435,7 +1455,10 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
             ## emit the signal
             self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name])
             
-
+            if sync_mode is not None:
+                ## sync up the widgets
+                self.sync_matplotlib_render_plot_widget(identifier=name, sync_mode=sync_mode)
+                
         else:
             # Already had the widget
             print(f'already had the valid pyqtgraph view widget and its display dock. Returning extant.')
@@ -1482,7 +1505,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
 
 
     @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 13:23', related_items=[])
-    def find_matplotlib_render_plot_widget(self, identifier):
+    def find_matplotlib_render_plot_widget(self, identifier, include_dock=False):
         """ finds the existing dynamically added matplotlib_render_plot_widget. 
         returns (widget, fig, ax)
         """
@@ -1490,15 +1513,26 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         if active_matplotlib_view_widget is not None:
             if active_matplotlib_view_widget.is_matplotlib_based():
                 ## matplotlib-based:
-                return active_matplotlib_view_widget, active_matplotlib_view_widget.getFigure(), active_matplotlib_view_widget.axes # return all axes instead of just the first one
+                if include_dock:
+                    dock_item = self.find_display_dock(identifier=identifier)
+                    return active_matplotlib_view_widget, active_matplotlib_view_widget.getFigure(), active_matplotlib_view_widget.axes, dock_item # return all axes instead of just the first one
+                else:
+                    return active_matplotlib_view_widget, active_matplotlib_view_widget.getFigure(), active_matplotlib_view_widget.axes # return all axes instead of just the first one
             elif active_matplotlib_view_widget.is_pyqtgraph_based():
                 ## pyqtgraph-based:
-                return active_matplotlib_view_widget, active_matplotlib_view_widget.getRootGraphicsLayoutWidget(), active_matplotlib_view_widget.getRootPlotItem()
+                if include_dock:
+                    dock_item = self.find_display_dock(identifier=identifier)
+                    return active_matplotlib_view_widget, active_matplotlib_view_widget.getRootGraphicsLayoutWidget(), active_matplotlib_view_widget.getRootPlotItem()
+                else:
+                    return active_matplotlib_view_widget, active_matplotlib_view_widget.getRootGraphicsLayoutWidget(), active_matplotlib_view_widget.getRootPlotItem(), dock_item
             else:
                 raise NotImplementedError(f'active_matplotlib_view_widget: {active_matplotlib_view_widget}')
         else:
             print(f'active_matplotlib_view_widget with identifier {identifier} was not found!')
-            return None, None, None
+            if include_dock:
+                return None, None, None, None
+            else:
+                return None, None, None
 
 
     @function_attributes(short_name=None, tags=['matplotlib_render_widget', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-17 13:27', related_items=[])
@@ -1580,7 +1614,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
     # ==================================================================================================================== #
 
     @function_attributes(short_name=None, tags=['intervals', 'tracks', 'pyqtgraph', 'specific', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 07:29', related_items=[])
-    def prepare_pyqtgraph_interval_tracks(self, enable_interval_overview_track: bool = False, should_remove_all_and_re_add: bool=True, name_modifier_suffix: str='', should_link_to_main_plot_widget:bool=True, debug_print=False):
+    def prepare_pyqtgraph_intervalPlot_tracks(self, enable_interval_overview_track: bool = False, should_remove_all_and_re_add: bool=True, name_modifier_suffix: str='', should_link_to_main_plot_widget:bool=True, debug_print=False):
         """ adds to separate pyqtgraph-backed tracks to the SpikeRaster2D plotter for rendering intervals, and updates `active_2d_plot.params.custom_interval_rendering_plots` so the intervals are rendered on these new tracks in addition to any normal ones
         
         enable_interval_overview_track: bool: if True, renders a track to show all the intervals during the sessions (overview) in addition to the track for the intervals within the current active window
@@ -1665,7 +1699,7 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
 
 
     @function_attributes(short_name=None, tags=['raster', 'tracks', 'pyqtgraph', 'specific', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-09 10:50', related_items=[])
-    def prepare_pyqtgraph_raster_track(self, name_modifier_suffix: str='', should_link_to_main_plot_widget:bool=True, debug_print=False):
+    def prepare_pyqtgraph_rasterPlot_track(self, name_modifier_suffix: str='', should_link_to_main_plot_widget:bool=True, debug_print=False):
         """ adds to separate pyqtgraph-backed tracks to the SpikeRaster2D plotter for rendering a 2D raster `active_2d_plot.params.custom_interval_rendering_plots` so the intervals are rendered on these new tracks in addition to any normal ones
         
         enable_interval_overview_track: bool: if True, renders a track to show all the intervals during the sessions (overview) in addition to the track for the intervals within the current active window
@@ -1681,6 +1715,9 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         #TODO 2025-01-09 12:04: - [ ] Needs to respond to signals:
         self.on_neuron_colors_changed
 
+        Usage:
+        
+        _raster_tracks_out_dict = active_2d_plot.prepare_pyqtgraph_rasterPlot_track(name_modifier_suffix='raster_window', should_link_to_main_plot_widget=has_main_raster_plot)
         
         """
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, CustomCyclicColorsDockDisplayConfig, NamedColorScheme
@@ -1970,6 +2007,65 @@ class Spike2DRaster(PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Rende
         self.debug_print_spike_raster_2D_specific_plots_info(indent_string = '\t')
         debug_print_axes_locations(self)
 
+
+    # ==================================================================================================================== #
+    # Crosshairs/Tracing Functions                                                                                         #
+    # ==================================================================================================================== #
+
+    def toggle_crosshair_traces_enabled(self, are_crosshairs_enabled):
+        print(f'SpikeRaster2D.on_crosshair_trace_toggled(is_crosshairs_enabled={are_crosshairs_enabled})')
+        if are_crosshairs_enabled:
+            # for a_ts_widget in self.get_flat_widgets_list():
+            for an_identifier, (a_dock_item, a_ts_widget) in self.get_flat_dock_item_tuple_dict().items():
+                if hasattr(a_ts_widget, 'add_crosshairs'):
+                    # add_crosshairs
+                    try:
+                        a_ts_widget.add_crosshairs(a_ts_widget.active_plot_target, name='traceHairs', should_force_discrete_to_bins=False, enable_y_trace=True)
+                        print(f'\tan_identifier: "{an_identifier}"')
+                        if an_identifier not in self.ui.connections['tracks']:
+                            self.ui.connections['tracks'][an_identifier] = {} ## make new dict to hold connections
+                            
+                        if 'sigCrosshairsUpdated' not in self.ui.connections['tracks'][an_identifier]:
+                            ## enable crosshairs callback
+                            print(f'\t\tadding crosshairs callback for item: "{an_identifier}"')
+                            self.ui.connections['tracks'][an_identifier]['sigCrosshairsUpdated'] = None
+                            # self.on_child_crosshair_updated_signal
+                            _crosshairs_updated_conn = a_ts_widget.sigCrosshairsUpdated.connect(lambda a_child_widget, an_identifier, a_trace_value: self.on_child_crosshair_updated_signal(an_identifier, a_trace_value))
+                            self.ui.connections['tracks'][an_identifier]['sigCrosshairsUpdated'] = _crosshairs_updated_conn ## set just as the raw connection so we can disconnect
+                            # self.ui.connections['tracks'][an_identifier]['sigCrosshairsUpdated'] = (_crosshairs_updated_conn, a_ts_widget.sigCrosshairsUpdated) ## set a tuple so we can disconnect
+                            print(f'\t\tdone.')
+                        else:
+                            print(f'\talready have a crosshairs callback for item {an_identifier}')
+                            
+                    except Exception as e:
+                        print(f'\tfailed to add crosshair traces for widget: {a_ts_widget}.\n\tError: {e}\n\tSkipping.')
+                    
+                    
+        else:
+            ## disable crosshairs
+            # for a_ts_widget in self.get_flat_widgets_list():
+            for an_identifier, (a_dock_item, a_ts_widget) in self.get_flat_dock_item_tuple_dict().items():
+                if hasattr(a_ts_widget, 'remove_crosshairs'):
+                    # remove_crosshairs:
+                    try:
+                        a_ts_widget.remove_crosshairs(a_ts_widget.active_plot_target, name='traceHairs')
+                        an_existing_crosshairs_updated_conn = self.ui.connections['tracks'].get(an_identifier, {}).pop('sigCrosshairsUpdated', None)
+                        if an_existing_crosshairs_updated_conn is not None:
+                            print(f'\tfound connection to remove for an_identifier: {an_identifier}, an_existing_crosshairs_updated_conn: {an_existing_crosshairs_updated_conn}')
+                            a_ts_widget.sigCrosshairsUpdated.disconnect(an_existing_crosshairs_updated_conn) ## disconnect
+                            print(f'\t\tconnection removed!')                        
+                        
+                    except Exception as e:
+                        print(f'\tfailed to remove crosshair traces for widget: {a_ts_widget}.\n\tError: {e}\n\tSkipping.')
+                        # raise e
+                                
+            
+
+    def on_child_crosshair_updated_signal(self, child_identifier, trace_value):
+        """ called when a child (with crosshairs enabled) updates its crosshairs trace. """
+        if self.debug_print:
+            print(f'SpikeRaster2D.on_child_crosshair_updated_signal(self: {self}, child_identifier: "{child_identifier}", trace_value: "{trace_value}")')
+        self.sigCrosshairsUpdated.emit(self, child_identifier, trace_value)
 
 
 @define(slots=False)

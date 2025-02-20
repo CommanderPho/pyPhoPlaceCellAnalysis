@@ -166,7 +166,7 @@ class LiveWindowEventIntervalMonitoringMixin:
 
 @metadata_attributes(short_name=None, tags=['epoch', 'intervals', 'rendering'], input_requires=[], output_provides=[], uses=['LiveWindowEventIntervalMonitoringMixin'], used_by=['Spike2DRaster'], creation_date='2025-01-06 15:10', related_items=[])
 class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
-    """ Implementors render Epochs/Intervals
+    """ Implementors render Epochs/Intervals as little rectangles
     
     Requires:
         self.plots
@@ -870,12 +870,15 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
         
         Usage:
         
-        import panel as pn
-        pn.extension()
+            import panel as pn
+            pn.extension()
 
-        out_configs_dict = active_2d_plot.extract_interval_display_config_lists()
-        pn.Row(*[pn.Column(*[pn.Param(a_sub_v) for a_sub_v in v]) for k,v in out_configs_dict.items()])
+            out_configs_dict = active_2d_plot.extract_interval_display_config_lists()
+            pn.Row(*[pn.Column(*[pn.Param(a_sub_v) for a_sub_v in v]) for k,v in out_configs_dict.items()])
 
+            
+            
+            
         """
         from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.epochs_plotting_mixins import EpochDisplayConfig
         out_configs_dict = {}

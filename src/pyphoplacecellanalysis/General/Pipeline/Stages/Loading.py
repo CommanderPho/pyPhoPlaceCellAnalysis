@@ -39,7 +39,7 @@ from pyphocorehelpers.print_helpers import print_filesystem_file_size, print_obj
 from pyphocorehelpers.Filesystem.path_helpers import build_unique_filename, backup_extant_file
 
 
-def safeSaveData(pkl_path: Union[str, Path], db: Any, should_append:bool=False, backup_file_if_smaller_than_original:bool=False, backup_minimum_difference_MB:int=5):
+def safeSaveData(pkl_path: Union[str, Path], db: Any, should_append:bool=False, backup_file_if_smaller_than_original:bool=False, backup_minimum_difference_MB:int=5, should_print_output_filesize:bool=True):
     """ saves the output data in a way that doesn't corrupt it if the pickling fails and the original file is retained.
     
     Saves `db` to a temporary pickle file (with the '.tmp' additional extension), which overwrites an existing pickle IFF saving completes successfully
@@ -91,7 +91,13 @@ def safeSaveData(pkl_path: Union[str, Path], db: Any, should_append:bool=False, 
                 # replace the old file with the new one:
                 print(f"\tmoving new output at '{pkl_path}' -> to desired location: '{_desired_final_pickle_path}'")
                 shutil.move(pkl_path, _desired_final_pickle_path) # move the temporary file to the desired destination, overwriting it
-
+            # END if is_tem...
+            
+            # Print final file size after successful save
+            if should_print_output_filesize:
+                final_file_size_MB = print_filesystem_file_size(_desired_final_pickle_path, enable_print=False)
+                print(f"\tSaved file size: {final_file_size_MB:.2f} MB")
+            
         except BaseException as e:
             print(f"ERROR: pickling exception occured while using safeSaveData(pkl_path: {_desired_final_pickle_path}, ..., , should_append={should_append}) but original file was NOT overwritten!\nException: {e}")
             # delete the incomplete pickle file

@@ -317,7 +317,7 @@ class BatchSessionCompletionHandler:
 
         return was_updated
 
-
+    @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=['cls._update_pipeline_missing_preprocessing_parameters', 'cls._post_fix_filtered_contexts', 'ComputationKWargParameters', 'PostHocPipelineFixup'], used_by=['on_load_local', 'on_complete_success_execution_session'], creation_date='2025-02-19 19:09', related_items=[])
     @classmethod
     def post_compute_validate(cls, curr_active_pipeline) -> bool:
         """ 2023-05-16 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks. 
@@ -326,6 +326,7 @@ class BatchSessionCompletionHandler:
         
         """
         from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters
+        from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import PostHocPipelineFixup
         
         if not LongShortPipelineTests(curr_active_pipeline=curr_active_pipeline).validate():
             print(f'ERROR!! Pipeline is invalid according to LongShortPipelineTests!!')
@@ -348,6 +349,11 @@ class BatchSessionCompletionHandler:
         #     # was_updated = True
         #     raise NotImplementedError("2023-11-29 - This shouldn't happen since we previously called `cls._post_fix_filtered_contexts(curr_active_pipeline)`!!")
         
+
+        ## call `PostHocPipelineFixup.FINAL_UPDATE_ALL(...)`'s fixup function:
+        was_updated = was_updated or PostHocPipelineFixup.FINAL_UPDATE_ALL(curr_active_pipeline, force_recompute=False, is_dry_run=False)
+
+
         ## Add `curr_active_pipeline.global_computation_results.computation_config` as needed:
         if curr_active_pipeline.global_computation_results.computation_config is None:
             print('global_computation_results.computation_config is None! Making new one!')
@@ -601,7 +607,7 @@ class BatchSessionCompletionHandler:
 
 
     ## Main function that's called with the complete pipeline:
-    @function_attributes(short_name=None, tags=['IMPORTANT', 'callback', 'replay'], input_requires=['filtered_sessions[*].replay'], output_provides=[], uses=['self.completion_functions'], used_by=['run_specific_batch'], creation_date='2024-07-02 11:44', related_items=[])  
+    @function_attributes(short_name=None, tags=['MAIN', 'IMPORTANT', 'callback', 'replay'], input_requires=['filtered_sessions[*].replay'], output_provides=[], uses=['.completion_functions', '.post_compute_validate', '.try_compute_global_computations_if_needed', '.try_complete_figure_generation_to_file', '.try_export_pipeline_hdf5_if_needed'], used_by=['run_specific_batch'], creation_date='2024-07-02 11:44', related_items=[])  
     def on_complete_success_execution_session(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline) -> PipelineCompletionResult:
         """ called when the execute_session completes like:
             `post_run_callback_fn_output = post_run_callback_fn(curr_session_context, curr_session_basedir, curr_active_pipeline)`

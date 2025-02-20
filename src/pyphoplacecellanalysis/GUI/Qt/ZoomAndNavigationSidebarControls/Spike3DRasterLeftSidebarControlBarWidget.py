@@ -39,13 +39,15 @@ class Spike3DRasterLeftSidebarControlBar(QWidget):
     self.ui.lblCrosshairTraceStaticLabel
     self.ui.lblCrosshairTraceValue
     
+    self.ui.verticalScrollBar
+    
     """
     
     animation_time_step_changed = pyqtSignal(float) # returns bool indicating whether is_playing
     temporal_zoom_factor_changed = pyqtSignal(float)
     render_window_duration_changed = pyqtSignal(float)
         
-    crosshair_trace_toggled = pyqtSignal(bool)
+    crosshair_trace_toggled = pyqtSignal()
 
     # @property
     # def lblCrosshairTraceValue(self):
@@ -56,7 +58,8 @@ class Spike3DRasterLeftSidebarControlBar(QWidget):
     @property
     def crosshair_trace_time(self) -> float:
         """The crosshair_trace_time property."""
-        return self._crosshair_trace_time
+        # return self.ui.lblCrosshairTraceValue.getText()
+        return None
     @crosshair_trace_time.setter
     def crosshair_trace_time(self, value: float):
         if value is not None:
@@ -73,28 +76,37 @@ class Spike3DRasterLeftSidebarControlBar(QWidget):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self.ui = uic.loadUi(uiFile, self) # Load the .ui file
         
-        # self.initUI()
+        self.initUI() ## when did this get disabled?
         self.show() # Show the GUI
 
 
     def initUI(self):
         # Disable the scroll bar
         self.ui.verticalScrollBar.hide()
+        self.ui.verticalScrollBar.setVisible(False)
+
         # Setup the vertical zoom slider
         # self.ui.verticalSliderZoom
-
+        self.ui.verticalSliderZoom.setVisible(False)
+        
         # Connect Signals:
         # self.ui.verticalSliderZoom.valueChanged.connect(self.temporal_zoom_slider_valueChanged)
         self.ui.spinAnimationTimeStep.sigValueChanged.connect(self.animation_time_step_valueChanged)
         self.ui.spinTemporalZoomFactor.sigValueChanged.connect(self.temporal_zoom_factor_valueChanged)
         self.ui.spinRenderWindowDuration.sigValueChanged.connect(self.render_window_duration_valueChanged)
         self.ui.btnToggleCrosshairTrace.clicked.connect(self.crosshair_trace_button_Toggled)
+        # self.ui.btnToggleCrosshairTrace.clicked.
+
+        
+        
 
         self.ui.btnToggleCrosshairTrace.setVisible(True)
         self.ui.lblCrosshairTraceStaticLabel.setVisible(False)
         self.ui.lblCrosshairTraceValue.setVisible(False)
              
- 
+
+        
+
     @pyqtExceptionPrintingSlot(object)
     def animation_time_step_valueChanged(self, sb):
         # print(f'sb: {sb}, sb.value(): {str(sb.value())}')
@@ -134,12 +146,14 @@ class Spike3DRasterLeftSidebarControlBar(QWidget):
         # self.temporal_zoom_factor_changed.emit(float_slider_val)
                         
 
-    @pyqtExceptionPrintingSlot()
+    # @pyqtExceptionPrintingSlot()
     def crosshair_trace_button_Toggled(self):
-        # print(f'sb: {sb}, sb.value(): {str(sb.value())}')
-        # old_value = self.render_window_duration
-        self.crosshair_trace_toggled.emit(self.ui.btnToggleCrosshairTrace.isChecked())
-        
+        print(f'Spike3DRasterLeftSidebarControlBar.crosshair_trace_button_Toggled(): self.ui.btnToggleCrosshairTrace.isChecked(): {self.ui.btnToggleCrosshairTrace.isChecked()}')
+        wants_crosshair_trace_visible: bool = self.ui.btnToggleCrosshairTrace.isChecked()
+        self.ui.lblCrosshairTraceStaticLabel.setVisible(wants_crosshair_trace_visible)
+        self.ui.lblCrosshairTraceValue.setVisible(wants_crosshair_trace_visible)
+        # self.crosshair_trace_toggled.emit(wants_crosshair_trace_visible)
+        self.crosshair_trace_toggled.emit()
 
     # def __str__(self):
     #      return
@@ -163,7 +177,13 @@ class SpikeRasterLeftSidebarControlsMixin:
         
         Currently used in Spike3DRasterWindowWidget to implement the left sidebar
     """
-    
+    @property
+    def left_side_bar_controls(self) -> Spike3DRasterLeftSidebarControlBar:
+        """The left_side_bar_controls property."""
+        return self.ui.leftSideToolbarWidget
+
+        
+
     @pyqtExceptionPrintingSlot()
     def SpikeRasterLeftSidebarControlsMixin_on_init(self):
         """ perform any parameters setting/checking during init """

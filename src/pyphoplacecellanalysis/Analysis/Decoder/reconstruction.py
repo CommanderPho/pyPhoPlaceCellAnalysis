@@ -1746,11 +1746,26 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         return filter_epochs_decoder_result
 
     @classmethod
-    def _perform_decoding_specific_epochs(cls, active_decoder: "BasePositionDecoder", filter_epochs_decoder_result: DynamicContainer, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DecodedFilterEpochsResult:
+    def _perform_decoding_specific_epochs(cls, active_decoder: "BasePositionDecoder", filter_epochs_decoder_result: DynamicContainer, use_single_time_bin_per_epoch: bool=False, enable_slow_debugging_time_bin_validation: bool=False, debug_print=False) -> DecodedFilterEpochsResult:
         """ Actually performs the computation
         
         NOTE: Uses active_decoder.decode(...) to actually do the decoding
         
+        NOTE 2025-02-29: when `enable_slow_debugging_time_bin_validation==True`, this function takes more than twice as long due to a deepcopy!
+        """ 
+        """ NOTE 2025-02-20 09:40: even when ``enable_slow_debugging_time_bin_validation==False`, this function takes forever because it prints a ton of statements. 
+        ERROR: epochs_spkcount(...): epoch[559], nbins[559]: 1 - TODO 2024-08-07 19:11: Building BinningContainer for epoch with fewer than 2 edges (occurs when epoch duration is shorter than the bin size). Using the epoch.start, epoch.stop as the two edges (giving a single bin) but this might be off and cause problems, as they are the edges of the epoch but maybe not "real" edges?
+	    ERROR (cont.): even after this hack `slide_view` is not updated, so the returned spkcount is not valid and has the old (wrong, way too many) number of bins. This results in decoded posteriors/postitions/etc with way too many bins downstream. see `SOLUTION 2024-08-07 20:08: - [ ] Recompute the Invalid Quantities with the known correct number of time bins` for info.
+        
+        
+        Occurs with epochs_decoding_time_bin_size = 1.0, frame_divide_bin_size = 1.0
+
+        At end of runs:
+            curr_filter_epoch_time_bin_size = 1.0
+            curr_epoch_num_time_bins = 1.0
+            len(invalid_indicies_list): 505
+            np.shape(p_x_given_n): (59, 424)
+            _arr_lengths: [570, 570, 570, 570]
         """
         # Looks like we're iterating over each epoch in filter_epochs:
         ## Validate the list lengths for the zip:
@@ -1760,7 +1775,8 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
 
         ## Set the static decoder properties
         filter_epochs_decoder_result.pos_bin_edges = deepcopy(active_decoder.xbin)
-
+        assert len(_arr_lengths) > 0, f"no epochs?!?!"
+        n_epochs: int = _arr_lengths[0] ## all the same, so any of them works
 
         # active_decoder.neuron_IDs
         
@@ -1869,9 +1885,10 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         assert np.all([(len(filter_epochs_decoder_result.most_likely_positions_list[i]) == len(filter_epochs_decoder_result.time_bin_containers[i].centers)) for i, a_n_bins in enumerate(filter_epochs_decoder_result.nbins)])
 
         out_result: DecodedFilterEpochsResult = DecodedFilterEpochsResult(**filter_epochs_decoder_result.to_dict()) # dump the dynamic dict as kwargs into the class
-        out_result.validate_time_bins() ## one last full check! raises assertions if any time bins are still off
         
-        
+        if enable_slow_debugging_time_bin_validation:
+            out_result.validate_time_bins() ## one last full check! raises assertions if any time bins are still off. Actually very slow!
+            
         return out_result
     
 

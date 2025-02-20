@@ -588,32 +588,32 @@ class BatchRun(HDF_SerializationMixin):
 
     @classmethod
     def convert_filelist_to_new_global_root(cls, existing_session_batch_basedirs, desired_global_data_root_parent_path, old_global_data_root_parent_path=None) -> List[Path]:
-            """ converts a list of files List[Path] containing the common parent root specified by `old_global_data_root_parent_path` or inferred from the list itself to a new parent specified by `desired_global_data_root_parent_path` 
-            Arguments:
-                desired_global_data_root_parent_path: the desired new global_data_root path
-                old_global_data_root_parent_path: if provided, the previous global_data_root path that all of the `existing_session_batch_basedirs` were built with. If not specifieed, tries to infer it using `cls.find_global_root_path(batch_progress_df)`
-                        
-            Usage:
+        """ converts a list of files List[Path] containing the common parent root specified by `old_global_data_root_parent_path` or inferred from the list itself to a new parent specified by `desired_global_data_root_parent_path` 
+        Arguments:
+            desired_global_data_root_parent_path: the desired new global_data_root path
+            old_global_data_root_parent_path: if provided, the previous global_data_root path that all of the `existing_session_batch_basedirs` were built with. If not specifieed, tries to infer it using `cls.find_global_root_path(batch_progress_df)`
+                    
+        Usage:
 
-                existing_session_batch_basedirs = list(batch_progress_df['basedirs'].values)
-                new_session_batch_basedirs = convert_filelist_to_new_global_root(existing_session_batch_basedirs, desired_global_data_root_parent_path, old_global_data_root_parent_path=old_global_data_root_parent_path)
-            """
-            if isinstance(desired_global_data_root_parent_path, str):
-                desired_global_data_root_parent_path = Path(desired_global_data_root_parent_path)
-            assert desired_global_data_root_parent_path.exists(), f"the path provide should be the one for the system (and it should exist)"
-            
-            ## Path-based method using `convert_filelist_to_new_parent(...)`:
-            if old_global_data_root_parent_path is not None:
-                source_parent_path = old_global_data_root_parent_path
-            else:
-                source_parent_path = cls.find_global_root_path(existing_session_batch_basedirs) # Path(r'/media/MAX/cloud/turbo/Data')
-                print(f'inferred source_parent_path: {source_parent_path}')
-            
-            if isinstance(source_parent_path, str):
-                source_parent_path = Path(source_parent_path)
+            existing_session_batch_basedirs = list(batch_progress_df['basedirs'].values)
+            new_session_batch_basedirs = convert_filelist_to_new_global_root(existing_session_batch_basedirs, desired_global_data_root_parent_path, old_global_data_root_parent_path=old_global_data_root_parent_path)
+        """
+        if isinstance(desired_global_data_root_parent_path, str):
+            desired_global_data_root_parent_path = Path(desired_global_data_root_parent_path)
+        assert desired_global_data_root_parent_path.exists(), f"the path provide should be the one for the system (and it should exist)"
+        
+        ## Path-based method using `convert_filelist_to_new_parent(...)`:
+        if old_global_data_root_parent_path is not None:
+            source_parent_path = old_global_data_root_parent_path
+        else:
+            source_parent_path = cls.find_global_root_path(existing_session_batch_basedirs) # Path(r'/media/MAX/cloud/turbo/Data')
+            print(f'inferred source_parent_path: {source_parent_path}')
+        
+        if isinstance(source_parent_path, str):
+            source_parent_path = Path(source_parent_path)
 
-            return convert_filelist_to_new_parent(existing_session_batch_basedirs, original_parent_path=source_parent_path, dest_parent_path=desired_global_data_root_parent_path)
-            
+        return convert_filelist_to_new_parent(existing_session_batch_basedirs, original_parent_path=source_parent_path, dest_parent_path=desired_global_data_root_parent_path)
+        
     @classmethod
     def rebuild_basedirs(cls, batch_progress_df, desired_global_data_root_parent_path, old_global_data_root_parent_path=None):
         """ replaces basedirs with ones that have been rebuilt from the local `global_data_root_parent_path` and hopefully point to extant paths. 

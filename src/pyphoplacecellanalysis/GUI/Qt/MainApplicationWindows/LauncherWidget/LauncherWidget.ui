@@ -15,8 +15,8 @@
    <string>Spike3D Launcher</string>
   </property>
   <property name="windowIcon">
-   <iconset resource="../../../../Resources/GuiResources.qrc">
-    <normaloff>:/Icons/Icons/SpikeRaster3DIcon.ico</normaloff>:/Icons/Icons/SpikeRaster3DIcon.ico</iconset>
+   <iconset resource="../../../../Resources/ActionIcons.qrc">
+    <normaloff>:/Graphics/Icons/Icon/LauncherWidget@22w.png</normaloff>:/Graphics/Icons/Icon/LauncherWidget@22w.png</iconset>
   </property>
   <property name="styleSheet">
    <string notr="true">background-color: rgb(71, 58, 46);

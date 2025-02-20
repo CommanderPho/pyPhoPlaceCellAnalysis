@@ -216,13 +216,25 @@ class SpikeRasterBase(LoggingBaseClassLoggerOwningMixin, UnitSortableMixin, Data
     
    
     @property
-    def temporal_axis_length(self):
+    def temporal_axis_length(self) -> float:
         """ NOTE: the temporal_axis_length actually refers to the length of the active_window, as it's used in the pyqtgraph Spike3DRaster class."""
         return self.temporal_zoom_factor * self.render_window_duration
     @property
-    def half_temporal_axis_length(self):
+    def half_temporal_axis_length(self) -> float:
         """The temporal_axis_length property."""
         return self.temporal_axis_length / 2.0
+    
+    @property
+    def total_data_duration(self) -> float:
+        """ The duration (in seconds) of all data in self.spikes_window."""
+        return (self.spikes_window.total_data_end_time - self.spikes_window.total_data_start_time)
+    
+    @property
+    def total_data_temporal_axis_length(self) -> float:
+        """The equivalent of self.temporal_axis_length but for all data instead of just the active window."""
+        return self.temporal_zoom_factor * self.total_data_duration
+    
+
         
     # TimeWindowPlaybackPropertiesMixin requirement:
     @property
@@ -233,7 +245,7 @@ class SpikeRasterBase(LoggingBaseClassLoggerOwningMixin, UnitSortableMixin, Data
     
     ######  Get/Set Properties ######:
     @property
-    def temporal_zoom_factor(self):
+    def temporal_zoom_factor(self) -> float:
         """The time dilation factor that maps spikes in the current window to y-positions along the time axis multiplicatively.
             Increasing this factor will result in a more spatially expanded time axis while leaving the visible window unchanged.
         """

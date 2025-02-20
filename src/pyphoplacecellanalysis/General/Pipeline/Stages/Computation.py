@@ -127,6 +127,97 @@ def get_all_batch_computation_names():
 
 
 
+from collections import OrderedDict
+from typing import Callable, Optional
+from attrs import define, field
+
+from pyphocorehelpers.programming_helpers import SourceCodeParsing
+
+
+def has_good_str_value(a_str_val) -> bool:
+    return ((a_str_val is not None) and (len(a_str_val) > 0))
+
+@metadata_attributes(short_name=None, tags=['computation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-19 13:12', related_items=['pyphoplacecellanalysis.General.Pipeline.Stages.Display.DisplayFunctionItem'])
+@define(slots=False)
+class ComputationFunctionItem:
+    """ For helping to render a UI computation function tree, similar to DisplayFunctionItem.
+        It holds metadata about a computation function.
+
+    Based off of `pyphoplacecellanalysis.General.Pipeline.Stages.Display.DisplayFunctionItem` on 2025-02-19 13:13 
+
+    from pyphoplacecellanalysis.General.Pipeline.Stages.Computation import ComputationFunctionItem
+
+    """
+    name: str = field()
+    fn_callable: Callable = field()
+
+    is_global: bool = field()
+    short_name: str = field()
+    docs: str = field()
+    icon_path: Optional[str] = field()
+    vscode_jump_link: Optional[str] = field()
+
+
+    @classmethod
+    def init_from_fn_object(cls, a_fn, icon_path=None):
+        _obj = cls(name=a_fn.__name__, fn_callable=a_fn, is_global=getattr(a_fn,'is_global', False), short_name=(getattr(a_fn,'short_name', a_fn.__name__) or a_fn.__name__),
+            docs=a_fn.__doc__, icon_path=icon_path, vscode_jump_link=SourceCodeParsing.build_vscode_jump_link(a_fcn_handle=a_fn))
+        return _obj
+
+    @property
+    def best_display_name(self) -> str:
+        """ returns the best name for display """
+        if has_good_str_value(self.short_name):
+            return self.short_name
+        else:
+            return self.name
+        
+
+    @property
+    def longform_description(self) -> str:
+        """The longform_description property."""
+        out_str_arr = []
+
+        if has_good_str_value(self.short_name):
+            out_str_arr.append(f"short_name: {self.short_name}") # short name first, then
+            out_str_arr.append(f"name: {self.name}") # full name
+        else:
+            out_str_arr.append(f"name: {self.name}") # just name
+
+        if has_good_str_value(self.docs):
+            out_str_arr.append(f"docs: {self.docs}")
+            
+        if has_good_str_value(self.vscode_jump_link):
+            out_str_arr.append(f"link: {self.vscode_jump_link}")
+            
+        out_str = '\n'.join(out_str_arr)
+        return out_str
+    
+    @property
+    def longform_description_formatted_html(self) -> str:
+        """HTML-formatted (with bold labels) longform text for use in QTextBrowser via .setHtml(...)"""
+        out_str_arr = []
+
+        if has_good_str_value(self.short_name):
+            out_str_arr.append(f"<b style='color:white;'>short_name</b>: {self.short_name}") # short name first, then
+            out_str_arr.append(f"<b style='color:white;'>name</b>: {self.name}") # full name
+        else:
+            out_str_arr.append(f"<b style='color:white;'>name</b>: {self.name}") # just name
+
+        if has_good_str_value(self.docs):
+            out_str_arr.append(f"<b style='color:white;'>docs</b>: {self.docs}")
+            
+        if has_good_str_value(self.vscode_jump_link):
+            # Create the HTML-formatted link
+            html_link: str = f'<a href="{self.vscode_jump_link}">{self.vscode_jump_link}</a>'
+            out_str_arr.append(f"<b style='color:white;'>link</b>: {html_link}")
+            
+        out_str = '<br>'.join(out_str_arr) # linebreaks with HTML's <br>
+        return out_str
+
+
+
+
 # ==================================================================================================================== #
 # PIPELINE STAGE                                                                                                       #
 # ==================================================================================================================== #
@@ -406,9 +497,8 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             assert len(computation_kwargs_list) == len(computation_functions_name_includelist), f"INITIAL Length mismatch between computation_kwargs_list ({len(computation_kwargs_list)}) and computation_functions_name_includelist ({len(computation_functions_name_includelist)})"
             computation_kwargs_dict = dict(zip(computation_functions_name_includelist, computation_kwargs_list))
             active_computation_functions_dict = self.find_registered_computation_functions(computation_functions_name_includelist, search_mode=FunctionsSearchMode.initFromIsGlobal(are_global), return_found_computation_functions_as_list=False)
-
-
-            active_found_computation_kwargs_list = [computation_kwargs_dict.get(k, (computation_kwargs_dict[getattr(a_computation_fn, 'short_name', a_computation_fn.__name__)])) for k, a_computation_fn in active_computation_functions_dict.items()] ## only the included items -- fallback to shortname if the literal name isn't in there
+            # Try the literal key first, then try the short_name/.__name__ as fallback:
+            active_found_computation_kwargs_list = [computation_kwargs_dict.get(k) or computation_kwargs_dict.get(getattr(a_computation_fn, 'short_name', a_computation_fn.__name__)) for k, a_computation_fn in active_computation_functions_dict.items()] ## only the included items -- fallback to shortname if the literal name isn't in there
             active_found_computation_functions = list(active_computation_functions_dict.values())
             if len(active_found_computation_functions) < len(computation_functions_name_includelist):
                 not_found_computation_functions_names = [k for k in computation_functions_name_includelist if k not in active_found_computation_functions]
@@ -1053,6 +1143,9 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
             computation_kwargs_list = [{} for _ in active_computation_functions]
         assert len(computation_kwargs_list) == len(active_computation_functions), f"Length mismatch: computation_kwargs_list (len: {len(computation_kwargs_list)}, contents: {computation_kwargs_list}) must match active_computation_functions (len: {len(active_computation_functions)}, contents: {active_computation_functions})"
 
+        ## finally, replace all `None` values with empty lists ({}) if no special kwargs are desired, as None will fail when `**computation_kwargs_list[i]` is called if left alone.
+        computation_kwargs_list = [{} if item is None else item for item in computation_kwargs_list]
+
         # computation_times_key_fn = lambda fn: fn
         computation_times_key_fn = lambda fn: str(fn.__name__) # Use only the functions name. I think this makes the .computation_times field picklable
         
@@ -1078,7 +1171,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                 for i, f in enumerate(active_computation_functions):
                     if progress_logger_callback is not None:
                         progress_logger_callback(f'Executing [{i}/{total_num_funcs}]: {f}')
-                    previous_computation_result = f(previous_computation_result, **computation_kwargs_list[i]) # call the function `f` directly here
+                    previous_computation_result = f(previous_computation_result, **computation_kwargs_list[i]) # call the function `f` directly here ## #TODO 2025-02-19 13:51: - [ ] was getting`TypeError: pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.PlacefieldComputations.PlacefieldComputations._perform_baseline_placefield_computation() argument after ** must be a mapping, not NoneType` which I fixed by replacing any None in the list with {}
                     # Log the computation copmlete time:
                     computation_times[computation_times_key_fn(f)] = datetime.now()
                 
@@ -2364,31 +2457,126 @@ class PipelineWithComputedPipelineStageMixin:
         return split_save_folder, split_save_paths, split_save_output_types, failed_keys
 
 
+    @function_attributes(short_name=None, tags=['save', 'pickle', 'custom', 'filename', 'filesystem', 'custom'], input_requires=[], output_provides=[], uses=['save_pipeline', 'save_global_computation_results'], used_by=[], creation_date='2025-02-19 07:18', related_items=[])
+    def try_save_pipeline_with_custom_user_modifiers(self, user_prefix: str = '', user_suffix: str = '', is_dryrun: bool=False) -> Tuple[List[str], bool]:
+        """ tries to save the pipeline with the user-specified custom suffix/prefix 
+
+        Usage:
+            user_custom_modified_filenames, did_save_success = try_save_pipeline_with_custom_user_modifiers(curr_active_pipeline=curr_active_pipeline, user_prefix='', user_suffix='2025-02-19')
+        """
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
+        
+        # @function_attributes(short_name=None, tags=['filesystem', 'custom', 'save', 'pickle', 'user'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-19 07:10', related_items=[])
+        def _build_filepaths_with_user_modifiers(custom_save_filepaths: List[str], user_prefix: str = '', user_suffix: str = '') -> List[str]:
+            """ modifiy paths and return lists of filenames """
+            ## convert to lists if they aren't so they have no effect (don't add uneeded separators like '_' for empty lists):
+            if not isinstance(user_prefix, (list, tuple)):
+                if user_prefix != '':
+                    user_prefix = [user_prefix] # single element list
+                else:
+                    user_prefix = [] ## empty so no effect	
+
+            if not isinstance(user_suffix, (list, tuple)):
+                if user_suffix != '':
+                    user_suffix = [user_suffix] # single element list
+                else:
+                    user_suffix = [] ## empty so no effect
+
+
+            user_custom_modified_filepaths = {k:Path(v).resolve() for k, v in custom_save_filepaths.items()} ## convert to real paths
+            user_custom_modified_filestems = {k:'_'.join([*user_prefix, f"{v.stem}", *user_suffix]) for k, v in user_custom_modified_filepaths.items()}
+            user_custom_modified_filenames = {k:v.resolve().with_stem(user_custom_modified_filestems[k]).name for k, v in user_custom_modified_filepaths.items()}
+            return user_custom_modified_filenames
+
+        # @function_attributes(short_name=None, tags=['filesystem', 'save', 'write', 'pickle', 'pipeline', 'custom'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-19 07:11', related_items=['_build_filepaths_with_user_modifiers'])
+        def _try_user_custom_save_pipeline(curr_active_pipeline, user_custom_modified_filenames):
+            """ tries to save the pipeline 
+            captures: is_dryrun
+            """
+            try:
+                print(f'trying to save the pipeline with custom filename: {user_custom_modified_filenames["pipeline_pkl"]}...')
+                # curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, override_pickle_path=curr_active_pipeline.pickle_path, active_pickle_filename='loadedSessPickle_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0_2025-01-20.pkl') #active_pickle_filename=
+                if not is_dryrun:
+                    curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, active_pickle_filename=user_custom_modified_filenames['pipeline_pkl']) #active_pickle_filename=    
+                else:
+                    print(f'\tis_dryrun == True, so not actually saving.')
+            except Exception as e:
+                print(f'ERROR: failed saving with exception: {e}.\n\t !! Aborting and not continuing to try and save global.')
+                # raise
+                return False
+            
+            try:
+                print(f'trying to save the global computations pipeline with custom filename: {user_custom_modified_filenames["global_computation_pkl"]}...')
+                if not is_dryrun:
+                    curr_active_pipeline.save_global_computation_results(override_global_pickle_filename=user_custom_modified_filenames['global_computation_pkl'])
+                else:
+                    print(f'\tis_dryrun == True, so not actually saving.')
+            except Exception as e:
+                print(f'ERROR: failed saving global_comps with exception: {e}')
+                # raise
+                return False
+            
+            return True
+
+        # ==================================================================================================================== #
+        # BEGIN FUNCTION BODY                                                                                                  #
+        # ==================================================================================================================== #
+        custom_save_filepaths, custom_save_filenames, custom_suffix = self.get_custom_pipeline_filenames_from_parameters()
+        user_custom_modified_filenames = _build_filepaths_with_user_modifiers(custom_save_filepaths=custom_save_filepaths, user_prefix=user_prefix, user_suffix=user_suffix)
+        did_save_success: bool = _try_user_custom_save_pipeline(curr_active_pipeline=self, user_custom_modified_filenames=user_custom_modified_filenames)
+        return (user_custom_modified_filenames, did_save_success)
+
+
+
+
     @function_attributes(short_name=None, tags=['fixup', 'deserialization', 'filesystem', 'post-load', 'cross-platform'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-14 09:41', related_items=[])
-    def post_load_fixup_sess_basedirs(self, updated_session_basepath: Path):
+    def post_load_fixup_sess_basedirs(self, updated_session_basepath: Path, force_update: bool = False) -> bool:
         """ after loading from pickle from another computer, fixes up the session's basepaths so they actually exist.
         
         Updates:
-            self.sess.config.basepath
-            self.filtered_sessions[an_epoch_name].config.basepath
+            self.sess.config.basepath, self.sess.filePrefix
+            self.filtered_sessions[an_epoch_name].config.basepath, self.filtered_sessions[an_epoch_name].filePrefix
             
-        """
-        did_fixup_any_missing_basepath: bool = False
+
+        Usage:
+
+
+            did_fixup_any_missing_basepath = 
+        """                
+        did_fixup_any_missing_path: bool = False
         Assert.path_exists(updated_session_basepath)
-        is_missing_basepath = (not self.sess.basepath.exists())
-        if is_missing_basepath:
-            self.sess.config.basepath = deepcopy(updated_session_basepath)
-            did_fixup_any_missing_basepath = True
+        # Check main session
+        is_missing_basepath: bool = (not self.sess.basepath.exists())
+        if is_missing_basepath or force_update:
+            if self.sess.basepath != updated_session_basepath:
+                self.sess.config.basepath = deepcopy(updated_session_basepath)
+                did_fixup_any_missing_path = True    
+                
+        has_invalid_filePrefix: bool = (self.sess.filePrefix is None) or (not self.sess.filePrefix.parent.exists())
+        if (self.sess.filePrefix is not None) and has_invalid_filePrefix:
+            updated_session_filePrefix = deepcopy(self.sess.basepath).joinpath(self.sess.filePrefix.name)
+            if updated_session_filePrefix != self.sess.filePrefix:
+                self.sess.filePrefix = updated_session_filePrefix.resolve()
+                did_fixup_any_missing_path = True
             
+
+        # Check filtered sessions
         for a_name, a_sess in self.filtered_sessions.items():
             is_missing_basepath = (not a_sess.basepath.exists())
-            if is_missing_basepath:
-                print(f"sess[{a_name}] is missing basepath: {a_sess.basepath}. updating.")
-                a_sess.config.basepath = deepcopy(updated_session_basepath)
-                did_fixup_any_missing_basepath = True
+            if is_missing_basepath or force_update:
+                if a_sess.basepath != updated_session_basepath:
+                    print(f"sess[{a_name}] is missing basepath: {a_sess.basepath}. updating.")
+                    a_sess.config.basepath = deepcopy(updated_session_basepath)
+                    did_fixup_any_missing_path = True
+            has_invalid_filePrefix: bool = (a_sess.filePrefix is None) or (not a_sess.filePrefix.parent.exists())
+            if (a_sess.filePrefix is not None) and has_invalid_filePrefix:
+                updated_session_filePrefix = deepcopy(a_sess.basepath).joinpath(a_sess.filePrefix.name)
+                if updated_session_filePrefix != a_sess.filePrefix:
+                    a_sess.filePrefix = updated_session_filePrefix.resolve()
+                    did_fixup_any_missing_path = True
+                    
         ## END for a_name, a_se...
-        
-        return did_fixup_any_missing_basepath               
+        return did_fixup_any_missing_path               
 
 
     
