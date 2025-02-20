@@ -48,6 +48,33 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 # from neuropy.analyses.placefields import perform_compute_placefields
 
 """-------------- Specific Computation Functions to be registered --------------"""
+""" 2025-02-20 08:55 Renamed 'subdivide' -> 'frame_divide', 'subdivision' -> 'frame_division' throughout my recent non-PBE-related functions for clearity. 
+
+# ==================================================================================================================== #
+# In EpochComputationFunctions.py:                                                                                     #
+# ==================================================================================================================== #
+# Direct variable renames:
+subdivided_epochs_results -> frame_divided_epochs_results
+subdivided_epochs_df -> frame_divided_epochs_df
+global_subivided_epochs_obj -> global_frame_divided_epochs_obj
+global_subivided_epochs_df -> global_frame_divided_epochs_df
+subdivided_epochs_specific_decoded_results_dict -> frame_divided_epochs_specific_decoded_results_dict
+
+# Function/parameter renames:
+subdivide_bin_size -> frame_divide_bin_size
+min_subdivision_resolution -> min_frame_division_resolution
+actual_subdivision_step_size -> actual_frame_division_step_size
+num_subdivisions -> num_frame_divisions
+
+
+
+# ==================================================================================================================== #
+# In decoder_plotting_mixins.py:                                                                                       #
+# ==================================================================================================================== #
+subdivide_bin_size -> frame_divide_bin_size
+
+"""
+
 # [/c:/Users/pho/repos/Spike3DWorkEnv/NeuroPy/neuropy/core/session/Formats/Specific/KDibaOldDataSessionFormat.py:142](vscode://file/c:/Users/pho/repos/Spike3DWorkEnv/NeuroPy/neuropy/core/session/Formats/Specific/KDibaOldDataSessionFormat.py:142)
 # ```python
 #     @classmethod
@@ -658,7 +685,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
         df['maze_name'] = 'global'
         # df['interval_type_id'] = 666
 
-        frame_divided_df: pd.DataFrame = frame_divide_epochs(df, frame_divide_bin_size)
+        frame_divided_df: pd.DataFrame = subdivide_epochs(df, frame_divide_bin_size)
         frame_divided_df['label'] = deepcopy(frame_divided_df.index.to_numpy())
         frame_divided_df['stop'] = frame_divided_df['stop'] - 1e-12
         global_frame_divided_epochs_obj = ensure_Epoch(frame_divided_df)
@@ -901,6 +928,7 @@ def estimate_memory_requirements(epochs_decoding_time_bin_size: float, frame_div
         'posterior': (n_max_decoded_bins * n_flattened_position_bins) * bytes_per_float,
         'posterior_intermediate_computation': (n_max_decoded_bins * n_flattened_position_bins * n_neurons) * bytes_per_float, 
         'occupancy': n_flattened_position_bins * bytes_per_float, 
+        'worst_case_scenario': (n_max_decoded_bins * n_flattened_position_bins * n_neurons * n_maze_contexts) * bytes_per_float, 
     }
     
     # Account for multiple maze contexts

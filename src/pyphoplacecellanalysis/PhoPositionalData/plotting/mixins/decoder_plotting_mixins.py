@@ -118,6 +118,19 @@ class SingleArtistMultiEpochBatchHelpers:
 
         curr_artist_dict, image_extent, plots_data = batch_plot_helper.add_position_posteriors(posterior_masking_value=0.0025, override_ax=None, debug_print=True, defer_draw=False)
 
+    
+    History 2025-02-20 08:58:
+        # In EpochComputationFunctions.py:
+        subdivided_epochs_results -> frame_divided_epochs_results
+        subdivided_epochs_df -> frame_divided_epochs_df
+        global_subivided_epochs_obj -> global_frame_divided_epochs_obj 
+        global_subivided_epochs_df -> global_frame_divided_epochs_df
+        subdivided_epochs_specific_decoded_results_dict -> frame_divided_epochs_specific_decoded_results_dict
+
+        # In decoder_plotting_mixins.py:
+        subdivide_bin_size -> frame_divide_bin_size
+
+
     """
     results2D: "NonPBEDimensionalDecodingResult" = field()
 
