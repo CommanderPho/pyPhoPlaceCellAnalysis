@@ -855,6 +855,63 @@ def validate_has_non_PBE_epoch_results(curr_active_pipeline, computation_filter_
     # _computationPrecidence = 2 # must be done after PlacefieldComputations, DefaultComputationFunctions
     # _is_global = False
 
+from pyphocorehelpers.programming_helpers import MemoryManagement # used in `EpochComputationFunctions.perform_compute_non_PBE_epochs`
+
+
+
+
+def estimate_memory_requirements(epochs_decoding_time_bin_size: float, subdivide_bin_size: float, n_flattened_position_bins: Optional[int]=None, n_neurons: Optional[int]=None, session_duration: Optional[float]=None, n_maze_contexts: int=9) -> Tuple[int, dict]:
+    """Estimates memory requirements for non-PBE epoch computations
+    
+    Args:
+        epochs_decoding_time_bin_size (float): Size of each decoding time bin in seconds
+        subdivide_bin_size (float): Size of subdivision bins in seconds
+        n_neurons (int, optional): Number of neurons
+        session_duration (float, optional): Duration in seconds
+        n_maze_contexts (int): Number of maze contexts to process (default 9)
+    
+    Returns:
+        Tuple[int, dict]: (Total estimated bytes, Detailed memory breakdown dictionary)
+        
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import estimate_memory_requirements
+        
+    History:
+        'subdivide' -> 'frame_divide'
+        'n_subdivided_bins' -> 'n_frame_divided_bins'
+    """
+    # Default values if not provided
+    if n_neurons is None:
+        n_neurons = 100  # Conservative default
+    if session_duration is None:
+        session_duration = 3600  # Default 1 hour
+
+    # Calculate array dimensions
+    n_time_bins = int(np.ceil(session_duration / epochs_decoding_time_bin_size))
+    n_frame_divided_bins = int(np.ceil(session_duration / subdivide_bin_size))
+    
+    n_max_decoded_bins: int = max(n_time_bins, n_frame_divided_bins)
+    bytes_per_float = 8  # float64
+    
+    # Calculate memory for each major array type
+    memory_breakdown = {
+        'spike_counts': (n_time_bins * n_neurons) * bytes_per_float,
+        'firing_rates': (n_max_decoded_bins * n_neurons) * bytes_per_float, 
+        'position_decoded': (n_max_decoded_bins * 2) * bytes_per_float,  
+        'posterior': (n_max_decoded_bins * n_flattened_position_bins) * bytes_per_float,
+        'posterior_intermediate_computation': (n_max_decoded_bins * n_flattened_position_bins * n_neurons) * bytes_per_float, 
+        'occupancy': n_flattened_position_bins * bytes_per_float, 
+    }
+    
+    # Account for multiple maze contexts
+    total_memory = sum(memory_breakdown.values()) * n_maze_contexts
+    
+    # Add 20% overhead for temporary arrays and computations
+    total_memory_with_overhead = int(total_memory * 1.2)
+    
+    return total_memory_with_overhead, memory_breakdown
+
+
 # 'epoch_computations', '
 class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     _computationGroupName = 'epoch_computations'
@@ -881,64 +938,86 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
 
 
         """
-        if include_includelist is not None:
-            print(f'WARN: perform_compute_non_PBE_epochs(...): include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
-
         print(f'perform_compute_non_PBE_epochs(..., training_data_portion={training_data_portion}, epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}, subdivide_bin_size: {subdivide_bin_size})')
         
-        long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
+        long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()        
+        try:
+            available_MB: int = MemoryManagement.get_available_system_memory_MB() # Get available memory in MegaBytes
+            available_GB: int = available_MB / 1024  # Gigabytes
+            print(f'available RAM: {available_GB:.2f} GB')
 
-        # Needs to store the parameters
-        # num_shuffles:int=1000
-        # minimum_inclusion_fr_Hz:float=12.0
-        # included_qclu_values=[1,2]
+            # Estimate memory requirements
+            # active_sess = owning_pipeline_reference.sess
+            active_sess = owning_pipeline_reference.filtered_sessions[global_epoch_name]
+            active_pf2D = computation_results[global_epoch_name].computed_data.pf2D
+            n_flattened_position_bins: int = active_pf2D.n_flattened_position_bins            
 
-        if drop_previous_result_and_compute_fresh:
-            removed_epoch_computations_result = global_computation_results.computed_data.pop('EpochComputations', None)
-            if removed_epoch_computations_result is not None:
-                print(f'removed previous "EpochComputations" result and computing fresh since `drop_previous_result_and_compute_fresh == True`')
+            required_memory, breakdown = estimate_memory_requirements(epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, subdivide_bin_size=subdivide_bin_size, n_flattened_position_bins=n_flattened_position_bins, n_neurons=active_sess.neurons.n_neurons, session_duration=active_sess.duration)
+            required_memory_GB: int = required_memory / 1e9 # Gigabytes
+            print(f"Total memory required: {required_memory_GB:.2f} GB")
+            print("Memory breakdown (GB):")
+            for k, v in breakdown.items():
+                print(f"\t{k}: {v/1e9:.3f}")
+                
+            if required_memory_GB > available_GB:
+                raise MemoryError(f"Estimated Insufficient Memory: Operation would require {required_memory_GB:.2f} GB (have {available_GB:.2f} GB available.")
+                # return global_computation_results
+                
+            # ==================================================================================================================== #
+            # Proceed with computation                                                                                             #
+            # ==================================================================================================================== #
+            if include_includelist is not None:
+                print(f'WARN: perform_compute_non_PBE_epochs(...): include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
 
+            if drop_previous_result_and_compute_fresh:
+                removed_epoch_computations_result = global_computation_results.computed_data.pop('EpochComputations', None)
+                if removed_epoch_computations_result is not None:
+                    print(f'removed previous "EpochComputations" result and computing fresh since `drop_previous_result_and_compute_fresh == True`')
 
-        if ('EpochComputations' not in global_computation_results.computed_data) or (not hasattr(global_computation_results.computed_data, 'EpochComputations')):
-            # initialize
-            global_computation_results.computed_data['EpochComputations'] = EpochComputationsComputationsContainer(training_data_portion=training_data_portion, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, subdivide_bin_size=subdivide_bin_size,
-                                                                                                                   a_new_NonPBE_Epochs_obj=None, results1D=None, results2D=None, is_global=True)
+            if ('EpochComputations' not in global_computation_results.computed_data) or (not hasattr(global_computation_results.computed_data, 'EpochComputations')):
+                # initialize
+                global_computation_results.computed_data['EpochComputations'] = EpochComputationsComputationsContainer(training_data_portion=training_data_portion, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, subdivide_bin_size=subdivide_bin_size,
+                                                                                                                    a_new_NonPBE_Epochs_obj=None, results1D=None, results2D=None, is_global=True)
 
-        # global_computation_results.computed_data['EpochComputations'].included_qclu_values = included_qclu_values
-        if (not hasattr(global_computation_results.computed_data['EpochComputations'], 'a_new_NonPBE_Epochs_obj') or (global_computation_results.computed_data['EpochComputations'].a_new_NonPBE_Epochs_obj is None)):
-            # initialize a new wcorr result
-            a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = Compute_NonPBE_Epochs.init_from_pipeline(curr_active_pipeline=owning_pipeline_reference, training_data_portion=training_data_portion)
+            else:
+                ## get and update existing:
+                global_computation_results.computed_data['EpochComputations'].training_data_portion = training_data_portion
+                global_computation_results.computed_data['EpochComputations'].epochs_decoding_time_bin_size = epochs_decoding_time_bin_size
+                global_computation_results.computed_data['EpochComputations'].subdivide_bin_size = subdivide_bin_size
+                global_computation_results.computed_data['EpochComputations'].a_new_NonPBE_Epochs_obj = None
+                
+
+            # global_computation_results.computed_data['EpochComputations'].included_qclu_values = included_qclu_values
+            if (not hasattr(global_computation_results.computed_data['EpochComputations'], 'a_new_NonPBE_Epochs_obj') or (global_computation_results.computed_data['EpochComputations'].a_new_NonPBE_Epochs_obj is None)):
+                # initialize a new wcorr result
+                a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = Compute_NonPBE_Epochs.init_from_pipeline(curr_active_pipeline=owning_pipeline_reference, training_data_portion=training_data_portion)
+                global_computation_results.computed_data['EpochComputations'].a_new_NonPBE_Epochs_obj = a_new_NonPBE_Epochs_obj
+            else:
+                ## get the existing one:
+                a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = global_computation_results.computed_data['EpochComputations'].a_new_NonPBE_Epochs_obj
+            
+            ## apply the new epochs to the session:
+            owning_pipeline_reference.filtered_sessions[global_epoch_name].non_PBE = deepcopy(a_new_NonPBE_Epochs_obj.global_epoch_only_non_PBE_epoch_df)
+
+            results1D, results2D = a_new_NonPBE_Epochs_obj.compute_all(owning_pipeline_reference, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, subdivide_bin_size=subdivide_bin_size, compute_1D=compute_1D, compute_2D=compute_2D)
+            if (results1D is not None) and compute_1D:
+                global_computation_results.computed_data['EpochComputations'].results1D = results1D
+
+            if (results2D is not None) and compute_2D:
+                global_computation_results.computed_data['EpochComputations'].results2D = results2D
+                
             global_computation_results.computed_data['EpochComputations'].a_new_NonPBE_Epochs_obj = a_new_NonPBE_Epochs_obj
-        else:
-            ## get the existing one:
-            a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = global_computation_results.computed_data['EpochComputations'].a_new_NonPBE_Epochs_obj
-        
-        ## apply the new epochs to the session:
-        owning_pipeline_reference.filtered_sessions[global_epoch_name].non_PBE = deepcopy(a_new_NonPBE_Epochs_obj.global_epoch_only_non_PBE_epoch_df)
-
-        results1D, results2D = a_new_NonPBE_Epochs_obj.compute_all(owning_pipeline_reference, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, subdivide_bin_size=subdivide_bin_size, compute_1D=compute_1D, compute_2D=compute_2D)
-        if (results1D is not None) and compute_1D:
-            global_computation_results.computed_data['EpochComputations'].results1D = results1D
-
-        if (results2D is not None) and compute_2D:
-            global_computation_results.computed_data['EpochComputations'].results2D = results2D
             
-
-        global_computation_results.computed_data['EpochComputations'].a_new_NonPBE_Epochs_obj = a_new_NonPBE_Epochs_obj
+        except MemoryError as mem_err:
+            print(f"Insufficient memory: {str(mem_err)}")
+            raise 
+            # raise MemoryError(f"Insufficient memory: {str(mem_err)}")
         
+        except Exception as e:
+            raise
+            # return None, f"Computation failed: {str(e)}"
 
-        """ Usage:
         
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.EpochComputationsComputations import WCorrShuffle, EpochComputationsComputationsContainer
-
-        wcorr_shuffle_results: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data.get('EpochComputations', None)
-        if wcorr_shuffle_results is not None:    
-            wcorr_ripple_shuffle: WCorrShuffle = wcorr_shuffle_results.wcorr_ripple_shuffle
-            print(f'wcorr_ripple_shuffle.n_completed_shuffles: {wcorr_ripple_shuffle.n_completed_shuffles}')
-        else:
-            print(f'EpochComputations is not computed.')
-            
-        """
         return global_computation_results
     
 
