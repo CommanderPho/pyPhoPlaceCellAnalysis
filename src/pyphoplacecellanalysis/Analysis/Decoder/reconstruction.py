@@ -1751,8 +1751,11 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         
         NOTE: Uses active_decoder.decode(...) to actually do the decoding
         
-        NOTE: when `enable_slow_debugging_time_bin_validation==True, this function takes more than twice as long due to a deepcopy!
-        
+        NOTE 2025-02-29: when `enable_slow_debugging_time_bin_validation==True`, this function takes more than twice as long due to a deepcopy!
+        """ 
+        """ NOTE 2025-02-20 09:40: even when ``enable_slow_debugging_time_bin_validation==False`, this function takes forever because it prints a ton of statements. 
+        ERROR: epochs_spkcount(...): epoch[559], nbins[559]: 1 - TODO 2024-08-07 19:11: Building BinningContainer for epoch with fewer than 2 edges (occurs when epoch duration is shorter than the bin size). Using the epoch.start, epoch.stop as the two edges (giving a single bin) but this might be off and cause problems, as they are the edges of the epoch but maybe not "real" edges?
+	    ERROR (cont.): even after this hack `slide_view` is not updated, so the returned spkcount is not valid and has the old (wrong, way too many) number of bins. This results in decoded posteriors/postitions/etc with way too many bins downstream. see `SOLUTION 2024-08-07 20:08: - [ ] Recompute the Invalid Quantities with the known correct number of time bins` for info.
         """
         # Looks like we're iterating over each epoch in filter_epochs:
         ## Validate the list lengths for the zip:
