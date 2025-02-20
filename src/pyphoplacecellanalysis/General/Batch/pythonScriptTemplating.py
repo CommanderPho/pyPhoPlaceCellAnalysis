@@ -182,7 +182,7 @@ class ProcessingScriptPhases(Enum):
             'directional_decoders_decode_continuous',
             'directional_decoders_evaluate_epochs',
             'directional_decoders_epoch_heuristic_scoring',
-            'non_PBE_epochs_results', # #TODO 2025-02-18 20:15: - [ ] Added to compute the new non_PBE results
+            # 'non_PBE_epochs_results', # #TODO 2025-02-18 20:15: - [ ] Added to compute the new non_PBE results
         ]
 
         phase3_extended_computations_include_includelist=['lap_direction_determination', 'pf_computation', 
@@ -203,6 +203,7 @@ class ProcessingScriptPhases(Enum):
             'directional_decoders_epoch_heuristic_scoring',
             'extended_pf_peak_information',
             'perform_wcorr_shuffle_analysis',
+            # 'non_PBE_epochs_results', #TODO 2025-02-19 21:29: - [ ] Not fully working due to memory errors on Apogee at least
         ]
 
         _out_run_config = {}
