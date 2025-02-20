@@ -271,6 +271,8 @@ class Compute_NonPBE_Epochs(ComputedResult):
     # a_new_global_training_df: pd.DataFrame = serialized_field()
     # a_new_global_test_df: pd.DataFrame = serialized_field()
 
+    skip_training_test_split: bool = serialized_attribute_field(default=False)
+
     a_new_training_df_dict: Dict[types.DecoderName, pd.DataFrame] = serialized_field()
     a_new_test_df_dict: Dict[types.DecoderName, pd.DataFrame] = serialized_field()
     
@@ -514,7 +516,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
     
 
     @classmethod
-    def init_from_pipeline(cls, curr_active_pipeline, training_data_portion: float = 5.0/6.0):
+    def init_from_pipeline(cls, curr_active_pipeline, training_data_portion: float = 5.0/6.0, skip_training_test_split: bool=True):
         a_new_training_df_dict, a_new_test_df_dict, (global_epoch_only_non_PBE_epoch_df, a_new_global_training_df, a_new_global_test_df) = cls._adding_global_non_PBE_epochs(curr_active_pipeline, training_data_portion=training_data_portion)
         
         t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
@@ -523,7 +525,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
         # single_global_epoch_df['label'] = single_global_epoch_df.index.to_numpy()
         # single_global_epoch: Epoch = Epoch(self.single_global_epoch_df)
         
-        _obj = cls(single_global_epoch_df=single_global_epoch_df, global_epoch_only_non_PBE_epoch_df=global_epoch_only_non_PBE_epoch_df, a_new_training_df_dict=a_new_training_df_dict, a_new_test_df_dict=a_new_test_df_dict)
+        _obj = cls(single_global_epoch_df=single_global_epoch_df, global_epoch_only_non_PBE_epoch_df=global_epoch_only_non_PBE_epoch_df, a_new_training_df_dict=a_new_training_df_dict, a_new_test_df_dict=a_new_test_df_dict, skip_training_test_split=skip_training_test_split)
         return _obj
 
     def __attrs_post_init__(self):
@@ -536,7 +538,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
         pass
     
 
-    def recompute(self, curr_active_pipeline, pfND_ndim: int = 2, epochs_decoding_time_bin_size: float = 0.025):
+    def recompute(self, curr_active_pipeline, pfND_ndim: int = 2, epochs_decoding_time_bin_size: float = 0.025, skip_training_test_split: bool = False):
         """ For a specified decoding time_bin_size and ndim (1D or 2D), copies the global pfND, builds new epoch objects, then decodes both train_test and continuous epochs
         
         
@@ -561,7 +563,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
         long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
         long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name].computed_data for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
         long_computation_config, short_computation_config, global_computation_config = [curr_active_pipeline.computation_results[an_epoch_name].computation_config for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        
+        long_session.non_pbe
         if pfND_ndim == 1:
              ## Uses 1D Placefields
             print(f'Uses 1D Placefields')
@@ -570,6 +572,12 @@ class Compute_NonPBE_Epochs(ComputedResult):
             ## Uses 2D Placefields
             print(f'Uses 2D Placefields')
             long_pfND, short_pfND, global_pfND = long_results.pf2D, short_results.pf2D, global_results.pf2D
+            # long_pfND_decoder, short_pfND_decoder, global_pfND_decoder = long_results.pf2D_Decoder, short_results.pf2D_Decoder, global_results.pf2D_Decoder
+
+
+        non_directional_names_to_default_epoch_names_map = dict(zip(['long', 'short', 'global'], [long_epoch_name, short_epoch_name, global_epoch_name]))
+        
+        original_pfs_dict: Dict[types.DecoderName, PfND] = {'long': deepcopy(long_pfND), 'short': deepcopy(short_pfND), 'global': deepcopy(global_pfND)} ## Uses ND Placefields
 
         # t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
         # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
@@ -587,35 +595,43 @@ class Compute_NonPBE_Epochs(ComputedResult):
         # global_pf1D_dt: PfND_TimeDependent = global_results.pf1D_dt
         # global_pf2D_dt: PfND_TimeDependent = global_results.pf2D_dt
 
-        ## extract values:
-        a_new_training_df_dict = self.a_new_training_df_dict
-        # a_new_training_epoch_obj_dict: Dict[types.DecoderName, Epoch] = self.a_new_training_epoch_obj_dict
-        a_new_testing_epoch_obj_dict: Dict[types.DecoderName, Epoch] = self.a_new_testing_epoch_obj_dict
-
-        ## INPUTS: (a_new_training_df_dict, a_new_testing_epoch_obj_dict), (a_new_test_df_dict, a_new_testing_epoch_obj_dict)
-        # original_pos_dfs_dict: Dict[types.DecoderName, pd.DataFrame] = {'long': deepcopy(long_session.position.to_dataframe()), 'short': deepcopy(short_session.position.to_dataframe()), 'global': deepcopy(global_session.position.to_dataframe())}
-        # original_pfs_dict: Dict[str, PfND] = {'long_any': deepcopy(long_pf1D_dt), 'short_any': deepcopy(short_pf1D_dt), 'global': deepcopy(global_pf1D_dt)}  ## Uses 1Ddt Placefields
-
-        original_pfs_dict: Dict[types.DecoderName, PfND] = {'long': deepcopy(long_pfND), 'short': deepcopy(short_pfND), 'global': deepcopy(global_pfND)} ## Uses ND Placefields
-
         # Build new Decoders and Placefields _________________________________________________________________________________ #
-        new_decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = {k:BasePositionDecoder(pf=a_pfs).replacing_computation_epochs(epochs=deepcopy(a_new_training_df_dict[k])) for k, a_pfs in original_pfs_dict.items()} ## build new simple decoders
+        if skip_training_test_split:
+            # Non-training, use originals
+            # long_epoch_obj, short_epoch_obj = [Epoch(curr_active_pipeline.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name.removesuffix('_any'))) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]] #TODO 2023-11-10 20:41: - [ ] Issue with getting actual Epochs from sess.epochs for directional laps: emerges because long_epoch_name: 'maze1_any' and the actual epoch label in curr_active_pipeline.sess.epochs is 'maze1' without the '_any' part.
+            # assert short_epoch_obj.n_epochs > 0, f'long_epoch_obj: {long_epoch_obj}, short_epoch_obj: {short_epoch_obj}'
+            # assert long_epoch_obj.n_epochs > 0, f'long_epoch_obj: {long_epoch_obj}, short_epoch_obj: {short_epoch_obj}'
+            new_decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = {a_name:BasePositionDecoder(pf=a_pfs).replacing_computation_epochs(epochs=deepcopy(curr_active_pipeline.filtered_sessions[non_directional_names_to_default_epoch_names_map[a_name]].non_pbe)) for a_name, a_pfs in original_pfs_dict.items()} ## build new simple decoders
+            # new_decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = {an_epoch_name:BasePositionDecoder(pf=a_pfs).replacing_computation_epochs(epochs=deepcopy(curr_active_pipeline.filtered_sessions[f"{an_epoch_name}_any"].non_pbe)) for an_epoch_name, a_pfs in original_pfs_dict.items()} ## build new simple decoders
+
+            
+        else:
+            ## extract values:
+            a_new_training_df_dict = self.a_new_training_df_dict
+            a_new_testing_epoch_obj_dict: Dict[types.DecoderName, Epoch] = self.a_new_testing_epoch_obj_dict
+            ## INPUTS: (a_new_training_df_dict, a_new_testing_epoch_obj_dict), (a_new_test_df_dict, a_new_testing_epoch_obj_dict)
+            new_decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = {a_name:BasePositionDecoder(pf=a_pfs).replacing_computation_epochs(epochs=deepcopy(a_new_training_df_dict[a_name])) for a_name, a_pfs in original_pfs_dict.items()} ## build new simple decoders
+
+
         new_pfs_dict: Dict[types.DecoderName, PfND] =  {k:deepcopy(a_new_decoder.pf) for k, a_new_decoder in new_decoder_dict.items()}  ## Uses 2D Placefields
         ## OUTPUTS: new_decoder_dict, new_pfs_dict
 
         ## INPUTS: (a_new_training_df_dict, a_new_testing_epoch_obj_dict), (new_decoder_dict, new_pfs_dict)
 
         ## Do Decoding of only the test epochs to validate performance
-        test_epoch_specific_decoded_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {a_name:a_new_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), filter_epochs=deepcopy(a_new_testing_epoch_obj_dict[a_name]), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False) for a_name, a_new_decoder in new_decoder_dict.items()}
+        if skip_training_test_split:
+            test_epoch_specific_decoded_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {}
+        else:
+            test_epoch_specific_decoded_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {a_name:a_new_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), filter_epochs=deepcopy(a_new_testing_epoch_obj_dict[a_name]), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False) for a_name, a_new_decoder in new_decoder_dict.items()}
 
-        ## Do Continuous Decoding (for all time (`single_global_epoch`), using the decoder from each epoch)
+        ## Do Continuous Decoding (for all time (`single_global_epoch`), using the decoder from each epoch) -- slowest dict comp
         continuous_specific_decoded_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {a_name:a_new_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), filter_epochs=deepcopy(single_global_epoch), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False) for a_name, a_new_decoder in new_decoder_dict.items()}
 
         return test_epoch_specific_decoded_results_dict, continuous_specific_decoded_results_dict, new_decoder_dict, new_pfs_dict
 
 
     @function_attributes(short_name=None, tags=['MAIN', 'compute'], input_requires=[], output_provides=[], uses=['self.__class__.build_frame_divided_epochs(...)'], used_by=[], creation_date='2025-02-18 09:40', related_items=[])
-    def compute_all(self, curr_active_pipeline, epochs_decoding_time_bin_size: float = 0.025, frame_divide_bin_size: float = 0.5, compute_1D: bool = True, compute_2D: bool = True) -> Tuple[Optional[NonPBEDimensionalDecodingResult], Optional[NonPBEDimensionalDecodingResult]]:
+    def compute_all(self, curr_active_pipeline, epochs_decoding_time_bin_size: float = 0.025, frame_divide_bin_size: float = 0.5, compute_1D: bool = True, compute_2D: bool = True, skip_training_test_split: Optional[bool] = None) -> Tuple[Optional[NonPBEDimensionalDecodingResult], Optional[NonPBEDimensionalDecodingResult]]:
         """ computes all pfs, decoders, and then performs decodings on both continuous and subivided epochs.
         
         ## OUTPUTS: global_continuous_decoded_epochs_result2D, a_continuous_decoded_result2D, p_x_given_n2D
@@ -635,14 +651,19 @@ class Compute_NonPBE_Epochs(ComputedResult):
         """
         # from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
-        
+
+        if skip_training_test_split is not None:
+            self.skip_training_test_split = skip_training_test_split ## override existing
+        else:
+            skip_training_test_split = self.skip_training_test_split
+
         # Build frame_divided epochs first since they're needed for both 1D and 2D
         (global_frame_divided_epochs_obj, global_frame_divided_epochs_df), global_pos_df = self.__class__.build_frame_divided_epochs(curr_active_pipeline, frame_divide_bin_size=frame_divide_bin_size)
         
         results1D, results2D = None, None
         
         if compute_1D:
-            test_epoch_specific_decoded_results1D_dict, continuous_specific_decoded_results1D_dict, new_decoder1D_dict, new_pf1Ds_dict = self.recompute(curr_active_pipeline=curr_active_pipeline, pfND_ndim=1, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size)
+            test_epoch_specific_decoded_results1D_dict, continuous_specific_decoded_results1D_dict, new_decoder1D_dict, new_pf1Ds_dict = self.recompute(curr_active_pipeline=curr_active_pipeline, pfND_ndim=1, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, skip_training_test_split=skip_training_test_split)
             frame_divided_epochs_specific_decoded_results1D_dict = {a_name:a_new_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), filter_epochs=deepcopy(global_frame_divided_epochs_obj), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False) for a_name, a_new_decoder in new_decoder1D_dict.items()}
             results1D = NonPBEDimensionalDecodingResult(ndim=1, 
                 test_epoch_results=test_epoch_specific_decoded_results1D_dict, 
@@ -652,7 +673,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
                 frame_divided_epochs_df=deepcopy(global_frame_divided_epochs_df), pos_df=global_pos_df)
 
         if compute_2D:
-            test_epoch_specific_decoded_results2D_dict, continuous_specific_decoded_results2D_dict, new_decoder2D_dict, new_pf2Ds_dict = self.recompute(curr_active_pipeline=curr_active_pipeline, pfND_ndim=2, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size)
+            test_epoch_specific_decoded_results2D_dict, continuous_specific_decoded_results2D_dict, new_decoder2D_dict, new_pf2Ds_dict = self.recompute(curr_active_pipeline=curr_active_pipeline, pfND_ndim=2, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, skip_training_test_split=skip_training_test_split)
             frame_divided_epochs_specific_decoded_results2D_dict = {a_name:a_new_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), filter_epochs=deepcopy(global_frame_divided_epochs_obj), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False) for a_name, a_new_decoder in new_decoder2D_dict.items()}
             results2D = NonPBEDimensionalDecodingResult(ndim=2, 
                 test_epoch_results=test_epoch_specific_decoded_results2D_dict,
@@ -960,8 +981,8 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
         input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-18 09:45', related_items=[],
         requires_global_keys=[], provides_global_keys=['EpochComputations'],
         validate_computation_test=validate_has_non_PBE_epoch_results, is_global=True)
-    def perform_compute_non_PBE_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, training_data_portion: float=(5.0/6.0), epochs_decoding_time_bin_size: float = 0.020, frame_divide_bin_size:float=0.200,
-                                        compute_1D: bool = True, compute_2D: bool = True, drop_previous_result_and_compute_fresh:bool=False, needs_training_test_split: bool = False):
+    def perform_compute_non_PBE_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, training_data_portion: float=(5.0/6.0), epochs_decoding_time_bin_size: float = 0.020, frame_divide_bin_size:float=5.0,
+                                        compute_1D: bool = True, compute_2D: bool = False, drop_previous_result_and_compute_fresh:bool=False, skip_training_test_split: bool = True):
         """ Performs the computation of the spearman and pearson correlations for the ripple and lap epochs.
 
         Requires:
@@ -1028,7 +1049,7 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
             # global_computation_results.computed_data['EpochComputations'].included_qclu_values = included_qclu_values
             if (not hasattr(global_computation_results.computed_data['EpochComputations'], 'a_new_NonPBE_Epochs_obj') or (global_computation_results.computed_data['EpochComputations'].a_new_NonPBE_Epochs_obj is None)):
                 # initialize a new wcorr result
-                a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = Compute_NonPBE_Epochs.init_from_pipeline(curr_active_pipeline=owning_pipeline_reference, training_data_portion=training_data_portion)
+                a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = Compute_NonPBE_Epochs.init_from_pipeline(curr_active_pipeline=owning_pipeline_reference, training_data_portion=training_data_portion, skip_training_test_split=skip_training_test_split)
                 global_computation_results.computed_data['EpochComputations'].a_new_NonPBE_Epochs_obj = a_new_NonPBE_Epochs_obj
             else:
                 ## get the existing one:
@@ -1037,7 +1058,7 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
             ## apply the new epochs to the session:
             owning_pipeline_reference.filtered_sessions[global_epoch_name].non_PBE = deepcopy(a_new_NonPBE_Epochs_obj.global_epoch_only_non_PBE_epoch_df)
 
-            results1D, results2D = a_new_NonPBE_Epochs_obj.compute_all(owning_pipeline_reference, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, frame_divide_bin_size=frame_divide_bin_size, compute_1D=compute_1D, compute_2D=compute_2D)
+            results1D, results2D = a_new_NonPBE_Epochs_obj.compute_all(owning_pipeline_reference, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, frame_divide_bin_size=frame_divide_bin_size, compute_1D=compute_1D, compute_2D=compute_2D, skip_training_test_split=skip_training_test_split)
             if (results1D is not None) and compute_1D:
                 global_computation_results.computed_data['EpochComputations'].results1D = results1D
 
