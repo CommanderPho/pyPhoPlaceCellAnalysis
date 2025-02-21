@@ -101,6 +101,8 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         variable_name = 'x',
         
         """
+        from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
+    
         # print(f'_display_plot_marginal_1D_most_likely_position_comparisons(...): active_config: {active_config}, kwargs: {kwargs}')
         
         active_decoder = computation_result.computed_data['pf2D_Decoder']
@@ -134,6 +136,24 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
                                                         active_most_likely_positions_1D=active_most_likely_positions,
                                                         **overriding_dict_with(lhs_dict={'ax':None, 'variable_name':variable_name, 'enable_flat_line_drawing':False, 'debug_print': False}, **kwargs))
         
+
+
+        title_string_components: List[str] = ["marginal_1D_most_likely_pos_compare", f"{posterior_name}", f"{variable_name}", f"{most_likely_positions_mode}", "1D Placemaps"]
+        
+        ## try to get context:
+        active_context = kwargs.pop('active_context', None)        
+        if active_context is not None:
+            ## Finally, add the display function to the active context
+            active_display_fn_identifying_ctx = active_context.adding_context('display_fn', display_fn_name='display_plot_marginal_1D_most_likely_position_comparisons')
+            # title_string_components = [active_display_fn_identifying_ctx.get_description(), *title_string_components]
+            optional_margin_kwargs = dict(top_margin=None, left_margin=0.0, right_margin=None, bottom_margin=None)
+        else:
+            active_display_fn_identifying_ctx = None
+            optional_margin_kwargs = dict()
+               
+        ## Sadly properly updating these titles messes up the margins
+        perform_update_title_subtitle(fig=fig, ax=curr_ax, active_context=active_display_fn_identifying_ctx, title_string=' - '.join(title_string_components), use_flexitext_titles=True, **optional_margin_kwargs)
+    
         return fig, curr_ax
 
 
