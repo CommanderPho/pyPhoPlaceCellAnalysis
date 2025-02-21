@@ -596,7 +596,7 @@ class PlottingHelpers:
         
 
         ## INPUTS: ax
-        assert y_bin_labels in [['long_LR', 'long_RL', 'short_LR', 'short_RL'], ['long', 'short'], ['LR', 'RL']], f"y_bin_labels must be one of the known marginal values but instead y_bin_labels: {y_bin_labels}"
+        assert set(y_bin_labels) in [set(['long_LR', 'long_RL', 'short_LR', 'short_RL']), set(['long', 'short']), set(['LR', 'RL'])], f"y_bin_labels must be one of the known marginal values but instead y_bin_labels: {y_bin_labels}"
         
         n_ybins: int = len(y_bin_labels)
         
