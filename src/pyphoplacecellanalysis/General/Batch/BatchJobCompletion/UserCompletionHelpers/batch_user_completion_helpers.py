@@ -2293,7 +2293,18 @@ class PostHocPipelineFixup:
                 # did_change: bool = ((_bak_loaded_track_limits is None) or (_new_loaded_track_limits != _bak_loaded_track_limits))
                 # change_dict[f'filtered_sessions["{a_decoder_name}"]'] = {}
                 # did_loaded_track_limits_change: bool = ((_bak_loaded_track_limits is None) or np.any([np.array(_bak_loaded_track_limits.get(k, [])) != np.array(v) for k, v in _new_loaded_track_limits.items()]))
-                did_loaded_track_limits_change: bool = (((_bak_loaded_track_limits is None) and (_new_loaded_track_limits is not None)) or np.any([_sub_sub_fn_did_potentially_arr_or_None_variable_change(np.array(_bak_loaded_track_limits.get(k, [])), np.array(v)) for k, v in _new_loaded_track_limits.items()]))
+                try:
+                    did_loaded_track_limits_change: bool = (((_bak_loaded_track_limits is None) and (_new_loaded_track_limits is not None)) or np.any([_sub_sub_fn_did_potentially_arr_or_None_variable_change(np.array(_bak_loaded_track_limits.get(k, [])), np.array(v)) for k, v in _new_loaded_track_limits.items()]))
+                                
+                except ValueError as e:
+                    ## something went wrong with the values! Consider them changed.
+                    print(f'\tsomething went wrong with the values, consider them changed!')
+                    did_loaded_track_limits_change: bool = True
+                    pass
+                except Exception as e:
+                    raise
+
+                
                 change_dict[f'filtered_sessions["{a_decoder_name}"].loaded_track_limits'] = did_loaded_track_limits_change
                 if did_loaded_track_limits_change:
                     did_any_change = True
