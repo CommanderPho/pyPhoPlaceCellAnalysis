@@ -56,6 +56,149 @@ from attrs import define, field, Factory, asdict # used for `ComputedResult`
 from neuropy.utils.indexing_helpers import get_values_from_keypaths, set_value_by_keypath, update_nested_dict
 
 
+
+# ==================================================================================================================== #
+# 2025-02-21 - Angular Binning, Transition Matricies, and More                                                         #
+# ==================================================================================================================== #
+
+@function_attributes(short_name=None, tags=['working', 'angular'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-21 00:48', related_items=[])
+def compute_3d_occupancy_map(df, n_x_bins=50, n_y_bins=50, n_dir_bins=8):
+    """Creates a 3D occupancy map with fixed dimensions regardless of observed data
+    
+    Args:
+        df (pd.DataFrame): DataFrame with binned columns
+        n_x_bins (int): Number of x position bins
+        n_y_bins (int): Number of y position bins
+        n_dir_bins (int): Number of head direction bins
+        
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_3d_occupancy_map
+        # 1. Compute the 3D occupancy map
+        # occupancy_map, bin_counts = compute_3d_occupancy_map(global_pos_df)
+
+        occupancy_map, bin_counts = compute_3d_occupancy_map(global_pos_df, n_x_bins=n_xbins, n_y_bins=n_ybins, n_dir_bins=n_dir_bins)
+
+        # Print the shape and counts
+        print(f"Occupancy map shape: {occupancy_map.shape}")
+        print(f"Unique bins per dimension: {bin_counts}")
+
+    """
+    # Create all possible combinations
+    x_bins = range(n_x_bins)
+    y_bins = range(n_y_bins)
+    dir_bins = range(n_dir_bins)
+    
+    # Use crosstab with specific bins to force output size
+    occupancy_map = pd.crosstab(
+        index=[df['binned_x'], df['binned_y']], 
+        columns=df['head_dir_angle_binned'],
+        dropna=False  # Keep all combinations
+    ).reindex(
+        index=pd.MultiIndex.from_product([x_bins, y_bins]),
+        columns=dir_bins,
+        fill_value=0  # Fill missing combinations with 0
+    ).values.reshape(n_x_bins, n_y_bins, n_dir_bins)
+    
+    return occupancy_map, {'x': n_x_bins, 'y': n_y_bins, 'dir': n_dir_bins}
+
+
+
+import numpy as np
+import pandas as pd
+from scipy.sparse import coo_matrix, csr_matrix
+from neuropy.utils.mixins.binning_helpers import get_bin_centers, get_bin_edges
+
+@function_attributes(short_name=None, tags=['sparse', 'transition-matrix', 'N-dimensional', 'binning', 'sparse'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-21 12:35', related_items=[])
+def create_sparse_matrix_from_bins(df: pd.DataFrame, bin_edges_dict: Dict[str, NDArray]) -> Optional[csr_matrix]:
+    """
+    Creates a sparse matrix from a DataFrame, using a dictionary to specify
+    bin edges for each relevant column.
+
+    Args:
+        df: Pandas DataFrame with columns to be binned.
+        bin_edges_dict: Dictionary where keys are column names in `df`
+                           and values are 1D arrays of bin edges for that column.
+
+    Returns:
+        A scipy.sparse.csr_matrix.  Returns None if the input is invalid.
+    """
+
+    # Input validation: Check if all columns in bin_edges_dict exist in df
+    if not all(col in df.columns for col in bin_edges_dict):
+        print("Error: Not all columns in bin_edges_dict are present in the DataFrame.")
+        return None
+    if not bin_edges_dict:
+        print("Error: bin_edges_dict is empty")
+        return None
+
+    # Calculate bin indices for each column
+    indices_dict: Dict[str, NDArray] = {}
+    for col, edges in bin_edges_dict.items():
+        indices_dict[col] = np.digitize(df[col], edges) - 1
+
+    # Determine the dimensionality of the sparse matrix
+    num_dimensions: int = len(bin_edges_dict)
+
+    # Create row and column indices based on dimensionality
+    row_indices: NDArray
+    col_indices: NDArray
+    shape: Tuple[int, int]
+    data_values: NDArray
+
+    if num_dimensions == 1:
+        # 1D case:  Row indices are just the bin indices of the single column
+        col_name: str = list(bin_edges_dict.keys())[0]
+        row_indices = np.zeros(len(df), dtype=int) # all rows are in the 0th "row"
+        col_indices = indices_dict[col_name]
+        shape = (1, len(bin_edges_dict[col_name]) - 1) # 1 row, num_bins columns (edges are one longer than centers)
+        data_values = df[col_name].to_numpy() # Or a constant, like np.ones(len(df))
+
+    elif num_dimensions == 2:
+        # 2D case: Row and column indices from the two columns
+        col_names: List[str] = list(bin_edges_dict.keys())
+        row_indices = indices_dict[col_names[0]]
+        col_indices = indices_dict[col_names[1]]
+        shape = (len(bin_edges_dict[col_names[0]]) - 1, len(bin_edges_dict[col_names[1]]) - 1)
+        # Assuming you want to count occurrences, use ones as data values
+        data_values = np.ones(len(df))
+
+    elif num_dimensions >= 3:
+        # "nD" case (represented as a flattened 2D matrix)
+        col_names = list(bin_edges_dict.keys())
+        row_indices = indices_dict[col_names[0]]  # First column is the row
+        col_indices = np.zeros(len(df), dtype=int)
+
+        # Accumulate column indices, multiplying by the size of each dimension
+        multiplier: int = 1
+        for i in range(1, num_dimensions):
+            col_indices += indices_dict[col_names[i]] * multiplier
+            # Subtract 1 from the length because edges are one element longer than centers
+            multiplier *= (len(bin_edges_dict[col_names[i]]) - 1)
+
+        shape = (len(bin_edges_dict[col_names[0]]) - 1, multiplier)
+        data_values = np.ones(len(df)) # Or a constant, like np.ones(len(df))
+
+    else:
+        print("Error: Invalid number of dimensions (must be 1, 2, or 3+).")
+        return None
+
+    # Remove out-of-bounds indices
+    valid_indices: NDArray[np.bool_] = (row_indices >= 0) & (row_indices < shape[0]) & (col_indices >= 0) & (col_indices < shape[1])
+    row_indices = row_indices[valid_indices]
+    col_indices = col_indices[valid_indices]
+    data_values = data_values[valid_indices]
+
+    # Create the sparse matrix (using coo_matrix for efficient construction)
+    sparse_matrix: coo_matrix = coo_matrix((data_values, (row_indices, col_indices)), shape=shape)
+    return sparse_matrix.tocsr()  # Convert to CSR for efficient row operations
+
+
+
+
+
+
+
+
 # ==================================================================================================================== #
 # 2025-02-14 - Drawing Final 2D Time Snapshots on Track                                                                #
 # ==================================================================================================================== #
