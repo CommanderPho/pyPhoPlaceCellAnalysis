@@ -8038,7 +8038,7 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
 
     @function_attributes(short_name=None, tags=['row', 'posterior'], input_requires=[], output_provides=[], uses=['add_new_matplotlib_render_plot_widget', 'plot_1D_most_likely_position_comparsions'], used_by=['prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs'], creation_date='2024-12-18 08:53', related_items=[])
     @classmethod
-    def _perform_add_new_decoded_posterior_row(cls, curr_active_pipeline, active_2d_plot, a_dock_config, a_decoder_name: str, a_position_decoder: BasePositionDecoder, time_window_centers, a_1D_posterior, extended_dock_title_info: Optional[str]=None):
+    def _perform_add_new_decoded_posterior_row(cls, curr_active_pipeline, active_2d_plot, a_dock_config, a_decoder_name: str, a_position_decoder: BasePositionDecoder, time_window_centers, a_1D_posterior, skip_plotting_measured_positions:bool=False, extended_dock_title_info: Optional[str]=None):
         """ used with `add_pseudo2D_decoder_decoded_epochs` - adds a single decoded row to the matplotlib dynamic output
         
         # a_decoder_name: str = "long_LR"
@@ -8069,11 +8069,9 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         active_bins = deepcopy(a_position_decoder.xbin)
         # time_window_centers = deepcopy(active_decoder.time_window_centers)
         
-
         # active_most_likely_positions = active_marginals.most_likely_positions_1D # Raw decoded positions
         active_most_likely_positions = None
         # active_posterior = active_marginals.p_x_given_n
-
         active_posterior = deepcopy(a_1D_posterior)
         
         # most_likely_positions_mode: 'standard'|'corrected'
@@ -8088,11 +8086,15 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
             # active_cmap = FixedCustomColormaps.get_custom_orange_with_low_values_dropped_cmap()
         )
 
+        ## include meaasured position:
+        measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
+
         ## Actual plotting portion:
-        fig, an_ax = plot_1D_most_likely_position_comparsions(None, time_window_centers=time_window_centers, xbin=active_bins,
+        fig, an_ax = plot_1D_most_likely_position_comparsions(measured_position_df=measured_position_df, time_window_centers=time_window_centers, xbin=active_bins,
                                                                 posterior=active_posterior,
                                                                 active_most_likely_positions_1D=active_most_likely_positions,
-                                                                ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
+                                                                ax=an_ax, variable_name=variable_name, debug_print=True,
+                                                                 enable_flat_line_drawing=False, skip_plotting_measured_positions=skip_plotting_measured_positions,
                                                                 posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
 
         ## Update the params
@@ -8158,12 +8160,11 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         _common_dock_config_kwargs = {'dock_group_names': [cls._build_dock_group_id(extended_dock_title_info=info_string)],
                                                            'showCloseButton': showCloseButton,
                                     }
-        
 
-        
+        skip_plotting_measured_positions: bool = kwargs.pop('skip_plotting_measured_positions', False) # skip measured positions by default
+                
         dock_configs = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, **_common_dock_config_kwargs), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, **_common_dock_config_kwargs),
                         CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, **_common_dock_config_kwargs), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, **_common_dock_config_kwargs))))
-
 
         # Need all_directional_pf1D_Decoder_dict
         output_dict = {}
@@ -8171,7 +8172,7 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         for a_decoder_name, a_1D_posterior in split_pseudo2D_posteriors_dict.items():
             a_dock_config = dock_configs[a_decoder_name]
             _out_tuple = cls._perform_add_new_decoded_posterior_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=a_dock_config, a_decoder_name=a_decoder_name, a_position_decoder=a_pseudo2D_decoder,
-                                                                     time_window_centers=time_window_centers, a_1D_posterior=a_1D_posterior, extended_dock_title_info=info_string)
+                                                                     time_window_centers=time_window_centers, a_1D_posterior=a_1D_posterior, skip_plotting_measured_positions=skip_plotting_measured_positions, extended_dock_title_info=info_string)
             # identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = _out_tuple
             output_dict[a_decoder_name] = _out_tuple
         
