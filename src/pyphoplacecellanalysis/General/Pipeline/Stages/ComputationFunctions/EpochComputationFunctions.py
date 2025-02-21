@@ -986,7 +986,7 @@ class EpochComputationsComputationsContainer(ComputedResult):
 
             pfs: Dict[types.DecoderName, PfND] = {k:deepcopy(v) for k, v in results1D.pfs.items() if k in unique_decoder_names}
             # decoders: Dict[types.DecoderName, BasePositionDecoder] = {k:deepcopy(v) for k, v in results1D.decoders.items() if k in unique_decoder_names}
-            # continuous_decoded_results_dict: Dict[str, DecodedFilterEpochsResult] = {k:deepcopy(v) for k, v in results1D.continuous_results.items() if k in unique_decoder_names}
+            continuous_decoded_results_dict: Dict[str, DecodedFilterEpochsResult] = {k:deepcopy(v) for k, v in results1D.continuous_results.items() if k in unique_decoder_names}
             # DirectionalPseudo2DDecodersResult(
 
             ## Combine the non-directional PDFs and renormalize to get the directional PDF:
@@ -1020,7 +1020,7 @@ class EpochComputationsComputationsContainer(ComputedResult):
             # p_x_given_n.shape # (62, 4, 209389)
 
             ## OUTPUTS: non_PBE_marginal_over_track_ID, time_bin_containers, time_window_centers
-            return non_PBE_all_directional_pf1D_Decoder, pseudo2D_continuous_specific_decoded_result, non_PBE_marginal_over_track_ID, (time_bin_containers, time_window_centers)
+            return non_PBE_all_directional_pf1D_Decoder, pseudo2D_continuous_specific_decoded_result, continuous_decoded_results_dict, non_PBE_marginal_over_track_ID, (time_bin_containers, time_window_centers)
             
 
     # ==================================================================================================================== #
