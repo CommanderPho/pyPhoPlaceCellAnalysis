@@ -137,7 +137,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
                                                         **overriding_dict_with(lhs_dict={'ax':None, 'variable_name':variable_name, 'enable_flat_line_drawing':False, 'debug_print': False}, **kwargs))
         
 
-
+        use_flexitext_titles = kwargs.pop('use_flexitext_titles', False)
         title_string_components: List[str] = ["marginal_1D_most_likely_pos_compare", f"{posterior_name}", f"{variable_name}", f"{most_likely_positions_mode}", "1D Placemaps"]
         
         ## try to get context:
