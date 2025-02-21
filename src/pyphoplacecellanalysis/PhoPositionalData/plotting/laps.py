@@ -38,7 +38,7 @@ fig, axs, laps_pages = plot_lap_trajectories_2d(curr_active_pipeline.sess, curr_
 # ==================================================================================================================== #
 # HELPER FUNCTIONS                                                                                                     #
 # ==================================================================================================================== #
-
+@function_attributes(short_name=None, tags=['matplotlib', 'arrow', 'line2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-21 05:25', related_items=[])
 def _plot_helper_add_arrow(line, position=None, position_mode='rel', direction='right', size=15, color=None):
     """
     add an arrow to a Matplotlib line object, such as a line2D.
@@ -113,6 +113,7 @@ def _plot_helper_add_arrow(line, position=None, position_mode='rel', direction='
         size=size
     )
 
+@function_attributes(short_name=None, tags=['matplotlib', 'span', 'range-slider'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-21 05:25', related_items=[])
 def _plot_helper_add_span_where_ranges(pos_t: np.ndarray, pos_where_even_lap_indicies, pos_where_odd_lap_indicies, curr_ax: plt.axes):
     """ Span_where implementation: Draws colored spans indicating the lap that is active during a given time interval. 
     
@@ -266,7 +267,7 @@ def plot_laps_2d(sess, legacy_plotting_mode=True, **kwargs):
 
 
 
-@function_attributes(short_name=None, tags=['lap','trajectories','3D','pyvista','qt','multiplotter','plotting','paginated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-09 05:13', related_items=[])
+@function_attributes(short_name=None, tags=['lap','trajectories','3D','pyvista','qt','multiplotter','plotting','paginated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-09 05:13', related_items=['plot_lap_trajectories_2d'])
 def plot_lap_trajectories_3d(sess, curr_num_subplots=1, active_page_index=0, included_lap_idxs=None, maximum_fixed_columns:int=5, single_combined_plot=True, lap_start_z = 0.0, lap_id_dependent_z_offset = 1.0, plot_stacked_arena_guides=False, existing_plotter=None, debug_print=False):
     """ Plots a PyVista Qt Multiplotter with either:
         1. several overhead 3D views, each showing a specific lap over the maze in one of its subplots
@@ -437,7 +438,7 @@ def plot_lap_trajectories_3d(sess, curr_num_subplots=1, active_page_index=0, inc
     
     return p, laps_pages
 
-@function_attributes(short_name=None, tags=['lap','trajectories','2D','matplotlib','plotting','paginated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-09 05:13', related_items=[])
+@function_attributes(short_name=None, tags=['lap','trajectories','2D','matplotlib','plotting','paginated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-09 05:13', related_items=['plot_lap_trajectories_3d'])
 def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0):
     """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots
      

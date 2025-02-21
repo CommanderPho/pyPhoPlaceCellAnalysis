@@ -54,7 +54,7 @@ from pyphocorehelpers.geometry_helpers import point_tuple_mid_point, BoundsRect,
 
 from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.EpochRenderTimebinSelectorWidget.EpochRenderTimebinSelectorWidget import EpochTimebinningIndexingDatasource # used in `DecodedTrajectoryPlotter` to conform to `EpochTimebinningIndexingDatasource` protocol
 
-
+@metadata_attributes(short_name=None, tags=['2D_timeseries', '2D_posteriors', 'frames', 'UNFINISHED', 'KINDA-WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-19 00:00', related_items=['multi_DecodedTrajectoryMatplotlibPlotter_side_by_side'])
 @define(slots=False, eq=False)
 class SingleArtistMultiEpochBatchHelpers:
     """ Handles draw
@@ -1038,51 +1038,6 @@ class SingleArtistMultiEpochBatchHelpers:
 
         ## OUTPUTS: track_all_normalized_rect_arr_dict
         return track_all_normalized_rect_arr_dict
-    
-
-    # @function_attributes(short_name=None, tags=['new', 'active', 'inverse'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 08:41', related_items=[])
-    # @classmethod
-    # def track_dict_all_stacked_rect_arr_inverse_normalization(cls, track_all_rect_arr_dict, ax, num_active_horizontal_repeats: int) -> Dict[str, NDArray]:
-    #     """ 
-    #     Usage:
-        
-    #         all_long_rect_arr = rect_tuples_to_horizontally_stacked_NDArray(long_rects, num_horizontal_repeats=(a_result.num_filter_epochs-1))
-    #         all_short_rect_arr = rect_tuples_to_horizontally_stacked_NDArray(short_rects, num_horizontal_repeats=(a_result.num_filter_epochs-1))
-
-    #     """
-    #     xlim = ax.get_xlim()
-    #     ylim = ax.get_ylim()
-
-    #     ax_width: float = np.diff(xlim)[0] ## how wide the current window is
-    #     ax_height: float = np.diff(ylim)[0]
-
-    #     # (xlim, ylim)
-    #     # (ax_width, ax_height)
-
-    #     inverse_normalization_factor_width: float = ax_width / num_active_horizontal_repeats
-    #     inverse_normalization_factor_height: float = 1.0 / ax_height
-
-    #     # (inverse_normalization_factor_width, inverse_normalization_factor_height)
-        
-    #     ## OUTPUTS: inverse_normalization_factor_width, inverse_normalization_factor_height
-
-    #     # ax.get_width()
-    #     inverse_normalized_track_all_rect_arr_dict = {}
-
-    #     for k, test_arr in track_all_rect_arr_dict.items():
-    #         new_test_arr = deepcopy(test_arr)
-    #         new_test_arr[:, 2] *= inverse_normalization_factor_width # scale by the width
-    #         new_test_arr[:, 0] *= inverse_normalization_factor_width
-
-    #         new_test_arr[:, 3] *= inverse_normalization_factor_height # scale by the width
-    #         new_test_arr[:, 1] *= inverse_normalization_factor_height
-
-    #         inverse_normalized_track_all_rect_arr_dict[k] = new_test_arr
-            
-    #     return inverse_normalized_track_all_rect_arr_dict
-    #     ## OUTPUTS: inverse_normalized_track_all_rect_arr_dict
-    
-
 
     @function_attributes(short_name=None, tags=['NEWEST', 'active', 'inverse', 'extent'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-17 22:02', related_items=[])
     @classmethod
@@ -1135,38 +1090,6 @@ class SingleArtistMultiEpochBatchHelpers:
             
         return inverse_normalized_track_all_rect_arr_dict
     
-
-
-    # @function_attributes(short_name=None, tags=['new', 'active'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-10 00:00', related_items=[])
-    # @classmethod
-    # def rect_tuples_to_horizontally_stacked_NDArray(cls, built_track_rects, num_horizontal_repeats: int, padding_x: float = 0.0, axes_inset_locators_list=None):
-    #     """ 
-    #     Usage:
-        
-    #         all_long_rect_arr = rect_tuples_to_horizontally_stacked_NDArray(long_rects, num_horizontal_repeats=(a_result.num_filter_epochs-1))
-    #         all_short_rect_arr = rect_tuples_to_horizontally_stacked_NDArray(short_rects, num_horizontal_repeats=(a_result.num_filter_epochs-1))
-
-    #     """
-    #     a_track_rect_arr = cls.rect_tuples_to_NDArray(built_track_rects, x_offset=-131.142)
-    #     x0s = a_track_rect_arr[:, 0] # x0
-    #     widths = a_track_rect_arr[:, 2] # w
-    #     heights = a_track_rect_arr[:, 3] # h
-
-    #     if axes_inset_locators_list is None:        
-    #         # x1s = x0s + widths
-    #         # x0s
-    #         # widths
-    #         # x1s
-    #         single_subdiv_width: float = np.max(widths)
-    #         single_subdiv_height: float = np.max(heights)
-            
-    #         single_subdiv_offset_x: float = single_subdiv_width + padding_x
-
-    #         ## OUTPUTS: single_subdiv_width, single_subdiv_height, single_subdiv_offset_x
-    #         return np.vstack(deepcopy([((epoch_idx * single_subdiv_offset_x), 0, single_subdiv_width, single_subdiv_height) for epoch_idx in np.arange(num_horizontal_repeats)])) # [x0, y0, width, height], where [x0, y0] is the lower-left corner -- can do data_coords by adding `, transform=existing_ax.transData`
-    #     else:
-    #         return np.vstack(deepcopy([((axes_inset_locators_list[epoch_idx, 0] * single_subdiv_offset_x), 0, single_subdiv_width, single_subdiv_height) for epoch_idx in np.arange(num_horizontal_repeats)])) # [x0, y0, width, height], where [x0, y0] is the lower-left corner -- can do data_coords by adding `, transform=existing_ax.transData`
-
     @function_attributes(short_name=None, tags=['main', 'new', 'active'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-11 09:16', related_items=[])
     @classmethod
     def add_batch_track_shapes(cls, ax, inverse_normalized_track_all_rect_arr_dict, track_kwargs_dict, transform=None):
@@ -1228,9 +1151,10 @@ class SingleArtistMultiEpochBatchHelpers:
         return track_shape_patch_collection_artists
 
 
-@function_attributes(short_name=None, tags=['multi-ax', 'inefficient'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-18 03:22', related_items=[])
-def multi_DecodedTrajectoryMatplotlibPlotter_side_by_side(a_result2D: DecodedFilterEpochsResult, a_new_global_decoder2D: BasePositionDecoder, global_session, n_axes: int = 10, posterior_masking_value: float = 0.020):
-    """ 
+@function_attributes(short_name=None, tags=['multi-ax', 'inefficient'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-18 03:22', related_items=['SingleArtistMultiEpochBatchHelpers'])
+def multi_DecodedTrajectoryMatplotlibPlotter_side_by_side(a_result2D: DecodedFilterEpochsResult, a_new_global_decoder2D: BasePositionDecoder, global_session, n_axes: int = 10, posterior_masking_value: float = 0.020, desired_epoch_start_idx:int=0):
+    """ Performs the same plotting as `SingleArtistMultiEpochBatchHelpers`, but in a less performant manner that draws each frame as a seperate artist (but unlike `SingleArtistMultiEpochBatchHelpers` computations are clear and it actually works)
+        
     Usage:
         from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance, _perform_plot_matplotlib_2D_tracks
         from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter
@@ -1266,12 +1190,12 @@ def multi_DecodedTrajectoryMatplotlibPlotter_side_by_side(a_result2D: DecodedFil
     # a_decoded_traj_plotter.axs = axes
     ## INPUTS: desired_epoch_start_idx
     # desired_epoch_start_idx: int = 0
-    desired_epoch_start_idx: int = 214
-    desired_epoch_end_idx: int = desired_epoch_start_idx + 10 ## 10 frames before the 8 minute mark
+    # desired_epoch_start_idx: int = 214
+    # desired_epoch_end_idx: int = desired_epoch_start_idx + 10 ## 10 frames before the 8 minute mark
     # desired_epoch_end_idx: int = 20
     # desired_epoch_end_idx: int = int(round(1/frame_divide_bin_size)) * 60 * 8 # 8 minutes
     # desired_epoch_start_idx: int = desired_epoch_end_idx - 10 ## 10 frames before the 8 minute mark
-    print(f'desired_epoch_start_idx: {desired_epoch_start_idx}, desired_epoch_end_idx: {desired_epoch_end_idx}')
+    # print(f'desired_epoch_start_idx: {desired_epoch_start_idx}, desired_epoch_end_idx: {desired_epoch_end_idx}')
 
     for i in np.arange(n_axes):
         print(f'plotting epoch[{i}]')

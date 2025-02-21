@@ -2,7 +2,7 @@ import datetime
 import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
-
+from pyphocorehelpers.function_helpers import function_attributes
 """ 
 #saving, #figures, #matplotlib, #pdf
 
@@ -21,6 +21,7 @@ aFig.savefig(fig_out_path)
 # Create the PdfPages object to which we will save the pages:
 # The with statement makes sure that the PdfPages object is closed properly at
 # the end of the block, even if an Exception occurs.
+@function_attributes(short_name=None, tags=['matplotlib', 'pdf', 'multi-page', 'save', 'export', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-01-01 00:00', related_items=[])
 def save_to_multipage_pdf(figures_list, save_file_path='multipage_pdf.pdf'):
     """Saves out a list of figures to a multi-page PDF file on disk. One figure is exported per page.
     """

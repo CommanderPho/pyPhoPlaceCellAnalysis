@@ -1899,7 +1899,7 @@ class DataframeFilterPredicates(HDF_SerializationMixin, AttrsBasedClassHelperMix
 
 @custom_define(slots=False, eq=False)
 class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
-    """ handles interactive filtering of dataframes by presenting a jupyter widget interface.
+    """ Involves an interactive ipywidget, and handles interactive filtering of dataframes by presenting a jupyter widget interface.
     
     
     Usage:
