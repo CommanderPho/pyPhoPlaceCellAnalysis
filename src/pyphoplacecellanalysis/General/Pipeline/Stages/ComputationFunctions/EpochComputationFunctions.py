@@ -1167,17 +1167,17 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
                 itemized_mem_breakdown.update(breakdown2D)
                 total_required_memory_GB += required_memory_GB_2D
             
-
+            itemized_mem_breakdown_GB = {k:v/1e9 for k, v in itemized_mem_breakdown.items()}
             if debug_print_memory_breakdown:
                     print("Memory breakdown (GB):")
-                    for k, v in itemized_mem_breakdown.items():
-                        print(f"\t{k}: {v/1e9:.3f}")
+                    for k, v in itemized_mem_breakdown_GB.items():
+                        print(f"\t{k}: {v:.3f}")
                 
             print(f"Total memory required: {total_required_memory_GB:.2f} GB")
             if total_required_memory_GB > available_GB:
                 print("Memory breakdown (GB):")
-                for k, v in itemized_mem_breakdown.items():
-                    print(f"\t{k}: {v/1e9:.3f}")
+                for k, v in itemized_mem_breakdown_GB.items():
+                    print(f"\t{k}: {v:.3f}")
                         
                 raise MemoryError(f"Estimated Insufficient Memory: Operation would require {total_required_memory_GB:.2f} GB (have {available_GB:.2f} GB available.")
                 # return global_computation_results
@@ -1203,7 +1203,7 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
                 global_computation_results.computed_data['EpochComputations'].training_data_portion = training_data_portion
                 global_computation_results.computed_data['EpochComputations'].epochs_decoding_time_bin_size = epochs_decoding_time_bin_size
                 global_computation_results.computed_data['EpochComputations'].frame_divide_bin_size = frame_divide_bin_size
-                global_computation_results.computed_data['EpochComputations'].a_new_NonPBE_Epochs_obj = None
+                global_computation_results.computed_data['EpochComputations'].a_new_NonPBE_Epochs_obj = None ## cheap to recompute
                 
 
             # global_computation_results.computed_data['EpochComputations'].included_qclu_values = included_qclu_values
