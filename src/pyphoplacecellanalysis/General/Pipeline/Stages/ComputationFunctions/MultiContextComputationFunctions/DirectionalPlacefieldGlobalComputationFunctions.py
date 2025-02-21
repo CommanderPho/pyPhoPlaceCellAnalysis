@@ -8038,7 +8038,7 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
 
     @function_attributes(short_name=None, tags=['row', 'posterior'], input_requires=[], output_provides=[], uses=['add_new_matplotlib_render_plot_widget', 'plot_1D_most_likely_position_comparsions'], used_by=['prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs'], creation_date='2024-12-18 08:53', related_items=[])
     @classmethod
-    def _perform_add_new_decoded_posterior_row(cls, curr_active_pipeline, active_2d_plot, a_dock_config, a_decoder_name: str, a_position_decoder: BasePositionDecoder, time_window_centers, a_1D_posterior, skip_plotting_measured_positions:bool=False, extended_dock_title_info: Optional[str]=None):
+    def _perform_add_new_decoded_posterior_row(cls, curr_active_pipeline, active_2d_plot, a_dock_config, a_decoder_name: str, a_position_decoder: BasePositionDecoder, time_window_centers, a_1D_posterior, skip_plotting_measured_positions:bool=False, extended_dock_title_info: Optional[str]=None, measured_position_df: Optional[pd.DataFrame]=None):
         """ used with `add_pseudo2D_decoder_decoded_epochs` - adds a single decoded row to the matplotlib dynamic output
         
         # a_decoder_name: str = "long_LR"
@@ -8087,7 +8087,9 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         )
 
         ## include meaasured position:
-        measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
+        if (measured_position_df is None) and (curr_active_pipeline is not None):
+            ## get from the pipeline if we can:
+            measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
 
         ## Actual plotting portion:
         fig, an_ax = plot_1D_most_likely_position_comparsions(measured_position_df=measured_position_df, time_window_centers=time_window_centers, xbin=active_bins,
@@ -8273,6 +8275,10 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
                                     }
         
 
+        override_dock_group_name: str = kwargs.pop('dock_group_name', None)
+        if override_dock_group_name is not None:
+            ## set the user-provided dock_group_name first:
+            _common_dock_config_kwargs['dock_group_names'] = [*_common_dock_config_kwargs['dock_group_names'], override_dock_group_name]
         
         dock_configs = dict(zip(('long', 'short', 'global'), (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Epochs.get_long_dock_colors, **_common_dock_config_kwargs),
                                                               CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Epochs.get_short_dock_colors, **_common_dock_config_kwargs),
