@@ -8215,7 +8215,7 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
                     flat_all_time_bin_sizes_output_tuples_dict[identifier_name] = an_output_tuple
         except (KeyError, AttributeError) as e:
             # KeyError: 'DirectionalDecodersDecoded'
-            print(f'add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epochs(...) failed to add any tracks, perhaps because the pipeline is missing any computed "DirectionalDecodersDecoded" global results. Skipping.')
+            print(f'add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epochs(...) failed to add any tracks, perhaps because the pipeline is missing any computed "DirectionalDecodersDecoded" global results. Error: "{e}". Skipping.')
             pass                   
 
         except Exception as e:

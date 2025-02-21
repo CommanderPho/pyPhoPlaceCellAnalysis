@@ -38,11 +38,24 @@ class Spike3DRasterRightSidebarWidget(QtWidgets.QWidget):
     
     @property
     def right_sidebar_contents_container(self) -> LayoutWidget:
-        return self.ui.layout_widget # AttributeError: 'Spike3DRasterRightSidebarWidget' object has no attribute 'ui'
-    
+        try:
+            return self.ui.layout_widget # AttributeError: 'Spike3DRasterRightSidebarWidget' object has no attribute 'ui'
+        except AttributeError as e:
+            ## occurs before class is initialized by uic.loadUi(...)
+            pass
+        except Exception as e:
+            raise e        
+
     @property
     def right_sidebar_contents_container_dockarea(self) -> NestedDockAreaWidget:
-        return self.ui.dynamic_docked_widget_container    
+        try:
+            return self.ui.dynamic_docked_widget_container
+        except AttributeError as e:
+            ## occurs before class is initialized by uic.loadUi(...)
+            pass
+        except Exception as e:
+            raise e
+        
 
     def __init__(self, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
