@@ -139,6 +139,8 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
 
         use_flexitext_titles = kwargs.pop('use_flexitext_titles', False)
         title_string_components: List[str] = ["marginal_1D_most_likely_pos_compare", f"{posterior_name}", f"{variable_name}", f"{most_likely_positions_mode}", "1D Placemaps"]
+        # title_string_component_separator_str: str = ' - '
+        title_string_component_separator_str: str = ' | '
         
         ## try to get context:
         active_context = kwargs.pop('active_context', None)        
@@ -152,7 +154,7 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             optional_margin_kwargs = dict()
                
         ## Sadly properly updating these titles messes up the margins
-        perform_update_title_subtitle(fig=fig, ax=curr_ax, active_context=active_display_fn_identifying_ctx, title_string=' - '.join(title_string_components), use_flexitext_titles=True, **optional_margin_kwargs)
+        perform_update_title_subtitle(fig=fig, ax=curr_ax, active_context=active_display_fn_identifying_ctx, title_string=title_string_component_separator_str.join(title_string_components), use_flexitext_titles=use_flexitext_titles, **optional_margin_kwargs)
     
         return fig, curr_ax
 
