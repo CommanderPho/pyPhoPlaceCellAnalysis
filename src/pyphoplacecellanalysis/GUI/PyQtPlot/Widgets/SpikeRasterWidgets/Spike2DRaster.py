@@ -615,7 +615,7 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
         """ called when the self._delayed_gui_timer QTimer fires. """
         #Stop the timer.
         self._delayed_gui_timer.stop()
-        print(f'_run_delayed_gui_load_code() called!')
+        print(f'Spike2DRaster._run_delayed_gui_load_code() called!')
         ## Make sure to set the initial linear scroll region size/location to something reasonable and not cut-off so the user can adjust it:
         self._fix_initial_linearRegionLocation() # Implemented in Render2DScrollWindowPlotMixin, since it's the one that creates the Scrollwindow anyways
 

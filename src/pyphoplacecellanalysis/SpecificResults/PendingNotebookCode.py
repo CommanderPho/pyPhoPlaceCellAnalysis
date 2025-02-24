@@ -222,16 +222,22 @@ class DataSlicingVisualizer(Decoded2DPosteriorTimeSyncMixin):
         """
         from neuropy.utils.indexing_helpers import find_nearest_time
         time_bin_edges, closest_index, closest_time, matched_time_difference = find_nearest_time(self.time_bin_edges, target_time=target_time, max_allowed_deviation=0.1, debug_print=False)
-        # df.iloc[closest_index]
         return closest_index
 
 
     def update(self, t, defer_render=False):
-        raise NotImplementedError
+        """ updates the slider 
+        """
+        closest_index = self.find_nearest_time_index(target_time=t)
+        print(f'closest_index: {closest_index}')
+        if closest_index is not None:
+            # closest_index
+            self.time_slider.setValue(closest_index)
 
-    def _update_plots(self):
-        """ Implementor must override! """
-        raise NotImplementedError
+
+    # def _update_plots(self):
+    #     """ Implementor must override! """
+    #     raise NotImplementedError
     
         
     # ==================================================================================================================== #
@@ -242,8 +248,8 @@ class DataSlicingVisualizer(Decoded2DPosteriorTimeSyncMixin):
     def on_window_changed(self, start_t, end_t):
         # called when the window is updated
         # print(f'Decoded2DPosteriorTimeSyncMixin.on_window_changed(start_t: {start_t}, end_t: {end_t})')
-        self.update(end_t, defer_render=False)
-        pass
+        self.update(start_t, defer_render=False)
+        
 
     @QtCore.Slot(float, float, float)
     def on_window_duration_changed(self, start_t, end_t, duration):

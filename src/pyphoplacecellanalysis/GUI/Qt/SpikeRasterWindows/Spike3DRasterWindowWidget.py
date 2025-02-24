@@ -261,6 +261,14 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # Update the windows once before showing the UI:
         self.spike_raster_plt_2d.update_scroll_window_region(window_start_time, window_start_time+window_duration, block_signals=False)
         
+        ## Starts the delayed_gui_itemer which will run after 1-second to update the GUI:
+        self._delayed_gui_timer = QtCore.QTimer(self)
+        self._delayed_gui_timer.timeout.connect(self._run_delayed_gui_load_code)
+        #Set the interval and start the timer.
+        self._delayed_gui_timer.start(1000)
+        
+
+
         self.show() # Show the GUI
 
     def initUI(self, curr_spikes_df, core_app_name='UnifiedSpikeRasterApp', window_duration=15.0, window_start_time=30.0, neuron_colors=None, neuron_sort_order=None, type_of_3d_plotter='pyqtgraph'):
@@ -423,6 +431,22 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             
         
 
+
+
+    def _run_delayed_gui_load_code(self):
+        """ called when the self._delayed_gui_timer QTimer fires. """
+        #Stop the timer.
+        self._delayed_gui_timer.stop()
+        print(f'Spike3DRasterWindowWidget._run_delayed_gui_load_code() called!')
+        ## Make sure to set the initial linear scroll region size/location to something reasonable and not cut-off so the user can adjust it:
+        bottom_playback_control_bar_widget = self.bottom_playback_control_bar_widget # Spike3DRasterBottomPlaybackControlBar
+        if bottom_playback_control_bar_widget is not None:
+            # comboActiveJumpTargetSeries = bottom_playback_control_bar_widget.ui.comboActiveJumpTargetSeries # QComboBox 
+            bottom_playback_control_bar_widget.current_selected_jump_target_series_name = 'Laps' ## tries to select the "Laps" epochs fromt he jump-to-comobo box
+
+
+
+
     @function_attributes(short_name=None, tags=['interactivity', 'event', 'scrolling', 'children'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-18 10:29', related_items=[])
     def update_scrolling_event_filters(self, debug_print=False):
         """ enables scrollability in the added matplotlib views just like the two upper views 
@@ -453,7 +477,10 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
          return
       
 
-
+    # ==================================================================================================================== #
+    # GlobalConnectionManagerAccessingMixin Conformances                                                                   #
+    # ==================================================================================================================== #
+    
     def connect_plotter_time_windows(self):
         """ connects the controlled plotter (usually the 3D plotter) to the 2D plotter that controls it. """
         # self.spike_3d_to_2d_window_connection = self.spike_raster_plt_2d.window_scrolled.connect(self.spike_raster_plt_3d.spikes_window.update_window_start_end)        
@@ -470,9 +497,19 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         
     def connect_controlled_time_synchronized_plotter(self, controlled_plt):
         """ try to connect the controlled_plt to the current controller (usually the 2D plot). """
-        return self.connection_man.connect_drivable_to_driver(drivable=controlled_plt, driver=self.spike_raster_plt_2d,
-                                                       custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.2, rateLimit=60, slot=drivable.spikes_window.update_window_start_end_rate_limited)))
-     
+        if hasattr(controlled_plt, 'spikes_window'):
+            return self.connection_man.connect_drivable_to_driver(drivable=controlled_plt, driver=self.spike_raster_plt_2d,
+                                                custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.2, rateLimit=60, slot=drivable.spikes_window.update_window_start_end_rate_limited)))
+
+        if hasattr(controlled_plt, 'on_window_changed_rate_limited'):
+            return self.connection_man.connect_drivable_to_driver(drivable=controlled_plt, driver=self.spike_raster_plt_2d,
+                                                        custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.2, rateLimit=60, slot=drivable.on_window_changed_rate_limited)))
+                
+        else:
+            raise NotImplementedError(f'') 
+
+
+
     def create_new_connected_widget(self, type_of_3d_plotter='vedo'):
         """ called to create a new/independent widget instance that's connected to this window's driver. """
         

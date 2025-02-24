@@ -49,7 +49,7 @@ RenderPlaybackControlsMixin
 
 
 btnJumpToPrevious
-comboActiveJumpTargetSeries
+comboActiveJumpTargetSeries - Combo box that allows the user to specify the "jump to" target
 btnJumpToNext
 
 # TODO:
