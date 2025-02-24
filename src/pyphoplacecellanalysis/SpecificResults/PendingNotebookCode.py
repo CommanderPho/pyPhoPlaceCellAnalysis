@@ -55,6 +55,305 @@ from attrs import define, field, Factory, asdict # used for `ComputedResult`
 
 from neuropy.utils.indexing_helpers import get_values_from_keypaths, set_value_by_keypath, update_nested_dict
 
+from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWidget
+from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow, LayoutScrollability
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.PyqtgraphTimeSynchronizedWidget import PyqtgraphTimeSynchronizedWidget
+
+
+import numpy as np
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets
+
+class DataSlicingVisualizer:
+    """Visualizes 3D data slicing using two ImageView widgets and a line ROI
+    
+    Args:
+        data (np.ndarray): 4D numpy array to visualize. If None, generates demo data
+        title (str, optional): Window title. Defaults to 'Data Slicing Visualizer'
+        
+
+
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import DataSlicingVisualizer
+    
+    """
+    
+    def __init__(self, data=None, title='Data Slicing Visualizer'):
+        self.app = pg.mkQApp("Data Slicing Example")
+        self.title = title
+        self.setup_ui()
+        if data is None:
+            self.generate_demo_data()
+        else:
+            self.data = data
+        self.setup_roi()
+        
+    def setup_ui(self):
+        """Initialize the UI components"""
+        self.win = QtWidgets.QMainWindow()
+        self.win.resize(800, 800)
+        self.win.setWindowTitle(self.title)
+        
+        # Setup central widget and layout
+        self.cw = QtWidgets.QWidget()
+        self.win.setCentralWidget(self.cw)
+        self.layout = QtWidgets.QGridLayout()
+        self.cw.setLayout(self.layout)
+        
+        # Create image views
+        self.imv1 = pg.ImageView()
+        self.imv2 = pg.ImageView()
+        self.layout.addWidget(self.imv1, 0, 0)
+        self.layout.addWidget(self.imv2, 1, 0)
+        
+    def generate_demo_data(self):
+        """Generate sample 3D visualization data"""
+        x1 = np.linspace(-30, 10, 128)[:, np.newaxis, np.newaxis]
+        x2 = np.linspace(-20, 20, 128)[:, np.newaxis, np.newaxis]
+        y = np.linspace(-30, 10, 128)[np.newaxis, :, np.newaxis]
+        z = np.linspace(-20, 20, 128)[np.newaxis, np.newaxis, :]
+        
+        d1 = np.sqrt(x1**2 + y**2 + z**2)
+        d2 = 2*np.sqrt(x1[::-1]**2 + y**2 + z**2)
+        d3 = 4*np.sqrt(x2**2 + y[:,::-1]**2 + z**2)
+        
+        self.data = (np.sin(d1) / d1**2) + (np.sin(d2) / d2**2) + (np.sin(d3) / d3**2)
+    
+    def set_data(self, new_data):
+        """Update the visualizer with new data
+        
+        Args:
+            new_data (np.ndarray): New 4D array to visualize
+        """
+        self.data = new_data
+        self.imv1.setImage(self.data)
+        self.update_slice()
+        
+    def setup_roi(self):
+        """Setup the ROI and connect signals"""
+        self.roi = pg.LineSegmentROI([[10, 64], [120,64]], pen='r')
+        self.imv1.addItem(self.roi)
+        self.roi.sigRegionChanged.connect(self.update_slice)
+        
+    def update_slice(self):
+        """Update the second image view based on ROI position"""
+        sliced_data = self.roi.getArrayRegion(self.data, self.imv1.imageItem, axes=(1,2))
+        self.imv2.setImage(sliced_data)
+        
+    def show(self):
+        """Display the visualization window"""
+        self.imv1.setImage(self.data)
+        # self.imv1.setHistogramRange(-0.01, 0.01)
+        # self.imv1.setLevels(-0.003, 0.003)
+        self.imv1.setHistogramRange(0.0, 1.0)
+        self.imv1.setLevels(0.0, 1.0)        
+
+        self.update_slice()
+        self.win.show()
+
+
+
+
+
+class TwoDimensionalPosteriorDisplayingTSWidget(PyqtgraphTimeSynchronizedWidget):
+    """ Plots the decoded position posterior (2D) at a given moment in time. 
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import TwoDimensionalPosteriorDisplayingTSWidget
+        TODO: Document
+
+    """
+    # Application/Window Configuration Options:
+    applicationName = 'TwoDimensionalPosteriorDisplayingTSApp'
+    windowName = 'TwoDimensionalPosteriorDisplayingTSWidgetWindow'
+    
+    enable_debug_print = True
+    
+    # sigCrosshairsUpdated = QtCore.Signal(object, str, str) # (self, name, trace_value) - CrosshairsTracingMixin Conformance
+
+    # @property
+    # def time_window_centers(self):
+    #     """The time_window_centers property."""
+    #     return self.active_one_step_decoder.time_window_centers # get time window centers (n_time_window_centers,)
+    
+
+    # @property
+    # def posterior_variable_to_render(self):
+    #     """The occupancy_mode_to_render property."""
+    #     return self.params.posterior_variable_to_render
+    # @posterior_variable_to_render.setter
+    # def posterior_variable_to_render(self, value):
+    #     self.params.posterior_variable_to_render = value
+    #     # on update, be sure to call self._update_plots()
+    #     self._update_plots()
+    
+    @property
+    def last_t(self):
+        raise NotImplementedError(f'Parent property that should not be accessed!')
+
+    @property
+    def active_plot_target(self):
+        """The active_plot_target property."""
+        return self.getRootPlotItem()
+    
+
+
+    def __init__(self, name='TwoDimensionalPosteriorDisplayingTSWidget', plot_function_name=None, scrollable_figure=True, application_name=None, window_name=None, parent=None, data=None, **kwargs):
+        """_summary_
+        , disable_toolbar=True, size=(5.0, 4.0), dpi=72
+        ## allows toggling between the various computed occupancies: such as raw counts,  normalized location, and seconds_occupancy
+            occupancy_mode_to_render: ['seconds_occupancy', 'num_pos_samples_occupancy', 'num_pos_samples_smoothed_occupancy', 'normalized_occupancy']
+        
+        Calls self.setup(), self.buildUI(), self._update_plots()
+        """
+        self.data = deepcopy(data)
+        super().__init__(application_name=application_name, window_name=(window_name or PyqtgraphTimeSynchronizedWidget.windowName), debug_print=False, **kwargs, parent=parent) # Call the inherited classes __init__ method    
+        
+
+    def setup(self):
+        assert hasattr(self.ui, 'connections')
+        
+        # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
+        # self.app = pg.mkQApp(self.applicationName)
+        # self.params = VisualizationParameters(self.applicationName)
+        
+
+        # # Add a trace region (initially hidden)
+        # self.trace_region = pg.LinearRegionItem(movable=True, brush=(0, 0, 255, 50))
+        # self.trace_region.setZValue(10)  # Ensure it appears above the plot
+        # self.trace_region.hide()  # Initially hide the trace region
+        # self.plot_widget.addItem(self.trace_region)
+
+        # # Override the PlotWidget's mouse events
+        # self.plot_widget.scene().sigMouseClicked.connect(self.mouse_clicked)
+        # self.plot_widget.scene().sigMouseMoved.connect(self.mouse_moved)
+        # self.plot_widget.scene().sigMouseReleased.connect(self.mouse_released)
+        # self.dragging = False
+        # self.start_pos = None
+
+        # self.params.shared_axis_order = 'row-major'
+        # self.params.shared_axis_order = 'column-major'
+        # self.params.shared_axis_order = None
+        
+        ## Build the colormap to be used:
+        # self.params.cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
+        # self.params.cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
+        # self.params.image_margins = 0.0
+        # self.params.image_bounds_extent, self.params.x_range, self.params.y_range = pyqtplot_build_image_bounds_extent(self.active_one_step_decoder.xbin, self.active_one_step_decoder.ybin, margin=self.params.image_margins, debug_print=self.enable_debug_print)
+        pass
+
+
+    def _buildGraphics(self):
+        """ called by self.buildUI() which usually is not overriden. """
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.CustomGraphicsLayoutWidget import CustomViewBox, CustomGraphicsLayoutWidget
+
+        ## More Involved Mode:
+        # self.ui.root_graphics_layout_widget = pg.GraphicsLayoutWidget()
+        self.ui.root_graphics_layout_widget = CustomGraphicsLayoutWidget()
+
+        # self.ui.root_view = self.ui.root_graphics_layout_widget.addViewBox()
+        ## lock the aspect ratio so pixels are always square
+        # self.ui.root_view.setAspectLocked(True)
+
+        ## Create image item
+        
+        # self.ui.imv = pg.ImageItem(border='w')
+        # self.ui.root_view.addItem(self.ui.imv)
+        # self.ui.root_view.setRange(QtCore.QRectF(*self.params.image_bounds_extent))
+
+        self.ui.root_plot_viewBox = None
+        self.ui.root_plot_viewBox = CustomViewBox()
+        self.ui.root_plot_viewBox.setObjectName('RootPlotCustomViewBox')
+        
+        # self.ui.root_plot = self.ui.root_graphics_layout_widget.addPlot(row=0, col=0, title=None) # , name=f'PositionDecoder'
+        self.ui.root_plot = self.ui.root_graphics_layout_widget.addPlot(row=0, col=0, title=None, viewBox=self.ui.root_plot_viewBox)
+        self.ui.root_plot.setObjectName('RootPlot')
+        # self.ui.root_plot.addItem(self.ui.imv, defaultPadding=0.0)  # add ImageItem to PlotItem
+        ## TODO: add item here
+        # self.ui.root_plot.showAxes(True)
+        self.ui.root_plot.hideButtons() # Hides the auto-scale button
+        
+        self.ui.root_plot.showAxes(False)     
+        # self.ui.root_plot.setRange(xRange=self.params.x_range, yRange=self.params.y_range, padding=0.0)
+        # Sets only the panning limits:
+        # self.ui.root_plot.setLimits(xMin=self.params.x_range[0], xMax=self.params.x_range[-1], yMin=self.params.y_range[0], yMax=self.params.y_range[-1])
+
+        ## Sets all limits:
+        # _x, _y, _width, _height = self.params.image_bounds_extent # [23.923329354140844, 123.85967782096927, 241.7178791533281, 30.256480996256016]
+        # self.ui.root_plot.setLimits(minXRange=_width, maxXRange=_width, minYRange=_height, maxYRange=_height)
+        # self.ui.root_plot.setLimits(xMin=self.params.x_range[0], xMax=self.params.x_range[-1], yMin=self.params.y_range[0], yMax=self.params.y_range[-1],
+        #                             minXRange=_width, maxXRange=_width, minYRange=_height, maxYRange=_height)
+        
+        self.ui.root_plot.setMouseEnabled(x=False, y=False)
+        self.ui.root_plot.setMenuEnabled(enableMenu=False)
+        
+        # ## Optional Interactive Color Bar:
+        # bar = pg.ColorBarItem(values= (0, 1), colorMap=self.params.cmap, width=5, interactive=False) # prepare interactive color bar
+        # # Have ColorBarItem control colors of img and appear in 'plot':
+        # bar.setImageItem(self.ui.imv, insert_in=self.ui.root_plot)
+        
+        self.ui.layout.addWidget(self.ui.root_graphics_layout_widget, 0, 0) # add the GLViewWidget to the layout at 0, 0
+        
+        # Set the color map:
+        # self.ui.imv.setColorMap(self.params.cmap)
+        ## Set initial view bounds
+        # self.ui.root_view.setRange(QtCore.QRectF(0, 0, 600, 600))
+
+    
+    def update(self, t, defer_render=False):
+        if self.enable_debug_print:
+            print(f'PyqtgraphTimeSynchronizedWidget.update(t: {t})')
+    
+        # # Finds the nearest previous decoded position for the time t:
+        # self.last_window_index = np.searchsorted(self.time_window_centers, t, side='left') # side='left' ensures that no future values (later than 't') are ever returned
+        # self.last_window_time = self.time_window_centers[self.last_window_index] # If there is no suitable index, return either 0 or N (where N is the length of `a`).
+        # Update the plots:
+        if not defer_render:
+            self._update_plots()
+
+
+    def _update_plots(self):
+        if self.enable_debug_print:
+            print(f'PyqtgraphTimeSynchronizedWidget._update_plots()')
+
+        # Update the existing one:
+        # self.ui.root_plot.setRange(xRange=self.params.x_range, yRange=self.params.y_range, padding=0.0)
+        # Sets only the panning limits:
+        # self.ui.root_plot.setLimits(xMin=self.params.x_range[0], xMax=self.params.x_range[-1], yMin=self.params.y_range[0], yMax=self.params.y_range[-1])
+
+        ## Sets all limits:
+        # _x, _y, _width, _height = self.params.image_bounds_extent # [23.923329354140844, 123.85967782096927, 241.7178791533281, 30.256480996256016]
+        # self.ui.root_plot.setLimits(minXRange=_width, maxXRange=_width, minYRange=_height, maxYRange=_height)
+        # self.ui.root_plot.setLimits(xMin=self.params.x_range[0], xMax=self.params.x_range[-1], yMin=self.params.y_range[0], yMax=self.params.y_range[-1],
+        #                             minXRange=_width, maxXRange=_width, minYRange=_height, maxYRange=_height)
+        
+        # Update the plots:
+        # curr_time_window_index = self.last_window_index
+        # curr_t = self.last_window_time
+
+        # if curr_time_window_index is None or curr_t is None:
+        #     return # return without updating
+
+        # self.setWindowTitle(f'{self.windowName} - {image_title} t = {curr_t}')
+        # self.setWindowTitle(f'PyqtgraphTimeSynchronizedWidget - {image_title} t = {curr_t}')
+        pass
+
+    # ==================================================================================================================== #
+    # QT Slots                                                                                                             #
+    # ==================================================================================================================== #
+    
+    @pg.QtCore.Slot(float, float)
+    def on_window_changed(self, start_t, end_t):
+        # called when the window is updated
+        if self.enable_debug_print:
+            print(f'PyqtgraphTimeSynchronizedWidget.on_window_changed(start_t: {start_t}, end_t: {end_t})')
+        # if self.enable_debug_print:
+        #     profiler = pg.debug.Profiler(disabled=True, delayed=True)
+
+        self.update(end_t, defer_render=False)
+        # if self.enable_debug_print:
+        #     profiler('Finished calling _update_plots()')
+        
 
 
 # ==================================================================================================================== #
