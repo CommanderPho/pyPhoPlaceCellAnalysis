@@ -165,7 +165,7 @@ class SpikeRasterBase(LoggingBaseClassLoggerOwningMixin, UnitSortableMixin, Data
     
     # Required for SpikesWindowOwningMixin:
     @property
-    def spikes_window(self):
+    def spikes_window(self) -> SpikesDataframeWindow:
         """The spikes_window property."""
         return self._spikes_window
     
