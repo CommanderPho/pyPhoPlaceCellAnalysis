@@ -197,8 +197,7 @@ class BinByBinDecodingDebugger:
 
         win = pg.GraphicsLayoutWidget()
         plots = []
-        out_pf1D_decoder_template_objects = []
-        _out_decoded_active_plots = {}
+        out_pf1D_decoder_template_objects: List[BaseTemplateDebuggingMixin] = []
 
         ## Initialize a new plots_container as needed:
         if plots_container is None:
@@ -252,7 +251,7 @@ class BinByBinDecodingDebugger:
             x_axis.setTickSpacing(major=5, minor=1)
 
             plots.append(plot)
-            _obj = BaseTemplateDebuggingMixin.init_from_decoder(a_decoder=a_decoder, win=plot, title_str=f't={a_time_bin_idx}')
+            _obj: BaseTemplateDebuggingMixin = BaseTemplateDebuggingMixin.init_from_decoder(a_decoder=a_decoder, win=plot, title_str=f't={a_time_bin_idx}')
             _obj.update_base_decoder_debugger_data(
                 included_neuron_ids=active_bin_aclus,
                 solo_override_alpha_weights=active_aclu_override_alpha_weights_dict,
@@ -294,25 +293,7 @@ class BinByBinDecodingDebugger:
                     - active_plots: Dict mapping epoch IDs to plot containers
                     - active_plots_data: Dict mapping epoch IDs to plot data
         """
-        from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import pyqtplot_build_image_bounds_extent
-        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import BaseTemplateDebuggingMixin
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import new_plot_raster_plot, NewSimpleRaster
-
-        def _subfn_simply_plot_posterior_in_pyqtgraph_plotitem(curr_plot, image, xbin_edges, ybin_edges):
-            pg.setConfigOptions(imageAxisOrder='row-major')
-            pg.setConfigOptions(antialias=True)
-            cmap = pg.colormap.get('jet','matplotlib')
-            image_bounds_extent, x_range, y_range = pyqtplot_build_image_bounds_extent(xbin_edges, ybin_edges, margin=0.0, debug_print=debug_print)
-            curr_plot.hideButtons()
-            img_item = pg.ImageItem(image=image, levels=(0,1))
-            curr_plot.addItem(img_item, defaultPadding=0.0)
-            img_item.setImage(image, rect=image_bounds_extent, autoLevels=False)
-            img_item.setLookupTable(cmap.getLookupTable(nPts=256), update=False)
-            curr_plot.setRange(xRange=x_range, yRange=y_range, padding=0.0, update=False, disableAutoRange=True)
-            curr_plot.setLimits(xMin=x_range[0], xMax=x_range[-1], yMin=y_range[0], yMax=y_range[-1])
-            return img_item
-
-
+        
         # ==================================================================================================================== #
         # BEGIN FUNCTION BODY                                                                                                  #
         # ==================================================================================================================== #
@@ -321,69 +302,27 @@ class BinByBinDecodingDebugger:
         if debug_print:
             print(f'an_epoch_id: {an_epoch_id}, n_epoch_time_bins: {n_epoch_time_bins}')
 
-        win = pg.GraphicsLayoutWidget()
-        plots = []
-        out_pf1D_decoder_template_objects = []
         _out_decoded_active_plots = {}
 
-        plots_data = _out_decoded_active_plots_data[an_epoch_id]
-        plots_container = RenderPlots(name=an_epoch_id, root_plot=None) # [a_lap_id]
-
-        # Epoch Active Spikes, takes up a row _______________________________________________________________ #
-        spanning_spikes_raster_plot = win.addPlot(title="spikes_raster Plot", row=0, rowspan=1, col=0, colspan=n_epoch_time_bins)
-        spanning_spikes_raster_plot.setTitle("spikes_raster Plot")
-        plots_container.root_plot = spanning_spikes_raster_plot
-        app, raster_win, plots_container, plots_data = new_plot_raster_plot(plots_data.spikes_df, plots_data.active_aclus, scatter_plot_kwargs=None, win=spanning_spikes_raster_plot, plots_data=plots_data, plots=plots_container,
-                                                            scatter_app_name=f'lap_specific_spike_raster', defer_show=True, active_context=None, add_debug_header_label=False)
-
-        _out_decoded_active_plots[an_epoch_id] = plots_container
-        win.nextRow()
-
         # Decoded Epoch Posterior (bin-by-bin), takes up a row _______________________________________________________________ #
-        spanning_posterior_plot = win.addPlot(title="P_x_given_n Plot", row=1, rowspan=1, col=0, colspan=n_epoch_time_bins)
-        spanning_posterior_plot.setTitle("P_x_given_n Plot - Decoded over lap")
-
-        most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = _out_decoded_active_p_x_given_n[an_epoch_id]
-        flat_p_x_given_n = deepcopy(p_x_given_n)
-        _subfn_simply_plot_posterior_in_pyqtgraph_plotitem(
-            curr_plot=spanning_posterior_plot,
-            image=flat_p_x_given_n,
-            xbin_edges=np.arange(n_epoch_time_bins+1),
-            ybin_edges=deepcopy(a_decoder.xbin)
-        )
-        win.nextRow()
-
-        # Bin-by-bin active spike templates/pf1D fields ______________________________________________________________________ #
-        # active_bin_unit_specific_time_binned_spike_counts = _out_decoded_unit_specific_time_binned_spike_counts[an_epoch_id]
         active_epoch_active_aclu_spike_counts_list = _out_decoded_active_unit_lists[an_epoch_id]
+        time_bin_edges = _out_decoded_time_bin_edges[an_epoch_id]
+        most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = _out_decoded_active_p_x_given_n[an_epoch_id]
+        plots_data = _out_decoded_active_plots_data[an_epoch_id]
+        plots_container = RenderPlots(name=an_epoch_id, root_plot=None) # Create a new one
+        # plots_data = RenderPlotsData(name=f'epoch[{an_epoch_id}]', spikes_df=epoch_specific_spikes_df, active_aclus=all_lap_active_units_list)
+        win, out_pf1D_decoder_template_objects, (plots_container, plots_data) = cls._perform_build_time_binned_decoder_debug_plots(a_decoder=a_decoder, time_bin_edges=time_bin_edges, p_x_given_n=p_x_given_n, active_epoch_active_aclu_spike_counts_list=active_epoch_active_aclu_spike_counts_list,
+                                                                                                                                    plots_data=plots_data, plots_container=plots_container,
+                                                                                                                                    debug_print=False)
+        ## Assign the outputs:
+        _out_decoded_active_plots[an_epoch_id] = plots_container
+        _out_decoded_active_plots_data[an_epoch_id] = plots_data
 
-        for a_time_bin_idx in np.arange(n_epoch_time_bins):
-            active_bin_active_aclu_spike_counts_dict = active_epoch_active_aclu_spike_counts_list[a_time_bin_idx]
-            active_bin_active_aclu_spike_count_values = np.array(list(active_bin_active_aclu_spike_counts_dict.values()))
-            active_bin_active_aclu_bin_normalized_spike_count_values = active_bin_active_aclu_spike_count_values / np.sum(
-                active_bin_active_aclu_spike_count_values)
 
-            aclu_override_alpha_weights = 0.8 + (0.2 * active_bin_active_aclu_bin_normalized_spike_count_values)
-            active_bin_aclus = np.array(list(active_bin_active_aclu_spike_counts_dict.keys()))
-            active_solo_override_num_spikes_weights = dict(zip(active_bin_aclus, active_bin_active_aclu_bin_normalized_spike_count_values))
-            active_aclu_override_alpha_weights_dict = dict(zip(active_bin_aclus, aclu_override_alpha_weights))
-            if debug_print:
-                print(f'a_time_bin_idx: {a_time_bin_idx}/{n_epoch_time_bins} - active_bin_aclus: {active_bin_aclus}')
 
-            plot = win.addPlot(title=f"Plot {a_time_bin_idx+1}", row=2, rowspan=1, col=a_time_bin_idx, colspan=1)
-            plot.getViewBox().setBorder(color=(200, 200, 200), width=1)
-            spanning_posterior_plot.showGrid(x=True, y=True)
-            x_axis = spanning_posterior_plot.getAxis('bottom')
-            x_axis.setTickSpacing(major=5, minor=1)
 
-            plots.append(plot)
-            _obj = BaseTemplateDebuggingMixin.init_from_decoder(a_decoder=a_decoder, win=plot, title_str=f't={a_time_bin_idx}')
-            _obj.update_base_decoder_debugger_data(
-                included_neuron_ids=active_bin_aclus,
-                solo_override_alpha_weights=active_aclu_override_alpha_weights_dict,
-                solo_override_num_spikes_weights=active_solo_override_num_spikes_weights
-            )
-            out_pf1D_decoder_template_objects.append(_obj)
+
+
 
         win.nextRow()
         win.setWindowTitle('BinByBinDecodingDebugger')
