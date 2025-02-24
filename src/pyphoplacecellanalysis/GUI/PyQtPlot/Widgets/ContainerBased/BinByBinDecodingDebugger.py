@@ -29,23 +29,30 @@ class BinByBinDecodingDebugger:
 
         # Example usage:
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-        global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
+        # global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
+        global_spikes_df = get_proper_global_spikes_df(curr_active_pipeline)
         global_laps = deepcopy(curr_active_pipeline.filtered_sessions[global_epoch_name].laps).trimmed_to_non_overlapping() 
         global_laps_epochs_df = global_laps.to_dataframe()
         global_laps_epochs_df
 
         ## INPUTS: 
         time_bin_size: float = 0.250
-        a_lap_id: int = 9
+        an_epoch_id: int = 9
         a_decoder_name = 'long_LR'
 
         ## COMPUTED: 
         a_decoder_idx: int = track_templates.get_decoder_names().index(a_decoder_name)
         a_decoder = deepcopy(track_templates.long_LR_decoder)
-        (_out_decoded_time_bin_edges, _out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists, _out_decoded_active_p_x_given_n, _out_decoded_active_plots_data) = BinByBinDecodingDebugger.build_spike_counts_and_decoder_outputs(track_templates=track_templates, global_laps_epochs_df=global_laps_epochs_df, spikes_df=global_spikes_df, a_decoder_name=a_decoder_name, time_bin_size=time_bin_size)
-        win, out_pf1D_decoder_template_objects, (_out_decoded_active_plots, _out_decoded_active_plots_data) = BinByBinDecodingDebugger.build_time_binned_decoder_debug_plots(a_decoder=a_decoder, a_lap_id=a_lap_id, _out_decoded_time_bin_edges=_out_decoded_time_bin_edges, _out_decoded_active_p_x_given_n=_out_decoded_active_p_x_given_n, _out_decoded_unit_specific_time_binned_spike_counts=_out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists=_out_decoded_active_unit_lists, _out_decoded_active_plots_data=_out_decoded_active_plots_data, debug_print=True)
-        print(f"Returned window: {win}")
-        print(f"Returned decoder objects: {out_pf1D_decoder_template_objects}")
+        (_out_decoded_time_bin_edges, _out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists, _out_decoded_active_p_x_given_n, _out_decoded_active_plots_data) = BinByBinDecodingDebugger.build_spike_counts_and_decoder_outputs(a_decoder=a_decoder, epochs_df=global_laps_epochs_df, spikes_df=global_spikes_df, time_bin_size=time_bin_size)
+        win, out_pf1D_decoder_template_objects, (_out_decoded_active_plots, _out_decoded_active_plots_data) = BinByBinDecodingDebugger.build_time_binned_decoder_debug_plots(a_decoder=a_decoder, an_epoch_id=an_epoch_id, _out_decoded_time_bin_edges=_out_decoded_time_bin_edges,
+                                                                                                                                                                            _out_decoded_active_p_x_given_n=_out_decoded_active_p_x_given_n, _out_decoded_unit_specific_time_binned_spike_counts=_out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists=_out_decoded_active_unit_lists, _out_decoded_active_plots_data=_out_decoded_active_plots_data,
+                                                                                                                                                                            debug_print=True)
+
+                                                                                                                                                                                
+
+    Usage 2:
+        ## All-in-one mode:
+        win, out_pf1D_decoder_template_objects, (_out_decoded_active_plots, _out_decoded_active_plots_data) = BinByBinDecodingDebugger.plot_bin_by_bin_decoding_example(curr_active_pipeline=curr_active_pipeline, a_decoder=a_decoder, time_bin_size=time_bin_size, an_epoch_id=an_epoch_id)
 
 
     """
@@ -58,15 +65,15 @@ class BinByBinDecodingDebugger:
     # spikes_df: pd.DataFrame = field()
     # global_laps_epochs_df: pd.DataFrame = field()
     @classmethod
-    def build_spike_counts_and_decoder_outputs(cls, track_templates, global_laps_epochs_df, spikes_df, a_decoder_name='long_LR', time_bin_size=0.500, debug_print=False):
+    def build_spike_counts_and_decoder_outputs(cls, a_decoder, epochs_df, spikes_df, time_bin_size=0.500, debug_print=False):
         """
             a_decoder_name: types.DecoderName = 'long_LR'
             
         """
         ## Get a specific decoder
         
-        a_decoder_idx: int = track_templates.get_decoder_names().index(a_decoder_name)
-        a_decoder = deepcopy(track_templates.long_LR_decoder)
+        # a_decoder_idx: int = track_templates.get_decoder_names().index(a_decoder_name)
+        # a_decoder = deepcopy(track_templates.long_LR_decoder)
 
         neuron_IDs = deepcopy(a_decoder.neuron_IDs)
         spikes_df = deepcopy(spikes_df).spikes.sliced_by_neuron_id(neuron_IDs)
@@ -77,7 +84,7 @@ class BinByBinDecodingDebugger:
         _out_decoded_active_p_x_given_n = {}
         _out_decoded_active_plots_data: Dict[str, RenderPlotsData]  = {}
 
-        for a_row in global_laps_epochs_df.itertuples():
+        for a_row in epochs_df.itertuples():
             t_start = a_row.start
             t_end = a_row.stop
             time_bin_edges = np.arange(t_start, (t_end + time_bin_size), time_bin_size)
@@ -115,9 +122,9 @@ class BinByBinDecodingDebugger:
         return (_out_decoded_time_bin_edges, _out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists, _out_decoded_active_p_x_given_n, _out_decoded_active_plots_data)
 
 
-    @function_attributes(short_name=None, tags=['MAIN', 'plot', 'gUI'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-24 12:20', related_items=[])
+    @function_attributes(short_name=None, tags=['MAIN', 'plot', 'gUI'], input_requires=[], output_provides=[], uses=['new_plot_raster_plot'], used_by=[], creation_date='2025-02-24 12:20', related_items=[])
     @classmethod
-    def build_time_binned_decoder_debug_plots(cls, a_decoder, a_lap_id, _out_decoded_time_bin_edges, _out_decoded_active_p_x_given_n, _out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists, _out_decoded_active_plots_data, debug_print=False):
+    def build_time_binned_decoder_debug_plots(cls, a_decoder, an_epoch_id, _out_decoded_time_bin_edges, _out_decoded_active_p_x_given_n, _out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists, _out_decoded_active_plots_data, debug_print=False):
         """ builds the plots 
         """
         from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import pyqtplot_build_image_bounds_extent
@@ -138,18 +145,18 @@ class BinByBinDecodingDebugger:
             curr_plot.setLimits(xMin=x_range[0], xMax=x_range[-1], yMin=y_range[0], yMax=y_range[-1])
             return img_item
 
-        time_bin_edges = _out_decoded_time_bin_edges[a_lap_id]
+        time_bin_edges = _out_decoded_time_bin_edges[an_epoch_id]
         n_epoch_time_bins = len(time_bin_edges) - 1
         if debug_print:
-            print(f'a_lap_id: {a_lap_id}, n_epoch_time_bins: {n_epoch_time_bins}')
+            print(f'a_lap_id: {an_epoch_id}, n_epoch_time_bins: {n_epoch_time_bins}')
 
         win = pg.GraphicsLayoutWidget()
         plots = []
         out_pf1D_decoder_template_objects = []
         _out_decoded_active_plots = {}
 
-        plots_data = _out_decoded_active_plots_data[a_lap_id]
-        plots_container = RenderPlots(name=a_lap_id, root_plot=None) # [a_lap_id]
+        plots_data = _out_decoded_active_plots_data[an_epoch_id]
+        plots_container = RenderPlots(name=an_epoch_id, root_plot=None) # [a_lap_id]
 
         # Epoch Active Spikes, takes up a row _______________________________________________________________ #
         spanning_spikes_raster_plot = win.addPlot(title="spikes_raster Plot", row=0, rowspan=1, col=0, colspan=n_epoch_time_bins)
@@ -160,14 +167,14 @@ class BinByBinDecodingDebugger:
 
 
 
-        _out_decoded_active_plots[a_lap_id] = plots_container
+        _out_decoded_active_plots[an_epoch_id] = plots_container
         win.nextRow()
 
         # Decoded Epoch Posterior (bin-by-bin), takes up a row _______________________________________________________________ #
         spanning_posterior_plot = win.addPlot(title="P_x_given_n Plot", row=1, rowspan=1, col=0, colspan=n_epoch_time_bins)
         spanning_posterior_plot.setTitle("P_x_given_n Plot - Decoded over lap")
 
-        most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = _out_decoded_active_p_x_given_n[a_lap_id]
+        most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = _out_decoded_active_p_x_given_n[an_epoch_id]
         flat_p_x_given_n = deepcopy(p_x_given_n)
         _simply_plot_posterior_in_pyqtgraph_plotitem(
             curr_plot=spanning_posterior_plot,
@@ -178,8 +185,8 @@ class BinByBinDecodingDebugger:
         win.nextRow()
 
         # Bin-by-bin active spike templates/pf1D fields ______________________________________________________________________ #
-        active_bin_unit_specific_time_binned_spike_counts = _out_decoded_unit_specific_time_binned_spike_counts[a_lap_id]
-        active_lap_active_aclu_spike_counts_list = _out_decoded_active_unit_lists[a_lap_id]
+        active_bin_unit_specific_time_binned_spike_counts = _out_decoded_unit_specific_time_binned_spike_counts[an_epoch_id]
+        active_lap_active_aclu_spike_counts_list = _out_decoded_active_unit_lists[an_epoch_id]
 
         for a_time_bin_idx in np.arange(n_epoch_time_bins):
             active_bin_active_aclu_spike_counts_dict = active_lap_active_aclu_spike_counts_list[a_time_bin_idx]
@@ -217,7 +224,7 @@ class BinByBinDecodingDebugger:
 
     @function_attributes(short_name=None, tags=['private', 'plot'], input_requires=[], output_provides=[], uses=['cls.build_spike_counts_and_decoder_outputs', 'cls.build_time_binned_decoder_debug_plots'], used_by=[], creation_date='2025-02-24 12:19', related_items=[])
     @classmethod
-    def plot_bin_by_bin_decoding_example(cls, curr_active_pipeline, track_templates, time_bin_size: float = 0.250, a_lap_id: int = 9, a_decoder_name = 'long_LR'):
+    def plot_bin_by_bin_decoding_example(cls, curr_active_pipeline, a_decoder, time_bin_size: float = 0.250, an_epoch_id: int = 9):
         """
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_bin_by_bin_decoding_example
 
@@ -251,10 +258,9 @@ class BinByBinDecodingDebugger:
 
 
         ## COMPUTED: 
-        a_decoder_idx: int = track_templates.get_decoder_names().index(a_decoder_name)
-        a_decoder = deepcopy(track_templates.long_LR_decoder)
-        (_out_decoded_time_bin_edges, _out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists, _out_decoded_active_p_x_given_n, _out_decoded_active_plots_data) = cls.build_spike_counts_and_decoder_outputs(track_templates=track_templates, global_laps_epochs_df=global_laps_epochs_df, spikes_df=global_spikes_df, a_decoder_name=a_decoder_name, time_bin_size=time_bin_size)
-        win, out_pf1D_decoder_template_objects, (_out_decoded_active_plots, _out_decoded_active_plots_data) = cls.build_time_binned_decoder_debug_plots(a_decoder=a_decoder, a_lap_id=a_lap_id, _out_decoded_time_bin_edges=_out_decoded_time_bin_edges, _out_decoded_active_p_x_given_n=_out_decoded_active_p_x_given_n, _out_decoded_unit_specific_time_binned_spike_counts=_out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists=_out_decoded_active_unit_lists, _out_decoded_active_plots_data=_out_decoded_active_plots_data, debug_print=True)
+        a_decoder = deepcopy(a_decoder)
+        (_out_decoded_time_bin_edges, _out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists, _out_decoded_active_p_x_given_n, _out_decoded_active_plots_data) = cls.build_spike_counts_and_decoder_outputs(a_decoder=a_decoder, epochs_df=global_laps_epochs_df, spikes_df=global_spikes_df, time_bin_size=time_bin_size)
+        win, out_pf1D_decoder_template_objects, (_out_decoded_active_plots, _out_decoded_active_plots_data) = cls.build_time_binned_decoder_debug_plots(a_decoder=a_decoder, an_epoch_id=an_epoch_id, _out_decoded_time_bin_edges=_out_decoded_time_bin_edges, _out_decoded_active_p_x_given_n=_out_decoded_active_p_x_given_n, _out_decoded_unit_specific_time_binned_spike_counts=_out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists=_out_decoded_active_unit_lists, _out_decoded_active_plots_data=_out_decoded_active_plots_data, debug_print=True)
         print(f"Returned window: {win}")
         print(f"Returned decoder objects: {out_pf1D_decoder_template_objects}")
 
