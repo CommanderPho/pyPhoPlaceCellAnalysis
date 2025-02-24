@@ -21,6 +21,7 @@ from neuropy.utils.mixins.unit_slicing import NeuronUnitSlicableObjectProtocol #
 from neuropy.analyses.decoders import epochs_spkcount # for decode_specific_epochs
 from neuropy.utils.mixins.binning_helpers import BinningContainer # for epochs_spkcount getting the correct time bins
 from neuropy.analyses.placefields import PfND # for BasePositionDecoder
+from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
 
 
 from pyphocorehelpers.function_helpers import function_attributes
@@ -1264,7 +1265,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
 
 
     """
-    pf: PfND = serialized_field()
+    pf: PfND = serialized_field(repr=keys_only_repr)
 
     neuron_IDXs: np.ndarray = serialized_field(default=None, is_computable=True)
     neuron_IDs: np.ndarray = serialized_field(default=None, is_computable=True)
