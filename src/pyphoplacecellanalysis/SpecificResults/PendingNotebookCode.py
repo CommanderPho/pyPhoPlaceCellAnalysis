@@ -65,23 +65,107 @@ import numpy as np
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore
 
-class DataSlicingVisualizer:
+
+class Decoded2DPosteriorTimeSyncMixin:
+    """ Implementors recieve simple time updates from another plot """
+    
+    def update(self, t, defer_render=False):
+        raise NotImplementedError
+
+    def _update_plots(self):
+        """ Implementor must override! """
+        raise NotImplementedError
+    
+        
+    # ==================================================================================================================== #
+    # QT Slots                                                                                                             #
+    # ==================================================================================================================== #
+    
+    @QtCore.Slot(float, float)
+    def on_window_changed(self, start_t, end_t):
+        # called when the window is updated
+        # print(f'Decoded2DPosteriorTimeSyncMixin.on_window_changed(start_t: {start_t}, end_t: {end_t})')
+        self.update(end_t, defer_render=False)
+        pass
+
+    @QtCore.Slot(float, float, float)
+    def on_window_duration_changed(self, start_t, end_t, duration):
+        """ changes self.half_render_window_duration """
+        # print(f'LiveWindowedData.on_window_duration_changed(start_t: {start_t}, end_t: {end_t}, duration: {duration})')
+        pass        
+
+
+    ############### Rate-Limited SLots ###############:
+    ##################################################
+    ## For use with pg.SignalProxy
+    # using signal proxy turns original arguments into a tuple
+    @QtCore.Slot(object)
+    def on_window_changed_rate_limited(self, evt):
+        self.on_window_changed(*evt)
+        
+
+    # @property
+    # def n_epochs(self) -> int:
+    #     return np.shape(self.active_epochs_df)[0]
+
+    # def lookup_label_from_index(self, an_idx: int) -> int:
+    #     """ Looks of the proper epoch "label", as in the value in the 'label' column of active_epochs_df, from a linear index such as that provided by the slider control.
+
+    #     curr_epoch_label = lookup_label_from_index(a_plotter, an_idx)
+    #     print(f'curr_epoch_label: {curr_epoch_label} :::') ## end line
+
+    #     """
+    #     curr_epoch_label = self.active_epochs_df['label'].iloc[an_idx] # gets the correct epoch label for the linear IDX
+    #     curr_redundant_label_lookup_label = self.active_epochs_df.label.to_numpy()[an_idx]
+    #     # print(f'curr_redundant_label_lookup_label: {curr_redundant_label_lookup_label} :::') ## end line
+    #     assert str(curr_redundant_label_lookup_label) == str(curr_epoch_label), f"curr_epoch_label: {str(curr_epoch_label)} != str(curr_redundant_label_lookup_label): {str(curr_redundant_label_lookup_label)}"
+    #     return curr_epoch_label
+
+
+    # def find_nearest_time_index(self, target_time: float) -> Optional[int]:
+    #     """ finds the index of the nearest time from the active epochs
+    #     """
+    #     from neuropy.utils.indexing_helpers import find_nearest_time
+    #     df = self.active_epochs_df
+    #     df, closest_index, closest_time, matched_time_difference = find_nearest_time(df=df, target_time=target_time, time_column_name='start', max_allowed_deviation=0.01, debug_print=False)
+    #     # df.iloc[closest_index]
+    #     return closest_index
+    
+
+
+class DataSlicingVisualizer(Decoded2DPosteriorTimeSyncMixin):
     """Visualizes 3D data slicing using ImageView widget and time slider
     
     Args:
         data (np.ndarray): 3D numpy array to visualize (P[x][y][t]). If None, generates demo data
         title (str, optional): Window title. Defaults to 'Data Slicing Visualizer'
+        
+        
+    Usage:
+    
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import DataSlicingVisualizer
+
+        ## INPUTS: time_bin_edges, p_x_given_n
+
+        # p_x_given_n.shape # (59, 8, 103512)
+        visualizer = DataSlicingVisualizer(time_bin_edges=time_bin_edges, data=p_x_given_n)
+        visualizer.set_data(time_bin_edges=time_bin_edges, new_data=p_x_given_n)
+        visualizer.show()
+
+
     """
     
-    def __init__(self, data=None, title='Data Slicing Visualizer'):
+    def __init__(self, time_bin_edges=None, data=None, title='Data Slicing Visualizer'):
         self.app = pg.mkQApp("Data Slicing Example")
         self.title = title
         self.setup_ui()
-        if data is None:
-            self.generate_demo_data()
-        else:
-            self.data = data
-        
+
+        assert time_bin_edges is not None
+        assert data is not None
+        self.time_bin_edges = time_bin_edges
+        self.data = data
+
+
     def setup_ui(self):
         """Initialize the UI components"""
         self.win = QtWidgets.QMainWindow()
@@ -103,26 +187,17 @@ class DataSlicingVisualizer:
         self.layout.addWidget(self.time_slider, 1, 0)
         self.time_slider.valueChanged.connect(self.update_time_slice)
         
-    def generate_demo_data(self):
-        """Generate sample 3D visualization data"""
-        x = np.linspace(-20, 20, 128)
-        y = np.linspace(-20, 20, 128)
-        t = np.linspace(0, 10, 50)
-        
-        X, Y, T = np.meshgrid(x, y, t, indexing='ij')
-        
-        # Generate some demo posterior data
-        self.data = np.exp(-(X**2 + Y**2)/(2*5**2))
-        self.data = self.data / np.sum(self.data, axis=(0,1), keepdims=True)
-        
-    def set_data(self, new_data):
+
+    def set_data(self, time_bin_edges, new_data):
         """Update the visualizer with new data
         
         Args:
             new_data (np.ndarray): New 3D array to visualize (P[x][y][t])
         """
+        self.time_bin_edges = time_bin_edges
         self.data = new_data
-        self.time_slider.setMaximum(self.data.shape[2] - 1)
+        assert np.shape(self.data)[-1] == (len(self.time_bin_edges)-1), f"np.shape(self.data)[-1]: {np.shape(self.data)[-1]}, (len(self.time_bin_edges)-1): {(len(self.time_bin_edges)-1)}"
+        self.time_slider.setMaximum(self.data.shape[-1] - 1) ## last dimension
         self.update_time_slice()
         
     def update_time_slice(self):
@@ -137,6 +212,54 @@ class DataSlicingVisualizer:
         self.imv.setHistogramRange(0.0, 1.0)
         self.imv.setLevels(0.0, 1.0)
         self.win.show()
+
+
+    # ==================================================================================================================== #
+    # Decoded2DPosteriorTimeSyncMixin Conformances                                                                         #
+    # ==================================================================================================================== #
+    def find_nearest_time_index(self, target_time: float) -> Optional[int]:
+        """ finds the index of the nearest time from the active epochs
+        """
+        from neuropy.utils.indexing_helpers import find_nearest_time
+        time_bin_edges, closest_index, closest_time, matched_time_difference = find_nearest_time(self.time_bin_edges, target_time=target_time, max_allowed_deviation=0.1, debug_print=False)
+        # df.iloc[closest_index]
+        return closest_index
+
+
+    def update(self, t, defer_render=False):
+        raise NotImplementedError
+
+    def _update_plots(self):
+        """ Implementor must override! """
+        raise NotImplementedError
+    
+        
+    # ==================================================================================================================== #
+    # QT Slots                                                                                                             #
+    # ==================================================================================================================== #
+    
+    @QtCore.Slot(float, float)
+    def on_window_changed(self, start_t, end_t):
+        # called when the window is updated
+        # print(f'Decoded2DPosteriorTimeSyncMixin.on_window_changed(start_t: {start_t}, end_t: {end_t})')
+        self.update(end_t, defer_render=False)
+        pass
+
+    @QtCore.Slot(float, float, float)
+    def on_window_duration_changed(self, start_t, end_t, duration):
+        """ changes self.half_render_window_duration """
+        # print(f'LiveWindowedData.on_window_duration_changed(start_t: {start_t}, end_t: {end_t}, duration: {duration})')
+        pass        
+
+
+    ############### Rate-Limited SLots ###############:
+    ##################################################
+    ## For use with pg.SignalProxy
+    # using signal proxy turns original arguments into a tuple
+    @QtCore.Slot(object)
+    def on_window_changed_rate_limited(self, evt):
+        self.on_window_changed(*evt)
+        
 
 
 
