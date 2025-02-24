@@ -524,6 +524,32 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         return image_raw, path_raw
 
 
+    @function_attributes(short_name=None, tags=['epochs_df', 'reconstruct', 'decoding' , 'pure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-24 13:56', related_items=[])
+    def build_pseudo_epochs_df_from_decoding_bins(self, epoch_end_non_overlapping_difference: float=1e-9) -> pd.DataFrame:
+        """Build another decoding_bin_epochs_df where we have an epoch with epoch_id for each decoded time bin
+        
+        Usage:
+            ## INPUTS: results2D
+            single_continuous_result: SingleEpochDecodedResult = results2D.continuous_results['long'].get_result_for_epoch(0) # SingleEpochDecodedResult
+            decoding_bins_epochs_df: pd.DataFrame = single_continuous_result.build_pseudo_epochs_df_from_decoding_bins()
+            decoding_bins_epochs_df
+
+        """
+        # single_continuous_result.nbins
+        # single_continuous_result.time_bin_container.edges
+        left_edges = self.time_bin_container.edges[:-1]
+        right_edges = self.time_bin_container.edges[1:]
+        assert len(left_edges) == len(right_edges), f"len(right_edges): {len(right_edges)}, len(left_edges): {len(left_edges)}"
+        assert len(left_edges) == self.time_bin_container.num_bins, f"self.time_bin_container.num_bins: {self.time_bin_container.num_bins}, len(left_edges): {len(left_edges)}"
+        # decoding_bins_epochs_df: pd.DataFrame = pd.DataFrame({'start': self.time_bin_container.left_edges, 'stop': self.time_bin_container.right_edges})
+        decoding_bins_epochs_df: pd.DataFrame = pd.DataFrame({'start': left_edges, 'stop': right_edges})
+        decoding_bins_epochs_df['stop'] = decoding_bins_epochs_df['stop'] - epoch_end_non_overlapping_difference # make non-overlapping by subtracting off 1-nano-second from the end of each
+        decoding_bins_epochs_df['duration'] = decoding_bins_epochs_df['stop'] - decoding_bins_epochs_df['start']
+        decoding_bins_epochs_df['label'] = decoding_bins_epochs_df.index.to_numpy().astype(int)
+        assert len(decoding_bins_epochs_df) == self.nbins, f"len(decoding_bins_epochs_df): {len(decoding_bins_epochs_df)}, self.nbins: {self.nbins}"
+        assert np.all(decoding_bins_epochs_df['duration'] > 0.0), f"all durations must be strictly greater than zero"
+        
+        return decoding_bins_epochs_df.epochs.get_valid_df()
                 
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     # def to_hdf(self, file_path):
