@@ -115,6 +115,7 @@ class BinByBinDecodingDebugger:
         return (_out_decoded_time_bin_edges, _out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists, _out_decoded_active_p_x_given_n, _out_decoded_active_plots_data)
 
 
+    @function_attributes(short_name=None, tags=['MAIN', 'plot', 'gUI'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-24 12:20', related_items=[])
     @classmethod
     def build_time_binned_decoder_debug_plots(cls, a_decoder, a_lap_id, _out_decoded_time_bin_edges, _out_decoded_active_p_x_given_n, _out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists, _out_decoded_active_plots_data, debug_print=False):
         """ builds the plots 
@@ -214,7 +215,7 @@ class BinByBinDecodingDebugger:
         return win, out_pf1D_decoder_template_objects, (_out_decoded_active_plots, _out_decoded_active_plots_data)
 
 
-    @function_attributes(short_name=None, tags=['MAIN', 'plot', 'GUI'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-24 12:19', related_items=[])
+    @function_attributes(short_name=None, tags=['private', 'plot'], input_requires=[], output_provides=[], uses=['cls.build_spike_counts_and_decoder_outputs', 'cls.build_time_binned_decoder_debug_plots'], used_by=[], creation_date='2025-02-24 12:19', related_items=[])
     @classmethod
     def plot_bin_by_bin_decoding_example(cls, curr_active_pipeline, track_templates, time_bin_size: float = 0.250, a_lap_id: int = 9, a_decoder_name = 'long_LR'):
         """
@@ -231,6 +232,9 @@ class BinByBinDecodingDebugger:
         a_decoder_idx: int = track_templates.get_decoder_names().index(a_decoder_name)
         a_decoder = deepcopy(track_templates.long_LR_decoder)
 
+        ## Build the plotter:
+        win, out_pf1D_decoder_template_objects, (_out_decoded_active_plots, _out_decoded_active_plots_data) = BinByBinDecodingDebugger.plot_bin_by_bin_decoding_example(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates, time_bin_size=time_bin_size, a_lap_id=a_lap_id, a_decoder_name=a_decoder_name)
+        
         
         
         """
@@ -257,6 +261,10 @@ class BinByBinDecodingDebugger:
         return win, out_pf1D_decoder_template_objects, (_out_decoded_active_plots, _out_decoded_active_plots_data)
     
 
+
+    @classmethod
+    def init_from_track_templates(cls, track_templates):
+        raise NotImplementedError(f'#TODO 2025-02-24 12:30: - [ ] Does not yet return any kind of object.')
 
 
     ## OUTPUTS: _out_decoded_time_bin_edges, _out_decoded_unit_specific_time_binned_spike_counts, _out_decoded_active_unit_lists, _out_decoded_active_p_x_given_n
