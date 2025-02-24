@@ -63,19 +63,14 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.PyqtgraphTi
 
 import numpy as np
 import pyphoplacecellanalysis.External.pyqtgraph as pg
-from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore
 
 class DataSlicingVisualizer:
-    """Visualizes 3D data slicing using two ImageView widgets and a line ROI
+    """Visualizes 3D data slicing using ImageView widget and time slider
     
     Args:
-        data (np.ndarray): 4D numpy array to visualize. If None, generates demo data
+        data (np.ndarray): 3D numpy array to visualize (P[x][y][t]). If None, generates demo data
         title (str, optional): Window title. Defaults to 'Data Slicing Visualizer'
-        
-
-
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import DataSlicingVisualizer
-    
     """
     
     def __init__(self, data=None, title='Data Slicing Visualizer'):
@@ -86,7 +81,6 @@ class DataSlicingVisualizer:
             self.generate_demo_data()
         else:
             self.data = data
-        self.setup_roi()
         
     def setup_ui(self):
         """Initialize the UI components"""
@@ -100,57 +94,49 @@ class DataSlicingVisualizer:
         self.layout = QtWidgets.QGridLayout()
         self.cw.setLayout(self.layout)
         
-        # Create image views
-        self.imv1 = pg.ImageView()
-        self.imv2 = pg.ImageView()
-        self.layout.addWidget(self.imv1, 0, 0)
-        self.layout.addWidget(self.imv2, 1, 0)
+        # Create image view
+        self.imv = pg.ImageView()
+        self.layout.addWidget(self.imv, 0, 0)
+        
+        # Add time slider
+        self.time_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self.layout.addWidget(self.time_slider, 1, 0)
+        self.time_slider.valueChanged.connect(self.update_time_slice)
         
     def generate_demo_data(self):
         """Generate sample 3D visualization data"""
-        x1 = np.linspace(-30, 10, 128)[:, np.newaxis, np.newaxis]
-        x2 = np.linspace(-20, 20, 128)[:, np.newaxis, np.newaxis]
-        y = np.linspace(-30, 10, 128)[np.newaxis, :, np.newaxis]
-        z = np.linspace(-20, 20, 128)[np.newaxis, np.newaxis, :]
+        x = np.linspace(-20, 20, 128)
+        y = np.linspace(-20, 20, 128)
+        t = np.linspace(0, 10, 50)
         
-        d1 = np.sqrt(x1**2 + y**2 + z**2)
-        d2 = 2*np.sqrt(x1[::-1]**2 + y**2 + z**2)
-        d3 = 4*np.sqrt(x2**2 + y[:,::-1]**2 + z**2)
+        X, Y, T = np.meshgrid(x, y, t, indexing='ij')
         
-        self.data = (np.sin(d1) / d1**2) + (np.sin(d2) / d2**2) + (np.sin(d3) / d3**2)
-    
+        # Generate some demo posterior data
+        self.data = np.exp(-(X**2 + Y**2)/(2*5**2))
+        self.data = self.data / np.sum(self.data, axis=(0,1), keepdims=True)
+        
     def set_data(self, new_data):
         """Update the visualizer with new data
         
         Args:
-            new_data (np.ndarray): New 4D array to visualize
+            new_data (np.ndarray): New 3D array to visualize (P[x][y][t])
         """
         self.data = new_data
-        self.imv1.setImage(self.data)
-        self.update_slice()
+        self.time_slider.setMaximum(self.data.shape[2] - 1)
+        self.update_time_slice()
         
-    def setup_roi(self):
-        """Setup the ROI and connect signals"""
-        self.roi = pg.LineSegmentROI([[10, 64], [120,64]], pen='r')
-        self.imv1.addItem(self.roi)
-        self.roi.sigRegionChanged.connect(self.update_slice)
-        
-    def update_slice(self):
-        """Update the second image view based on ROI position"""
-        sliced_data = self.roi.getArrayRegion(self.data, self.imv1.imageItem, axes=(1,2))
-        self.imv2.setImage(sliced_data)
+    def update_time_slice(self):
+        """Update the image view based on current time slider value"""
+        t = self.time_slider.value()
+        self.imv.setImage(self.data[:,:,t].T)
         
     def show(self):
         """Display the visualization window"""
-        self.imv1.setImage(self.data)
-        # self.imv1.setHistogramRange(-0.01, 0.01)
-        # self.imv1.setLevels(-0.003, 0.003)
-        self.imv1.setHistogramRange(0.0, 1.0)
-        self.imv1.setLevels(0.0, 1.0)        
-
-        self.update_slice()
+        self.time_slider.setMaximum(self.data.shape[2] - 1)
+        self.update_time_slice()
+        self.imv.setHistogramRange(0.0, 1.0)
+        self.imv.setLevels(0.0, 1.0)
         self.win.show()
-
 
 
 
