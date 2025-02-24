@@ -51,7 +51,7 @@ class SpikesDataframeWindow(LiveWindowedData):
     
     ## TimeWindow Convenince properties:
     @property
-    def active_time_window(self):
+    def active_time_window(self) -> Tuple[float, float]:
         """ the active time window (2 element start, end tuple)"""
         return self.timeWindow.active_time_window
     
@@ -111,7 +111,7 @@ class SpikesDataframeWindow(LiveWindowedData):
         # return self._df
         return self.dataSource.df
     @df.setter
-    def df(self, value):
+    def df(self, value: pd.DataFrame) -> None:
         self.dataSource.df = value
         # self.spike_dataframe_changed_signal.emit()
         
@@ -152,38 +152,61 @@ class SpikesWindowOwningMixin:
         
     """
     @property
-    def spikes_window(self):
+    def spikes_window(self) -> SpikesDataframeWindow:
         """The spikes_window property."""
         raise NotImplementedError
         # return self._spikes_window
 
     @property
-    def active_windowed_df(self):
+    def active_windowed_df(self) -> pd.DataFrame:
         """ """
         return self.spikes_window.active_windowed_df
     
     # from SpikesDataframeOwningMixin
     @property
-    def spikes_df(self):
+    def spikes_df(self) -> pd.DataFrame:
         """The spikes_df property."""
         return self.spikes_window.df
   
   
     # Require TimeWindow
     @property
-    def render_window_duration(self):
+    def render_window_duration(self) -> float:
         """The render_window_duration property."""
         return float(self.spikes_window.window_duration)
     @render_window_duration.setter
-    def render_window_duration(self, value):
+    def render_window_duration(self, value: float) -> None:
         self.spikes_window.window_duration = value
     
     @property
-    def half_render_window_duration(self):
+    def half_render_window_duration(self) -> float:
         """ """
         return np.ceil(float(self.spikes_window.window_duration)/2.0) # 10 by default 
     
 
+
+    ## TimeWindow Convenince properties:
+    @property
+    def active_time_window(self) -> Tuple[float, float]:
+        """ the active time window (2 element start, end tuple)"""
+        return self.spikes_window.active_time_window
+    
+    @property
+    def active_window_duration(self) -> float:
+        """The window_duration property."""
+        return self.spikes_window.window_duration
+    
+    @property
+    def active_window_end_time(self) -> float:
+        """The active_window_end_time property."""
+        return (self.spikes_window.active_window_start_time + self.spikes_window.window_duration)
+    
+    @property
+    def active_window_start_time(self) -> float:
+        """The current start time of the sliding time window"""
+        return self.spikes_window.active_window_start_time
+    
+    
     # @property
     # def total_data_temporal_axis_length(self) -> float:
     #     """The equivalent of self.temporal_axis_length but for all data instead of just the active window."""
@@ -195,18 +218,21 @@ class SpikesWindowOwningMixin:
     # SpikesDataframeWindow Passthrus                                                                                      #
     # ==================================================================================================================== #
     @property
-    def total_df_start_end_times(self):
+    def total_df_start_end_times(self) -> Tuple[float, float]:
         """[earliest_df_time, latest_df_time]: The earliest and latest spiketimes in the total df """
         return self.spikes_window.total_df_start_end_times
     @property
-    def total_data_start_time(self):
+    def total_data_start_time(self) -> float:
         """returns the earliest_df_time: The earliest spiketimes in the total df """
         return self.spikes_window.total_data_start_time
     @property
-    def total_data_end_time(self):
+    def total_data_end_time(self) -> float:
         """returns the latest_df_time: The latest spiketimes in the total df """
         return self.spikes_window.total_data_end_time
-            
+    @property
+    def total_data_duration(self) -> float:
+        """ The duration (in seconds) of all data in self.spikes_window."""
+        return (self.spikes_window.total_data_end_time - self.spikes_window.total_data_start_time)
 
 
     def debug_print_spikes_window(self, prefix_string='spikes_window.', indent_string = '\t'):

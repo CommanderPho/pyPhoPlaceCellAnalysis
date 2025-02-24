@@ -39,14 +39,14 @@ class LiveWindowedData(SimplePrintable, PrettyPrintable, QtCore.QObject):
     
     # Simple TimeWindow passthrough properties
     @property
-    def window_duration(self):
+    def window_duration(self) -> float:
         """The render_window_duration property."""
         return float(self.timeWindow.window_duration)
     @window_duration.setter
     def window_duration(self, value):
         self.timeWindow.window_duration = value
     @property
-    def half_window_duration(self):
+    def half_window_duration(self) -> float:
         """ """
         return np.ceil(float(self.timeWindow.window_duration)/2.0) # 10 by default 
     
