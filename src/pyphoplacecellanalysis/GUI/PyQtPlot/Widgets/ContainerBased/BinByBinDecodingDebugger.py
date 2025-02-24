@@ -17,10 +17,15 @@ from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphocorehelpers.print_helpers import strip_type_str_to_classname
 from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
 
+from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
+from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
+from pyphocorehelpers.DataStructure.RenderPlots.PyqtgraphRenderPlots import PyqtgraphRenderPlots
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericPyQtGraphContainer
+
 
 @metadata_attributes(short_name=None, tags=['pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-24 17:22', related_items=[])
 @define(slots=False, eq=False)
-class BinByBinDecodingDebugger:
+class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
     """ handles displaying the process of debugging decoding for each time bin
     
     Usage 1 > Plotting Laps:    
@@ -55,14 +60,19 @@ class BinByBinDecodingDebugger:
 
 
     """
-    plots: RenderPlots = field(repr=keys_only_repr)
-    plots_data: RenderPlotsData = field(repr=keys_only_repr)
-    ui: PhoUIContainer = field(repr=keys_only_repr)
-    params: VisualizationParameters = field(repr=keys_only_repr)
-
+    # ==================================================================================================================== #
+    # GenericPyQtGraphContainer Conformance                                                                                #
+    # ==================================================================================================================== #
+    name: str = field(default='binByBinDecodingDebugger')
+    plots: PyqtgraphRenderPlots = field(default=Factory(PyqtgraphRenderPlots, 'binByBinDecodingDebugger'))
+    plot_data: RenderPlotsData = field(default=Factory(RenderPlotsData, 'binByBinDecodingDebugger'))
+    ui: PhoUIContainer = field(default=Factory(PhoUIContainer, 'binByBinDecodingDebugger'))
+    params: VisualizationParameters = field(default=Factory(VisualizationParameters, 'binByBinDecodingDebugger'), repr=keys_only_repr)
+    
     # time_bin_size: float = field(default=0.500) # 500ms
     # spikes_df: pd.DataFrame = field()
     # global_laps_epochs_df: pd.DataFrame = field()
+    
     @classmethod
     def build_spike_counts_and_decoder_outputs(cls, a_decoder, epochs_df, spikes_df, time_bin_size=0.500, epoch_id_col_name: str='lap_id', debug_print=False):
         """ 
@@ -321,7 +331,7 @@ class BinByBinDecodingDebugger:
 
 
 
-        win.nextRow()
+        # win.nextRow()
         win.setWindowTitle('BinByBinDecodingDebugger')
         win.show()
         return win, out_pf1D_decoder_template_objects, (_out_decoded_active_plots, _out_decoded_active_plots_data)
