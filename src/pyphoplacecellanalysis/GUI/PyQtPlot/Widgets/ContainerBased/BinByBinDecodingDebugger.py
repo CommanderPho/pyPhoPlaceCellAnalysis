@@ -17,15 +17,15 @@ from pyphocorehelpers.print_helpers import strip_type_str_to_classname
 from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
 
 
-# @define(slots=False, eq=False)
 @metadata_attributes(short_name=None, tags=['pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-24 17:22', related_items=[])
+@define(slots=False, eq=False)
 class BinByBinDecodingDebugger:
     """ handles displaying the process of debugging decoding for each time bin
     
     Usage:    
-        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.BinByBinDecodingDebugger import BinByBinDecodingDebugger 
         from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import LayoutScrollability, pyqtplot_build_image_bounds_extent
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TemplateDebugger import BaseTemplateDebuggingMixin, build_pf1D_heatmap_with_labels_and_peaks, TrackTemplates
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.BinByBinDecodingDebugger import BinByBinDecodingDebugger 
 
         # Example usage:
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
@@ -209,10 +209,12 @@ class BinByBinDecodingDebugger:
             out_pf1D_decoder_template_objects.append(_obj)
 
         win.nextRow()
+        win.setWindowTitle('BinByBinDecodingDebugger')
         win.show()
         return win, out_pf1D_decoder_template_objects, (_out_decoded_active_plots, _out_decoded_active_plots_data)
 
 
+    @function_attributes(short_name=None, tags=['MAIN', 'plot', 'GUI'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-24 12:19', related_items=[])
     @classmethod
     def plot_bin_by_bin_decoding_example(cls, curr_active_pipeline, track_templates, time_bin_size: float = 0.250, a_lap_id: int = 9, a_decoder_name = 'long_LR'):
         """
