@@ -31,6 +31,15 @@ class BinByBinDebuggingData:
     """ 
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.BinByBinDecodingDebugger import BinByBinDebuggingData
     
+    
+    ## INPUTS: neuron_IDs, (active_global_spikes_df, active_window_decoded_epochs_df, active_aclu_spike_counts_dict_list)
+    ## INPUTS: active_window_slice_idxs, active_window_time_bin_edges, active_p_x_given_n
+    plots_container = PyqtgraphRenderPlots(name='PhoTest', root_plot=None) # Create a new one
+    plots_data = RenderPlotsData(name=f'epoch[Test]', spikes_df=active_global_spikes_df, active_aclus=neuron_IDs)
+    win, out_pf1D_decoder_template_objects, (plots_container, plots_data) = BinByBinDecodingDebugger._perform_build_time_binned_decoder_debug_plots(a_decoder=a_decoder, time_bin_edges=active_window_time_bin_edges, p_x_given_n=active_p_x_given_n, active_epoch_active_aclu_spike_counts_list=active_epoch_active_aclu_spike_counts_list,
+                                                                                                                                plots_data=plots_data, plots_container=plots_container,
+                                                                                                                                debug_print=False)
+                                                                                                                                
     """
     decoding_time_bin_size: float = field(repr=True)
     a_decoder: BasePositionDecoder = field(repr=False)
@@ -97,19 +106,19 @@ class BinByBinDebuggingData:
         active_global_spikes_df = deepcopy(self.global_spikes_df).spikes.time_sliced(t_start=active_window_t_start, t_stop=active_window_t_end)
         active_window_decoded_epochs_df = deepcopy(self.decoding_bins_epochs_df).time_slicer.time_slice(t_start=active_window_t_start, t_stop=active_window_t_end)
         active_window_decoded_epochs_df['rel_epoch_idx'] = active_window_decoded_epochs_df.index.to_numpy().astype(int) ## add the ''rel_epoch_idx' column
-        
+        ## constrain plot to just self.n_max_debugged_time_bins time bins:
         if self.n_max_debugged_time_bins is not None:
-                min_time_bin_idx: int = active_window_decoded_epochs_df['label'].astype(int).min()
-                max_time_bin_idx: int = (min_time_bin_idx + self.n_max_debugged_time_bins)-1
-                print(f'self.n_max_debugged_time_bins: {self.n_max_debugged_time_bins}, min_time_bin_idx: {min_time_bin_idx}, max_time_bin_idx: {max_time_bin_idx}')
-                max_time_stop_sec: float = active_window_decoded_epochs_df[(active_window_decoded_epochs_df['label'].astype(int) <= max_time_bin_idx)]['stop'].max()
-                print(f'max_time_stop_sec: {max_time_stop_sec}')
-                # active_global_spikes_df, active_window_decoded_epochs_df, active_epoch_active_aclu_spike_counts_list, (active_window_slice_idxs, active_window_time_bin_edges, active_p_x_given_n) = self.sliced_to_current_window(active_window_t_start, max_time_stop_sec)
-                # active_window_decoded_epochs_df
-                active_global_spikes_df = deepcopy(self.global_spikes_df).spikes.time_sliced(t_start=active_window_t_start, t_stop=max_time_stop_sec)
-                active_window_decoded_epochs_df = deepcopy(self.decoding_bins_epochs_df).time_slicer.time_slice(t_start=active_window_t_start, t_stop=max_time_stop_sec)
-                active_window_decoded_epochs_df['rel_epoch_idx'] = active_window_decoded_epochs_df.index.to_numpy().astype(int) ## add the ''rel_epoch_idx' column
-                
+            min_time_bin_idx: int = active_window_decoded_epochs_df['label'].astype(int).min()
+            max_time_bin_idx: int = (min_time_bin_idx + self.n_max_debugged_time_bins)-1
+            print(f'self.n_max_debugged_time_bins: {self.n_max_debugged_time_bins}, min_time_bin_idx: {min_time_bin_idx}, max_time_bin_idx: {max_time_bin_idx}')
+            max_time_stop_sec: float = active_window_decoded_epochs_df[(active_window_decoded_epochs_df['label'].astype(int) <= max_time_bin_idx)]['stop'].max()
+            print(f'max_time_stop_sec: {max_time_stop_sec}')
+            # active_global_spikes_df, active_window_decoded_epochs_df, active_epoch_active_aclu_spike_counts_list, (active_window_slice_idxs, active_window_time_bin_edges, active_p_x_given_n) = self.sliced_to_current_window(active_window_t_start, max_time_stop_sec)
+            # active_window_decoded_epochs_df
+            active_global_spikes_df = deepcopy(self.global_spikes_df).spikes.time_sliced(t_start=active_window_t_start, t_stop=max_time_stop_sec)
+            active_window_decoded_epochs_df = deepcopy(self.decoding_bins_epochs_df).time_slicer.time_slice(t_start=active_window_t_start, t_stop=max_time_stop_sec)
+            active_window_decoded_epochs_df['rel_epoch_idx'] = active_window_decoded_epochs_df.index.to_numpy().astype(int) ## add the ''rel_epoch_idx' column
+            
 
         active_spike_counts_per_bin_df: pd.DataFrame = active_global_spikes_df.groupby('binned_time')['aclu'].value_counts().unstack(fill_value=0)
 
