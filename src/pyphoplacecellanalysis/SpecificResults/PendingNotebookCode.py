@@ -26,7 +26,7 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.programming_helpers import metadata_attributes
 
 from functools import wraps, partial
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult, SingleEpochDecodedResult
 
 
 # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
@@ -64,6 +64,61 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.PyqtgraphTi
 import numpy as np
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore
+
+
+def plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipeline, a_decoder, a_decoded_result: DecodedFilterEpochsResult):
+    """ 
+    
+    """
+    from pyphocorehelpers.DataStructure.RenderPlots.PyqtgraphRenderPlots import PyqtgraphRenderPlots
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.BinByBinDecodingDebugger import BinByBinDebuggingData, BinByBinDecodingDebugger
+
+
+    neuron_IDs = deepcopy(a_decoder.neuron_IDs)
+    global_spikes_df = get_proper_global_spikes_df(curr_active_pipeline).spikes.sliced_by_neuron_id(neuron_IDs) ## only get the relevant spikes
+    ## OUTPUTS: neuron_IDs, global_spikes_df, active_window_time_bins
+    active_2d_plot = spike_raster_window.spike_raster_plt_2d
+    active_spikes_window = active_2d_plot.spikes_window
+    decoding_time_bin_size: float = a_decoded_result.decoding_time_bin_size
+    single_continuous_result: SingleEpochDecodedResult = a_decoded_result.get_result_for_epoch(0) # SingleEpochDecodedResult
+    decoding_bins_epochs_df: pd.DataFrame = single_continuous_result.build_pseudo_epochs_df_from_decoding_bins().epochs.get_valid_df()
+    bin_by_bin_data: BinByBinDebuggingData = BinByBinDebuggingData.init_from_single_continuous_result(a_decoder=a_decoder, global_spikes_df=global_spikes_df, single_continuous_result=single_continuous_result, decoding_time_bin_size=decoding_time_bin_size, n_max_debugged_time_bins=25)
+    ## OUTPUTS: bin_by_bin_data
+
+    ## INPUTS: active_spikes_window, global_spikes_df, decoding_bins_epochs_df
+    ## Slice to current window:
+    active_window_t_start, active_window_t_end = active_spikes_window.active_time_window
+    print(f'active_window_t_start: {active_window_t_start}, active_window_t_end: {active_window_t_end}')
+    active_global_spikes_df, active_window_decoded_epochs_df, active_epoch_active_aclu_spike_counts_list, (active_window_slice_idxs, active_window_time_bin_edges, active_p_x_given_n) = bin_by_bin_data.sliced_to_current_window(active_window_t_start, active_window_t_end)
+
+    ## OUTPUTS: active_window_slice_idxs, active_window_time_bin_edges, active_p_x_given_n
+
+    ## OUTPUTS: active_global_spikes_df, active_window_decoded_epochs_df, active_epoch_active_aclu_spike_counts_list
+
+    ## INPUTS: neuron_IDs, (active_global_spikes_df, active_window_decoded_epochs_df, active_aclu_spike_counts_dict_list)
+    ## INPUTS: active_window_slice_idxs, active_window_time_bin_edges, active_p_x_given_n
+    plots_container = PyqtgraphRenderPlots(name='PhoTest', root_plot=None) # Create a new one
+    plots_data = RenderPlotsData(name=f'epoch[Test]', spikes_df=active_global_spikes_df, a_decoder=a_decoder, active_aclus=neuron_IDs, bin_by_bin_data=bin_by_bin_data)
+    win, out_pf1D_decoder_template_objects, (plots_container, plots_data) = BinByBinDecodingDebugger._perform_build_time_binned_decoder_debug_plots(a_decoder=a_decoder, time_bin_edges=active_window_time_bin_edges, p_x_given_n=active_p_x_given_n, active_epoch_active_aclu_spike_counts_list=active_epoch_active_aclu_spike_counts_list,
+                                                                                                                                plots_data=plots_data, plots_container=plots_container,
+                                                                                                                                debug_print=False)
+
+
+    # Later when data changes:
+    def _on_update_fcn():
+        """ captures: active_spikes_window, bin_by_bin_data, 
+        """
+        ## INPUTS: active_spikes_window, global_spikes_df, decoding_bins_epochs_df
+        ## Slice to current window:
+        active_window_t_start, active_window_t_end = active_spikes_window.active_time_window
+        print(f'active_window_t_start: {active_window_t_start}, active_window_t_end: {active_window_t_end}')
+        active_global_spikes_df, active_window_decoded_epochs_df, active_epoch_active_aclu_spike_counts_list, (active_window_slice_idxs, active_window_time_bin_edges, active_p_x_given_n) = bin_by_bin_data.sliced_to_current_window(active_window_t_start, active_window_t_end)
+        win, out_pf1D_decoder_template_objects, (plots_container, plots_data) = BinByBinDecodingDebugger.update_time_binned_decoder_debug_plots(win, out_pf1D_decoder_template_objects, plots_container, plots_data, new_time_bin_edges=active_window_time_bin_edges, new_p_x_given_n=active_p_x_given_n, new_active_aclu_spike_counts_list=active_epoch_active_aclu_spike_counts_list)
+
+
+    return win, out_pf1D_decoder_template_objects, (plots_container, plots_data), _on_update_fcn
+
+
 
 @function_attributes(short_name=None, tags=['mixin', 'sync', 'QT'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-24 17:07', related_items=[])
 class Decoded2DPosteriorTimeSyncMixin:
@@ -637,7 +692,7 @@ from neuropy.utils.indexing_helpers import PandasHelpers
 @function_attributes(short_name=None, tags=['UNFINISHED', 'plotting', 'computing'], input_requires=[], output_provides=[], uses=['_perform_plot_multi_decoder_meas_pred_position_track'], used_by=[], creation_date='2025-02-13 14:58', related_items=['_perform_plot_multi_decoder_meas_pred_position_track'])
 def add_continuous_decoded_posterior(spike_raster_window, curr_active_pipeline, desired_time_bin_size: float, debug_print=True):
     """ computes the continuously decoded position posteriors (if needed) using the pipeline, then adds them as a new track to the SpikeRaster2D 
-    
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import add_continuous_decoded_posterior
     """
     # ==================================================================================================================== #
     # COMPUTING                                                                                                            #
@@ -655,7 +710,7 @@ def add_continuous_decoded_posterior(spike_raster_window, curr_active_pipeline, 
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewDecodedPosteriors_MatplotlibPlotCommand
 
     display_output = {}
-    AddNewDecodedPosteriors_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, action_identifier='actionPseudo2DDecodedEpochsDockedMatplotlibView')
+    AddNewDecodedPosteriors_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=None, active_context=None, display_output=display_output, action_identifier='actionPseudo2DDecodedEpochsDockedMatplotlibView')
 
     all_global_menus_actionsDict, global_flat_action_dict = spike_raster_window.build_all_menus_actions_dict()
     if debug_print:
@@ -671,7 +726,6 @@ def add_continuous_decoded_posterior(spike_raster_window, curr_active_pipeline, 
 
 
     menu_commands = [
-        'AddTimeCurves.Position',
         # 'DockedWidgets.LongShortDecodedEpochsDockedMatplotlibView',
         # 'DockedWidgets.DirectionalDecodedEpochsDockedMatplotlibView',
         # 'DockedWidgets.TrackTemplatesDecodedEpochsDockedMatplotlibView',
