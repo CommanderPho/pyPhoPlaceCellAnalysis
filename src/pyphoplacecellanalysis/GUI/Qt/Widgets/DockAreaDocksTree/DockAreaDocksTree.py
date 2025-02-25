@@ -32,7 +32,7 @@ uiFile = os.path.join(path, 'DockAreaDocksTree.ui')
 
 @metadata_attributes(short_name=None, tags=['build_dock_area_managing_tree_widget'], input_requires=[], output_provides=[], uses=[], used_by=['build_dock_area_managing_tree_widget'], creation_date='2025-01-28 07:32', related_items=['build_dock_area_managing_tree_widget'])
 class DockAreaDocksTree(QWidget):
-    """ 
+    """ Display an interactive pyqt5 widget for manager Docks
     
     from pyphoplacecellanalysis.GUI.Qt.Widgets.DockAreaDocksTree.DockAreaDocksTree import DockAreaDocksTree
     
@@ -69,8 +69,9 @@ class DockAreaDocksTree(QWidget):
         self.show() # Show the GUI
 
     def initUI(self):
-        pass
-    
+        # Connect context menu signal
+        self.ui.mainTreeWidget.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.ui.mainTreeWidget.customContextMenuRequested.connect(self.show_context_menu)    
 
     def rebuild_dock_tree_items(self, dock_tree_list):
         """ rebuilds the tree items from a list 
@@ -129,6 +130,52 @@ class DockAreaDocksTree(QWidget):
 
 
         main_docks_tree.expandAll()
+
+    # ==================================================================================================================== #
+    # Custom Tree Item Actions                                                                                             #
+    # ==================================================================================================================== #
+    def show_context_menu(self, position):
+        """Shows a custom context menu for leaf tree items"""
+        # Get the item at clicked position
+        item = self.ui.mainTreeWidget.itemAt(position)
+        if item is None:
+            return
+            
+        # Only show menu for leaf nodes (items without children)
+        if item.childCount() == 0:
+            menu = QtWidgets.QMenu()
+            
+            # Add menu actions
+            show_info_action = menu.addAction("Show Info")
+            rename_action = menu.addAction("Rename")
+            
+            # Connect actions
+            show_info_action.triggered.connect(lambda: self.show_item_info(item))
+            rename_action.triggered.connect(lambda: self.rename_item(item))
+            
+            # Show the menu at cursor position
+            menu.exec_(self.ui.mainTreeWidget.viewport().mapToGlobal(position))
+
+    def show_item_info(self, item):
+        """Handler for Show Info action"""
+        dock = item.data(1, 0)  # Get the stored dock from column 1
+        info_text = f"Dock Name: {dock.name()}\nType: {type(dock).__name__}"
+        QtWidgets.QMessageBox.information(self, "Dock Info", info_text)
+
+    def rename_item(self, item):
+        """Handler for Rename action"""
+        dock = item.data(1, 0)
+        current_name = dock.name()
+        new_name, ok = QtWidgets.QInputDialog.getText(
+            self, "Rename Dock", 
+            "Enter new name:", 
+            QtWidgets.QLineEdit.Normal,
+            current_name
+        )
+        if ok and new_name:
+            item.setText(0, new_name)
+            # Emit signal to notify of name change
+            self.sigDockConfigChanged.emit({"dock": dock, "new_name": new_name})
 
 
 ## Start Qt event loop
