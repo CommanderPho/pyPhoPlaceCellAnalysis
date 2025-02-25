@@ -339,6 +339,106 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
     # ==================================================================================================================== #
     # CrosshairsTracingMixin Conformances                                                                                  #
     # ==================================================================================================================== #
+    
+    @function_attributes(short_name=None, tags=['callback'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-25 18:24', related_items=[])
+    def on_crosshair_mouse_moved(self, event, ax, vLine, name, matrix=None, xbins=None, ybins=None):
+        """ Called when mouse moves to update crosshair positions and emit signals
+        
+        History: factored out of a callback `def mouseMoved(event)` in add_crosshairs(...) on 2025-02-25 18:25 
+        
+        Args:
+            event: matplotlib mouse event
+            ax: matplotlib axis
+            vLine: vertical line artist
+            name: name of the crosshair
+            matrix: optional data matrix 
+            xbins: optional x bin values
+            ybins: optional y bin values
+        """
+        are_crosshairs_currently_visible: bool = vLine.get_visible()
+        new_desired_visibility_is_visible: bool = True
+        did_visibility_change: bool = False
+        did_position_change: bool = False
+        
+        if event.inaxes == ax:
+            # Mouse is inside the axes - show and update crosshairs
+            x_point = event.xdata
+            if self.params.crosshairs_enable_y_trace: y_point = event.ydata
+            if self.params.should_force_discrete_to_bins:
+                x_point = float(int(round(x_point)))+0.5
+                if self.params.crosshairs_enable_y_trace: y_point = float(int(round(y_point)))+0.5
+            index_x = int(x_point)
+            if self.params.crosshairs_enable_y_trace: index_y = int(y_point)
+            value_str_arr: List[str] = []
+            value_str: str = ''
+            if matrix is not None:
+                shape = np.shape(matrix)
+                valid_x = (index_x >= 0 and index_x < shape[0])
+                valid_y = (index_y >= 0 and index_y < shape[1]) if self.params.crosshairs_enable_y_trace else True
+                if valid_x and valid_y:
+                    if self.params.should_force_discrete_to_bins:
+                        if (xbins is not None) and (ybins is not None) and self.params.crosshairs_enable_y_trace:
+                            value_str_arr.extend([f"(x[{index_x}]={xbins[index_x]:.3f}", f"y[{index_y}]={ybins[index_y]:.3f}"])
+                        else:
+                            value_str_arr.extend([f"(x={index_x}", f"y={index_x if not self.params.crosshairs_enable_y_trace else index_y}"])
+                    else:
+                        value_str_arr.extend([f"x={x_point:.1f}", f"y={y_point:.1f}"] if self.params.crosshairs_enable_y_trace else [f"x={x_point:.1f}", ])
+                    
+                    if self.params.should_force_discrete_to_bins:
+                        if (xbins is not None) and (ybins is not None) and self.params.crosshairs_enable_y_trace:
+                            value_str = f"value={matrix[index_x][index_y]:.3f}"
+                        else:
+                            value_str = f"value={matrix[index_x][index_y]:.3f}"
+                    else:
+                        value_str = f"value={matrix[index_x][index_y]:.3f}" if self.params.crosshairs_enable_y_trace else f"value={matrix[index_x][0]:.3f}"
+                    value_str_arr.append(value_str)
+                    value_str = '' ## clear this string, it won't be used, and will instead be pieced together by the value_str_arr
+                ## END if valid_x and valid_y:
+                
+            else:
+                ## No matrix provided, just show the (x/y)
+                if self.params.should_force_discrete_to_bins:
+                    if (xbins is not None) and (ybins is not None) and self.params.crosshairs_enable_y_trace:
+                        value_str_arr.extend([f"(x[{index_x}]={xbins[index_x]:.3f}", f"y[{index_y}]={ybins[index_y]:.3f}"])
+                    else:
+                        value_str_arr.extend([f"(x={index_x}", f"y={index_x if not self.params.crosshairs_enable_y_trace else index_y}"])
+                else:
+                    value_str_arr.extend([f"x={x_point:.1f}", f"y={y_point:.1f}"] if self.params.crosshairs_enable_y_trace else [f"x={x_point:.1f}", ])       
+                    
+                value_str = self.params.crosshair_value_format_join_symbol.join(value_str_arr)
+
+            # END if matrix is not None
+            value_str = self.params.crosshair_value_format_join_symbol.join(value_str_arr) ## build the final value output string from the value_str_arr
+            old_x_point = vLine.get_xdata()
+            did_position_change = (did_position_change or np.any(old_x_point != x_point))
+            vLine.set_xdata(x_point)
+                                
+            if self.params.crosshairs_enable_y_trace: 
+                old_y_point = self.plots[name]['crosshairs_hLine'].get_ydata()
+                did_position_change = (did_position_change or np.any(old_y_point != y_point))
+                self.plots[name]['crosshairs_hLine'].set_ydata(y_point)
+                
+            self.sigCrosshairsUpdated.emit(self, name, value_str) ## emit the `sigCrosshairsUpdated` event
+                            
+            new_desired_visibility_is_visible = True
+        else:
+            # Mouse left the axes - hide crosshairs
+            new_desired_visibility_is_visible = False
+            
+        # Check vertical line visibility
+        are_crosshairs_currently_visible: bool = vLine.get_visible()
+        did_visibility_change: bool = (are_crosshairs_currently_visible != new_desired_visibility_is_visible)
+
+        if did_visibility_change:
+            ## update visibility
+            vLine.set_visible(new_desired_visibility_is_visible)
+            if self.params.crosshairs_enable_y_trace:
+                self.plots[name]['crosshairs_hLine'].set_visible(new_desired_visibility_is_visible)
+                
+        ## END if did_visibility_change
+        needs_redraw: bool = (did_position_change or did_visibility_change)
+        if needs_redraw:
+            ax.figure.canvas.draw_idle()
     def add_crosshairs(self, plot_item, name, matrix=None, xbins=None, ybins=None, enable_y_trace:bool=True, should_force_discrete_to_bins:Optional[bool]=True, **kwargs):
         """ adds crosshairs that allow the user to hover a bin and have the label dynamically display the bin (x, y) and value.
         
@@ -401,101 +501,19 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
                 hLine = ax.axhline(y=0, **horizontal_crosshair_formatting_dict, label=f'{name}.crosshairs_hLine')
                 self.plots[name]['crosshairs_hLine'] = hLine
 
-            def mouseMoved(event):
-                """ called when the mouse is moved
-                captures: self, ax, vLine, matrix
-                
-                """
-                are_crosshairs_currently_visible: bool = vLine.get_visible()
-                new_desired_visibility_is_visible: bool = True
-                did_visibility_change: bool = False
-                did_position_change: bool = False
-                
-                if event.inaxes == ax:
-                    # Mouse is inside the axes - show and update crosshairs
-                    x_point = event.xdata
-                    if self.params.crosshairs_enable_y_trace: y_point = event.ydata
-                    if self.params.should_force_discrete_to_bins:
-                        x_point = float(int(round(x_point)))+0.5
-                        if self.params.crosshairs_enable_y_trace: y_point = float(int(round(y_point)))+0.5
-                    index_x = int(x_point)
-                    if self.params.crosshairs_enable_y_trace: index_y = int(y_point)
-                    value_str_arr: List[str] = []
-                    value_str: str = ''
-                    if matrix is not None:
-                        shape = np.shape(matrix)
-                        valid_x = (index_x >= 0 and index_x < shape[0])
-                        valid_y = (index_y >= 0 and index_y < shape[1]) if self.params.crosshairs_enable_y_trace else True
-                        if valid_x and valid_y:
-                            if self.params.should_force_discrete_to_bins:
-                                if (xbins is not None) and (ybins is not None) and self.params.crosshairs_enable_y_trace:
-                                    value_str_arr.extend([f"(x[{index_x}]={xbins[index_x]:.3f}", f"y[{index_y}]={ybins[index_y]:.3f}"])
-                                else:
-                                    value_str_arr.extend([f"(x={index_x}", f"y={index_x if not self.params.crosshairs_enable_y_trace else index_y}"])
-                            else:
-                                value_str_arr.extend([f"x={x_point:.1f}", f"y={y_point:.1f}"] if self.params.crosshairs_enable_y_trace else [f"x={x_point:.1f}", ])
-                            
+            ## connect the callback:
+            cid = ax.figure.canvas.mpl_connect('motion_notify_event', lambda event: self.on_crosshair_mouse_moved(event, ax, vLine, name, matrix, xbins, ybins))
+            self.ui.connections[name] = {'motion_notify_event': cid,
+                                         'figure_enter_event': ax.figure.canvas.mpl_connect('figure_enter_event', self.on_figure_enter),
+                                         'figure_leave_event': ax.figure.canvas.mpl_connect('figure_leave_event', self.on_figure_leave),
+            }
 
-                            if self.params.should_force_discrete_to_bins:
-                                if (xbins is not None) and (ybins is not None) and self.params.crosshairs_enable_y_trace:
-                                    value_str = f"value={matrix[index_x][index_y]:.3f}"
-                                else:
-                                    value_str = f"value={matrix[index_x][index_y]:.3f}"
-                            else:
-                                value_str = f"value={matrix[index_x][index_y]:.3f}" if self.params.crosshairs_enable_y_trace else f"value={matrix[index_x][0]:.3f}"
-                            value_str_arr.append(value_str)
-                            value_str = '' ## clear this string, it won't be used, and will instead be pieced together by the value_str_arr
-                        ## END if valid_x and valid_y:
-                        
-                    else:
-                        ## No matrix provided, just show the (x/y)
-                        if self.params.should_force_discrete_to_bins:
-                            if (xbins is not None) and (ybins is not None) and self.params.crosshairs_enable_y_trace:
-                                value_str_arr.extend([f"(x[{index_x}]={xbins[index_x]:.3f}", f"y[{index_y}]={ybins[index_y]:.3f}"])
-                            else:
-                                 value_str_arr.extend([f"(x={index_x}", f"y={index_x if not self.params.crosshairs_enable_y_trace else index_y}"])
-                        else:
-                             value_str_arr.extend([f"x={x_point:.1f}", f"y={y_point:.1f}"] if self.params.crosshairs_enable_y_trace else [f"x={x_point:.1f}", ])       
-                             
-                        value_str = crosshair_value_format_join_symbol.join(value_str_arr)
+            # 'figure_enter_event'    # Mouse enters figure
+            # 'figure_leave_event'    # Mouse leaves figure
+            # 'axes_enter_event'      # Mouse enters axes
+            # 'axes_leave_event'      # Mouse leaves axes
 
-                    # END if matrix is not None
-                    value_str = crosshair_value_format_join_symbol.join(value_str_arr) ## build the final value output string from the value_str_arr
-                    # print(f'value_str: {value_str}')
-                    old_x_point = vLine.get_xdata()
-                    did_position_change = (did_position_change or np.any(old_x_point != x_point))
-                    vLine.set_xdata(x_point)
-                                        
-                    if self.params.crosshairs_enable_y_trace: 
-                        old_y_point = self.plots[name]['crosshairs_hLine'].get_ydata()
-                        did_position_change = (did_position_change or np.any(old_y_point != y_point))
-                        self.plots[name]['crosshairs_hLine'].set_ydata(y_point)
-                        
-                    # if self.params.crosshairs_enable_y_trace: self.plots[name]['crosshairs_hLine'].set_ydata(y_point)
-                    self.sigCrosshairsUpdated.emit(self, name, value_str) ## emit the `sigCrosshairsUpdated` event
-                                     
-                    new_desired_visibility_is_visible = True
-                else:
-                    # Mouse left the axes - hide crosshairs
-                    new_desired_visibility_is_visible = False
-                    
-                # Check vertical line visibility
-                are_crosshairs_currently_visible: bool = vLine.get_visible()
-                did_visibility_change: bool = (are_crosshairs_currently_visible != new_desired_visibility_is_visible)
 
-                if did_visibility_change:
-                    ## update visibility
-                    vLine.set_visible(new_desired_visibility_is_visible)
-                    if self.params.crosshairs_enable_y_trace:
-                        self.plots[name]['crosshairs_hLine'].set_visible(new_desired_visibility_is_visible)
-                        
-                ## END if did_visibility_change
-                needs_redraw: bool = (did_position_change or did_visibility_change)
-                if needs_redraw:
-                    ax.figure.canvas.draw_idle()
-            ## END def mouseMoved(event)
-            cid = ax.figure.canvas.mpl_connect('motion_notify_event', mouseMoved)
-            self.ui.connections[name] = cid
         else:
             print(f"already have 'crosshairs_vLine' in plots_dict")
 
