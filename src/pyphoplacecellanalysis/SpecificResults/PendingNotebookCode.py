@@ -70,7 +70,6 @@ def plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipe
     """ 
     
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_attached_BinByBinDecodingDebugger
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_attached_BinByBinDecodingDebugger
 
     ## INPUTS: a_decoder, a_decoded_result
     win, out_pf1D_decoder_template_objects, (plots_container, plots_data), _on_update_fcn = plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipeline, a_decoder=a_decoder, a_decoded_result=a_decoded_result)
@@ -695,14 +694,14 @@ from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, po
 from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
 from neuropy.utils.indexing_helpers import PandasHelpers
 
-@function_attributes(short_name=None, tags=['UNFINISHED', 'plotting', 'computing'], input_requires=[], output_provides=[], uses=['_perform_plot_multi_decoder_meas_pred_position_track'], used_by=[], creation_date='2025-02-13 14:58', related_items=['_perform_plot_multi_decoder_meas_pred_position_track'])
+@function_attributes(short_name=None, tags=['UNFINISHED', 'plotting', 'computing'], input_requires=[], output_provides=[], uses=['AddNewDecodedPosteriors_MatplotlibPlotCommand', '_perform_plot_multi_decoder_meas_pred_position_track'], used_by=[], creation_date='2025-02-13 14:58', related_items=['_perform_plot_multi_decoder_meas_pred_position_track'])
 def add_continuous_decoded_posterior(spike_raster_window, curr_active_pipeline, desired_time_bin_size: float, debug_print=True):
     """ computes the continuously decoded position posteriors (if needed) using the pipeline, then adds them as a new track to the SpikeRaster2D 
     
     Usage:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import add_continuous_decoded_posterior
 
-        nested_dock_items, nested_dynamic_docked_widget_container_widgets = add_continuous_decoded_posterior(spike_raster_window=spike_raster_window, curr_active_pipeline=curr_active_pipeline, desired_time_bin_size=0.50, debug_print=True)
+        (nested_dock_items, nested_dynamic_docked_widget_container_widgets), (a_continuously_decoded_dict, pseudo2D_decoder, all_directional_pf1D_Decoder_dict) = add_continuous_decoded_posterior(spike_raster_window=spike_raster_window, curr_active_pipeline=curr_active_pipeline, desired_time_bin_size=0.05, debug_print=True)
 
     """
     # ==================================================================================================================== #
@@ -713,7 +712,38 @@ def add_continuous_decoded_posterior(spike_raster_window, curr_active_pipeline, 
     #                                                   enabled_filter_names=None, fail_on_exception=True, debug_print=False)
     # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields', 'directional_decoders_decode_continuous'], computation_kwargs_list=[{'laps_decoding_time_bin_size': 0.058}, {'time_bin_size': 0.058, 'should_disable_cache':False}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
     curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': desired_time_bin_size, 'should_disable_cache': False}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
-    
+    ## get the result data:
+    try:
+        ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
+        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+        pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
+        all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+        a_continuously_decoded_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict.get(desired_time_bin_size, None)
+        info_string: str = f" - t_bin_size: {desired_time_bin_size}"
+
+    except (KeyError, AttributeError) as e:
+        # KeyError: 'DirectionalDecodersDecoded'
+        print(f'add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epochs(...) failed to add any tracks, perhaps because the pipeline is missing any computed "DirectionalDecodersDecoded" global results. Error: "{e}". Skipping.')
+        a_continuously_decoded_dict = None
+        pseudo2D_decoder = None        
+        pass
+
+    except Exception as e:
+        raise
+
+
+    # # output_dict = _cmd.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals(curr_active_pipeline=_cmd._active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, **enable_rows_config_kwargs)
+    # output_dict = AddNewDecodedPosteriors_MatplotlibPlotCommand.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, a_pseudo2D_decoder=pseudo2D_decoder, debug_print=debug_print, **kwargs)
+    # for a_key, an_output_tuple in output_dict.items():
+    #     identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = an_output_tuple                
+    #     # if a_key not in all_time_bin_sizes_output_dict:
+    #     #     all_time_bin_sizes_output_dict[a_key] = [] ## init empty list
+    #     # all_time_bin_sizes_output_dict[a_key].append(an_output_tuple)
+        
+    #     assert (identifier_name not in flat_all_time_bin_sizes_output_tuples_dict), f"identifier_name: {identifier_name} already in flat_all_time_bin_sizes_output_tuples_dict: {list(flat_all_time_bin_sizes_output_tuples_dict.keys())}"
+    #     flat_all_time_bin_sizes_output_tuples_dict[identifier_name] = an_output_tuple
+
+
 
     # ==================================================================================================================== #
     # PLOTTING                                                                                                             #
@@ -762,8 +792,7 @@ def add_continuous_decoded_posterior(spike_raster_window, curr_active_pipeline, 
 
     ## OUTPUTS: nested_dock_items, nested_dynamic_docked_widget_container_widgets
 
-
-    return nested_dock_items, nested_dynamic_docked_widget_container_widgets
+    return (nested_dock_items, nested_dynamic_docked_widget_container_widgets), (a_continuously_decoded_dict, pseudo2D_decoder, all_directional_pf1D_Decoder_dict)
 
 
 

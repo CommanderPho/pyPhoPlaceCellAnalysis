@@ -8142,6 +8142,9 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         widget.plots_data.variable_name = variable_name
         if a_1D_posterior is not None:
             widget.plots_data.matrix = deepcopy(a_1D_posterior)
+
+        if a_position_decoder is not None:
+            widget.plots_data.a_decoder = deepcopy(a_position_decoder)
         
         ## try to add the measured_positions
         measured_position_df = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
