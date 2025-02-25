@@ -545,24 +545,36 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
 
 
     def remove_crosshairs(self, plot_item, name=None):
-        print(f'CustomMatplotlibWidget.remove_crosshairs(plot_item: {plot_item}, name: "{name}"):')
+        """Removes crosshairs from the specified plot or all plots if name is None
+        
+        Args:
+            plot_item: matplotlib axis
+            name: optional name of specific crosshair to remove
+        """
         if name is None:
+            # Remove all crosshairs
             for key in list(self.plots.keys()):
                 for ln in ('crosshairs_vLine','crosshairs_hLine'):
-                    if (self.plots[key] is not None) and (ln in self.plots[key]): self.plots[key][ln].remove()
-                if (plot_item is not None) and (key in self.ui.connections): plot_item.figure.canvas.mpl_disconnect(self.ui.connections[key]); del self.ui.connections[key]
+                    if (self.plots[key] is not None) and (ln in self.plots[key]): 
+                        self.plots[key][ln].remove()
+                if (plot_item is not None) and (key in self.ui.connections):
+                    plot_item.figure.canvas.mpl_disconnect(self.ui.connections[key])
+                    del self.ui.connections[key]
                 del self.plots[key]
         else:
+            # Remove specific named crosshair
             if name in self.plots:
                 if self.plots[name] is not None:
                     for ln in ('crosshairs_vLine','crosshairs_hLine'):
-                        if (ln in self.plots[name]): self.plots[name][ln].remove()
-                #END if self.plots[name] is not None...
-                if (plot_item is not None) and (name in self.ui.connections): plot_item.figure.canvas.mpl_disconnect(self.ui.connections[name]); del self.ui.connections[name]
+                        if (ln in self.plots[name]): 
+                            self.plots[name][ln].remove()
+                if (plot_item is not None) and (name in self.ui.connections):
+                    plot_item.figure.canvas.mpl_disconnect(self.ui.connections[name])
+                    del self.ui.connections[name]
                 if (self.plots[name] is not None):
                     del self.plots[name]
-            else:
-                print(f"name '{name}' was specified but this could not be found in self.plots[name]: self.plots.keys(): {list(self.plots.keys())}")
+        
+        # Trigger redraw
         plot_item.figure.canvas.draw_idle()
 
 
