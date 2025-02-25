@@ -885,6 +885,20 @@ class DynamicDockDisplayAreaOwningMixin:
         """Delegates to child widget's get_flat_widgets_list"""
         return self.dock_manager_widget.get_flat_dock_identifiers_list(debug_print=debug_print)
 
+
+    def get_leaf_only_flat_dock_identifiers_list(self) -> List[str]:
+        """Delegates to child widget's get_flat_widgets_list"""
+        flat_dock_item_tuple_dict: Dict[str, Tuple] = self.get_flat_dock_item_tuple_dict()
+        leaf_only_flat_dockwidgets_dict = {k:a_widget for k, (a_dock, a_widget) in flat_dock_item_tuple_dict.items() if ('LEAF' == a_dock.config.additional_metadata.get('type', 'LEAF')) }
+        return list(leaf_only_flat_dockwidgets_dict.keys())
+    
+    def get_group_only_flat_dock_identifiers_list(self) -> List[str]:
+        """Delegates to child widget's get_flat_widgets_list"""
+        flat_dock_item_tuple_dict: Dict[str, Tuple] = self.get_flat_dock_item_tuple_dict()
+        group_only_flat_dockwidgets_dict = {k:a_widget for k, (a_dock, a_widget) in flat_dock_item_tuple_dict.items() if ('GROUP' == a_dock.config.additional_metadata.get('type', 'LEAF')) }
+        return list(group_only_flat_dockwidgets_dict.keys())
+
+
     def get_flat_dockitems_list(self, debug_print=False) -> List[Dock]:
         """Delegates to child widget's get_flat_dockitems_list"""
         return self.dock_manager_widget.get_flat_dockitems_list(debug_print=debug_print)
