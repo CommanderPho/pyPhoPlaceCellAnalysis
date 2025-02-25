@@ -69,6 +69,12 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore
 def plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipeline, a_decoder, a_decoded_result: DecodedFilterEpochsResult):
     """ 
     
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_attached_BinByBinDecodingDebugger
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_attached_BinByBinDecodingDebugger
+
+    ## INPUTS: a_decoder, a_decoded_result
+    win, out_pf1D_decoder_template_objects, (plots_container, plots_data), _on_update_fcn = plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipeline, a_decoder=a_decoder, a_decoded_result=a_decoded_result)
+        
     """
     from pyphocorehelpers.DataStructure.RenderPlots.PyqtgraphRenderPlots import PyqtgraphRenderPlots
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.BinByBinDecodingDebugger import BinByBinDebuggingData, BinByBinDecodingDebugger
@@ -692,7 +698,12 @@ from neuropy.utils.indexing_helpers import PandasHelpers
 @function_attributes(short_name=None, tags=['UNFINISHED', 'plotting', 'computing'], input_requires=[], output_provides=[], uses=['_perform_plot_multi_decoder_meas_pred_position_track'], used_by=[], creation_date='2025-02-13 14:58', related_items=['_perform_plot_multi_decoder_meas_pred_position_track'])
 def add_continuous_decoded_posterior(spike_raster_window, curr_active_pipeline, desired_time_bin_size: float, debug_print=True):
     """ computes the continuously decoded position posteriors (if needed) using the pipeline, then adds them as a new track to the SpikeRaster2D 
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import add_continuous_decoded_posterior
+    
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import add_continuous_decoded_posterior
+
+        nested_dock_items, nested_dynamic_docked_widget_container_widgets = add_continuous_decoded_posterior(spike_raster_window=spike_raster_window, curr_active_pipeline=curr_active_pipeline, desired_time_bin_size=0.50, debug_print=True)
+
     """
     # ==================================================================================================================== #
     # COMPUTING                                                                                                            #
