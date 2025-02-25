@@ -439,6 +439,31 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
         needs_redraw: bool = (did_position_change or did_visibility_change)
         if needs_redraw:
             ax.figure.canvas.draw_idle()
+
+
+
+    def on_figure_enter(self, event):
+        """Called when mouse enters the figure to restore crosshair visibility"""
+        for name, plot_items in self.plots.items():
+            if 'crosshairs_vLine' in plot_items:
+                plot_items['crosshairs_vLine'].set_visible(True)
+                if self.params.crosshairs_enable_y_trace:
+                    plot_items['crosshairs_hLine'].set_visible(True)
+        # Redraw to show changes
+        event.canvas.draw_idle()
+
+    def on_figure_leave(self, event):
+        """Called when mouse leaves the figure to hide all crosshairs"""
+        for name, plot_items in self.plots.items():
+            if 'crosshairs_vLine' in plot_items:
+                plot_items['crosshairs_vLine'].set_visible(False)
+                if self.params.crosshairs_enable_y_trace:
+                    plot_items['crosshairs_hLine'].set_visible(False)
+        # Redraw to hide changes
+        event.canvas.draw_idle()
+
+
+
     def add_crosshairs(self, plot_item, name, matrix=None, xbins=None, ybins=None, enable_y_trace:bool=True, should_force_discrete_to_bins:Optional[bool]=True, **kwargs):
         """ adds crosshairs that allow the user to hover a bin and have the label dynamically display the bin (x, y) and value.
         
