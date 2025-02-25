@@ -21,6 +21,120 @@ from pyphocorehelpers.DataStructure.general_parameter_containers import Visualiz
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphocorehelpers.DataStructure.RenderPlots.PyqtgraphRenderPlots import PyqtgraphRenderPlots
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericPyQtGraphContainer
+from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
+from pyphocorehelpers.DataStructure.RenderPlots.PyqtgraphRenderPlots import PyqtgraphRenderPlots
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
+
+@define(slots=False, eq=False)
+class BinByBinDebuggingData:
+    """ 
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.BinByBinDecodingDebugger import BinByBinDebuggingData
+    
+    """
+    decoding_time_bin_size: float = field(repr=True)
+    a_decoder: BasePositionDecoder = field(repr=False)
+    global_spikes_df: pd.DataFrame = field(repr=False)
+    decoding_bins_epochs_df: pd.DataFrame = field(repr=keys_only_repr)
+    time_bin_edges: NDArray = field(repr=keys_only_repr)
+    p_x_given_n: NDArray = field(repr=keys_only_repr)
+    n_max_debugged_time_bins: Optional[int] = field(default=20)
+
+    @classmethod
+    def init_from_single_continuous_result(cls, a_decoder, global_spikes_df: pd.DataFrame, single_continuous_result: SingleEpochDecodedResult, decoding_time_bin_size: float, n_max_debugged_time_bins: Optional[int] = 20):
+        """
+        decoding_time_bin_size: float = a_decoded_result.decoding_time_bin_size
+        single_continuous_result: SingleEpochDecodedResult = a_decoded_result.get_result_for_epoch(0) # SingleEpochDecodedResult
+        a_decoder = deepcopy(results1D.decoders[a_decoder_name])
+        neuron_IDs = deepcopy(a_decoder.neuron_IDs)
+        global_spikes_df = get_proper_global_spikes_df(curr_active_pipeline).spikes.sliced_by_neuron_id(neuron_IDs) ## only get the relevant spikes
+        
+        
+        bin_by_bin_data: BinByBinDebuggingData = BinByBinDebuggingData.init_from_single_continuous_result(a_decoder=a_decoder, global_spikes_df=global_spikes_df, single_continuous_result=single_continuous_result, decoding_time_bin_size=decoding_time_bin_size)
+        
+        """
+
+        decoding_bins_epochs_df: pd.DataFrame = single_continuous_result.build_pseudo_epochs_df_from_decoding_bins().epochs.get_valid_df()
+        time_bin_edges = deepcopy(single_continuous_result.time_bin_edges)
+        p_x_given_n: NDArray = deepcopy(single_continuous_result.p_x_given_n)
+
+        global_spikes_df = deepcopy(global_spikes_df)
+        global_spikes_df = global_spikes_df.spikes.add_binned_time_column(time_window_edges=time_bin_edges, time_window_edges_binning_info=single_continuous_result.time_bin_container.edge_info) # "binned_time" column added
+        global_spikes_df['binned_time'] = global_spikes_df['binned_time'].astype(int) - 1 # convert to 0-indexed
+        global_spikes_df
+        # a_decoded_result.filter_epochs
+        # a_decoded_result.spkcount
+
+        ## OUTPUTS: decoding_bins_epochs_df, time_bin_edges, p_x_given_n, decoding_time_bin_size
+        ## get the list of all 'aclu' values in the dataframe when groupnig on the 'binned_time' columns:
+        # global_spikes_df['binned_time']
+        # Get unique aclu values per time bin
+        unique_aclus_per_bin = global_spikes_df.groupby('binned_time')['aclu'].unique()
+        # unique_aclus_per_bin
+
+        ## OUTPUTS: unique_aclus_per_bin
+        # assert len(decoding_bins_epochs_df) == len(unique_aclus_per_bin), f"len(decoding_bins_epochs_df): {len(decoding_bins_epochs_df)}, len(unique_aclus_per_bin): {len(unique_aclus_per_bin)}"
+        decoding_bins_epochs_df['active_aclus'] = unique_aclus_per_bin
+        decoding_bins_epochs_df['active_aclus'] = decoding_bins_epochs_df['active_aclus'].apply(lambda x: [] if np.any(pd.isna(x)) else x) ## fill the np.NaNs with empty lists
+        # spike_counts_per_bin = global_spikes_df.groupby('binned_time')['aclu'].value_counts().unstack(fill_value=0) ## global:
+
+        ## OUTPUTS: spike_counts_per_bin
+        decoding_bins_epochs_df
+        _obj = cls(decoding_time_bin_size=decoding_time_bin_size, a_decoder=a_decoder, global_spikes_df=global_spikes_df, decoding_bins_epochs_df=decoding_bins_epochs_df, time_bin_edges=time_bin_edges, p_x_given_n=p_x_given_n, n_max_debugged_time_bins=n_max_debugged_time_bins)
+        return _obj
+    
+
+    def sliced_to_current_window(self, active_window_t_start, active_window_t_end):
+        """ captures: global_spikes_df, decoding_bins_epochs_df, time_bin_edges, p_x_given_n
+        
+        """
+        ## INPUTS: global_spikes_df, decoding_bins_epochs_df
+        ## INPUTS: decoding_bins_epochs_df, time_bin_edges, p_x_given_n
+        ## Slice to current window:
+        
+        print(f'active_window_t_start: {active_window_t_start}, active_window_t_end: {active_window_t_end}')
+
+        active_global_spikes_df = deepcopy(self.global_spikes_df).spikes.time_sliced(t_start=active_window_t_start, t_stop=active_window_t_end)
+        active_window_decoded_epochs_df = deepcopy(self.decoding_bins_epochs_df).time_slicer.time_slice(t_start=active_window_t_start, t_stop=active_window_t_end)
+        active_window_decoded_epochs_df['rel_epoch_idx'] = active_window_decoded_epochs_df.index.to_numpy().astype(int) ## add the ''rel_epoch_idx' column
+        
+        if self.n_max_debugged_time_bins is not None:
+                min_time_bin_idx: int = active_window_decoded_epochs_df['label'].astype(int).min()
+                max_time_bin_idx: int = (min_time_bin_idx + self.n_max_debugged_time_bins)-1
+                print(f'self.n_max_debugged_time_bins: {self.n_max_debugged_time_bins}, min_time_bin_idx: {min_time_bin_idx}, max_time_bin_idx: {max_time_bin_idx}')
+                max_time_stop_sec: float = active_window_decoded_epochs_df[(active_window_decoded_epochs_df['label'].astype(int) <= max_time_bin_idx)]['stop'].max()
+                print(f'max_time_stop_sec: {max_time_stop_sec}')
+                # active_global_spikes_df, active_window_decoded_epochs_df, active_epoch_active_aclu_spike_counts_list, (active_window_slice_idxs, active_window_time_bin_edges, active_p_x_given_n) = self.sliced_to_current_window(active_window_t_start, max_time_stop_sec)
+                # active_window_decoded_epochs_df
+                active_global_spikes_df = deepcopy(self.global_spikes_df).spikes.time_sliced(t_start=active_window_t_start, t_stop=max_time_stop_sec)
+                active_window_decoded_epochs_df = deepcopy(self.decoding_bins_epochs_df).time_slicer.time_slice(t_start=active_window_t_start, t_stop=max_time_stop_sec)
+                active_window_decoded_epochs_df['rel_epoch_idx'] = active_window_decoded_epochs_df.index.to_numpy().astype(int) ## add the ''rel_epoch_idx' column
+                
+
+        active_spike_counts_per_bin_df: pd.DataFrame = active_global_spikes_df.groupby('binned_time')['aclu'].value_counts().unstack(fill_value=0)
+
+        ## INPUTS: active_spike_counts_per_bin
+        # active_spike_counts_per_bin.columns
+        active_aclu_spike_counts_dict_list: List[Dict[types.aclu_index, int]] = active_spike_counts_per_bin_df.to_dict(orient='record')
+        active_aclu_spike_counts_dict_list: List[Dict[types.aclu_index, int]] = [{k:v for k, v in an_aclu_to_spike_count_dict.items() if v > 0} for an_aclu_to_spike_count_dict in active_aclu_spike_counts_dict_list] ## only include the aclus with non-zero num spikes
+        # aclu_columns = active_spike_counts_per_bin.columns.to_numpy().astype(int)
+        active_epoch_active_aclu_spike_counts_list = active_aclu_spike_counts_dict_list
+        ## OUTPUTS: active_aclu_spike_counts_dict_list
+
+        ## INPUTS: decoding_bins_epochs_df, time_bin_edges, p_x_given_n
+        active_window_slice_idxs: NDArray = active_window_decoded_epochs_df['label'].to_numpy().astype(int) ## get indicies required to slice
+        active_window_time_bin_edges = self.time_bin_edges[active_window_slice_idxs]
+        if np.ndim(self.p_x_given_n) == 3:
+            active_p_x_given_n = self.p_x_given_n[:, :, active_window_slice_idxs]
+        else:
+            active_p_x_given_n = self.p_x_given_n[:, active_window_slice_idxs]
+            
+        ## OUTPUTS: active_window_slice_idxs, active_window_time_bin_edges, active_p_x_given_n
+
+        ## OUTPUTS: active_global_spikes_df, active_window_decoded_epochs_df, active_epoch_active_aclu_spike_counts_list
+        # active_epoch_active_aclu_spike_counts_list
+        return active_global_spikes_df, active_window_decoded_epochs_df, active_epoch_active_aclu_spike_counts_list, (active_window_slice_idxs, active_window_time_bin_edges, active_p_x_given_n)
+
 
 
 @metadata_attributes(short_name=None, tags=['pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-24 17:22', related_items=[])
@@ -73,6 +187,30 @@ class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
     # spikes_df: pd.DataFrame = field()
     # global_laps_epochs_df: pd.DataFrame = field()
     
+
+    @classmethod
+    def _compute_active_units_for_time_bins(cls, unit_specific_time_binned_spike_counts: np.ndarray, neuron_IDs: np.ndarray, n_time_bins: int) -> List[Dict[int, float]]:
+        """Computes the active units and their spike counts for each time bin.
+        
+        Args:
+            unit_specific_time_binned_spike_counts (np.ndarray): Array of spike counts per unit per time bin
+            neuron_IDs (np.ndarray): Array of neuron IDs
+            n_time_bins (int): Number of time bins
+            
+        Returns:
+            List[Dict[int, float]]: List of dictionaries mapping active unit IDs to their spike counts for each time bin
+        """
+        active_units_list = []
+        for a_time_bin_idx in np.arange(n_time_bins):
+            unit_spike_counts = np.squeeze(unit_specific_time_binned_spike_counts[:, a_time_bin_idx])
+            active_unit_idxs = np.where(unit_spike_counts > 0)[0]
+            active_units = neuron_IDs[active_unit_idxs]
+            active_aclu_spike_counts_dict = dict(zip(active_units, unit_spike_counts[active_unit_idxs]))
+            active_units_list.append(active_aclu_spike_counts_dict)
+        return active_units_list
+
+
+
     @classmethod
     def build_spike_counts_and_decoder_outputs(cls, a_decoder, epochs_df, spikes_df, time_bin_size=0.500, epoch_id_col_name: str='lap_id', debug_print=False):
         """ 
