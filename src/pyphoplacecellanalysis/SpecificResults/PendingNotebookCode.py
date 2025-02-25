@@ -698,7 +698,7 @@ def add_continuous_decoded_posterior(spike_raster_window, curr_active_pipeline, 
     ## OUTPUTS: nested_dock_items, nested_dynamic_docked_widget_container_widgets
 
 
-    pass
+    return nested_dock_items, nested_dynamic_docked_widget_container_widgets
 
 
 
@@ -914,7 +914,7 @@ def compute_train_test_split_epochs_decoders(directional_laps_results: Direction
 # 2025-01-20 - Easy Decoding                                                                                           #
 # ==================================================================================================================== #
 @function_attributes(short_name=None, tags=['decoding', 'ACTIVE', 'useful'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-20 15:26', related_items=[])
-def easy_independent_decoding(long_LR_decoder: BasePositionDecoder, spikes_df: pd.DataFrame, time_bin_size: float = 0.025, t_start: float = 0.0, t_end: float = 2093.8978568242164):
+def easy_independent_decoding(a_decoder: BasePositionDecoder, spikes_df: pd.DataFrame, time_bin_size: float = 0.025, t_start: float = 0.0, t_end: float = 2093.8978568242164):
     """ Uses the provieded decoder, spikes, and time binning parameters to decode the neural activity for the specified epoch.
 
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import easy_independent_decoding
@@ -928,7 +928,7 @@ def easy_independent_decoding(long_LR_decoder: BasePositionDecoder, spikes_df: p
 
 
     """
-    neuron_IDs = deepcopy(long_LR_decoder.neuron_IDs) # array([  2,   5,   8,  10,  14,  15,  23,  24,  25,  26,  31,  32,  33,  41,  49,  50,  51,  55,  58,  64,  69,  70,  73,  74,  75,  76,  78,  82,  83,  85,  86,  90,  92,  93,  96, 109])
+    neuron_IDs = deepcopy(a_decoder.neuron_IDs) # array([  2,   5,   8,  10,  14,  15,  23,  24,  25,  26,  31,  32,  33,  41,  49,  50,  51,  55,  58,  64,  69,  70,  73,  74,  75,  76,  78,  82,  83,  85,  86,  90,  92,  93,  96, 109])
     spikes_df: pd.DataFrame = deepcopy(spikes_df).spikes.sliced_by_neuron_id(neuron_IDs) ## filter everything down
     time_bin_edges: NDArray = np.arange(t_start, t_end + time_bin_size, time_bin_size)
     unique_units = np.unique(spikes_df['aclu']) # sorted
@@ -938,7 +938,7 @@ def easy_independent_decoding(long_LR_decoder: BasePositionDecoder, spikes_df: p
     ])
 
     ## OUTPUT: time_bin_edges, unit_specific_time_binned_spike_counts
-    _decoded_pos_outputs = long_LR_decoder.decode(unit_specific_time_binned_spike_counts=unit_specific_time_binned_spike_counts, time_bin_size=time_bin_size, output_flat_versions=True, debug_print=True)
+    _decoded_pos_outputs = a_decoder.decode(unit_specific_time_binned_spike_counts=unit_specific_time_binned_spike_counts, time_bin_size=time_bin_size, output_flat_versions=True, debug_print=True)
     # _decoded_pos_outputs = all_directional_pf1D_Decoder.decode(unit_specific_time_binned_spike_counts=unit_specific_time_binned_spike_counts, time_bin_size=0.020, output_flat_versions=True, debug_print=True)
     return _decoded_pos_outputs, (unit_specific_time_binned_spike_counts, time_bin_edges, spikes_df)
 
