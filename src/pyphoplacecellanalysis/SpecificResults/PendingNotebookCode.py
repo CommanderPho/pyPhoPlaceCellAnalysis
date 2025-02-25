@@ -924,7 +924,7 @@ def easy_independent_decoding(long_LR_decoder: BasePositionDecoder, spikes_df: p
     t_start = 0.0
     t_end = 2093.8978568242164
     _decoded_pos_outputs, (unit_specific_time_binned_spike_counts, time_bin_edges, spikes_df) = easy_independent_decoding(long_LR_decoder, spikes_df=spikes_df, time_bin_size=time_bin_size, t_start=t_start, t_end=t_end)
-
+    most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = _decoded_pos_outputs
 
 
     """

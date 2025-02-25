@@ -111,7 +111,9 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
     jump_series_selection_changed = QtCore.pyqtSignal(str)
     
     jump_specific_time = QtCore.pyqtSignal(float)
+    jump_specific_time_window = QtCore.pyqtSignal(float, float)
     
+
     # Series Target Actions
     series_remove_pressed = QtCore.pyqtSignal(str)    
     series_customize_pressed = QtCore.pyqtSignal(str)
@@ -179,6 +181,8 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         self.ui.btnRight.clicked.connect(self.on_jump_right)
         
         self._INIT_UI_initialize_jump_time_edit()
+        self._INIT_UI_initialize_active_window_time_double_spinboxes()
+        
 
         ## Remove Extra Buttons:
         self.ui.btnSkipLeft.hide()
@@ -581,13 +585,81 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         """)
         
 
+    # ==================================================================================================================== #
+    # Start/End Double Spin Boxes                                                                                          #
+    # ==================================================================================================================== #
+    #     
+    def _INIT_UI_initialize_active_window_time_double_spinboxes(self):
+        """ sets up `doubleSpinBox_ActiveWindowStartTime` and `doubleSpinBox_ActiveWindowEndTime`
+        
+        """
+        # Connect signals to handle focus and editing states
+        self.ui.doubleSpinBox_ActiveWindowStartTime.editingFinished.connect(self.on_active_window_start_time_editing_finished)
+        self.ui.doubleSpinBox_ActiveWindowStartTime.installEventFilter(self)
+        
+        self.ui.doubleSpinBox_ActiveWindowEndTime.editingFinished.connect(self.on_active_window_end_time_editing_finished)
+        self.ui.doubleSpinBox_ActiveWindowEndTime.installEventFilter(self)
+        
+
+    def on_start_end_doubleSpinBox_edit_mode_changed(self, are_controls_editable: bool):
+        """ called to enable user editing of the two doubleSpinBox controls for start/end times 
+        """
+        print(f'Spike3DRasterBottomPlaybackControlBar.on_start_end_doubleSpinBox_edit_mode_changed(are_controls_editable: {are_controls_editable})')
+        if not are_controls_editable:
+            # Clear focus from both spinboxes
+            self.ui.doubleSpinBox_ActiveWindowStartTime.clearFocus()
+            self.ui.doubleSpinBox_ActiveWindowEndTime.clearFocus()
+            # Deselect any selected text using the underlying QLineEdit
+            self.ui.doubleSpinBox_ActiveWindowStartTime.lineEdit().deselect()
+            self.ui.doubleSpinBox_ActiveWindowEndTime.lineEdit().deselect()
+                    
+        if are_controls_editable:
+            focus_policy = QtCore.Qt.ClickFocus
+        else:
+            ## not editable
+            focus_policy = QtCore.Qt.NoFocus
+            
+        self.ui.doubleSpinBox_ActiveWindowStartTime.setReadOnly(not are_controls_editable)
+        self.ui.doubleSpinBox_ActiveWindowStartTime.setKeyboardTracking(are_controls_editable)
+        self.ui.doubleSpinBox_ActiveWindowStartTime.setFocusPolicy(focus_policy)
+        
+        self.ui.doubleSpinBox_ActiveWindowEndTime.setReadOnly(not are_controls_editable)
+        self.ui.doubleSpinBox_ActiveWindowEndTime.setKeyboardTracking(are_controls_editable)
+        self.ui.doubleSpinBox_ActiveWindowEndTime.setFocusPolicy(focus_policy)
+
+
+    def on_active_window_start_time_editing_finished(self):
+        """Editing of the time has finished """
+        start_t_seconds: float = float(self.ui.doubleSpinBox_ActiveWindowStartTime.value())
+        end_t_seconds: float = float(self.ui.doubleSpinBox_ActiveWindowEndTime.value())
+        self.log_print(f'start_t_seconds: {start_t_seconds}, end_t_seconds: {end_t_seconds}')
+        
+        self.ui.doubleSpinBox_ActiveWindowStartTime.clearFocus()
+        ## emit the event
+        self.jump_specific_time_window.emit(start_t_seconds, end_t_seconds)
+
+
+    def on_active_window_end_time_editing_finished(self):
+        """Editing of the time has finished """
+        start_t_seconds: float = float(self.ui.doubleSpinBox_ActiveWindowStartTime.value())
+        end_t_seconds: float = float(self.ui.doubleSpinBox_ActiveWindowEndTime.value())
+        self.log_print(f'start_t_seconds: {start_t_seconds}, end_t_seconds: {end_t_seconds}')
+        
+        self.ui.doubleSpinBox_ActiveWindowEndTime.clearFocus()
+        ## emit the event
+        self.jump_specific_time_window.emit(start_t_seconds, end_t_seconds)
+        
+
+        
+        
+
     @pyqtExceptionPrintingSlot(float, float)
     def on_window_changed(self, start_t, end_t):
         if self.params.debug_print:
             self.log_print(f'Spike3DRasterBottomPlaybackControlBar.on_time_window_changed(start_t: {start_t}, end_t: {end_t})')
         # need to block signals:
-        # self.ui.doubleSpinBox_ActiveWindowStartTime.blockSignals(True)
-        # self.ui.doubleSpinBox_ActiveWindowEndTime.blockSignals(True)
+        self.ui.doubleSpinBox_ActiveWindowStartTime.blockSignals(True)
+        self.ui.doubleSpinBox_ActiveWindowEndTime.blockSignals(True)
         if (start_t is not None):
             self.ui.doubleSpinBox_ActiveWindowStartTime.setValue(start_t)
             # self.ui.jumpToHourMinSecTimeEdit.blockSignals(True)
@@ -603,8 +675,8 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
 
         if (end_t is not None):
             self.ui.doubleSpinBox_ActiveWindowEndTime.setValue(end_t)
-        # self.ui.doubleSpinBox_ActiveWindowStartTime.blockSignals(False) # unblock the signals when done
-        # self.ui.doubleSpinBox_ActiveWindowEndTime.blockSignals(False)
+        self.ui.doubleSpinBox_ActiveWindowStartTime.blockSignals(False) # unblock the signals when done
+        self.ui.doubleSpinBox_ActiveWindowEndTime.blockSignals(False)
         # self.ui.doubleSpinBox_ActiveWindowStartTime.setValue(start_t)
         # self.ui.doubleSpinBox_ActiveWindowEndTime.setValue(end_t)
         if self.params.debug_print:
