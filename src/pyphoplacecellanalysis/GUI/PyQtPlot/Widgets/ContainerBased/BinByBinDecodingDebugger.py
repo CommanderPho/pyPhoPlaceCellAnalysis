@@ -70,8 +70,10 @@ class BinByBinDebuggingData:
 
         global_spikes_df = deepcopy(global_spikes_df)
         global_spikes_df = global_spikes_df.spikes.add_binned_time_column(time_window_edges=time_bin_edges, time_window_edges_binning_info=single_continuous_result.time_bin_container.edge_info) # "binned_time" column added
+        global_spikes_df = global_spikes_df.dropna(axis='index', how='any', subset=['binned_time'], inplace=False)
+        
         global_spikes_df['binned_time'] = global_spikes_df['binned_time'].astype(int) - 1 # convert to 0-indexed
-        global_spikes_df
+        # global_spikes_df
         # a_decoded_result.filter_epochs
         # a_decoded_result.spkcount
 
