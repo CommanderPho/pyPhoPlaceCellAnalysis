@@ -1,4 +1,6 @@
-from typing import Optional, Callable
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing_extensions import TypeAlias
+from nptyping import NDArray
 import warnings
 from attrs import define, field, Factory
 from ..Qt import QtCore, QtGui, QtWidgets
@@ -14,13 +16,15 @@ class DockDisplayConfig(object):
     showGroupButton: bool = field(default=False)
     showOrientationButton: bool = field(default=False)
     
-
     hideTitleBar: bool = field(default=False)
     fontSize: str = field(default='10px')
     corner_radius: str = field(default='2px')
     # fontSize: str = field(default='10px')
     custom_get_stylesheet_fn: Callable = field(default=None) #(self, orientation, is_dim)
     _orientation: Optional[str] = field(default=None, alias="orientation", metadata={'valid_values': [None, 'auto', 'vertical', 'horizontal']}) # alias="orientation" just refers to the initializer, it doesn't interfere with the @property
+
+    additional_metadata: Dict = field(default=Factory(dict)) ## optional metadata
+
 
     @property
     def orientation(self) -> str:

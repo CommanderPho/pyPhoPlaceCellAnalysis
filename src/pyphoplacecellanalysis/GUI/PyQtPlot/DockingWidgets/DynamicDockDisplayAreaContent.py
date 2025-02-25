@@ -54,6 +54,8 @@ class CustomDockDisplayConfig(DockDisplayConfig):
     custom_get_colors_dict: Optional[Dict] = field(default=None)
     _custom_get_colors_callback_fn: Optional[Callable] = field(default=None, alias='custom_get_colors_callback_fn')
     dock_group_names: List[str] = field(default=Factory(list), metadata={'desc': 'a list of conceptual "groups" that the dock specified by this config belongs to. Allows closing, moving, etc multiple docks at a time.'})
+    # additional_metadata: Dict = field(default=Factory(dict)) ## optional metadata
+    
 
     @property
     def custom_get_colors_callback(self):
@@ -757,6 +759,9 @@ class DynamicDockDisplayAreaContentMixin:
                                                                           True: DockDisplayColors(fg_color='#aaa', bg_color='#35265f', border_color='#423399'),
             })
         
+        display_config.additional_metadata = {'type': 'GROUP', 'creation_fn': 'build_wrapping_nested_dock_area',            
+        }
+        
         ## Add the container to hold dynamic matplotlib plot widgets:
         nested_dynamic_docked_widget_container = NestedDockAreaWidget()
         nested_dynamic_docked_widget_container.setObjectName("nested_dynamic_docked_widget_container")
@@ -875,7 +880,6 @@ class DynamicDockDisplayAreaOwningMixin:
     def clear_all_display_docks(self):
         """Delegates to child widget's clear_all_display_docks"""
         return self.dock_manager_widget.clear_all_display_docks()
-
 
     def get_flat_dock_identifiers_list(self, debug_print=False) -> List[str]:
         """Delegates to child widget's get_flat_widgets_list"""
