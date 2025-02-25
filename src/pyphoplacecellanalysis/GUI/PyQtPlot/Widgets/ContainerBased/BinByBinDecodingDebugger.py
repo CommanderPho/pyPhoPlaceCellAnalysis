@@ -25,6 +25,7 @@ from pyphocorehelpers.DataStructure.general_parameter_containers import Visualiz
 from pyphocorehelpers.DataStructure.RenderPlots.PyqtgraphRenderPlots import PyqtgraphRenderPlots
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
+from neuropy.utils.indexing_helpers import PandasHelpers
 
 @define(slots=False, eq=False)
 class BinByBinDebuggingData:
@@ -93,7 +94,7 @@ class BinByBinDebuggingData:
         return _obj
     
 
-    def sliced_to_current_window(self, active_window_t_start, active_window_t_end):
+    def sliced_to_current_window(self, active_window_t_start, active_window_t_end, debug_print:bool=True):
         """ captures: global_spikes_df, decoding_bins_epochs_df, time_bin_edges, p_x_given_n
         
         """
@@ -120,16 +121,6 @@ class BinByBinDebuggingData:
             active_window_decoded_epochs_df['rel_epoch_idx'] = active_window_decoded_epochs_df.index.to_numpy().astype(int) ## add the ''rel_epoch_idx' column
             
 
-        active_spike_counts_per_bin_df: pd.DataFrame = active_global_spikes_df.groupby('binned_time')['aclu'].value_counts().unstack(fill_value=0)
-
-        ## INPUTS: active_spike_counts_per_bin
-        # active_spike_counts_per_bin.columns
-        active_aclu_spike_counts_dict_list: List[Dict[types.aclu_index, int]] = active_spike_counts_per_bin_df.to_dict(orient='record')
-        active_aclu_spike_counts_dict_list: List[Dict[types.aclu_index, int]] = [{k:v for k, v in an_aclu_to_spike_count_dict.items() if v > 0} for an_aclu_to_spike_count_dict in active_aclu_spike_counts_dict_list] ## only include the aclus with non-zero num spikes
-        # aclu_columns = active_spike_counts_per_bin.columns.to_numpy().astype(int)
-        active_epoch_active_aclu_spike_counts_list = active_aclu_spike_counts_dict_list
-        ## OUTPUTS: active_aclu_spike_counts_dict_list
-
         ## INPUTS: decoding_bins_epochs_df, time_bin_edges, p_x_given_n
         active_window_slice_idxs: NDArray = active_window_decoded_epochs_df['label'].to_numpy().astype(int) ## get indicies required to slice
         active_window_time_bin_edges = self.time_bin_edges[active_window_slice_idxs]
@@ -137,8 +128,33 @@ class BinByBinDebuggingData:
             active_p_x_given_n = self.p_x_given_n[:, :, active_window_slice_idxs]
         else:
             active_p_x_given_n = self.p_x_given_n[:, active_window_slice_idxs]
+
+        n_epoch_time_bins = len(active_window_time_bin_edges) - 1
+        if debug_print:
+            print(f'n_epoch_time_bins: {n_epoch_time_bins}')
             
         ## OUTPUTS: active_window_slice_idxs, active_window_time_bin_edges, active_p_x_given_n
+
+
+        # active_spike_counts_per_bin_df: pd.DataFrame = active_global_spikes_df.groupby('binned_time')['aclu'].value_counts().unstack(fill_value=0)
+        active_spike_counts_per_bin_df: pd.DataFrame = active_global_spikes_df.groupby('binned_time')['aclu'].value_counts().unstack(fill_value=0)
+        # active_spike_counts_per_bin_df.index # Int64Index([7957, 7958, 7959, 7960, 7963, 7964, 7966, 7967], dtype='int64', name='binned_time')
+        ## Find missing index values and insert rows containing all zeros - active_window_slice_idxs: array([7958, 7959, 7960, 7961, 7962, 7963, 7964, 7965, 7966, 7967])
+        # Get the expected range of bin indices
+        expected_bin_indices = active_window_slice_idxs
+        # Reindex the dataframe to include all expected bins, filling missing ones with 0
+        active_spike_counts_per_bin_df = active_spike_counts_per_bin_df.reindex(expected_bin_indices, fill_value=0)
+
+
+        ## INPUTS: active_spike_counts_per_bin
+        # active_spike_counts_per_bin.columns
+        active_aclu_spike_counts_dict_list: List[Dict[types.aclu_index, int]] = active_spike_counts_per_bin_df.to_dict(orient='record')
+        # active_aclu_spike_counts_dict_list: List[Dict[types.aclu_index, int]] = [{k:v for k, v in an_aclu_to_spike_count_dict.items() if v > 0} for an_aclu_to_spike_count_dict in active_aclu_spike_counts_dict_list] ## only include the aclus with non-zero num spikes
+        active_aclu_spike_counts_dict_list: List[Dict[types.aclu_index, int]] = [{k:v for k, v in an_aclu_to_spike_count_dict.items() if v > 0} for an_aclu_to_spike_count_dict in active_aclu_spike_counts_dict_list] ## only include the aclus with non-zero num spikes
+        # aclu_columns = active_spike_counts_per_bin.columns.to_numpy().astype(int)
+        active_epoch_active_aclu_spike_counts_list = active_aclu_spike_counts_dict_list
+        ## OUTPUTS: active_aclu_spike_counts_dict_list
+        
 
         ## OUTPUTS: active_global_spikes_df, active_window_decoded_epochs_df, active_epoch_active_aclu_spike_counts_list
         # active_epoch_active_aclu_spike_counts_list
@@ -407,6 +423,7 @@ class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
                 solo_override_alpha_weights=active_aclu_override_alpha_weights_dict,
                 solo_override_num_spikes_weights=active_solo_override_num_spikes_weights
             )
+            
             out_pf1D_decoder_template_objects.append(_obj)
 
         win.nextRow()
