@@ -313,15 +313,10 @@ class BaseTemplateDebuggingMixin:
         self.plots_data, self.plots, self.ui = self._subfn_buildUI_base_decoder_debugger_data(included_any_context_neuron_ids=self.params.included_any_context_neuron_ids, debug_print=self.params.debug_print, enable_cell_colored_heatmap_rows=self.params.enable_cell_colored_heatmap_rows, _out_data=self.plots_data, _out_plots=self.plots, _out_ui=self.ui, _out_params=self.params, decoder=self.decoder)
 
 
-    def update_base_decoder_debugger_data(self, included_neuron_ids, solo_emphasized_aclus: Optional[List]=None, solo_override_num_spikes_weights: Optional[Dict]=None, solo_override_alpha_weights: Optional[Dict]=None):
-        """Updates the visualization with new neuron selections"""
-        self.params.solo_emphasized_aclus = solo_emphasized_aclus
-        self.params.solo_override_alpha_weights = solo_override_alpha_weights
-        
-        _out_data = self._subfn_rebuild_sort_idxs(self.decoder, self.plots_data, included_neuron_ids)
-        
+    def update_clear_plotted_items(self):
+        """ clears the plotted items for re-plotting 
+        """
         curr_win, curr_img = self.plots.pf1D_heatmap
-        
         # Update text items and lines
         for aclu, text_item in self.ui.text_items.items():
             curr_win.removeItem(text_item)
@@ -332,54 +327,73 @@ class BaseTemplateDebuggingMixin:
             curr_win.removeItem(line_item)
         self.ui.order_location_lines.clear()
 
-        _temp_curr_out_colors_heatmap_image = []
-        
-        for cell_i, aclu in enumerate(_out_data.sorted_neuron_IDs):
-            saturation_scale = 1.0
-            value_scale_multiplier = 1.0
-            alpha_scale_multiplier = 1.0
-            spike_scale_size: int = 1
+
+    def update_base_decoder_debugger_data(self, included_neuron_ids, solo_emphasized_aclus: Optional[List]=None, solo_override_num_spikes_weights: Optional[Dict]=None, solo_override_alpha_weights: Optional[Dict]=None):
+        """Updates the visualization with new neuron selections"""
+        self.params.solo_emphasized_aclus = solo_emphasized_aclus
+        self.params.solo_override_alpha_weights = solo_override_alpha_weights
+
+        if len(included_neuron_ids) == 0:
+            print(f'clearing...')
+            curr_win, curr_img = self.plots.pf1D_heatmap
+            self.update_clear_plotted_items()
+            curr_img.clear()
             
-            if solo_emphasized_aclus is not None and aclu not in solo_emphasized_aclus:
-                saturation_scale = 0.02
-                value_scale_multiplier = 0.1
+        else:
+            ## valid:
+            _out_data = self._subfn_rebuild_sort_idxs(self.decoder, self.plots_data, included_neuron_ids)
+            
+            curr_win, curr_img = self.plots.pf1D_heatmap
+            self.update_clear_plotted_items()
+
+            _temp_curr_out_colors_heatmap_image = []
+            
+            for cell_i, aclu in enumerate(_out_data.sorted_neuron_IDs):
+                saturation_scale = 1.0
+                value_scale_multiplier = 1.0
+                alpha_scale_multiplier = 1.0
+                spike_scale_size: int = 1
                 
+                if solo_emphasized_aclus is not None and aclu not in solo_emphasized_aclus:
+                    saturation_scale = 0.02
+                    value_scale_multiplier = 0.1
+                    
 
-            if solo_override_num_spikes_weights is not None:
-                spike_scale_size = solo_override_num_spikes_weights.get(aclu, 1) 
+                if solo_override_num_spikes_weights is not None:
+                    spike_scale_size = solo_override_num_spikes_weights.get(aclu, 1) 
 
-            if solo_override_alpha_weights is not None:
-                alpha_scale_multiplier = solo_override_alpha_weights.get(aclu, 1.0) * alpha_scale_multiplier
-                
+                if solo_override_alpha_weights is not None:
+                    alpha_scale_multiplier = solo_override_alpha_weights.get(aclu, 1.0) * alpha_scale_multiplier
+                    
 
-            a_color_vector = _out_data.sort_helper_neuron_id_to_neuron_colors[aclu]
-            text = SelectableTextItem(f"{int(aclu)}", color=build_adjusted_color(pg.mkColor(a_color_vector), value_scale=value_scale_multiplier, saturation_scale=saturation_scale, alpha_scale=alpha_scale_multiplier), anchor=(1,0))
-            text.setPos(-1.0, (cell_i+1))
-            curr_win.addItem(text)
-            self.ui.text_items[aclu] = text
+                a_color_vector = _out_data.sort_helper_neuron_id_to_neuron_colors[aclu]
+                text = SelectableTextItem(f"{int(aclu)}", color=build_adjusted_color(pg.mkColor(a_color_vector), value_scale=value_scale_multiplier, saturation_scale=saturation_scale, alpha_scale=alpha_scale_multiplier), anchor=(1,0))
+                text.setPos(-1.0, (cell_i+1))
+                curr_win.addItem(text)
+                self.ui.text_items[aclu] = text
 
-            heatmap_base_color = pg.mkColor(a_color_vector)
-            row_data = _out_data.sorted_pf_tuning_curves[cell_i, :]
-            out_colors_row = DataSeriesColorHelpers.qColorsList_to_NDarray([build_adjusted_color(heatmap_base_color, value_scale=(v * value_scale_multiplier), saturation_scale=saturation_scale, alpha_scale=alpha_scale_multiplier) for v in row_data], is_255_array=False).T
-            _temp_curr_out_colors_heatmap_image.append(out_colors_row)
+                heatmap_base_color = pg.mkColor(a_color_vector)
+                row_data = _out_data.sorted_pf_tuning_curves[cell_i, :]
+                out_colors_row = DataSeriesColorHelpers.qColorsList_to_NDarray([build_adjusted_color(heatmap_base_color, value_scale=(v * value_scale_multiplier), saturation_scale=saturation_scale, alpha_scale=alpha_scale_multiplier) for v in row_data], is_255_array=False).T
+                _temp_curr_out_colors_heatmap_image.append(out_colors_row)
 
-            # pf_peak_indicator_lines ____________________________________________________________________________________________ #
-            x_offset = _out_data.sorted_pf_peak_locations[cell_i]
-            y_offset = float(cell_i)
-            line = QtGui.QGraphicsLineItem(x_offset, y_offset, x_offset, (y_offset + 1.0))
-            line.setPen(pg.mkPen(build_adjusted_color(pg.mkColor(a_color_vector), value_scale=value_scale_multiplier, saturation_scale=saturation_scale, alpha_scale=alpha_scale_multiplier), width=(2*spike_scale_size)))
-            curr_win.addItem(line)
-            self.ui.order_location_lines[aclu] = line
-        # END for cell_i, aclu in enumerate(_out_data.sorted_neuron_IDs)...
-        
-        out_colors_heatmap_image_matrix = np.stack(_temp_curr_out_colors_heatmap_image, axis=0)
-        out_colors_heatmap_image_matrix = np.clip(out_colors_heatmap_image_matrix, 0, 1)
+                # pf_peak_indicator_lines ____________________________________________________________________________________________ #
+                x_offset = _out_data.sorted_pf_peak_locations[cell_i]
+                y_offset = float(cell_i)
+                line = QtGui.QGraphicsLineItem(x_offset, y_offset, x_offset, (y_offset + 1.0))
+                line.setPen(pg.mkPen(build_adjusted_color(pg.mkColor(a_color_vector), value_scale=value_scale_multiplier, saturation_scale=saturation_scale, alpha_scale=alpha_scale_multiplier), width=(2*spike_scale_size)))
+                curr_win.addItem(line)
+                self.ui.order_location_lines[aclu] = line
+            # END for cell_i, aclu in enumerate(_out_data.sorted_neuron_IDs)...
+            
+            out_colors_heatmap_image_matrix = np.stack(_temp_curr_out_colors_heatmap_image, axis=0)
+            out_colors_heatmap_image_matrix = np.clip(out_colors_heatmap_image_matrix, 0, 1)
 
-        if self.params.enable_cell_colored_heatmap_rows:
-            curr_img.updateImage(out_colors_heatmap_image_matrix)
-        self.plots_data.out_colors_heatmap_image_matrix = out_colors_heatmap_image_matrix
-        
-        curr_img.setRect(_out_data.active_pfs_img_extents)
+            if self.params.enable_cell_colored_heatmap_rows:
+                curr_img.updateImage(out_colors_heatmap_image_matrix)
+            self.plots_data.out_colors_heatmap_image_matrix = out_colors_heatmap_image_matrix
+            
+            curr_img.setRect(_out_data.active_pfs_img_extents)
 
 
     @classmethod
