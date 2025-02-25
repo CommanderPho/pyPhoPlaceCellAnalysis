@@ -222,7 +222,7 @@ class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
         spanning_spikes_raster_plot.setTitle("spikes_raster Plot")
         plots_container.root_plot = spanning_spikes_raster_plot
         app, raster_win, plots_container, plots_data = new_plot_raster_plot(plots_data.spikes_df, plots_data.active_aclus, scatter_plot_kwargs=None, win=spanning_spikes_raster_plot, plots_data=plots_data, plots=plots_container,
-                                                            scatter_app_name=f'epoch_specific_spike_raster', defer_show=True, active_context=None, add_debug_header_label=False)
+                                                            scatter_app_name=f'epoch_specific_spike_raster', defer_show=True, active_context=None, add_debug_header_label=False) # RasterPlotSetupTuple
         
         win.nextRow()
 
@@ -231,12 +231,7 @@ class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
         spanning_posterior_plot.setTitle("P_x_given_n Plot - Decoded over epoch")
 
         flat_p_x_given_n = deepcopy(p_x_given_n)
-        _subfn_simply_plot_posterior_in_pyqtgraph_plotitem(
-            curr_plot=spanning_posterior_plot,
-            image=flat_p_x_given_n,
-            xbin_edges=np.arange(n_epoch_time_bins+1),
-            ybin_edges=deepcopy(a_decoder.xbin)
-        )
+        _subfn_simply_plot_posterior_in_pyqtgraph_plotitem(curr_plot=spanning_posterior_plot, image=flat_p_x_given_n, xbin_edges=np.arange(n_epoch_time_bins+1), ybin_edges=deepcopy(a_decoder.xbin))
         win.nextRow()
 
         # Bin-by-bin active spike templates/pf1D fields ______________________________________________________________________ #

@@ -176,14 +176,11 @@ QDoubleSpinBox::down-arrow {
 	border : 1px solid black;
 };</string>
         </property>
-        <property name="readOnly">
-         <bool>false</bool>
-        </property>
         <property name="buttonSymbols">
          <enum>QAbstractSpinBox::NoButtons</enum>
         </property>
         <property name="keyboardTracking">
-         <bool>false</bool>
+         <bool>true</bool>
         </property>
         <property name="showGroupSeparator" stdset="0">
          <bool>false</bool>
@@ -1469,14 +1466,11 @@ QDoubleSpinBox::down-arrow {
 	border : 1px solid black;
 };</string>
         </property>
-        <property name="readOnly">
-         <bool>false</bool>
-        </property>
         <property name="buttonSymbols">
          <enum>QAbstractSpinBox::NoButtons</enum>
         </property>
         <property name="keyboardTracking">
-         <bool>false</bool>
+         <bool>true</bool>
         </property>
         <property name="suffix">
          <string> [sec]</string>

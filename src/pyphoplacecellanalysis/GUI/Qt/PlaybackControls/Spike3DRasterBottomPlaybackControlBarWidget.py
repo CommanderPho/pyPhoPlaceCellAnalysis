@@ -739,8 +739,18 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
                 self.time_edit.clearFocus()  # Finalize and lose focus
                 return True  # Mark event as handled
             
+        elif (source == self.ui.doubleSpinBox_ActiveWindowStartTime) or (source == self.ui.doubleSpinBox_ActiveWindowEndTime):
+            if event.type() == event.KeyPress:
+                # """Handle Enter key to finalize and lose focus."""
+                if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+                    source.clearFocus()  # Finalize and lose focus
+                    return True  # Mark event as handled
+                else: 
+                    ## other key presses, such as type numbers and such
+                    pass
+
         if self.params.debug_print:
-            print(f'.eventFilter(source: {source}, event: {event})')
+            print(f'Spike3DRasterBottomPlaybackControlBar.eventFilter(source: {source}, event: {event})')
             
         return super().eventFilter(source, event)
     
