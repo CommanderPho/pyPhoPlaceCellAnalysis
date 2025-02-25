@@ -8035,6 +8035,26 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         return dock_group_identifier_name
 
 
+    @classmethod
+    def _perform_overlay_measured_position(cls, identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, measured_position_df: pd.DataFrame, variable_name = 'x'):
+        """ 
+        
+        if a_position_decoder.pf.filtered_pos_df is not None:
+            measured_position_df = deepcopy(a_position_decoder.pf.filtered_pos_df)
+        else:
+            # fallback to session
+            measured_position_df = curr_active_pipeline.sess.position.to_dataframe()
+            
+        """
+        # identifier_name, widget, matplotlib_fig, matplotlib_fig_axes
+        actual_postion_plot_kwargs = {'color': '#ff000066', 'alpha': 0.35, 'marker': 'none', 'animated': False}
+        _out_artists = {}
+        for an_ax in matplotlib_fig_axes:                
+            line_measured_position = an_ax.plot(measured_position_df['t'].to_numpy(), measured_position_df[variable_name].to_numpy(), label=f'measured {variable_name}', **actual_postion_plot_kwargs) # Opaque RED # , linestyle='dashed', linewidth=2, color='#ff0000ff'
+            _out_artists[an_ax] = line_measured_position
+        return _out_artists
+
+            
 
     @function_attributes(short_name=None, tags=['row', 'posterior'], input_requires=[], output_provides=[], uses=['add_new_matplotlib_render_plot_widget', 'plot_1D_most_likely_position_comparsions'], used_by=['prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs'], creation_date='2024-12-18 08:53', related_items=[])
     @classmethod
@@ -8069,6 +8089,7 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         active_bins = deepcopy(a_position_decoder.xbin)
         # time_window_centers = deepcopy(active_decoder.time_window_centers)
         
+        
 
         # active_most_likely_positions = active_marginals.most_likely_positions_1D # Raw decoded positions
         active_most_likely_positions = None
@@ -8088,8 +8109,17 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
             # active_cmap = FixedCustomColormaps.get_custom_orange_with_low_values_dropped_cmap()
         )
 
+
+        measured_position_df = None
+        # if a_position_decoder.pf.filtered_pos_df is not None:
+        #     measured_position_df = deepcopy(a_position_decoder.pf.filtered_pos_df)
+        # else:
+        #     # fallback to session
+        #     measured_position_df = curr_active_pipeline.sess.position.to_dataframe()
+            
+
         ## Actual plotting portion:
-        fig, an_ax = plot_1D_most_likely_position_comparsions(None, time_window_centers=time_window_centers, xbin=active_bins,
+        fig, an_ax = plot_1D_most_likely_position_comparsions(measured_position_df=measured_position_df, time_window_centers=time_window_centers, xbin=active_bins,
                                                                 posterior=active_posterior,
                                                                 active_most_likely_positions_1D=active_most_likely_positions,
                                                                 ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
@@ -8113,7 +8143,15 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         if a_1D_posterior is not None:
             widget.plots_data.matrix = deepcopy(a_1D_posterior)
         
-
+        ## try to add the measured_positions
+        measured_position_df = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
+        widget.plots_data.measured_position_df = None
+        widget.plots.measured_position_artists = None
+        if measured_position_df is not None:
+            widget.plots_data.measured_position_df = measured_position_df
+            _out_artists = cls._perform_overlay_measured_position(identifier_name=identifier_name, widget=widget, matplotlib_fig=fig, matplotlib_fig_axes=[an_ax], measured_position_df=measured_position_df)
+            widget.plots.measured_position_artists = _out_artists
+                
         widget.draw() # alternative to accessing through full path?
         active_2d_plot.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
         return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes
