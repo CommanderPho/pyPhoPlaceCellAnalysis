@@ -225,7 +225,7 @@ border-color: rgb(0, 0, 0);</string>
        </property>
        <property name="icon">
         <iconset resource="../../../Resources/ActionIcons.qrc">
-         <normaloff>:/Graphics/Icons/graphics/Crosshairs.svg</normaloff>:/Graphics/Icons/graphics/Crosshairs.svg</iconset>
+         <normaloff>:/Icons/Icons/actions/CrosshairsWithDot.png</normaloff>:/Icons/Icons/actions/CrosshairsWithDot.png</iconset>
        </property>
        <property name="iconSize">
         <size>
@@ -414,7 +414,6 @@ border-color: rgb(0, 0, 0);</string>
  </customwidgets>
  <resources>
   <include location="../../../Resources/GuiResources.qrc"/>
-  <include location="../../../Resources/ActionIcons.qrc"/>
   <include location="../../../Resources/ActionIcons.qrc"/>
  </resources>
  <connections/>

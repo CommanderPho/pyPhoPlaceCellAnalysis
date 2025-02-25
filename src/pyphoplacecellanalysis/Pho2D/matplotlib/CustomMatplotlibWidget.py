@@ -402,7 +402,10 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
                 self.plots[name]['crosshairs_hLine'] = hLine
 
             def mouseMoved(event):
-                """ called when the mouse is moved"""
+                """ called when the mouse is moved
+                captures: self, ax, vLine, matrix
+                
+                """
                 are_crosshairs_currently_visible: bool = vLine.get_visible()
                 new_desired_visibility_is_visible: bool = True
                 did_visibility_change: bool = False
@@ -495,6 +498,8 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
             self.ui.connections[name] = cid
         else:
             print(f"already have 'crosshairs_vLine' in plots_dict")
+
+
 
     def remove_crosshairs(self, plot_item, name=None):
         print(f'CustomMatplotlibWidget.remove_crosshairs(plot_item: {plot_item}, name: "{name}"):')

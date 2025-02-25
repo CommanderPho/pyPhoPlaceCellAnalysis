@@ -259,7 +259,6 @@ QToolTip {
  </customwidgets>
  <resources>
   <include location="../../../Resources/ActionIcons.qrc"/>
-  <include location="../../../Resources/ActionIcons.qrc"/>
   <include location="../../../Resources/GuiResources.qrc"/>
  </resources>
  <connections/>
