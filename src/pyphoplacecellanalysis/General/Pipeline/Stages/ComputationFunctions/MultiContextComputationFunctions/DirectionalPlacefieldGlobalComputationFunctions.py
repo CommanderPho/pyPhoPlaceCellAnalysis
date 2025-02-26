@@ -2452,7 +2452,7 @@ class DirectionalDecodersContinuouslyDecodedResult(ComputedResult):
     """
     _VersionedResultMixin_version: str = "2024.01.22_0" # to be updated in your IMPLEMENTOR to indicate its version
     
-    pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = serialized_field(default=None, metadata={'field_added': "2024.01.16_0"})
+    pf1D_Decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = serialized_field(default=None, metadata={'field_added': "2024.01.16_0"})
     pseudo2D_decoder: BasePositionDecoder = serialized_field(default=None, metadata={'field_added': "2024.01.22_0"})
     spikes_df: pd.DataFrame = serialized_field(default=None, metadata={'field_added': "2024.01.22_0"}) # global
     
@@ -2514,7 +2514,107 @@ class DirectionalDecodersContinuouslyDecodedResult(ComputedResult):
             return {k:v.get('pseudo2D', None) for k, v in self.continuously_decoded_result_cache_dict.items()}   
 
 
+    @function_attributes(short_name=None, tags=['pseudo2D', 'timeline-track', '1D', 'split-to-1D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-26 07:23', related_items=[])
+    def split_pseudo2D_continuous_result_to_1D_continuous_result(self, pseudo2D_decoder_names_list: Optional[str]=None, debug_print=False):
+        """ Get 1D representations of the Pseudo2D track (4 decoders) so they can be plotted on seperate tracks and bin-debugged independently.
 
+        This returns the "all-decoders-sum-to-1-across-time' normalization style that Kamran likes
+        
+        
+        Uses: self.continuously_decoded_result_cache_dict
+
+        
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult, DecodedFilterEpochsResult
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
+
+        
+        all_time_bin_sizes_output_dict: : Dict[float, Dict[types.DecoderName, SingleEpochDecodedResult]] = directional_decoders_decode_result.split_pseudo2D_continuous_result_to_1D_continuous_result()
+        """
+        from neuropy.utils.mixins.indexing_helpers import get_dict_subset
+        # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult, DecodedFilterEpochsResult
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
+
+        if pseudo2D_decoder_names_list is None:
+            pseudo2D_decoder_names_list = ('long_LR', 'long_RL', 'short_LR', 'short_RL')
+
+        pseudo2D_decoder: BasePositionDecoder = self.pseudo2D_decoder  # merged pseudo2D decoder
+        all_directional_pf1D_Decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = self.pf1D_Decoder_dict ## separate 1D decoders
+
+        continuously_decoded_result_cache_dict = self.continuously_decoded_result_cache_dict
+
+        # all_time_bin_sizes_output_dict = {'non_marginalized_raw_result': [], 'marginal_over_direction': [], 'marginal_over_track_ID': []}
+        # flat_all_time_bin_sizes_output_tuples_list: List[Tuple] = []
+
+        all_time_bin_sizes_output_dict: Dict[float, Dict[types.DecoderName, SingleEpochDecodedResult]] = {} ## time_bin_size: 1D_tracks
+        
+        for time_bin_size, a_continuously_decoded_dict in continuously_decoded_result_cache_dict.items():
+            ## Each iteration here adds 4 more tracks -- one for each decoding context
+            
+            # a_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult]
+            if debug_print:
+                print(f'time_bin_size: {time_bin_size}')
+
+            # info_string: str = f" - t_bin_size: {time_bin_size}"
+            
+            ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
+            # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+            # continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
+
+            # continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = deepcopy(directional_decoders_decode_result.most_recent_continuously_decoded_dict)
+            assert a_continuously_decoded_dict is not None
+
+            ## Get the separate 1D results, these are ready-to-go:
+            all_directional_pf1D_Decoder_continuous_results_dict: Dict[types.DecoderName, SingleEpochDecodedResult] = {k:v.get_result_for_epoch(0) for k, v in get_dict_subset(a_continuously_decoded_dict, subset_includelist=None, subset_excludelist=['pseudo2D']).items()}
+            
+
+            ## Extract the Pseudo2D results as separate 1D tracks
+            ## INPUTS: most_recent_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult], info_string
+            
+            # all_directional_continuously_decoded_dict = most_recent_continuously_decoded_dict or {}
+            pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = a_continuously_decoded_dict.get('pseudo2D', None)
+            assert len(pseudo2D_decoder_continuously_decoded_result.p_x_given_n_list) == 1
+            single_pseudo2D_decoder_continuously_decoded_result: SingleEpochDecodedResult = pseudo2D_decoder_continuously_decoded_result.get_result_for_epoch(0)
+            
+            p_x_given_n = single_pseudo2D_decoder_continuously_decoded_result.p_x_given_n ## continuous -- meaning single epoch
+            # # p_x_given_n = pseudo2D_decoder_continuously_decoded_result.p_x_given_n_list[0]['p_x_given_n']
+            # time_bin_container = single_pseudo2D_decoder_continuously_decoded_result.time_bin_container
+            # time_window_centers = time_bin_container.centers
+            
+
+            # p_x_given_n.shape # (62, 4, 209389)
+
+            ## Split across the 2nd axis to make 1D posteriors that can be displayed in separate dock rows:
+            assert p_x_given_n.shape[1] == len(pseudo2D_decoder_names_list), f"for pseudo2D_decoder_names_list: {pseudo2D_decoder_names_list}\n\texpected the len(pseudo2D_decoder_names_list): {len(pseudo2D_decoder_names_list)} pseudo-y bins for the decoder in p_x_given_n.shape[1]. but found p_x_given_n.shape: {p_x_given_n.shape}"
+            # split_pseudo2D_posteriors_dict = {k:np.squeeze(p_x_given_n[:, i, :]) for i, k in enumerate(pseudo2D_decoder_names_list)}
+
+            # Need all_directional_pf1D_Decoder_dict
+            # output_dict = {}
+            output_pseudo2D_split_to_1D_continuous_results_dict: Dict[types.DecoderName, SingleEpochDecodedResult] = {}
+
+            # for a_decoder_name, a_1D_posterior in split_pseudo2D_posteriors_dict.items():
+            for i, a_decoder_name in enumerate(pseudo2D_decoder_names_list):
+                ## make separate `SingleEpochDecodedResult` objects
+                
+                # all_directional_pf1D_Decoder_continuous_results_dict
+                output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name] = deepcopy(single_pseudo2D_decoder_continuously_decoded_result) ## copy the whole pseudo2D result
+                # output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].p_x_given_n = a_1D_posterior ## or could squish them here
+                output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].p_x_given_n = np.squeeze(output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].p_x_given_n[:, i, :]) ## or could squish them here
+                
+                # _out_tuple = dict(a_decoder_name=a_decoder_name, a_position_decoder=pseudo2D_decoder, time_window_centers=time_window_centers, a_1D_posterior=a_1D_posterior)
+                # identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = _out_tuple
+                # output_dict[a_decoder_name] = _out_tuple
+            ## END for i, a_de...
+            all_time_bin_sizes_output_dict[time_bin_size] = output_pseudo2D_split_to_1D_continuous_results_dict
+            
+        ## END for time_bin_size, a_continuously_decoded_dict in cont
+        
+        return all_time_bin_sizes_output_dict
+
+
+
+
+        ## OUTPUTS: all_directional_pf1D_Decoder_dict: Dict[types.DecoderName, BasePositionDecoder], all_directional_pf1D_Decoder_continuous_results_dict: Dict[types.DecoderName, SingleEpochDecodedResult]
+        ## OUTPUTS: pseudo2D_decoder: BasePositionDecoder, single_pseudo2D_decoder_continuously_decoded_result: SingleEpochDecodedResult, 
 
     
 
@@ -8220,6 +8320,7 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         return output_dict
     
 
+    @function_attributes(short_name=None, tags=['multi-time-bin'], input_requires=[], output_provides=[], uses=['cls.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs'], used_by=[], creation_date='2025-02-26 05:37', related_items=[])
     @classmethod
     def add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epochs(cls, curr_active_pipeline, active_2d_plot, debug_print=False, **kwargs):
         """ adds all computed time_bin_sizes in `curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'].continuously_decoded_result_cache_dict` from the global_computation_results as new matplotlib plot rows. """
@@ -8236,6 +8337,8 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
             # flat_all_time_bin_sizes_output_tuples_list: List[Tuple] = []
             
             for time_bin_size, a_continuously_decoded_dict in continuously_decoded_result_cache_dict.items():
+                ## Each iteration here adds 4 more tracks -- one for each decoding context
+                
                 # a_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult]
                 if debug_print:
                     print(f'time_bin_size: {time_bin_size}')
@@ -8264,7 +8367,7 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
     
 
 
-    @function_attributes(short_name=None, tags=['pseudo2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-29 09:24', related_items=[])
+    @function_attributes(short_name=None, tags=['pseudo2D'], input_requires=[], output_provides=[], uses=['cls.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs'], used_by=[], creation_date='2025-01-29 09:24', related_items=[])
     @classmethod
     def add_pseudo2D_decoder_decoded_epochs(cls, curr_active_pipeline, active_2d_plot, debug_print=False, **kwargs):
         """ adds the decoded epochs for the long/short decoder from the global_computation_results as new matplotlib plot rows. """
