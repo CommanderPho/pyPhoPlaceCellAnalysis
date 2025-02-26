@@ -120,7 +120,7 @@ def plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipe
         active_global_spikes_df, active_window_decoded_epochs_df, active_epoch_active_aclu_spike_counts_list, (active_window_slice_idxs, active_window_time_bin_edges, active_p_x_given_n) = bin_by_bin_data.sliced_to_current_window(active_window_t_start, active_window_t_end)
         win, out_pf1D_decoder_template_objects, (plots_container, plots_data) = BinByBinDecodingDebugger.update_time_binned_decoder_debug_plots(win, out_pf1D_decoder_template_objects, plots_container, plots_data, new_time_bin_edges=active_window_time_bin_edges, new_p_x_given_n=active_p_x_given_n, new_active_aclu_spike_counts_list=active_epoch_active_aclu_spike_counts_list)
 
-
+    ## END def _on_update_fcn()...
     return win, out_pf1D_decoder_template_objects, (plots_container, plots_data), _on_update_fcn
 
 
@@ -735,7 +735,7 @@ def add_continuous_decoded_posterior(spike_raster_window, curr_active_pipeline, 
     # # output_dict = _cmd.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals(curr_active_pipeline=_cmd._active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, **enable_rows_config_kwargs)
     # output_dict = AddNewDecodedPosteriors_MatplotlibPlotCommand.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, a_pseudo2D_decoder=pseudo2D_decoder, debug_print=debug_print, **kwargs)
     # for a_key, an_output_tuple in output_dict.items():
-    #     identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = an_output_tuple                
+    #     identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dDisplayItem = an_output_tuple                
     #     # if a_key not in all_time_bin_sizes_output_dict:
     #     #     all_time_bin_sizes_output_dict[a_key] = [] ## init empty list
     #     # all_time_bin_sizes_output_dict[a_key].append(an_output_tuple)

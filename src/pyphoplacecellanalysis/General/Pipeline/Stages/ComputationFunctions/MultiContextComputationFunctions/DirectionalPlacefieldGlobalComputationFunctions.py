@@ -8097,7 +8097,7 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
 
         # Update display output dict:
         for a_decoder_name, an_output_tuple in output_dict.items():
-            identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = an_output_tuple
+            identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dDisplayItem = an_output_tuple
             self._display_output[identifier_name] = an_output_tuple
 
         print(f'\t AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand.execute() is done.')
@@ -8336,7 +8336,7 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
                 # output_dict = _cmd.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals(curr_active_pipeline=_cmd._active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, **enable_rows_config_kwargs)
                 output_dict = cls.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, a_pseudo2D_decoder=pseudo2D_decoder, debug_print=debug_print, **kwargs)
                 for a_key, an_output_tuple in output_dict.items():
-                    identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = an_output_tuple                
+                    identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dDisplayItem = an_output_tuple
                     # if a_key not in all_time_bin_sizes_output_dict:
                     #     all_time_bin_sizes_output_dict[a_key] = [] ## init empty list
                     # all_time_bin_sizes_output_dict[a_key].append(an_output_tuple)
@@ -8470,7 +8470,7 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         
         # Update display output dict:
         for a_decoder_name, an_output_tuple in output_dict.items():
-            identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = an_output_tuple
+            identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dDisplayItem = an_output_tuple
             self._display_output[identifier_name] = an_output_tuple
         
         print(f'\t AddNewDecodedPosteriors_MatplotlibPlotCommand.execute() is done.')
@@ -8481,7 +8481,7 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
         # self.log_command(*args, **kwargs) # pops this command from the `menu_action_history_list`
         for identifier_name, an_output_tuple in self._display_output.items():
-            # identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = an_output_tuple
+            # identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dDisplayItem = an_output_tuple
             # widget, matplotlib_fig, matplotlib_fig_axes = active_2d_plot.add_new_matplotlib_render_plot_widget(name=identifier_name, dockSize=(65, 200), display_config=a_dock_config)
             active_2d_plot.remove_matplotlib_render_plot_widget(identifier_name)
 
