@@ -799,7 +799,20 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
                     curr_active_computation_params = deepcopy(active_computation_params)
 
                    
-                
+                # Check if computation_epochs exists before trying to slice it
+                if curr_active_computation_params.pf_params.computation_epochs is not None:
+                    curr_active_computation_params.pf_params.computation_epochs = curr_active_computation_params.pf_params.computation_epochs.time_slice(a_filtered_session.t_start, a_filtered_session.t_stop)
+                else:
+                    # Create an epoch object spanning the entire session time range
+                    from neuropy.core.epoch import Epoch
+                    import pandas as pd
+                    curr_active_computation_params.pf_params.computation_epochs = Epoch(pd.DataFrame({
+                        'start': [a_filtered_session.t_start],
+                        'stop': [a_filtered_session.t_stop],
+                        'label': ['all']
+                    }))
+                    
+                    # curr_active_computation_params.pf_params.computation_epochs = ## Build an epoch spanning the whole `a_filtered_session` # curr_active_computation_params.pf_params.computation_epochs.time_slice(a_filtered_session.t_start, a_filtered_session.t_stop)
 
                 # # ensure config is filtered:
                 # # 2023-11-10 - Note hardcoded directional lap/pf suffixes used here.
@@ -815,7 +828,11 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
                 # `a_filtered_session` seems to be working. a_filtered_session.laps is correctly filtered.
                 # for maze2: a_filtered_session.t_start, a_filtered_session.t_stop
-                curr_active_computation_params.pf_params.computation_epochs = curr_active_computation_params.pf_params.computation_epochs.time_slice(a_filtered_session.t_start, a_filtered_session.t_stop)
+                # curr_active_computation_params.pf_params.computation_epochs = curr_active_computation_params.pf_params.computation_epochs.time_slice(a_filtered_session.t_start, a_filtered_session.t_stop)
+                if curr_active_computation_params.pf_params.computation_epochs is not None:
+                    curr_active_computation_params.pf_params.computation_epochs = curr_active_computation_params.pf_params.computation_epochs.time_slice(a_filtered_session.t_start, a_filtered_session.t_stop)
+
+
                 if debug_print:
                     print(f'curr_active_computation_params.pf_params.computation_epochs: {curr_active_computation_params.pf_params.computation_epochs}')
 
