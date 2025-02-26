@@ -309,17 +309,20 @@ class DockConfigEditor(DockConfigOwningMixin, QWidget):
         def update(state):
             setattr(self.config, property_name, state == Qt.Checked)
             self.updatePreview()
+              self.sigDockConfigChanged.emit(self)
         return update
     
     def updateStringProperty(self, property_name):
         def update(text):
             setattr(self.config, property_name, text)
             self.updatePreview()
+              self.sigDockConfigChanged.emit(self)
         return update
     
     def updateOrientation(self, text):
         self.config.orientation = text
         self.updatePreview()
+          self.sigDockConfigChanged.emit(self)
     
     def updateColors(self):
         if self.is_custom_config:
@@ -338,6 +341,7 @@ class DockConfigEditor(DockConfigOwningMixin, QWidget):
             self.config.custom_get_colors_dict[True] = self.dim_colors
             
             self.updatePreview()
+              self.sigDockConfigChanged.emit(self)
     
     def addDockGroup(self):
         group_name, ok = QInputDialog.getText(self, "Add Dock Group", "Group Name:")
@@ -346,6 +350,7 @@ class DockConfigEditor(DockConfigOwningMixin, QWidget):
                 self.config.dock_group_names.append(group_name)
                 self.group_names_list.addItem(group_name)
                 self.updatePreview()
+                  self.sigDockConfigChanged.emit(self)
     
     def removeDockGroup(self):
         selected_items = self.group_names_list.selectedItems()
@@ -426,3 +431,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+              self.sigDockConfigChanged.emit(self)
