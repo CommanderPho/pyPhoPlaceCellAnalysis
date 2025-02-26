@@ -568,14 +568,43 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
 
 
         Usage:
-            hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('test_data.h5')
+            import h5py
+            
             _pfnd_obj: PfND = long_one_step_decoder_1D.pf
-            _pfnd_obj.to_hdf(hdf5_output_path, key='test_pfnd')
+            hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('test_data.h5')
+            with h5py.File(a_save_path, 'w') as f: ## open the path as a HDF5 file handle:
+                _pfnd_obj.to_hdf(f, key='test_pfnd')
+            
+                
+        More Error-tolerant usage:                
+            import h5py
+
+            a_decoder_name: str = 'long'
+            a_full_decoded_2D_posterior_result: SingleEpochDecodedResult = results2D.continuous_results[a_decoder_name].get_result_for_epoch(0)
+            a_save_path = Path('data/a_full_decoded_2D_posterior_result.pkl').resolve()
+            if not a_save_path.parent.exists():
+                print(f'creating "{a_save_path.parent}"...')
+                a_save_path.parent.mkdir(exist_ok=True)
+            
+            with h5py.File(a_save_path, 'w') as f: ## open the path as a HDF5 file handle:
+                a_full_decoded_2D_posterior_result.to_hdf(f, 'a_full_decoded_2D_posterior_result')
+                print(f'\tsaved "{a_save_path}".')
+                
+    
         """
         import h5py
         from pyphocorehelpers.plotting.media_output_helpers import img_data_to_greyscale, get_array_as_image
         
-        assert not isinstance(file_path, (str, Path)), f"pass an already open HDF5 file handle. You passed type(file_path): {type(file_path)}, file_path: {file_path}"
+        # assert not isinstance(file_path, (str, Path)), f"pass an already open HDF5 file handle. You passed type(file_path): {type(file_path)}, file_path: {file_path}"
+        assert not isinstance(file_path, (str, Path)), f""" pass an already open HDF5 file handle. You passed type(file_path): {type(file_path)}, file_path: {file_path}. Example
+            import h5py    
+            _pfnd_obj: PfND = long_one_step_decoder_1D.pf
+            hdf5_output_path: Path = curr_active_pipeline.get_output_path().joinpath('test_data.h5')
+            with h5py.File(a_save_path, 'w') as f: ## open the path as a HDF5 file handle:
+                _pfnd_obj.to_hdf(f, key='test_pfnd')
+        """
+        
+
         f = file_path
         if debug_print and enable_hdf_testing_mode:
             print(f'type(f): {type(f)}, f: {f}') # type(f): <class 'h5py._hl.files.File'>, f: <HDF5 file "decoded_epoch_posteriors.h5" (mode r+)>
@@ -653,8 +682,6 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
             if (a_val is not None):
                 ## valid value
                 group.attrs[a_field_name] = a_val
-
-
 
 
     @classmethod
