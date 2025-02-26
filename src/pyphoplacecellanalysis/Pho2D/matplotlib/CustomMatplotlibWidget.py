@@ -354,6 +354,14 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
             matrix: optional data matrix 
             xbins: optional x bin values
             ybins: optional y bin values
+            
+            
+            
+        Updates:
+        
+        self.plots[name]['crosshairs_hLine']
+        self.plots[name]['crosshairs_hLine']
+        
         """
         are_crosshairs_currently_visible: bool = vLine.get_visible()
         new_desired_visibility_is_visible: bool = True
@@ -441,10 +449,53 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
             ax.figure.canvas.draw_idle()
 
 
+    @function_attributes(short_name=None, tags=['callback', 'matplotlib', 'ax-level'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-25 18:55', related_items=[])
+    def on_axes_enter(self, event):
+        """Called when mouse enters an axes to show crosshairs for that axes"""
+        if event.inaxes is None:
+            return
+            
+        # Only show crosshairs for the entered axes
+        for name, plot_items in self.plots.items():
+            if not isinstance(plot_items, dict):
+                continue
+                
+            if 'crosshairs_vLine' in plot_items and plot_items['crosshairs_vLine'].axes == event.inaxes:
+                plot_items['crosshairs_vLine'].set_visible(True)
+                if self.params.crosshairs_enable_y_trace:
+                    plot_items['crosshairs_hLine'].set_visible(True)
+        event.canvas.draw_idle()
 
+    @function_attributes(short_name=None, tags=['callback', 'matplotlib', 'ax-level'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-25 18:56', related_items=[])
+    def on_axes_leave(self, event):
+        """Called when mouse leaves an axes to hide its crosshairs"""
+        # if event.inaxes is None:
+        #     return
+        # Only hide crosshairs for the left axes
+        for name, plot_items in self.plots.items():
+            if not isinstance(plot_items, dict):
+                continue
+                
+            if 'crosshairs_vLine' in plot_items and plot_items['crosshairs_vLine'].axes == event.inaxes:
+                plot_items['crosshairs_vLine'].set_visible(False)
+                if self.params.crosshairs_enable_y_trace:
+                    plot_items['crosshairs_hLine'].set_visible(False)
+        event.canvas.draw_idle()
+
+
+
+    @function_attributes(short_name=None, tags=['callback', 'matplotlib', 'figure-level'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-25 18:40', related_items=[])
     def on_figure_enter(self, event):
         """Called when mouse enters the figure to restore crosshair visibility"""
+        # Skip if self.plots is not a dictionary or is empty
+        if not isinstance(self.plots, dict) or not self.plots:
+            return
+            
         for name, plot_items in self.plots.items():
+            # Skip non-dictionary items
+            if not isinstance(plot_items, dict):
+                continue
+                
             if 'crosshairs_vLine' in plot_items:
                 plot_items['crosshairs_vLine'].set_visible(True)
                 if self.params.crosshairs_enable_y_trace:
@@ -452,15 +503,28 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
         # Redraw to show changes
         event.canvas.draw_idle()
 
+    @function_attributes(short_name=None, tags=['callback', 'matplotlib', 'figure-level'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-25 18:40', related_items=[])
     def on_figure_leave(self, event):
         """Called when mouse leaves the figure to hide all crosshairs"""
+        # Skip if self.plots is not a dictionary or is empty
+        if not isinstance(self.plots, dict) or not self.plots:
+            return
+            
         for name, plot_items in self.plots.items():
+            # Skip non-dictionary items
+            if not isinstance(plot_items, dict):
+                continue
+                
             if 'crosshairs_vLine' in plot_items:
                 plot_items['crosshairs_vLine'].set_visible(False)
                 if self.params.crosshairs_enable_y_trace:
                     plot_items['crosshairs_hLine'].set_visible(False)
         # Redraw to hide changes
         event.canvas.draw_idle()
+
+
+
+
 
 
 
@@ -519,7 +583,7 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
         plots_dict = self.plots.get(name, {})
         if 'crosshairs_vLine' not in plots_dict:
             if name not in self.plots:
-                 self.plots[name] = {}
+                 self.plots[name] = {'crosshairs_vLine': None} ## create the dictionary to hold the related items
             vLine = ax.axvline(x=0, **vertical_crosshair_formatting_dict, label=f'{name}.crosshairs_vLine')
             self.plots[name]['crosshairs_vLine'] = vLine
             if self.params.crosshairs_enable_y_trace:
@@ -529,6 +593,9 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
             ## connect the callback:
             cid = ax.figure.canvas.mpl_connect('motion_notify_event', lambda event: self.on_crosshair_mouse_moved(event, ax, vLine, name, matrix, xbins, ybins))
             self.ui.connections[name] = {'motion_notify_event': cid,
+                                         'axes_enter_event': ax.figure.canvas.mpl_connect('axes_enter_event', self.on_axes_enter),
+                                         'axes_leave_event': ax.figure.canvas.mpl_connect('axes_leave_event', self.on_axes_leave),
+                                         ## figure-level events
                                          'figure_enter_event': ax.figure.canvas.mpl_connect('figure_enter_event', self.on_figure_enter),
                                          'figure_leave_event': ax.figure.canvas.mpl_connect('figure_leave_event', self.on_figure_leave),
             }
@@ -558,7 +625,9 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
                     if (self.plots[key] is not None) and (ln in self.plots[key]): 
                         self.plots[key][ln].remove()
                 if (plot_item is not None) and (key in self.ui.connections):
-                    plot_item.figure.canvas.mpl_disconnect(self.ui.connections[key])
+                    # Disconnect all event types
+                    for event_type, cid in self.ui.connections[key].items():
+                        plot_item.figure.canvas.mpl_disconnect(cid)
                     del self.ui.connections[key]
                 del self.plots[key]
         else:
@@ -569,8 +638,10 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
                         if (ln in self.plots[name]): 
                             self.plots[name][ln].remove()
                 if (plot_item is not None) and (name in self.ui.connections):
-                    plot_item.figure.canvas.mpl_disconnect(self.ui.connections[name])
-                    del self.ui.connections[name]
+                    for event_type, cid in self.ui.connections[name].items():
+                        plot_item.figure.canvas.mpl_disconnect(cid)
+                    del self.ui.connections[name]                                    
+                    # plot_item.figure.canvas.mpl_disconnect(self.ui.connections[name])
                 if (self.plots[name] is not None):
                     del self.plots[name]
         
