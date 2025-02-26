@@ -66,7 +66,7 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore
 
 
-def plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipeline, a_decoder, a_decoded_result: DecodedFilterEpochsResult):
+def plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipeline, a_decoder: BasePositionDecoder, a_decoded_result: Union[DecodedFilterEpochsResult, SingleEpochDecodedResult]):
     """ 
     
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_attached_BinByBinDecodingDebugger
@@ -84,9 +84,17 @@ def plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipe
     ## OUTPUTS: neuron_IDs, global_spikes_df, active_window_time_bins
     active_2d_plot = spike_raster_window.spike_raster_plt_2d
     active_spikes_window = active_2d_plot.spikes_window
-    decoding_time_bin_size: float = a_decoded_result.decoding_time_bin_size
-    single_continuous_result: SingleEpochDecodedResult = a_decoded_result.get_result_for_epoch(0) # SingleEpochDecodedResult
-    decoding_bins_epochs_df: pd.DataFrame = single_continuous_result.build_pseudo_epochs_df_from_decoding_bins().epochs.get_valid_df()
+
+    if isinstance(a_decoded_result, SingleEpochDecodedResult):
+        single_continuous_result = a_decoded_result ## already have this
+        decoding_time_bin_size: float = single_continuous_result.time_bin_container.edge_info.step
+    else:
+        ## extract it
+        single_continuous_result: SingleEpochDecodedResult = a_decoded_result.get_result_for_epoch(0) # SingleEpochDecodedResult            
+        decoding_time_bin_size: float = a_decoded_result.decoding_time_bin_size
+
+
+    # decoding_bins_epochs_df: pd.DataFrame = single_continuous_result.build_pseudo_epochs_df_from_decoding_bins().epochs.get_valid_df()
     bin_by_bin_data: BinByBinDebuggingData = BinByBinDebuggingData.init_from_single_continuous_result(a_decoder=a_decoder, global_spikes_df=global_spikes_df, single_continuous_result=single_continuous_result, decoding_time_bin_size=decoding_time_bin_size, n_max_debugged_time_bins=25)
     ## OUTPUTS: bin_by_bin_data
 
