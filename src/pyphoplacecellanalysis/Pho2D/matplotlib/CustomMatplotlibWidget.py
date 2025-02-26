@@ -339,7 +339,66 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
     # ==================================================================================================================== #
     # CrosshairsTracingMixin Conformances                                                                                  #
     # ==================================================================================================================== #
-    
+    def format_crosshair_value_string(self, x_point: float, y_point: Optional[float]=None, matrix=None, xbins=None, ybins=None) -> str:
+        """Formats the crosshair value string based on cursor position and data
+        
+        Args:
+            x_point: Current x coordinate
+            y_point: Current y coordinate
+            index_x: Integer x index
+            index_y: Integer y index
+            matrix: Optional data matrix
+            xbins: Optional x bin values
+            ybins: Optional y bin values
+            
+        Returns:
+            Formatted string for crosshair display
+        """
+        
+        index_x = int(x_point)
+        if (y_point is not None): index_y = int(y_point)
+        value_str_arr: List[str] = []
+        value_str: str = ''
+        
+        # Format position strings
+        if matrix is not None:
+            shape = np.shape(matrix)
+            valid_x = (index_x >= 0 and index_x < shape[0])
+            valid_y = (index_y >= 0 and index_y < shape[1]) if (y_point is not None) else True
+            
+            if valid_x and valid_y:
+                # Format position string
+                if self.params.should_force_discrete_to_bins:
+                    if (xbins is not None) and (ybins is not None) and (y_point is not None):
+                        value_str_arr.extend([f"(x[{index_x}]={xbins[index_x]:.3f}", f"y[{index_y}]={ybins[index_y]:.3f}"])
+                    else:
+                        value_str_arr.extend([f"(x={index_x}", f"y={index_x if not (y_point is not None) else index_y}"])
+                else:
+                    value_str_arr.extend([f"x={x_point:.1f}", f"y={y_point:.1f}"] if (y_point is not None) else [f"x={x_point:.1f}", ])
+                
+                # Format data value string
+                if self.params.should_force_discrete_to_bins:
+                    if (xbins is not None) and (ybins is not None) and (y_point is not None):
+                        value_str_arr.append(f"value={matrix[index_x][index_y]:.3f}")
+                    else:
+                        value_str_arr.append(f"value={matrix[index_x][index_y]:.3f}")
+                else:
+                    value_str_arr.append(f"value={matrix[index_x][index_y]:.3f}" if (y_point is not None) else f"value={matrix[index_x][0]:.3f}")
+        else:
+            # No matrix provided, just show the (x/y)
+            if self.params.should_force_discrete_to_bins:
+                if (xbins is not None) and (ybins is not None) and (y_point is not None):
+                    value_str_arr.extend([f"(x[{index_x}]={xbins[index_x]:.3f}", f"y[{index_y}]={ybins[index_y]:.3f}"])
+                else:
+                    value_str_arr.extend([f"(x={index_x}", f"y={index_x if not (y_point is not None) else index_y}"])
+            else:
+                value_str_arr.extend([f"x={x_point:.1f}", f"y={y_point:.1f}"] if (y_point is not None) else [f"x={x_point:.1f}", ])
+        
+        # Join formatted strings
+        value_str = self.params.crosshair_value_format_join_symbol.join(value_str_arr) ## build the final value output string from the value_str_arr
+        return value_str
+
+
     @function_attributes(short_name=None, tags=['callback'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-25 18:24', related_items=[])
     def on_crosshair_mouse_moved(self, event, ax, vLine, name, matrix=None, xbins=None, ybins=None):
         """ Called when mouse moves to update crosshair positions and emit signals
@@ -368,6 +427,9 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
         did_visibility_change: bool = False
         did_position_change: bool = False
         
+        # crosshair_value_format_join_symbol: str = self.params.setdefault('crosshair_value_format_join_symbol', ', ')
+        crosshair_value_format_join_symbol: str = self.params.setdefault('crosshair_value_format_join_symbol', '\n')
+
         if event.inaxes == ax:
             # Mouse is inside the axes - show and update crosshairs
             x_point = event.xdata
@@ -377,54 +439,18 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
                 if self.params.crosshairs_enable_y_trace: y_point = float(int(round(y_point)))+0.5
             index_x = int(x_point)
             if self.params.crosshairs_enable_y_trace: index_y = int(y_point)
-            value_str_arr: List[str] = []
-            value_str: str = ''
             
-
             ## try to retrieve the matrix
             if matrix is None:
                 matrix = self.plots_data.get('matrix', None)
-                xbins = self.plots.get('xbins', None)
-                ybins = self.plots.get('ybins', None)
+                xbins = self.plots_data.get('xbins', None)
+                ybins = self.plots_data.get('ybins', None)
                               
-            if matrix is not None:
-                shape = np.shape(matrix)
-                valid_x = (index_x >= 0 and index_x < shape[0])
-                valid_y = (index_y >= 0 and index_y < shape[1]) if self.params.crosshairs_enable_y_trace else True
-                if valid_x and valid_y:
-                    if self.params.should_force_discrete_to_bins:
-                        if (xbins is not None) and (ybins is not None) and self.params.crosshairs_enable_y_trace:
-                            value_str_arr.extend([f"(x[{index_x}]={xbins[index_x]:.3f}", f"y[{index_y}]={ybins[index_y]:.3f}"])
-                        else:
-                            value_str_arr.extend([f"(x={index_x}", f"y={index_x if not self.params.crosshairs_enable_y_trace else index_y}"])
-                    else:
-                        value_str_arr.extend([f"x={x_point:.1f}", f"y={y_point:.1f}"] if self.params.crosshairs_enable_y_trace else [f"x={x_point:.1f}", ])
-                    
-                    if self.params.should_force_discrete_to_bins:
-                        if (xbins is not None) and (ybins is not None) and self.params.crosshairs_enable_y_trace:
-                            value_str = f"value={matrix[index_x][index_y]:.3f}"
-                        else:
-                            value_str = f"value={matrix[index_x][index_y]:.3f}"
-                    else:
-                        value_str = f"value={matrix[index_x][index_y]:.3f}" if self.params.crosshairs_enable_y_trace else f"value={matrix[index_x][0]:.3f}"
-                    value_str_arr.append(value_str)
-                    value_str = '' ## clear this string, it won't be used, and will instead be pieced together by the value_str_arr
-                ## END if valid_x and valid_y:
-                
-            else:
-                ## No matrix provided, just show the (x/y)
-                if self.params.should_force_discrete_to_bins:
-                    if (xbins is not None) and (ybins is not None) and self.params.crosshairs_enable_y_trace:
-                        value_str_arr.extend([f"(x[{index_x}]={xbins[index_x]:.3f}", f"y[{index_y}]={ybins[index_y]:.3f}"])
-                    else:
-                        value_str_arr.extend([f"(x={index_x}", f"y={index_x if not self.params.crosshairs_enable_y_trace else index_y}"])
-                else:
-                    value_str_arr.extend([f"x={x_point:.1f}", f"y={y_point:.1f}"] if self.params.crosshairs_enable_y_trace else [f"x={x_point:.1f}", ])       
-                    
-                value_str = self.params.crosshair_value_format_join_symbol.join(value_str_arr)
 
-            # END if matrix is not None
-            value_str = self.params.crosshair_value_format_join_symbol.join(value_str_arr) ## build the final value output string from the value_str_arr
+            # Replace the value formatting code with a single function call
+            value_str: str = self.format_crosshair_value_string(x_point, y_point=y_point, matrix=matrix, xbins=xbins, ybins=ybins)
+            
+            ## check position changes:
             old_x_point = vLine.get_xdata()
             did_position_change = (did_position_change or np.any(old_x_point != x_point))
             vLine.set_xdata(x_point)
@@ -586,8 +612,8 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
             self.params.should_force_discrete_to_bins = should_force_discrete_to_bins
         should_force_discrete_to_bins: bool = self.params.should_force_discrete_to_bins
         
-        # crosshair_value_format_join_symbol: str = self.params.setdefault('crosshair_value_format_join_symbol', ', ')
-        crosshair_value_format_join_symbol: str = self.params.setdefault('crosshair_value_format_join_symbol', '\n')
+        # # crosshair_value_format_join_symbol: str = self.params.setdefault('crosshair_value_format_join_symbol', ', ')
+        # crosshair_value_format_join_symbol: str = self.params.setdefault('crosshair_value_format_join_symbol', '\n')
         
         if enable_y_trace is not None:
             self.params.crosshairs_enable_y_trace = enable_y_trace

@@ -1282,6 +1282,7 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
         
         return new_curves_separate_plot
         
+
     @function_attributes(short_name=None, tags=['pyqtgraph', 'render_plot_group'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 04:59', related_items=[])
     def remove_separate_render_plot_items(self, separate_plot_item):
         """ removes the PlotItem separate_plot_item created by calling self.create_separate_render_plot_item(...) from the layout. """
