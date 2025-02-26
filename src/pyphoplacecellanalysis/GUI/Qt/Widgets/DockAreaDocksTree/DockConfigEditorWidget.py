@@ -2,12 +2,18 @@ import sys
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
                             QFormLayout, QCheckBox, QLineEdit, QComboBox, 
                             QGroupBox, QLabel)
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QtCore
 
 # Import the DockDisplayConfig class
 from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import DockDisplayConfig
 
-class DockConfigEditor(QWidget):
+class DockConfigOwningMixin:
+    sigDockConfigChanged = QtCore.pyqtSignal(object) # (self)    
+    sigSave = QtCore.pyqtSignal(str, str, str) # signal emitted when the mapping from the temporal window to the spatial layout is changed
+    sigRefresh = QtCore.pyqtSignal(str, str, str) # signal emitted when the mapping from the temporal window to the spatial
+
+
+class DockConfigEditor(DockConfigOwningMixin, QWidget):
     """ allows the user to display and edit a `DockDisplayConfig` via a GUI
     
     """
