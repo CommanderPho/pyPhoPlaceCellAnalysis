@@ -507,7 +507,7 @@ class DockLabel(VerticalLabel):
         self.updateStyle()
         self.setAutoFillBackground(False)
         self.mouseMoved = False
-        self.setToolTip(self.text())
+        self.setToolTip(self.text()) ## the original text is only preserved in the label's .toolTip()
         self.closeButton = None
         self.collapseButton = None
         self.groupButton = None
@@ -664,8 +664,7 @@ class DockLabel(VerticalLabel):
                 current_x += button_size
         ## END if self.groupButton...   
         
-
-
+        ## See how much space is left for the text label after subtracting away the buttons:
         button_occupied_space = ((button_size if button_size else 0) * num_total_title_bar_buttons)
 
         if self.elided_text_mode is not None:
@@ -689,7 +688,8 @@ class DockLabel(VerticalLabel):
                 print(f'\tavailable_text_space: {available_text_space}')
             # Skip elision if available space is insufficient
             if available_text_space > 0:
-                elided_text = font_metrics.elidedText(self.text(), self.elided_text_mode, available_text_space)
+                original_text: str = self.toolTip()
+                elided_text = font_metrics.elidedText(original_text, self.elided_text_mode, available_text_space)
                 self.setText(elided_text)
             else:
                 if debug_print:

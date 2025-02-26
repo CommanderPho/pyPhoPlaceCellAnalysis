@@ -19,7 +19,11 @@ __all__ = ['VerticalLabel']
             #return QtCore.QSize(16, 50)
 
 class VerticalLabel(QtWidgets.QLabel):
-    """ 
+    """ A flexible label that adjusts its orientation and size based on the orientation and available space.
+    
+    When text is ellided (which means to cut out a portion of it and replace it with ellipses ("...") so it fits in the available space, the label's text is actualy replaced by the ellided version.
+    The original is only accessible via the .toolTip()
+    
     
     VerticalLabel: .forceWidth, .orientation
     """
