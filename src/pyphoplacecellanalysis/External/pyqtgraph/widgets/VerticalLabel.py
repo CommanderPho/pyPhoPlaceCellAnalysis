@@ -89,6 +89,18 @@ class VerticalLabel(QtWidgets.QLabel):
                 return QtCore.QSize(self.hint.width(), self.hint.height())
             else:
                 return QtCore.QSize(50, 19)
+            
+    def relayout_text(self):
+        """ forces text update by directly manipulating the label"""
+        # ellided_text = self.text()
+        original_text: str = self.toolTip()
+        print(f'\toriginal_text: "{original_text}"')
+        # self.elided_text_mode = QtCore.Qt.TextElideMode.ElideLeft  # Ensure elision is enabled
+        self.setText("")  # Clear text temporarily
+        self.setText(original_text)  # Reset text to trigger recalculation
+
+        # self.updateStyle()
+        # self.resizeEvent(QtGui.QResizeEvent(self.size(), self.size()))
 
 
 if __name__ == '__main__':
