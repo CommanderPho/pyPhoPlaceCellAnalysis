@@ -379,6 +379,14 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
             if self.params.crosshairs_enable_y_trace: index_y = int(y_point)
             value_str_arr: List[str] = []
             value_str: str = ''
+            
+
+            ## try to retrieve the matrix
+            if matrix is None:
+                matrix = self.plots_data.get('matrix', None)
+                xbins = self.plots.get('xbins', None)
+                ybins = self.plots.get('ybins', None)
+                              
             if matrix is not None:
                 shape = np.shape(matrix)
                 valid_x = (index_x >= 0 and index_x < shape[0])
@@ -476,51 +484,59 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
             if not isinstance(plot_items, dict):
                 continue
                 
-            if 'crosshairs_vLine' in plot_items and plot_items['crosshairs_vLine'].axes == event.inaxes:
-                plot_items['crosshairs_vLine'].set_visible(False)
-                if self.params.crosshairs_enable_y_trace:
-                    plot_items['crosshairs_hLine'].set_visible(False)
-        event.canvas.draw_idle()
-
-
-
-    @function_attributes(short_name=None, tags=['callback', 'matplotlib', 'figure-level'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-25 18:40', related_items=[])
-    def on_figure_enter(self, event):
-        """Called when mouse enters the figure to restore crosshair visibility"""
-        # Skip if self.plots is not a dictionary or is empty
-        if not isinstance(self.plots, dict) or not self.plots:
-            return
-            
-        for name, plot_items in self.plots.items():
-            # Skip non-dictionary items
-            if not isinstance(plot_items, dict):
-                continue
-                
             if 'crosshairs_vLine' in plot_items:
-                plot_items['crosshairs_vLine'].set_visible(True)
+                is_visible: bool = (plot_items['crosshairs_vLine'].axes == event.inaxes) # only if it's equal to the current event axes
+                plot_items['crosshairs_vLine'].set_visible(is_visible)
                 if self.params.crosshairs_enable_y_trace:
-                    plot_items['crosshairs_hLine'].set_visible(True)
-        # Redraw to show changes
+                    plot_items['crosshairs_hLine'].set_visible(is_visible)
+                    
+            # if 'crosshairs_hLine' in plot_items:
+            #     is_hline_visible: bool = (plot_items['crosshairs_hLine'].axes == event.inaxes)
+            #     plot_items['crosshairs_hLine'].set_visible(is_hline_visible)
+            #     if self.params.crosshairs_enable_y_trace:
+            #         plot_items['crosshairs_hLine'].set_visible(is_hline_visible)
+                    
         event.canvas.draw_idle()
 
-    @function_attributes(short_name=None, tags=['callback', 'matplotlib', 'figure-level'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-25 18:40', related_items=[])
-    def on_figure_leave(self, event):
-        """Called when mouse leaves the figure to hide all crosshairs"""
-        # Skip if self.plots is not a dictionary or is empty
-        if not isinstance(self.plots, dict) or not self.plots:
-            return
+
+
+    # @function_attributes(short_name=None, tags=['callback', 'matplotlib', 'figure-level'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-25 18:40', related_items=[])
+    # def on_figure_enter(self, event):
+    #     """Called when mouse enters the figure to restore crosshair visibility"""
+    #     # Skip if self.plots is not a dictionary or is empty
+    #     if not isinstance(self.plots, dict) or not self.plots:
+    #         return
             
-        for name, plot_items in self.plots.items():
-            # Skip non-dictionary items
-            if not isinstance(plot_items, dict):
-                continue
+    #     for name, plot_items in self.plots.items():
+    #         # Skip non-dictionary items
+    #         if not isinstance(plot_items, dict):
+    #             continue
                 
-            if 'crosshairs_vLine' in plot_items:
-                plot_items['crosshairs_vLine'].set_visible(False)
-                if self.params.crosshairs_enable_y_trace:
-                    plot_items['crosshairs_hLine'].set_visible(False)
-        # Redraw to hide changes
-        event.canvas.draw_idle()
+    #         if 'crosshairs_vLine' in plot_items:
+    #             plot_items['crosshairs_vLine'].set_visible(True)
+    #             if self.params.crosshairs_enable_y_trace:
+    #                 plot_items['crosshairs_hLine'].set_visible(True)
+    #     # Redraw to show changes
+    #     event.canvas.draw_idle()
+
+    # @function_attributes(short_name=None, tags=['callback', 'matplotlib', 'figure-level'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-25 18:40', related_items=[])
+    # def on_figure_leave(self, event):
+    #     """Called when mouse leaves the figure to hide all crosshairs"""
+    #     # Skip if self.plots is not a dictionary or is empty
+    #     if not isinstance(self.plots, dict) or not self.plots:
+    #         return
+            
+    #     for name, plot_items in self.plots.items():
+    #         # Skip non-dictionary items
+    #         if not isinstance(plot_items, dict):
+    #             continue
+                
+    #         if 'crosshairs_vLine' in plot_items:
+    #             plot_items['crosshairs_vLine'].set_visible(False)
+    #             if self.params.crosshairs_enable_y_trace:
+    #                 plot_items['crosshairs_hLine'].set_visible(False)
+    #     # Redraw to hide changes
+    #     event.canvas.draw_idle()
 
 
 
@@ -596,8 +612,8 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
                                          'axes_enter_event': ax.figure.canvas.mpl_connect('axes_enter_event', self.on_axes_enter),
                                          'axes_leave_event': ax.figure.canvas.mpl_connect('axes_leave_event', self.on_axes_leave),
                                          ## figure-level events
-                                         'figure_enter_event': ax.figure.canvas.mpl_connect('figure_enter_event', self.on_figure_enter),
-                                         'figure_leave_event': ax.figure.canvas.mpl_connect('figure_leave_event', self.on_figure_leave),
+                                        #  'figure_enter_event': ax.figure.canvas.mpl_connect('figure_enter_event', self.on_figure_enter),
+                                        #  'figure_leave_event': ax.figure.canvas.mpl_connect('figure_leave_event', self.on_figure_leave),
             }
 
             # 'figure_enter_event'    # Mouse enters figure
