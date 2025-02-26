@@ -847,6 +847,26 @@ class SpikeRasterBottomFrameControlsMixin(LoggingBaseClassLoggerOwningMixin):
         """The logger property."""
         return self.bottom_playback_control_bar_widget.logger
 
+    # @property
+    # def logger(self) -> LoggingBaseClass:
+    #     """The logger property."""
+    #     if not hasattr(self, '_logger'):
+    #         return None # not initialized yet
+    #     return self._logger
+    # @logger.setter
+    # def logger(self, value: LoggingBaseClass):
+    #     self._logger = value
+        
+    # @property
+    # def attached_log_window(self) -> Optional[LoggingOutputWidget]:
+    #     """The attached_log_window property."""
+    #     try:
+    #         if not hasattr(self, '_attached_log_window'):
+    #             return None # not initialized yet
+    #         return self._attached_log_window
+    #     except (AttributeError, NameError):
+    #         return None
+
 
     @QtCore.pyqtSlot()
     def SpikeRasterBottomFrameControlsMixin_on_init(self):

@@ -5,6 +5,8 @@ from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,
                             QGroupBox, QLabel, QTabWidget, QListWidget, QPushButton, QInputDialog)
 from PyQt5.QtCore import Qt
 
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 # Import the DockDisplayConfig class
 from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock
 from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import DockDisplayConfig
@@ -19,6 +21,7 @@ class DockConfigOwningMixin:
     sigRevert = QtCore.pyqtSignal(object) # signal emitted when the user wants to revert the changes to the config back to the pre-edited values
     
 
+@metadata_attributes(short_name=None, tags=['GUI', 'config'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-26 03:07', related_items=['Uic_AUTOGEN_TinyDockPlanningHelperWidget.py', 'Uic_AUTOGEN_DockPlanningHelperWidget.py', 'DockPlanningHelperWidget'])
 class DockConfigEditor(DockConfigOwningMixin, QWidget):
     """ allows the user to display and edit a `DockDisplayConfig` via a GUI
     
@@ -220,109 +223,26 @@ class DockConfigEditor(DockConfigOwningMixin, QWidget):
         
         self.setLayout(main_layout)
 
-        # self.setWindowTitle('Dock Display Config Editor')
-        # self.resize(400, 500)
-        
-        # main_layout = QVBoxLayout()
-        
-        # # Boolean properties group
-        # bool_group = QGroupBox("Button Options")
-        # bool_layout = QFormLayout()
-        
-        # # Create checkboxes for boolean properties
-        # self.close_btn_cb = QCheckBox()
-        # self.close_btn_cb.setChecked(self.config.showCloseButton)
-        # self.close_btn_cb.stateChanged.connect(self.updateBoolProperty('showCloseButton'))
-        # bool_layout.addRow("Show Close Button:", self.close_btn_cb)
-        
-        # self.collapse_btn_cb = QCheckBox()
-        # self.collapse_btn_cb.setChecked(self.config.showCollapseButton)
-        # self.collapse_btn_cb.stateChanged.connect(self.updateBoolProperty('showCollapseButton'))
-        # bool_layout.addRow("Show Collapse Button:", self.collapse_btn_cb)
-        
-        # self.group_btn_cb = QCheckBox()
-        # self.group_btn_cb.setChecked(self.config.showGroupButton)
-        # self.group_btn_cb.stateChanged.connect(self.updateBoolProperty('showGroupButton'))
-        # bool_layout.addRow("Show Group Button:", self.group_btn_cb)
-        
-        # self.orientation_btn_cb = QCheckBox()
-        # self.orientation_btn_cb.setChecked(self.config.showOrientationButton)
-        # self.orientation_btn_cb.stateChanged.connect(self.updateBoolProperty('showOrientationButton'))
-        # bool_layout.addRow("Show Orientation Button:", self.orientation_btn_cb)
-        
-        # self.hide_title_cb = QCheckBox()
-        # self.hide_title_cb.setChecked(self.config.hideTitleBar)
-        # self.hide_title_cb.stateChanged.connect(self.updateBoolProperty('hideTitleBar'))
-        # bool_layout.addRow("Hide Title Bar:", self.hide_title_cb)
-        
-        # bool_group.setLayout(bool_layout)
-        
-        # # String properties group
-        # string_group = QGroupBox("Appearance")
-        # string_layout = QFormLayout()
-        
-        # self.font_size_edit = QLineEdit(self.config.fontSize)
-        # self.font_size_edit.textChanged.connect(self.updateStringProperty('fontSize'))
-        # string_layout.addRow("Font Size:", self.font_size_edit)
-        
-        # self.corner_radius_edit = QLineEdit(self.config.corner_radius)
-        # self.corner_radius_edit.textChanged.connect(self.updateStringProperty('corner_radius'))
-        # string_layout.addRow("Corner Radius:", self.corner_radius_edit)
-        
-        # # Orientation dropdown
-        # self.orientation_combo = QComboBox()
-        # self.orientation_combo.addItems(["auto", "horizontal", "vertical"])
-        # current_orientation = self.config.orientation
-        # if current_orientation == "horizontal" or current_orientation is None:
-        #     self.orientation_combo.setCurrentIndex(1)
-        # elif current_orientation == "auto":
-        #     self.orientation_combo.setCurrentIndex(0)
-        # else:  # vertical
-        #     self.orientation_combo.setCurrentIndex(2)
-        
-        # self.orientation_combo.currentTextChanged.connect(self.updateOrientation)
-        # string_layout.addRow("Orientation:", self.orientation_combo)
-        
-        # string_group.setLayout(string_layout)
-        
-        # # Preview section
-        # preview_group = QGroupBox("Preview (Configuration Output)")
-        # preview_layout = QVBoxLayout()
-        
-        # self.preview_label = QLabel()
-        # self.preview_label.setWordWrap(True)
-        # self.preview_label.setAlignment(Qt.AlignTop)
-        # self.updatePreview()
-        
-        # preview_layout.addWidget(self.preview_label)
-        # preview_group.setLayout(preview_layout)
-        
-        # # Add all groups to main layout
-        # main_layout.addWidget(bool_group)
-        # main_layout.addWidget(string_group)
-        # main_layout.addWidget(preview_group)
-        
-        # self.setLayout(main_layout)
 
         
     def updateBoolProperty(self, property_name):
         def update(state):
             setattr(self.config, property_name, state == Qt.Checked)
             self.updatePreview()
-              self.sigDockConfigChanged.emit(self)
+            self.sigDockConfigChanged.emit(self)
         return update
     
     def updateStringProperty(self, property_name):
         def update(text):
             setattr(self.config, property_name, text)
             self.updatePreview()
-              self.sigDockConfigChanged.emit(self)
+            self.sigDockConfigChanged.emit(self)
         return update
     
     def updateOrientation(self, text):
         self.config.orientation = text
         self.updatePreview()
-          self.sigDockConfigChanged.emit(self)
+        self.sigDockConfigChanged.emit(self)
     
     def updateColors(self):
         if self.is_custom_config:
@@ -341,7 +261,7 @@ class DockConfigEditor(DockConfigOwningMixin, QWidget):
             self.config.custom_get_colors_dict[True] = self.dim_colors
             
             self.updatePreview()
-              self.sigDockConfigChanged.emit(self)
+            self.sigDockConfigChanged.emit(self)
     
     def addDockGroup(self):
         group_name, ok = QInputDialog.getText(self, "Add Dock Group", "Group Name:")
@@ -350,7 +270,7 @@ class DockConfigEditor(DockConfigOwningMixin, QWidget):
                 self.config.dock_group_names.append(group_name)
                 self.group_names_list.addItem(group_name)
                 self.updatePreview()
-                  self.sigDockConfigChanged.emit(self)
+                self.sigDockConfigChanged.emit(self)
     
     def removeDockGroup(self):
         selected_items = self.group_names_list.selectedItems()
@@ -361,7 +281,9 @@ class DockConfigEditor(DockConfigOwningMixin, QWidget):
                     self.config.dock_group_names.remove(group_name)
                     self.group_names_list.takeItem(self.group_names_list.row(item))
             self.updatePreview()
-    
+            self.sigDockConfigChanged.emit(self)    
+
+
     def updatePreview(self):
         # Display the current configuration as text
         props = [
@@ -431,4 +353,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-              self.sigDockConfigChanged.emit(self)
+

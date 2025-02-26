@@ -1533,17 +1533,28 @@ QDoubleSpinBox::down-arrow {
       </item>
       <item row="1" column="34">
        <widget class="QToolButton" name="btnToggleRightSidebar">
+        <property name="focusPolicy">
+         <enum>Qt::NoFocus</enum>
+        </property>
         <property name="toolTip">
          <string>Toggle right sidebar visibility</string>
         </property>
-        <property name="text">
-         <string/>
+        <property name="icon">
+         <iconset resource="../../../Resources/ActionIcons.qrc">
+          <normaloff>:/Icons/Icons/Icon/application-sidebar-collapse.png</normaloff>
+          <normalon>:/Icons/Icons/Icon/application-dock.png</normalon>:/Icons/Icons/Icon/application-sidebar-collapse.png</iconset>
         </property>
         <property name="checkable">
          <bool>true</bool>
         </property>
+        <property name="popupMode">
+         <enum>QToolButton::InstantPopup</enum>
+        </property>
+        <property name="autoRaise">
+         <bool>true</bool>
+        </property>
         <property name="arrowType">
-         <enum>Qt::LeftArrow</enum>
+         <enum>Qt::NoArrow</enum>
         </property>
        </widget>
       </item>
