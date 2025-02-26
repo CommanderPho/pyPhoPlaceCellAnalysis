@@ -14,15 +14,19 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaCo
 
 
 class DockConfigOwningMixin:
-    sigDockConfigChanged = QtCore.pyqtSignal(object) # (self)    
-    sigSave = QtCore.pyqtSignal(str, str, str) # signal emitted when the mapping from the temporal window to the spatial layout is changed
-    sigRefresh = QtCore.pyqtSignal(str, str, str) # signal emitted when the mapping from the temporal window to the spatial
-
+    sigDockConfigChanged = QtCore.pyqtSignal(object) # (self) - signal emitted when any property of the internal dock config is modified.
+    sigSave = QtCore.pyqtSignal(object) # signal emitted when the user wants to finalize and commit the changes to the config
+    sigRevert = QtCore.pyqtSignal(object) # signal emitted when the user wants to revert the changes to the config back to the pre-edited values
+    
 
 class DockConfigEditor(DockConfigOwningMixin, QWidget):
     """ allows the user to display and edit a `DockDisplayConfig` via a GUI
     
     """
+    sigDockConfigChanged = QtCore.pyqtSignal(object) # (self) - signal emitted when any property of the internal dock config is modified.
+    sigSave = QtCore.pyqtSignal(object) # signal emitted when the user wants to finalize and commit the changes to the config
+    sigRevert = QtCore.pyqtSignal(object) # signal emitted when the user wants to revert the changes to the config back to the pre-edited values    
+
     def __init__(self, config=None):
         super().__init__()
         
