@@ -90,6 +90,11 @@ self.ui.btnJoystickMove
 .sig_joystick_delta_occured (float, float)
 
 
+
+# Dock/Track Controls ________________________________________________________________________________________________ #
+btnAddDockedTrack
+
+
 """
 ## Define the .ui file path
 path = os.path.dirname(os.path.abspath(__file__))
@@ -113,7 +118,6 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
     jump_specific_time = QtCore.pyqtSignal(float)
     jump_specific_time_window = QtCore.pyqtSignal(float, float)
     
-
     # Series Target Actions
     series_remove_pressed = QtCore.pyqtSignal(str)    
     series_customize_pressed = QtCore.pyqtSignal(str)
@@ -125,6 +129,9 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
 
     sigToggleRightSidebarVisibility = QtCore.pyqtSignal(bool)
 
+
+    sigAddDockedTrackRequested = QtCore.pyqtSignal()
+    
 
     def __init__(self, parent=None):
         # super().__init__(parent=parent) # Call the inherited classes __init__ method
@@ -230,6 +237,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         # pg.JoystickButton
         self.ui.connections['btnJoystickMove_sigStateChanged'] = self.ui.btnJoystickMove.sigStateChanged.connect(self.on_joystick_delta_state_changed)
         
+        self.ui.connections['btnAddDockedTrack_pressed'] = self.ui.btnAddDockedTrack.pressed.connect(self.on_add_docked_track_widget_button_pressed)
 
         self.ui.btnToggleRightSidebar.pressed.connect(self.on_right_sidebar_toggle_button_pressed)
 
@@ -791,6 +799,11 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         print(f'\tshould_sidebar_be_visible: {should_sidebar_be_visible}')
         
         self.sigToggleRightSidebarVisibility.emit(should_sidebar_be_visible)
+
+    def on_add_docked_track_widget_button_pressed(self):
+        """ btnAddDockedTrack """
+        self.log_print(f'on_add_docked_track_widget_button_pressed()')
+        self.sigAddDockedTrackRequested.emit()
 
     # ==================================================================================================================== #
     # eventFilter                                                                                                          #

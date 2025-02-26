@@ -34,6 +34,7 @@ from pyphoplacecellanalysis.GUI.Qt.NeuronVisualSelectionControls.NeuronVisualSel
 
 from pyphoplacecellanalysis.GUI.Qt.Menus.PhoMenuHelper import PhoMenuHelper
 from pyphocorehelpers.DataStructure.logging_data_structures import LoggingBaseClass, LoggingBaseClassLoggerOwningMixin
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
 
 # remove TimeWindowPlaybackControllerActionsMixin
 # class Spike3DRasterWindowWidget(SpikeRasterBottomFrameControlsMixin, TimeWindowPlaybackControllerActionsMixin, TimeWindowPlaybackPropertiesMixin, QtWidgets.QWidget):
@@ -336,6 +337,9 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.ui.bottom_bar_connections = None 
         self.ui.bottom_bar_connections = self.SpikeRasterBottomFrameControlsMixin_connectSignals(self.ui.bottomPlaybackControlBarWidget)
         self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.sig_joystick_delta_occured.connect(self.perform_slide_relative_time))
+        if self.ui.spike_raster_plt_2d is not None:
+            ## connect the btnAddDockedTrack to the 2D plotter's add track function:
+            self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.sigAddDockedTrackRequested.connect(lambda: self.ui.spike_raster_plt_2d.add_new_matplotlib_render_plot_widget(name='newDockedWidget', sync_mode=SynchronizedPlotMode.TO_WINDOW)))
 
         self.ui.left_side_bar_connections = None
         self.ui.left_side_bar_connections = self.SpikeRasterLeftSidebarControlsMixin_connectSignals(self.ui.leftSideToolbarWidget)
