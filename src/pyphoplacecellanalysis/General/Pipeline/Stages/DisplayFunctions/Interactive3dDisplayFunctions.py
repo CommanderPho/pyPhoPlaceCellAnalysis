@@ -46,6 +46,14 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
         should_use_separate_window = kwargs.pop('separate_window', True)
         pActiveTuningCurvesPlotter = kwargs.get('extant_plotter', None)
         active_pf2D = kwargs.get('override_pf2D', computation_result.computed_data['pf2D'])
+
+        # Modify active_config before creating/updating plotter
+        active_config.plotting_config.should_use_linear_track_geometry = kwargs.get('should_use_linear_track_geometry', True)
+        # active_config.plotting_config.t_start = t_start
+        # active_config.plotting_config.t_delta = t_delta 
+        # active_config.plotting_config.t_end = t_end
+                
+
         ipcDataExplorer = InteractivePlaceCellTuningCurvesDataExplorer(active_config, computation_result.sess, active_pf2D, active_config.plotting_config.pf_colors, **({'extant_plotter':None} | kwargs))
         pActiveTuningCurvesPlotter = ipcDataExplorer.plot(pActiveTuningCurvesPlotter) # [2, 17449]
         # Update the ipcDataExplorer's colors for spikes and placefields from its configs on init:
@@ -110,6 +118,12 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
         """
         active_config.plotting_config.show_legend = True        
         active_session = computation_result.sess # this is unfiltered, shouldn't be used... actually, it should be filtered. Don't know what's wrong here.
+
+        # Modify active_config before creating/updating plotter
+        active_config.plotting_config.should_use_linear_track_geometry = kwargs.get('should_use_linear_track_geometry', True)
+        # active_config.plotting_config.t_start = t_start
+        # active_config.plotting_config.t_delta = t_delta 
+        # active_config.plotting_config.t_end = t_end
 
         print(f'computation_result.sess: {computation_result.sess}')
         # try: pActiveInteractivePlaceSpikesPlotter
