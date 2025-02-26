@@ -8188,9 +8188,6 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         
         active_bins = deepcopy(a_position_decoder.xbin)
         # time_window_centers = deepcopy(active_decoder.time_window_centers)
-        
-        
-
         # active_most_likely_positions = active_marginals.most_likely_positions_1D # Raw decoded positions
         active_most_likely_positions = None
         # active_posterior = active_marginals.p_x_given_n
@@ -8209,15 +8206,8 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
             # active_cmap = FixedCustomColormaps.get_custom_orange_with_low_values_dropped_cmap()
         )
 
-
-        measured_position_df = None
-        # if a_position_decoder.pf.filtered_pos_df is not None:
-        #     measured_position_df = deepcopy(a_position_decoder.pf.filtered_pos_df)
-        # else:
-        #     # fallback to session
-        #     measured_position_df = curr_active_pipeline.sess.position.to_dataframe()
+        measured_position_df = None # Note: for some reason setting `measured_position_df` to anything other than None here messes up the plotting entirely. Set it to None now, and if we want measured positions plot them after
             
-
         ## Actual plotting portion:
         fig, an_ax = plot_1D_most_likely_position_comparsions(measured_position_df=measured_position_df, time_window_centers=time_window_centers, xbin=active_bins,
                                                                 posterior=active_posterior,
@@ -8232,7 +8222,7 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         if extended_dock_title_info is not None:
             widget.params.extended_dock_title_info = deepcopy(extended_dock_title_info)
             
-        ## Update the plots_data
+        ## Update the plots_data - used for crosshairs tracing and other things
         if time_window_centers is not None:
             widget.plots_data.time_window_centers = deepcopy(time_window_centers)
         if active_bins is not None:
@@ -8242,7 +8232,6 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
         widget.plots_data.variable_name = variable_name
         if a_1D_posterior is not None:
             widget.plots_data.matrix = deepcopy(a_1D_posterior)
-
         if a_position_decoder is not None:
             widget.plots_data.a_decoder = deepcopy(a_position_decoder)
         

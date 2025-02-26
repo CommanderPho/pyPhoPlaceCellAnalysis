@@ -1345,17 +1345,6 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
             self.ui.matplotlib_view_widgets[name].installEventFilter(self)
             
             ## Add directly to the main grid layout:
-            # self.ui.layout.addWidget(self.ui.matplotlib_view_widget, row, col)
-            
-            ## Add to dynamic_docked_widget_container:
-            # min_width = 500
-            # min_height = 50
-            # if _last_dock_outer_nested_item is not None:
-            #     #NOTE: to stack two dock widgets on top of each other, do area.moveDock(d6, 'above', d4)   ## move d6 to stack on top of d4
-            #     dockAddLocationOpts = ['above', _last_dock_outer_nested_item] # position relative to the _last_dock_outer_nested_item for this figure
-            # else:
-            # dockAddLocationOpts = ['bottom'] #no previous dock for this filter, so use absolute positioning
-            
             if display_config is None:
                 display_config = FigureWidgetDockDisplayConfig(showCloseButton=True)
             
@@ -1365,8 +1354,7 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
             dDisplayItem.updateStyle()
             dDisplayItem.update()
             
-            #TODO 2024-12-18 08:54: - [ ] Where the red must be coming in
-            ## Add the plot:
+            ## Add the initial plot:
             fig = self.ui.matplotlib_view_widgets[name].getFigure()
             _single_ax = self.ui.matplotlib_view_widgets[name].getFigure().add_subplot(111) # Adds a single axes to the figure
             ax = self.ui.matplotlib_view_widgets[name].axes # return all axes instead of just the first one
@@ -1374,9 +1362,8 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
             ## emit the signal
             self.sigEmbeddedMatplotlibDockWidgetAdded.emit(self, dDisplayItem, self.ui.matplotlib_view_widgets[name])
             
-
         else:
-            # Already had the widget
+            # Already had the dock and widget
             print(f'already had the valid matplotlib view widget and its display dock. Returning extant.')
             fig = self.ui.matplotlib_view_widgets[name].getFigure()
             ax = self.ui.matplotlib_view_widgets[name].axes # return all axes instead of just the first one
@@ -1407,37 +1394,20 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
         based off of `add_new_matplotlib_render_plot_widget`, but to support embedded pyqtgraph plots instead of matplotlib plots
         
         emit an event so the parent can call `self.update_scrolling_event_filters()` to add the new item
+        Uses: self.ui.matplotlib_view_widgets
         
         Usage:
         
             a_time_sync_pyqtgraph_widget, root_graphics_layout_widget, plot_item = self.add_new_embedded_pyqtgraph_render_plot_widget(name='test_pyqtgraph_view_widget', dockSize=(500,50))
             
         """
-        
-        
         dDisplayItem = self.ui.dynamic_docked_widget_container.find_display_dock(identifier=name) # Dock
         if dDisplayItem is None:
             # No extant matplotlib_view_widget and display_dock currently, create a new one:
             ## TODO: hardcoded single-widget: used to be named `self.ui.matplotlib_view_widget`
             self.ui.matplotlib_view_widgets[name] = PyqtgraphTimeSynchronizedWidget(name=name) # Matplotlib widget directly
             self.ui.matplotlib_view_widgets[name].setObjectName(name)
-            # self.ui.matplotlib_view_widgets[name].plots.fig.subplots_adjust(top=1.0, bottom=0.0, left=0.0, right=1.0, hspace=0.0, wspace=0.0)
 
-            ## Enable scrollability
-            # self.ui.matplotlib_view_widgets[name].installEventFilter(self)
-            
-            ## Add directly to the main grid layout:
-            # self.ui.layout.addWidget(self.ui.matplotlib_view_widget, row, col)
-            
-            ## Add to dynamic_docked_widget_container:
-            # min_width = 500
-            # min_height = 50
-            # if _last_dock_outer_nested_item is not None:
-            #     #NOTE: to stack two dock widgets on top of each other, do area.moveDock(d6, 'above', d4)   ## move d6 to stack on top of d4
-            #     dockAddLocationOpts = ['above', _last_dock_outer_nested_item] # position relative to the _last_dock_outer_nested_item for this figure
-            # else:
-            # dockAddLocationOpts = ['bottom'] #no previous dock for this filter, so use absolute positioning
-            
             if display_config is None:
                 display_config = FigureWidgetDockDisplayConfig(showCloseButton=True, showCollapseButton=False, showGroupButton=False)
                 
@@ -1699,7 +1669,7 @@ class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurv
         return _interval_tracks_out_dict
 
 
-    @function_attributes(short_name=None, tags=['raster', 'tracks', 'pyqtgraph', 'specific', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-09 10:50', related_items=[])
+    @function_attributes(short_name=None, tags=['raster', 'tracks', 'pyqtgraph', 'specific', 'dynamic_ui', 'group_matplotlib_render_plot_widget'], input_requires=[], output_provides=[], uses=['self.add_new_embedded_pyqtgraph_render_plot_widget'], used_by=[], creation_date='2025-01-09 10:50', related_items=[])
     def prepare_pyqtgraph_rasterPlot_track(self, name_modifier_suffix: str='', should_link_to_main_plot_widget:bool=True, debug_print=False):
         """ adds to separate pyqtgraph-backed tracks to the SpikeRaster2D plotter for rendering a 2D raster `active_2d_plot.params.custom_interval_rendering_plots` so the intervals are rendered on these new tracks in addition to any normal ones
         
