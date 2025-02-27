@@ -310,10 +310,11 @@ def batch_evaluate_required_computations(curr_active_pipeline, include_includeli
 	assert len(force_recompute_override_computations_includelist) <= len(include_includelist), f"READ THE NOTE ABOUT force_recompute_override_computations_includelist being a subset of include_includelist in the code above!! include_includelist: {include_includelist}\nforce_recompute_override_computations_includelist: {force_recompute_override_computations_includelist}"
 
 	## Get computed relative entropy measures:
-	_, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-	# global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'
+
 
 	if included_computation_filter_names is None:
+		_, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+		# global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'		
 		included_computation_filter_names = [global_epoch_name] # use only the global epoch: e.g. ['maze']
 		if progress_print:
 			print(f'Running batch_evaluate_required_computations(...) with global_epoch_name: "{global_epoch_name}"')
@@ -439,10 +440,12 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
 	assert len(force_recompute_override_computations_includelist) <= len(include_includelist), f"READ THE NOTE ABOUT force_recompute_override_computations_includelist being a subset of include_includelist in the code above!! include_includelist: {include_includelist}\nforce_recompute_override_computations_includelist: {force_recompute_override_computations_includelist}"
 
 	## Get computed relative entropy measures:
-	_, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-	# global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'
+
 
 	if included_computation_filter_names is None:
+		_, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+		# global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'
+		curr_active_pipeline.sess.epochs.epochs.glo
 		included_computation_filter_names = [global_epoch_name] # use only the global epoch: e.g. ['maze']
 		if progress_print:
 			print(f'Running batch_extended_computations(...) with global_epoch_name: "{global_epoch_name}"')
