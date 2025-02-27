@@ -5827,6 +5827,10 @@ def _perform_compute_custom_epoch_decoding(curr_active_pipeline, directional_mer
         return decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict
 
 
+
+# ==================================================================================================================== #
+# Main Computation Functions                                                                                           #
+# ==================================================================================================================== #
 class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     """ functions related to directional placefield computations. """
     _computationGroupName = 'directional_pfs'

@@ -1296,8 +1296,8 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
 
     neuron_IDXs: np.ndarray = serialized_field(default=None, is_computable=True)
     neuron_IDs: np.ndarray = serialized_field(default=None, is_computable=True)
-    F: np.ndarray = non_serialized_field(default=None)
-    P_x: np.ndarray = non_serialized_field(default=None)
+    F: np.ndarray = non_serialized_field(default=None, repr=False)
+    P_x: np.ndarray = non_serialized_field(default=None, repr=False)
 
     setup_on_init:bool = non_serialized_field(default=True)
     post_load_on_init:bool = non_serialized_field(default=False)
