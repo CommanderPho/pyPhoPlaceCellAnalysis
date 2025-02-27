@@ -159,6 +159,11 @@ global_move_modules_list:Dict={
 
 
 def loadData(pkl_path, debug_print=False, **kwargs):
+    """ 
+    from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData
+
+    loadData(
+    """
     # for reading also binary mode is important
     db = None
     active_move_modules_list: Dict = kwargs.pop('move_modules_list', global_move_modules_list)
