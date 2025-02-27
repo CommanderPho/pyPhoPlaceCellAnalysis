@@ -445,7 +445,7 @@ def batch_extended_computations(curr_active_pipeline, include_includelist=None, 
 	if included_computation_filter_names is None:
 		_, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
 		# global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'
-		curr_active_pipeline.sess.epochs.epochs.glo
+		
 		included_computation_filter_names = [global_epoch_name] # use only the global epoch: e.g. ['maze']
 		if progress_print:
 			print(f'Running batch_extended_computations(...) with global_epoch_name: "{global_epoch_name}"')
