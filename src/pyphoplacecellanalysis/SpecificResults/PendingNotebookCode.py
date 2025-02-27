@@ -237,14 +237,14 @@ class Decoded2DPosteriorTimeSyncMixin:
     # QT Slots                                                                                                             #
     # ==================================================================================================================== #
     
-    @QtCore.Slot(float, float)
+    @QtCore.pyqtSlot(float, float)
     def on_window_changed(self, start_t, end_t):
         # called when the window is updated
         # print(f'Decoded2DPosteriorTimeSyncMixin.on_window_changed(start_t: {start_t}, end_t: {end_t})')
         self.update(end_t, defer_render=False)
         pass
 
-    @QtCore.Slot(float, float, float)
+    @QtCore.pyqtSlot(float, float, float)
     def on_window_duration_changed(self, start_t, end_t, duration):
         """ changes self.half_render_window_duration """
         # print(f'LiveWindowedData.on_window_duration_changed(start_t: {start_t}, end_t: {end_t}, duration: {duration})')
@@ -255,7 +255,7 @@ class Decoded2DPosteriorTimeSyncMixin:
     ##################################################
     ## For use with pg.SignalProxy
     # using signal proxy turns original arguments into a tuple
-    @QtCore.Slot(object)
+    @QtCore.pyqtSlot(object)
     def on_window_changed_rate_limited(self, evt):
         self.on_window_changed(*evt)
         
@@ -521,14 +521,14 @@ class DataSlicingVisualizer(Decoded2DPosteriorTimeSyncMixin):
     # QT Slots                                                                                                             #
     # ==================================================================================================================== #
     
-    @QtCore.Slot(float, float)
+    @QtCore.pyqtSlot(float, float)
     def on_window_changed(self, start_t, end_t):
         # called when the window is updated
         # print(f'Decoded2DPosteriorTimeSyncMixin.on_window_changed(start_t: {start_t}, end_t: {end_t})')
         self.update(start_t, defer_render=False)
         
 
-    @QtCore.Slot(float, float, float)
+    @QtCore.pyqtSlot(float, float, float)
     def on_window_duration_changed(self, start_t, end_t, duration):
         """ changes self.half_render_window_duration """
         # print(f'LiveWindowedData.on_window_duration_changed(start_t: {start_t}, end_t: {end_t}, duration: {duration})')
@@ -539,7 +539,7 @@ class DataSlicingVisualizer(Decoded2DPosteriorTimeSyncMixin):
     ##################################################
     ## For use with pg.SignalProxy
     # using signal proxy turns original arguments into a tuple
-    @QtCore.Slot(object)
+    @QtCore.pyqtSlot(object)
     def on_window_changed_rate_limited(self, evt):
         self.on_window_changed(*evt)
         
