@@ -66,6 +66,94 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore
 
 
+@function_attributes(short_name=None, tags=['pipeline', 'filter', 'qclu'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-27 14:31', related_items=[])
+def filtered_by_frate_and_qclu(curr_active_pipeline, desired_qclu_subset=[1, 2], desired_minimum_inclusion_fr_Hz: float = 4.0):
+    """ Filter and return a copy of pipeline components by qclus and min_fr_Hz
+    
+    Parameters
+    ----------
+    curr_active_pipeline : NeuropyPipeline
+        The pipeline containing computation results to filter
+    desired_qclu_subset : list, optional
+        List of quality cluster values to include, by default [1, 2]
+    desired_minimum_inclusion_fr_Hz : float, optional
+        Minimum firing rate threshold in Hz, by default 4.0
+        
+    Returns
+    -------
+    tuple
+        (filtered_directional_laps_results, filtered_track_templates, filtered_directional_merged_decoders, filtered_rank_order_results)
+        All components filtered to include only specified neurons
+
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import filtered_by_frate_and_qclu
+
+        # Get filtered pipeline components
+        filtered_directional_laps_results, filtered_track_templates, filtered_merged_decoders, filtered_rank_order = filtered_by_frate_and_qclu(
+            curr_active_pipeline, 
+            desired_qclu_subset=[1, 2], 
+            desired_minimum_inclusion_fr_Hz=4.0
+        )
+
+        # Display summary of filtered results
+        print(f"Filtered neurons: {len(filtered_track_templates.any_decoder_neuron_IDs)}")
+        if filtered_merged_decoders is not None:
+            print(f"Filtered decoders available: Yes")
+        if filtered_rank_order is not None:
+            print(f"Filtered rank order available: Yes")
+
+    """
+    filtered_pipeline = deepcopy(curr_active_pipeline)
+
+    # Get the original components from the pipeline
+    directional_laps_results = filtered_pipeline.global_computation_results.computed_data['DirectionalLaps']
+    
+    # Get templates with filtering criteria
+    track_templates = directional_laps_results.get_templates(
+        minimum_inclusion_fr_Hz=desired_minimum_inclusion_fr_Hz, 
+        included_qclu_values=desired_qclu_subset
+    )
+    
+    # Apply filtering to get neurons that meet criteria
+    filtered_track_templates = track_templates.filtered_by_frate_and_qclu(
+        minimum_inclusion_fr_Hz=desired_minimum_inclusion_fr_Hz, 
+        included_qclu_values=desired_qclu_subset
+    )
+    
+    # Get the neuron IDs that passed filtering
+    filtered_any_decoder_neuron_IDs = deepcopy(filtered_track_templates.any_decoder_neuron_IDs)
+    
+    # Filter the directional laps results by these neuron IDs
+    filtered_directional_laps_results = directional_laps_results.filtered_by_included_aclus(
+        filtered_any_decoder_neuron_IDs
+    )
+    
+    # Filter additional components if they exist in the pipeline
+    filtered_directional_merged_decoders = None
+    if 'DirectionalMergedDecoders' in filtered_pipeline.global_computation_results.computed_data:
+        directional_merged_decoders_result = filtered_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
+        filtered_directional_merged_decoders = directional_merged_decoders_result.filtered_by_included_aclus(
+            filtered_any_decoder_neuron_IDs
+        )
+    
+    filtered_rank_order_results = None
+    if 'RankOrder' in filtered_pipeline.global_computation_results.computed_data:
+        rank_order_results = filtered_pipeline.global_computation_results.computed_data['RankOrder']
+        if hasattr(rank_order_results, 'filtered_by_included_aclus'):
+            filtered_rank_order_results = rank_order_results.filtered_by_included_aclus(
+                filtered_any_decoder_neuron_IDs
+            )
+    
+    # Return all filtered components
+    return filtered_pipeline
+
+
+# ==================================================================================================================== #
+# Pre 2025-02-27                                                                                                       #
+# ==================================================================================================================== #
+
 def plot_attached_BinByBinDecodingDebugger(spike_raster_window, curr_active_pipeline, a_decoder: BasePositionDecoder, a_decoded_result: Union[DecodedFilterEpochsResult, SingleEpochDecodedResult]):
     """ 
     
