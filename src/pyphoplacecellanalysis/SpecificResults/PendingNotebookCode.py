@@ -224,7 +224,7 @@ class DataSlicingVisualizer(Decoded2DPosteriorTimeSyncMixin):
 
     """
     
-    def __init__(self, time_bin_edges=None, data=None, title='Data Slicing Visualizer'):
+    def __init__(self, time_bin_edges=None, data=None, measured_df=None, x_bin_edges=None, y_bin_edges=None, title='Data Slicing Visualizer'):
         self.app = pg.mkQApp("Data Slicing Example")
         self.title = title
         self.setup_ui()
@@ -233,7 +233,10 @@ class DataSlicingVisualizer(Decoded2DPosteriorTimeSyncMixin):
         assert data is not None
         self.time_bin_edges = time_bin_edges
         self.data = data
-
+        self.measured_df = measured_df
+        self.x_bin_edges = x_bin_edges
+        self.y_bin_edges = y_bin_edges
+        self.position_marker = None
 
     def setup_ui(self):
         """Initialize the UI components"""
@@ -255,32 +258,149 @@ class DataSlicingVisualizer(Decoded2DPosteriorTimeSyncMixin):
         self.time_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self.layout.addWidget(self.time_slider, 1, 0)
         self.time_slider.valueChanged.connect(self.update_time_slice)
-        
 
-    def set_data(self, time_bin_edges, new_data):
-        """Update the visualizer with new data
-        
-        Args:
-            new_data (np.ndarray): New 3D array to visualize (P[x][y][t])
-        """
+    def set_data(self, time_bin_edges, new_data, measured_df=None, x_bin_edges=None, y_bin_edges=None):
         self.time_bin_edges = time_bin_edges
         self.data = new_data
+        if measured_df is not None:
+            self.measured_df = measured_df
+        if x_bin_edges is not None:
+            self.x_bin_edges = x_bin_edges
+        if y_bin_edges is not None:
+            self.y_bin_edges = y_bin_edges
+
+        self.time_bin_edges = time_bin_edges
+        self.data = new_data
+        if measured_df is not None:
+            self.measured_df = measured_df
+        
+        print(f"Data shape: {self.data.shape}, expecting (x, y, t)")
         assert np.shape(self.data)[-1] == (len(self.time_bin_edges)-1), f"np.shape(self.data)[-1]: {np.shape(self.data)[-1]}, (len(self.time_bin_edges)-1): {(len(self.time_bin_edges)-1)}"
         self.time_slider.setMaximum(self.data.shape[-1] - 1) ## last dimension
         self.update_time_slice()
-        
+
+
+
     def update_time_slice(self):
         """Update the image view based on current time slider value"""
         t = self.time_slider.value()
-        self.imv.setImage(self.data[:,:,t].T)
         
+        # Get current slice and create normalized version for display
+        current_slice = self.data[:,:,t]
+        
+        # Debug information
+        print(f"Slice {t}: Shape={current_slice.shape}, min={np.min(current_slice):.8f}, max={np.max(current_slice):.8f}")
+        
+        # Set the image with transposition
+        self.imv.setImage(current_slice.T)
+        
+        # Force update the histogram levels based on current data
+        min_val = np.min(current_slice)
+        max_val = np.max(current_slice)
+        if min_val != max_val:  # Avoid division by zero
+            self.imv.setLevels(min_val, max_val)
+        
+        # Add the animal's position marker if we have position data
+        self.add_position_marker(t)
+
+
+    def add_position_marker(self, t_index):
+        """Add a marker showing the animal's current position"""
+        if self.measured_df is None:
+            return
+        
+        # Get the time for the current slice
+        current_time = self.time_bin_edges[t_index]
+        
+        # Find the closest time point in the measured_df
+        if 't' in self.measured_df.columns:
+            # Find the closest timestamp
+            closest_idx = (self.measured_df['t'] - current_time).abs().idxmin()
+            real_x = self.measured_df.loc[closest_idx, 'x']
+            real_y = self.measured_df.loc[closest_idx, 'y']
+            
+            # Convert real coordinates to bin indices
+            if hasattr(self, 'x_bin_edges') and hasattr(self, 'y_bin_edges'):
+                x_idx = np.digitize(real_x, self.x_bin_edges) - 1
+                y_idx = np.digitize(real_y, self.y_bin_edges) - 1
+                
+                # Clip to valid range
+                x_idx = np.clip(x_idx, 0, len(self.x_bin_edges)-2)
+                y_idx = np.clip(y_idx, 0, len(self.y_bin_edges)-2)
+            else:
+                # Estimate using data shape
+                x_bins, y_bins = self.data.shape[0:2]
+                x_min, x_max = self.measured_df['x'].min(), self.measured_df['x'].max()
+                y_min, y_max = self.measured_df['y'].min(), self.measured_df['y'].max()
+                
+                x_idx = int((real_x - x_min) / (x_max - x_min) * (x_bins-1))
+                y_idx = int((real_y - y_min) / (y_max - y_min) * (y_bins-1))
+                
+                x_idx = np.clip(x_idx, 0, x_bins-1)
+                y_idx = np.clip(y_idx, 0, y_bins-1)
+            
+            # Remove previous marker if it exists
+            if self.position_marker is not None:
+                self.imv.getView().removeItem(self.position_marker)
+            
+            # CORRECTED: When we transpose the image, x becomes the second dimension 
+            # and y becomes the first dimension in the displayed image
+            self.position_marker = pg.ScatterPlotItem()
+            self.position_marker.setData(
+                [x_idx],  # This is now correctly the horizontal axis in the displayed image
+                [y_idx],  # This is now correctly the vertical axis in the displayed image
+                size=15, 
+                pen=pg.mkPen('w', width=2), 
+                brush=pg.mkBrush(255, 0, 0, 200)
+            )
+            
+            # Add marker to the view
+            self.imv.getView().addItem(self.position_marker)
+            print(f"Added position marker at real position (x={real_x:.2f}, y={real_y:.2f}), bin indices (x={x_idx}, y={y_idx})")
+
+
+
     def show(self):
         """Display the visualization window"""
         self.time_slider.setMaximum(self.data.shape[2] - 1)
         self.update_time_slice()
-        self.imv.setHistogramRange(0.0, 1.0)
-        self.imv.setLevels(0.0, 1.0)
+        
+        # Use a better colormap for small probability values
+        # self.imv.setColorMap(pg.colormap.get('viridis'))
+         # Use a better colormap for small probability values
+        self.imv.setColorMap(pg.colormap.get('inferno'))  # 'inferno' or 'hot' work well for log-transformed data
+    
+
+        # Don't manually set levels - let the data range drive it
+        # self.imv.setHistogramRange(0.0, 1.0)
+        # self.imv.setLevels(0.0, 1.0)
+        
         self.win.show()
+
+
+    def test_image_display(self):
+        """Generate and display a simple test image to verify ImageView is working"""
+        # Create a test pattern - a simple gradient
+        test_width, test_height = 100, 100
+        test_image = np.zeros((test_width, test_height))
+        
+        # Create a gradient pattern
+        for i in range(test_width):
+            for j in range(test_height):
+                test_image[i, j] = (i + j) / (test_width + test_height)
+        
+        # Alternatively, create a checkerboard pattern
+        # checkerboard = np.zeros((test_width, test_height))
+        # for i in range(test_width):
+        #     for j in range(test_height):
+        #         checkerboard[i, j] = (i % 20 < 10) ^ (j % 20 < 10)
+        
+        # Display the test image
+        self.imv.setImage(test_image)
+        self.imv.setLevels(0, 1)
+        print(f"Displaying test image with shape {test_image.shape}")
+        print(f"Test image min: {np.min(test_image)}, max: {np.max(test_image)}")
+        
 
 
     # ==================================================================================================================== #
