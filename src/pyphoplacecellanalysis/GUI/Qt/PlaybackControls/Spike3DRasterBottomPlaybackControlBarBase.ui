@@ -333,6 +333,29 @@ QDoubleSpinBox::down-arrow {
         </layout>
        </widget>
       </item>
+      <item row="1" column="33">
+       <spacer name="horizontalSpacer_9">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::Fixed</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>10</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item row="1" column="36">
+       <widget class="QPushButton" name="btnHelp">
+        <property name="text">
+         <string>Help</string>
+        </property>
+       </widget>
+      </item>
       <item row="1" column="32">
        <widget class="QPushButton" name="btnAddDockedTrack">
         <property name="toolTip">
@@ -350,48 +373,6 @@ QDoubleSpinBox::down-arrow {
         <property name="icon">
          <iconset resource="../../../Resources/ActionIcons.qrc">
           <normaloff>:/Icons/Icons/Icon/application-plus.png</normaloff>:/Icons/Icons/Icon/application-plus.png</iconset>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="35">
-       <widget class="QPushButton" name="btnHelp">
-        <property name="text">
-         <string>Help</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="2">
-       <spacer name="horizontalSpacer_5">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeType">
-         <enum>QSizePolicy::Preferred</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>20</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
-      <item row="1" column="0">
-       <widget class="ToggleButton" name="button_play_pause">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="toolTip">
-         <string notr="true">Toggle Play/Pause</string>
-        </property>
-        <property name="text">
-         <string>Play/Pause</string>
-        </property>
-        <property name="checkable">
-         <bool>false</bool>
         </property>
        </widget>
       </item>
@@ -461,8 +442,24 @@ QDoubleSpinBox::down-arrow {
         </property>
        </widget>
       </item>
-      <item row="1" column="6">
-       <widget class="QPushButton" name="button_speed_up">
+      <item row="1" column="2">
+       <spacer name="horizontalSpacer_5">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::Preferred</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>20</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item row="1" column="0">
+       <widget class="ToggleButton" name="button_play_pause">
         <property name="sizePolicy">
          <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
           <horstretch>0</horstretch>
@@ -470,32 +467,13 @@ QDoubleSpinBox::down-arrow {
          </sizepolicy>
         </property>
         <property name="toolTip">
-         <string notr="true">Speed up the playback</string>
-        </property>
-        <property name="statusTip">
-         <string>Speed Up</string>
-        </property>
-        <property name="whatsThis">
-         <string>Speed Up</string>
-        </property>
-        <property name="accessibleName">
-         <string>Speed Up</string>
+         <string notr="true">Toggle Play/Pause</string>
         </property>
         <property name="text">
-         <string/>
+         <string>Play/Pause</string>
         </property>
-        <property name="icon">
-         <iconset resource="../../../Resources/ActionIcons.qrc">
-          <normaloff>:/Icons/Icons/actions/fast-download-white.png</normaloff>:/Icons/Icons/actions/fast-download-white.png</iconset>
-        </property>
-        <property name="iconSize">
-         <size>
-          <width>24</width>
-          <height>24</height>
-         </size>
-        </property>
-        <property name="shortcut">
-         <string>Ctrl+=</string>
+        <property name="checkable">
+         <bool>false</bool>
         </property>
        </widget>
       </item>
@@ -563,6 +541,44 @@ QDoubleSpinBox::down-arrow {
         </property>
        </widget>
       </item>
+      <item row="1" column="6">
+       <widget class="QPushButton" name="button_speed_up">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="toolTip">
+         <string notr="true">Speed up the playback</string>
+        </property>
+        <property name="statusTip">
+         <string>Speed Up</string>
+        </property>
+        <property name="whatsThis">
+         <string>Speed Up</string>
+        </property>
+        <property name="accessibleName">
+         <string>Speed Up</string>
+        </property>
+        <property name="text">
+         <string/>
+        </property>
+        <property name="icon">
+         <iconset resource="../../../Resources/ActionIcons.qrc">
+          <normaloff>:/Icons/Icons/actions/fast-download-white.png</normaloff>:/Icons/Icons/actions/fast-download-white.png</iconset>
+        </property>
+        <property name="iconSize">
+         <size>
+          <width>24</width>
+          <height>24</height>
+         </size>
+        </property>
+        <property name="shortcut">
+         <string>Ctrl+=</string>
+        </property>
+       </widget>
+      </item>
       <item row="1" column="9">
        <widget class="QPushButton" name="button_mark_start">
         <property name="toolTip">
@@ -600,63 +616,6 @@ QSpinBox::hover {
         </property>
        </widget>
       </item>
-      <item row="1" column="31">
-       <widget class="QLineEdit" name="txtLogLine">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-          <horstretch>1</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="minimumSize">
-         <size>
-          <width>100</width>
-          <height>0</height>
-         </size>
-        </property>
-        <property name="maximumSize">
-         <size>
-          <width>1000</width>
-          <height>16777215</height>
-         </size>
-        </property>
-        <property name="baseSize">
-         <size>
-          <width>800</width>
-          <height>0</height>
-         </size>
-        </property>
-        <property name="readOnly">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="34">
-       <widget class="QPushButton" name="btnToggleExternalLogWindow">
-        <property name="toolTip">
-         <string>Log Window</string>
-        </property>
-        <property name="statusTip">
-         <string>Log Window</string>
-        </property>
-        <property name="whatsThis">
-         <string>Log Window</string>
-        </property>
-        <property name="styleSheet">
-         <string notr="true">color: rgb(255, 255, 255);\nselection-color: rgb(85, 170, 255);\nselection-background-color: rgb(85, 170, 255);\nbackground-color: rgb(65, 60, 54);\nalternate-background-color: rgb(222, 222, 222);</string>
-        </property>
-        <property name="text">
-         <string/>
-        </property>
-        <property name="icon">
-         <iconset resource="../../../Resources/ActionIcons.qrc">
-          <normaloff>:/Icons/Icons/Icon/log-40.png</normaloff>:/Icons/Icons/Icon/log-40.png</iconset>
-        </property>
-        <property name="checkable">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
       <item row="1" column="8">
        <spacer name="horizontalSpacer_6">
         <property name="orientation">
@@ -673,21 +632,21 @@ QSpinBox::hover {
         </property>
        </spacer>
       </item>
-      <item row="1" column="26">
-       <widget class="QToolButton" name="btnLeft">
-        <property name="toolTip">
-         <string>Step Frames Left</string>
+      <item row="1" column="30">
+       <spacer name="horizontalSpacer_3">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
         </property>
-        <property name="text">
-         <string>&lt;</string>
+        <property name="sizeType">
+         <enum>QSizePolicy::Preferred</enum>
         </property>
-        <property name="shortcut">
-         <string>Left</string>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
         </property>
-        <property name="arrowType">
-         <enum>Qt::LeftArrow</enum>
-        </property>
-       </widget>
+       </spacer>
       </item>
       <item row="1" column="1">
        <widget class="QPushButton" name="button_reverse">
@@ -734,23 +693,49 @@ alternate-background-color: rgb(222, 222, 222);</string>
         </property>
        </widget>
       </item>
-      <item row="1" column="30">
-       <spacer name="horizontalSpacer_3">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
+      <item row="1" column="35">
+       <widget class="QPushButton" name="btnToggleExternalLogWindow">
+        <property name="toolTip">
+         <string>Log Window</string>
         </property>
-        <property name="sizeType">
-         <enum>QSizePolicy::Preferred</enum>
+        <property name="statusTip">
+         <string>Log Window</string>
         </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
+        <property name="whatsThis">
+         <string>Log Window</string>
         </property>
-       </spacer>
+        <property name="styleSheet">
+         <string notr="true">color: rgb(255, 255, 255);\nselection-color: rgb(85, 170, 255);\nselection-background-color: rgb(85, 170, 255);\nbackground-color: rgb(65, 60, 54);\nalternate-background-color: rgb(222, 222, 222);</string>
+        </property>
+        <property name="text">
+         <string/>
+        </property>
+        <property name="icon">
+         <iconset resource="../../../Resources/ActionIcons.qrc">
+          <normaloff>:/Icons/Icons/Icon/log-40.png</normaloff>:/Icons/Icons/Icon/log-40.png</iconset>
+        </property>
+        <property name="checkable">
+         <bool>true</bool>
+        </property>
+       </widget>
       </item>
-      <item row="0" column="0" colspan="36">
+      <item row="1" column="26">
+       <widget class="QToolButton" name="btnLeft">
+        <property name="toolTip">
+         <string>Step Frames Left</string>
+        </property>
+        <property name="text">
+         <string>&lt;</string>
+        </property>
+        <property name="shortcut">
+         <string>Left</string>
+        </property>
+        <property name="arrowType">
+         <enum>Qt::LeftArrow</enum>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="0" colspan="37">
        <widget class="HighlightedJumpSlider" name="slider_progress">
         <property name="enabled">
          <bool>false</bool>
@@ -817,21 +802,8 @@ alternate-background-color: rgb(222, 222, 222);</string>
         </property>
        </widget>
       </item>
-      <item row="1" column="29">
-       <widget class="QToolButton" name="btnSkipRight">
-        <property name="toolTip">
-         <string>Skip Frames Right</string>
-        </property>
-        <property name="text">
-         <string>-&gt;</string>
-        </property>
-        <property name="shortcut">
-         <string>Ctrl+Right</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="14">
-       <spacer name="horizontalSpacer_4">
+      <item row="1" column="19">
+       <spacer name="horizontalSpacer_7">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
         </property>
@@ -846,8 +818,8 @@ alternate-background-color: rgb(222, 222, 222);</string>
         </property>
        </spacer>
       </item>
-      <item row="1" column="19">
-       <spacer name="horizontalSpacer_7">
+      <item row="1" column="14">
+       <spacer name="horizontalSpacer_4">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
         </property>
@@ -877,6 +849,19 @@ alternate-background-color: rgb(222, 222, 222);</string>
          </size>
         </property>
        </spacer>
+      </item>
+      <item row="1" column="29">
+       <widget class="QToolButton" name="btnSkipRight">
+        <property name="toolTip">
+         <string>Skip Frames Right</string>
+        </property>
+        <property name="text">
+         <string>-&gt;</string>
+        </property>
+        <property name="shortcut">
+         <string>Ctrl+Right</string>
+        </property>
+       </widget>
       </item>
       <item row="1" column="25">
        <widget class="QToolButton" name="btnSkipLeft">
@@ -929,22 +914,6 @@ QDoubleSpinBox::down-arrow {
          <double>1.000000000000000</double>
         </property>
        </widget>
-      </item>
-      <item row="1" column="24">
-       <spacer name="horizontalSpacer_8">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeType">
-         <enum>QSizePolicy::Preferred</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
       </item>
       <item row="1" column="16">
        <widget class="QDoubleSpinBox" name="doubleSpinBox_ActiveWindowStartTime">
@@ -1006,7 +975,7 @@ QDoubleSpinBox::down-arrow {
         </property>
        </widget>
       </item>
-      <item row="1" column="36">
+      <item row="1" column="37">
        <widget class="QToolButton" name="btnToggleRightSidebar">
         <property name="focusPolicy">
          <enum>Qt::NoFocus</enum>
@@ -1032,6 +1001,22 @@ QDoubleSpinBox::down-arrow {
          <enum>Qt::NoArrow</enum>
         </property>
        </widget>
+      </item>
+      <item row="1" column="24">
+       <spacer name="horizontalSpacer_8">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::Preferred</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
       </item>
       <item row="1" column="21">
        <spacer name="horizontalSpacer">
@@ -1578,21 +1563,36 @@ QDoubleSpinBox::down-arrow {
         </layout>
        </widget>
       </item>
-      <item row="1" column="33">
-       <spacer name="horizontalSpacer_9">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
+      <item row="1" column="34">
+       <widget class="QLineEdit" name="txtLogLine">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+          <horstretch>1</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
         </property>
-        <property name="sizeType">
-         <enum>QSizePolicy::Fixed</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
+        <property name="minimumSize">
          <size>
-          <width>10</width>
-          <height>20</height>
+          <width>100</width>
+          <height>0</height>
          </size>
         </property>
-       </spacer>
+        <property name="maximumSize">
+         <size>
+          <width>1000</width>
+          <height>16777215</height>
+         </size>
+        </property>
+        <property name="baseSize">
+         <size>
+          <width>800</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="readOnly">
+         <bool>true</bool>
+        </property>
+       </widget>
       </item>
      </layout>
     </widget>

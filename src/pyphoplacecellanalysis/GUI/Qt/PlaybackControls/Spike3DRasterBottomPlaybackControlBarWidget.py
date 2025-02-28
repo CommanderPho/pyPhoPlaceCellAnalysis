@@ -158,7 +158,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         # debug_log_controls = [self.ui.txtLogLine, self.ui.btnToggleExternalLogWindow]
         standalone_extra_controls = [self.ui.btnHelp]
         
-        controls_to_hide = [self.ui.slider_progress, self.ui.button_full_screen, self.ui.btnCurrentIntervals_Customize, *move_controls, *standalone_extra_controls]
+        controls_to_hide = [self.ui.slider_progress, self.ui.button_full_screen, self.ui.btnCurrentIntervals_Customize, *standalone_extra_controls] # , *move_controls
 
 
         # Setup Button: Play/Pause

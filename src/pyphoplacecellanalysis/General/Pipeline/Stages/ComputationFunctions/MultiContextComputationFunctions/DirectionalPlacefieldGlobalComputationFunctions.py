@@ -8533,7 +8533,7 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_M
         if extended_dock_title_info is not None:
             identifier_name += extended_dock_title_info ## add extra info like the time_bin_size in ms
         print(f'identifier_name: {identifier_name}')
-        widget, matplotlib_fig, matplotlib_fig_axes = active_2d_plot.add_new_matplotlib_render_plot_widget(name=identifier_name, dockSize=(25, 200), display_config=a_dock_config)
+        widget, matplotlib_fig, matplotlib_fig_axes, dock_crap = active_2d_plot.add_new_matplotlib_render_plot_widget(name=identifier_name, dockSize=(25, 200), display_config=a_dock_config)
         an_ax = matplotlib_fig_axes[0]
 
         variable_name: str = a_variable_name
