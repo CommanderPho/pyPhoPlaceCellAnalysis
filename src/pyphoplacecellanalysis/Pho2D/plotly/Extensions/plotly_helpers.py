@@ -404,7 +404,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
         import plotly.io as pio
         template: str = 'plotly_dark' # set plotl template
         pio.templates.default = template
-        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import plotly_pre_post_delta_scatter
+        from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import plotly_pre_post_delta_scatter
 
 
         histogram_bins: int = 25
@@ -430,6 +430,9 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
         post_delta_label: str = 'Post-delta'
 
     # figure_context_dict ________________________________________________________________________________________________ #
+    if data_context is None:
+        data_context = IdentifyingContext() ## empty context
+        
     data_context = data_context.adding_context_if_missing(variable_name=histogram_variable_name)
     
     figure_context_dict = {'histogram_variable_name': histogram_variable_name}
