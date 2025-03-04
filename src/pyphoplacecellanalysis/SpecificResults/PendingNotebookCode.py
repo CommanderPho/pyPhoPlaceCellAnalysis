@@ -66,13 +66,92 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore
 
 
+# ==================================================================================================================== #
+# 2025-03-03 - Unit Time Binned Spike Count Masking of Decoding                                                        #
+# ==================================================================================================================== #
+
+def compute_unit_time_binned_spike_counts_and_mask(spikes_df: pd.DataFrame, time_bin_edges: NDArray, min_num_spikes_per_bin_to_be_considered_active:int=1, min_num_unique_active_neurons_per_time_bin:int=2):
+    """ Computes the number of neurons in each spike time bin (specified by time_bin_edges) and threshold based on some criteria
+
+    Usage:    
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_unit_time_binned_spike_counts_and_mask
+        
+        time_bin_edges: NDArray = deepcopy(results1D.continuous_results['global'].time_bin_edges[0])
+        spikes_df: pd.DataFrame = deepcopy(get_proper_global_spikes_df(curr_active_pipeline))
+        unit_specific_time_binned_spike_counts, (is_time_bin_active, inactive_mask, mask_rgba) = compute_unit_time_binned_spike_counts_and_mask(spikes_df=spikes_df, time_bin_edges=time_bin_edges)
+        
+    """
+    # results2D.continuous_results['global'] #.spkcount[0] #  .shape
+
+    # results1D.decoders['global'] #.unit_specific_time_binned_spike_counts  #.shape
+    # results2D.a_result2D.spkcount
 
 
+    unique_units = np.unique(spikes_df['aclu']) # sorted
+    unit_specific_time_binned_spike_counts: NDArray = np.array([
+        np.histogram(spikes_df.loc[spikes_df['aclu'] == unit, 't_rel_seconds'], bins=time_bin_edges)[0]
+        for unit in unique_units
+    ])
+
+    # unique_units.shape
+    # unit_specific_time_binned_spike_counts # .shape (n_aclus, n_time_bins)
+    total_spikes_per_time_bin = np.sum(unit_specific_time_binned_spike_counts, axis=0)
+    unique_active_cells_per_time_bin = np.sum((unit_specific_time_binned_spike_counts >= min_num_spikes_per_bin_to_be_considered_active), axis=0)
+
+    ## OUTPUTS: total_spikes_per_time_bin, unique_active_cells_per_time_bin
+     # require 3 neurons to fire in a timebin for it to be considered active.
+
+    is_time_bin_active = (unique_active_cells_per_time_bin >= min_num_unique_active_neurons_per_time_bin)
+
+    ## OUTPUTS: is_time_bin_active - a bool that specifies whether each time bin is active (included) or not. If it's not, it should be masked out with a dark black box or something
+
+    total_spikes_per_time_bin
+    unique_active_cells_per_time_bin
+
+    ## INPUTS: is_time_bin_active
+    # Create mask of inactive time bins
+    inactive_mask = ~is_time_bin_active
+    mask_rgba = np.zeros((1, len(is_time_bin_active), 4), dtype=np.uint8)
+    mask_rgba[0, inactive_mask, :] = [0, 0, 0, 200]  # Black with 80% opacity for inactive bins
+
+    ## OUTPUTS: mask_rgba
+
+    return unit_specific_time_binned_spike_counts, (is_time_bin_active, inactive_mask, mask_rgba)
 
 
+def _plot_low_firing_time_bins_overlay_image(widget, time_bin_edges, mask_rgba):
+    """ plots the black masks for low-firing time bins on the specified widget track
+    
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _plot_low_firing_time_bins_overlay_image
 
+        _plot_low_firing_time_bins_overlay_image(widget=widget, time_bin_edges=time_bin_edges, mask_rgba=mask_rgba)
+    """
+	## INPUTS: is_time_bin_active
+    # Create mask of inactive time bins
+    # inactive_mask = ~is_time_bin_active
+    # mask_rgba = np.zeros((1, len(is_time_bin_active), 4), dtype=np.uint8)
+    # mask_rgba[0, inactive_mask, :] = [0, 0, 0, 200]  # Black with 80% opacity for inactive bins
+    an_ax = widget.axes[0]
 
+    ## OUTPUTS: mask_rgba
+    xmin = time_bin_edges[0]
+    xmax = time_bin_edges[-1]
+    ymin, ymax = an_ax.get_ylim()
+    x_first_extent = (xmin, xmax, ymin, ymax)
 
+    # Setup the heatmap colormap
+    low_spiking_heatmap_imshow_kwargs = dict(
+        origin='lower',
+        aspect='auto',
+        interpolation='nearest',
+        extent=x_first_extent,
+        animated=False,
+    )
+
+    # Plot the spike counts as a heatmap
+    low_firing_bins_image = an_ax.imshow(mask_rgba, **low_spiking_heatmap_imshow_kwargs)
+    widget.plots.low_firing_bins_image = low_firing_bins_image
 
 
 @function_attributes(short_name=None, tags=['timeline-track', 'firing-rate', 'unit-spiking'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-03 15:28', related_items=[])
@@ -95,6 +174,18 @@ def add_unit_spike_count_visualization(active_2d_plot, neuron_ids: NDArray, time
     Usage:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import add_unit_spike_count_visualization
         
+        time_bin_edges: NDArray = deepcopy(results1D.continuous_results['global'].time_bin_edges[0])
+        spikes_df: pd.DataFrame = deepcopy(get_proper_global_spikes_df(curr_active_pipeline))
+
+        unique_units = np.unique(spikes_df['aclu']) # sorted
+        unit_specific_time_binned_spike_counts: NDArray = np.array([
+            np.histogram(spikes_df.loc[spikes_df['aclu'] == unit, 't_rel_seconds'], bins=time_bin_edges)[0]
+            for unit in unique_units
+        ])
+
+        # unique_units.shape
+        unit_specific_time_binned_spike_counts # .shape (n_aclus, n_time_bins)
+
         ## INPUTS: unique_units, time_bin_edges, unit_specific_time_binned_spike_counts
         widget, matplotlib_fig, matplotlib_fig_axes, dDisplayItem = add_unit_spike_count_visualization(active_2d_plot, neuron_ids=unique_units, time_bin_edges=time_bin_edges, unit_specific_time_binned_spike_counts=unit_specific_time_binned_spike_counts, a_dock_config=None, extended_dock_title_info=None)
 
@@ -142,18 +233,7 @@ def add_unit_spike_count_visualization(active_2d_plot, neuron_ids: NDArray, time
     an_ax.set_xlabel('Time Window')
     an_ax.set_ylabel('Neuron ID')
     
-    # # Add y-tick labels showing neuron IDs (only show a subset if many neurons)
-    # if n_neurons <= 20:
-    #     # Show all neuron IDs
-    #     an_ax.set_yticks(range(n_neurons))
-    #     an_ax.set_yticklabels(neuron_ids)
-    # else:
-    #     # Show a subset of neuron IDs
-    #     step = max(1, n_neurons // 10)
-    #     tick_idxs = range(0, n_neurons, step)
-    #     an_ax.set_yticks(tick_idxs)
-    #     an_ax.set_yticklabels([neuron_ids[i] for i in tick_idxs])
-    
+
     # Add title
     an_ax.set_title(f'{variable_name} over Time')
 
@@ -183,8 +263,9 @@ def add_unit_spike_count_visualization(active_2d_plot, neuron_ids: NDArray, time
 
 
 
-
-
+# ==================================================================================================================== #
+# 2025-02-27 - Filtering Pipeline                                                                                      #
+# ==================================================================================================================== #
 
 @function_attributes(short_name=None, tags=['pipeline', 'filter', 'qclu'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-27 14:31', related_items=[])
 def filtered_by_frate_and_qclu(curr_active_pipeline, desired_qclu_subset=[1, 2], desired_minimum_inclusion_fr_Hz: float = 4.0):
