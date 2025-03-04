@@ -370,6 +370,10 @@
    </property>
   </action>
   <action name="actionSpike3DLauncher">
+   <property name="icon">
+    <iconset resource="../../../../Resources/ActionIcons.qrc">
+     <normaloff>:/Graphics/Icons/Icon/LauncherWidget@22w.png</normaloff>:/Graphics/Icons/Icon/LauncherWidget@22w.png</iconset>
+   </property>
    <property name="text">
     <string>Spike3D Launcher</string>
    </property>
