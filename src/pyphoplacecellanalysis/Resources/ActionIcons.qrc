@@ -1,5 +1,15 @@
 <RCC>
   <qresource prefix="Icons">
+    <file>Icons/actions/pencil.png</file>
+    <file>Icons/actions/pencil-button.png</file>
+    <file>Icons/actions/pencil-color.png</file>
+    <file>Icons/actions/pencil--exclamation.png</file>
+    <file>Icons/actions/pencil-field.png</file>
+    <file>Icons/actions/pencil--minus.png</file>
+    <file>Icons/actions/pencil--plus.png</file>
+    <file>Icons/actions/pencil-prohibition.png</file>
+    <file>Icons/actions/pencil-ruler.png</file>
+    <file>Icons/actions/pencil-small.png</file>
     <file>Icons/actions/AdjustFrameBounds.png</file>
     <file>Icons/actions/Crosshairs.png</file>
     <file>Icons/actions/CrosshairsWithDot.png</file>
