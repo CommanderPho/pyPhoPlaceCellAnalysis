@@ -62,6 +62,14 @@ btnJumpToSpecifiedTime
 jumpToHourMinSecTimeEdit
 
 
+
+# Edit Double Fields _________________________________________________________________________________________________ #
+btnEditNumberField_Revert
+btnEditNumberField_Toggle
+
+
+
+
 ## Logging Widgets:
 txtLogLine -- shows a preview of the last log entries
 btnToggleExternalLogWindow -- opens the separate logging window
@@ -93,6 +101,9 @@ self.ui.btnJoystickMove
 
 # Dock/Track Controls ________________________________________________________________________________________________ #
 btnAddDockedTrack
+
+
+
 
 
 """
