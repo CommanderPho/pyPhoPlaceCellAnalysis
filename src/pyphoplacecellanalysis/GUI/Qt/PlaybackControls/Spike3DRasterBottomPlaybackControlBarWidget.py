@@ -66,7 +66,8 @@ jumpToHourMinSecTimeEdit
 # Edit Double Fields _________________________________________________________________________________________________ #
 btnEditNumberField_Revert
 btnEditNumberField_Toggle
-
+doubleSpinBox_ActiveWindowStartTime
+doubleSpinBox_ActiveWindowEndTime
 
 
 
@@ -140,9 +141,12 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
 
     sigToggleRightSidebarVisibility = QtCore.pyqtSignal(bool)
 
-
     sigAddDockedTrackRequested = QtCore.pyqtSignal()
-    
+
+
+    ## Editing Start/End Window
+    sigManualEditWindowStartEndToggled = QtCore.pyqtSignal(bool) # whether the user is manually editing
+
 
     def __init__(self, parent=None):
         # super().__init__(parent=parent) # Call the inherited classes __init__ method
@@ -612,6 +616,9 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         """ sets up `doubleSpinBox_ActiveWindowStartTime` and `doubleSpinBox_ActiveWindowEndTime`
         
         """
+        # Connect toggle button to toggle edit mode
+        self.ui.btnEditNumberField_Toggle.toggled.connect(self.on_edit_number_field_toggle_changed)
+
         # Connect signals to handle focus and editing states
         self.ui.doubleSpinBox_ActiveWindowStartTime.editingFinished.connect(self.on_active_window_start_time_editing_finished)
         self.ui.doubleSpinBox_ActiveWindowStartTime.installEventFilter(self)
@@ -619,6 +626,33 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         self.ui.doubleSpinBox_ActiveWindowEndTime.editingFinished.connect(self.on_active_window_end_time_editing_finished)
         self.ui.doubleSpinBox_ActiveWindowEndTime.installEventFilter(self)
         
+        # Initialize in non-editable mode
+        self.on_start_end_doubleSpinBox_edit_mode_changed(False)
+        
+
+
+    @pyqtExceptionPrintingSlot(bool)
+    def on_edit_number_field_toggle_changed(self, is_checked):
+        """Handles when the edit number field toggle button is toggled
+        
+        Args:
+            is_checked (bool): Whether the button is toggled/checked
+        """
+        self.log_print(f'on_edit_number_field_toggle_changed(is_checked: {is_checked})')
+        
+        # Format the toggle button based on checked state
+        self._format_boolean_toggle_button(button=self.ui.btnEditNumberField_Toggle)
+        
+        # Update the editability of the spinboxes
+        self.on_start_end_doubleSpinBox_edit_mode_changed(is_checked)
+        
+        # Emit signal to notify other components
+        self.sigManualEditWindowStartEndToggled.emit(is_checked)
+        
+        # If editing is enabled, set focus to the start time spinbox
+        if is_checked:
+            self.ui.doubleSpinBox_ActiveWindowStartTime.setFocus()
+
 
     def on_start_end_doubleSpinBox_edit_mode_changed(self, are_controls_editable: bool):
         """ called to enable user editing of the two doubleSpinBox controls for start/end times 
