@@ -70,7 +70,7 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore
 # 2025-03-03 - Unit Time Binned Spike Count Masking of Decoding                                                        #
 # ==================================================================================================================== #
 
-
+@function_attributes(short_name=None, tags=['unit-spike-counts', 'mask', 'time-bin', 'spikes'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-04 10:09', related_items=[])
 def compute_unit_time_binned_spike_counts_and_mask(spikes_df: pd.DataFrame, time_bin_edges: NDArray, min_num_spikes_per_bin_to_be_considered_active:int=1, min_num_unique_active_neurons_per_time_bin:int=2):
     """ Computes the number of neurons in each spike time bin (specified by time_bin_edges) and threshold based on some criteria
 
@@ -132,6 +132,9 @@ def mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bi
     spikes_df: pd.DataFrame = deepcopy(get_proper_global_spikes_df(curr_active_pipeline))
     a_decoder, a_decoded_result = mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(a_decoder=non_PBE_all_directional_pf1D_Decoder, a_decoded_result=pseudo2D_continuous_specific_decoded_result, spikes_df=spikes_df)
     
+    
+    #TODO 2025-03-04 10:10: - [ ] Seems like `a_decoder` is just passed-through unaltered. Could refactor into a classmethod of `DecodedFilterEpochsResult`
+    
     """
     # time_bin_edges: NDArray = deepcopy(results1D.continuous_results['global'].time_bin_edges[0])
     time_bin_edges: NDArray = deepcopy(a_decoded_result.time_bin_edges)
@@ -151,8 +154,6 @@ def mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bi
         # Make a copy of the original data before masking
         original_data = a_decoded_result.p_x_given_n_list[i].copy()
         
-
-        
         # Fill invalid time bins with the last valid value - EFFICIENT IMPLEMENTATION
         if np.any(is_time_bin_active):  # Only proceed if we have some valid values
             # Calculate "last valid index" lookup array - very efficient O(n) operation
@@ -171,7 +172,6 @@ def mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bi
             a_decoded_result.most_likely_position_indicies_list[i][:, inactive_mask] = -1 # use -1 instead of np.nan as it needs to be integer
             a_decoded_result.most_likely_positions_list[i][inactive_mask, :] = np.nan
             
-
             ## when done, have `last_valid_indices`
             # print(f'last_valid_indices: {last_valid_indices}')
             
@@ -212,7 +212,7 @@ def mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bi
 
 
 
-
+@function_attributes(short_name=None, tags=['plot-helper', 'matplotlib', 'unit-activity', 'black-inactive-time-bins', 'time-bin'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-04 10:11', related_items=[])
 def _plot_low_firing_time_bins_overlay_image(widget, time_bin_edges, mask_rgba):
     """ plots the black masks for low-firing time bins on the specified widget track
     
