@@ -1269,6 +1269,102 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
     
     
 
+    @function_attributes(short_name=None, tags=['mask', 'unit-spike-counts', 'pure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-04 01:32', related_items=[])
+    def mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(self, spikes_df: pd.DataFrame) -> Tuple["DecodedFilterEpochsResult", Tuple[NDArray, NDArray]]:
+        """ copies the decoded result and returns the back-filled version 
+        Pure: does not modify self
+        
+        a_decoded_result.p_x_given_n_list[0].shape # (59, 2, 69487)
+        a_decoded_result.most_likely_position_indicies_list[0].shape # .shape (2, 69487)
+        a_decoded_result.most_likely_positions_list[0].shape # .shape (69487, 2)
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin
+        
+        spikes_df: pd.DataFrame = deepcopy(get_proper_global_spikes_df(curr_active_pipeline))
+        non_PBE_all_directional_pf1D_Decoder, pseudo2D_continuous_specific_decoded_result, continuous_decoded_results_dict, non_PBE_marginal_over_track_ID, (time_bin_containers, time_window_centers) = nonPBE_results._build_merged_joint_placefields_and_decode(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)))
+        maksed_pseudo2D_continuous_specific_decoded_result, mask_index_tuple = pseudo2D_continuous_specific_decoded_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)))
+        # (all_time_bin_indicies, last_valid_indicies) = mask_index_tuple
+        maksed_pseudo2D_continuous_specific_decoded_result
+                
+        #TODO 2025-03-04 10:10: - [ ] Seems like `a_decoder` is just passed-through unaltered. Could refactor into a classmethod of `DecodedFilterEpochsResult`
+        
+        """
+        # time_bin_edges: NDArray = deepcopy(results1D.continuous_results['global'].time_bin_edges[0])
+        time_bin_edges: NDArray = deepcopy(self.time_bin_edges)
+        if len(time_bin_edges) == 1:
+            time_bin_edges = time_bin_edges[0] ## unwrap
+        
+        unit_specific_time_binned_spike_counts, unique_units, (is_time_bin_active, inactive_mask, mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask(time_bin_edges=time_bin_edges)
+        
+        # a_decoder = deepcopy(a_decoder)
+        a_decoded_result: DecodedFilterEpochsResult = deepcopy(self) ## copy self to make the decoded result duplicate
+        
+        for i in np.arange(a_decoded_result.num_filter_epochs):
+            ## Mask each output value
+            # inactive_mask_indicies = np.where(inactive_mask)[0]
+            num_positions, num_y_bins, num_time_bins = np.shape(a_decoded_result.p_x_given_n_list[i])
+            
+            # Make a copy of the original data before masking
+            original_data = a_decoded_result.p_x_given_n_list[i].copy()
+            
+            # Fill invalid time bins with the last valid value - EFFICIENT IMPLEMENTATION
+            if np.any(is_time_bin_active):  # Only proceed if we have some valid values
+                # Calculate "last valid index" lookup array - very efficient O(n) operation
+                last_valid_indices = np.zeros(num_time_bins, dtype=int)
+                current_valid_idx = 0
+                all_time_bin_indicies = np.arange(num_time_bins, dtype=int) ## all time bins
+                
+                for t in np.arange(num_time_bins):
+                    if is_time_bin_active[t]:
+                        current_valid_idx = t
+                    last_valid_indices[t] = current_valid_idx
+                
+
+                # Mask inactive time bins with NaN
+                a_decoded_result.p_x_given_n_list[i][:, :, inactive_mask] = np.nan
+                a_decoded_result.most_likely_position_indicies_list[i][:, inactive_mask] = -1 # use -1 instead of np.nan as it needs to be integer
+                a_decoded_result.most_likely_positions_list[i][inactive_mask, :] = np.nan
+                
+                ## when done, have `last_valid_indices`
+                # print(f'last_valid_indices: {last_valid_indices}')
+                
+                # Use the lookup array to efficiently fill NaN values for each position/y-bin with its last valid value
+                # for pos_idx in range(num_positions):
+                #     for y_idx in range(num_y_bins):
+                #         # Only process time bins that need filling (inactive AND have a prior valid value)
+                #         fill_mask = inactive_mask & (np.arange(num_time_bins) > last_valid_indices[0])
+                #         if np.any(fill_mask):
+                #             # Map each time point to its last valid time point using the precomputed lookup
+                #             source_indices = last_valid_indices[fill_mask]
+                #             a_decoded_result.p_x_given_n_list[i][pos_idx, y_idx, fill_mask] = original_data[pos_idx, y_idx, source_indices]
+                
+                a_decoded_result.p_x_given_n_list[i][:, :, all_time_bin_indicies] = original_data[:, :, last_valid_indices]
+
+
+                # Also fix the most_likely_position arrays using the same technique
+                # For most_likely_position_indicies_list (shape: 2, num_time_bins)
+                a_decoded_result.most_likely_position_indicies_list[i][:, all_time_bin_indicies] = a_decoded_result.most_likely_position_indicies_list[i][:, last_valid_indices]
+                
+
+                # for y_idx in range(num_y_bins):
+                #     fill_mask = inactive_mask & (np.arange(num_time_bins) > last_valid_indices[0])
+                #     if np.any(fill_mask):
+                #         source_indices = last_valid_indices[fill_mask]
+                #         a_decoded_result.most_likely_position_indicies_list[i][y_idx, fill_mask] = original_data[y_idx, source_indices]
+                
+                # For most_likely_positions_list (shape: num_time_bins, 2)
+                a_decoded_result.most_likely_positions_list[i][all_time_bin_indicies, :] = a_decoded_result.most_likely_positions_list[i][last_valid_indices, :]
+                
+                # fill_mask = inactive_mask & (np.arange(num_time_bins) > last_valid_indices[0])
+                # if np.any(fill_mask):
+                #     source_indices = last_valid_indices[fill_mask]
+                #     for dim in range(2):  # x and y dimensions
+                #         a_decoded_result.most_likely_positions_list[i][fill_mask, dim] = a_decoded_result.most_likely_positions_list[i][source_indices, dim]
+        
+        return a_decoded_result, (all_time_bin_indicies, last_valid_indices)
+
+
+
 # ==================================================================================================================== #
 # Placemap Position Decoders                                                                                           #
 # ==================================================================================================================== #
