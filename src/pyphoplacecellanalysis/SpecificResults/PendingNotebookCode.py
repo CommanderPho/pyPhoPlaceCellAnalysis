@@ -249,7 +249,7 @@ def _plot_low_firing_time_bins_overlay_image(widget, time_bin_edges, mask_rgba):
 
 
 @function_attributes(short_name=None, tags=['timeline-track', 'firing-rate', 'unit-spiking'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-03 15:28', related_items=[])
-def add_unit_spike_count_visualization(active_2d_plot, neuron_ids: NDArray, time_bin_edges: NDArray, unit_specific_time_binned_spike_counts: NDArray, a_dock_config=None, extended_dock_title_info=None):
+def add_unit_spike_count_visualization(active_2d_plot, neuron_ids: NDArray, time_bin_edges: NDArray, unit_specific_time_binned_spike_counts: NDArray, a_dock_config=None, extended_dock_title_info=None, neuron_colors_map=None, use_neuron_colors=True):
     """Adds a new row visualization for unit-specific time binned spike counts
     
     Args:
@@ -284,8 +284,9 @@ def add_unit_spike_count_visualization(active_2d_plot, neuron_ids: NDArray, time
         widget, matplotlib_fig, matplotlib_fig_axes, dDisplayItem = add_unit_spike_count_visualization(active_2d_plot, neuron_ids=unique_units, time_bin_edges=time_bin_edges, unit_specific_time_binned_spike_counts=unit_specific_time_binned_spike_counts, a_dock_config=None, extended_dock_title_info=None)
 
     """
-    from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
+    
 
+    
     ## Add a new row displaying unit spike counts over time
     identifier_name: str = f'SpikeCountsOverTime'
     if extended_dock_title_info is not None:
@@ -309,18 +310,53 @@ def add_unit_spike_count_visualization(active_2d_plot, neuron_ids: NDArray, time
     ymax = n_neurons
     x_first_extent = (xmin, xmax, ymin, ymax)
     
-    # Setup the heatmap colormap
-    spike_count_heatmap_imshow_kwargs = dict(
-        origin='lower',
-        cmap=get_heatmap_cmap(cmap='viridis', bad_color='black', under_color='white', over_color='red'),
-        aspect='auto',
-        interpolation='nearest',
-        extent=x_first_extent,
-        animated=False,
-    )
+    # Generate neuron colors if not provided
+    if neuron_colors_map is None and use_neuron_colors:
+        # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import paired_separately_sort_neurons, paired_incremental_sort_neurons # _display_directional_template_debugger
+        # from neuropy.utils.indexing_helpers import paired_incremental_sorting, union_of_arrays, intersection_of_arrays
+        # from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import UnitColoringMode, DataSeriesColorHelpers
+        # from pyphocorehelpers.gui.Qt.color_helpers import QColor, build_adjusted_color
+        from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import build_neurons_color_map
+        neurons_colors_array = build_neurons_color_map(n_neurons)
+        neuron_colors_map = {neuron_id: neurons_colors_array[:, i] for i, neuron_id in enumerate(neuron_ids)}
+    
+    if use_neuron_colors:
+        # Create a colored image matrix where each row uses the neuron's color with intensity proportional to spike count
+        image_matrix = np.zeros((n_neurons, n_time_bins, 4))  # RGBA format
+        
+        # Find max count for normalization
+        max_count = np.max(unit_specific_time_binned_spike_counts)
+        
+        for i, neuron_id in enumerate(neuron_ids):
+            base_color = neuron_colors_map[neuron_id]
+            for j in range(n_time_bins):
+                # Scale color intensity by spike count
+                normalized_count = unit_specific_time_binned_spike_counts[i, j] / max_count if max_count > 0 else 0
+                # Create a color with intensity proportional to spike count
+                image_matrix[i, j] = [
+                    base_color[0] * normalized_count,
+                    base_color[1] * normalized_count,
+                    base_color[2] * normalized_count,
+                    1.0  # Full alpha
+                ]
+        
+        # Plot the custom colored spike counts
+        image = an_ax.imshow(image_matrix, origin='lower', aspect='auto', extent=x_first_extent, interpolation='nearest')
+    else:
+        # Use standard heatmap as before
+        from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
+        
+        spike_count_heatmap_imshow_kwargs = dict(
+            origin='lower',
+            cmap=get_heatmap_cmap(cmap='viridis', bad_color='black', under_color='white', over_color='red'),
+            aspect='auto',
+            interpolation='nearest',
+            extent=x_first_extent,
+            animated=False,
+        )
+        image = an_ax.imshow(unit_specific_time_binned_spike_counts, **spike_count_heatmap_imshow_kwargs)
+    
 
-    # Plot the spike counts as a heatmap
-    image = an_ax.imshow(unit_specific_time_binned_spike_counts, **spike_count_heatmap_imshow_kwargs)
     widget.plots.image = image
     
     # Configure axes
