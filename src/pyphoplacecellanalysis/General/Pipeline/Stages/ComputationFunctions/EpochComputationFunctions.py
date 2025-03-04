@@ -885,7 +885,7 @@ class EpochComputationsComputationsContainer(ComputedResult):
     
     training_data_portion: float = serialized_attribute_field(default=(5.0/6.0))
     epochs_decoding_time_bin_size: float = serialized_attribute_field(default=0.020) 
-    frame_divide_bin_size: float = serialized_attribute_field(default=0.200)
+    frame_divide_bin_size: float = serialized_attribute_field(default=10.0)
 
     a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = serialized_field(default=None, repr=False)
     results1D: Optional[NonPBEDimensionalDecodingResult] = serialized_field(default=None, repr=False)
@@ -937,7 +937,7 @@ class EpochComputationsComputationsContainer(ComputedResult):
     # Marginalization Methods                                                                                              #
     # ==================================================================================================================== #
     # From `General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions._build_merged_directional_placefields`
-    def _build_merged_joint_placefields_and_decode(self, spikes_df: pd.DataFrame, debug_print=False):
+    def _build_merged_joint_placefields_and_decode(self, spikes_df: pd.DataFrame, filter_epochs:Optional[Epoch]=None, debug_print=False):
         """ Merges the computed directional placefields into a Pseudo2D decoder, with the pseudo last axis corresponding to the decoder index.
 
         NOTE: this builds a **decoder** not just placefields, which is why it depends on the time_bin_sizes (which will later be used for decoding)		
@@ -980,9 +980,6 @@ class EpochComputationsComputationsContainer(ComputedResult):
         unique_decoder_names: List[str] = ['long', 'short']
         # results1D.pfs
         # results1D.decoders # BasePositionDecoder
-        # single_global_epoch_df: pd.DataFrame = Epoch(deepcopy(a_new_NonPBE_Epochs_obj.single_global_epoch_df))
-        single_global_epoch: Epoch = Epoch(deepcopy(a_new_NonPBE_Epochs_obj.single_global_epoch_df))
-        # PfND
 
         pfs: Dict[types.DecoderName, PfND] = {k:deepcopy(v) for k, v in results1D.pfs.items() if k in unique_decoder_names}
         # decoders: Dict[types.DecoderName, BasePositionDecoder] = {k:deepcopy(v) for k, v in results1D.decoders.items() if k in unique_decoder_names}
@@ -994,9 +991,16 @@ class EpochComputationsComputationsContainer(ComputedResult):
         non_PBE_all_directional_pf1D_Decoder: BasePositionDecoder = BasePositionDecoder(non_PBE_all_directional_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
         # non_PBE_all_directional_pf1D_Decoder
 
+        if filter_epochs is None:
+            # use global epoch
+            # single_global_epoch_df: pd.DataFrame = Epoch(deepcopy(a_new_NonPBE_Epochs_obj.single_global_epoch_df))
+            single_global_epoch: Epoch = Epoch(deepcopy(a_new_NonPBE_Epochs_obj.single_global_epoch_df))
+            filter_epochs = single_global_epoch
+
+
         # takes 6.3 seconds
         ## Do Continuous Decoding (for all time (`single_global_epoch`), using the decoder from each epoch) -- slowest dict comp
-        pseudo2D_continuous_specific_decoded_result: DecodedFilterEpochsResult = non_PBE_all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=deepcopy(single_global_epoch),
+        pseudo2D_continuous_specific_decoded_result: DecodedFilterEpochsResult = non_PBE_all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=deepcopy(filter_epochs),
                                                                                                                                                 decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False)
 
         ## OUTPUTS: pseudo2D_continuous_specific_decoded_results, non_PBE_all_directional_pf1D, non_PBE_all_directional_pf1D_Decoder
@@ -1011,16 +1015,18 @@ class EpochComputationsComputationsContainer(ComputedResult):
 
         # NOTE: non_marginalized_raw_result is a marginal_over_track_ID since there are only two elements
         non_PBE_marginal_over_track_ID = DirectionalPseudo2DDecodersResult.build_generalized_non_marginalized_raw_posteriors(pseudo2D_continuous_specific_decoded_result, unique_decoder_names=unique_decoder_names)[0]['p_x_given_n']
-        # non_marginalized_raw_result = DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors(pseudo2D_decoder_continuously_decoded_result)[0]['p_x_given_n']
-        # marginal_over_direction = DirectionalPseudo2DDecodersResult.build_custom_marginal_over_direction(pseudo2D_decoder_continuously_decoded_result)[0]['p_x_given_n']
-        # marginal_over_track_ID = DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(pseudo2D_decoder_continuously_decoded_result)[0]['p_x_given_n']
-
         time_bin_containers = pseudo2D_continuous_specific_decoded_result.time_bin_containers[0]
         time_window_centers = time_bin_containers.centers
         # p_x_given_n.shape # (62, 4, 209389)
 
+        ## Build into a marginal df like `all_sessions_laps_df` - uses `time_window_centers`, pseudo2D_continuous_specific_decoded_result, non_PBE_marginal_over_track_ID:
+        track_marginal_posterior_df : pd.DataFrame = pd.DataFrame({'t':deepcopy(time_window_centers), 'P_Long': np.squeeze(non_PBE_marginal_over_track_ID[0, :]), 'P_Short': np.squeeze(non_PBE_marginal_over_track_ID[1, :]), 'time_bin_size': pseudo2D_continuous_specific_decoded_result.decoding_time_bin_size})
+        # track_marginal_posterior_df['delta_aligned_start_t'] = track_marginal_posterior_df['t'] - t_delta ## subtract off t_delta
+        track_marginal_posterior_df
+
+
         ## OUTPUTS: non_PBE_marginal_over_track_ID, time_bin_containers, time_window_centers
-        return non_PBE_all_directional_pf1D_Decoder, pseudo2D_continuous_specific_decoded_result, continuous_decoded_results_dict, non_PBE_marginal_over_track_ID, (time_bin_containers, time_window_centers)
+        return non_PBE_all_directional_pf1D_Decoder, pseudo2D_continuous_specific_decoded_result, continuous_decoded_results_dict, non_PBE_marginal_over_track_ID, (time_bin_containers, time_window_centers, track_marginal_posterior_df)
         
 
     # ==================================================================================================================== #
@@ -1171,14 +1177,20 @@ def estimate_memory_requirements_bytes(epochs_decoding_time_bin_size: float, fra
         'spike_counts': (n_time_bins * n_neurons) * bytes_per_float,
         'firing_rates': (n_max_decoded_bins * n_neurons) * bytes_per_float, 
         'position_decoded': (n_max_decoded_bins * 2) * bytes_per_float,  
-        # 'posterior': (n_max_decoded_bins * n_flattened_position_bins) * bytes_per_float,
+        'posterior': (n_max_decoded_bins * n_flattened_position_bins) * bytes_per_float,
         # 'posterior_intermediate_computation': (n_max_decoded_bins * n_flattened_position_bins * n_neurons) * bytes_per_float, 
         'occupancy': n_flattened_position_bins * bytes_per_float, 
-        'worst_case_scenario': (n_max_decoded_bins * n_flattened_position_bins * n_neurons) * bytes_per_float, 
+        # 'worst_case_scenario': (n_max_decoded_bins * n_flattened_position_bins * n_neurons) * bytes_per_float, 
     }
+
     # itemized_memory_breakdown_GB = {k:(v/1e9) for k, v in itemized_memory_breakdown.items()}
     # Account for multiple maze contexts
     total_memory = sum(itemized_memory_breakdown.values()) * n_maze_contexts
+    
+    intermediate_itemized_memory_breakdown = {
+        'worst_case_scenario': (n_max_decoded_bins * n_flattened_position_bins * n_neurons) * bytes_per_float, 
+    }
+    total_memory += sum(intermediate_itemized_memory_breakdown.values())
     
     # Add 20% overhead for temporary arrays and computations
     total_memory_with_overhead = int(total_memory * 1.2)
