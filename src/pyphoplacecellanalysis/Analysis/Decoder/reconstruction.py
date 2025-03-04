@@ -880,9 +880,6 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         if 'pos_bin_edges' not in state:
             self.__dict__.update(pos_bin_edges=None) ## default to None (for same unpickling)
 
-
-
-
     def flatten(self):
         """ flattens the result over all epochs to produce one per time bin """
         # returns a flattened version of self over all epochs
