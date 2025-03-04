@@ -744,7 +744,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
     
 
     ## Optional Helpers
-    pos_bin_edges: Optional[NDArray] = serialized_field(default=None, metadata={'desc':'the position bin edges of the decoder that was used to produce the result', 'shape': ('n_pos_bins+1')})
+    pos_bin_edges: Optional[NDArray] = serialized_field(default=None, metadata={'desc':'the position bin edges of the decoder that was used to produce the result', 'shape': ('n_pos_bins+1', )})
 
     @property
     def n_pos_bins(self) -> Optional[int]:
