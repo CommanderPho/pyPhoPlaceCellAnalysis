@@ -70,6 +70,7 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore
 # 2025-03-03 - Unit Time Binned Spike Count Masking of Decoding                                                        #
 # ==================================================================================================================== #
 
+
 def compute_unit_time_binned_spike_counts_and_mask(spikes_df: pd.DataFrame, time_bin_edges: NDArray, min_num_spikes_per_bin_to_be_considered_active:int=1, min_num_unique_active_neurons_per_time_bin:int=2):
     """ Computes the number of neurons in each spike time bin (specified by time_bin_edges) and threshold based on some criteria
 
@@ -117,6 +118,43 @@ def compute_unit_time_binned_spike_counts_and_mask(spikes_df: pd.DataFrame, time
     ## OUTPUTS: mask_rgba
 
     return unit_specific_time_binned_spike_counts, (is_time_bin_active, inactive_mask, mask_rgba)
+
+@function_attributes(short_name=None, tags=['mask', 'unit-spike-counts'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-04 01:32', related_items=[])
+def mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(a_decoder: BasePositionDecoder, a_decoded_result: DecodedFilterEpochsResult, spikes_df: pd.DataFrame):
+    """ modifies the result
+    
+    a_decoded_result.p_x_given_n_list[0].shape # (59, 2, 69487)
+    a_decoded_result.most_likely_position_indicies_list[0].shape # .shape (2, 69487)
+    a_decoded_result.most_likely_positions_list[0].shape # .shape (69487, 2)
+
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin
+    
+    spikes_df: pd.DataFrame = deepcopy(get_proper_global_spikes_df(curr_active_pipeline))
+    a_decoder, a_decoded_result = mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(a_decoder=non_PBE_all_directional_pf1D_Decoder, a_decoded_result=pseudo2D_continuous_specific_decoded_result, spikes_df=spikes_df)
+    
+    """
+    # time_bin_edges: NDArray = deepcopy(results1D.continuous_results['global'].time_bin_edges[0])
+    time_bin_edges: NDArray = deepcopy(a_decoded_result.time_bin_edges)
+    if len(time_bin_edges) == 1:
+        time_bin_edges = time_bin_edges[0] ## unwrap
+    
+    unit_specific_time_binned_spike_counts, (is_time_bin_active, inactive_mask, mask_rgba) = compute_unit_time_binned_spike_counts_and_mask(spikes_df=spikes_df, time_bin_edges=time_bin_edges)
+    
+    a_decoder = deepcopy(a_decoder)
+    a_decoded_result = deepcopy(a_decoded_result)
+    
+    for i in np.arange(a_decoded_result.num_filter_epochs):
+        ## Mask each output value
+        inactive_mask_indicies = np.where(inactive_mask)[0]
+        num_positions, num_y_bins, num_time_bins = np.shape(a_decoded_result.p_x_given_n_list[i])
+        
+        a_decoded_result.p_x_given_n_list[i][:, :, is_time_bin_active] = np.nan # (59, 2, 69487)
+        a_decoded_result.most_likely_position_indicies_list[i][:, is_time_bin_active] = np.nan #  .shape (2, 69487)
+        a_decoded_result.most_likely_positions_list[i][is_time_bin_active, :] = np.nan # .shape (69487, 2)
+        # a_decoded_result.p_x_given_n_list[i] = np.ma.masked_array(a_decoded_result.p_x_given_n_list[i], inactive_mask)
+        ## TODO: for each invalid timebin (specified by inactive_mask), fill with the last valid p_x_given_n value
+
+    return a_decoder, a_decoded_result
 
 
 def _plot_low_firing_time_bins_overlay_image(widget, time_bin_edges, mask_rgba):
