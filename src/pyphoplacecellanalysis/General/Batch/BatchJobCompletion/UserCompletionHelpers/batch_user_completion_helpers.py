@@ -1407,7 +1407,7 @@ def figures_rank_order_results_completion_function(self, global_data_root_parent
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['wcorr', 'shuffle'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
+@function_attributes(short_name=None, tags=['wcorr', 'shuffle', 'export', 'mat', 'pkl', 'csv'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def compute_and_export_session_wcorr_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                    should_skip_previous_saved_shuffles:bool=False, with_data_name: Optional[str]=None) -> dict:
     """  Computes the shuffled wcorrs and export them to several formats: .mat, .pkl, and .csv

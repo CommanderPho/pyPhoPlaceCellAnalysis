@@ -1547,7 +1547,7 @@ QDoubleSpinBox::down-arrow {
            </property>
            <property name="icon">
             <iconset resource="../../../Resources/ActionIcons.qrc">
-             <normaloff>:/Icons/Icons/Icon/JumpToNext.png</normaloff>:/Icons/Icons/Icon/JumpToNext.png</iconset>
+             <normaloff>:/Icons/Icons/actions/JumpSwerveLeft.png</normaloff>:/Icons/Icons/actions/JumpSwerveLeft.png</iconset>
            </property>
            <property name="iconSize">
             <size>

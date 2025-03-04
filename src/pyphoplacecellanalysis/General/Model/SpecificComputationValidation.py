@@ -11,19 +11,19 @@ class SpecificComputationResultsSpecification:
     """ This encapsulates the specification for required/provided global results 
 
     Usage:
-    	from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import SpecificComputationResultsSpecification
+        from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import SpecificComputationResultsSpecification
     
     Can specify like:
     
-    	@function_attributes(short_name='merged_directional_placefields', tags=['directional_pf', 'laps', 'epoch', 'session', 'pf1D', 'pf2D'], input_requires=[], output_provides=[], uses=['PfND.build_merged_directional_placefields('], used_by=[], creation_date='2023-10-25 09:33', related_items=[],
-		    results_specification = SpecificComputationResultsSpecification(provides_global_keys=['DirectionalMergedDecoders']),
-		    provides_global_keys = ['DirectionalMergedDecoders'],
-		validate_computation_test=DirectionalPseudo2DDecodersResult.validate_has_directional_merged_placefields, is_global=True)
+        @function_attributes(short_name='merged_directional_placefields', tags=['directional_pf', 'laps', 'epoch', 'session', 'pf1D', 'pf2D'], input_requires=[], output_provides=[], uses=['PfND.build_merged_directional_placefields('], used_by=[], creation_date='2023-10-25 09:33', related_items=[],
+            results_specification = SpecificComputationResultsSpecification(provides_global_keys=['DirectionalMergedDecoders']),
+            provides_global_keys = ['DirectionalMergedDecoders'],
+        validate_computation_test=DirectionalPseudo2DDecodersResult.validate_has_directional_merged_placefields, is_global=True)
         def a_fn(...
             ...
             
         results_specification=SpecificComputationResultsSpecification(provides_global_keys=['DirectionalMergedDecoders']),
-		provides_global_keys=['DirectionalMergedDecoders'],
+        provides_global_keys=['DirectionalMergedDecoders'],
 
 
     """
@@ -74,7 +74,7 @@ class SpecificComputationValidator:
     """ This encapsulates the logic for testing if a computation already complete or needs to be completed, and calling the compute function if needed.
 
     Usage:
-    	from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import SpecificComputationValidator
+        from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import SpecificComputationValidator
     
         ## Specify the computations and the requirements to validate them.
         _comp_specifiers = [
@@ -817,7 +817,7 @@ class ComputationValidatorsTreeWidget:
         self.accordion.selected_index = None  # Initially set to None to expand all
 
         self.main_container.children = [self.accordion]
-        
+            
     def create_section_widget(self, validators: Dict, section_name: str) -> widgets.VBox:
         validator_rows = []
         
@@ -835,14 +835,25 @@ class ComputationValidatorsTreeWidget:
             
             # Dependencies section
             spec = validator.results_specification
-            deps_box = widgets.VBox([
-                widgets.HTML("<b>Dependencies:</b>"),
-                widgets.HTML(f"<span style='color: #2962FF'>Required Global: {', '.join(spec.requires_global_keys) or 'None'}</span>"),
-                widgets.HTML(f"<span style='color: #1565C0'>Required Local: {', '.join(spec.requires_local_keys) or 'None'}</span>"),
-                widgets.HTML(f"<span style='color: #2E7D32'>Provides Global: {', '.join(spec.provides_global_keys) or 'None'}</span>"),
-                widgets.HTML(f"<span style='color: #388E3C'>Provides Local: {', '.join(spec.provides_local_keys) or 'None'}</span>")
-            ], layout={'padding': '4px', 'margin': '4px', 'border': '1px solid #ddd'})
-            validator_details.append(deps_box)
+            deps_children = [widgets.HTML("<b>Dependencies:</b>")]
+            
+            # Only add dependency categories that have values
+            if spec.requires_global_keys:
+                deps_children.append(widgets.HTML(f"<span style='color: #2962FF'>Required Global: {', '.join(spec.requires_global_keys)}</span>"))
+            
+            if spec.requires_local_keys:
+                deps_children.append(widgets.HTML(f"<span style='color: #1565C0'>Required Local: {', '.join(spec.requires_local_keys)}</span>"))
+            
+            if spec.provides_global_keys:
+                deps_children.append(widgets.HTML(f"<span style='color: #2E7D32'>Provides Global: {', '.join(spec.provides_global_keys)}</span>"))
+            
+            if spec.provides_local_keys:
+                deps_children.append(widgets.HTML(f"<span style='color: #388E3C'>Provides Local: {', '.join(spec.provides_local_keys)}</span>"))
+            
+            # Only add the deps_box if it has more than just the title
+            if len(deps_children) > 1:
+                deps_box = widgets.VBox(deps_children, layout={'padding': '4px', 'margin': '4px', 'border': '1px solid #ddd'})
+                validator_details.append(deps_box)
             
             # Function kwargs if any
             if validator.computation_fn_kwargs:
@@ -854,12 +865,13 @@ class ComputationValidatorsTreeWidget:
             
             # Combine into accordion section
             section = widgets.VBox(validator_details, 
-                                 layout={'border': '1px solid #ccc',
+                                layout={'border': '1px solid #ccc',
                                         'margin': '2px',
                                         'padding': '4px'})
             validator_rows.append(section)
             
         return widgets.VBox(validator_rows)
-        
+
+
     def display(self):
         display(self.main_container)

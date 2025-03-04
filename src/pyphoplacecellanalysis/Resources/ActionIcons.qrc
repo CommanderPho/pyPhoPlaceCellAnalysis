@@ -33,6 +33,12 @@
     <file>Icons/actions/fast-download-white.png</file>
     <file>Icons/actions/slow-download-white.png</file>
     <file>Icons/actions/fast-forward.png</file>
+    <file>Icons/actions/JumpSkipLeft.png</file>
+    <file>Icons/actions/JumpSkipRight.png</file>
+    <file>Icons/actions/JumpSwerveLeft.png</file>
+    <file>Icons/actions/JumpSwerveRight.png</file>
+    <file>Icons/actions/ToEnd.png</file>
+    <file>Icons/actions/ToStart.png</file>
     <file>Icons/Icon/log-40.png</file>
     <file>Icons/Icon/JumpToNext.png</file>
     <file>Icons/Icon/JumpToPrev.png</file>
