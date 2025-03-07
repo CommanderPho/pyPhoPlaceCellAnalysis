@@ -1342,6 +1342,12 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
     #TODO 2024-05-22 17:26: - [ ] 'DirectionalMergedDecodersResult' -> 'DirectionalPseudo2DDecodersResult'
 
+    #TODO 2025-03-04 17:35: - [ ] Limited in the following ways:
+        - Assumes directional (long/short) configurations, not general
+        - Assumes two epochs of interest: (laps/ripples)
+        - Outputs a bunch of separate marginal files which seems excessive
+        
+    
     {'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalMergedDecodersResult':'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalPseudo2DDecodersResult'}
 
 
@@ -2435,6 +2441,9 @@ class DirectionalDecodersContinuouslyDecodedResult(ComputedResult):
 
     #TODO 2024-05-22 17:26: - [ ] 'DirectionalDecodersDecodedResult' -> 'DirectionalDecodersContinuouslyDecodedResult'
     'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalDecodersDecodedResult':'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.DirectionalDecodersContinuouslyDecodedResult',
+    
+
+    #TODO 2025-03-04 17:39: - [ ] This class looks nearly general!
     
     Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
@@ -3543,7 +3552,7 @@ class MeasuredDecodedPositionComparison(UnpackableMixin, object):
     
 @define(slots=False)
 class CustomDecodeEpochsResult(UnpackableMixin):
-    """ Represents a custom decoding of an Epochs object
+    """ Represents a custom decoding of an Epochs object that also compares the decoded position with the measured position
     
     Usage:
 
@@ -3878,7 +3887,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
         
 
 
-@function_attributes(short_name='custom_decode_epochs', tags=['USEFUL', 'decode', 'pure'], input_requires=[], output_provides=[], uses=[], used_by=['_do_custom_decode_epochs_dict'], creation_date='2024-04-05 11:59', related_items=[])
+@function_attributes(short_name='custom_decode_epochs', tags=['USEFUL', 'decode', 'pure'], input_requires=[], output_provides=[], uses=[], used_by=['_do_custom_decode_epochs_dict', '_do_train_test_split_decode_and_evaluate'], creation_date='2024-04-05 11:59', related_items=[])
 def _do_custom_decode_epochs(global_spikes_df: pd.DataFrame,  global_measured_position_df: pd.DataFrame, pfND_Decoder: BasePositionDecoder, epochs_to_decode_df: pd.DataFrame, decoding_time_bin_size: float, debug_print=False, **kwargs) -> CustomDecodeEpochsResult: #Tuple[MeasuredDecodedPositionComparison, DecodedFilterEpochsResult]:
     """
     Do a single position decoding using a single decoder for a single set of epochs

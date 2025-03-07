@@ -413,7 +413,7 @@ class Zhang_Two_Step:
         return k * one_step_p_x_given_n * cls.compute_conditional_probability_x_prev_given_x_t(x_prev, all_x, sigma_t, C)
     
 
-@custom_define(slots=False, repr=False)
+@custom_define(slots=False, repr=False, eq=False)
 class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     """ Values for a single epoch. Class to hold debugging information for a transformation process
      
@@ -690,7 +690,7 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         raise NotImplementedError("read_hdf not implemented")
 
 
-@custom_define(slots=False, repr=False)
+@custom_define(slots=False, repr=False, eq=False)
 class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     """ Container for the results of decoding a set of epochs (filter_epochs) using a decoder (active_decoder) 
     
@@ -742,7 +742,6 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
     time_bin_edges: list = non_serialized_field(metadata={'shape': ('n_epochs',)}) # depends on the number of epochs, one per epoch
     epoch_description_list: list[str] = non_serialized_field(default=Factory(list), metadata={'shape': ('n_epochs',)}) # depends on the number of epochs, one for each
     
-
     ## Optional Helpers
     pos_bin_edges: Optional[NDArray] = serialized_field(default=None, metadata={'desc':'the position bin edges of the decoder that was used to produce the result', 'shape': ('n_pos_bins+1', )})
 
@@ -1374,7 +1373,7 @@ from neuropy.utils.mixins.binning_helpers import GridBinDebuggableMixin, DebugBi
 # Stateless Decoders (New 2023-04-06)                                                                                  #
 # ==================================================================================================================== #
 
-@custom_define(slots=False)
+@custom_define(slots=False, eq=False)
 class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLocationRepresentingMixin, PeakLocationRepresentingMixin, NeuronUnitSlicableObjectProtocol, BinnedPositionsMixin):
     """ 2023-04-06 - A simplified data-only version of the decoder that serves to remove all state related to specific computations to make each run independent 
     Stores only the raw inputs that are used to decode, with the user specifying the specifics for a given decoding (like time_time_sizes, etc.
@@ -1387,10 +1386,10 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
     """
     pf: PfND = serialized_field(repr=keys_only_repr)
 
-    neuron_IDXs: np.ndarray = serialized_field(default=None, is_computable=True)
-    neuron_IDs: np.ndarray = serialized_field(default=None, is_computable=True)
-    F: np.ndarray = non_serialized_field(default=None, repr=False)
-    P_x: np.ndarray = non_serialized_field(default=None, repr=False)
+    neuron_IDXs: np.ndarray = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons',)})
+    neuron_IDs: np.ndarray = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons',)})
+    F: np.ndarray = non_serialized_field(default=None, repr=False, metadata={'shape': ('n_flat_position_bins','n_neurons',)})
+    P_x: np.ndarray = non_serialized_field(default=None, repr=False, metadata={'shape': ('n_flat_position_bins',)})
 
     setup_on_init:bool = non_serialized_field(default=True)
     post_load_on_init:bool = non_serialized_field(default=False)
@@ -1520,10 +1519,6 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         """ Called after deserializing/loading saved result from disk to rebuild the needed computed variables. """
         with WrappingMessagePrinter(f'post_load() called.', begin_line_ending='... ', finished_message='all rebuilding completed.', enable_print=self.debug_print):
             self._setup_computation_variables()
-            # self._setup_time_bin_spike_counts_N_i()
-            # self._setup_time_window_centers()
-            # self.p_x_given_n = self._reshape_output(self.flat_p_x_given_n)
-            # self.compute_most_likely_positions()
 
     # for NeuronUnitSlicableObjectProtocol:
     def get_by_id(self, ids, defer_compute_all:bool=False): # defer_compute_all:bool = False
@@ -2230,7 +2225,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
 # ==================================================================================================================== #
 # Bayesian Decoder                                                                                                     #
 # ==================================================================================================================== #
-@custom_define(slots=False)
+@custom_define(slots=False, eq=False)
 class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingClass, BasePositionDecoder): # needs `HDFMixin, `
     """ Holds the placefields. Can be called on any spike data to compute the most likely position given the spike data.
 
