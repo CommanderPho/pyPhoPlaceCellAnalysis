@@ -158,6 +158,29 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         self.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
         return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item
     
+    def add_docked_decoded_posterior_track_from_result(self, name: str, a_1D_decoded_result: Union[SingleEpochDecodedResult, DecodedFilterEpochsResult], xbin: Optional[NDArray]=None, measured_position_df: Optional[pd.DataFrame]=None, **kwargs):
+            """ adds a decoded 1D posterior from a decoded result
+
+            Aims to replace `AddNewDecodedPosteriors_MatplotlibPlotCommand._perform_add_new_decoded_posterior_row`
+            
+            
+            Usage 0:
+                time_bin_size = epochs_decoding_time_bin_size
+                info_string: str = f" - t_bin_size: {time_bin_size}"
+                identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item = active_2d_plot.add_docked_decoded_posterior_track(name='non-PBE_marginal_over_track_ID',
+                                                                                                        time_window_centers=time_window_centers, a_1D_posterior=non_PBE_marginal_over_track_ID,
+                                                                                                        xbin = deepcopy(a_position_decoder.xbin), measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()),
+                                                                                                        extended_dock_title_info=info_string)
+                                                                                                        
+            Usage 1:
+                _out_tuple = active_2d_plot.add_docked_decoded_posterior_track(name=f'DirectionalDecodersDecoded[{a_decoder_name}]', a_dock_config=a_dock_config,
+                                                                                                time_window_centers=a_1D_continuous_decoded_result.time_bin_container.centers, a_1D_posterior=a_1D_continuous_decoded_result.p_x_given_n,
+                                                                                                xbin = deepcopy(a_1D_decoder.xbin), measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()),
+                                                                                                extended_dock_title_info=info_string)
+            """
+            return self.add_docked_decoded_posterior_track(name=name, time_window_centers=a_1D_decoded_result.time_bin_container.centers, a_1D_posterior=a_1D_decoded_result.p_x_given_n, xbin=xbin, measured_position_df=measured_position_df, **kwargs)
+        
+
 
     def add_docked_marginal_track(self, name: str, time_window_centers: NDArray, a_1D_posterior: NDArray, xbin: Optional[NDArray]=None, a_variable_name: Optional[str]=None, a_dock_config: Optional[CustomDockDisplayConfig]=None, extended_dock_title_info: Optional[str]=None):
         """ adds a marginal (such as Long v. Short, or Long_LR v. Long_RL v. Short_LR v. Short_RL) 
@@ -230,6 +253,46 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         self.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
         return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item
 
+
+    def add_docked_decoded_results_dict_tracks(self, name: str, a_decoded_result_dict: Dict[str, SingleEpochDecodedResult], dock_configs: Dict[str, CustomDockDisplayConfig], pf1D_Decoder_dict: Dict[str, BasePositionDecoder], measured_position_df: Optional[pd.DataFrame]=None, **kwargs):
+        """
+        info_string: str = f'{active_time_bin_size:.2f}'
+        dock_group_sep_character: str = '_'
+        showCloseButton = True
+        _common_dock_config_kwargs = {'dock_group_names': [dock_group_sep_character.join([f'ContinuousDecode', info_string])], 'showCloseButton': showCloseButton}
+        dock_configs: Dict[str, CustomDockDisplayConfig] = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'),
+                                (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, **_common_dock_config_kwargs),
+                                CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, **_common_dock_config_kwargs),
+                                CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, **_common_dock_config_kwargs),
+                                CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, **_common_dock_config_kwargs))))
+                                
+        output_dict = active_2d_plot.add_docked_decoded_results_dict_tracks(name=f'DirectionalDecodersDecoded', a_decoded_result_dict=a_split_pseudo2D_continuous_result_to_1D_continuous_result_dict, dock_configs=dock_configs, pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict,
+                                                                                                    measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()),
+                                                                                                    extended_dock_title_info=info_string)
+                                                                                                    
+        """
+        output_dict = {}
+        for a_decoder_name, a_1D_continuous_decoded_result in a_decoded_result_dict.items():
+            ## a_1D_continuous_decoded_result: SingleEpochDecodedResult
+            a_dock_config = dock_configs[a_decoder_name]
+            a_1D_decoder: BasePositionDecoder = pf1D_Decoder_dict[a_decoder_name]
+            # _out_tuple = self.add_docked_decoded_posterior_track(name=f'DirectionalDecodersDecoded[{a_decoder_name}]', a_dock_config=a_dock_config,
+            #                                                                                         time_window_centers=a_1D_continuous_decoded_result.time_bin_container.centers, a_1D_posterior=a_1D_continuous_decoded_result.p_x_given_n,
+            #                                                                                         xbin = deepcopy(a_1D_decoder.xbin), measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()),
+            #                                                                                         extended_dock_title_info=info_string)
+            
+
+            _out_tuple = self.add_docked_decoded_posterior_track_from_result(name=f'{name}[{a_decoder_name}]', a_dock_config=a_dock_config, a_1D_decoded_result=a_1D_continuous_decoded_result,
+                                                                                                    xbin = deepcopy(a_1D_decoder.xbin), measured_position_df=deepcopy(measured_position_df), **kwargs)
+            
+
+            identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dDisplayItem = _out_tuple
+            ## Add `a_decoded_result` to the plots_data
+            widget.plots_data.a_decoded_result = a_1D_continuous_decoded_result
+            widget.plots_data.a_decoder = deepcopy(a_1D_decoder)
+            output_dict[a_decoder_name] = (identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dDisplayItem) ## add again
+        ## END for a_decoder_name, a_1D_continuous_decoded_result 
+        return output_dict
 
 
     @function_attributes(short_name=None, tags=['UNFINISHED', 'plotting', 'computing'], input_requires=[], output_provides=[], uses=['AddNewDecodedPosteriors_MatplotlibPlotCommand', '_perform_plot_multi_decoder_meas_pred_position_track'], used_by=[], creation_date='2025-02-13 14:58', related_items=['_perform_plot_multi_decoder_meas_pred_position_track'])
