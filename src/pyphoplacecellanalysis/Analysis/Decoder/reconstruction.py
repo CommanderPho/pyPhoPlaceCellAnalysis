@@ -1390,8 +1390,11 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
 
             ## INPUTS: laps_pseudo2D_continuous_specific_decoded_result: DecodedFilterEpochsResult
-            laps_pseudo2D_split_to_1D_continuous_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = laps_pseudo2D_continuous_specific_decoded_result.split_pseudo2D_result_to_1D_result(pseudo2D_decoder_names_list=['long', 'short'])
-            laps_pseudo2D_split_to_1D_continuous_results_dict
+            unique_decoder_names = ['long', 'short']
+            laps_pseudo2D_split_to_1D_continuous_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = laps_pseudo2D_continuous_specific_decoded_result.split_pseudo2D_result_to_1D_result(pseudo2D_decoder_names_list=unique_decoder_names)
+            masked_laps_pseudo2D_split_to_1D_continuous_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = masked_laps_pseudo2D_continuous_specific_decoded_result.split_pseudo2D_result_to_1D_result(pseudo2D_decoder_names_list=unique_decoder_names)
+
+            # OUTPUTS: laps_pseudo2D_split_to_1D_continuous_results_dict, masked_laps_pseudo2D_split_to_1D_continuous_results_dict
 
 
         """
