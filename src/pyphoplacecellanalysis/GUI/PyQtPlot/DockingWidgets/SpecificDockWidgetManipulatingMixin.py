@@ -11,7 +11,7 @@ from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock
 from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DynamicDockDisplayAreaOwningMixin, DynamicDockDisplayAreaContentMixin
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult, Zhang_Two_Step
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, TrackTemplates, TrainTestSplitResult
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
@@ -63,7 +63,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
     def add_docked_decoded_continuous_result_track(self, name: str):
         pass
 
-    def add_docked_decoded_posterior_track(self, name: str, time_window_centers: NDArray, a_1D_posterior: NDArray, xbin: Optional[NDArray]=None, measured_position_df: Optional[pd.DataFrame]=None, a_variable_name: Optional[str]=None, a_dock_config: Optional[CustomDockDisplayConfig]=None, extended_dock_title_info: Optional[str]=None):
+    def add_docked_decoded_posterior_track(self, name: str, time_window_centers: NDArray, a_1D_posterior: NDArray, xbin: Optional[NDArray]=None, measured_position_df: Optional[pd.DataFrame]=None, a_variable_name: Optional[str]=None, a_dock_config: Optional[CustomDockDisplayConfig]=None, extended_dock_title_info: Optional[str]=None, should_defer_render:bool=False):
         """ adds a decoded 1D posterior 
 
         Aims to replace `AddNewDecodedPosteriors_MatplotlibPlotCommand._perform_add_new_decoded_posterior_row`
@@ -154,8 +154,11 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
             widget.plots.measured_position_artists = _out_artists
 
 
-        widget.draw() # alternative to accessing through full path?
+        if not should_defer_render:
+            widget.draw() # alternative to accessing through full path?
+        # end if not should_defer_render
         self.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
+        
         return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item
     
     def add_docked_decoded_posterior_track_from_result(self, name: str, a_1D_decoded_result: Union[SingleEpochDecodedResult, DecodedFilterEpochsResult], xbin: Optional[NDArray]=None, measured_position_df: Optional[pd.DataFrame]=None, **kwargs):
@@ -276,16 +279,8 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
             ## a_1D_continuous_decoded_result: SingleEpochDecodedResult
             a_dock_config = dock_configs[a_decoder_name]
             a_1D_decoder: BasePositionDecoder = pf1D_Decoder_dict[a_decoder_name]
-            # _out_tuple = self.add_docked_decoded_posterior_track(name=f'DirectionalDecodersDecoded[{a_decoder_name}]', a_dock_config=a_dock_config,
-            #                                                                                         time_window_centers=a_1D_continuous_decoded_result.time_bin_container.centers, a_1D_posterior=a_1D_continuous_decoded_result.p_x_given_n,
-            #                                                                                         xbin = deepcopy(a_1D_decoder.xbin), measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()),
-            #                                                                                         extended_dock_title_info=info_string)
-            
-
             _out_tuple = self.add_docked_decoded_posterior_track_from_result(name=f'{name}[{a_decoder_name}]', a_dock_config=a_dock_config, a_1D_decoded_result=a_1D_continuous_decoded_result,
-                                                                                                    xbin = deepcopy(a_1D_decoder.xbin), measured_position_df=deepcopy(measured_position_df), **kwargs)
-            
-
+                                                                                                    xbin = deepcopy(a_1D_decoder.xbin), measured_position_df=deepcopy(measured_position_df), **kwargs) # , should_defer_render=False
             identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dDisplayItem = _out_tuple
             ## Add `a_decoded_result` to the plots_data
             widget.plots_data.a_decoded_result = a_1D_continuous_decoded_result
@@ -295,9 +290,126 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         return output_dict
 
 
+
+    def compute_if_needed_and_add_continuous_decoded_posterior(self, curr_active_pipeline, desired_time_bin_size: float, debug_print=True):
+        """ computes the continuously decoded position posteriors (if needed) using the pipeline, then adds them as a new track to the SpikeRaster2D 
+        from `pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.AddNewDecodedPosteriors_MatplotlibPlotCommand.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs`
+        based off of `pyphoplacecellanalysis.SpecificResults.PendingNotebookCode.add_continuous_decoded_posterior`
+        
+        Usage:    
+            output_dict = active_2d_plot.compute_if_needed_and_add_continuous_decoded_posterior(curr_active_pipeline=curr_active_pipeline, desired_time_bin_size=0.05, debug_print=True)
+
+        """
+        # ==================================================================================================================== #
+        # COMPUTING                                                                                                            #
+        # ==================================================================================================================== #
+        
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': desired_time_bin_size, 'should_disable_cache': False}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+        
+        ## get the result data:
+        try:
+            ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
+            directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+            # pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
+            all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+            a_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.continuously_decoded_result_cache_dict.get(desired_time_bin_size, None)
+            all_time_bin_sizes_output_dict: Dict[float, Dict[types.DecoderName, SingleEpochDecodedResult]] = directional_decoders_decode_result.split_pseudo2D_continuous_result_to_1D_continuous_result()
+            a_split_pseudo2D_continuous_result_to_1D_continuous_result_dict: Dict[types.DecoderName, SingleEpochDecodedResult] = all_time_bin_sizes_output_dict.get(desired_time_bin_size, None)
+            
+
+            assert a_continuously_decoded_dict is not None, f"a_continuously_decoded_dict is None even after recomputing!"
+            assert a_split_pseudo2D_continuous_result_to_1D_continuous_result_dict is not None, f"a_split_pseudo2D_continuous_result_to_1D_continuous_result_dict is None even after recomputing!"
+            # if a_continuously_decoded_dict is None:
+            #     ## recompute
+            #     curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': desired_time_bin_size, 'should_disable_cache': False}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+            #     directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+            #     pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
+            #     all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+            #     a_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.continuously_decoded_result_cache_dict.get(desired_time_bin_size, None)
+            #     assert a_continuously_decoded_dict is not None, f"a_continuously_decoded_dict is None even after recomputing!"
+            info_string: str = f" - t_bin_size: {desired_time_bin_size:.2f}"
+
+        except (KeyError, AttributeError) as e:
+            # KeyError: 'DirectionalDecodersDecoded'
+            print(f'add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epochs(...) failed to add any tracks, perhaps because the pipeline is missing any computed "DirectionalDecodersDecoded" global results. Error: "{e}". Skipping.')
+            a_continuously_decoded_dict = None
+            pseudo2D_decoder = None        
+            pass
+
+        except Exception as e:
+            raise
+
+
+        # # output_dict = _cmd.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals(curr_active_pipeline=_cmd._active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, **enable_rows_config_kwargs)
+        # output_dict = AddNewDecodedPosteriors_MatplotlibPlotCommand.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, a_pseudo2D_decoder=pseudo2D_decoder, debug_print=debug_print, **kwargs)
+        # for a_key, an_output_tuple in output_dict.items():
+        #     identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dDisplayItem = an_output_tuple                
+        #     # if a_key not in all_time_bin_sizes_output_dict:
+        #     #     all_time_bin_sizes_output_dict[a_key] = [] ## init empty list
+        #     # all_time_bin_sizes_output_dict[a_key].append(an_output_tuple)
+            
+        #     assert (identifier_name not in flat_all_time_bin_sizes_output_tuples_dict), f"identifier_name: {identifier_name} already in flat_all_time_bin_sizes_output_tuples_dict: {list(flat_all_time_bin_sizes_output_tuples_dict.keys())}"
+        #     flat_all_time_bin_sizes_output_tuples_dict[identifier_name] = an_output_tuple
+
+
+
+        # ==================================================================================================================== #
+        # PLOTTING                                                                                                             #
+        # ==================================================================================================================== #
+        # assert a_continuously_decoded_dict is not None
+
+        ## INPUTS: most_recent_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult], info_string
+        
+        # all_directional_continuously_decoded_dict = most_recent_continuously_decoded_dict or {}
+        # pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = a_continuously_decoded_dict.get('pseudo2D', None)
+        # assert len(pseudo2D_decoder_continuously_decoded_result.p_x_given_n_list) == 1
+        # p_x_given_n = pseudo2D_decoder_continuously_decoded_result.p_x_given_n_list[0]
+        # # p_x_given_n = pseudo2D_decoder_continuously_decoded_result.p_x_given_n_list[0]['p_x_given_n']
+        # # time_bin_containers = pseudo2D_decoder_continuously_decoded_result.time_bin_containers[0]
+        # # time_window_centers = time_bin_containers.centers
+        # # p_x_given_n.shape # (62, 4, 209389)
+
+        # ## Split across the 2nd axis to make 1D posteriors that can be displayed in separate dock rows:
+        # assert p_x_given_n.shape[1] == 4, f"expected the 4 pseudo-y bins for the decoder in p_x_given_n.shape[1]. but found p_x_given_n.shape: {p_x_given_n.shape}"
+        # split_pseudo2D_posteriors_dict = {k:np.squeeze(p_x_given_n[:, i, :]) for i, k in enumerate(('long_LR', 'long_RL', 'short_LR', 'short_RL'))}
+
+        dock_group_sep_character: str = '_'
+        showCloseButton = True
+        _common_dock_config_kwargs = {'dock_group_names': [dock_group_sep_character.join([f'ContinuousDecode', info_string])], 'showCloseButton': showCloseButton}
+        # dock_configs: Dict[str, CustomDockDisplayConfig] = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, **_common_dock_config_kwargs), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, **_common_dock_config_kwargs),
+        #                 CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, **_common_dock_config_kwargs), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, **_common_dock_config_kwargs))))
+
+        # info_string: str = f'{desired_time_bin_size:.2f}'
+        dock_configs: Dict[str, CustomDockDisplayConfig] = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'),
+                                (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, **_common_dock_config_kwargs),
+                                CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, **_common_dock_config_kwargs),
+                                CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, **_common_dock_config_kwargs),
+                                CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, **_common_dock_config_kwargs))))
+        
+        output_dict = self.add_docked_decoded_results_dict_tracks(name=f'ContinuousDecode', a_decoded_result_dict=a_split_pseudo2D_continuous_result_to_1D_continuous_result_dict, dock_configs=dock_configs, pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict,
+                                                                                                    measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()),
+                                                                                                    extended_dock_title_info=info_string)
+        
+
+        # # Need all_directional_pf1D_Decoder_dict
+        # output_dict = {}
+
+        # for a_decoder_name, a_1D_posterior in split_pseudo2D_posteriors_dict.items():
+        #     a_dock_config = dock_configs[a_decoder_name]
+        #     _out_tuple = cls._perform_add_new_decoded_posterior_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=self, a_dock_config=a_dock_config, a_decoder_name=a_decoder_name, a_position_decoder=a_pseudo2D_decoder,
+        #                                                              time_window_centers=time_window_centers, a_1D_posterior=a_1D_posterior, extended_dock_title_info=info_string)
+        #     # identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dDisplayItem = _out_tuple
+        #     output_dict[a_decoder_name] = _out_tuple
+        
+
+        # OUTPUTS: output_dict
+        return output_dict
+
+
+
     @function_attributes(short_name=None, tags=['UNFINISHED', 'plotting', 'computing'], input_requires=[], output_provides=[], uses=['AddNewDecodedPosteriors_MatplotlibPlotCommand', '_perform_plot_multi_decoder_meas_pred_position_track'], used_by=[], creation_date='2025-02-13 14:58', related_items=['_perform_plot_multi_decoder_meas_pred_position_track'])
     @classmethod
-    def add_continuous_decoded_posterior(cls, spike_raster_window, curr_active_pipeline, desired_time_bin_size: float, debug_print=True):
+    def perform_add_continuous_decoded_posterior(cls, spike_raster_window, curr_active_pipeline, desired_time_bin_size: float, debug_print=True):
         """ computes the continuously decoded position posteriors (if needed) using the pipeline, then adds them as a new track to the SpikeRaster2D 
         
         Usage:
@@ -313,7 +425,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': 0.058}], #computation_kwargs_list=[{'time_bin_size': 0.025}], 
         #                                                   enabled_filter_names=None, fail_on_exception=True, debug_print=False)
         # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields', 'directional_decoders_decode_continuous'], computation_kwargs_list=[{'laps_decoding_time_bin_size': 0.058}, {'time_bin_size': 0.058, 'should_disable_cache':False}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
-        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': desired_time_bin_size, 'should_disable_cache': False}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+        # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': desired_time_bin_size, 'should_disable_cache': False}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
         ## get the result data:
         try:
             ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
@@ -321,6 +433,15 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
             pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
             all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
             a_continuously_decoded_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict.get(desired_time_bin_size, None)
+            if a_continuously_decoded_dict is None:
+                ## recompute
+                curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': desired_time_bin_size, 'should_disable_cache': False}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+                directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+                pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
+                all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+                a_continuously_decoded_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict.get(desired_time_bin_size, None)
+                assert a_continuously_decoded_dict is not None, f"a_continuously_decoded_dict is None even after recomputing!"
+
             info_string: str = f" - t_bin_size: {desired_time_bin_size}"
 
         except (KeyError, AttributeError) as e:
@@ -382,6 +503,8 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
             global_flat_action_dict[a_command].trigger()
 
 
+        # output_dict = self.add_all_computed_time_bin_sizes_pseudo2D_decoder_decoded_epochs(self._active_pipeline, active_2d_plot, **kwargs)
+        
         ## Dock all Grouped results from `'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView'`
         ## INPUTS: active_2d_plot
         grouped_dock_items_dict = active_2d_plot.ui.dynamic_docked_widget_container.get_dockGroup_dock_dict()
