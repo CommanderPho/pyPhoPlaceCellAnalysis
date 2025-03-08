@@ -56,7 +56,7 @@ from pyphoplacecellanalysis.GUI.Qt.Menus.PhoMenuHelper import PhoMenuHelper
 
 from pyphocorehelpers.DataStructure.enum_helpers import ExtendedEnum
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsWidgets.CustomGraphicsLayoutWidget import CustomViewBox
-
+from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.SpecificDockWidgetManipulatingMixin import SpecificDockWidgetManipulatingMixin
 
 
 class SynchronizedPlotMode(ExtendedEnum):
@@ -78,7 +78,7 @@ class SynchronizedPlotMode(ExtendedEnum):
 
 
 @metadata_attributes(short_name=None, tags=['raster', 'gui'], input_requires=[], output_provides=[], uses=['LiveWindowedData'], used_by=[], creation_date='2024-12-18 12:45', related_items=[])
-class Spike2DRaster(DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRasterBase):
+class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaOwningMixin, PyQtGraphSpecificTimeCurvesMixin, EpochRenderingMixin, Render2DScrollWindowPlotMixin, SpikeRasterBase):
     """ Displays a 2D version of a raster plot with the spikes occuring along a plane. 
     
     Usage:
