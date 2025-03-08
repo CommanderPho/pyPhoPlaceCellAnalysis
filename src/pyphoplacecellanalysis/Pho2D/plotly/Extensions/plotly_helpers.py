@@ -1117,7 +1117,7 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
 
     return fig, figure_context
 
-@function_attributes(short_name=None, tags=['plotly', 'blue_yellow'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-06 06:04', related_items=[])
+@function_attributes(short_name=None, tags=['plotly', 'blue_yellow'], input_requires=[], output_provides=[], uses=['plotly_plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2024-02-06 06:04', related_items=[])
 def plot_blue_yellow_points(a_df, specific_point_list):
     """ Renders a figure containing one or more yellow-blue plots (marginals) for a given hoverred point. Used with Dash app.
 
@@ -1487,16 +1487,6 @@ def plot_across_sessions_scatter_results(directory: Union[Path, str], concatenat
 
     """
     from pyphocorehelpers.Filesystem.path_helpers import file_uri_from_path
-    # import plotly.graph_objs as go
-
-    # def _subfn_build_figure(data, **build_fig_kwargs):
-    #     return go.Figure(data=data, **(dict(layout_yaxis_range=[0.0, 1.0]) | build_fig_kwargs))
-
-    # def _subfn_build_figure(data_results_df: pd.DataFrame, **build_fig_kwargs):
-    #     # return go.Figure(data=data, **(dict(layout_yaxis_range=[0.0, 1.0]) | build_fig_kwargs))
-    #     scatter_title = build_fig_kwargs.pop('title', None)
-    #     return go.Figure(px.scatter(data_results_df, x='delta_aligned_start_t', y='P_Long', color='session_name', size='time_bin_size', title=scatter_title), layout_yaxis_range=[0.0, 1.0])
-    # , 'histnorm': 'probability density'
 
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
     if not isinstance(directory, Path):
