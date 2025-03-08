@@ -1338,7 +1338,6 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             a_decoded_result.most_likely_position_indicies_list[i][:, inactive_mask] = -1 # use -1 instead of np.nan as it needs to be integer
             a_decoded_result.most_likely_positions_list[i][inactive_mask, :] = np.nan
         
-
             # Fill invalid time bins with the last valid value - EFFICIENT IMPLEMENTATION
             if np.any(is_time_bin_active):  # Only proceed if we have some valid values
                 # Calculate "last valid index" lookup array - very efficient O(n) operation
@@ -1361,6 +1360,13 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             else:
                 ## no valid time bins
                 print(f'WARN: Epoch[{i}]: with {num_time_bins} time_bins has no time bins with enough firing to infer back-filled positions from, so all entries will be NaN.')
+
+            # Add the marginal container to the list
+            curr_unit_marginal_x, curr_unit_marginal_y = BasePositionDecoder.perform_build_marginals(p_x_given_n=a_decoded_result.p_x_given_n_list[i], most_likely_positions=a_decoded_result.most_likely_positions_list[i], debug_print=False)
+            if curr_unit_marginal_x is not None:
+                a_decoded_result.marginal_x_list[i] = curr_unit_marginal_x
+            if curr_unit_marginal_y is not None:
+                a_decoded_result.marginal_y_list[i] = curr_unit_marginal_y
 
             ## END if np.any(is_time_bin_active)
             is_time_bin_active_list.append(is_time_bin_active)
