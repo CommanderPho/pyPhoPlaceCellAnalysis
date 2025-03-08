@@ -1,6 +1,7 @@
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, Union, Optional
+import pyphoplacecellanalysis.General.type_aliases as types
 from attrs import define, field, Factory
 from datetime import datetime
 from neuropy.analyses import Epoch
@@ -1122,7 +1123,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             # assert a_time_window_centers_n_time_bins == n_time_bins, f"a_time_window_centers_n_time_bins: {a_time_window_centers_n_time_bins} != n_time_bins_posterior: {n_time_bins}"
 
 
-    @function_attributes(short_name=None, tags=['marginal', 'direction', 'track_id'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-08 00:40', related_items=[]) 
+    @function_attributes(short_name=None, tags=['marginal', 'direction', 'track_id'], input_requires=[], output_provides=[], uses=[], used_by=['self.compute_marginals'], creation_date='2024-10-08 00:40', related_items=[]) 
     @classmethod
     def perform_compute_marginals(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, "DecodedFilterEpochsResult"], filter_epochs: pd.DataFrame, epoch_idx_col_name: str = 'lap_idx', epoch_start_t_col_name: str = 'lap_start_t', additional_transfer_column_names: Optional[List[str]]=None, auto_transfer_all_columns:bool=True): # -> tuple[tuple["DecodedMarginalResultTuple", "DecodedMarginalResultTuple", Tuple[List[DynamicContainer], Any, Any, pd.DataFrame]], pd.DataFrame]:
         """Computes and initializes the marginal properties
@@ -1168,7 +1169,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         
 
 
-    @function_attributes(short_name=None, tags=['marginal', 'direction', 'track_id'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-08 00:40', related_items=[]) 
+    @function_attributes(short_name=None, tags=['marginal', 'direction', 'track_id'], input_requires=[], output_provides=[], uses=['self.perform_compute_marginals'], used_by=[], creation_date='2024-10-08 00:40', related_items=[]) 
     def compute_marginals(self, epoch_idx_col_name: str = 'lap_idx', epoch_start_t_col_name: str = 'lap_start_t', additional_transfer_column_names: Optional[List[str]]=None, auto_transfer_all_columns:bool=True): # -> tuple[tuple["DecodedMarginalResultTuple", "DecodedMarginalResultTuple", Tuple[List[DynamicContainer], Any, Any, pd.DataFrame]], pd.DataFrame]:
         """Computes and initializes the marginal properties
         
@@ -1367,6 +1368,54 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         return a_decoded_result, (is_time_bin_active_list, inactive_mask_list, all_time_bin_indicies_list, last_valid_indices_list)
 
 
+    @function_attributes(short_name=None, tags=['pseudo2D', 'timeline-track', '1D', 'split-to-1D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-26 07:23', related_items=[])
+    def split_pseudo2D_result_to_1D_result(self, pseudo2D_decoder_names_list: Optional[str]=None, debug_print=False) -> Dict[types.DecoderName, "DecodedFilterEpochsResult"]:
+        """ Get 1D representations of the Pseudo2D track (4 decoders) so they can be plotted on seperate tracks and bin-debugged independently.
+
+        This returns the "all-decoders-sum-to-1-across-time' normalization style that Kamran likes
+
+        Usage:        
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult, DecodedFilterEpochsResult
+            from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
+
+            ## INPUTS: laps_pseudo2D_continuous_specific_decoded_result: DecodedFilterEpochsResult
+            laps_pseudo2D_split_to_1D_continuous_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = laps_pseudo2D_continuous_specific_decoded_result.split_pseudo2D_result_to_1D_result(pseudo2D_decoder_names_list=['long', 'short'])
+            laps_pseudo2D_split_to_1D_continuous_results_dict
+
+
+        """
+        if pseudo2D_decoder_names_list is None:
+            pseudo2D_decoder_names_list = ('long_LR', 'long_RL', 'short_LR', 'short_RL')
+        
+        p_x_given_n_shapes_list = [np.shape(v) for v in self.p_x_given_n_list]  #  [(59, 2, 66), (59, 2, 102), (59, 2, 226), ...]
+        p_x_given_n_shapes_list = np.vstack(p_x_given_n_shapes_list) # (84, 3)
+        posterior_ndim: int = (np.shape(p_x_given_n_shapes_list)[-1]-1) # 1 or 2
+
+        if posterior_ndim == 1:
+            print(f'WARN: already 1D')
+            raise ValueError(f'ALREADY 1D, cannot split!')
+            return pseudo2D_decoder_names_list
+        else:
+            spatial_n_bin_sizes = p_x_given_n_shapes_list[:, :posterior_ndim] ## get the spatial columns, and they should all be the same
+            assert np.all(spatial_n_bin_sizes == spatial_n_bin_sizes[0, :]), f"all rows must have the same number of spatial bins, but spatial_n_bin_sizes: {spatial_n_bin_sizes}"
+            n_xbins, n_ybins = spatial_n_bin_sizes[0, :]
+            if debug_print:
+                print(f'n_xbins: {n_xbins}, n_ybins: {n_ybins}')
+            ## we will reduce along the y-dim dimension
+                
+            ## Extract the Pseudo2D results as separate 1D tracks
+            ## Split across the 2nd axis to make 1D posteriors that can be displayed in separate dock rows:
+            assert n_ybins == len(pseudo2D_decoder_names_list), f"for pseudo2D_decoder_names_list: {pseudo2D_decoder_names_list}\n\texpected the len(pseudo2D_decoder_names_list): {len(pseudo2D_decoder_names_list)} pseudo-y bins for the decoder in n_ybins. but found n_ybins: {n_ybins}"
+        
+            output_pseudo2D_split_to_1D_continuous_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {}
+            for i, a_decoder_name in enumerate(pseudo2D_decoder_names_list):
+                ## make separate `DecodedFilterEpochsResult` objects                
+                output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name] = deepcopy(self) ## copy the whole pseudo2D result
+                output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].p_x_given_n_list = [np.squeeze(p_x_given_n[:, i, :]) for p_x_given_n in output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].p_x_given_n_list] ## or could squish them here
+                # output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].compute_marginals()
+            ## END for i, a_de...
+            return output_pseudo2D_split_to_1D_continuous_results_dict
+    
 
 # ==================================================================================================================== #
 # Placemap Position Decoders                                                                                           #
