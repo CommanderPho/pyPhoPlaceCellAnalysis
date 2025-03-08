@@ -541,11 +541,11 @@ def plot_slices_1D_most_likely_position_comparsions(measured_position_df, slices
     
     Usage:
     
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_slices_1D_most_likely_position_comparsions
     
         ## Test Plotting just a single dimension of the 2D posterior:
         
-        fig, ax, out_img_list = plot_slices_1D_most_likely_position_comparsions(sess.position.to_dataframe(), slices_time_window_centers=[v.centers for v in long_results_obj.time_bin_containers], xbin=pho_custom_decoder.xbin,
+        fig, ax, out_img_list = plot_slices_1D_most_likely_position_comparsions(measured_position_df=sess.position.to_dataframe(), slices_time_window_centers=[v.centers for v in long_results_obj.time_bin_containers], xbin=pho_custom_decoder.xbin,
                                                         slices_posteriors=long_results_obj.p_x_given_n_list,
                                                         slices_active_most_likely_positions_1D=None,
                                                         enable_flat_line_drawing=False, debug_print=False)
