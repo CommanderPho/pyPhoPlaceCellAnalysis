@@ -26,6 +26,9 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDe
 class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
     """ Factors out the specific plots added to Spike2DRaster
 
+    Aims to replace: `AddNewDecodedPosteriors_MatplotlibPlotCommand` and their heavy dependencies for plotting
+    
+
     from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.SpecificDockWidgetManipulatingMixin import SpecificDockWidgetManipulatingMixin
 
 
@@ -157,7 +160,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
     
 
     def add_docked_marginal_track(self, name: str, time_window_centers: NDArray, a_1D_posterior: NDArray, xbin: Optional[NDArray]=None, a_variable_name: Optional[str]=None, a_dock_config: Optional[CustomDockDisplayConfig]=None, extended_dock_title_info: Optional[str]=None):
-        """ adds a marginal 
+        """ adds a marginal (such as Long v. Short, or Long_LR v. Long_RL v. Short_LR v. Short_RL) 
         
         time_bin_size = epochs_decoding_time_bin_size
         info_string: str = f" - t_bin_size: {time_bin_size}"
