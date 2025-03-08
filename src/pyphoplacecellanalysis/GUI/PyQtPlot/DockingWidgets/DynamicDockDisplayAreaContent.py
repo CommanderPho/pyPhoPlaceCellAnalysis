@@ -527,9 +527,10 @@ class DynamicDockDisplayAreaContentMixin(BaseDynamicInstanceConformingMixin):
         nested_dynamic_docked_widget_container_widgets = {}
         for dock_group_name, flat_group_dockitems_list in grouped_dock_items_dict.items():
             # Skip if this group already has a container
-            if hasattr(self, 'nested_dock_items') and dock_group_name in self.nested_dock_items:
+            if hasattr(self, 'nested_dock_items') and (dock_group_name in self.nested_dock_items):
                 continue
-                
+            # else:
+            ## create a new item
             dDisplayItem, nested_dynamic_docked_widget_container = self.build_wrapping_nested_dock_area(flat_group_dockitems_list, dock_group_name=dock_group_name)
             nested_dock_items[dock_group_name] = dDisplayItem # Dock
             nested_dynamic_docked_widget_container_widgets[dock_group_name] = nested_dynamic_docked_widget_container # nested_dynamic_docked_widget_container
@@ -540,6 +541,8 @@ class DynamicDockDisplayAreaContentMixin(BaseDynamicInstanceConformingMixin):
         self.nested_dock_items.update(nested_dock_items)
 
         return nested_dock_items, nested_dynamic_docked_widget_container_widgets
+    
+
     # ==================================================================================================================== #
     # Main Creation/Find/Deletion Functions                                                                                #
     # ==================================================================================================================== #
@@ -670,7 +673,7 @@ class DynamicDockDisplayAreaContentMixin(BaseDynamicInstanceConformingMixin):
             num_found_group_items = len(extant_group_items)
             if num_found_group_items > 0:
                 # Item was found with this identifier
-                print(f'Found a group with the identifier {identifier} containing {num_found_group_items} items. Removing all...')
+                print(f'remove_display_dock(identifier="{identifier}"): Found a group with the identifier "{identifier}" containing {num_found_group_items} items. Removing all...')
                 for (unique_identifier, item_dict) in extant_group_items.items():
                     # loop through the dictionary and remove the children items:
                     # item_dict['widget'].close() # this shouldn't be needed because the 'dock' is the parent, meaning it should properly close the widget as well.
@@ -696,7 +699,7 @@ class DynamicDockDisplayAreaContentMixin(BaseDynamicInstanceConformingMixin):
                     KeyError: 'long_LR'
                     """
                     # seems to always happen, not sure why
-                    print(f'WARNING: identifier: {identifier} not found in dynamic_display_dict.keys(): {list(self.dynamic_display_dict.keys())}')
+                    print(f'remove_display_dock(identifier="{identifier}"): WARNING: identifier: "{identifier}" not found in dynamic_display_dict.keys(): {list(self.dynamic_display_dict.keys())}')
                 except Exception as e:
                     # Unhandled exception
                     raise
@@ -708,7 +711,7 @@ class DynamicDockDisplayAreaContentMixin(BaseDynamicInstanceConformingMixin):
 
         else:
             # no extant items found
-            print(f'No extant groups/items found with name {identifier}')
+            print(f'remove_display_dock(identifier="{identifier}"): No extant groups/items found with name "{identifier}"')
             return
         
         
@@ -853,8 +856,27 @@ class DynamicDockDisplayAreaContentMixin(BaseDynamicInstanceConformingMixin):
             # a_dock.updateStyle()
             self.displayDockArea.addDock(dock=a_dock) ## move the dock items as children to the new container
             
-        ## remove the group
-        self.remove_display_dock(identifier=a_group_container_id)
+        ## remove the group        
+        try:
+            self.remove_display_dock(identifier=a_group_container_id)
+        except KeyError as e:
+            # seems to always happen, not sure why
+            print(f'unwrap_docks_in_nested_dock_area(dock_group_name: "{dock_group_name}"): WARNING: self.remove_display_dock(identifier: "{a_group_container_id}") failed!')
+            pass
+        except Exception as e:
+            # Unhandled exception
+            raise        
+
+        try:
+            del self.nested_dock_items[a_group_id] ## remove from the self.nested_dock_items
+        except KeyError as e:
+            # seems to always happen, not sure why
+            print(f'unwrap_docks_in_nested_dock_area(dock_group_name: "{dock_group_name}"): WARNING: del self.nested_dock_items["{a_group_id}"]: "{a_group_id}" not found in nested_dock_items.keys(): {list(self.nested_dock_items.keys())}')
+            pass
+        except Exception as e:
+            # Unhandled exception
+            raise
+
 
 
     def unwrap_docks_in_all_nested_dock_area(self):
@@ -885,8 +907,27 @@ class DynamicDockDisplayAreaContentMixin(BaseDynamicInstanceConformingMixin):
                 # a_dock.updateStyle()
                 self.displayDockArea.addDock(dock=a_dock) ## move the dock items as children to the new container
             # END for a_dock in a_flat_group_dockitems_list
-            ## remove the group
-            self.remove_display_dock(identifier=a_group_container_id)
+            ## remove the group        
+            try:
+                self.remove_display_dock(identifier=a_group_container_id)
+            except KeyError as e:
+                # seems to always happen, not sure why
+                print(f'unwrap_docks_in_all_nested_dock_area(): WARNING: self.remove_display_dock(identifier: "{a_group_container_id}") failed!')
+                pass
+            except Exception as e:
+                # Unhandled exception
+                raise        
+
+            try:
+                del self.nested_dock_items[a_group_id] ## remove from the self.nested_dock_items
+            except KeyError as e:
+                # seems to always happen, not sure why
+                print(f'unwrap_docks_in_all_nested_dock_area(): WARNING: del self.nested_dock_items["{a_group_id}"]: "{a_group_id}" not found in nested_dock_items.keys(): {list(self.nested_dock_items.keys())}')
+                pass
+            except Exception as e:
+                # Unhandled exception
+                raise
+            
         # END for a_group_id, a_flat_group_dockitems_list in grouped_dock_items_dict.items()
     
 
@@ -1018,3 +1059,15 @@ class DynamicDockDisplayAreaOwningMixin(BaseDynamicInstanceConformingMixin):
     def get_dockGroup_dock_dict(self, debug_print=False) -> Dict[str, List[Dock]]:
         """Delegates to child widget's get_dockGroup_dock_dict"""
         return self.dock_manager_widget.get_dockGroup_dock_dict(debug_print)
+
+    # ==================================================================================================================== #
+    # dockGroups                                                                                                           #
+    # ==================================================================================================================== #
+    def dissolve_all_dockGroups(self):
+        """ fetches the dockGroup items and perform layout """
+        return self.dock_manager_widget.unwrap_docks_in_all_nested_dock_area()
+    
+    def layout_dockGroups(self):
+        """ fetches the dockGroup items and perform layout """
+        return self.dock_manager_widget.layout_dockGroups()
+    
