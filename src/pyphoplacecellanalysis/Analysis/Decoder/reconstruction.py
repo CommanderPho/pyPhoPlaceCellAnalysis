@@ -880,7 +880,11 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             self.__dict__.update(pos_bin_edges=None) ## default to None (for same unpickling)
 
     def flatten(self):
-        """ flattens the result over all epochs to produce one per time bin """
+        """ flattens the result over all epochs to produce one per time bin 
+        Usage:
+            n_timebins, flat_time_bin_containers, timebins_p_x_given_n = laps_pseudo2D_continuous_specific_decoded_result.flatten()
+        
+        """
         # returns a flattened version of self over all epochs
         n_timebins = np.sum(self.nbins)
         flat_time_bin_containers = np.hstack(self.time_bin_containers)
@@ -904,7 +908,8 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
     def flatten_to_masked_values(self):
         """ appends np.nan values to the beginning and end of each posterior (adding a start and end timebin as well) to allow flat plotting via matplotlib.
         Looks  like it was depricated by `plot_slices_1D_most_likely_position_comparsions` to plot epoch slices (corresponding to certain periods in time) along the continuous session duration.
-
+        Usage:
+            desired_total_n_timebins, updated_is_masked_bin, updated_time_bin_containers, updated_timebins_p_x_given_n = laps_pseudo2D_continuous_specific_decoded_result.flatten_to_masked_values()
         """
         # returns a flattened version of self over all epochs
         updated_is_masked_bin = []
