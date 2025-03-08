@@ -577,42 +577,73 @@ class DockLabel(VerticalLabel):
         self.collapseButton = None
         self.groupButton = None
         self.orientationButton = None
-        self.num_total_title_bar_buttons: int = int(display_config.showCloseButton) + int(display_config.showCollapseButton) + int(display_config.showGroupButton)
-        # if self.num_total_title_bar_buttons > 1:
-        #     ## use a layout instead
-        #     # self.buttonBarLayout = QtWidgets.
-        #     pass
-        # Define a minimum button size to ensure buttons are always visible
-        MIN_BUTTON_SIZE = 12
+        
+        self.updateButtonsFromConfig()
+        # Connect config property changes to UI updates
+        # self.config.propertyChanged.connect(self.updateButtonsFromConfig)
+    
 
-        if display_config.showCloseButton:
+
+    def updateButtonsFromConfig(self):
+        """Updates button visibility and state based on current config."""
+        MIN_BUTTON_SIZE = 12
+        
+        # Update close button
+        if self.config.showCloseButton and self.closeButton is None:
             self.closeButton = QtWidgets.QToolButton(self)
             self.closeButton.clicked.connect(self.sigCloseClicked)
             self.closeButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_TitleBarCloseButton))
             self.closeButton.setMinimumSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
             self.closeButton.setFixedSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
-            
-        if display_config.showCollapseButton:
+        elif not self.config.showCloseButton and self.closeButton is not None:
+            self.closeButton.deleteLater()
+            self.closeButton = None
+        
+        # Update collapse button
+        if self.config.showCollapseButton and self.collapseButton is None:
             self.collapseButton = QtWidgets.QToolButton(self)
             self.collapseButton.clicked.connect(self.sigCollapseClicked)
             self.collapseButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_TitleBarMinButton))
             self.collapseButton.setMinimumSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
             self.collapseButton.setFixedSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
-            
-        if display_config.showGroupButton:
+        elif not self.config.showCollapseButton and self.collapseButton is not None:
+            self.collapseButton.deleteLater()
+            self.collapseButton = None
+        
+        # Update group button
+        if self.config.showGroupButton and self.groupButton is None:
             self.groupButton = QtWidgets.QToolButton(self)
             self.groupButton.clicked.connect(self.sigGroupClicked)
             self.groupButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogListView))
             self.groupButton.setMinimumSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
             self.groupButton.setFixedSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
-            
-        if display_config.showOrientationButton:
+        elif not self.config.showGroupButton and self.groupButton is not None:
+            self.groupButton.deleteLater()
+            self.groupButton = None
+        
+        # Update orientation button
+        if self.config.showOrientationButton and self.orientationButton is None:
             self.orientationButton = QtWidgets.QToolButton(self)
             self.orientationButton.setCheckable(True)
             self.orientationButton.toggled.connect(self.sigToggleOrientationClicked)
             self.orientationButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_ToolBarHorizontalExtensionButton))
-            self.orientationButton.setMinimumSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE) 
+            self.orientationButton.setMinimumSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
             self.orientationButton.setFixedSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
+        elif not self.config.showOrientationButton and self.orientationButton is not None:
+            self.orientationButton.deleteLater()
+            self.orientationButton = None
+        
+        # Update count of buttons
+        self.num_total_title_bar_buttons = (int(self.config.showCloseButton) + 
+                                        int(self.config.showCollapseButton) + 
+                                        int(self.config.showGroupButton) +
+                                        int(self.config.showOrientationButton))
+        
+        # Force a resize to update button positions
+        self.updateGeometry()
+        self.update()
+
+
 
 
     def debug_print(self, label_name: str="Unknown"):
