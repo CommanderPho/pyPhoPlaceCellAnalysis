@@ -1,48 +1,34 @@
-# from __future__ import annotations # prevents having to specify types for typehinting as strings
-# from typing import TYPE_CHECKING
-# import numpy as np
-# import pandas as pd
-# from attrs import define, field, Factory, asdict, astuple
-# from functools import wraps
-# from copy import deepcopy
-# from collections import namedtuple
-# from pathlib import Path
-# from datetime import datetime, date, timedelta
+from __future__ import annotations # prevents having to specify types for typehinting as strings
+from typing import TYPE_CHECKING
+import numpy as np
+import pandas as pd
+from attrs import define, field, Factory, asdict, astuple
+from copy import deepcopy
+from pathlib import Path
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any, Iterable
+from typing_extensions import TypeAlias
+from numpy.typing import NDArray  # Correct import for NDArray
+from typing import NewType
+import neuropy.utils.type_aliases as types
+# DecoderName = NewType('DecoderName', str)
 
-# from typing import Dict, List, Tuple, Optional, Callable, Union, Any, Iterable
-# from typing_extensions import TypeAlias
-# # from nptyping import NDArray
-# from numpy.typing import NDArray  # Correct import for NDArray
-# # from nptyping import NDArray
-# from typing import NewType
-# import neuropy.utils.type_aliases as types
-# # DecoderName = NewType('DecoderName', str)
+from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
+from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
+from pyphocorehelpers.function_helpers import function_attributes
+from neuropy.utils.indexing_helpers import NumpyHelpers
+from pyphocorehelpers.assertion_helpers import Assert
 
-# from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
-# from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
-# from pyphocorehelpers.function_helpers import function_attributes
-# from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
-# from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
-# from pyphocorehelpers.print_helpers import strip_type_str_to_classname
-# from pyphocorehelpers.exception_helpers import ExceptionPrintingContext
-# from neuropy.utils.indexing_helpers import NumpyHelpers
-# from pyphocorehelpers.assertion_helpers import Assert
-
-# from neuropy.core.laps import Laps # used in `DirectionalLapsHelpers`
-# from neuropy.utils.result_context import IdentifyingContext
-# from neuropy.utils.dynamic_container import DynamicContainer
-# from neuropy.utils.mixins.dict_representable import override_dict # used to build config
-# from neuropy.analyses.placefields import PlacefieldComputationParameters
-# from neuropy.core.epoch import NamedTimerange, Epoch, ensure_dataframe
-# from neuropy.core.epoch import find_data_indicies_from_epoch_times
-# from neuropy.utils.indexing_helpers import union_of_arrays # `paired_incremental_sort_neurons`
-# from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field, keys_only_repr
-# from neuropy.utils.mixins.HDF5_representable import HDFMixin
-# from neuropy.utils.indexing_helpers import PandasHelpers, NumpyHelpers, flatten
+from neuropy.core.laps import Laps # used in `DirectionalLapsHelpers`
+from neuropy.utils.result_context import IdentifyingContext
+from neuropy.core.epoch import NamedTimerange, Epoch, ensure_dataframe
+from neuropy.core.epoch import find_data_indicies_from_epoch_times
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field, keys_only_repr
+from neuropy.utils.mixins.HDF5_representable import HDFMixin
+from neuropy.utils.indexing_helpers import PandasHelpers, NumpyHelpers, flatten
  
-# from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder # used for `complete_directional_pfs_computations`
-# from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult # needed in DirectionalPseudo2DDecodersResult
-# from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder # used for `complete_directional_pfs_computations`
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult # needed in DirectionalPseudo2DDecodersResult
+from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
 
 # import scipy.stats
 # from scipy import ndimage
@@ -77,8 +63,725 @@
 # # 2025-02-21 - I realized that `TrackTemplates` and `DirectionalLapsResult` are pointlessly hard-coded to require directionality, but a more general solution would be just to allow dicts of decoders.
 
 
+#TODO 2025-03-07 18:38: - [ ] Generalize `DecoderDecodedEpochsResult`
+
+@define(slots=False, repr=False)
+class GeneralDecoderDecodedEpochsResult(ComputedResult):
+    """ Contains Decoded Epochs (such as laps, ripple) for a each of the Decoders.
+
+    2024-02-15 - Computed by `_decode_and_evaluate_epochs_using_directional_decoders`
+    
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
+    """ 
+
+    _VersionedResultMixin_version: str = "2025.03.07_0" # to be updated in your IMPLEMENTOR to indicate its version
+
+    pos_bin_size: float = serialized_attribute_field(default=None, is_computable=False, repr=True)
+    ripple_decoding_time_bin_size: float = serialized_attribute_field(default=None, is_computable=False, repr=True)
+    laps_decoding_time_bin_size: float = serialized_attribute_field(default=None, is_computable=False, repr=True)
+
+    decoder_laps_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = serialized_field(default=None)
+    decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = serialized_field(default=None)
+
+    decoder_laps_radon_transform_df_dict: Dict = serialized_field(default=None)
+    decoder_ripple_radon_transform_df_dict: Dict = serialized_field(default=None)
+        
+    decoder_laps_radon_transform_extras_dict: Dict = non_serialized_field(default=None) # non-serialized
+    decoder_ripple_radon_transform_extras_dict: Dict = non_serialized_field(default=None) # non-serialized
+        
+    laps_weighted_corr_merged_df: pd.DataFrame = serialized_field(default=None)
+    ripple_weighted_corr_merged_df: pd.DataFrame = serialized_field(default=None)
+    decoder_laps_weighted_corr_df_dict: Dict = serialized_field(default=Factory(dict))
+    decoder_ripple_weighted_corr_df_dict: Dict = serialized_field(default=Factory(dict))
+    
+    laps_simple_pf_pearson_merged_df: pd.DataFrame = serialized_field(default=None)
+    ripple_simple_pf_pearson_merged_df: pd.DataFrame = serialized_field(default=None)
+    
+    @classmethod
+    def compute_matching_best_indicies(cls, a_marginals_df: pd.DataFrame, index_column_name: str = 'most_likely_decoder_index', second_index_column_name: str = 'best_decoder_index', enable_print=True):
+        """ count up the number of rows that the RadonTransform and the most-likely direction agree 
+        
+        DecoderDecodedEpochsResult.compute_matching_best_indicies
+
+        """
+        num_total_epochs: int = len(a_marginals_df)
+        agreeing_rows_count: int = (a_marginals_df[index_column_name] == a_marginals_df[second_index_column_name]).sum()
+        agreeing_rows_ratio = float(agreeing_rows_count)/float(num_total_epochs)
+        if enable_print:
+            print(f'agreeing_rows_count/num_total_epochs: {agreeing_rows_count}/{num_total_epochs}\n\tagreeing_rows_ratio: {agreeing_rows_ratio}')
+        return agreeing_rows_ratio, (agreeing_rows_count, num_total_epochs)
 
 
+    @classmethod
+    def add_session_df_columns(cls, df: pd.DataFrame, session_name: str, time_bin_size: float=None, t_start: Optional[float]=None, curr_session_t_delta: Optional[float]=None, t_end: Optional[float]=None, time_col: str=None, end_time_col_name: Optional[str]=None) -> pd.DataFrame:
+        """ adds session-specific information to the marginal dataframes 
+    
+        Added Columns: ['session_name', 'time_bin_size', 'delta_aligned_start_t', 'pre_post_delta_category', 'maze_id']
+
+        Usage:
+            # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
+            session_name: str = curr_active_pipeline.session_name
+            t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+            df = DecoderDecodedEpochsResult.add_session_df_columns(df, session_name=session_name, time_bin_size=None, curr_session_t_delta=t_delta, time_col='ripple_start_t')
+            
+            a_ripple_df = DecoderDecodedEpochsResult.add_session_df_columns(a_ripple_df, session_name=session_name, time_bin_size=None, curr_session_t_delta=t_delta, time_col='ripple_start_t')
+    
+        """
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor
+        
+        return df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=time_bin_size, t_start=t_start, curr_session_t_delta=curr_session_t_delta, t_end=t_end, time_col=time_col, end_time_col_name=end_time_col_name)
+    
+    @classmethod
+    @function_attributes(short_name=None, tags=['temp'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-01 22:58', related_items=[])
+    def load_user_selected_epoch_times(cls, curr_active_pipeline, track_templates=None, epochs_name='ripple', **additional_selections_context) -> Tuple[Dict[str, NDArray], NDArray]:
+        """
+
+        Usage:    
+            decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times = load_user_selected_epoch_times(curr_active_pipeline)
+            # Finds the indicies into the dataframe (`filtered_ripple_simple_pf_pearson_merged_df`) from the decoder_user_selected_epoch_times_dict
+            # Inputs: filtered_ripple_simple_pf_pearson_merged_df, decoder_user_selected_epoch_times_dict
+
+            new_selections_dict = {}
+            for a_name, a_start_stop_arr in decoder_user_selected_epoch_times_dict.items():
+                # a_pagination_controller = self.pagination_controllers[a_name] # DecodedEpochSlicesPaginatedFigureController
+                if len(a_start_stop_arr) > 0:
+                    assert np.shape(a_start_stop_arr)[1] == 2, f"input should be start, stop times as a numpy array"
+                    # new_selections_dict[a_name] = filtered_ripple_simple_pf_pearson_merged_df.epochs.find_data_indicies_from_epoch_times(a_start_stop_arr) # return indicies into dataframe
+                    new_selections_dict[a_name] = filtered_ripple_simple_pf_pearson_merged_df.epochs.matching_epoch_times_slice(a_start_stop_arr) # return sliced dataframes
+                    
+            new_selections_dict
+
+        """
+        # Inputs: curr_active_pipeline (for curr_active_pipeline.build_display_context_for_session)
+        from neuropy.utils.misc import numpyify_array
+        from neuropy.core.user_annotations import UserAnnotationsManager
+        annotations_man = UserAnnotationsManager()
+        user_annotations = annotations_man.get_user_annotations()
+
+        if track_templates is None:
+            # Get from the pipeline:
+            directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+            rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
+            minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
+            included_qclu_values: float = rank_order_results.included_qclu_values
+            track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only
+        
+
+        # loaded_selections_context_dict = {a_name:curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs=epochs_name, decoder=a_name, user_annotation='selections') for a_name, a_decoder in track_templates.get_decoders_dict().items()}
+        loaded_selections_context_dict = {a_name:curr_active_pipeline.sess.get_context().merging_context('display_', IdentifyingContext(display_fn_name='DecodedEpochSlices', epochs=epochs_name, decoder=a_name, user_annotation='selections', **additional_selections_context)) for a_name, a_decoder in track_templates.get_decoders_dict().items()} ## gets around DisplayPipelineStage being passed for `curr_active_pipeline` sometimes
+
+        decoder_user_selected_epoch_times_dict = {a_name:np.atleast_2d(numpyify_array(user_annotations.get(a_selections_ctx, []))) for a_name, a_selections_ctx in loaded_selections_context_dict.items()}
+        # loaded_selections_dict
+        
+        ## Inputs: loaded_selections_dict, 
+        ## Find epochs that are present in any of the decoders:
+        total_num_user_selections: int = int(np.sum([np.size(v) for v in decoder_user_selected_epoch_times_dict.values()]))
+        if total_num_user_selections > 0:
+            concatenated_selected_epoch_times = NumpyHelpers.safe_concat([a_start_stop_arr for a_name, a_start_stop_arr in decoder_user_selected_epoch_times_dict.items() if np.size(a_start_stop_arr)>0], axis=0) # ` if np.size(a_start_stop_arr)>0` part was added to avoid empty lists causing `ValueError: all the input arrays must have same number of dimensions, but the array at index 0 has 1 dimension(s) and the array at index 1 has 2 dimension(s)`
+            any_good_selected_epoch_times: NDArray = np.unique(concatenated_selected_epoch_times, axis=0) # drops duplicate rows (present in multiple decoders), and sorts them ascending
+        else:
+            print(f'WARNING: No user selections for this epoch')
+            any_good_selected_epoch_times: NDArray = np.atleast_2d([]) 
+            
+        return decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times
+
+
+    @classmethod
+    @function_attributes(short_name=None, tags=['temp'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-02 13:28', related_items=[])
+    def merge_decoded_epochs_result_dfs(cls, *dfs_list, should_drop_directional_columns:bool=True, start_t_idx_name='ripple_start_t'):
+        """ filter the ripple results scores by the user annotations. 
+        
+        *dfs_list: a series of dataframes to join
+        should_drop_directional_columns:bool - if True, the direction (LR/RL) columns are dropped and only the _best_ columns are left.
+        """   
+        filtered_ripple_simple_pf_pearson_merged_df, ripple_weighted_corr_merged_df = dfs_list # , additional_columns_merged_df
+
+        df: Optional[pd.DataFrame] = None
+
+        if filtered_ripple_simple_pf_pearson_merged_df is not None:
+            if df is None:
+                df = filtered_ripple_simple_pf_pearson_merged_df.copy()
+                assert np.all(np.isin(['P_LR', 'P_RL'], df.columns)), f"{list(df.columns)}" # ,'P_Long', 'P_Short'
+                direction_max_indices = df[['P_LR', 'P_RL']].values.argmax(axis=1)
+                # track_identity_max_indices = df[['P_Long', 'P_Short']].values.argmax(axis=1)
+
+            direction_max_indices = df[['P_LR', 'P_RL']].values.argmax(axis=1)
+            track_identity_max_indices = df[['P_Long', 'P_Short']].values.argmax(axis=1)
+            # Get only the best direction long/short values for each metric:
+            df['long_best_pf_peak_x_pearsonr'] = np.where(direction_max_indices, df['long_LR_pf_peak_x_pearsonr'], df['long_RL_pf_peak_x_pearsonr'])
+            df['short_best_pf_peak_x_pearsonr'] = np.where(direction_max_indices, df['short_LR_pf_peak_x_pearsonr'], df['short_RL_pf_peak_x_pearsonr'])
+            if should_drop_directional_columns:
+                df = df.drop(columns=['P_LR', 'P_RL','best_decoder_index', 'long_LR_pf_peak_x_pearsonr', 'long_RL_pf_peak_x_pearsonr', 'short_LR_pf_peak_x_pearsonr', 'short_RL_pf_peak_x_pearsonr']) # drop the directional column names
+
+        # Outputs: df
+
+        ## Add new weighted correlation results as new columns in existing filter_epochs df:
+        # Inputs: ripple_weighted_corr_merged_df, df from previous step
+
+        if ripple_weighted_corr_merged_df is not None:
+            if df is None:
+                df: pd.DataFrame = ripple_weighted_corr_merged_df.copy()
+                assert np.all(np.isin(['P_LR', 'P_RL'], df.columns)), f"{list(df.columns)}" # ,'P_Long', 'P_Short'
+                direction_max_indices = df[['P_LR', 'P_RL']].values.argmax(axis=1)
+                # track_identity_max_indices = df[['P_Long', 'P_Short']].values.argmax(axis=1)
+
+
+            ## Perfrom a 1D matching of the epoch start times:
+            ## ORDER MATTERS:
+            # elements =  df[start_t_idx_name].to_numpy()
+            # test_elements = ripple_weighted_corr_merged_df[start_t_idx_name].to_numpy()
+            # valid_found_indicies = np.nonzero(np.isclose(test_elements[:, None], elements, atol=1e-3).any(axis=1))[0] #TODO 2024-03-14 09:34: - [ ] ERROR HERE?!?!
+            # hand_selected_ripple_weighted_corr_merged_df = ripple_weighted_corr_merged_df.iloc[valid_found_indicies].reset_index(drop=True) ## NOTE .iloc used here!
+            valid_found_indicies = find_data_indicies_from_epoch_times(ripple_weighted_corr_merged_df, epoch_times=df[start_t_idx_name].to_numpy(), t_column_names=[start_t_idx_name,], atol=1e-3)
+            hand_selected_ripple_weighted_corr_merged_df = ripple_weighted_corr_merged_df.loc[valid_found_indicies].reset_index(drop=True) ## Switched to .loc
+
+            ## Add the wcorr columns to `df`:
+            wcorr_column_names = ['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']
+            df[wcorr_column_names] = hand_selected_ripple_weighted_corr_merged_df[wcorr_column_names] # add the columns to the dataframe
+            df['long_best_wcorr'] = np.where(direction_max_indices, df['wcorr_long_LR'], df['wcorr_long_RL'])
+            df['short_best_wcorr'] = np.where(direction_max_indices, df['wcorr_short_LR'], df['wcorr_short_RL'])
+            if should_drop_directional_columns:
+                df = df.drop(columns=['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']) # drop the directional column names
+            
+            ## Add differences:
+            df['wcorr_abs_diff'] = df['long_best_wcorr'].abs() - df['short_best_wcorr'].abs()
+            df['pearsonr_abs_diff'] = df['long_best_pf_peak_x_pearsonr'].abs() - df['short_best_pf_peak_x_pearsonr'].abs()
+
+        return df
+
+
+    @classmethod
+    @function_attributes(short_name=None, tags=['temp'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-01 22:58', related_items=[])
+    def filter_epochs_dfs_by_annotation_times(cls, curr_active_pipeline, any_good_selected_epoch_times, ripple_decoding_time_bin_size, *dfs_list):
+        """ filter the ripple results scores by the user annotations. 
+        
+        *dfs_list: a series of dataframes to join
+
+        """   
+        # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
+
+        filtered_ripple_simple_pf_pearson_merged_df, ripple_weighted_corr_merged_df = dfs_list
+
+        hand_selected_ripple_simple_pf_pearson_merged_df = filtered_ripple_simple_pf_pearson_merged_df.epochs.matching_epoch_times_slice(any_good_selected_epoch_times)
+        # hand_selected_ripple_simple_pf_pearson_merged_df
+
+        df: pd.DataFrame = cls.merge_decoded_epochs_result_dfs(hand_selected_ripple_simple_pf_pearson_merged_df, ripple_weighted_corr_merged_df, should_drop_directional_columns=True)
+
+        # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
+        session_name: str = curr_active_pipeline.session_name
+        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        df = DecoderDecodedEpochsResult.add_session_df_columns(df, session_name=session_name, time_bin_size=None, t_start=t_start, curr_session_t_delta=t_delta, t_end=t_end, time_col='ripple_start_t')
+        df["time_bin_size"] = ripple_decoding_time_bin_size
+        df['is_user_annotated_epoch'] = True # if it's filtered here, it's true
+
+        return df
+
+
+
+    @classmethod
+    @function_attributes(short_name=None, tags=['user-annotations', 'column', 'epoch', 'is_valid_epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-04 00:00', related_items=[])
+    def try_add_is_epoch_boolean_column(cls, a_df: pd.DataFrame, any_good_selected_epoch_times: NDArray, new_column_name:str='is_valid_epoch', t_column_names=None, atol:float=0.01, not_found_action='skip_index', debug_print=False) -> bool:
+        """ tries to add a 'new_column_name' column to the dataframe. 
+        
+        t_column_names = ['ripple_start_t',]
+        """
+        if (any_good_selected_epoch_times is None):
+            return False
+        any_good_selected_epoch_indicies = None
+        try:
+            # any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=t_column_names, atol=atol, not_found_action=not_found_action, debug_print=debug_print)    
+            any_good_selected_epoch_indicies = a_df.epochs.find_data_indicies_from_epoch_times(epoch_times=np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=t_column_names, atol=atol)
+        except BaseException as e:
+            print(f'ERROR: failed with error {e} while trying to add column "{new_column_name}". Out of options.')
+
+        if any_good_selected_epoch_indicies is None:
+            return False
+
+        # print(f'\t succeded at getting indicies! for {a_df_name}. got {len(any_good_selected_epoch_indicies)} indicies!')
+        a_df[new_column_name] = False
+        # a_df[new_column_name].iloc[any_good_selected_epoch_indicies] = True
+        a_df[new_column_name].loc[any_good_selected_epoch_indicies] = True
+        # a_df[new_column_name].loc[a_df.index.to_numpy()[any_good_selected_epoch_indicies]] = True # IndexError: index 392 is out of bounds for axis 0 with size 390
+        return True
+
+
+    @classmethod
+    @function_attributes(short_name=None, tags=['user-annotations', 'column', 'epoch', 'is_user_annotated_epoch'], input_requires=[], output_provides=[], uses=['cls.try_add_is_epoch_boolean_column'], used_by=[], creation_date='2024-03-02 13:17', related_items=[])
+    def try_add_is_user_annotated_epoch_column(cls, a_df: pd.DataFrame, any_good_selected_epoch_times, t_column_names=['ripple_start_t',]) -> bool:
+        """ tries to add a 'is_user_annotated_epoch' column to the dataframe. """
+        return cls.try_add_is_epoch_boolean_column(a_df=a_df, any_good_selected_epoch_times=any_good_selected_epoch_times, new_column_name='is_user_annotated_epoch', t_column_names=t_column_names, atol=0.01, not_found_action='skip_index', debug_print=False)
+    
+
+    @classmethod
+    @function_attributes(short_name=None, tags=['user-annotations', 'column', 'epoch', 'is_valid_epoch'], input_requires=[], output_provides=[], uses=['cls.try_add_is_epoch_boolean_column'], used_by=[], creation_date='2024-03-02 13:17', related_items=[])
+    def try_add_is_valid_epoch_column(cls, a_df: pd.DataFrame, any_good_selected_epoch_times, t_column_names=['ripple_start_t',]) -> bool:
+        """ tries to add a 'is_valid_epoch' column to the dataframe. """
+        return cls.try_add_is_epoch_boolean_column(a_df=a_df, any_good_selected_epoch_times=any_good_selected_epoch_times, new_column_name='is_valid_epoch', t_column_names=t_column_names, atol=0.01, not_found_action='skip_index', debug_print=False)
+
+
+    @function_attributes(short_name=None, tags=['columns', 'epochs', 'IMPORTANT'], input_requires=[], output_provides=[], uses=['filter_and_update_epochs_and_spikes'], used_by=[], creation_date='2024-03-14 09:22', related_items=[])
+    def add_all_extra_epoch_columns(self, curr_active_pipeline, track_templates: TrackTemplates, required_min_percentage_of_active_cells: float = 0.333333,
+                                     debug_print=False, **additional_selections_context) -> None:
+        """ instead of filtering by the good/user-selected ripple epochs, it adds two columns: ['is_valid_epoch', 'is_user_annotated_epoch'] so they can be later identified and filtered to `self.decoder_ripple_filter_epochs_decoder_result_dict.filter_epochs`
+        Updates `self.decoder_ripple_filter_epochs_decoder_result_dict.filter_epochs` in-place 
+        """
+        ## INPUTS: decoder_ripple_filter_epochs_decoder_result_dict
+
+        # 2024-03-04 - Filter out the epochs based on the criteria:
+        _, _, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        session_name: str = curr_active_pipeline.session_name
+        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+
+        filtered_epochs_df, active_spikes_df = filter_and_update_epochs_and_spikes(curr_active_pipeline=curr_active_pipeline, global_epoch_name=global_epoch_name, track_templates=track_templates, required_min_percentage_of_active_cells=required_min_percentage_of_active_cells, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1, **additional_selections_context)
+        filtered_valid_epoch_times = filtered_epochs_df[['start', 'stop']].to_numpy()
+
+        ## 2024-03-08 - Also constrain the user-selected ones (just to try it):
+        decoder_user_selected_epoch_times_dict, any_user_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(curr_active_pipeline, track_templates=track_templates, **additional_selections_context)
+
+        a_result_dict = self.decoder_ripple_filter_epochs_decoder_result_dict ## Only operates on `self.decoder_ripple_filter_epochs_decoder_result_dict` (ripples)
+
+        for a_name, a_result in a_result_dict.items():
+            did_update_user_annotation_col = DecoderDecodedEpochsResult.try_add_is_user_annotated_epoch_column(ensure_dataframe(a_result.filter_epochs), any_good_selected_epoch_times=any_user_selected_epoch_times, t_column_names=None)
+            if debug_print:
+                print(f'did_update_user_annotation_col["{a_name}"]: {did_update_user_annotation_col}')
+            did_update_is_valid = DecoderDecodedEpochsResult.try_add_is_valid_epoch_column(ensure_dataframe(a_result.filter_epochs), any_good_selected_epoch_times=filtered_valid_epoch_times, t_column_names=None)
+            # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
+            a_result.filter_epochs = DecoderDecodedEpochsResult.add_session_df_columns(ensure_dataframe(a_result.filter_epochs), session_name=session_name, time_bin_size=None, t_start=t_start, curr_session_t_delta=t_delta, t_end=t_end)            
+            if debug_print:
+                print(f'did_update_is_valid["{a_name}"]: {did_update_is_valid}')
+        if debug_print:
+            print(f'\tdone.')
+
+
+    @classmethod
+    def add_score_best_dir_columns(cls, df: pd.DataFrame, col_name: str = 'pf_peak_x_pearsonr', should_drop_directional_columns:bool=False, is_col_name_suffix_mode: bool = False, 
+                                include_LS_diff_col: bool=True, include_best_overall_score_col: bool=True) -> pd.DataFrame:
+        """ adds in a single "*_diff" and the 'long_best_*', 'short_best_*' columns
+        Generalized from `merge_decoded_epochs_result_dfs`
+
+        is_col_name_suffix_mode: bool - if True, the variable name (specified by `col_name`)
+
+        
+        Usage:
+
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
+
+            directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']
+            directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(curr_active_pipeline, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=False)
+
+        """
+        added_col_names = []
+        direction_max_indices = df[['P_LR', 'P_RL']].values.argmax(axis=1)
+        track_identity_max_indices = df[['P_Long', 'P_Short']].values.argmax(axis=1)
+        # Get only the best direction long/short values for each metric:
+        long_best_col_name: str = f'long_best_{col_name}'
+        short_best_col_name: str = f'short_best_{col_name}'
+        overall_best_col_name: str = f'overall_best_{col_name}'
+        
+        
+        if is_col_name_suffix_mode:
+            long_LR_string = f'long_LR_{col_name}'
+            long_RL_string = f'long_RL_{col_name}'
+            short_LR_string = f'short_LR_{col_name}'
+            short_RL_string = f'short_RL_{col_name}'
+        else:
+            long_LR_string = f'{col_name}_long_LR'
+            long_RL_string = f'{col_name}_long_RL'
+            short_LR_string = f'{col_name}_short_LR'
+            short_RL_string = f'{col_name}_short_RL'
+        
+        df[long_best_col_name] = np.where(direction_max_indices, df[long_LR_string], df[long_RL_string])
+        df[short_best_col_name] = np.where(direction_max_indices, df[short_LR_string], df[short_RL_string])
+        added_col_names.append(long_best_col_name)
+        added_col_names.append(short_best_col_name)
+        
+        if should_drop_directional_columns:
+            df = df.drop(columns=['P_LR', 'P_RL','best_decoder_index', long_LR_string, long_RL_string, short_LR_string, short_RL_string]) # drop the directional column names
+
+        ## Add differences:
+        if include_LS_diff_col:
+            LS_diff_col_name: str = f'{col_name}_diff'
+            df[LS_diff_col_name] = df[long_best_col_name].abs() - df[short_best_col_name].abs()
+            added_col_names.append(LS_diff_col_name)
+        
+
+        ## adds an "overall_best_{col_name}" column that includes the maximum between long and short
+        if include_best_overall_score_col and (long_best_col_name in df) and (short_best_col_name in df):
+            df[overall_best_col_name] = df[[long_best_col_name, short_best_col_name]].max(axis=1, skipna=True)
+            added_col_names.append(overall_best_col_name)
+
+        return df, tuple(added_col_names)
+
+
+    @classmethod
+    def get_all_scores_column_names(cls) -> Tuple:
+        from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring
+        
+        # Column Names _______________________________________________________________________________________________________ #
+        basic_df_column_names = ['start', 'stop', 'label', 'duration']
+        selection_col_names = ['is_user_annotated_epoch', 'is_valid_epoch']
+        session_identity_col_names = ['session_name', 'time_bin_size', 'delta_aligned_start_t', 'pre_post_delta_category', 'maze_id']
+        
+        # Score Columns (one value for each decoder) _________________________________________________________________________ #
+        decoder_bayes_prob_col_names = ['P_decoder']
+
+        radon_transform_col_names = ['score', 'velocity', 'intercept', 'speed']
+        weighted_corr_col_names = ['wcorr']
+        pearson_col_names = ['pearsonr']
+
+        heuristic_score_col_names = HeuristicReplayScoring.get_all_score_computation_col_names()
+        print(f'heuristic_score_col_names: {heuristic_score_col_names}')
+
+        ## All included columns:
+        all_df_shared_column_names: List[str] = basic_df_column_names + selection_col_names + session_identity_col_names # these are not replicated for each decoder, they're the same for the epoch
+        all_df_score_column_names: List[str] = decoder_bayes_prob_col_names + radon_transform_col_names + weighted_corr_col_names + pearson_col_names + heuristic_score_col_names 
+        all_df_column_names: List[str] = all_df_shared_column_names + all_df_score_column_names ## All included columns, includes the score columns which will not be replicated
+
+        ## Add in the 'wcorr' metrics:
+        merged_conditional_prob_column_names = ['P_LR', 'P_RL', 'P_Long', 'P_Short']
+        merged_wcorr_column_names = ['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']
+
+        return (all_df_shared_column_names, all_df_score_column_names, all_df_column_names,
+                    merged_conditional_prob_column_names, merged_wcorr_column_names, heuristic_score_col_names)
+
+    @function_attributes(short_name=None, tags=['merged', 'all_scores', 'df', 'epochs'], input_requires=[], output_provides=[], uses=['.decoder_ripple_filter_epochs_decoder_result_dict', '_build_merged_score_metric_df'], used_by=[], creation_date='2024-03-14 19:10', related_items=[])
+    def build_complete_all_scores_merged_df(self, debug_print=False) -> pd.DataFrame:
+        """ Builds a single merged dataframe from the four separate .filter_epochs dataframes from the result for each decoder, merging them into a single dataframe with ['_long_LR','_long_RL','_short_LR','_short_RL'] suffixes for the combined columns.
+        2024-03-14 19:04 
+
+        Usage:
+            extracted_merged_scores_df = build_complete_all_scores_merged_df(directional_decoders_epochs_decode_result)
+            extracted_merged_scores_df
+
+
+        #TODO 2024-07-15 18:32: - [ ] Ending up with multiple 'P_LR' columns in the dataframe! Not sure how this can happen.
+
+
+        """
+        from neuropy.core.epoch import ensure_dataframe
+        from neuropy.utils.indexing_helpers import flatten, NumpyHelpers, PandasHelpers
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _build_merged_score_metric_df
+
+        # # Column Names _______________________________________________________________________________________________________ #
+
+        # ## All included columns:
+        if debug_print:
+            print(f'build_complete_all_scores_merged_df(...):')
+        all_df_shared_column_names, all_df_score_column_names, all_df_column_names, merged_conditional_prob_column_names, merged_wcorr_column_names, heuristic_score_col_names = self.get_all_scores_column_names()
+
+        ## Extract the concrete dataframes from the results:
+        extracted_filter_epochs_dfs_dict = {k:ensure_dataframe(a_result.filter_epochs) for k, a_result in self.decoder_ripple_filter_epochs_decoder_result_dict.items()} # #TODO 2024-12-17 08:12: - [ ] Debugging: P_Decoder columns already have NaNs in the same place as they do in the next step here!
+        ## Merge the dict of four dataframes, one for each decoder, with column names like ['wcorr', 'travel', 'speed'] to a single merged df with suffixed of the dict keys like ['wcorr_long_LR', 'wcorr_long_RL',  ...., 'travel_long_LR', 'travel_long_RL', 'travel_short_LR', 'travel_short_RL', ...]
+        extracted_merged_scores_df: pd.DataFrame = _build_merged_score_metric_df(extracted_filter_epochs_dfs_dict, columns=all_df_score_column_names, best_decoder_index_column_name=None) ## already has NaN values for the decoder probabilities here :[
+        # extracted_merged_scores_df
+
+        _ref_df = deepcopy(tuple(extracted_filter_epochs_dfs_dict.values())[0]) # first dataframe is the same as the others, determine which columns are available
+        included_all_df_shared_column_names = [k for k in all_df_shared_column_names if k in _ref_df.columns] # only the included columns
+
+        # `common_shared_portion_df` the columns of the dataframe that is the same for all four decoders
+        # common_shared_portion_df: pd.DataFrame = deepcopy(tuple(extracted_filter_epochs_dfs_dict.values())[0][all_df_shared_column_names]) # copy it from the first dataframe
+        common_shared_portion_df: pd.DataFrame = deepcopy(tuple(extracted_filter_epochs_dfs_dict.values())[0][included_all_df_shared_column_names]) # copy it from the first dataframe
+        base_shape = np.shape(common_shared_portion_df)
+
+        included_merge_dfs_list = [common_shared_portion_df]
+
+        #TODO 2024-07-12 07:06: - [ ] `self.ripple_weighted_corr_merged_df` is the problem it seems, it's of different size (more epochs) than all of the other dataframes
+
+        ##Gotta get those ['P_LR', 'P_RL'] columns to determine best directions
+        conditional_prob_df = deepcopy(self.ripple_weighted_corr_merged_df[merged_conditional_prob_column_names]) ## just use the columns from this
+        conditional_prob_df_shape = np.shape(conditional_prob_df)
+        if (base_shape[0] != conditional_prob_df_shape[0]):
+            print(f'\tbuild_complete_all_scores_merged_df(...): warning: all dfs should have same number of rows, but conditional_prob_df_shape: {conditional_prob_df_shape} != base_shape: {base_shape}. Skipping adding `conditional_prob_df`.')
+        else:
+            ## add it 
+            included_merge_dfs_list.append(conditional_prob_df)
+
+        
+        ## Re-derive the correct conditional probs:
+        # ['P_LR', 'P_RL']
+        # ['P_Long', 'P_Short']
+
+        P_decoder_column_names = ['P_decoder_long_LR','P_decoder_long_RL','P_decoder_short_LR','P_decoder_short_RL']
+        P_decoder_marginals_column_names = ['P_LR', 'P_RL', 'P_Long', 'P_Short']
+
+        # if np.any([(a_col not in extracted_merged_scores_df) for a_col in P_decoder_column_names]):
+        if np.any([(a_col not in extracted_merged_scores_df) for a_col in P_decoder_marginals_column_names]):
+            # needs Marginalized Probability columns: ['P_LR', 'P_RL'], ['P_Long', 'P_Short']
+            if debug_print:
+                print(f'\tneeds Marginalized Probability columns. adding.')
+            # assert np.any([(a_col not in extracted_merged_scores_df) for a_col in P_decoder_column_names]), f"missing marginals and cannot recompute them because we're also missing the raw probabilities. extracted_merged_scores_df.columns: {list(extracted_merged_scores_df.columns)}"
+            ## They remain normalized because they all already sum to one.
+            extracted_merged_scores_df['P_Long'] = extracted_merged_scores_df['P_decoder_long_LR'] + extracted_merged_scores_df['P_decoder_long_RL']
+            extracted_merged_scores_df['P_Short'] = extracted_merged_scores_df['P_decoder_short_LR'] + extracted_merged_scores_df['P_decoder_short_RL']
+
+            extracted_merged_scores_df['P_LR'] = extracted_merged_scores_df['P_decoder_long_LR'] + extracted_merged_scores_df['P_decoder_short_LR']
+            extracted_merged_scores_df['P_RL'] = extracted_merged_scores_df['P_decoder_long_RL'] + extracted_merged_scores_df['P_decoder_short_RL']
+
+
+        extracted_merged_scores_df_shape = np.shape(extracted_merged_scores_df)
+        if (base_shape[0] != extracted_merged_scores_df_shape[0]):
+            print(f'\tbuild_complete_all_scores_merged_df(...): warning: all dfs should have same number of rows, but extracted_merged_scores_df_shape: {extracted_merged_scores_df_shape} != base_shape: {base_shape}. Skipping adding `extracted_merged_scores_df`.')
+        else:
+            ## add it
+            included_merge_dfs_list.append(extracted_merged_scores_df)
+
+        # # Weighted correlations:
+
+        # Build the final merged dataframe with the score columns for each of the four decoders but only one copy of the common columns.
+        extracted_merged_scores_df: pd.DataFrame = pd.concat(included_merge_dfs_list, axis='columns') # (common_shared_portion_df, conditional_prob_df, extracted_merged_scores_df) ### I THINK NaNs come in here
+        # extracted_merged_scores_df: pd.DataFrame = pd.concat((common_shared_portion_df, conditional_prob_df, extracted_merged_scores_df), axis='columns')
+        extracted_merged_scores_df['ripple_start_t'] = extracted_merged_scores_df['start']
+
+        if np.any([(a_col not in extracted_merged_scores_df) for a_col in merged_wcorr_column_names]):
+            # needs wcorr columns
+            if debug_print:
+                print(f'\tbuild_complete_all_scores_merged_df(...): needs wcorr columns. adding.')
+            wcorr_columns_df = deepcopy(self.ripple_weighted_corr_merged_df[merged_wcorr_column_names]) ## just use the columns from this
+            assert np.shape(wcorr_columns_df)[0] == np.shape(extracted_merged_scores_df)[0], f"should have same number of columns"
+            extracted_merged_scores_df: pd.DataFrame = pd.concat((extracted_merged_scores_df, wcorr_columns_df), axis='columns')
+
+        ## Add in the wcorr and pearsonr columns:
+        # self.ripple_simple_pf_pearson_merged_df ## ?? where is it getting "pearsonr_long_LR"?
+
+        ## add in the "_diff" columns and the 'best_dir_*' columns
+        added_column_names = []
+        # for a_score_col in heuristic_score_col_names:
+        #     extracted_merged_scores_df, curr_added_column_name_tuple = self.add_score_best_dir_columns(extracted_merged_scores_df, col_name=a_score_col, should_drop_directional_columns=False, is_col_name_suffix_mode=False)
+        #     added_column_names.extend(curr_added_column_name_tuple)
+        #     # (long_best_col_name, short_best_col_name, LS_diff_col_name)
+
+        try:
+            for a_score_col in all_df_score_column_names:
+                extracted_merged_scores_df, curr_added_column_name_tuple = self.add_score_best_dir_columns(extracted_merged_scores_df, col_name=a_score_col, should_drop_directional_columns=False, is_col_name_suffix_mode=False, include_LS_diff_col=True, include_best_overall_score_col=True)
+                added_column_names.extend(curr_added_column_name_tuple)
+        except Exception as err:
+            print(f'\tbuild_complete_all_scores_merged_df(...): Encountered ERROR: {err} while trying to add "a_score_col": {a_score_col}, but trying to continue, so close!')
+
+
+        extracted_merged_scores_df = extracted_merged_scores_df.rename(columns=dict(zip(['P_decoder_long_LR','P_decoder_long_RL','P_decoder_short_LR','P_decoder_short_RL'], ['P_Long_LR','P_Long_RL','P_Short_LR','P_Short_RL'])), inplace=False)
+        if 'time_bin_size' not in extracted_merged_scores_df.columns:
+            ## add the column
+            extracted_merged_scores_df['time_bin_size'] = self.ripple_decoding_time_bin_size
+
+        extracted_merged_scores_df = PandasHelpers.dropping_duplicated_df_columns(df=extracted_merged_scores_df)
+        return extracted_merged_scores_df
+
+
+
+    @classmethod
+    def _perform_export_dfs_dict_to_csvs(cls, extracted_dfs_dict: Dict, parent_output_path: Path, active_context: IdentifyingContext, session_name: str, tbin_values_dict: Dict,
+                                        t_start: Optional[float]=None, curr_session_t_delta: Optional[float]=None, t_end: Optional[float]=None,
+                                        user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None):
+        """ Classmethod: export as separate .csv files. 
+        active_context = curr_active_pipeline.get_session_context()
+        curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
+        CURR_BATCH_OUTPUT_PREFIX: str = f"{BATCH_DATE_TO_USE}-{curr_session_name}"
+        print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
+
+        active_context = curr_active_pipeline.get_session_context()
+        session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
+        session_name: str = curr_active_pipeline.session_name
+        earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end = curr_active_pipeline.find_LongShortDelta_times()
+        histogram_bins = 25
+        # Shifts the absolute times to delta-relative values, as would be needed to draw on a 'delta_aligned_start_t' axis:
+        delta_relative_t_start, delta_relative_t_delta, delta_relative_t_end = np.array([earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end]) - t_delta
+        decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(curr_active_pipeline)
+        any_good_selected_epoch_indicies = filtered_ripple_simple_pf_pearson_merged_df.epochs.matching_epoch_times_slice(any_good_selected_epoch_times)
+        df = filter_epochs_dfs_by_annotation_times(curr_active_pipeline, any_good_selected_epoch_times, ripple_decoding_time_bin_size=ripple_decoding_time_bin_size, filtered_ripple_simple_pf_pearson_merged_df, ripple_weighted_corr_merged_df)
+        df
+
+        tbin_values_dict={'laps': self.laps_decoding_time_bin_size, 'ripple': self.ripple_decoding_time_bin_size}
+
+        #TODO 2024-11-01 07:53: - [ ] Need to pass the correct (full) context, including the qclu/fr_Hz filter values and the replay name. 
+        #TODO 2024-11-01 07:54: - [X] Need to add a proper timebin column to the df instead of including it in the filename (if possible)
+            - does already add a 'time_bin_size' column, and the suffix is probably so it doesn't get overwritten by different time_bin_sizes, might need to put them together post-hoc
+            
+        '2024-11-01_1250PM-kdiba_gor01_two_2006-6-12_16-53-46__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0normal_computed-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]-(laps_weighted_corr_merged_df)_tbin-1.5.csv'
+            
+        """
+
+        assert parent_output_path.exists(), f"'{parent_output_path}' does not exist!"
+        output_date_str: str = get_now_rounded_time_str(rounded_minutes=10)
+        # Export CSVs:
+        def export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'(laps_marginals_df)', parent_output_path: Path=None):
+            """ captures `active_context`, 'output_date_str'
+            """
+            # parent_output_path: Path = Path('output').resolve()
+            # active_context = curr_active_pipeline.get_session_context()
+            session_identifier_str: str = active_context.get_description() # 'kdiba_gor01_two_2006-6-12_16-53-46__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0normal_computed-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]'
+            # session_identifier_str: str = active_context.get_description(subset_excludelist=['custom_suffix']) # no this is just the session
+            assert output_date_str is not None
+            out_basename = '-'.join([output_date_str, session_identifier_str, data_identifier_str]) # '2024-11-15_0200PM-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays_qclu_[1, 2, 4, 6, 7, 9]_frateThresh_5.0-(ripple_WCorrShuffle_df)_tbin-0.025'
+            out_filename = f"{out_basename}.csv"
+            out_path = parent_output_path.joinpath(out_filename).resolve()
+            export_df.to_csv(out_path)
+            return out_path 
+
+        if custom_export_df_to_csv_fn is None:
+            # use the default
+            custom_export_df_to_csv_fn = export_df_to_csv
+
+
+        # active_context.custom_suffix = '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0' # '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0normal_computed-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]'
+        
+        #TODO 2024-03-02 12:12: - [ ] Could add weighted correlation if there is a dataframe for that and it's computed:
+        # tbin_values_dict = {'laps': self.laps_decoding_time_bin_size, 'ripple': self.ripple_decoding_time_bin_size}
+        time_col_name_dict = {'laps': 'lap_start_t', 'ripple': 'ripple_start_t'} ## default should be 't_bin_center'
+    
+        ## INPUTS: decoder_ripple_filter_epochs_decoder_result_dict
+        export_files_dict = {}
+        
+        for a_df_name, a_df in extracted_dfs_dict.items():
+            an_epochs_source_name: str = a_df_name.split(sep='_', maxsplit=1)[0] # get the first part of the variable names that indicates whether it's for "laps" or "ripple"
+
+            a_tbin_size: float = float(tbin_values_dict[an_epochs_source_name])
+            a_time_col_name: str = time_col_name_dict.get(an_epochs_source_name, 't_bin_center')
+            ## Add t_bin column method
+            a_df = cls.add_session_df_columns(a_df, session_name=session_name, time_bin_size=a_tbin_size, t_start=t_start, curr_session_t_delta=curr_session_t_delta, t_end=t_end, time_col=a_time_col_name)
+            a_tbin_size_str: str = f"{round(a_tbin_size, ndigits=5)}"
+            a_data_identifier_str: str = f'({a_df_name})_tbin-{a_tbin_size_str}' ## build the identifier '(laps_weighted_corr_merged_df)_tbin-1.5'
+            
+            # add in custom columns
+            #TODO 2024-03-14 06:48: - [ ] I could use my newly implemented `directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(curr_active_pipeline, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=True)` function, but since this looks at decoder-specific info it's better just to duplicate implementation and do it again here.
+            # ripple_marginals_df['ripple_idx'] = ripple_marginals_df.index.to_numpy()
+            # ripple_marginals_df['ripple_start_t'] = ripple_epochs_df['start'].to_numpy()
+            if (user_annotation_selections is not None):
+                any_good_selected_epoch_times = user_annotation_selections.get(an_epochs_source_name, None) # like ripple
+                if any_good_selected_epoch_times is not None:
+                    num_valid_epoch_times: int = len(any_good_selected_epoch_times)
+                    print(f'num_user_selected_times: {num_valid_epoch_times}')
+                    any_good_selected_epoch_indicies = None
+                    print(f'adding user annotation column!')
+
+                    if any_good_selected_epoch_indicies is None:
+                        try:
+                            any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=['ripple_start_t',], atol=0.01, not_found_action='skip_index', debug_print=False)
+                        except AttributeError as e:
+                            print(f'ERROR: failed method 2 for {a_df_name}. Out of options.')        
+                        except Exception as e:
+                            print(f'ERROR: failed for {a_df_name}. Out of options.')
+                        
+                    if any_good_selected_epoch_indicies is not None:
+                        print(f'\t succeded at getting {len(any_good_selected_epoch_indicies)} selected indicies (of {num_valid_epoch_times} user selections) for {a_df_name}. got {len(any_good_selected_epoch_indicies)} indicies!')
+                        a_df['is_user_annotated_epoch'] = False
+                        a_df['is_user_annotated_epoch'].iloc[any_good_selected_epoch_indicies] = True
+                    else:
+                        print(f'\t failed all methods for annotations')
+
+            # adds in column 'is_valid_epoch'
+            if (valid_epochs_selections is not None):
+                # 2024-03-04 - Filter out the epochs based on the criteria:
+                any_good_selected_epoch_times = valid_epochs_selections.get(an_epochs_source_name, None) # like ripple
+                if any_good_selected_epoch_times is not None:
+                    num_valid_epoch_times: int = len(any_good_selected_epoch_times)
+                    print(f'num_valid_epoch_times: {num_valid_epoch_times}')
+                    any_good_selected_epoch_indicies = None
+                    print(f'adding valid filtered epochs column!')
+
+                    if any_good_selected_epoch_indicies is None:
+                        try:
+                            any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=['ripple_start_t',], atol=0.01, not_found_action='skip_index', debug_print=False)
+                        except AttributeError as e:
+                            print(f'ERROR: failed method 2 for {a_df_name}. Out of options.')        
+                        except Exception as e:
+                            print(f'ERROR: failed for {a_df_name}. Out of options.')
+                        
+                    if any_good_selected_epoch_indicies is not None:
+                        print(f'\t succeded at getting {len(any_good_selected_epoch_indicies)} selected indicies (of {num_valid_epoch_times} valid filter epoch times) for {a_df_name}. got {len(any_good_selected_epoch_indicies)} indicies!')
+                        a_df['is_valid_epoch'] = False
+
+                        try:
+                            a_df['is_valid_epoch'].iloc[any_good_selected_epoch_indicies] = True
+                            # a_df['is_valid_epoch'].loc[any_good_selected_epoch_indicies] = True
+
+                        except Exception as e:
+                            print(f'WARNING: trying to get whether the epochs are valid FAILED probably, 2024-06-28 custom computed epochs thing: {e}, just setting all to True')
+                            a_df['is_valid_epoch'] = True
+                    else:
+                        print(f'\t failed all methods for selection filter')
+
+            export_files_dict[a_df_name] = custom_export_df_to_csv_fn(a_df, data_identifier_str=a_data_identifier_str, parent_output_path=parent_output_path) # this is exporting corr '(ripple_WCorrShuffle_df)_tbin-0.025'
+        # end for a_df_name, a_df
+        
+        return export_files_dict
+    
+
+
+    def perform_export_dfs_dict_to_csvs(self, extracted_dfs_dict: Dict, parent_output_path: Path, active_context, session_name: str, curr_session_t_delta: Optional[float], user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None):
+        """ export as separate .csv files. 
+        active_context = curr_active_pipeline.get_session_context()
+        curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
+        CURR_BATCH_OUTPUT_PREFIX: str = f"{BATCH_DATE_TO_USE}-{curr_session_name}"
+        print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
+
+        active_context = curr_active_pipeline.get_session_context()
+        session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
+        session_name: str = curr_active_pipeline.session_name
+        earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end = curr_active_pipeline.find_LongShortDelta_times()
+        histogram_bins = 25
+        # Shifts the absolute times to delta-relative values, as would be needed to draw on a 'delta_aligned_start_t' axis:
+        delta_relative_t_start, delta_relative_t_delta, delta_relative_t_end = np.array([earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end]) - t_delta
+        decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(curr_active_pipeline)
+        any_good_selected_epoch_indicies = filtered_ripple_simple_pf_pearson_merged_df.epochs.matching_epoch_times_slice(any_good_selected_epoch_times)
+        df = filter_epochs_dfs_by_annotation_times(curr_active_pipeline, any_good_selected_epoch_times, ripple_decoding_time_bin_size=ripple_decoding_time_bin_size, filtered_ripple_simple_pf_pearson_merged_df, ripple_weighted_corr_merged_df)
+        df
+
+        """
+        return self._perform_export_dfs_dict_to_csvs(extracted_dfs_dict=extracted_dfs_dict, parent_output_path=parent_output_path, active_context=active_context, session_name=session_name, tbin_values_dict={'laps': self.laps_decoding_time_bin_size, 'ripple': self.ripple_decoding_time_bin_size},
+                                                     curr_session_t_delta=curr_session_t_delta, user_annotation_selections=user_annotation_selections, valid_epochs_selections=valid_epochs_selections, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn)
+
+
+
+    @function_attributes(short_name=None, tags=['export', 'CSV', 'main'], input_requires=[], output_provides=['ripple_all_scores_merged_df.csv'], uses=['self.perform_export_dfs_dict_to_csvs', 'self.build_complete_all_scores_merged_df'], used_by=['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'], creation_date='2024-03-15 10:13', related_items=[])
+    def export_csvs(self, parent_output_path: Path, active_context: IdentifyingContext, session_name: str, curr_session_t_delta: Optional[float], user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None, export_df_variable_names=None, should_export_complete_all_scores_df:bool=True):
+        """ export as separate .csv files. 
+
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
+
+        active_context = curr_active_pipeline.get_session_context()
+        curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
+        CURR_BATCH_OUTPUT_PREFIX: str = f"{BATCH_DATE_TO_USE}-{curr_session_name}"
+        print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
+
+        active_context = curr_active_pipeline.get_session_context()
+        session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
+        session_name: str = curr_active_pipeline.session_name
+        earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end = curr_active_pipeline.find_LongShortDelta_times()
+        histogram_bins = 25
+        # Shifts the absolute times to delta-relative values, as would be needed to draw on a 'delta_aligned_start_t' axis:
+        delta_relative_t_start, delta_relative_t_delta, delta_relative_t_end = np.array([earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end]) - t_delta
+        decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(curr_active_pipeline)
+        any_good_selected_epoch_indicies = filtered_ripple_simple_pf_pearson_merged_df.epochs.matching_epoch_times_slice(any_good_selected_epoch_times)
+        df = filter_epochs_dfs_by_annotation_times(curr_active_pipeline, any_good_selected_epoch_times, ripple_decoding_time_bin_size=ripple_decoding_time_bin_size, filtered_ripple_simple_pf_pearson_merged_df, ripple_weighted_corr_merged_df)
+        df
+
+
+            
+        """
+        export_files_dict = {}
+        _df_variables_names = ['laps_weighted_corr_merged_df', 'ripple_weighted_corr_merged_df', 'laps_simple_pf_pearson_merged_df', 'ripple_simple_pf_pearson_merged_df']
+        if export_df_variable_names is None:
+            # export all by default
+            export_df_variable_names = _df_variables_names
+            
+        extracted_dfs_dict = {a_df_name:getattr(self, a_df_name) for a_df_name in export_df_variable_names}
+        if len(extracted_dfs_dict) > 0:
+            export_files_dict = export_files_dict | self.perform_export_dfs_dict_to_csvs(extracted_dfs_dict=extracted_dfs_dict, parent_output_path=parent_output_path, active_context=active_context, session_name=session_name, curr_session_t_delta=curr_session_t_delta, user_annotation_selections=user_annotation_selections, valid_epochs_selections=valid_epochs_selections, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn)
+
+        ## try to export the merged all_scores dataframe
+        if should_export_complete_all_scores_df:
+            extracted_merged_scores_df: pd.DataFrame = self.build_complete_all_scores_merged_df()
+            if 'time_bin_size' not in extracted_merged_scores_df.columns:
+                ## add the column
+                print(f'WARN: adding the time_bin_size columns: {self.ripple_decoding_time_bin_size}')
+                extracted_merged_scores_df['time_bin_size'] = self.ripple_decoding_time_bin_size
+
+            export_df_dict = {'ripple_all_scores_merged_df': extracted_merged_scores_df}
+            export_files_dict = export_files_dict | self.perform_export_dfs_dict_to_csvs(extracted_dfs_dict=export_df_dict, parent_output_path=parent_output_path, active_context=active_context, session_name=session_name, curr_session_t_delta=curr_session_t_delta, user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn)
+
+        return export_files_dict
+
+    
 
 
 
