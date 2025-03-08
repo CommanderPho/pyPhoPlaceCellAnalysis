@@ -1,5 +1,8 @@
-import keyword
 import os
+# Set PyQt5 as the default Qt library before any imports
+os.environ['PYQTGRAPH_QT_LIB'] = 'PyQt5'
+
+import keyword
 import re
 import subprocess
 import sys
@@ -308,6 +311,13 @@ class ExampleLoader(QtWidgets.QMainWindow):
         self.setCentralWidget(self.cw)
         self.ui.setupUi(self.cw)
         self.setWindowTitle("PyQtGraph Examples")
+
+        # Set the self.ui.qtLibCombo to match our Qt library
+        # Find the index of "PyQt5" in the combo box items
+        qt_lib_index = self.ui.qtLibCombo.findText("PyQt5")
+        if qt_lib_index >= 0:
+            self.ui.qtLibCombo.setCurrentIndex(qt_lib_index)
+
         self.codeBtn = QtWidgets.QPushButton('Run Edited Code')
         self.codeLayout = QtWidgets.QGridLayout()
         self.ui.codeView.setLayout(self.codeLayout)
