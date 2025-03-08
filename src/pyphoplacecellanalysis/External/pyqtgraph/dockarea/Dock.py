@@ -480,6 +480,71 @@ class Dock(QtWidgets.QWidget, DockDrop):
 
 
 
+def debug_dock_label(dock_label, label_name="Unknown"):
+    """Print comprehensive debug information about a DockLabel to diagnose layout issues."""
+    print(f"\n--- DockLabel Debug: {label_name} ---")
+    
+    # Basic geometry info
+    print(f"Position: ({dock_label.x()}, {dock_label.y()})")
+    print(f"Size: {dock_label.width()} × {dock_label.height()}")
+    print(f"Geometry: {dock_label.geometry()}")
+    print(f"Content rect: {dock_label.rect()}")
+    print(f"Size hint: {dock_label.sizeHint()}")
+    print(f"Minimum size hint: {dock_label.minimumSizeHint()}")
+    
+    # Text content issues
+    print(f"Text content: '{dock_label.text()}'")
+    print(f"Text length: {len(dock_label.text())}")
+    print(f"Has tooltip: {bool(dock_label.toolTip())}")
+    
+    # Orientation and layout issues
+    print(f"Orientation: {dock_label.orientation}")
+    print(f"Dim state: {dock_label.dim}")
+    print(f"Size policy: {dock_label.sizePolicy().horizontalPolicy()}, {dock_label.sizePolicy().verticalPolicy()}")
+    
+    # Button presence and sizes
+    print(f"Has closeButton: {dock_label.closeButton is not None}")
+    if dock_label.closeButton:
+        print(f"  - closeButton size: {dock_label.closeButton.size()}")
+    
+    print(f"Has collapseButton: {dock_label.collapseButton is not None}")
+    if dock_label.collapseButton:
+        print(f"  - collapseButton size: {dock_label.collapseButton.size()}")
+    
+    print(f"Has groupButton: {dock_label.groupButton is not None}")
+    if dock_label.groupButton:
+        print(f"  - groupButton size: {dock_label.groupButton.size()}")
+    
+    print(f"Has orientationButton: {dock_label.orientationButton is not None}")
+    if dock_label.orientationButton:
+        print(f"  - orientationButton size: {dock_label.orientationButton.size()}")
+    
+    # Visibility and enablement
+    print(f"Is visible: {dock_label.isVisible()}")
+    print(f"Is enabled: {dock_label.isEnabled()}")
+    print(f"Is shown: {not dock_label.isHidden()}")
+    
+    # Parent and layout context
+    print(f"Parent type: {type(dock_label.parent()).__name__}")
+    
+    # Font metrics for text rendering
+    font_metrics = dock_label.fontMetrics()
+    if dock_label.text():
+        text_width = font_metrics.horizontalAdvance(dock_label.text())
+        print(f"Text width by font metrics: {text_width}px")
+    
+    # Check elided text mode
+    if hasattr(dock_label, 'elided_text_mode'):
+        print(f"Elided text mode: {dock_label.elided_text_mode}")
+    
+    # Check stylesheet
+    if dock_label.styleSheet():
+        print(f"Has custom stylesheet: Yes")
+        # print(f"Stylesheet: {dock_label.styleSheet()}")
+    else:
+        print(f"Has custom stylesheet: No")
+    
+    print("--- End Debug Info ---\n")
 
 
 
@@ -517,28 +582,45 @@ class DockLabel(VerticalLabel):
         #     ## use a layout instead
         #     # self.buttonBarLayout = QtWidgets.
         #     pass
+        # Define a minimum button size to ensure buttons are always visible
+        MIN_BUTTON_SIZE = 12
+
         if display_config.showCloseButton:
             self.closeButton = QtWidgets.QToolButton(self)
             self.closeButton.clicked.connect(self.sigCloseClicked)
             self.closeButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_TitleBarCloseButton))
+            self.closeButton.setMinimumSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
+            self.closeButton.setFixedSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
+            
         if display_config.showCollapseButton:
             self.collapseButton = QtWidgets.QToolButton(self)
             self.collapseButton.clicked.connect(self.sigCollapseClicked)
             self.collapseButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_TitleBarMinButton))
+            self.collapseButton.setMinimumSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
+            self.collapseButton.setFixedSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
+            
         if display_config.showGroupButton:
             self.groupButton = QtWidgets.QToolButton(self)
             self.groupButton.clicked.connect(self.sigGroupClicked)
             self.groupButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogListView))
+            self.groupButton.setMinimumSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
+            self.groupButton.setFixedSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
+            
         if display_config.showOrientationButton:
             self.orientationButton = QtWidgets.QToolButton(self)
             self.orientationButton.setCheckable(True)
-            # self.orientationButton.clicked.connect(self.sigToggleOrientationClicked)
             self.orientationButton.toggled.connect(self.sigToggleOrientationClicked)
             self.orientationButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_ToolBarHorizontalExtensionButton))
-            # self.orientationButton.setIcon(QtWidgets.QApplication.style().????(QtWidgets.QStyle.StandardPixmap.SP_ToolBarVerticalExtensionButton))
+            self.orientationButton.setMinimumSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE) 
+            self.orientationButton.setFixedSize(MIN_BUTTON_SIZE, MIN_BUTTON_SIZE)
 
 
+    def debug_print(self, label_name: str="Unknown"):
+        """Print comprehensive debug information about a DockLabel to diagnose layout issues."""
+        return debug_dock_label(self, label_name=label_name)
+    
 
+    """Print comprehensive debug information about a DockLabel to diagnose layout issues."""
     def updateStyle(self):
         updated_stylesheet = self.config.get_stylesheet(orientation=self.orientation, is_dim=self.dim)
         if self.orientation == 'vertical':
