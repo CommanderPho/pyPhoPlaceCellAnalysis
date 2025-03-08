@@ -25,6 +25,8 @@ def debug_widget_geometry(a_widget, widget_name="Unknown"):
     # print(f"Dim state: {a_widget.dim}")
     print(f"Size policy: {a_widget.sizePolicy().horizontalPolicy()}, {a_widget.sizePolicy().verticalPolicy()}")
     print(f"stretch: {a_widget.stretch()}")
+    print(f"container: {a_widget.container()}")
+    
     # Visibility and enablement
     print(f"Is visible: {a_widget.isVisible()}")
     print(f"Is enabled: {a_widget.isEnabled()}")
@@ -35,6 +37,43 @@ def debug_widget_geometry(a_widget, widget_name="Unknown"):
     
     print("--- End Debug Info ---\n")
     
+
+
+
+
+def debug_print_dock(a_dock, widget_name="Unknown"):
+    """Print comprehensive debug information about a DockLabel to diagnose layout issues."""
+    print(f"\n--- Dock Debug: {widget_name} ---")
+    
+    # Basic geometry info
+    print(f"Position: ({a_dock.x()}, {a_dock.y()})")
+    print(f"Size: {a_dock.width()} × {a_dock.height()}")
+    print(f"Geometry: {a_dock.geometry()}")
+    print(f"Content rect: {a_dock.rect()}")
+    print(f"Size hint: {a_dock.sizeHint()}")
+    print(f"Minimum size hint: {a_dock.minimumSizeHint()}")
+    
+    # Orientation and layout issues
+    print(f"Orientation: {a_dock.orientation}")
+    # print(f"Dim state: {a_widget.dim}")
+    print(f"Size policy: {a_dock.sizePolicy().horizontalPolicy()}, {a_dock.sizePolicy().verticalPolicy()}")
+    print(f"stretch: {a_dock.stretch()}")
+    print(f"container: {a_dock.container()}")
+    print(f"title: {a_dock.title()}")
+    
+    # Visibility and enablement
+    print(f"Is visible: {a_dock.isVisible()}")
+    print(f"Is enabled: {a_dock.isEnabled()}")
+    print(f"Is shown: {not a_dock.isHidden()}")
+    
+    # Parent and layout context
+    print(f"Parent type: {type(a_dock.parent()).__name__}")
+    
+    print("--- End Debug Info ---\n")
+
+
+
+
 
 @define(slots=False)
 class DockDisplayConfig(object):
@@ -253,6 +292,12 @@ class Dock(QtWidgets.QWidget, DockDrop):
 
         if hideTitle:
             self.hideTitleBar()
+
+
+    def debug_print(self, widget_name: str="Unknown"):
+        """Print comprehensive debug information about a Dock to diagnose layout issues."""
+        return debug_print_dock(self, widget_name=widget_name)
+    
 
     def implements(self, name=None):
         if name is None:
