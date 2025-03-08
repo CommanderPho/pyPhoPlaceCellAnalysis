@@ -1758,6 +1758,30 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                 if debug_print:
                     print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_x.p_x_given_n.shape}')
             custom_curr_unit_marginal_list.append(curr_unit_marginal_x)
+
+        # ## INPUTS: custom_curr_unit_marginal_list
+        
+        # ## All
+        # _epoch_repeated_epoch_index_list = [np.full((n_bins, ), i) for i, n_bins in enumerate(custom_curr_unit_marginal_list.nbins)]
+        # _epoch_repeated_sub_epoch_time_bin_index_list = [np.arange(n_bins) for n_bins in custom_curr_unit_marginal_list.nbins]
+        # epochs_repeated_epoch_index: NDArray = np.hstack(_epoch_repeated_epoch_index_list) # np.shape(epochs_p_x_given_n) # (2, 19018)
+        # epochs_repeated_sub_epoch_time_bin_index: NDArray = np.hstack(_epoch_repeated_sub_epoch_time_bin_index_list) # np.shape(epochs_t_centers) # (19018,)
+
+        # ## Non-masked
+        # _epochs_p_x_given_n_list = [v['p_x_given_n'] for v in custom_curr_unit_marginal_list]
+        # _epochs_t_centers_list = [t.centers for t in custom_curr_unit_marginal_list.time_bin_containers]
+        # epochs_p_x_given_n: NDArray = np.hstack(_epochs_p_x_given_n_list) # np.shape(epochs_p_x_given_n) # (2, 19018)
+        # epochs_t_centers: NDArray = np.hstack(_epochs_t_centers_list) # np.shape(epochs_t_centers) # (19018,)
+        # assert np.shape(epochs_p_x_given_n)[-1] == np.shape(epochs_t_centers)[0]
+
+        # ## OUTPUTS: epochs_repeated_epoch_index, epochs_repeated_sub_epoch_time_bin_index, epochs_t_centers, epochs_p_x_given_n
+        # _common_epoch_df_dict = {'epoch_id': epochs_repeated_epoch_index, 'sub_epoch_time_bin_index': epochs_repeated_sub_epoch_time_bin_index}
+
+        # ## Build into a marginal df like `all_sessions_epochs_df`:
+        # track_marginal_posterior_df : pd.DataFrame = pd.DataFrame({'t':deepcopy(epochs_t_centers), 'P_Long': np.squeeze(epochs_p_x_given_n[0, :]), 'P_Short': np.squeeze(epochs_p_x_given_n[1, :]), **deepcopy(_common_epoch_df_dict)}) # , 'time_bin_size': pseudo2D_continuous_specific_decoded_result.decoding_time_bin_size
+        # ## OUTPUTS: track_marginal_posterior_df
+        
+
         return custom_curr_unit_marginal_list
 
 
