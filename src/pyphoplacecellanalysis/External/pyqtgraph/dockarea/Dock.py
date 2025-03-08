@@ -7,6 +7,34 @@ from ..Qt import QtCore, QtGui, QtWidgets
 from ..widgets.VerticalLabel import VerticalLabel
 from .DockDrop import DockDrop
 
+def debug_widget_geometry(a_widget, widget_name="Unknown"):
+    """Print comprehensive debug information about a DockLabel to diagnose layout issues."""
+    widget_type = type(a_widget)
+    print(f"\n--- {widget_type} Debug: {widget_name} ---")
+    
+    # Basic geometry info
+    print(f"Position: ({a_widget.x()}, {a_widget.y()})")
+    print(f"Size: {a_widget.width()} × {a_widget.height()}")
+    print(f"Geometry: {a_widget.geometry()}")
+    print(f"Content rect: {a_widget.rect()}")
+    print(f"Size hint: {a_widget.sizeHint()}")
+    print(f"Minimum size hint: {a_widget.minimumSizeHint()}")
+    
+    # Orientation and layout issues
+    print(f"Orientation: {a_widget.orientation}")
+    # print(f"Dim state: {a_widget.dim}")
+    print(f"Size policy: {a_widget.sizePolicy().horizontalPolicy()}, {a_widget.sizePolicy().verticalPolicy()}")
+    print(f"stretch: {a_widget.stretch()}")
+    # Visibility and enablement
+    print(f"Is visible: {a_widget.isVisible()}")
+    print(f"Is enabled: {a_widget.isEnabled()}")
+    print(f"Is shown: {not a_widget.isHidden()}")
+    
+    # Parent and layout context
+    print(f"Parent type: {type(a_widget.parent()).__name__}")
+    
+    print("--- End Debug Info ---\n")
+    
 
 @define(slots=False)
 class DockDisplayConfig(object):
