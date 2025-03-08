@@ -426,8 +426,6 @@ class DynamicDockDisplayAreaContentMixin(BaseDynamicInstanceConformingMixin):
                 all_collected_dock_items_identifiers.append(a_dock_item.name())
         return all_collected_dock_items_identifiers
     
-
-
     def get_flat_dock_item_tuple_dict(self, debug_print=False) -> Dict[str, Tuple[Dock, Optional["QtWidgets.QWidget"]]]:
         """ extracts the 'dock' property that is the contents of each added dock item from the self.dynamic_display_dict and returns it as a flat list """
         # all_collected_dock_items_identifiers = self.get_flat_dock_identifiers_list()
@@ -441,10 +439,30 @@ class DynamicDockDisplayAreaContentMixin(BaseDynamicInstanceConformingMixin):
         return out_dict
     
     
+    def get_leaf_only_flat_dock_identifiers_list(self) -> List[str]:
+        """the dock_identifiers only for the leaf (non-group) items"""
+        flat_dock_item_tuple_dict: Dict[str, Tuple[Dock, Optional["QtWidgets.QWidget"]]] = self.get_flat_dock_item_tuple_dict()
+        leaf_only_flat_dockwidgets_dict = {k:a_widget for k, (a_dock, a_widget) in flat_dock_item_tuple_dict.items() if ('LEAF' == a_dock.config.additional_metadata.get('type', 'LEAF')) }
+        return list(leaf_only_flat_dockwidgets_dict.keys())
+    
+    def get_group_only_flat_dock_identifiers_list(self) -> List[str]:
+        """the dock_identifiers only for the dock-group items"""
+        flat_dock_item_tuple_dict: Dict[str, Tuple[Dock, Optional["QtWidgets.QWidget"]]] = self.get_flat_dock_item_tuple_dict()
+        group_only_flat_dockwidgets_dict = {k:a_widget for k, (a_dock, a_widget) in flat_dock_item_tuple_dict.items() if ('GROUP' == a_dock.config.additional_metadata.get('type', 'LEAF')) }
+        return list(group_only_flat_dockwidgets_dict.keys())
+    
+
+
 
     # ==================================================================================================================== #
     # dockGroup                                                                                                            #
     # ==================================================================================================================== #
+    # ## Dock all Grouped results from `'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView'`
+    # ## INPUTS: active_2d_plot
+    # nested_dock_items, nested_dynamic_docked_widget_container_widgets = active_2d_plot.ui.dynamic_docked_widget_container.layout_dockGroups()
+    # grouped_dock_items_dict = active_2d_plot.ui.dynamic_docked_widget_container.get_dockGroup_dock_dict()
+    # ## OUTPUTS: nested_dock_items, nested_dynamic_docked_widget_container_widgets
+    
     @function_attributes(short_name=None, tags=['dockGroup'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 00:00', related_items=[])
     def get_dockGroup_dock_dict(self, debug_print=False) -> Dict[str, List[Dock]]:
         """ extracts the 'widget' property that is the contents of each added dock item from the self.dynamic_display_dict and returns it as a flat list """
@@ -722,7 +740,7 @@ class DynamicDockDisplayAreaContentMixin(BaseDynamicInstanceConformingMixin):
         return test_dock_planning_widget, dDisplayItem
 
     @function_attributes(short_name=None, tags=['docks', 'nested', 'wrapping'], input_requires=[], output_provides=[], uses=['self.add_display_dock(...)', 'NestedDockAreaWidget','CustomDockDisplayConfig'], used_by=['layout_dockGroups'], creation_date='2025-01-14 03:41', related_items=[])        
-    def build_wrapping_nested_dock_area(self, flat_group_dockitems_list, dock_group_name: str = 'ContinuousDecode_ - t_bin_size: 0.025'):
+    def build_wrapping_nested_dock_area(self, flat_group_dockitems_list: List[Dock], dock_group_name: str = 'ContinuousDecode_ - t_bin_size: 0.025'):
         """ 
         Builds a wrapping dock area containing several pre-existing dock items
         
@@ -791,6 +809,87 @@ class DynamicDockDisplayAreaContentMixin(BaseDynamicInstanceConformingMixin):
             nested_dynamic_docked_widget_container.displayDockArea.addDock(dock=a_dock) ## move the dock items as children to the new container
             
         return dDisplayItem, nested_dynamic_docked_widget_container
+    
+
+    def unwrap_docks_in_nested_dock_area(self, dock_group_name: str='ContinuousDecode_0.03'):
+        """
+        Removes an existing wrapping dock area containing several pre-existing dock items and returns the dock items back to their parent
+        
+        Reciprocal of `build_wrapping_nested_dock_area`
+        
+        Usage:
+            active_2d_plot.dock_manager_widget.unwrap_docks_in_nested_dock_area(dock_group_name='ContinuousDecode_0.03')
+
+        """
+        group_dock_ids_list = self.get_group_only_flat_dock_identifiers_list()
+        # leaf_dock_ids_list = self.get_leaf_only_flat_dock_identifiers_list()
+        
+        group_dock_raw_identifiers_list = [v.lstrip('GROUP[').rstrip(']') for v in group_dock_ids_list] # 'GROUP[ContinuousDecode_0.03]' -> 'ContinuousDecode_0.03'
+
+        assert dock_group_name in group_dock_raw_identifiers_list, f"dock_group_name: '{dock_group_name}' was not found in group_dock_raw_identifiers_list: {group_dock_raw_identifiers_list}"
+        grouped_dock_items_dict: Dict[str, List[Dock]] = self.get_dockGroup_dock_dict()
+        # {'ContinuousDecode_ - t_bin_size: 0.025': [<Dock ContinuousDecode_long_LR - t_bin_size: 0.025 (65, 200)>,
+        #   <Dock ContinuousDecode_long_RL - t_bin_size: 0.025 (65, 200)>,
+        #   <Dock ContinuousDecode_short_LR - t_bin_size: 0.025 (65, 200)>,
+        #   <Dock ContinuousDecode_short_RL - t_bin_size: 0.025 (65, 200)>],
+        #  'ContinuousDecode_0.03': [<Dock DirectionalDecodersDecoded[long_LR]0.03 (65, 200)>,
+        #   <Dock DirectionalDecodersDecoded[long_RL]0.03 (65, 200)>,
+        #   <Dock DirectionalDecodersDecoded[short_LR]0.03 (65, 200)>,
+        #   <Dock DirectionalDecodersDecoded[short_RL]0.03 (65, 200)>]}
+
+        found_group_idx: int = group_dock_raw_identifiers_list.index(dock_group_name)
+        assert found_group_idx != -1
+        a_group_container_id: str = group_dock_ids_list[found_group_idx]
+        a_group_id: str = group_dock_raw_identifiers_list[found_group_idx]
+        flat_group_dockitems_list: List[Dock] = grouped_dock_items_dict[a_group_id]
+
+        for a_dock in flat_group_dockitems_list:
+            # a_dock_identifier: str = a_dock.name()
+            # ## format nested child docks:
+            # a_dock.config.showCloseButton = False
+            # a_dock.config.showCollapseButton = False
+            # a_dock.config.showGroupButton = False
+            # a_dock.config.corner_radius='0px'
+            # a_dock.updateStyle()
+            self.displayDockArea.addDock(dock=a_dock) ## move the dock items as children to the new container
+            
+        ## remove the group
+        self.remove_display_dock(identifier=a_group_container_id)
+
+
+    def unwrap_docks_in_all_nested_dock_area(self):
+        """
+        Removes all existing wrapping dock areas (groups) and returns the dock items back to their parent
+        
+        Reciprocal of `build_wrapping_nested_dock_area`
+        
+        Usage:
+            active_2d_plot.dock_manager_widget.unwrap_docks_in_all_nested_dock_area()
+
+        """
+        # group_dock_ids_list = self.get_group_only_flat_dock_identifiers_list()
+        # leaf_dock_ids_list = self.get_leaf_only_flat_dock_identifiers_list()        
+        # group_dock_raw_identifiers_list = [v.lstrip('GROUP[').rstrip(']') for v in group_dock_ids_list] # 'GROUP[ContinuousDecode_0.03]' -> 'ContinuousDecode_0.03'
+        grouped_dock_items_dict: Dict[str, List[Dock]] = self.get_dockGroup_dock_dict()
+
+        for a_group_id, a_flat_group_dockitems_list in grouped_dock_items_dict.items():
+            a_group_container_id: str = f'GROUP[{a_group_id}]'
+            # a_flat_group_dockitems_list: List[Dock]
+            for a_dock in a_flat_group_dockitems_list:
+                # a_dock_identifier: str = a_dock.name()
+                # ## format nested child docks:
+                # a_dock.config.showCloseButton = False
+                # a_dock.config.showCollapseButton = False
+                # a_dock.config.showGroupButton = False
+                # a_dock.config.corner_radius='0px'
+                # a_dock.updateStyle()
+                self.displayDockArea.addDock(dock=a_dock) ## move the dock items as children to the new container
+            # END for a_dock in a_flat_group_dockitems_list
+            ## remove the group
+            self.remove_display_dock(identifier=a_group_container_id)
+        # END for a_group_id, a_flat_group_dockitems_list in grouped_dock_items_dict.items()
+    
+
 
 
     @pyqtExceptionPrintingSlot(object, str)
