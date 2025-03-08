@@ -4,6 +4,8 @@ from enum import Enum
 from attrs import define, field, Factory
 import numpy as np
 
+from neuropy.utils.mixins.dynamic_conformance_updating_mixin import BaseDynamicInstanceConformingMixin
+
 # import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
@@ -323,7 +325,7 @@ class CustomCyclicColorsDockDisplayConfig(CustomDockDisplayConfig):
 
 
 
-class DynamicDockDisplayAreaContentMixin:
+class DynamicDockDisplayAreaContentMixin(BaseDynamicInstanceConformingMixin):
     """ Conformers are able to dynamically add/remove Dock items and their widgets to the root self.area (a DockArea) item.
     
     Requires at minimum:
@@ -844,7 +846,7 @@ class DynamicDockDisplayAreaContentMixin:
 
 
 @metadata_attributes(short_name=None, tags=['widget', 'dock', 'dockarea'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-13 18:21', related_items=['PipelineDynamicDockDisplayAreaMixin'])
-class DynamicDockDisplayAreaOwningMixin:
+class DynamicDockDisplayAreaOwningMixin(BaseDynamicInstanceConformingMixin):
     """A mixin for widgets that own/contain a child widget implementing DynamicDockDisplayAreaContentMixin.
     Provides convenient access to dock management functions by delegating to the child widget.
     
