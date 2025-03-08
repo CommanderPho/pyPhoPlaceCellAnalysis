@@ -765,6 +765,11 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         """ for compatibility """
         return deepcopy([self.time_bin_containers[an_epoch_idx].centers for an_epoch_idx in np.arange(self.num_filter_epochs)])
 
+    @property
+    def flat_time_window_centers(self) -> NDArray:
+        """ for compatibility """
+        return np.hstack(self.time_window_centers) ## a flat list of time_window_centers
+
 
     @function_attributes(short_name=None, tags=['single-epoch', 'indexing', 'start-time'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=['self.get_result_for_epoch_at_time'])
     def get_result_for_epoch(self, active_epoch_idx: int) -> SingleEpochDecodedResult:
@@ -1415,7 +1420,37 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                 # output_pseudo2D_split_to_1D_continuous_results_dict[a_decoder_name].compute_marginals()
             ## END for i, a_de...
             return output_pseudo2D_split_to_1D_continuous_results_dict
+
+
+    @function_attributes(short_name=None, tags=['pseudo2D', 'marginal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-08 08:02', related_items=[])
+    def get_pseudo2D_result_to_pseudo2D_marginalization_result(self, pseudo2D_decoder_names_list: Optional[str]=None, debug_print=False) -> Tuple[NDArray, NDArray]:
+        """ Get marginalization of the Pseudo2D track (4 decoders) so they can be plotted on seperate tracks and bin-debugged independently.
+
+        Usage:
+            ## INPUTS: laps_pseudo2D_continuous_specific_decoded_result: DecodedFilterEpochsResult
+            flat_time_window_centers, flat_marginal_y_p_x_given_n = laps_pseudo2D_continuous_specific_decoded_result.get_pseudo2D_result_to_pseudo2D_marginalization_result(pseudo2D_decoder_names_list=unique_decoder_names)
+            flat_marginal_y_p_x_given_n
+
+
+        """
+        if pseudo2D_decoder_names_list is None:
+            pseudo2D_decoder_names_list = ('long_LR', 'long_RL', 'short_LR', 'short_RL')
+        
+        marginal_y_p_x_given_n_list = [v.p_x_given_n for v in self.marginal_y_list]  #  [(2, 66), (2, 102), (2, 226), ...] (n_ybins, n_epoch_t_bins[i])
+        flat_marginal_y_p_x_given_n: NDArray = np.hstack(marginal_y_p_x_given_n_list) # (2, 19018)
+        n_ybins, n_flat_tbin_centers = np.shape(flat_marginal_y_p_x_given_n)
+        if debug_print:
+            print(f'n_flat_tbin_centers: {n_flat_tbin_centers}, n_ybins: {n_ybins}')
+
+        flat_time_window_centers: NDArray = np.hstack(self.time_window_centers)
+        assert len(flat_time_window_centers) == n_flat_tbin_centers
+        
+        ## we will reduce along the y-dim dimension  
+        assert n_ybins == len(pseudo2D_decoder_names_list), f"for pseudo2D_decoder_names_list: {pseudo2D_decoder_names_list}\n\texpected the len(pseudo2D_decoder_names_list): {len(pseudo2D_decoder_names_list)} pseudo-y bins for the decoder in n_ybins. but found n_ybins: {n_ybins}"
     
+        return flat_time_window_centers, flat_marginal_y_p_x_given_n
+        
+
 
 # ==================================================================================================================== #
 # Placemap Position Decoders                                                                                           #

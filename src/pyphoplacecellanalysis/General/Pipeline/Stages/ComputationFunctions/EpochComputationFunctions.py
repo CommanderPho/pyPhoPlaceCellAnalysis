@@ -963,7 +963,6 @@ class EpochComputationsComputationsContainer(ComputedResult):
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
 
         a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = self.a_new_NonPBE_Epochs_obj
         results1D: NonPBEDimensionalDecodingResult = self.results1D
@@ -973,7 +972,6 @@ class EpochComputationsComputationsContainer(ComputedResult):
         frame_divide_bin_size = self.frame_divide_bin_size
 
         print(f'{epochs_decoding_time_bin_size = }, {frame_divide_bin_size = }')
-
 
         ## INPUTS: results1D, results1D.continuous_results, a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs
 

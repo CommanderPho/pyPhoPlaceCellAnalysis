@@ -395,6 +395,35 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
                                                                                                     measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()),
                                                                                                     extended_dock_title_info=info_string)
                                                                                                     
+                                                                                                    
+
+
+        Usage 2:
+            from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
+            from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, DockDisplayColors
+
+            
+            ## INPUTS: laps_pseudo2D_continuous_specific_decoded_result: DecodedFilterEpochsResult
+            unique_decoder_names = ['long', 'short']
+            laps_pseudo2D_split_to_1D_continuous_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = laps_pseudo2D_continuous_specific_decoded_result.split_pseudo2D_result_to_1D_result(pseudo2D_decoder_names_list=unique_decoder_names)
+
+            active_time_bin_size: float = pseudo2D_continuous_specific_decoded_result.decoding_time_bin_size
+            info_string: str = f'{active_time_bin_size:.3f}'
+            dock_group_sep_character: str = '_'
+            showCloseButton = True
+            _common_dock_config_kwargs = {'dock_group_names': [dock_group_sep_character.join([f'LapsDecode', info_string])], 'showCloseButton': showCloseButton}
+            dock_configs: Dict[str, CustomDockDisplayConfig] = dict(zip(unique_decoder_names,
+                                    (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Epochs.get_long_dock_colors, **_common_dock_config_kwargs),
+                                    CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Epochs.get_short_dock_colors, **_common_dock_config_kwargs))))
+                                    
+
+            pf1D_Decoder_dict = {k:deepcopy(v) for k, v in results1D.decoders.items() if k in unique_decoder_names}
+
+            output_dict = active_2d_plot.add_docked_decoded_results_dict_tracks(name=f'LapsDecode', a_decoded_result_dict=laps_pseudo2D_split_to_1D_continuous_results_dict, dock_configs=dock_configs, pf1D_Decoder_dict=pf1D_Decoder_dict,
+                                                                                                        measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()),
+                                                                                                        extended_dock_title_info=info_string)
+                                                                                                                                                                                                            
+                                                                                                    
         """
         output_dict = {}
         for a_decoder_name, a_1D_decoded_result in a_decoded_result_dict.items():
