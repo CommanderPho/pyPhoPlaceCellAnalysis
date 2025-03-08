@@ -207,7 +207,7 @@ class DisplayColorsEnum:
             Usage:
                 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
                 
-                even_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors())
+                long_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Epochs.get_long_dock_colors())
                 
                 long_fg_color, long_bg_color, long_border_color = DisplayColorsEnum.Epochs.get_long_dock_colors(None, is_dim=False)
                 LR_fg_color, LR_bg_color, LR_border_color = DisplayColorsEnum.Laps.get_short_dock_colors(None, is_dim=False)
