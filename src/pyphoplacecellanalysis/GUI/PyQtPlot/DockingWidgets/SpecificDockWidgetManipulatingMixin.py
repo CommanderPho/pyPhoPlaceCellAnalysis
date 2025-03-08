@@ -63,7 +63,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
     def add_docked_decoded_continuous_result_track(self, name: str):
         pass
 
-    def add_docked_decoded_posterior_track(self, name: str, time_window_centers: NDArray, a_1D_posterior: NDArray, xbin: Optional[NDArray]=None, measured_position_df: Optional[pd.DataFrame]=None, a_variable_name: Optional[str]=None, a_dock_config: Optional[CustomDockDisplayConfig]=None, extended_dock_title_info: Optional[str]=None, should_defer_render:bool=False):
+    def add_docked_decoded_posterior_track(self, name: str, time_window_centers: NDArray, a_1D_posterior: NDArray, xbin: Optional[NDArray]=None, measured_position_df: Optional[pd.DataFrame]=None, a_variable_name: Optional[str]=None, a_dock_config: Optional[CustomDockDisplayConfig]=None, extended_dock_title_info: Optional[str]=None, should_defer_render:bool=False, **kwargs):
         """ adds a decoded 1D posterior 
 
         Aims to replace `AddNewDecodedPosteriors_MatplotlibPlotCommand._perform_add_new_decoded_posterior_row`
@@ -113,9 +113,9 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         active_most_likely_positions = None
         active_posterior = deepcopy(a_1D_posterior)
         
-        posterior_heatmap_imshow_kwargs = dict(
+        posterior_heatmap_imshow_kwargs = kwargs.pop('posterior_heatmap_imshow_kwargs', dict(
             cmap = get_heatmap_cmap(cmap='viridis', bad_color='black', under_color='white', over_color='red'),
-        )
+        ))
 
         # most_likely_positions_mode: 'standard'|'corrected'
         ## Actual plotting portion:
@@ -161,7 +161,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         
         return identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dock_item
     
-    def add_docked_decoded_posterior_slices_track(self, name: str, slices_time_window_centers: List[NDArray], slices_posteriors: List[NDArray], xbin: Optional[NDArray]=None, measured_position_df: Optional[pd.DataFrame]=None, a_variable_name: Optional[str]=None, a_dock_config: Optional[CustomDockDisplayConfig]=None, extended_dock_title_info: Optional[str]=None, should_defer_render:bool=False):
+    def add_docked_decoded_posterior_slices_track(self, name: str, slices_time_window_centers: List[NDArray], slices_posteriors: List[NDArray], xbin: Optional[NDArray]=None, measured_position_df: Optional[pd.DataFrame]=None, a_variable_name: Optional[str]=None, a_dock_config: Optional[CustomDockDisplayConfig]=None, extended_dock_title_info: Optional[str]=None, should_defer_render:bool=False, **kwargs):
         """ adds a decoded 1D posterior 
 
         Aims to replace `AddNewDecodedPosteriors_MatplotlibPlotCommand._perform_add_new_decoded_posterior_row`
@@ -212,9 +212,9 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         # active_most_likely_positions = active_marginals.most_likely_positions_1D # Raw decoded positions
         slices_active_most_likely_positions_1D = None
         
-        posterior_heatmap_imshow_kwargs = dict(
+        posterior_heatmap_imshow_kwargs = kwargs.pop('posterior_heatmap_imshow_kwargs', dict(
             cmap = get_heatmap_cmap(cmap='viridis', bad_color='black', under_color='white', over_color='red'),
-        )
+        ))
 
         # most_likely_positions_mode: 'standard'|'corrected'
         ## Actual plotting portion:
@@ -341,7 +341,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         active_most_likely_positions = None
         active_posterior = deepcopy(a_1D_posterior)
         
-        posterior_heatmap_imshow_kwargs = dict()	
+        posterior_heatmap_imshow_kwargs = dict()
         
         # most_likely_positions_mode: 'standard'|'corrected'
         ## Actual plotting portion:
