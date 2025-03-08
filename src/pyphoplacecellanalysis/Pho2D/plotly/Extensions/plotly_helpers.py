@@ -771,31 +771,8 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
                 line=dict(color="Black", width=2),
                 name='figure_sup_huge_title_text_line'
             )
-                
-            # else:
-            #     ## need to update properties of the existing figure:
-            #     print(f'trying to update existing figure "figure_sup_huge_title_text_annotation"')
-            #     # fig.update_annotations(selector={'name':'figure_sup_huge_title_text_annotation'},
-            #     #                     patch=dict(
-            #     #                         text=figure_sup_huge_title_text,
-            #     #                         **annotation_kwargs,
-            #     #                         y=0.5,
-            #     #                         xref="paper",
-            #     #                         yref="paper",
-            #     #                         showarrow=False,
-            #     #                         textangle=-90,
-            #     #                         xanchor='center',
-            #     #                         yanchor='middle',
-            #     #                         name='figure_sup_huge_title_text_annotation',
-            #     #                     ),
-            #     # )
-            #     annotation_idx: int = -1
-            #     fig.layout.annotations[annotation_idx].text = figure_sup_huge_title_text
-            ## TODO: update shape 'figure_sup_huge_title_text_line'
-                    
-            
-            
-
+        # END if is_top_supertitle
+    # END if figure_sup_huge_title_text is not None
 
     # Add footer text if provided
     if figure_footer_text:
@@ -808,7 +785,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
                 'name': 'figure_footer_text_annotation'
             },
         )
-            
+    # END if figure_footer_text 
     return fig, figure_context
 
 
