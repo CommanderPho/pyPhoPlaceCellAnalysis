@@ -21,6 +21,7 @@ from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import 
 from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, CustomCyclicColorsDockDisplayConfig, NamedColorScheme
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult, DecodedFilterEpochsResult
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
+from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
 
 
 class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
@@ -99,12 +100,18 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         if xbin is None:
             xbin = np.arange(n_xbins)
 
+        xbin_labels = kwargs.pop('xbin_labels', None)
+        if xbin_labels is not None:
+            assert len(xbin_labels) == len(xbin)
+        
+        dockSize = kwargs.pop('dockSize', (65, 200)) 
+        
         ## ✅ Add a new row for each of the four 1D directional decoders:
         identifier_name: str = name
         if extended_dock_title_info is not None:
             identifier_name += extended_dock_title_info ## add extra info like the time_bin_size in ms
         # print(f'identifier_name: {identifier_name}')
-        widget, matplotlib_fig, matplotlib_fig_axes, dock_item = self.add_new_matplotlib_render_plot_widget(name=identifier_name, dockSize=(65, 200), display_config=a_dock_config)
+        widget, matplotlib_fig, matplotlib_fig_axes, dock_item = self.add_new_matplotlib_render_plot_widget(name=identifier_name, dockSize=dockSize, display_config=a_dock_config)
         an_ax = matplotlib_fig_axes[0]
 
         variable_name: str = a_variable_name
@@ -124,6 +131,14 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
                                                                 active_most_likely_positions_1D=active_most_likely_positions,
                                                                 ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
                                                                 posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
+
+        if xbin_labels is not None:
+            ## add the labels:
+            widget.plots.label_artists_dict = {}
+            y_bin_labels = list(reversed(xbin_labels))
+            widget.params.y_bin_labels = y_bin_labels
+            widget.plots.label_artists_dict[an_ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(an_ax, y_bin_labels=y_bin_labels, enable_draw_decoder_colored_lines=False)
+
 
         ## Update the params
         widget.params.variable_name = variable_name
@@ -183,6 +198,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_slices_1D_most_likely_position_comparsions
         from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
+        
         if a_variable_name is None:
             a_variable_name = name
 
@@ -199,12 +215,18 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         if xbin is None:
             xbin = np.arange(n_xbins)
 
+        xbin_labels = kwargs.pop('xbin_labels', None)
+        if xbin_labels is not None:
+            assert len(xbin_labels) == len(xbin)
+            
+        dockSize = kwargs.pop('dockSize', (65, 200)) 
+        
         ## ✅ Add a new row for each of the four 1D directional decoders:
         identifier_name: str = name
         if extended_dock_title_info is not None:
             identifier_name += extended_dock_title_info ## add extra info like the time_bin_size in ms
         # print(f'identifier_name: {identifier_name}')
-        widget, matplotlib_fig, matplotlib_fig_axes, dock_item = self.add_new_matplotlib_render_plot_widget(name=identifier_name, dockSize=(65, 200), display_config=a_dock_config)
+        widget, matplotlib_fig, matplotlib_fig_axes, dock_item = self.add_new_matplotlib_render_plot_widget(name=identifier_name, dockSize=dockSize, display_config=a_dock_config)
         an_ax = matplotlib_fig_axes[0]
 
         variable_name: str = a_variable_name
@@ -224,6 +246,14 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
                                                         ax=an_ax, variable_name=variable_name, debug_print=True, enable_flat_line_drawing=False,
                                                         posterior_heatmap_imshow_kwargs=posterior_heatmap_imshow_kwargs)
         
+
+
+        if xbin_labels is not None:
+            ## add the labels:
+            widget.plots.label_artists_dict = {}
+            y_bin_labels = list(reversed(xbin_labels))
+            widget.params.y_bin_labels = y_bin_labels
+            widget.plots.label_artists_dict[an_ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(an_ax, y_bin_labels=y_bin_labels, enable_draw_decoder_colored_lines=False)
 
 
         ## Update the params
@@ -260,6 +290,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
 
         if not should_defer_render:
             widget.draw() # alternative to accessing through full path?
+            
         # end if not should_defer_render
         self.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
         
@@ -287,6 +318,7 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
                                                                                                 xbin = deepcopy(a_1D_decoder.xbin), measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()),
                                                                                                 extended_dock_title_info=info_string)
             """
+            from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
             if isinstance(a_1D_decoded_result, SingleEpochDecodedResult):
                 return self.add_docked_decoded_posterior_track(name=name, time_window_centers=a_1D_decoded_result.time_bin_container.centers, a_1D_posterior=a_1D_decoded_result.p_x_given_n, xbin=xbin, measured_position_df=measured_position_df, **kwargs)
             elif isinstance(a_1D_decoded_result, DecodedFilterEpochsResult):
@@ -313,6 +345,8 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
         from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
+        from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
+        
         if a_variable_name is None:
             a_variable_name = name
 
@@ -368,6 +402,8 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         widget.plots_data.variable_name = variable_name
         if a_1D_posterior is not None:
             widget.plots_data.matrix = deepcopy(a_1D_posterior)
+
+
 
 
         widget.draw() # alternative to accessing through full path?
