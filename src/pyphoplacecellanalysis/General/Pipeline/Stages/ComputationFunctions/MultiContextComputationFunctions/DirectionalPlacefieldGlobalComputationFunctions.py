@@ -1569,7 +1569,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
     @function_attributes(short_name=None, tags=['ACTIVE', 'general', 'non_PBE'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-20 16:16', related_items=[])
     @classmethod
-    def build_generalized_non_marginalized_raw_posteriors(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], unique_decoder_names: List[str], debug_print=False) -> List[DynamicContainer]:
+    def build_generalized_non_marginalized_raw_posteriors(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], unique_decoder_names: List[str], debug_print=False) -> Tuple[List[DynamicContainer], pd.DataFrame]:
         """ works for an all-directional coder with an arbitrary (but specified as `unique_decoder_names`) n_decoders items
         
         Requires: filter_epochs_decoder_result.p_x_given_n_list
@@ -1649,7 +1649,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
             unique_decoder_names = ['long', 'short']
             # NOTE: non_marginalized_raw_result is a marginal_over_track_ID since there are only two elements
-            non_PBE_marginal_over_track_ID = DirectionalPseudo2DDecodersResult.build_generalized_non_marginalized_raw_posteriors(pseudo2D_decoder_continuously_decoded_result, unique_decoder_names=unique_decoder_names)[0]['p_x_given_n']
+            non_PBE_marginal_over_track_ID, non_PBE_marginal_over_track_ID_posterior_df = DirectionalPseudo2DDecodersResult.build_generalized_non_marginalized_raw_posteriors(pseudo2D_decoder_continuously_decoded_result, unique_decoder_names=unique_decoder_names)[0]['p_x_given_n']
             # non_marginalized_raw_result = DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors(pseudo2D_decoder_continuously_decoded_result)[0]['p_x_given_n']
             # marginal_over_direction = DirectionalPseudo2DDecodersResult.build_custom_marginal_over_direction(pseudo2D_decoder_continuously_decoded_result)[0]['p_x_given_n']
             # marginal_over_track_ID = DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(pseudo2D_decoder_continuously_decoded_result)[0]['p_x_given_n']
@@ -1761,28 +1761,35 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
         # ## INPUTS: custom_curr_unit_marginal_list
         
-        # ## All
-        # _epoch_repeated_epoch_index_list = [np.full((n_bins, ), i) for i, n_bins in enumerate(custom_curr_unit_marginal_list.nbins)]
-        # _epoch_repeated_sub_epoch_time_bin_index_list = [np.arange(n_bins) for n_bins in custom_curr_unit_marginal_list.nbins]
-        # epochs_repeated_epoch_index: NDArray = np.hstack(_epoch_repeated_epoch_index_list) # np.shape(epochs_p_x_given_n) # (2, 19018)
-        # epochs_repeated_sub_epoch_time_bin_index: NDArray = np.hstack(_epoch_repeated_sub_epoch_time_bin_index_list) # np.shape(epochs_t_centers) # (19018,)
+        ## All
+        epochs_repeated_epoch_index: NDArray = np.hstack([np.full((n_bins, ), i) for i, n_bins in enumerate(filter_epochs_decoder_result.nbins)]) # np.shape(epochs_p_x_given_n) # (2, 19018)
+        epochs_repeated_sub_epoch_time_bin_index: NDArray = np.hstack([np.arange(n_bins) for n_bins in filter_epochs_decoder_result.nbins]) # np.shape(epochs_t_centers) # (19018,)
 
-        # ## Non-masked
-        # _epochs_p_x_given_n_list = [v['p_x_given_n'] for v in custom_curr_unit_marginal_list]
-        # _epochs_t_centers_list = [t.centers for t in custom_curr_unit_marginal_list.time_bin_containers]
-        # epochs_p_x_given_n: NDArray = np.hstack(_epochs_p_x_given_n_list) # np.shape(epochs_p_x_given_n) # (2, 19018)
-        # epochs_t_centers: NDArray = np.hstack(_epochs_t_centers_list) # np.shape(epochs_t_centers) # (19018,)
-        # assert np.shape(epochs_p_x_given_n)[-1] == np.shape(epochs_t_centers)[0]
+        ## Non-masked
+        epochs_p_x_given_n: NDArray = np.hstack([v['p_x_given_n'] for v in custom_curr_unit_marginal_list]) # np.shape(epochs_p_x_given_n) # (2, 19018)
+        epochs_t_centers: NDArray = np.hstack([t.centers for t in filter_epochs_decoder_result.time_bin_containers]) # np.shape(epochs_t_centers) # (19018,)
+        assert np.shape(epochs_p_x_given_n)[-1] == np.shape(epochs_t_centers)[0]
 
-        # ## OUTPUTS: epochs_repeated_epoch_index, epochs_repeated_sub_epoch_time_bin_index, epochs_t_centers, epochs_p_x_given_n
-        # _common_epoch_df_dict = {'epoch_id': epochs_repeated_epoch_index, 'sub_epoch_time_bin_index': epochs_repeated_sub_epoch_time_bin_index}
+        ## OUTPUTS: epochs_repeated_epoch_index, epochs_repeated_sub_epoch_time_bin_index, epochs_t_centers, epochs_p_x_given_n
+        _common_epoch_df_dict = {'epoch_id': epochs_repeated_epoch_index, 'sub_epoch_time_bin_index': epochs_repeated_sub_epoch_time_bin_index}
 
-        # ## Build into a marginal df like `all_sessions_epochs_df`:
-        # track_marginal_posterior_df : pd.DataFrame = pd.DataFrame({'t':deepcopy(epochs_t_centers), 'P_Long': np.squeeze(epochs_p_x_given_n[0, :]), 'P_Short': np.squeeze(epochs_p_x_given_n[1, :]), **deepcopy(_common_epoch_df_dict)}) # , 'time_bin_size': pseudo2D_continuous_specific_decoded_result.decoding_time_bin_size
-        # ## OUTPUTS: track_marginal_posterior_df
+        assert np.shape(epochs_p_x_given_n)[0] == len(unique_decoder_names), f"unique_decoder_names: {unique_decoder_names} len(unique_decoder_names) != np.shape(epochs_p_x_given_n)[0]: {np.shape(epochs_p_x_given_n)[0]}"
+
+        _marginal_prob_var_names = [f"P_{v.capitalize()}" for v in unique_decoder_names] # ['P_Long', 'P_Short']
+        
+        _marginal_probs_dict = {a_marginal_prob_col_name:np.squeeze(epochs_p_x_given_n[i, :]) for i, (a_marginal_prob_col_name, a_decoder_name) in enumerate(zip(_marginal_prob_var_names, unique_decoder_names))} # 'P_Long': np.squeeze(epochs_p_x_given_n[0, :]), 'P_Short': np.squeeze(epochs_p_x_given_n[1, :]),
+        if debug_print:
+            print(f'_marginal_probs_dict: {_marginal_probs_dict}')
+        
+        ## Build into a marginal df like `all_sessions_epochs_df`:
+        track_marginal_posterior_df: pd.DataFrame = pd.DataFrame({'t':deepcopy(epochs_t_centers),
+                                                                    **_marginal_probs_dict,
+                                                                    # 'P_Long': np.squeeze(epochs_p_x_given_n[0, :]), 'P_Short': np.squeeze(epochs_p_x_given_n[1, :]),
+                                                                     **deepcopy(_common_epoch_df_dict)}) # , 'time_bin_size': pseudo2D_continuous_specific_decoded_result.decoding_time_bin_size
+        ## OUTPUTS: track_marginal_posterior_df
         
 
-        return custom_curr_unit_marginal_list
+        return custom_curr_unit_marginal_list, track_marginal_posterior_df
 
 
 
