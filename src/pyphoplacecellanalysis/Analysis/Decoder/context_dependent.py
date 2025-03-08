@@ -57,13 +57,17 @@ from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResu
 #     NDArray[np.bool_]
 # ]
 
-
-
-
 # # 2025-02-21 - I realized that `TrackTemplates` and `DirectionalLapsResult` are pointlessly hard-coded to require directionality, but a more general solution would be just to allow dicts of decoders.
-
-
 #TODO 2025-03-07 18:38: - [ ] Generalize `DecoderDecodedEpochsResult`
+
+
+#TODO 2025-03-08 13:57: - [ ] Final Output will be: a decoded posterior 
+# - used to decode:
+#   - LapEpochs, RippleEpochs, ContinuousEpochs (not needed)
+# - computed using:
+#   - RunningDecoder (Only-laps), NonPBEDecoder (Any non-PBE period)
+#   - 
+
 
 @define(slots=False, repr=False)
 class GeneralDecoderDecodedEpochsResult(ComputedResult):
