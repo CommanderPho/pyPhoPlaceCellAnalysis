@@ -1285,7 +1285,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
     
 
     @function_attributes(short_name=None, tags=['mask', 'unit-spike-counts', 'pure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-04 01:32', related_items=[])
-    def mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(self, spikes_df: pd.DataFrame, masked_bin_fill_mode:MaskedTimeBinFillType='last_valid') -> Tuple["DecodedFilterEpochsResult", Tuple[NDArray, NDArray]]:
+    def mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(self, spikes_df: pd.DataFrame, min_num_spikes_per_bin_to_be_considered_active:int=1, min_num_unique_active_neurons_per_time_bin:int=2, masked_bin_fill_mode:MaskedTimeBinFillType='last_valid') -> Tuple["DecodedFilterEpochsResult", Tuple[NDArray, NDArray]]:
         """ finds periods where there is insufficient firing to decode based on the provided paramters, copies the decoded result and returns a version with positions back-filled from the last bin that did meet the minimum firing criteria
         
         Pure: does not modify self
@@ -1294,8 +1294,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         a_decoded_result.most_likely_position_indicies_list[0].shape # .shape (2, 69487)
         a_decoded_result.most_likely_positions_list[0].shape # .shape (69487, 2)
 
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin
-        
+
         spikes_df: pd.DataFrame = deepcopy(get_proper_global_spikes_df(curr_active_pipeline))
         non_PBE_all_directional_pf1D_Decoder, pseudo2D_continuous_specific_decoded_result, continuous_decoded_results_dict, non_PBE_marginal_over_track_ID, (time_bin_containers, time_window_centers) = nonPBE_results._build_merged_joint_placefields_and_decode(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)))
         maksed_pseudo2D_continuous_specific_decoded_result, mask_index_tuple = pseudo2D_continuous_specific_decoded_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)))
@@ -1331,7 +1330,9 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             a_time_bin_edges: NDArray = deepcopy(a_decoded_result.time_bin_edges[i])
             assert len(a_time_bin_edges) == (num_time_bins+1)
         
-            unit_specific_time_binned_spike_counts, unique_units, (is_time_bin_active, inactive_mask, mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask(time_bin_edges=a_time_bin_edges)
+            unit_specific_time_binned_spike_counts, unique_units, (is_time_bin_active, inactive_mask, mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask(time_bin_edges=a_time_bin_edges,
+                                                                                                                                                                                    min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active,
+                                                                                                                                                                                    min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
             
             # Make a copy of the original data before masking
             original_data = a_decoded_result.p_x_given_n_list[i].copy()
