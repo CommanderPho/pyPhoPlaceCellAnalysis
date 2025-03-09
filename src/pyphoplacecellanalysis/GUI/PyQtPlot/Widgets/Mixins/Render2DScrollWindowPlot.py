@@ -24,6 +24,12 @@ class ScatterItemData:
 class Render2DScrollWindowPlotMixin:
     """ Adds a LinearRegionItem to the plot that represents the entire data timerange which defines a user-adjustable window into the data. Finally, also adds a plot that shows only the zoomed-in data within the window. 
     
+    Controls/Manages:
+        Two PyQtGraph-based PlotItems 
+        - a static overview of the whole recording session with a user-adjustable window slider into the data
+        - a dynamically scrolling zoomed-in view of the above raster, controlled by the adjustable window
+        
+        
     Known Uses:
         Implemented by Spike2DRaster
     
@@ -37,7 +43,7 @@ class Render2DScrollWindowPlotMixin:
     """
     
     ## Scrollable Window Signals
-    window_scrolled = QtCore.pyqtSignal(float, float) # signal is emitted on updating the 2D sliding window, where the first argument is the new start value and the 2nd is the new end value
+    window_scrolled = QtCore.Signal(float, float) # signal is emitted on updating the 2D sliding window, where the first argument is the new start value and the 2nd is the new end value
     
     
     def ScrollRasterPreviewWindow_on_BuildUI(self, background_static_scroll_window_plot):

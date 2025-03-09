@@ -105,6 +105,8 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
     Includes2DActiveWindowScatter = True # Includes2DActiveWindowScatter: if True, it displays the main scatter plot for the active window.
     
     ## Scrollable Window Signals
+    window_scrolled = QtCore.Signal(float, float) # overriding from Render2DScrollWindowPlotMixin - signal is emitted on updating the 2D sliding window, where the first argument is the new start value and the 2nd is the new end value
+    
     # window_scrolled = QtCore.pyqtSignal(float, float) # signal is emitted on updating the 2D sliding window, where the first argument is the new start value and the 2nd is the new end value
     sigOnIntervalEnteredWindow = QtCore.Signal(object) # pyqtSignal(object)
     sigOnIntervalExitedindow = QtCore.Signal(object)
