@@ -103,8 +103,8 @@ class GeneralDecoderDecodedEpochsResult(ComputedResult):
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
     """ 
 
-    _VersionedResultMixin_version: str = "2025.03.07_0" # to be updated in your IMPLEMENTOR to indicate its version
-
+    _VersionedResultMixin_version: str = "2025.03.07_0" # Initial: 2025.03.07_0
+    
     pos_bin_size: float = serialized_attribute_field(default=None, is_computable=False, repr=True)
     ripple_decoding_time_bin_size: float = serialized_attribute_field(default=None, is_computable=False, repr=True)
     laps_decoding_time_bin_size: float = serialized_attribute_field(default=None, is_computable=False, repr=True)

@@ -940,7 +940,7 @@ class EpochComputationsComputationsContainer(ComputedResult):
     results1D: Optional[NonPBEDimensionalDecodingResult] = serialized_field(default=None, repr=False)
     results2D: Optional[NonPBEDimensionalDecodingResult] = serialized_field(default=None, repr=False)
 
-    a_general_decoder_dict_decoded_epochs_dict_result: GeneralDecoderDictDecodedEpochsDictResult = serialized_field(default=None, is_computable=True, repr=False, metadata={'version_added': '2025.03.09'})
+    a_general_decoder_dict_decoded_epochs_dict_result: GeneralDecoderDictDecodedEpochsDictResult = serialized_field(default=None, is_computable=True, repr=False, metadata={'field_added': '2025.03.09_0'})
     
     # Utility Methods ____________________________________________________________________________________________________ #
 
