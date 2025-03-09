@@ -111,16 +111,16 @@ def pyqtgraph_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context
         tuple: (main_widget, figure_context) - the widget containing the plot and context info
     
     Usage:
-        # from pyphoplacecellanalysis.Pho2D.PyQtPlot.Extensions.pyqtgraph_helpers import pyqtgraph_pre_post_delta_scatter
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import pyqtgraph_pre_post_delta_scatter
-        
-        widget, context = pyqtgraph_pre_post_delta_scatter(
-            data_results_df=your_dataframe,
-            histogram_variable_name='P_Short',
-            histogram_bins=25,
-            scatter_kwargs=dict(title='Your Title')
-        )
-        widget.show()
+
+        ## test AI-generated pyqtgraph version
+        plot_row_identifier: str = f'{a_known_decoded_epochs_type.capitalize()} - {a_prefix.capitalize()} - {a_suffix} decoder' # should be like 'Laps (Masked) from Non-PBE decoder'
+
+        fig_widget, figure_context = pyqtgraph_pre_post_delta_scatter(data_results_df=deepcopy(a_decoded_posterior_df), out_scatter_fig=None, 
+                                        histogram_variable_name='P_Short', hist_kwargs=dict(), histogram_bins=histogram_bins,
+                                        common_plot_kwargs=dict(),
+                                        px_scatter_kwargs = dict(x='delta_aligned_start_t', y='P_Short', title=plot_row_identifier))
+        fig_widget.show()
     """
     # Create app if needed
     app = mkQApp("Pre-Post Delta Scatter")
@@ -295,8 +295,15 @@ def pyqtgraph_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context
             )
             plot.addItem(scatter)
     
-    def plot_histogram_data(df, plot, is_vertical=True):
-        """Plot histogram of data"""
+    def plot_histogram_data(df, plot, is_vertical=True, align="left"):
+        """Plot histogram of data
+        
+        Args:
+            df: DataFrame with data
+            plot: PyQtGraph plot item
+            is_vertical: Whether the histogram is vertical (True) or horizontal (False)
+            align: For horizontal histograms, whether to align "left", "right" or "center"
+        """
         if len(df) == 0:
             return
             
@@ -311,6 +318,11 @@ def pyqtgraph_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context
         
         bins = np.linspace(bin_min, bin_max, histogram_bins)
         
+        # Get histogram counts
+        hist, bin_edges = np.histogram(y, bins=bins)
+        bin_width = bin_edges[1] - bin_edges[0]
+        
+        # For handling different colors
         if 'color' in common_plot_kwargs:
             color_by = common_plot_kwargs['color']
             unique_values = df[color_by].unique()
@@ -329,45 +341,81 @@ def pyqtgraph_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context
                     # Vertical bars - height is the histogram count
                     bars = pg.BarGraphItem(
                         x=bin_edges[:-1], height=hist, 
-                        width=(bin_edges[1] - bin_edges[0]) * 0.8,
+                        width=bin_width * 0.8,
                         brush=color, pen=None
                     )
+                    plot.addItem(bars)
                 else:
-                    # Horizontal bars - width is the histogram count, x starts at 0
-                    bars = pg.BarGraphItem(
-                        x=0, y=bin_edges[:-1], width=hist,
-                        height=(bin_edges[1] - bin_edges[0]) * 0.8,
-                        brush=color, pen=None
-                    )
-                plot.addItem(bars)
+                    # Horizontal bars with alignment options
+                    if align == "left":
+                        # Left-aligned: starts at x=0, extends right
+                        bars = pg.BarGraphItem(
+                            x=0, y=bin_edges[:-1], width=hist,
+                            height=bin_width * 0.8,
+                            brush=color, pen=None
+                        )
+                    elif align == "right":
+                        # Right-aligned: ends at right edge, extends left
+                        # Find the maximum histogram value for scaling
+                        max_hist = hist.max() if len(hist) > 0 else 1
+                        # Create bars with negative width to extend left
+                        bars = pg.BarGraphItem(
+                            x=max_hist, y=bin_edges[:-1], width=-hist,
+                            height=bin_width * 0.8,
+                            brush=color, pen=None
+                        )
+                    else:  # center
+                        # Center-aligned
+                        bars = pg.BarGraphItem(
+                            x=-hist/2, y=bin_edges[:-1], width=hist,
+                            height=bin_width * 0.8,
+                            brush=color, pen=None
+                        )
+                    plot.addItem(bars)
         else:
             # Default histogram with single color
-            hist, bin_edges = np.histogram(y, bins=bins)
-            
             if is_vertical:
-                # Vertical histogram (bars extend upward)
+                # Vertical histogram
                 bars = pg.BarGraphItem(
                     x=bin_edges[:-1], height=hist, 
-                    width=(bin_edges[1] - bin_edges[0]) * 0.8,
+                    width=bin_width * 0.8,
                     brush=(100, 100, 255, 150), pen=None
                 )
+                plot.addItem(bars)
             else:
-                # Horizontal histogram (bars extend rightward from x=0)
-                bars = pg.BarGraphItem(
-                    x=0, y=bin_edges[:-1], width=hist,
-                    height=(bin_edges[1] - bin_edges[0]) * 0.8,
-                    brush=(100, 100, 255, 150), pen=None
-                )
-            plot.addItem(bars)
+                # Horizontal histogram with alignment
+                if align == "left":
+                    bars = pg.BarGraphItem(
+                        x=0, y=bin_edges[:-1], width=hist,
+                        height=bin_width * 0.8,
+                        brush=(100, 100, 255, 150), pen=None
+                    )
+                elif align == "right":
+                    # Find max for scaling
+                    max_hist = hist.max() if len(hist) > 0 else 1
+                    bars = pg.BarGraphItem(
+                        x=max_hist, y=bin_edges[:-1], width=-hist,
+                        height=bin_width * 0.8,
+                        brush=(100, 100, 255, 150), pen=None
+                    )
+                else:  # center
+                    bars = pg.BarGraphItem(
+                        x=-hist/2, y=bin_edges[:-1], width=hist,
+                        height=bin_width * 0.8,
+                        brush=(100, 100, 255, 150), pen=None
+                    )
+                plot.addItem(bars)
 
-    # Plot pre-delta histogram (vertical orientation)
-    plot_histogram_data(pre_delta_df, pre_hist_plot, is_vertical=False)
-    
+
+    # Plot pre-delta histogram (horizontal, left-aligned)
+    plot_histogram_data(pre_delta_df, pre_hist_plot, is_vertical=False, align="left")
+
     # Plot scatter plot
     plot_scatter_data(data_results_df, scatter_plot)
-    
-    # Plot post-delta histogram (vertical orientation)
-    plot_histogram_data(post_delta_df, post_hist_plot, is_vertical=False)
+
+    # Plot post-delta histogram (horizontal, right-aligned)
+    plot_histogram_data(post_delta_df, post_hist_plot, is_vertical=False, align="right")
+
     
     # Add epoch shapes if provided
     if time_delta_tuple is not None:
