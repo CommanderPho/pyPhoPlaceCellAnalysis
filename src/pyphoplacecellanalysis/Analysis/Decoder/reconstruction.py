@@ -691,6 +691,11 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         raise NotImplementedError("read_hdf not implemented")
 
 
+from typing import Literal
+# Define a type that can only be one of these specific strings
+MaskedTimeBinFillType = Literal['ignore', 'last_valid', 'nan_filled', 'dropped'] ## used in `DecodedFilterEpochsResult.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(...)` to specify how invalid bins (due to too few spikes) are treated.
+
+
 @custom_define(slots=False, repr=False, eq=False)
 class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     """ Container for the results of decoding a set of epochs (filter_epochs) using a decoder (active_decoder) 
@@ -1280,7 +1285,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
     
 
     @function_attributes(short_name=None, tags=['mask', 'unit-spike-counts', 'pure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-04 01:32', related_items=[])
-    def mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(self, spikes_df: pd.DataFrame, masked_bin_fill_mode='last_valid') -> Tuple["DecodedFilterEpochsResult", Tuple[NDArray, NDArray]]:
+    def mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(self, spikes_df: pd.DataFrame, masked_bin_fill_mode:MaskedTimeBinFillType='last_valid') -> Tuple["DecodedFilterEpochsResult", Tuple[NDArray, NDArray]]:
         """ finds periods where there is insufficient firing to decode based on the provided paramters, copies the decoded result and returns a version with positions back-filled from the last bin that did meet the minimum firing criteria
         
         Pure: does not modify self
@@ -1302,8 +1307,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         """
         from neuropy.utils.mixins.binning_helpers import BinningContainer, BinningInfo, get_bin_edges
 
-
-        assert masked_bin_fill_mode in ['last_valid', 'nan_filled', 'dropped']
+        assert masked_bin_fill_mode in ['ignore', 'last_valid', 'nan_filled', 'dropped']
         
         # a_decoder = deepcopy(a_decoder)
         a_decoded_result: DecodedFilterEpochsResult = deepcopy(self) ## copy self to make the decoded result duplicate
@@ -1332,11 +1336,13 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             # Make a copy of the original data before masking
             original_data = a_decoded_result.p_x_given_n_list[i].copy()
             all_time_bin_indicies = np.arange(num_time_bins, dtype=int) ## all time bins
-            
-            # Mask inactive time bins with NaN
-            a_decoded_result.p_x_given_n_list[i][:, :, inactive_mask] = np.nan
-            a_decoded_result.most_likely_position_indicies_list[i][:, inactive_mask] = -1 # use -1 instead of np.nan as it needs to be integer
-            a_decoded_result.most_likely_positions_list[i][inactive_mask, :] = np.nan
+
+
+            if masked_bin_fill_mode != 'ignore':
+                # Mask inactive time bins with NaN in all modes except ignore mode
+                a_decoded_result.p_x_given_n_list[i][:, :, inactive_mask] = np.nan
+                a_decoded_result.most_likely_position_indicies_list[i][:, inactive_mask] = -1 # use -1 instead of np.nan as it needs to be integer
+                a_decoded_result.most_likely_positions_list[i][inactive_mask, :] = np.nan
 
             if masked_bin_fill_mode == 'last_valid':
                 ## backfill from last_valid decoded position
@@ -1372,8 +1378,6 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                 a_decoded_result.most_likely_position_indicies_list[i] = a_decoded_result.most_likely_position_indicies_list[i][:, is_time_bin_active]
                 a_decoded_result.most_likely_positions_list[i] = a_decoded_result.most_likely_positions_list[i][is_time_bin_active, :]
 
-
-
                 a_binning_container: BinningContainer = deepcopy(a_decoded_result.time_bin_containers[i])
                 # a_binning_container.centers = a_binning_container.centers[is_time_bin_active]
                 a_sliced_centers = deepcopy(a_decoded_result.time_bin_containers[i].centers[is_time_bin_active])
@@ -1392,6 +1396,10 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                 
             elif masked_bin_fill_mode == 'nan_filled':
                 ## just NaN out the invalid bins, which we've already done as a pre-processing step
+                last_valid_indices = None # we don't need `last_valid_indices` in these modes
+                pass
+            elif masked_bin_fill_mode == 'ignore':
+                ## do nothing, not even NaN out the invalid values.
                 last_valid_indices = None # we don't need `last_valid_indices` in these modes
                 pass
             else:
