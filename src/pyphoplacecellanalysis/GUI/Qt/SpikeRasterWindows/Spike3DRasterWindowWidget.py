@@ -452,6 +452,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             # comboActiveJumpTargetSeries = bottom_playback_control_bar_widget.ui.comboActiveJumpTargetSeries # QComboBox 
             bottom_playback_control_bar_widget.current_selected_jump_target_series_name = 'Laps' ## tries to select the "Laps" epochs fromt he jump-to-comobo box
 
+        self.init_left_and_bottom_bar_times_from_active_window() ## Initialize
+
 
 
 
@@ -678,15 +680,62 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             print(f'Spike3DRasterWindowWidget.on_temporal_zoom_factor_valueChanged(updated_val: {updated_val})')
         old_value = self.temporal_zoom_factor        
         self.temporal_zoom_factor = updated_val
-                
+
     @pyqtExceptionPrintingSlot(float)
     def on_render_window_duration_valueChanged(self, updated_val):
         if self.enable_debug_print:
             print(f'Spike3DRasterWindowWidget.on_render_window_duration_valueChanged(updated_val: {updated_val})')
-        old_value = self.render_window_duration
+
+        # Add a guard to prevent circular updates
+        if abs(self.render_window_duration - updated_val) < 1e-6:
+            # Skip if value is essentially the same
+            return
+            
+        old_value = deepcopy(self.render_window_duration)
         self.render_window_duration = updated_val
-        # TODO 2023-03-29 19:14: - [ ] need to set self.render_window_duration.timeWindow.window_duration = updated_val
         
+        window_duration = float(updated_val)
+        if window_duration is not None:
+            if abs(window_duration - self.animation_active_time_window.window_duration) > 1e-6:
+                if self.enable_debug_print:
+                    print(f'\ton_render_window_duration_valueChanged(updated_val: {updated_val}): window_duration changed: new_window_duration {window_duration} != self.animation_active_time_window.window_duration: {self.animation_active_time_window.window_duration}')
+                # Block programmatic updates from triggering more signals
+                self._updating_window_programmatically = True
+                try:
+                    self.animation_active_time_window.timeWindow.window_duration = window_duration
+                finally:
+                    self._updating_window_programmatically = False
+                    
+
+        # old_value = deepcopy(self.render_window_duration)
+        # self.render_window_duration = updated_val
+        # # self.spikes_window.window_duration = float(updated_val)
+        # # self.spikes_window.timeWindow.window_duration = float(updated_val)
+
+        # # TODO 2023-03-29 19:14: - [ ] need to set self.animation_active_time_window.timeWindow.window_duration = updated_val
+        # window_duration = float(updated_val)
+        # if window_duration is not None:
+        #     if window_duration != self.animation_active_time_window.window_duration:
+        #         if self.enable_debug_print:
+        #             print(f'\ton_render_window_duration_valueChanged(updated_val: {updated_val}): window_duration changed: new_window_duration {window_duration} != self.animation_active_time_window.window_duration: {self.animation_active_time_window.window_duration}')
+        #         self.animation_active_time_window.timeWindow.window_duration = window_duration
+        #         # TODO 2023-03-29 19:18: - [ ] See if anything needs to be updated manually when window duration changes.
+
+
+
+    def init_left_and_bottom_bar_times_from_active_window(self):
+        """ Initializes the left and bottom time controls from the actual visable window
+        """
+        window_duration = self.animation_active_time_window.timeWindow.window_duration
+        start_time, end_time = self.animation_active_time_window.timeWindow.active_time_window
+        self.SpikeRasterBottomFrameControlsMixin_on_window_update(start_time, end_time) ## indirect 
+        self.SpikeRasterLeftSidebarControlsMixin_on_window_update(start_time, end_time)
+        return (start_time, end_time), window_duration
+
+
+    # ==================================================================================================================== #
+    # Crosshairs                                                                                                           #
+    # ==================================================================================================================== #
     # @pyqtExceptionPrintingSlot(bool)
     def on_crosshair_trace_toggled(self):
         # def on_crosshair_trace_toggled(self, updated_is_crosshair_trace_enabled):

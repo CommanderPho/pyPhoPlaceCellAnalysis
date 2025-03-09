@@ -41,6 +41,12 @@ class Spike3DRasterLeftSidebarControlBar(QWidget):
     
     self.ui.verticalScrollBar
     
+    spinAnimationTimeStep
+    spinRenderWindowDuration
+    spinTemporalZoomFactor
+    
+    self.ui.btnToggleCollapseExpand
+    
     """
     
     animation_time_step_changed = pyqtSignal(float) # returns bool indicating whether is_playing
@@ -81,6 +87,9 @@ class Spike3DRasterLeftSidebarControlBar(QWidget):
 
 
     def initUI(self):
+        
+        self.ui.btnToggleCollapseExpand.setVisible(False)
+        
         # Disable the scroll bar
         self.ui.verticalScrollBar.hide()
         self.ui.verticalScrollBar.setVisible(False)
@@ -244,28 +253,26 @@ class SpikeRasterLeftSidebarControlsMixin:
 
         if (new_start is not None) and (new_end is not None):
             ## Block signals:
-            # left_side_bar_controls.ui.verticalSliderZoom.blockSignals(True)
-            # left_side_bar_controls.ui.spinAnimationTimeStep.blockSignals(True)
-            # left_side_bar_controls.ui.spinTemporalZoomFactor.blockSignals(True)
-            left_side_bar_controls.ui.spinRenderWindowDuration.blockSignals(True)            
+            left_side_bar_controls.ui.spinRenderWindowDuration.blockSignals(True)
+
+            # Force completion of any ongoing edits to prevent conflicts
+            if left_side_bar_controls.ui.spinRenderWindowDuration.hasFocus():
+                # First interpret any text in the editor
+                left_side_bar_controls.ui.spinRenderWindowDuration.interpretText()
+                # Then remove focus to cancel any ongoing edit
+                left_side_bar_controls.ui.spinRenderWindowDuration.clearFocus()
 
             ## Update values:
             new_duration: float = new_end - new_start
-            # print(f'\tnew_duration: {new_duration}, self.render_window_duration: {self.render_window_duration}')
-            # left_side_bar_controls.ui.verticalSliderZoom.setValue(round(self.temporal_zoom_factor))
-            # left_side_bar_controls.ui.spinAnimationTimeStep.setValue(self.animation_time_step)
-            # left_side_bar_controls.ui.spinTemporalZoomFactor.setValue(round(self.temporal_zoom_factor))
-            # left_side_bar_controls.ui.spinRenderWindowDuration.setValue(self.render_window_duration)
-            left_side_bar_controls.ui.spinRenderWindowDuration.setValue(new_duration)
+            
+            # Check if value is actually different to avoid unnecessary updates
+            current_value = left_side_bar_controls.ui.spinRenderWindowDuration.value()
+            if abs(current_value - new_duration) > 1e-6:  # Compare with small epsilon for float comparison
+                left_side_bar_controls.ui.spinRenderWindowDuration.setValue(new_duration)
 
             ## Unblock when done:
-            # left_side_bar_controls.ui.verticalSliderZoom.blockSignals(False)
-            # left_side_bar_controls.ui.spinAnimationTimeStep.blockSignals(False)
-            # left_side_bar_controls.ui.spinTemporalZoomFactor.blockSignals(False)
             left_side_bar_controls.ui.spinRenderWindowDuration.blockSignals(False)
-       
-    
-
+            
         
     
 ## Start Qt event loop
