@@ -534,24 +534,36 @@ def pyqtgraph_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context
 from typing import Literal
 
 # Define a type that can only be one of these specific strings
-KnownNamedDecodingEpochsType = Literal['laps', 'ripple', 'non_pbe']
+KnownNamedDecodingEpochsType = Literal['laps', 'replay', 'ripple', 'non_pbe']
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import MaskedTimeBinFillType
 
 @function_attributes(short_name=None, tags=['posteriors'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-09 05:21', related_items=[])
 def _build_output_decoded_posteriors(non_PBE_all_directional_pf1D_Decoder: BasePositionDecoder, pseudo2D_continuous_specific_decoded_result: DecodedFilterEpochsResult, filter_epochs_to_decode_dict: Dict[KnownNamedDecodingEpochsType, Epoch], unique_decoder_names: List[str], spikes_df: pd.DataFrame, epochs_decoding_time_bin_size: float,
                                      session_name: str, t_start: float, t_delta: float, t_end: float):
-    """
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _build_output_decoded_posteriors
+    """ Given a
     
+    Breakdown:
     
-    session_name: str = curr_active_pipeline.session_name
-    t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
-    
-    filter_epochs_pseudo2D_continuous_specific_decoded_result, filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict = _build_output_decoded_posteriors(non_PBE_all_directional_pf1D_Decoder=non_PBE_all_directional_pf1D_Decoder, pseudo2D_continuous_specific_decoded_result=pseudo2D_continuous_specific_decoded_result,
-        filter_epochs_to_decode_dict=filter_epochs_to_decode_dict,
-        unique_decoder_names=['long', 'short'], spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), epochs_decoding_time_bin_size=epochs_decoding_time_bin_size,
-        session_name=session_name, t_start=t_start, t_delta=t_delta, t_end=t_end,
-    )
+    1. decoding for particular filter_epochs
+    2. build raw posteriors from across the decoded epochs, returning a list of DynamicResults and a pd.DataFrame with the columns specified in unique_decoder_names (e.g. ['long', 'short'] or ['Long_LR', 'Long_RL', ...])
+    3. mask the decoded result from step 1 by determining the number of spikes, number of unique active cells, etc in each decoding time bin (not in each epoch, which we do elsewhere). This discards bins with insufficient activity to properly decoding, which usually result in predictably noisy posteriors.
+    4. build raw posteriors (most importantly dataframe) from the masked results
+    5. test two different types of masking
+
+
+    Not Needed: , pseudo2D_continuous_specific_decoded_result: DecodedFilterEpochsResult
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _build_output_decoded_posteriors
+        
+        
+        session_name: str = curr_active_pipeline.session_name
+        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        
+        filter_epochs_pseudo2D_continuous_specific_decoded_result, filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict = _build_output_decoded_posteriors(non_PBE_all_directional_pf1D_Decoder=non_PBE_all_directional_pf1D_Decoder, pseudo2D_continuous_specific_decoded_result=pseudo2D_continuous_specific_decoded_result,
+            filter_epochs_to_decode_dict=filter_epochs_to_decode_dict,
+            unique_decoder_names=['long', 'short'], spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), epochs_decoding_time_bin_size=epochs_decoding_time_bin_size,
+            session_name=session_name, t_start=t_start, t_delta=t_delta, t_end=t_end,
+        )
     
     """
     assert epochs_decoding_time_bin_size is not None, f"epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}"
@@ -560,7 +572,6 @@ def _build_output_decoded_posteriors(non_PBE_all_directional_pf1D_Decoder: BaseP
     filter_epochs_pseudo2D_continuous_specific_decoded_result: Dict[KnownNamedDecodingEpochsType, DecodedFilterEpochsResult] = {}
     filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict: Dict[KnownNamedDecodingEpochsType, Dict[str, pd.DataFrame]] = {}
     
-
     for a_decoded_epoch_type_name, a_filter_epoch_obj in filter_epochs_to_decode_dict.items():
         # a_decoded_epoch_type_name: like 'laps', 'ripple', or 'non_pbe'
         a_pseudo2D_continuous_specific_decoded_result: DecodedFilterEpochsResult = non_PBE_all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=deepcopy(a_filter_epoch_obj), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False)
@@ -585,11 +596,17 @@ def _build_output_decoded_posteriors(non_PBE_all_directional_pf1D_Decoder: BaseP
         
         # track_marginal_posterior_df_list = [track_marginal_posterior_df, masked_track_marginal_posterior_df]
 
+
+        # masked_bin_fill_modes: ['ignore', 'last_valid', 'nan_filled', 'dropped']
+
         # _track_marginal_posterior_df_dict = {'track_marginal_posterior_df':track_marginal_posterior_df, 'masked_track_marginal_posterior_df': masked_track_marginal_posterior_df}
         decoded_filter_epoch_track_marginal_posterior_df_dict: Dict[str, pd.DataFrame] = {# 'track_marginal_posterior_df':track_marginal_posterior_df,
-                                                                                        'a_non_PBE_marginal_over_track_ID_posterior_df': a_non_PBE_marginal_over_track_ID_posterior_df,
-                                                                                        'masked_laps_non_PBE_marginal_over_track_ID_posterior_df': masked_laps_non_PBE_marginal_over_track_ID_posterior_df,
-                                                                                        'dropping_masked_laps_non_PBE_marginal_over_track_ID_posterior_df': dropping_masked_laps_non_PBE_marginal_over_track_ID_posterior_df,
+                                                                                        'ignore': a_non_PBE_marginal_over_track_ID_posterior_df,
+                                                                                        'last_valid': masked_laps_non_PBE_marginal_over_track_ID_posterior_df,
+                                                                                        'nan_filled': dropping_masked_laps_non_PBE_marginal_over_track_ID_posterior_df,
+                                                                                        # 'a_non_PBE_marginal_over_track_ID_posterior_df': a_non_PBE_marginal_over_track_ID_posterior_df,
+                                                                                        # 'masked_laps_non_PBE_marginal_over_track_ID_posterior_df': masked_laps_non_PBE_marginal_over_track_ID_posterior_df,
+                                                                                        # 'dropping_masked_laps_non_PBE_marginal_over_track_ID_posterior_df': dropping_masked_laps_non_PBE_marginal_over_track_ID_posterior_df,
                                                                                         }
 
         # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
@@ -599,7 +616,7 @@ def _build_output_decoded_posteriors(non_PBE_all_directional_pf1D_Decoder: BaseP
             a_df = a_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=epochs_decoding_time_bin_size, curr_session_t_delta=t_delta, time_col='t')
             decoded_filter_epoch_track_marginal_posterior_df_dict[k] = a_df
             
-
+        # ['dropping_masked', 'dropping_masked', 'masked', 'dropping_masked']
         filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict[a_decoded_epoch_type_name] = decoded_filter_epoch_track_marginal_posterior_df_dict
         # # track_marginal_posterior_df = _track_marginal_posterior_df_dict['track_marginal_posterior_df']
         # # masked_track_marginal_posterior_df = _track_marginal_posterior_df_dict['masked_track_marginal_posterior_df']
