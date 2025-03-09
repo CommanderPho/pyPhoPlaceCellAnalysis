@@ -930,7 +930,7 @@ class EpochComputationsComputationsContainer(ComputedResult):
             print(f'EpochComputations is not computed.')
             
     """
-    _VersionedResultMixin_version: str = "2025.02.18_0" # to be updated in your IMPLEMENTOR to indicate its version
+    _VersionedResultMixin_version: str = "2025.03.09_0" # to be updated in your IMPLEMENTOR to indicate its version
     
     training_data_portion: float = serialized_attribute_field(default=(5.0/6.0))
     epochs_decoding_time_bin_size: float = serialized_attribute_field(default=0.020) 
@@ -940,7 +940,8 @@ class EpochComputationsComputationsContainer(ComputedResult):
     results1D: Optional[NonPBEDimensionalDecodingResult] = serialized_field(default=None, repr=False)
     results2D: Optional[NonPBEDimensionalDecodingResult] = serialized_field(default=None, repr=False)
 
-
+    a_general_decoder_dict_decoded_epochs_dict_result: GeneralDecoderDictDecodedEpochsDictResult = serialized_field(default=None, is_computable=True, repr=False, metadata={'version_added': '2025.03.09'})
+    
     # Utility Methods ____________________________________________________________________________________________________ #
 
     # def to_dict(self) -> Dict:
@@ -1309,16 +1310,17 @@ def validate_has_non_PBE_epoch_results(curr_active_pipeline, computation_filter_
     a_new_NonPBE_Epochs_obj = seq_results.a_new_NonPBE_Epochs_obj
     if a_new_NonPBE_Epochs_obj is None:
         return False
+    
 
-
+    a_general_decoder_dict_decoded_epochs_dict_result = seq_results.a_general_decoder_dict_decoded_epochs_dict_result
+    if a_general_decoder_dict_decoded_epochs_dict_result is None:
+        return False
 
     # _computationPrecidence = 2 # must be done after PlacefieldComputations, DefaultComputationFunctions
     # _is_global = False
 
+
 from pyphocorehelpers.programming_helpers import MemoryManagement # used in `EpochComputationFunctions.perform_compute_non_PBE_epochs`
-
-
-
 
 def estimate_memory_requirements_bytes(epochs_decoding_time_bin_size: float, frame_divide_bin_size: float, n_flattened_position_bins: Optional[int]=None, n_neurons: Optional[int]=None, session_duration: Optional[float]=None, n_maze_contexts: int=9) -> Tuple[int, dict]:
     """Estimates memory requirements for non-PBE epoch computations
@@ -1536,7 +1538,9 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
                 unique_decoder_names=unique_decoder_names, spikes_df=deepcopy(get_proper_global_spikes_df(owning_pipeline_reference)), epochs_decoding_time_bin_size=epochs_decoding_time_bin_size,
                 session_name=session_name, t_start=t_start, t_delta=t_delta, t_end=t_end,
             )
-
+            
+            ## update the result object, adding the decoded result if needed
+            global_computation_results.computed_data['EpochComputations'].a_general_decoder_dict_decoded_epochs_dict_result = a_general_decoder_dict_decoded_epochs_dict_result
 
             ## OUTPUTS: filter_epochs_pseudo2D_continuous_specific_decoded_result, filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict
             # 58sec
