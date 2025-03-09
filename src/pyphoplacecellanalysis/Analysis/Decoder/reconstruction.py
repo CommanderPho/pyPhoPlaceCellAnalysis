@@ -1280,7 +1280,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
     
 
     @function_attributes(short_name=None, tags=['mask', 'unit-spike-counts', 'pure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-04 01:32', related_items=[])
-    def mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(self, spikes_df: pd.DataFrame) -> Tuple["DecodedFilterEpochsResult", Tuple[NDArray, NDArray]]:
+    def mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(self, spikes_df: pd.DataFrame, masked_bin_fill_mode='last_valid') -> Tuple["DecodedFilterEpochsResult", Tuple[NDArray, NDArray]]:
         """ finds periods where there is insufficient firing to decode based on the provided paramters, copies the decoded result and returns a version with positions back-filled from the last bin that did meet the minimum firing criteria
         
         Pure: does not modify self
@@ -1300,7 +1300,11 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         #TODO 2025-03-04 10:10: - [ ] Seems like `a_decoder` is just passed-through unaltered. Could refactor into a classmethod of `DecodedFilterEpochsResult`
         
         """
+        from neuropy.utils.mixins.binning_helpers import BinningContainer, BinningInfo, get_bin_edges
 
+
+        assert masked_bin_fill_mode in ['last_valid', 'nan_filled', 'dropped']
+        
         # a_decoder = deepcopy(a_decoder)
         a_decoded_result: DecodedFilterEpochsResult = deepcopy(self) ## copy self to make the decoded result duplicate
         
@@ -1327,39 +1331,72 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             
             # Make a copy of the original data before masking
             original_data = a_decoded_result.p_x_given_n_list[i].copy()
-            
-            last_valid_indices = np.zeros(num_time_bins, dtype=int)
-            current_valid_idx = 0
             all_time_bin_indicies = np.arange(num_time_bins, dtype=int) ## all time bins
-        
-
+            
             # Mask inactive time bins with NaN
             a_decoded_result.p_x_given_n_list[i][:, :, inactive_mask] = np.nan
             a_decoded_result.most_likely_position_indicies_list[i][:, inactive_mask] = -1 # use -1 instead of np.nan as it needs to be integer
             a_decoded_result.most_likely_positions_list[i][inactive_mask, :] = np.nan
-        
-            # Fill invalid time bins with the last valid value - EFFICIENT IMPLEMENTATION
-            if np.any(is_time_bin_active):  # Only proceed if we have some valid values
-                # Calculate "last valid index" lookup array - very efficient O(n) operation
-                for t in np.arange(num_time_bins):
-                    if is_time_bin_active[t]:
-                        current_valid_idx = t
-                    last_valid_indices[t] = current_valid_idx
-                
-                ## when done, have `last_valid_indices`
-                # print(f'last_valid_indices: {last_valid_indices}')
-                a_decoded_result.p_x_given_n_list[i][:, :, all_time_bin_indicies] = original_data[:, :, last_valid_indices]
 
-                # Also fix the most_likely_position arrays using the same technique
-                # For most_likely_position_indicies_list (shape: 2, num_time_bins)
-                a_decoded_result.most_likely_position_indicies_list[i][:, all_time_bin_indicies] = a_decoded_result.most_likely_position_indicies_list[i][:, last_valid_indices]
+            if masked_bin_fill_mode == 'last_valid':
+                ## backfill from last_valid decoded position
+                last_valid_indices = np.zeros(num_time_bins, dtype=int)
+                current_valid_idx = 0
+                # Fill invalid time bins with the last valid value - EFFICIENT IMPLEMENTATION
+                if np.any(is_time_bin_active):  # Only proceed if we have some valid values
+                    # Calculate "last valid index" lookup array - very efficient O(n) operation
+                    for t in np.arange(num_time_bins):
+                        if is_time_bin_active[t]:
+                            current_valid_idx = t
+                        last_valid_indices[t] = current_valid_idx
+                    
+                    ## when done, have `last_valid_indices`
+                    # print(f'last_valid_indices: {last_valid_indices}')
+                    a_decoded_result.p_x_given_n_list[i][:, :, all_time_bin_indicies] = original_data[:, :, last_valid_indices]
+
+                    # Also fix the most_likely_position arrays using the same technique
+                    # For most_likely_position_indicies_list (shape: 2, num_time_bins)
+                    a_decoded_result.most_likely_position_indicies_list[i][:, all_time_bin_indicies] = a_decoded_result.most_likely_position_indicies_list[i][:, last_valid_indices]
+                    
+                    # For most_likely_positions_list (shape: num_time_bins, 2)
+                    a_decoded_result.most_likely_positions_list[i][all_time_bin_indicies, :] = a_decoded_result.most_likely_positions_list[i][last_valid_indices, :]
+            
+                else:
+                    ## no valid time bins
+                    print(f'WARN: Epoch[{i}]: with {num_time_bins} time_bins has no time bins with enough firing to infer back-filled positions from, so all entries will be NaN.')
+
+            elif masked_bin_fill_mode == 'dropped':
+                ## just drop the invalid bins by selecting via the `is_time_bin_active` (active_mask):
+                # Drop inactive time bins by selecting only active ones
+                a_decoded_result.p_x_given_n_list[i] = a_decoded_result.p_x_given_n_list[i][:, :, is_time_bin_active]
+                a_decoded_result.most_likely_position_indicies_list[i] = a_decoded_result.most_likely_position_indicies_list[i][:, is_time_bin_active]
+                a_decoded_result.most_likely_positions_list[i] = a_decoded_result.most_likely_positions_list[i][is_time_bin_active, :]
+
+
+
+                a_binning_container: BinningContainer = deepcopy(a_decoded_result.time_bin_containers[i])
+                # a_binning_container.centers = a_binning_container.centers[is_time_bin_active]
+                a_sliced_centers = deepcopy(a_decoded_result.time_bin_containers[i].centers[is_time_bin_active])
+                center_info = BinningContainer.build_center_binning_info(centers=a_sliced_centers, variable_extents=a_binning_container.center_info.variable_extents)
+                ## make whole new container
+                a_decoded_result.time_bin_containers[i] = BinningContainer(centers=a_sliced_centers)
+                # a_decoded_result.time_bin_containers[i] = a_decoded_result.time_bin_containers[i][is_time_bin_active]
+
+                # a_decoded_result.time_bin_edges[i] = a_time_bin_edges[is_time_bin_active]
+                a_decoded_result.time_bin_edges[i] = get_bin_edges(a_sliced_centers) # 
+                # a_decoded_result.time_bin_edges[i] = a_time_bin_edges[is_time_bin_active] ## for sure wrong
+                a_decoded_result.nbins[i] = len(a_time_bin_edges[is_time_bin_active])
+                a_decoded_result.spkcount[i] = a_decoded_result.spkcount[i][:, is_time_bin_active] # (80, 66) - (n_neurons, n_epoch_t_bins[i])
+                ## maybe messing up: epoch_description_list,
+                last_valid_indices = None # we don't need `last_valid_indices` in these modes
                 
-                # For most_likely_positions_list (shape: num_time_bins, 2)
-                a_decoded_result.most_likely_positions_list[i][all_time_bin_indicies, :] = a_decoded_result.most_likely_positions_list[i][last_valid_indices, :]
-        
+            elif masked_bin_fill_mode == 'nan_filled':
+                ## just NaN out the invalid bins, which we've already done as a pre-processing step
+                last_valid_indices = None # we don't need `last_valid_indices` in these modes
+                pass
             else:
-                ## no valid time bins
-                print(f'WARN: Epoch[{i}]: with {num_time_bins} time_bins has no time bins with enough firing to infer back-filled positions from, so all entries will be NaN.')
+                raise NotImplementedError(f"masked_bin_fill_mode: '{masked_bin_fill_mode}' was not one of the known valid modes: ['last_valid', 'nan_filled', 'dropped']")
+
 
             # Add the marginal container to the list
             curr_unit_marginal_x, curr_unit_marginal_y = BasePositionDecoder.perform_build_marginals(p_x_given_n=a_decoded_result.p_x_given_n_list[i], most_likely_positions=a_decoded_result.most_likely_positions_list[i], debug_print=False)
