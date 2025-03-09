@@ -557,8 +557,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
 
     def recompute(self, curr_active_pipeline, pfND_ndim: int = 2, epochs_decoding_time_bin_size: float = 0.025, skip_training_test_split: bool = False):
         """ For a specified decoding time_bin_size and ndim (1D or 2D), copies the global pfND, builds new epoch objects, then decodes both train_test and continuous epochs
-        
-        
+
         test_epoch_specific_decoded_results_dict, continuous_specific_decoded_results_dict, new_decoder_dict, new_pfs_dict = a_new_NonPBE_Epochs_obj.recompute(curr_active_pipeline=curr_active_pipeline, epochs_decoding_time_bin_size = 0.058)
         
         pfND_ndim: 1 - 1D, 2 - 2D
@@ -569,8 +568,7 @@ class Compute_NonPBE_Epochs(ComputedResult):
         # from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult, SingleEpochDecodedResult
         # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
-        
-        
+
          # 25ms
         # epochs_decoding_time_bin_size: float = 0.050 # 50ms
         # epochs_decoding_time_bin_size: float = 0.250 # 250ms
