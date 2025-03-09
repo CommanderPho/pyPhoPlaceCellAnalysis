@@ -172,6 +172,10 @@ class VersionedResultMixin:
         result_version: str = serialized_attribute_field(default='2024.01.11_0', is_computable=False, repr=False) # this field specfies the version of the result. 
 
         
+        ## NOTE: when a field is added, the metadata should be set like
+        `a_general_decoder_dict_decoded_epochs_dict_result: GeneralDecoderDictDecodedEpochsDictResult = serialized_field(default=None, is_computable=True, repr=False, metadata={'field_added': '2025.03.09_0'})`
+
+                
         def __setstate__(self, state):
             # Restore instance attributes (i.e., _mapping and _keys_at_init).
 
