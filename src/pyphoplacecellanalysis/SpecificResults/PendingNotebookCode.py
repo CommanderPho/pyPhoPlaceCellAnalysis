@@ -65,6 +65,419 @@ import numpy as np
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore
 
+from copy import deepcopy
+from typing import Optional, Union, List, Tuple, Dict, Any
+import numpy as np
+import pandas as pd
+from pathlib import Path
+
+from pyphoplacecellanalysis.External.pyqtgraph import QtCore, QtGui, QtWidgets
+import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import mkQApp
+
+from neuropy.utils.result_context import IdentifyingContext
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.Filesystem.path_helpers import sanitize_filename_for_Windows
+from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
+
+
+@function_attributes(short_name=None, tags=['pyqtgraph', 'scatter', 'histogram'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-15 14:30', related_items=['plotly_pre_post_delta_scatter'])
+def pyqtgraph_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: Optional[IdentifyingContext]=None, 
+                                     histogram_bins:int=25, common_plot_kwargs=None, scatter_kwargs=None,
+                                     histogram_variable_name='P_Long', hist_kwargs=None,
+                                     forced_range_y=[0.0, 1.0], time_delta_tuple=None, is_dark_mode: bool = True,
+                                     figure_sup_huge_title_text: str=None, is_top_supertitle: bool = False, figure_footer_text: Optional[str]=None,
+                                     existing_widget=None, **kwargs):
+    """ Plots a scatter plot of a variable pre/post delta, with a histogram on each end corresponding to the pre/post delta distribution using PyQtGraph
+    
+    Args:
+        data_results_df (pd.DataFrame): DataFrame containing the data to plot
+        data_context (Optional[IdentifyingContext], optional): Context info for the plot. Defaults to None.
+        histogram_bins (int, optional): Number of bins for histograms. Defaults to 25.
+        common_plot_kwargs (dict, optional): Common kwargs for all plots. Defaults to None.
+        scatter_kwargs (dict, optional): Kwargs for scatter plot. Defaults to None.
+        histogram_variable_name (str, optional): Variable to plot. Defaults to 'P_Long'.
+        hist_kwargs (dict, optional): Kwargs for histograms. Defaults to None.
+        forced_range_y (list, optional): Y-axis range. Defaults to [0.0, 1.0].
+        time_delta_tuple (tuple, optional): Tuple of (start, delta, end) times. Defaults to None.
+        is_dark_mode (bool, optional): Use dark mode theme. Defaults to True.
+        figure_sup_huge_title_text (str, optional): Super title text. Defaults to None.
+        is_top_supertitle (bool, optional): Place supertitle at top. Defaults to False.
+        figure_footer_text (Optional[str], optional): Footer text. Defaults to None.
+        existing_widget (QWidget, optional): Existing widget to use. Defaults to None.
+
+    Returns:
+        tuple: (main_widget, figure_context) - the widget containing the plot and context info
+    
+    Usage:
+        # from pyphoplacecellanalysis.Pho2D.PyQtPlot.Extensions.pyqtgraph_helpers import pyqtgraph_pre_post_delta_scatter
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import pyqtgraph_pre_post_delta_scatter
+        
+        widget, context = pyqtgraph_pre_post_delta_scatter(
+            data_results_df=your_dataframe,
+            histogram_variable_name='P_Short',
+            histogram_bins=25,
+            scatter_kwargs=dict(title='Your Title')
+        )
+        widget.show()
+    """
+    # Create app if needed
+    app = mkQApp("Pre-Post Delta Scatter")
+    
+    # Copy dataframe to avoid modifying the original
+    data_results_df = data_results_df.copy()
+    debug_print = kwargs.get('debug_print', False)
+    
+    # Set up display labels
+    pre_delta_label = 'Pre-delta'
+    post_delta_label = 'Post-delta'
+
+    # Initialize context and figure context dictionary
+    if data_context is None:
+        data_context = IdentifyingContext()  # empty context
+    
+    data_context = data_context.adding_context_if_missing(variable_name=histogram_variable_name)
+    figure_context_dict = {'histogram_variable_name': histogram_variable_name}
+    
+    # Get session info
+    if 'session_name' in data_results_df.columns:
+        num_unique_sessions = data_results_df['session_name'].nunique(dropna=True)
+    else:
+        num_unique_sessions = 1
+    
+    data_context = data_context.adding_context_if_missing(num_sessions=num_unique_sessions)
+    figure_context_dict['num_unique_sessions'] = num_unique_sessions
+    
+    # Get time bin size info
+    num_unique_time_bin_sizes = data_results_df.time_bin_size.nunique(dropna=True)
+    unique_time_bin_sizes = np.unique(data_results_df.time_bin_size.to_numpy())
+    
+    if debug_print:
+        print(f'num_unique_sessions: {num_unique_sessions}, num_unique_time_bins: {num_unique_time_bin_sizes}')
+    
+    if num_unique_time_bin_sizes == 1:
+        assert len(unique_time_bin_sizes) == 1
+        figure_context_dict['t_bin_size'] = unique_time_bin_sizes[0]
+    else:
+        figure_context_dict['n_unique_t_bin_sizes'] = num_unique_time_bin_sizes
+    
+    # Initialize plotting kwargs
+    if hist_kwargs is None:
+        hist_kwargs = {}
+    
+    if scatter_kwargs is None:
+        scatter_kwargs = {}
+    
+    if common_plot_kwargs is None:
+        common_plot_kwargs = {}
+    
+    # Build title
+    if num_unique_sessions == 1:
+        main_title = f"Session {scatter_kwargs.get('title', 'UNKNOWN')}"
+    else:
+        main_title = f"Across Sessions {scatter_kwargs.get('title', 'UNKNOWN')} ({num_unique_sessions} Sessions)"
+    
+    if num_unique_time_bin_sizes > 1:
+        main_title = main_title + f" - {num_unique_time_bin_sizes} Time Bin Sizes"
+        figure_context_dict['n_tbin'] = num_unique_time_bin_sizes
+    elif num_unique_time_bin_sizes == 1:
+        time_bin_size = unique_time_bin_sizes[0]
+        main_title = main_title + f" - time bin size: {time_bin_size} sec"
+    else:
+        main_title = main_title + f" - ERR: <No Entries in DataFrame>"
+    
+    figure_context_dict['title'] = main_title
+    
+    # Filter data for pre-delta and post-delta
+    pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
+    post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
+    
+    # ==================================================================================================================== #
+    # Build PyQtGraph Widget                                                                                               #
+    # ==================================================================================================================== #
+    
+    # Create main widget if not provided
+    if existing_widget is None:
+        main_widget = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout()
+        main_widget.setLayout(layout)
+    else:
+        main_widget = existing_widget
+        layout = main_widget.layout()
+        if layout is None:
+            layout = QtWidgets.QVBoxLayout()
+            main_widget.setLayout(layout)
+        
+        # Clear existing layout
+        while layout.count():
+            child = layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+    
+    # Create title label if needed
+    if figure_sup_huge_title_text:
+        title_label = QtWidgets.QLabel(figure_sup_huge_title_text)
+        title_label.setAlignment(QtCore.Qt.AlignCenter)
+        font = title_label.font()
+        font.setBold(True)
+        font.setPointSize(14)
+        title_label.setFont(font)
+        layout.addWidget(title_label)
+    
+    # Create GraphicsLayoutWidget for plots
+    plot_widget = pg.GraphicsLayoutWidget()
+    layout.addWidget(plot_widget)
+    
+    # Configure plot widget
+    if is_dark_mode:
+        plot_widget.setBackground('k')
+    else:
+        plot_widget.setBackground('w')
+    
+    # Create three plots side by side
+    pre_hist_plot = plot_widget.addPlot(row=0, col=0)
+    scatter_plot = plot_widget.addPlot(row=0, col=1)
+    post_hist_plot = plot_widget.addPlot(row=0, col=2)
+    
+    # Link y axes
+    pre_hist_plot.setYLink(scatter_plot)
+    post_hist_plot.setYLink(scatter_plot)
+    
+    # Set titles
+    pre_hist_plot.setTitle(pre_delta_label)
+    scatter_plot.setTitle(main_title)
+    post_hist_plot.setTitle(post_delta_label)
+    
+    # Set axis labels
+    pre_hist_plot.setLabel('bottom', "# Events")
+    scatter_plot.setLabel('bottom', "Delta-aligned Event Time (seconds)")
+    scatter_plot.setLabel('left', "Probability of Short Track")  # This should be based on histogram_variable_name
+    post_hist_plot.setLabel('bottom', "# Events")
+    
+    # Set y range
+    if forced_range_y:
+        pre_hist_plot.setYRange(forced_range_y[0], forced_range_y[1], padding=0)
+        scatter_plot.setYRange(forced_range_y[0], forced_range_y[1], padding=0)
+        post_hist_plot.setYRange(forced_range_y[0], forced_range_y[1], padding=0)
+    
+    # Create legends
+    legend = scatter_plot.addLegend()
+    
+    # ==================================================================================================================== #
+    # Add data to plots                                                                                                    #
+    # ==================================================================================================================== #
+    
+    # Plot functions
+    def plot_scatter_data(df, plot):
+        """Plot scatter data, colored by time_bin_size or other variable"""
+        if 'color' in common_plot_kwargs:
+            color_by = common_plot_kwargs['color']
+            unique_values = df[color_by].unique()
+            
+            for i, val in enumerate(unique_values):
+                subset = df[df[color_by] == val]
+                color = pg.intColor(i, len(unique_values))
+                scatter = pg.ScatterPlotItem(
+                    x=subset['delta_aligned_start_t'].values,
+                    y=subset[histogram_variable_name].values,
+                    pen=None, brush=color, size=8, alpha=0.5,
+                    name=f"{val}"
+                )
+                plot.addItem(scatter)
+        else:
+            # Default scatter with single color
+            scatter = pg.ScatterPlotItem(
+                x=df['delta_aligned_start_t'].values,
+                y=df[histogram_variable_name].values,
+                pen=None, brush=(0, 135, 255, 150), size=8,
+                name="Data"
+            )
+            plot.addItem(scatter)
+    
+    def plot_histogram_data(df, plot, is_vertical=True):
+        """Plot histogram of data"""
+        if len(df) == 0:
+            return
+            
+        y = df[histogram_variable_name].values
+        
+        # Create bins
+        bin_min, bin_max = 0, 1
+        if forced_range_y:
+            bin_min, bin_max = forced_range_y[0], forced_range_y[1]
+        else:
+            bin_min, bin_max = np.min(y), np.max(y)
+        
+        bins = np.linspace(bin_min, bin_max, histogram_bins)
+        
+        if 'color' in common_plot_kwargs:
+            color_by = common_plot_kwargs['color']
+            unique_values = df[color_by].unique()
+            
+            for i, val in enumerate(unique_values):
+                subset = df[df[color_by] == val]
+                if len(subset) == 0:
+                    continue
+                    
+                y_subset = subset[histogram_variable_name].values
+                hist, bin_edges = np.histogram(y_subset, bins=bins)
+                
+                color = pg.intColor(i, len(unique_values))
+                
+                if is_vertical:
+                    # Vertical bars - height is the histogram count
+                    bars = pg.BarGraphItem(
+                        x=bin_edges[:-1], height=hist, 
+                        width=(bin_edges[1] - bin_edges[0]) * 0.8,
+                        brush=color, pen=None
+                    )
+                else:
+                    # Horizontal bars - width is the histogram count, x starts at 0
+                    bars = pg.BarGraphItem(
+                        x=0, y=bin_edges[:-1], width=hist,
+                        height=(bin_edges[1] - bin_edges[0]) * 0.8,
+                        brush=color, pen=None
+                    )
+                plot.addItem(bars)
+        else:
+            # Default histogram with single color
+            hist, bin_edges = np.histogram(y, bins=bins)
+            
+            if is_vertical:
+                # Vertical histogram (bars extend upward)
+                bars = pg.BarGraphItem(
+                    x=bin_edges[:-1], height=hist, 
+                    width=(bin_edges[1] - bin_edges[0]) * 0.8,
+                    brush=(100, 100, 255, 150), pen=None
+                )
+            else:
+                # Horizontal histogram (bars extend rightward from x=0)
+                bars = pg.BarGraphItem(
+                    x=0, y=bin_edges[:-1], width=hist,
+                    height=(bin_edges[1] - bin_edges[0]) * 0.8,
+                    brush=(100, 100, 255, 150), pen=None
+                )
+            plot.addItem(bars)
+
+    # Plot pre-delta histogram (vertical orientation)
+    plot_histogram_data(pre_delta_df, pre_hist_plot, is_vertical=False)
+    
+    # Plot scatter plot
+    plot_scatter_data(data_results_df, scatter_plot)
+    
+    # Plot post-delta histogram (vertical orientation)
+    plot_histogram_data(post_delta_df, post_hist_plot, is_vertical=False)
+    
+    # Add epoch shapes if provided
+    if time_delta_tuple is not None:
+        assert len(time_delta_tuple) == 3
+        earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end = time_delta_tuple
+        delta_relative_t_start, delta_relative_t_delta, delta_relative_t_end = (
+            np.array([earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end]) - t_delta
+        )
+        
+        # Get track config colors
+        long_short_display_config_manager = LongShortDisplayConfigManager()
+        
+        if is_dark_mode:
+            long_epoch_color = pg.mkColor(long_short_display_config_manager.long_epoch_config.mpl_color)
+            short_epoch_color = pg.mkColor(long_short_display_config_manager.short_epoch_config.mpl_color)
+            y_zero_line_color = pg.mkColor('rgba(50,50,50,100)')  # dark grey
+            vertical_epoch_divider_line_color = pg.mkColor('rgba(0,0,0,100)')  # black
+        else:
+            long_epoch_color = pg.mkColor(long_short_display_config_manager.long_epoch_config_light_mode.mpl_color)
+            short_epoch_color = pg.mkColor(long_short_display_config_manager.short_epoch_config_light_mode.mpl_color)
+            y_zero_line_color = pg.mkColor('rgba(200,200,200,100)')  # light grey
+            vertical_epoch_divider_line_color = pg.mkColor('rgba(255,255,255,100)')  # white
+        
+        # Add horizontal zero line
+        zero_line = pg.InfiniteLine(pos=0, angle=0, pen=pg.mkPen(y_zero_line_color, width=9))
+        scatter_plot.addItem(zero_line)
+        
+        # Add vertical divider line at x=0
+        divider_line = pg.InfiniteLine(pos=0, angle=90, pen=pg.mkPen(vertical_epoch_divider_line_color, width=3))
+        scatter_plot.addItem(divider_line)
+        
+        # Add region items for Long and Short epochs
+        long_region = pg.LinearRegionItem(
+            values=[delta_relative_t_start, delta_relative_t_delta],
+            brush=long_epoch_color,
+            alpha=0.3,
+            movable=False
+        )
+        scatter_plot.addItem(long_region)
+        
+        short_region = pg.LinearRegionItem(
+            values=[delta_relative_t_delta, delta_relative_t_end],
+            brush=short_epoch_color,
+            alpha=0.3,
+            movable=False
+        )
+        scatter_plot.addItem(short_region)
+        
+        # Add text labels for regions
+        long_text = pg.TextItem("Long", anchor=(0.5, 0))
+        long_text.setPos((delta_relative_t_start + delta_relative_t_delta) / 2, 0.95)
+        scatter_plot.addItem(long_text)
+        
+        short_text = pg.TextItem("Short", anchor=(0.5, 0))
+        short_text.setPos((delta_relative_t_delta + delta_relative_t_end) / 2, 0.95)
+        scatter_plot.addItem(short_text)
+    
+    # Add footer text if provided
+    if figure_footer_text:
+        footer_label = QtWidgets.QLabel(figure_footer_text)
+        footer_label.setAlignment(QtCore.Qt.AlignCenter)
+        font = footer_label.font()
+        font.setPointSize(10)
+        footer_label.setFont(font)
+        footer_label.setStyleSheet("color: gray;")
+        layout.addWidget(footer_label)
+    
+    # Set column stretch factors to match the original Plotly layout
+    plot_widget.ci.layout.setColumnStretchFactor(0, 1)  # Pre-delta histogram (10%)
+    plot_widget.ci.layout.setColumnStretchFactor(1, 8)  # Scatter plot (80%)
+    plot_widget.ci.layout.setColumnStretchFactor(2, 1)  # Post-delta histogram (10%)
+    
+    # Create context info
+    figure_context = IdentifyingContext(**figure_context_dict)
+    figure_context = figure_context.adding_context_if_missing(
+        **data_context.get_subset(subset_includelist=['epochs_name', 'data_grain']).to_dict(),
+        plot_type='scatter+hist', 
+        comparison='pre-post-delta', 
+        variable_name=histogram_variable_name
+    )
+    
+    # Create a preferred filename for exporting
+    preferred_filename = sanitize_filename_for_Windows(figure_context.get_subset(subset_excludelist=[]).get_description())
+    
+    # Store metadata with the widget for later access
+    main_widget.setProperty('figure_context', figure_context.to_dict())
+    main_widget.setProperty('preferred_filename', preferred_filename)
+    
+    # Add export functionality
+    def export_to_png(path=None):
+        if path is None:
+            path = f"{preferred_filename}.png"
+        
+        exporter = pg.exporters.ImageExporter(plot_widget.scene())
+        exporter.export(path)
+        return path
+    
+    def export_to_svg(path=None):
+        if path is None:
+            path = f"{preferred_filename}.svg"
+        
+        exporter = pg.exporters.SVGExporter(plot_widget.scene())
+        exporter.export(path)
+        return path
+    
+    # Attach export methods to the widget
+    main_widget.export_to_png = export_to_png
+    main_widget.export_to_svg = export_to_svg
+    
+    return main_widget, figure_context
 
 
 # ==================================================================================================================== #
@@ -104,18 +517,18 @@ def _build_output_decoded_posteriors(non_PBE_all_directional_pf1D_Decoder: BaseP
         # a_decoded_epoch_type_name: like 'laps', 'ripple', or 'non_pbe'
         a_pseudo2D_continuous_specific_decoded_result: DecodedFilterEpochsResult = non_PBE_all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=deepcopy(a_filter_epoch_obj), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False)
         filter_epochs_pseudo2D_continuous_specific_decoded_result[a_decoded_epoch_type_name] = a_pseudo2D_continuous_specific_decoded_result ## add result to outputs dict
-        a_pseudo2D_split_to_1D_continuous_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = a_pseudo2D_continuous_specific_decoded_result.split_pseudo2D_result_to_1D_result(pseudo2D_decoder_names_list=unique_decoder_names)
+        # a_pseudo2D_split_to_1D_continuous_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = a_pseudo2D_continuous_specific_decoded_result.split_pseudo2D_result_to_1D_result(pseudo2D_decoder_names_list=unique_decoder_names)
         a_non_PBE_marginal_over_track_ID, a_non_PBE_marginal_over_track_ID_posterior_df = DirectionalPseudo2DDecodersResult.build_generalized_non_marginalized_raw_posteriors(a_pseudo2D_continuous_specific_decoded_result, unique_decoder_names=unique_decoder_names) #[0]['p_x_given_n']
 
         ## MASKED:
-        masked_pseudo2D_continuous_specific_decoded_result, _mask_index_tuple = a_pseudo2D_continuous_specific_decoded_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(spikes_df), masked_bin_fill_mode='last_valid') ## Masks the low-firing bins so they don't confound the analysis.
+        # masked_pseudo2D_continuous_specific_decoded_result, _mask_index_tuple = a_pseudo2D_continuous_specific_decoded_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(spikes_df), masked_bin_fill_mode='last_valid') ## Masks the low-firing bins so they don't confound the analysis.
         masked_laps_pseudo2D_continuous_specific_decoded_result, _mask_index_tuple = a_pseudo2D_continuous_specific_decoded_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(spikes_df), masked_bin_fill_mode='last_valid') ## Masks the low-firing bins so they don't confound the analysis.
-        masked_laps_pseudo2D_split_to_1D_continuous_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = masked_laps_pseudo2D_continuous_specific_decoded_result.split_pseudo2D_result_to_1D_result(pseudo2D_decoder_names_list=unique_decoder_names)
+        # masked_laps_pseudo2D_split_to_1D_continuous_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = masked_laps_pseudo2D_continuous_specific_decoded_result.split_pseudo2D_result_to_1D_result(pseudo2D_decoder_names_list=unique_decoder_names)
         masked_laps_non_PBE_marginal_over_track_ID, masked_laps_non_PBE_marginal_over_track_ID_posterior_df = DirectionalPseudo2DDecodersResult.build_generalized_non_marginalized_raw_posteriors(masked_laps_pseudo2D_continuous_specific_decoded_result, unique_decoder_names=unique_decoder_names) #[0]['p_x_given_n']
 
         ## MASKED with NaNs (no backfill):
         dropping_masked_laps_pseudo2D_continuous_specific_decoded_result, _dropping_mask_index_tuple = a_pseudo2D_continuous_specific_decoded_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(spikes_df), masked_bin_fill_mode='nan_filled') ## Masks the low-firing bins so they don't confound the analysis.
-        dropping_masked_laps_pseudo2D_split_to_1D_continuous_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = dropping_masked_laps_pseudo2D_continuous_specific_decoded_result.split_pseudo2D_result_to_1D_result(pseudo2D_decoder_names_list=unique_decoder_names)
+        # dropping_masked_laps_pseudo2D_split_to_1D_continuous_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = dropping_masked_laps_pseudo2D_continuous_specific_decoded_result.split_pseudo2D_result_to_1D_result(pseudo2D_decoder_names_list=unique_decoder_names)
         dropping_masked_laps_non_PBE_marginal_over_track_ID, dropping_masked_laps_non_PBE_marginal_over_track_ID_posterior_df = DirectionalPseudo2DDecodersResult.build_generalized_non_marginalized_raw_posteriors(dropping_masked_laps_pseudo2D_continuous_specific_decoded_result, unique_decoder_names=unique_decoder_names) #[0]['p_x_given_n']
         
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor
