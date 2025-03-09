@@ -2106,7 +2106,6 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
                 # ==================================================================================================================== #
                 ## TODO 2024-08-07 20:27: - [ ] FUTURE: the core issue is being introduced in `epochs_spkcount` or whatever as a result of the strange slide. It may occur both n=1 and n=2 bins, maybe only n=2 now.
                 
-
                 #TODO 2024-08-16 01:10: - [ ] is `self.nbins` being updated?
 
 

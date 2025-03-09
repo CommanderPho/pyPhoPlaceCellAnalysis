@@ -38,15 +38,23 @@ class BatchCompletionHelpers:
 	
 	
 	"""
-	@function_attributes(short_name=None, tags=['replay', 'epochs'], input_requires=[], output_provides=[], uses=[], used_by=['overwrite_replay_epochs_and_recompute'], creation_date='2024-06-26 21:10', related_items=[])
+	@function_attributes(short_name=None, tags=['replay', 'epochs', 'dataframe_METADATA', 'dataframe_METADATA_ALTERING'], input_requires=[], output_provides=[], uses=[], used_by=['overwrite_replay_epochs_and_recompute'], creation_date='2024-06-26 21:10', related_items=[])
 	@classmethod
 	def replace_replay_epochs(cls, curr_active_pipeline, new_replay_epochs: Epoch):
 		""" 
 		Replaces each session's replay epochs and their `preprocessing_parameters.epoch_estimation_parameters.replays` config
 		
-		from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import replace_replay_epochs
+		
+		Accesses: new_replay_epochs.metadata:
+			['epochs_source', 'minimum_inclusion_fr_Hz', 'min_num_active_neurons', 'epochs_source']
 
 
+				
+		Usage:
+			from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import replace_replay_epochs
+
+
+		
 		"""
 		_backup_session_replay_epochs = {}
 		_backup_session_configs = {}
@@ -123,7 +131,7 @@ class BatchCompletionHelpers:
 
 
 
-	@function_attributes(short_name=None, tags=['dataframe', 'filename', 'metadata'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 12:40', related_items=[])
+	@function_attributes(short_name=None, tags=['dataframe', 'filename', 'metadata', 'dataframe_METADATA', 'dataframe_METADATA_ALTERING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 12:40', related_items=[])
 	@classmethod
 	def _get_custom_suffix_for_replay_filename(cls, new_replay_epochs: Epoch, *extras_strings) -> str:
 		""" Uses metadata stored in the replays dataframe to determine an appropriate filename
