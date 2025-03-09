@@ -68,6 +68,31 @@ from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResu
 #   - RunningDecoder (Only-laps), NonPBEDecoder (Any non-PBE period)
 #   - 
 
+""" 
+
+    ##Gotta get those ['P_LR', 'P_RL'] columns to determine best directions
+    extracted_merged_scores_df: pd.DataFrame = directional_decoders_epochs_decode_result.build_complete_all_scores_merged_df()
+    
+    extracted_merged_scores_df = extracted_merged_scores_df.loc[:, ~extracted_merged_scores_df.columns.duplicated()] # drops the duplicate columns, keeping only the first instance
+    extracted_merged_scores_df['is_most_likely_direction_LR'] = (extracted_merged_scores_df['P_LR'] > 0.5) # ValueError: Cannot set a DataFrame with multiple columns to the single column is_most_likely_direction_LR. Have duplicate columns for 'P_LR' unfortunately.
+
+        
+        
+    ## 2024-03-08 - Also constrain the user-selected ones (just to try it):
+    decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(curr_active_pipeline, track_templates=track_templates)
+
+    ## run 'directional_decoders_epoch_heuristic_scoring',
+    directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(curr_active_pipeline, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=True)
+
+    t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+    _output_csv_paths = directional_decoders_epochs_decode_result.export_csvs(parent_output_path=self.collected_outputs_path.resolve(), active_context=active_context, session_name=curr_session_name, curr_session_t_delta=t_delta,
+                                                                              user_annotation_selections={'ripple': any_good_selected_epoch_times},
+                                                                              valid_epochs_selections={'ripple': filtered_valid_epoch_times},
+                                                                              custom_export_df_to_csv_fn=custom_export_df_to_csv_fn,
+                                                                              should_export_complete_all_scores_df=True, export_df_variable_names=[], # `export_df_variable_names=[]` means export no non-complete dfs
+                                                                              )
+"""
+
 
 @define(slots=False, repr=False)
 class GeneralDecoderDecodedEpochsResult(ComputedResult):
