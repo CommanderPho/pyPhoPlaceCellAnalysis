@@ -11,7 +11,7 @@ import pandas as pd
 from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
 from neuropy.utils.dynamic_container import DynamicContainer # for _perform_two_step_position_decoding_computation
 from neuropy.utils.efficient_interval_search import get_non_overlapping_epochs # used in _subfn_compute_decoded_epochs to get only the valid (non-overlapping) epochs
-from neuropy.core.epoch import Epoch, subdivide_epochs, ensure_dataframe, ensure_Epoch
+from neuropy.core.epoch import Epoch, TimeColumnAliasesProtocol, subdivide_epochs, ensure_dataframe, ensure_Epoch
 from neuropy.analyses.placefields import HDF_SerializationMixin, PfND
 
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
@@ -1081,11 +1081,22 @@ class EpochComputationsComputationsContainer(ComputedResult):
         
         for a_decoded_epoch_type_name, a_filter_epoch_obj in filter_epochs_to_decode_dict.items():
             # a_decoded_epoch_type_name: like 'laps', 'ripple', or 'non_pbe'
-            a_pseudo2D_continuous_specific_decoded_result: DecodedFilterEpochsResult = non_PBE_all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=deepcopy(a_filter_epoch_obj), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False)
+            
+            a_filtered_epochs_df = ensure_dataframe(deepcopy(a_filter_epoch_obj)).epochs.filtered_by_duration(min_duration=epochs_decoding_time_bin_size*2)
+            # active_filter_epochs = a_filter_epoch_obj
+            active_filter_epochs = a_filtered_epochs_df
+            a_pseudo2D_continuous_specific_decoded_result: DecodedFilterEpochsResult = non_PBE_all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=deepcopy(active_filter_epochs), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False)
+            
+            # a_filtered_epochs_df = a_pseudo2D_continuous_specific_decoded_result.filter_epochs.epochs.filtered_by_duration(min_duration=epochs_decoding_time_bin_size*2)
+            # a_pseudo2D_continuous_specific_decoded_result = a_pseudo2D_continuous_specific_decoded_result.filtered_by_epoch_times(included_epoch_start_times=a_filtered_epochs_df['start'].to_numpy())
+            
+
             filter_epochs_pseudo2D_continuous_specific_decoded_result[a_decoded_epoch_type_name] = a_pseudo2D_continuous_specific_decoded_result ## add result to outputs dict
             # a_pseudo2D_split_to_1D_continuous_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = a_pseudo2D_continuous_specific_decoded_result.split_pseudo2D_result_to_1D_result(pseudo2D_decoder_names_list=unique_decoder_names)
             a_non_PBE_marginal_over_track_ID, a_non_PBE_marginal_over_track_ID_posterior_df = DirectionalPseudo2DDecodersResult.build_generalized_non_marginalized_raw_posteriors(a_pseudo2D_continuous_specific_decoded_result, unique_decoder_names=unique_decoder_names) #[0]['p_x_given_n']
 
+
+            
             ## MASKED:
             # masked_pseudo2D_continuous_specific_decoded_result, _mask_index_tuple = a_pseudo2D_continuous_specific_decoded_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(spikes_df), masked_bin_fill_mode='last_valid') ## Masks the low-firing bins so they don't confound the analysis.
             masked_laps_pseudo2D_continuous_specific_decoded_result, _mask_index_tuple = a_pseudo2D_continuous_specific_decoded_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(spikes_df), masked_bin_fill_mode='last_valid') ## Masks the low-firing bins so they don't confound the analysis.
@@ -1355,6 +1366,8 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
 
 
         """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import EpochFilteringMode, _compute_proper_filter_epochs
+        
         print(f'perform_compute_non_PBE_epochs(..., training_data_portion={training_data_portion}, epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}, frame_divide_bin_size: {frame_divide_bin_size})')
 
 
@@ -1446,8 +1459,49 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
 
             if (results2D is not None) and compute_2D:
                 global_computation_results.computed_data['EpochComputations'].results2D = results2D
-                
+
             global_computation_results.computed_data['EpochComputations'].a_new_NonPBE_Epochs_obj = a_new_NonPBE_Epochs_obj
+            
+
+            # ==================================================================================================================== #
+            # 2025-03-09 - Compute the Decoded Marginals for the known epochs (laps, ripples, etc)                                 #
+            # ==================================================================================================================== #
+            ## Common/shared for all decoded epochs:
+            unique_decoder_names = ['long', 'short']
+            non_PBE_all_directional_pf1D_Decoder, pseudo2D_continuous_specific_decoded_result, continuous_decoded_results_dict, non_PBE_marginal_over_track_ID, (time_bin_containers, time_window_centers, track_marginal_posterior_df) = global_computation_results.computed_data['EpochComputations']._build_merged_joint_placefields_and_decode(spikes_df=deepcopy(get_proper_global_spikes_df(owning_pipeline_reference))) # , filter_epochs=deepcopy(global_any_laps_epochs_obj)
+
+            global_session = owning_pipeline_reference.filtered_sessions[global_epoch_name]
+            
+            ## from dict of filter_epochs to decode:
+            global_replays_df: pd.DataFrame = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(deepcopy(global_session.replay))
+            global_any_laps_epochs_obj = owning_pipeline_reference.computation_results[global_epoch_name].computation_config.pf_params.computation_epochs # global_session.get
+            filter_epochs_to_decode_dict: Dict[KnownNamedDecodingEpochsType, Epoch] = {'laps': ensure_Epoch(deepcopy(global_any_laps_epochs_obj)),
+                                                                                    'pbe': ensure_Epoch(deepcopy(global_session.pbe.get_non_overlapping())),
+                                            #  'ripple': ensure_Epoch(deepcopy(global_session.ripple)),
+                                            #   'replay': ensure_Epoch(deepcopy(global_replays_df)),
+                                            'non_pbe': ensure_Epoch(deepcopy(global_session.non_pbe)),
+                                            }
+            # filter_epochs_to_decode_dict
+
+            ## constrain all epochs to be at least two decoding time bins long, or drop them entirely:
+            filter_epochs_to_decode_dict = {k:_compute_proper_filter_epochs(epochs_df=v, desired_decoding_time_bin_size=epochs_decoding_time_bin_size, minimum_event_duration=(2.0 * epochs_decoding_time_bin_size), mode=EpochFilteringMode.DropShorter) for k, v in filter_epochs_to_decode_dict.items()}
+
+            ## Perform the decoding and masking as needed for invalid bins:
+            session_name: str = owning_pipeline_reference.session_name
+            t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
+
+            filter_epochs_pseudo2D_continuous_specific_decoded_result, filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict = EpochComputationsComputationsContainer._build_output_decoded_posteriors(non_PBE_all_directional_pf1D_Decoder=non_PBE_all_directional_pf1D_Decoder, # pseudo2D_continuous_specific_decoded_result=pseudo2D_continuous_specific_decoded_result,
+                filter_epochs_to_decode_dict=filter_epochs_to_decode_dict,
+                unique_decoder_names=unique_decoder_names, spikes_df=deepcopy(get_proper_global_spikes_df(owning_pipeline_reference)), epochs_decoding_time_bin_size=epochs_decoding_time_bin_size,
+                session_name=session_name, t_start=t_start, t_delta=t_delta, t_end=t_end,
+            )
+
+
+            ## OUTPUTS: filter_epochs_pseudo2D_continuous_specific_decoded_result, filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict
+            # 58sec
+
+
+
             
         except MemoryError as mem_err:
             print(f"Insufficient memory: {str(mem_err)}")

@@ -5207,7 +5207,7 @@ from enum import Enum
 class EpochFilteringMode(Enum):
     """
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import EpochFilteringMode
-
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import EpochFilteringMode, _compute_proper_filter_epochs
     
     """
     DropShorter = 1 # ## Drop those less than the time bin duration
