@@ -88,7 +88,7 @@ class ProcessingScriptPhases(Enum):
             phase0_any_run_custom_user_completion_functions_dict = {
                 # 'backup_previous_session_files_completion_function': backup_previous_session_files_completion_function, # disabled 2024-10-29
                 # "determine_session_t_delta_completion_function": determine_session_t_delta_completion_function,  # ran 2024-05-28 6am
-                'kdiba_session_post_fixup_completion_function': kdiba_session_post_fixup_completion_function, 2025-01-15 10:16 REMOVED
+                # 'kdiba_session_post_fixup_completion_function': kdiba_session_post_fixup_completion_function, # 2025-01-15 10:16 REMOVED
             }
 
             # Unused:
