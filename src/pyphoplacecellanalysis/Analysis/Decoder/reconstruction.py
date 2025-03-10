@@ -1884,9 +1884,9 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         epochs_df = pd.DataFrame({'start':[t_start],'stop':[t_end],'label':['epoch']})
 
         ## final step is to time_bin (relative to the start of each epoch) the time values of remaining spikes
-        spkcount, included_neuron_ids, nbins, time_bin_containers_list = epochs_spkcount(spikes_df, epochs=epochs_df, bin_size=decoding_time_bin_size, slideby=decoding_time_bin_size, export_time_bins=True, included_neuron_ids=self.neuron_IDs, debug_print=debug_print) ## time_bins returned are not correct, they're subsampled at a rate of 1000
+        spkcount, included_neuron_ids, n_tbin_centers, time_bin_containers_list = epochs_spkcount(spikes_df, epochs=epochs_df, bin_size=decoding_time_bin_size, export_time_bins=True, included_neuron_ids=self.neuron_IDs, debug_print=debug_print)
         spkcount = spkcount[0]
-        nbins = nbins[0]
+        n_tbin_centers = n_tbin_centers[0]
         time_bin_container = time_bin_containers_list[0] # neuropy.utils.mixins.binning_helpers.BinningContainer
         # original_time_bin_container = deepcopy(self.time_binning_container) ## compared to this, we lose the last time_bin (which is partial)
         # is_time_bin_included_in_new = np.isin(original_time_bin_container.centers, time_bin_container.centers) ## see which of the original time bins vanished in the new `time_bin_container`
@@ -1993,22 +1993,22 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
             print(f'np.shape(filter_epoch_spikes_df): {np.shape(filter_epoch_spikes_df)}')
 
         ## final step is to time_bin (relative to the start of each epoch) the time values of remaining spikes
-        spkcount, included_neuron_ids, nbins, time_bin_containers_list = epochs_spkcount(filter_epoch_spikes_df, epochs=filter_epochs, bin_size=decoding_time_bin_size, slideby=decoding_time_bin_size, export_time_bins=True, included_neuron_ids=neuron_IDs, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print) ## time_bins returned are not correct, they're subsampled at a rate of 1000
-        num_filter_epochs = len(nbins) # one for each epoch in filter_epochs
+        spkcount, included_neuron_ids, n_tbin_centers, time_bin_containers_list = epochs_spkcount(filter_epoch_spikes_df, epochs=filter_epochs, bin_size=decoding_time_bin_size, export_time_bins=True, included_neuron_ids=neuron_IDs, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
+        num_filter_epochs = len(n_tbin_centers) # one for each epoch in filter_epochs
 
         # apply np.atleast_1d to all
-        for i, a_n_bins in enumerate(nbins):
+        for i, a_n_bins in enumerate(n_tbin_centers):
             time_bin_containers_list[i].centers = np.atleast_1d(time_bin_containers_list[i].centers)
             time_bin_containers_list[i].edges = np.atleast_1d(time_bin_containers_list[i].edges)
             # time_bin_containers_list[i].nbins = np.atleast_1d(time_bin_containers_list[i].edges)
 
             # [(a_n_bins == len(time_bin_containers_list[i].centers)) ]
-        assert np.all([(a_n_bins == len(time_bin_containers_list[i].centers)) for i, a_n_bins in enumerate(nbins)])
+        assert np.all([(a_n_bins == len(time_bin_containers_list[i].centers)) for i, a_n_bins in enumerate(n_tbin_centers)])
         # assert np.all([(a_n_bins == (len(time_bin_containers_list[i].edges)-1)) for i, a_n_bins in enumerate(nbins)]) # don't know why this wouldn't be true, but it's okay if it isn't I guess
-        assert np.all([(a_n_bins == time_bin_containers_list[i].num_bins) for i, a_n_bins in enumerate(nbins)])
+        assert np.all([(a_n_bins == time_bin_containers_list[i].num_bins) for i, a_n_bins in enumerate(n_tbin_centers)])
 
         filter_epochs_decoder_result.spkcount = spkcount
-        filter_epochs_decoder_result.nbins = nbins
+        filter_epochs_decoder_result.nbins = n_tbin_centers
         filter_epochs_decoder_result.time_bin_containers = time_bin_containers_list
         filter_epochs_decoder_result.decoding_time_bin_size = decoding_time_bin_size
         filter_epochs_decoder_result.filter_epochs = filter_epochs
@@ -2016,7 +2016,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
 
         
         if debug_print:
-            print(f'num_filter_epochs: {num_filter_epochs}, nbins: {nbins}') # the number of time bins that compose each decoding epoch e.g. nbins: [7 2 7 1 5 2 7 6 8 5 8 4 1 3 5 6 6 6 3 3 4 3 6 7 2 6 4 1 7 7 5 6 4 8 8 5 2 5 5 8]
+            print(f'num_filter_epochs: {num_filter_epochs}, nbins: {n_tbin_centers}') # the number of time bins that compose each decoding epoch e.g. nbins: [7 2 7 1 5 2 7 6 8 5 8 4 1 3 5 6 6 6 3 3 4 3 6 7 2 6 4 1 7 7 5 6 4 8 8 5 2 5 5 8]
 
         # bins = np.arange(epoch.start, epoch.stop, 0.001)
         filter_epochs_decoder_result.most_likely_positions_list = []

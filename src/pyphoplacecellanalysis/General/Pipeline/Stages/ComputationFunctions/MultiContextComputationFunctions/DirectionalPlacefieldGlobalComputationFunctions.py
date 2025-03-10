@@ -11,11 +11,9 @@ from datetime import datetime, date, timedelta
 
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, Iterable
 from typing_extensions import TypeAlias
-# import nptyping as ND
-from nptyping import NDArray
-from numpy.typing import NDArray  # Correct import for NDArray
-# import nptyping as ND
-from nptyping import NDArray
+import nptyping as ND
+# from nptyping import NDArray
+from numpy.typing import NDArray  # Correct import for NDArray in this context
 from typing import NewType
 import neuropy.utils.type_aliases as types
 # DecoderName = NewType('DecoderName', str)
@@ -71,7 +69,8 @@ DecodedMarginalResultTuple: TypeAlias = Tuple[
     NDArray[np.float_],
     NDArray[np.int_],
     NDArray[np.bool_]
-]
+] ## NOTE MUST use `from numpy.typing import NDArray` and not `from nptyping import NDArray` in this case, otherwise you have to specify the shape in addition to the type`
+
 
 # DecodedMarginalResultTuple = NewType('DecodedMarginalResultTuple', Tuple[List[DynamicContainer], NDArray[float], NDArray[int], NDArray[bool]])
 
@@ -3547,8 +3546,6 @@ import portion as P # Required for interval search: portion~=2.3.0
 import attrs
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
-import nptyping as ND
-from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 decoder_name: TypeAlias = str # a string that describes a decoder, such as 'LongLR' or 'ShortRL'
 epoch_split_key: TypeAlias = str # a string that describes a split epoch, such as 'train' or 'test'
@@ -4324,8 +4321,6 @@ class TrainTestLapsSplitting:
         
 
         """
-        import nptyping as ND
-from nptyping import NDArray
         from neuropy.core.epoch import Epoch, ensure_dataframe
         from neuropy.analyses.placefields import PfND
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
