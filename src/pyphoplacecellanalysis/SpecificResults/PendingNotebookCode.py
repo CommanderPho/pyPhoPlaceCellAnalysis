@@ -1704,7 +1704,7 @@ def _single_compute_train_test_split_epochs_decoders(a_decoder: BasePositionDeco
     
     """
     import nptyping as ND
-from nptyping import NDArray
+    from nptyping import NDArray
     from neuropy.core.epoch import Epoch, ensure_dataframe
     from neuropy.analyses.placefields import PfND
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
@@ -1773,7 +1773,7 @@ def compute_train_test_split_epochs_decoders(directional_laps_results: Direction
     
     """
     import nptyping as ND
-from nptyping import NDArray
+    from nptyping import NDArray
     from neuropy.core.epoch import Epoch, ensure_dataframe
     from neuropy.analyses.placefields import PfND
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
