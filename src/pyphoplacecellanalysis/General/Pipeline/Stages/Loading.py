@@ -7,6 +7,7 @@ from datetime import datetime
 import pathlib
 from pathlib import Path
 import shutil
+import nptyping as ND
 from nptyping import NDArray
 import numpy as np # for _backup_extant_file(...)
 

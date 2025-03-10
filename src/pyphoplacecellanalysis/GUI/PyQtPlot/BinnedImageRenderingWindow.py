@@ -1,5 +1,6 @@
 import numpy as np
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+import nptyping as ND
 from nptyping import NDArray
 from copy import deepcopy
 import attrs

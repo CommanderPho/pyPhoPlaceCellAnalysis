@@ -7,6 +7,7 @@ from datetime import datetime
 from neuropy.analyses import Epoch
 from neuropy.core import Ratemap # for BasePositionDecoder
 from neuropy.core.epoch import ensure_dataframe
+import nptyping as ND
 from nptyping import NDArray # for DecodedFilterEpochsResult
 # import pathlib
 

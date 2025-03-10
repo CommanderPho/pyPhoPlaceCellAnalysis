@@ -4,6 +4,7 @@
 # ==================================================================================================================== #
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 from attrs import astuple, asdict, field, define # used in `UnpackableMixin`
 from copy import deepcopy

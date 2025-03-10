@@ -4,6 +4,7 @@ from nptyping import NDArray
 import pandas as pd
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 from copy import deepcopy

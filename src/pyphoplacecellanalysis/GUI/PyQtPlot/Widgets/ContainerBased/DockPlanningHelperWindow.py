@@ -1,6 +1,7 @@
 from copy import deepcopy
 from typing import Optional, Dict, List, Tuple, Callable, Union
 from attrs import define, field, Factory
+import nptyping as ND
 from nptyping import NDArray
 import numpy as np
 import pandas as pd

@@ -18,6 +18,7 @@ from neuropy.core import Epoch
 from neuropy.analyses.placefields import PfND
 from neuropy.utils.misc import safe_pandas_get_group
 import pandas as pd
+import nptyping as ND
 from nptyping import NDArray
 import attrs
 from attrs import asdict, define, field, Factory, astuple

@@ -2,6 +2,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Dict, Callable, List, Optional, Tuple
 from attrs import define, field
+import nptyping as ND
 from nptyping import NDArray
 import numpy as np
 import pandas as pd

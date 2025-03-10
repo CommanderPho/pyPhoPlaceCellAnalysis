@@ -11,9 +11,11 @@ from datetime import datetime, date, timedelta
 
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, Iterable
 from typing_extensions import TypeAlias
-# from nptyping import NDArray
+# import nptyping as ND
+from nptyping import NDArray
 from numpy.typing import NDArray  # Correct import for NDArray
-# from nptyping import NDArray
+# import nptyping as ND
+from nptyping import NDArray
 from typing import NewType
 import neuropy.utils.type_aliases as types
 # DecoderName = NewType('DecoderName', str)
@@ -3545,6 +3547,7 @@ import portion as P # Required for interval search: portion~=2.3.0
 import attrs
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 decoder_name: TypeAlias = str # a string that describes a decoder, such as 'LongLR' or 'ShortRL'
@@ -4321,7 +4324,8 @@ class TrainTestLapsSplitting:
         
 
         """
-        from nptyping import NDArray
+        import nptyping as ND
+from nptyping import NDArray
         from neuropy.core.epoch import Epoch, ensure_dataframe
         from neuropy.analyses.placefields import PfND
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder

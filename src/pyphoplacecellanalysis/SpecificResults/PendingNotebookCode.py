@@ -12,6 +12,7 @@ from neuropy.core.user_annotations import UserAnnotationsManager
 from neuropy.utils.dynamic_container import DynamicContainer
 from neuropy.utils.indexing_helpers import union_of_arrays
 from neuropy.utils.result_context import IdentifyingContext
+import nptyping as ND
 from nptyping import NDArray
 import attrs
 import matplotlib as mpl
@@ -33,6 +34,7 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionD
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing import NewType
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 decoder_name: TypeAlias = str # a string that describes a decoder, such as 'LongLR' or 'ShortRL'
@@ -1701,7 +1703,8 @@ def _single_compute_train_test_split_epochs_decoders(a_decoder: BasePositionDeco
     split_train_test_epoch_specific_pf1D_Decoder_dict[an_epoch_period_description] = a_sliced_pf1D_Decoder
     
     """
-    from nptyping import NDArray
+    import nptyping as ND
+from nptyping import NDArray
     from neuropy.core.epoch import Epoch, ensure_dataframe
     from neuropy.analyses.placefields import PfND
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
@@ -1769,7 +1772,8 @@ def compute_train_test_split_epochs_decoders(directional_laps_results: Direction
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_train_test_split_epochs_decoders, _single_compute_train_test_split_epochs_decoders
     
     """
-    from nptyping import NDArray
+    import nptyping as ND
+from nptyping import NDArray
     from neuropy.core.epoch import Epoch, ensure_dataframe
     from neuropy.analyses.placefields import PfND
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
@@ -5100,6 +5104,7 @@ from pyphocorehelpers.assertion_helpers import Assert
 from pyphocorehelpers.indexing_helpers import partition_df_dict, partition
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, NewType
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 
@@ -5378,6 +5383,7 @@ def plot_grad_quiver(sobel_x, sobel_y, downsample_step=1):
 # ==================================================================================================================== #
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 from typing import NewType
 

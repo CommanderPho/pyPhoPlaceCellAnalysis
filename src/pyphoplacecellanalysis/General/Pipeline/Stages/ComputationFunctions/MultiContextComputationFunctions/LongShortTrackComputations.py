@@ -47,6 +47,7 @@ from neuropy.core.session.dataSession import DataSession # for `pipeline_complet
 from typing import Dict, List, Any, Optional, Tuple
 from scipy.special import factorial, logsumexp
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+import nptyping as ND
 from nptyping import NDArray, DataFrame, Shape, assert_isinstance, Int, Structure as S
 import awkward as ak # `simpler_compute_measured_vs_expected_firing_rates` new Awkward array for ragged arrays
 

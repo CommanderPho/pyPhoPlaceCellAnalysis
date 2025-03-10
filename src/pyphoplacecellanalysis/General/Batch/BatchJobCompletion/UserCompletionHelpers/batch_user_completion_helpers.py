@@ -4,6 +4,7 @@ from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from neuropy.analyses import Epoch
 from neuropy.core.epoch import ensure_dataframe
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 
@@ -11,7 +12,6 @@ from pathlib import Path
 import inspect
 from jinja2 import Template
 from neuropy.utils.result_context import IdentifyingContext
-from nptyping import NDArray
 import numpy as np
 import pandas as pd
 

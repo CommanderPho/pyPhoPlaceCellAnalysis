@@ -15,6 +15,7 @@ from scipy.sparse import coo_matrix, csr_matrix
 
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, TypeVar, NewType, Literal
 from typing_extensions import TypeAlias  # "from typing_extensions" in Python 3.9 and earlier
+import nptyping as ND
 from nptyping import NDArray
 from scipy.ndimage import gaussian_filter1d
 from sklearn.preprocessing import normalize

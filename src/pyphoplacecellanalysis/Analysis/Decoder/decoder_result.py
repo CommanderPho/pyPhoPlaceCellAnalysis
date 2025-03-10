@@ -15,6 +15,7 @@ from attrs import define, field, Factory
 import attrs # used for several things
 import matplotlib.pyplot as plt
 from matplotlib import cm
+import nptyping as ND
 from nptyping import NDArray # used for plot_kourosh_activity_style_figure version too to get a good colormap 
 import numpy as np
 import numpy.ma as ma # for masked array

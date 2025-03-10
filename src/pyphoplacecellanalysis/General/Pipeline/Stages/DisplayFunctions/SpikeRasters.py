@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional, Union, Tuple
 from collections import namedtuple
 from copy import deepcopy
+import nptyping as ND
 from nptyping import NDArray
 import numpy as np
 import pandas as pd

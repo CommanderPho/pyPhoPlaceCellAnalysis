@@ -5,6 +5,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 from typing import NewType
 
@@ -49,6 +50,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, NewType
+import nptyping as ND
 from nptyping import NDArray
 
 import neuropy.utils.type_aliases as types

@@ -2,6 +2,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 from typing import NewType
 import neuropy.utils.type_aliases as types
@@ -27,6 +28,7 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionD
 # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, Literal, NewType
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 

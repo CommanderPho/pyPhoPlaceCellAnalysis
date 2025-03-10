@@ -1,6 +1,7 @@
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias  # "from typing_extensions" in Python 3.9 and earlier
 from typing import NewType
+import nptyping as ND
 from nptyping import NDArray
 from neuropy.utils.type_aliases import aclu_index, DecoderName ## other imports?
 
@@ -8,6 +9,7 @@ from neuropy.utils.type_aliases import aclu_index, DecoderName ## other imports?
 
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, TypeVar
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 # import neuropy.utils.type_aliases as types
 import pyphoplacecellanalysis.General.type_aliases as types

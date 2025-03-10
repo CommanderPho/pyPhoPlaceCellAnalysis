@@ -11,6 +11,7 @@ from matplotlib.figure import Figure
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, NewType, TypeVar
 from neuropy.utils.indexing_helpers import find_desired_sort_indicies
 from typing_extensions import TypeAlias
+import nptyping as ND
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 import numpy as np
