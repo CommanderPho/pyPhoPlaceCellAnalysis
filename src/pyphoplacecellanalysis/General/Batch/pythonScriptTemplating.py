@@ -121,7 +121,7 @@ class ProcessingScriptPhases(Enum):
                 'compute_and_export_cell_first_spikes_characteristics_completion_function': compute_and_export_cell_first_spikes_characteristics_completion_function,
                 'export_session_h5_file_completion_function': export_session_h5_file_completion_function, # ran 2024-09-26 3pm
                 'save_custom_session_files_completion_function': save_custom_session_files_completion_function,
-                'generalized_decode_epochs_dict_and_export_results_completion_function': generalized_decode_epochs_dict_and_export_results_completion_function,
+                # 'generalized_decode_epochs_dict_and_export_results_completion_function': generalized_decode_epochs_dict_and_export_results_completion_function, # Not yet implemented 2025-03-10 19:56 
             }
 
             if self.value == ProcessingScriptPhases.clean_run.value:
