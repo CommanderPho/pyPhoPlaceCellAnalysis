@@ -110,5 +110,80 @@ class TestDecodersMethods(unittest.TestCase):
         # self.assertTrue(np.all(np.isclose(neuron_sliced_pf.ratemap.tuning_curves, [original_pf.ratemap.tuning_curves[idx] for idx in subset_included_neuron_IDXs]))) # ensure that the tuning curves built for the neuron_slided_pf are the same as those subset as retrieved from the  original_pf
 
 
+class TestEpochsSpkcountMethods(unittest.TestCase):
+
+    def setUp(self):
+        self.enable_debug_printing = False
+        self.test_spikes_df = pd.DataFrame({
+            'neuron_id': [1, 1, 2, 2, 3],
+            'time': [0.1, 0.2, 0.15, 0.25, 0.3]
+        })
+        self.test_epochs_df = pd.DataFrame({
+            'start': [0.0, 0.5],
+            'stop': [0.4, 0.8]
+        })
+
+    def test_single_time_bin_per_epoch(self):
+        spkcount, nbins, time_bins = epochs_spkcount(
+            self.test_spikes_df, 
+            self.test_epochs_df,
+            bin_size=0.1,
+            export_time_bins=True,
+            use_single_time_bin_per_epoch=True
+        )
+        self.assertEqual(len(nbins), 2)
+        self.assertTrue(all(nbins == 1))
+        self.assertEqual(len(time_bins), 2)
+
+    def test_short_epoch_handling(self):
+        short_epochs_df = pd.DataFrame({
+            'start': [0.0, 0.5],
+            'stop': [0.005, 0.51]
+        })
+        spkcount, nbins, time_bins = epochs_spkcount(
+            self.test_spikes_df,
+            short_epochs_df,
+            bin_size=0.01,
+            export_time_bins=True
+        )
+        self.assertEqual(len(nbins), 2)
+        self.assertTrue(all(nbins == 1))
+
+    def test_included_neuron_ids(self):
+        specific_neuron_ids = [1, 2, 3, 4]
+        spkcount, nbins, _ = epochs_spkcount(
+            self.test_spikes_df,
+            self.test_epochs_df,
+            included_neuron_ids=specific_neuron_ids,
+            bin_size=0.1
+        )
+        self.assertEqual(len(spkcount[0]), len(specific_neuron_ids))
+
+    def test_variable_slideby(self):
+        spkcount, nbins, _ = epochs_spkcount(
+            self.test_spikes_df,
+            self.test_epochs_df,
+            bin_size=0.1,
+            slideby=0.05
+        )
+        self.assertTrue(all(n > 0 for n in nbins))
+
+    def test_empty_epochs(self):
+        empty_epochs_df = pd.DataFrame({
+            'start': [],
+            'stop': []
+        })
+        spkcount, nbins, time_bins = epochs_spkcount(
+            self.test_spikes_df,
+            empty_epochs_df,
+            bin_size=0.1,
+            export_time_bins=True
+        )
+        self.assertEqual(len(spkcount), 0)
+        self.assertEqual(len(nbins), 0)
+        self.assertEqual(len(time_bins), 0)
+        
+
 if __name__ == '__main__':
+
     unittest.main()
