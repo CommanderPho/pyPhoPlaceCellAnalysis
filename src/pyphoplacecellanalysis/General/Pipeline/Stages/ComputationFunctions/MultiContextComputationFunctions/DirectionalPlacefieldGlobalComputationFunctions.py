@@ -12,8 +12,8 @@ from datetime import datetime, date, timedelta
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, Iterable
 from typing_extensions import TypeAlias
 import nptyping as ND
-# from nptyping import NDArray
-from numpy.typing import NDArray  # Correct import for NDArray in this context
+from nptyping import NDArray
+# from numpy.typing import NDArray  # Correct import for NDArray in this context
 from typing import NewType
 import neuropy.utils.type_aliases as types
 # DecoderName = NewType('DecoderName', str)
@@ -66,11 +66,10 @@ if TYPE_CHECKING:
 # DecodedMarginalResultTuple: TypeAlias = Tuple[List[DynamicContainer], NDArray[float], NDArray[int], NDArray[bool]] # used by 
 DecodedMarginalResultTuple: TypeAlias = Tuple[
     List[DynamicContainer],
-    NDArray[np.float_],
-    NDArray[np.int_],
-    NDArray[np.bool_]
-] ## NOTE MUST use `from numpy.typing import NDArray` and not `from nptyping import NDArray` in this case, otherwise you have to specify the shape in addition to the type`
-
+    NDArray[ND.Shape["*"], ND.Float],
+    NDArray[ND.Shape["*"], ND.Int],
+    NDArray[ND.Shape["*"], ND.Bool]
+] 
 
 # DecodedMarginalResultTuple = NewType('DecodedMarginalResultTuple', Tuple[List[DynamicContainer], NDArray[float], NDArray[int], NDArray[bool]])
 
