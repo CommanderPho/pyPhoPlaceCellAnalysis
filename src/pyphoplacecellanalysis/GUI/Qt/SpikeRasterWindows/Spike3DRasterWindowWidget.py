@@ -1767,7 +1767,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             if self.should_debug_print_interaction_events:
                 print(f'\t unhandled event {QEventLookupHelpers.get_event_string(event)}')
                 
-        if (delta is not None) and (delta > 0):
+        if (delta is not None) and (abs(delta) > 0):
             ## do the scroll
             if self.should_debug_print_interaction_events:
                 print(f'\tperofmring scroll with delta: {delta}')
