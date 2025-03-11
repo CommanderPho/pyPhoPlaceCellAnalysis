@@ -3008,16 +3008,13 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
         a_new_fully_generic_result
 
     """
-    from neuropy.core.epoch import EpochsAccessor, Epoch, ensure_dataframe
-    from pyphocorehelpers.indexing_helpers import partition_df_dict, partition_df        
+    from typing import Literal
+    from neuropy.core.epoch import EpochsAccessor, Epoch, ensure_dataframe, ensure_Epoch   
     # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _adding_global_non_PBE_epochs
     # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import Compute_NonPBE_Epochs
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer, NonPBEDimensionalDecodingResult, Compute_NonPBE_Epochs, KnownFilterEpochs, GeneralDecoderDictDecodedEpochsDictResult
     from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult, GenericResultTupleIndexType, KnownNamedDecodingEpochsType, MaskedTimeBinFillType
-    from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch
     from neuropy.analyses.placefields import PfND
-    from typing import Literal
-    from neuropy.core.epoch import ensure_dataframe
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
     from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring
     from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
@@ -3045,11 +3042,11 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['non_PBE_epochs_results'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
     
     ## Unpack the results:
-    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+    # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
 
     ## Unpack from pipeline:
     nonPBE_results: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
-    a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = nonPBE_results.a_new_NonPBE_Epochs_obj
+    # a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = nonPBE_results.a_new_NonPBE_Epochs_obj
     results1D: NonPBEDimensionalDecodingResult = nonPBE_results.results1D
     results2D: NonPBEDimensionalDecodingResult = nonPBE_results.results2D
 
@@ -3096,7 +3093,6 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
         ## INPUTS: directional_decoders_epochs_decode_result, filtered_epochs_df
         ## Inputs: a_new_fully_generic_result
         a_new_fully_generic_result = a_new_fully_generic_result.adding_directional_decoder_results_filtered_by_spikes_per_t_bin_masked(directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result)
-
         ## OUTPUTS: a_new_fully_generic_result
     else:
         print('WARN: missing "DirectionalDecodersEpochsEvaluations" global result. Skipping.')
@@ -3107,23 +3103,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
     #TODO 🚧 2025-03-11 13:01: - [ ] Allow overriding qclu and inclusion_fr values, see other user function
     if 'DirectionalMergedDecoders' in curr_active_pipeline.global_computation_results.computed_data:
-        # rank_order_results = curr_active_pipeline.global_computation_results.computed_data.get('RankOrder', None) # : "RankOrderComputationsContainer"
-        # if rank_order_results is not None:
-        #     minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
-        #     included_qclu_values: List[int] = rank_order_results.included_qclu_values
-        # else:        
-        #     ## get from parameters:
-        #     minimum_inclusion_fr_Hz: float = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
-        #     included_qclu_values: List[int] = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
-                
-
-        # directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
-        # track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
-        # print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
-        # print(f'included_qclu_values: {included_qclu_values}')
-
         # DirectionalMergedDecoders: Get the result after computation:
-        
         directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
         a_new_fully_generic_result = a_new_fully_generic_result.adding_directional_pseudo2D_decoder_results_filtered_by_spikes_per_t_bin_masked(directional_merged_decoders_result=directional_merged_decoders_result)
     else:
