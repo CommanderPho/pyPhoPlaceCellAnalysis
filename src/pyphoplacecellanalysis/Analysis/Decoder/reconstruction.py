@@ -1327,7 +1327,16 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         for i in np.arange(num_filter_epochs):
             ## Mask each output value
             # inactive_mask_indicies = np.where(inactive_mask)[0]
-            num_positions, num_y_bins, num_time_bins = np.shape(a_decoded_result.p_x_given_n_list[i])
+            *num_spatial_dims_list, num_time_bins = np.shape(a_decoded_result.p_x_given_n_list[i])
+            if len(num_spatial_dims_list) == 2: 
+                # 2D
+                num_positions, num_y_bins = num_spatial_dims_list            
+            elif len(num_spatial_dims_list) == 1:
+                # 1D
+                num_positions = num_spatial_dims_list
+            else:
+                raise NotImplementedError(f'len(num_spatial_dims_list): {len(num_spatial_dims_list)}: num_spatial_dims_list: {num_spatial_dims_list} but expected 2 or 3')
+
             a_time_bin_edges: NDArray = deepcopy(a_decoded_result.time_bin_edges[i])
             assert len(a_time_bin_edges) == (num_time_bins+1)
         
@@ -1342,9 +1351,10 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
 
             if masked_bin_fill_mode != 'ignore':
                 # Mask inactive time bins with NaN in all modes except ignore mode
-                a_decoded_result.p_x_given_n_list[i][:, :, inactive_mask] = np.nan
-                a_decoded_result.most_likely_position_indicies_list[i][:, inactive_mask] = -1 # use -1 instead of np.nan as it needs to be integer
-                a_decoded_result.most_likely_positions_list[i][inactive_mask, :] = np.nan
+                # Use arr[..., inactive_mask], which works for any number of dimensions:
+                a_decoded_result.p_x_given_n_list[i][..., inactive_mask] = np.nan
+                a_decoded_result.most_likely_position_indicies_list[i][..., inactive_mask] = -1 # use -1 instead of np.nan as it needs to be integer
+                a_decoded_result.most_likely_positions_list[i][inactive_mask, ...] = np.nan
 
             if masked_bin_fill_mode == 'last_valid':
                 ## backfill from last_valid decoded position
@@ -1360,15 +1370,15 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                     
                     ## when done, have `last_valid_indices`
                     # print(f'last_valid_indices: {last_valid_indices}')
-                    a_decoded_result.p_x_given_n_list[i][:, :, all_time_bin_indicies] = original_data[:, :, last_valid_indices]
+                    a_decoded_result.p_x_given_n_list[i][..., all_time_bin_indicies] = original_data[..., last_valid_indices]
 
                     # Also fix the most_likely_position arrays using the same technique
                     # For most_likely_position_indicies_list (shape: 2, num_time_bins)
                     a_decoded_result.most_likely_position_indicies_list[i][:, all_time_bin_indicies] = a_decoded_result.most_likely_position_indicies_list[i][:, last_valid_indices]
                     
                     # For most_likely_positions_list (shape: num_time_bins, 2)
-                    a_decoded_result.most_likely_positions_list[i][all_time_bin_indicies, :] = a_decoded_result.most_likely_positions_list[i][last_valid_indices, :]
-            
+                    a_decoded_result.most_likely_positions_list[i][all_time_bin_indicies, ...] = a_decoded_result.most_likely_positions_list[i][last_valid_indices, ...] # Use a dimension-agnostic approach:
+
                 else:
                     ## no valid time bins
                     print(f'WARN: Epoch[{i}]: with {num_time_bins} time_bins has no time bins with enough firing to infer back-filled positions from, so all entries will be NaN.')
@@ -1376,7 +1386,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             elif masked_bin_fill_mode == 'dropped':
                 ## just drop the invalid bins by selecting via the `is_time_bin_active` (active_mask):
                 # Drop inactive time bins by selecting only active ones
-                a_decoded_result.p_x_given_n_list[i] = a_decoded_result.p_x_given_n_list[i][:, :, is_time_bin_active]
+                a_decoded_result.p_x_given_n_list[i] = a_decoded_result.p_x_given_n_list[i][..., is_time_bin_active]
                 a_decoded_result.most_likely_position_indicies_list[i] = a_decoded_result.most_likely_position_indicies_list[i][:, is_time_bin_active]
                 a_decoded_result.most_likely_positions_list[i] = a_decoded_result.most_likely_positions_list[i][is_time_bin_active, :]
 
@@ -2153,7 +2163,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
                     assert np.shape(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx])[1] == 2, f"filter_epochs_decoder_result.most_likely_positions_list[invalid_idx] expected to be of shape (n_t_bins, 2), but shape {np.shape(filter_epochs_decoder_result.most_likely_position_indicies_list[invalid_idx])}"
                     filter_epochs_decoder_result.most_likely_positions_list[invalid_idx] = filter_epochs_decoder_result.most_likely_positions_list[invalid_idx][good_indicies, :] ## (2, n_t_bins): (16, 2) -> (2, 1)
 
-                    filter_epochs_decoder_result.p_x_given_n_list[invalid_idx] = filter_epochs_decoder_result.p_x_given_n_list[invalid_idx][:, :, good_indicies]
+                    filter_epochs_decoder_result.p_x_given_n_list[invalid_idx] = filter_epochs_decoder_result.p_x_given_n_list[invalid_idx][..., good_indicies]
                     filter_epochs_decoder_result.spkcount[invalid_idx] = filter_epochs_decoder_result.spkcount[invalid_idx][:, good_indicies] ## okay for 2D? (80, 16) -> (80, 1)
                     ## do post-hoc checking:
                     assert (len(filter_epochs_decoder_result.time_bin_containers[invalid_idx].centers) == len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx])), f"even after fixing invalid_idx: {invalid_idx}: len(time_bin_containers[invalid_idx].centers): {len(filter_epochs_decoder_result.time_bin_containers[invalid_idx].centers)} != len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx]): {len(filter_epochs_decoder_result.most_likely_positions_list[invalid_idx])} "

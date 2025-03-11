@@ -237,6 +237,30 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         return a_new_fully_generic_result
 
 
+
+    # @function_attributes(short_name=None, tags=['adding'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-11 14:40', related_items=[])
+    def adding_from_old_GeneralDecoderDictDecodedEpochsDictResult(self, a_general_decoder_dict_decoded_epochs_dict_result) -> "GenericDecoderDictDecodedEpochsDictResult":
+        """ adds the results from a 2025-03-10 result (`GeneralDecoderDictDecodedEpochsDictResult`) to the new 2025-03-11 format (`GenericDecoderDictDecodedEpochsDictResult`), in-place, but returning itself
+
+        from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult, GenericResultTupleIndexType, KnownNamedDecodingEpochsType, MaskedTimeBinFillType
+
+        a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = GenericDecoderDictDecodedEpochsDictResult()  # start empty
+        a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = a_new_fully_generic_result.adding_from_old_GeneralDecoderDictDecodedEpochsDictResult(a_general_decoder_dict_decoded_epochs_dict_result=a_general_decoder_dict_decoded_epochs_dict_result)
+        a_new_fully_generic_result
+        """
+        _shared_context_fragment = {'trained_compute_epochs': 'non_pbe'}
+        for a_known_epoch_name, an_epoch in a_general_decoder_dict_decoded_epochs_dict_result.filter_epochs_to_decode_dict.items():
+            a_new_identifier = IdentifyingContext(**_shared_context_fragment, known_named_decoding_epochs_type=a_known_epoch_name)
+            self.filter_epochs_to_decode_dict[a_new_identifier] = deepcopy(an_epoch)
+            
+            self.filter_epochs_specific_decoded_result[a_new_identifier] = deepcopy(a_general_decoder_dict_decoded_epochs_dict_result.filter_epochs_pseudo2D_continuous_specific_decoded_result[a_known_epoch_name])
+            for a_known_t_bin_fill_type, a_posterior_df in a_general_decoder_dict_decoded_epochs_dict_result.filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict[a_known_epoch_name].items():
+                a_new_joint_identifier = IdentifyingContext(**_shared_context_fragment, known_named_decoding_epochs_type=a_known_epoch_name, masked_time_bin_fill_type=a_known_t_bin_fill_type)
+                self.filter_epochs_decoded_track_marginal_posterior_df_dict[a_new_joint_identifier] = deepcopy(a_posterior_df)
+
+        return self
+    
+
     # @function_attributes(short_name=None, tags=['adding'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-11 13:16', related_items=[])
     def adding_directional_decoder_results_filtered_by_spikes_per_t_bin_masked(self, directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult) -> "GenericDecoderDictDecodedEpochsDictResult":
         """ Takes the previously computed results and produces versions with each time bin masked by a required number of spike counts/participation.
