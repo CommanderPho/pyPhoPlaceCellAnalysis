@@ -875,10 +875,10 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import MaskedTimeBin
 GenericResultTupleIndexType: TypeAlias = MaskedTimeBinFillType # an template/stand-in variable that aims to abstract away the unique-hashable index of a single result computed with a given set of parameters. Not yet fully implemented 2025-03-09 17:50 
 
 
-
+@function_attributes(short_name=None, tags=['DEPRICATED', 'replaced', 'not-general'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-11 13:50', related_items=['GenericDecoderDictDecodedEpochsDictResult'])
 @define(slots=False, repr=False, eq=False)
 class GeneralDecoderDictDecodedEpochsDictResult(ComputedResult):
-    """ 
+    """ REPLACED BY `GenericDecoderDictDecodedEpochsDictResult` on 2025-03-11 13:51 
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import GeneralDecoderDictDecodedEpochsDictResult, GenericResultTupleIndexType, KnownNamedDecodingEpochsType, MaskedTimeBinFillType
     
     

@@ -157,6 +157,7 @@ KnownNamedDecodingEpochsType = Literal['laps', 'replay', 'ripple', 'pbe', 'non_p
 # Define a type that can only be one of these specific strings
 MaskedTimeBinFillType = Literal['ignore', 'last_valid', 'nan_filled', 'dropped'] ## used in `DecodedFilterEpochsResult.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(...)` to specify how invalid bins (due to too few spikes) are treated.
 
+DataTimeGrain = Literal['per_epoch', 'per_time_bin']
 GenericResultTupleIndexType: TypeAlias = IdentifyingContext # an template/stand-in variable that aims to abstract away the unique-hashable index of a single result computed with a given set of parameters. Not yet fully implemented 2025-03-09 17:50 
 """ Possible IdentifyingContext keys:
 All entries are {IdentifyingContextKeyName} | {ImplicitButUnenforcedKeyValueType} | Description with possible values
@@ -166,6 +167,8 @@ decoder_identifier | types.DecoderName | name of a decoder ['long_LR', 'long', e
 time_bin_size | float | decoding time bin size (e.g. 0.025, 0.058)
 known_named_decoding_epochs_type | KnownNamedDecodingEpochsType | the name of a known set of Epochs (e.g. 'laps', 'replay', 'ripple', 'pbe', 'non_pbe')
 masked_time_bin_fill_type | MaskedTimeBinFillType | used in `DecodedFilterEpochsResult.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(...)` to specify how invalid bins (due to too few spikes) are treated. (e.g. 'ignore', 'last_valid', 'nan_filled', 'dropped')
+data_grain | DataTimeGrain | how the data is binned in time (e.g. "data_grain='per_epoch'" or "data_grain='per_time_bin'") Note: used in `pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper.SpecificPrePostDeltaScatter._pre_post_delta_scatter_laps_per_time_bin`
+
 """
 
 # @metadata_attributes(short_name=None, tags=['Generic', 'Improved'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-11 07:53', related_items=['GeneralDecoderDictDecodedEpochsDictResult'])
@@ -326,15 +329,8 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         """
         filtered_epochs_df = None ## parameter just to allow an override I think
         
-
         # DirectionalMergedDecoders: Get the result after computation:
         
-        ripple_decoding_time_bin_size: float = directional_merged_decoders_result.ripple_decoding_time_bin_size
-        laps_decoding_time_bin_size: float = directional_merged_decoders_result.laps_decoding_time_bin_size
-        all_directional_pf1D_Decoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
-        pf1D = all_directional_pf1D_Decoder.pf
-        laps_time_bin_marginals_df: pd.DataFrame = deepcopy(directional_merged_decoders_result.laps_time_bin_marginals_df)
-
         ## NOTE, HAVE:
         all_directional_pf1D_Decoder: BasePositionDecoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
         all_directional_decoder_dict: Dict[str, BasePositionDecoder] = directional_merged_decoders_result.all_directional_decoder_dict
@@ -342,14 +338,14 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult = directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result
         all_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result
         
-        # Marginalized posteriors computed from above posteriors:
-        laps_directional_marginals_tuple: Tuple = directional_merged_decoders_result.laps_directional_marginals_tuple # laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = self.laps_directional_marginals_tuple
-        laps_track_identity_marginals_tuple: Tuple = directional_merged_decoders_result.laps_track_identity_marginals_tuple
-        # laps_non_marginalized_decoder_marginals_tuple: Tuple = serialized_field(default=None, metadata={'field_added': "2024.10.09_0"}, hdf_metadata={'epochs': 'Laps'})
+        # # Marginalized posteriors computed from above posteriors:
+        # laps_directional_marginals_tuple: Tuple = directional_merged_decoders_result.laps_directional_marginals_tuple # laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = self.laps_directional_marginals_tuple
+        # laps_track_identity_marginals_tuple: Tuple = directional_merged_decoders_result.laps_track_identity_marginals_tuple
+        # # laps_non_marginalized_decoder_marginals_tuple: Tuple = serialized_field(default=None, metadata={'field_added': "2024.10.09_0"}, hdf_metadata={'epochs': 'Laps'})
         
-        ripple_directional_marginals_tuple: Tuple = directional_merged_decoders_result.ripple_directional_marginals_tuple
-        ripple_track_identity_marginals_tuple: Tuple = directional_merged_decoders_result.ripple_track_identity_marginals_tuple
-        # ripple_non_marginalized_decoder_marginals_tuple: Tuple = serialized_field(default=None, metadata={'field_added': "2024.10.09_0"}, hdf_metadata={'epochs': 'Replay'})
+        # ripple_directional_marginals_tuple: Tuple = directional_merged_decoders_result.ripple_directional_marginals_tuple
+        # ripple_track_identity_marginals_tuple: Tuple = directional_merged_decoders_result.ripple_track_identity_marginals_tuple
+        # # ripple_non_marginalized_decoder_marginals_tuple: Tuple = serialized_field(default=None, metadata={'field_added': "2024.10.09_0"}, hdf_metadata={'epochs': 'Replay'})
     
 
         # ==================================================================================================================== #
@@ -369,7 +365,15 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                                                 'pbe': directional_merged_decoders_result.ripple_decoding_time_bin_size,
         }
 
-        
+
+        decoder_epoch_marginals_df_dict_dict = {'laps': {'per_time_bin': deepcopy(directional_merged_decoders_result.laps_time_bin_marginals_df), 'per_epoch': deepcopy(directional_merged_decoders_result.laps_all_epoch_bins_marginals_df)},
+                                                'pbe': {'per_time_bin': deepcopy(directional_merged_decoders_result.ripple_time_bin_marginals_df), 'per_epoch': deepcopy(directional_merged_decoders_result.ripple_all_epoch_bins_marginals_df)},
+        }
+
+
+        # dict(data_grain='per_epoch', known_named_decoding_epochs_type='laps'): deepcopy(directional_merged_decoders_result.laps_all_epoch_bins_marginals_df),
+        # dict(data_grain='per_time_bin', known_named_decoding_epochs_type='laps'): deepcopy(directional_merged_decoders_result.laps_time_bin_marginals_df), 
+        # ...
 
         for a_known_decoded_epochs_type, a_decoder_epochs_filter_epochs_decoder_result in decoder_filter_epochs_result_dict.items():
 
@@ -394,22 +398,27 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         pos_bin_size: float = directional_merged_decoders_result.pos_bin_size
         print(f'{pos_bin_size = }, {epochs_decoding_time_bin_size = }')
 
-
         ## OUTPUTS: filtered_decoder_filter_epochs_decoder_result_dict_dict, epochs_decoding_time_bin_size
 
         ## Perform the decoding and masking as needed for invalid bins:
-
+        a_decoder_name: str = 'pseudo2D' # FIXED FOR THIS ENTIRE FUNCTION
+        
         for a_known_decoded_epochs_type, a_decoder_epochs_filter_epochs_decoder_result in decoder_filter_epochs_result_dict.items():
-
-            # for a_decoder_name, a_decoded_epochs_result in decoder_ripple_filter_epochs_decoder_result_dict.items():
-            a_decoder_name: str = 'pseudo2D'
             ## build the complete identifier
             a_new_identifier: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier=a_decoder_name, time_bin_size=epochs_decoding_time_bin_size, known_named_decoding_epochs_type=a_known_decoded_epochs_type, masked_time_bin_fill_type='ignore')
             self.filter_epochs_specific_decoded_result[a_new_identifier] = deepcopy(a_decoder_epochs_filter_epochs_decoder_result)
             self.filter_epochs_to_decode_dict[a_new_identifier] = deepcopy(a_decoder_epochs_filter_epochs_decoder_result.filter_epochs) ## needed? Do I want full identifier as key?
             # self.filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict[a_new_identifier] ## #TODO 2025-03-11 11:39: - [ ] must be computed or assigned from prev result
-                
+            self.decoders[a_new_identifier] = all_directional_pf1D_Decoder ## this will duplicate this decoder needlessly for each repetation here, but that's okay for now
+            for a_known_data_grain, a_decoded_marginals_df in decoder_epoch_marginals_df_dict_dict[a_known_decoded_epochs_type].items():
+                a_new_data_grain_identifier: IdentifyingContext = a_new_identifier.adding_context_if_missing(data_grain=a_known_data_grain)
+                self.filter_epochs_decoded_track_marginal_posterior_df_dict[a_new_data_grain_identifier] = deepcopy(a_decoded_marginals_df) 
 
+            for an_individual_decoder_name, an_individual_directional_decoder in all_directional_decoder_dict.items():
+                a_new_individual_decoder_identifier: IdentifyingContext = a_new_identifier.overwriting_context(decoder_identifier=an_individual_decoder_name) # replace 'decoder_identifier'
+                self.decoders[a_new_individual_decoder_identifier] = deepcopy(an_individual_directional_decoder) 
+
+                
 
         # directional_decoders_epochs_decode_result.build_complete_all_scores_merged_df(debug
                                                                                     
