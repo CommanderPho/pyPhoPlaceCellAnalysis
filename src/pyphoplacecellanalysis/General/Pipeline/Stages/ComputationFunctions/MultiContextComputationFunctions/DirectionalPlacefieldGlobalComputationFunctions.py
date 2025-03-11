@@ -8278,13 +8278,14 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
             widget.plots_data.a_decoder = deepcopy(a_position_decoder)
         
         ## try to add the measured_positions
-        measured_position_df = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
         widget.plots_data.measured_position_df = None
-        widget.plots.measured_position_artists = None
-        if measured_position_df is not None:
-            widget.plots_data.measured_position_df = measured_position_df
-            _out_artists = cls._perform_overlay_measured_position(identifier_name=identifier_name, widget=widget, matplotlib_fig=fig, matplotlib_fig_axes=[an_ax], measured_position_df=measured_position_df)
-            widget.plots.measured_position_artists = _out_artists
+        widget.plots.measured_position_artists = None       
+        if curr_active_pipeline is not None:
+            measured_position_df = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
+            if measured_position_df is not None:
+                widget.plots_data.measured_position_df = measured_position_df
+                _out_artists = cls._perform_overlay_measured_position(identifier_name=identifier_name, widget=widget, matplotlib_fig=fig, matplotlib_fig_axes=[an_ax], measured_position_df=measured_position_df)
+                widget.plots.measured_position_artists = _out_artists
                 
         widget.draw() # alternative to accessing through full path?
         active_2d_plot.sync_matplotlib_render_plot_widget(identifier_name) # Sync it with the active window:
