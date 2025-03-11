@@ -241,9 +241,12 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
         directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = deepcopy(curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']) ## GENERAL
 
-        a_new_fully_generic_result = _subfn_filter_by_spikes_per_t_bin_masked_and_add_to_generic_result(a_new_fully_generic_result, directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result)
+        # a_new_fully_generic_result = _subfn_filter_by_spikes_per_t_bin_masked_and_add_to_generic_result(a_new_fully_generic_result, directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result)
+        a_new_fully_generic_result = a_new_fully_generic_result.adding_directional_decoder_results_filtered_by_spikes_per_t_bin_masked(directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result)
 
         """
+        filtered_epochs_df = None ## parameter just to allow an override I think
+        
 
         decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = deepcopy(directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict)
         decoder_laps_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = deepcopy(directional_decoders_epochs_decode_result.decoder_laps_filter_epochs_decoder_result_dict)
@@ -308,10 +311,117 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # extracted_merged_scores_df
         ## Inputs: a_new_fully_generic_result
 
+        return self
+
+
+
+    def adding_directional_pseudo2D_decoder_results_filtered_by_spikes_per_t_bin_masked(self, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult) -> "GenericDecoderDictDecodedEpochsDictResult":
+        """ Takes the previously computed results and produces versions with each time bin masked by a required number of spike counts/participation.
+        Updates in-places, creating new entries, but also returns self
+
+        Usage:
+            directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
+            a_new_fully_generic_result = a_new_fully_generic_result.adding_directional_pseudo2D_decoder_results_filtered_by_spikes_per_t_bin_masked(directional_merged_decoders_result=directional_merged_decoders_result)
+
+        """
+        filtered_epochs_df = None ## parameter just to allow an override I think
+        
+
+        # DirectionalMergedDecoders: Get the result after computation:
+        
+        ripple_decoding_time_bin_size: float = directional_merged_decoders_result.ripple_decoding_time_bin_size
+        laps_decoding_time_bin_size: float = directional_merged_decoders_result.laps_decoding_time_bin_size
+        all_directional_pf1D_Decoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
+        pf1D = all_directional_pf1D_Decoder.pf
+        laps_time_bin_marginals_df: pd.DataFrame = deepcopy(directional_merged_decoders_result.laps_time_bin_marginals_df)
+
+        ## NOTE, HAVE:
+        all_directional_pf1D_Decoder: BasePositionDecoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
+        all_directional_decoder_dict: Dict[str, BasePositionDecoder] = directional_merged_decoders_result.all_directional_decoder_dict
+        # Posteriors computed via the all_directional decoder:
+        all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult = directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result
+        all_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result
+        
+        # Marginalized posteriors computed from above posteriors:
+        laps_directional_marginals_tuple: Tuple = directional_merged_decoders_result.laps_directional_marginals_tuple # laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = self.laps_directional_marginals_tuple
+        laps_track_identity_marginals_tuple: Tuple = directional_merged_decoders_result.laps_track_identity_marginals_tuple
+        # laps_non_marginalized_decoder_marginals_tuple: Tuple = serialized_field(default=None, metadata={'field_added': "2024.10.09_0"}, hdf_metadata={'epochs': 'Laps'})
+        
+        ripple_directional_marginals_tuple: Tuple = directional_merged_decoders_result.ripple_directional_marginals_tuple
+        ripple_track_identity_marginals_tuple: Tuple = directional_merged_decoders_result.ripple_track_identity_marginals_tuple
+        # ripple_non_marginalized_decoder_marginals_tuple: Tuple = serialized_field(default=None, metadata={'field_added': "2024.10.09_0"}, hdf_metadata={'epochs': 'Replay'})
+    
+
+        # ==================================================================================================================== #
+        # Reuse the old/previously computed version of the result with the additional properties                               #
+        # ==================================================================================================================== #
+        ## These are of type `trained_compute_epochs` -- e.g. trained_compute_epochs='laps'  || trained_compute_epochs='non_pbe'
+        trained_compute_epochs_dict_dict = {'laps': ensure_Epoch(deepcopy(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result.filter_epochs)), ## only laps were ever trained to decode until the non-PBEs
+                                            # 'pbe': ensure_Epoch(deepcopy(directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict['long_LR'].filter_epochs)), ## PBEs were never used to decode, only laps
+        }
+
+        ## NOTE that this is only done for the "trained_compute_epochs='laps'" context
+        decoder_filter_epochs_result_dict = {'laps': deepcopy(all_directional_laps_filter_epochs_decoder_result),
+                                                'pbe': deepcopy(all_directional_ripple_filter_epochs_decoder_result),
+        }
+
+        epochs_decoding_time_bin_size_dict = {'laps': directional_merged_decoders_result.laps_decoding_time_bin_size,
+                                                'pbe': directional_merged_decoders_result.ripple_decoding_time_bin_size,
+        }
+
+        
+
+        for a_known_decoded_epochs_type, a_decoder_epochs_filter_epochs_decoder_result in decoder_filter_epochs_result_dict.items():
+
+            filtered_decoder_filter_epochs_decoder_result = None
+            unfiltered_epochs_df = deepcopy(a_decoder_epochs_filter_epochs_decoder_result.filter_epochs)
+            if filtered_epochs_df is not None:
+                ## filter
+                filtered_epochs_df = ensure_dataframe(filtered_epochs_df)
+                filtered_decoder_filter_epochs_decoder_result: DecodedFilterEpochsResult = a_decoder_epochs_filter_epochs_decoder_result.filtered_by_epoch_times(filtered_epochs_df[['start', 'stop']].to_numpy()) # working filtered
+            else:
+                unfiltered_epochs_df = ensure_dataframe(unfiltered_epochs_df)
+                filtered_decoder_filter_epochs_decoder_result: DecodedFilterEpochsResult = a_decoder_epochs_filter_epochs_decoder_result.filtered_by_epoch_times(ensure_dataframe(unfiltered_epochs_df)[['start', 'stop']].to_numpy()) # working unfiltered
+
+            assert filtered_decoder_filter_epochs_decoder_result is not None
+            
+            ## collect results:
+            filtered_decoder_filter_epochs_decoder_result[a_known_decoded_epochs_type] = filtered_decoder_filter_epochs_decoder_result
+        ## END for a_known_decoded_epochs_type, a_....
+        
+        Assert.all_equal(epochs_decoding_time_bin_size_dict.values())
+        epochs_decoding_time_bin_size: float = list(epochs_decoding_time_bin_size_dict.values())[0]
+        pos_bin_size: float = directional_merged_decoders_result.pos_bin_size
+        print(f'{pos_bin_size = }, {epochs_decoding_time_bin_size = }')
+
+
+        ## OUTPUTS: filtered_decoder_filter_epochs_decoder_result_dict_dict, epochs_decoding_time_bin_size
+
+        ## Perform the decoding and masking as needed for invalid bins:
+
+        for a_known_decoded_epochs_type, a_decoder_epochs_filter_epochs_decoder_result in decoder_filter_epochs_result_dict.items():
+
+            # for a_decoder_name, a_decoded_epochs_result in decoder_ripple_filter_epochs_decoder_result_dict.items():
+            a_decoder_name: str = 'pseudo2D'
+            ## build the complete identifier
+            a_new_identifier: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier=a_decoder_name, time_bin_size=epochs_decoding_time_bin_size, known_named_decoding_epochs_type=a_known_decoded_epochs_type, masked_time_bin_fill_type='ignore')
+            self.filter_epochs_specific_decoded_result[a_new_identifier] = deepcopy(a_decoder_epochs_filter_epochs_decoder_result)
+            self.filter_epochs_to_decode_dict[a_new_identifier] = deepcopy(a_decoder_epochs_filter_epochs_decoder_result.filter_epochs) ## needed? Do I want full identifier as key?
+            # self.filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict[a_new_identifier] ## #TODO 2025-03-11 11:39: - [ ] must be computed or assigned from prev result
+                
+
+
+        # directional_decoders_epochs_decode_result.build_complete_all_scores_merged_df(debug
+                                                                                    
+        # extracted_merged_scores_df = directional_decoders_epochs_decode_result.build_complete_all_scores_merged_df(debug_print=True)
+        # extracted_merged_scores_df
+        ## Inputs: a_new_fully_generic_result
 
         return self
     
 
+    
+    # @function_attributes(short_name=None, tags=['adding', 'generating', 'masking'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-11 13:22', related_items=[])
     def creating_new_spikes_per_t_bin_masked_variants(self, spikes_df: pd.DataFrame) -> "GenericDecoderDictDecodedEpochsDictResult":
         """ Takes the previously computed results and produces versions with each time bin masked by a required number of spike counts/participation.
         Updates in-places, creating new entries, but also returns self
