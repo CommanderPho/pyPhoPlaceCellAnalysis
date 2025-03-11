@@ -999,15 +999,20 @@ class SpikeRasterBottomFrameControlsMixin(LoggingBaseClassLoggerOwningMixin):
         print(f'SpikeRasterBottomFrameControlsMixin_on_window_update(new_start: {new_start}, new_end: {new_end}')
         #TODO 2023-11-21 18:49: - [ ] Doesn't work :[
         # need to block signals:
+        
+        self.blockSignals(True)
         # doubleSpinBox_ActiveWindowStartTime.blockSignals(True)
         # doubleSpinBox_ActiveWindowEndTime.blockSignals(True)
         # if new_start is not None:
         #     self.ui.doubleSpinBox_ActiveWindowStartTime.setValue(new_start)
         # if new_end is not None:
         #     self.ui.doubleSpinBox_ActiveWindowEndTime.setValue(new_end)
+        self.bottom_playback_control_bar_widget.on_window_changed(new_start, new_end)
+        
         # doubleSpinBox_ActiveWindowStartTime.blockSignals(False) # unblock the signals when done
         # doubleSpinBox_ActiveWindowEndTime.blockSignals(False)
-        self.bottom_playback_control_bar_widget.on_window_changed(new_start, new_end)
+        self.blockSignals(False) # unblock the signals when done
+
         # if new_start is not None:
         #     ## update the jump time when it scrolls
         #     ## should rate-limit it:
