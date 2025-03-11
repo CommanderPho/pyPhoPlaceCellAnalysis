@@ -523,6 +523,8 @@ class PipelineWithDisplayPipelineStageMixin:
         Currently I think the display_outputs system uses the a simple display context (consisting of only the display function name) as the key, meaning it needs to be refined so that multiple version of the same figure can be produced.
 
         """
+        from neuropy.utils.result_context import IdentifyingContext
+        
         assert self.can_display, "Current self.stage must already be a DisplayPipelineStage. Call self.prepare_for_display to reach this step."
         debug_print = kwargs.get('debug_print', False)
         
