@@ -25,6 +25,7 @@ from pyphocorehelpers.gui.Qt.HighlightedJumpSlider import HighlightedJumpSlider
 from pyphocorehelpers.gui.Qt.ToggleButton import ToggleButtonModel, ToggleButton
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 from pyphocorehelpers.gui.Qt.QtUIC_Helpers import load_ui_with_named_spacers
+from pyphocorehelpers.gui.Qt.QtUIC_Helpers import get_all_spacer_items, get_spacer_at
 # For extra button symbols:
 import qtawesome as qta
 
@@ -168,7 +169,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         """ setup the UI
         """
    
-        playback_controls = [self.ui.button_play_pause, self.ui.button_reverse, self.ui.horizontalSpacer_playback] # 
+        playback_controls = [self.ui.button_play_pause, self.ui.button_reverse, self.ui.horizontalSpacer_1] # 
 
         speed_controls = [self.ui.button_slow_down, self.ui.doubleSpinBoxPlaybackSpeed, self.ui.toolButton_SpeedBurstEnabled, self.ui.button_speed_up, self.ui.horizontalSpacer_6] # 
 
@@ -243,8 +244,21 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
 
         ## Hide any controls in `controls_to_hide`
         for a_ctrl in controls_to_hide:
-            a_ctrl.hide()
-        
+            if hasattr(a_ctrl, 'hide'):
+                a_ctrl.hide()
+            else:
+                a_ctrl.changeSize(0, 0, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+                # a_ctrl.layout().invalidate()  # or update()
+                # a_ctrl.update()
+                self.ui.layout().removeItem(a_ctrl)
+                # self.ui.layout().invalidate()
+
+        # Force the layout to recalc: assume ui is the parent widget holding the layout
+        self.ui.layout().invalidate()  # invalidates the layout cache
+        self.ui.layout().update()      # requests a relayout/redraw
+        # Optionally, you can also trigger a geometry update on the widget:
+        self.ui.updateGeometry()
+
         # debug_log_controls _________________________________________________________________________________________________ #
         self.ui._attached_log_window = None
         self.ui.connections['_logger_sigLogUpdated'] = self._logger.sigLogUpdated.connect(self.on_log_updated)
