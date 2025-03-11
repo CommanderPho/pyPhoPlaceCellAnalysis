@@ -152,16 +152,19 @@ class Spike3DRasterLeftSidebarControlBar(QWidget):
     @pyqtExceptionPrintingSlot(int)
     def temporal_zoom_slider_valueChanged(self, int_slider_val):
         # print(f'sb: {sb}, sb.value(): {str(sb.value())}')
-        print(f'temporal_zoom_slider_valueChanged({int_slider_val})')
+        if self.enable_debug_print:
+            print(f'temporal_zoom_slider_valueChanged({int_slider_val})')
         float_slider_val = (float(int_slider_val)-0.0)/1000.0
-        print(f'\t float_slider_val: {float_slider_val}')
+        if self.enable_debug_print:
+            print(f'\t float_slider_val: {float_slider_val}')
         # TODO: emit the temporal changed signal:    
         # self.temporal_zoom_factor_changed.emit(float_slider_val)
                         
 
     # @pyqtExceptionPrintingSlot()
     def crosshair_trace_button_Toggled(self):
-        print(f'Spike3DRasterLeftSidebarControlBar.crosshair_trace_button_Toggled(): self.ui.btnToggleCrosshairTrace.isChecked(): {self.ui.btnToggleCrosshairTrace.isChecked()}')
+        if self.enable_debug_print:
+            print(f'Spike3DRasterLeftSidebarControlBar.crosshair_trace_button_Toggled(): self.ui.btnToggleCrosshairTrace.isChecked(): {self.ui.btnToggleCrosshairTrace.isChecked()}')
         wants_crosshair_trace_visible: bool = self.ui.btnToggleCrosshairTrace.isChecked()
         self.ui.lblCrosshairTraceStaticLabel.setVisible(wants_crosshair_trace_visible)
         self.ui.lblCrosshairTraceValue.setVisible(wants_crosshair_trace_visible)
@@ -228,6 +231,7 @@ class SpikeRasterLeftSidebarControlsMixin:
         left_side_bar_connections.append(left_side_bar_controls.temporal_zoom_factor_changed.connect(self.on_temporal_zoom_factor_valueChanged))
         left_side_bar_connections.append(left_side_bar_controls.render_window_duration_changed.connect(self.on_render_window_duration_valueChanged))
         left_side_bar_connections.append(left_side_bar_controls.crosshair_trace_toggled.connect(self.on_crosshair_trace_toggled)) # #TODO 2025-02-10 16:50: - [ ] Add handler for enable/disable crosshairs trace
+        left_side_bar_connections.append(left_side_bar_controls.debug_mode_button_Toggled.connect(self.on_debug_mode_Toggled))
         return left_side_bar_connections
         
             
@@ -264,7 +268,8 @@ class SpikeRasterLeftSidebarControlsMixin:
     def SpikeRasterLeftSidebarControlsMixin_on_window_update(self, new_start=None, new_end=None):
         """ called to perform updates when the active window changes. Redraw, recompute data, etc. """
         # Called in the Implementor's update_window(...) function
-        print(f'SpikeRasterLeftSidebarControlsMixin_on_window_update(new_start: {new_start}, new_end: {new_end}')
+        if self.enable_debug_print:
+            print(f'SpikeRasterLeftSidebarControlsMixin_on_window_update(new_start: {new_start}, new_end: {new_end}')
         
         left_side_bar_controls = self.ui.leftSideToolbarWidget
 
@@ -307,6 +312,7 @@ class SpikeRasterLeftSidebarControlsMixin:
         did_update: bool = (old_value != updated_is_debug_mode_enabled)
         self.params.debug_print = updated_is_debug_mode_enabled
         self.should_debug_print_interaction_events = updated_is_debug_mode_enabled
+        self.enable_debug_print = updated_is_debug_mode_enabled
         # self.debug_print = updated_is_debug_mode_enabled
         print(f'\tself.debug_print: {self.debug_print}')
         print(f'\tself.should_debug_print_interaction_events: {self.should_debug_print_interaction_events}')

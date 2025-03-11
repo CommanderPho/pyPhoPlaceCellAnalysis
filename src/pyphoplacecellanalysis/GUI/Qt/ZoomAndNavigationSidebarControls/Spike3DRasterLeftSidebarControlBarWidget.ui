@@ -58,7 +58,7 @@ font: 7pt &quot;MS Shell Dlg 2&quot;;</string>
     <number>0</number>
    </property>
    <item>
-    <layout class="QVBoxLayout" name="verticalLayout" stretch="0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0">
+    <layout class="QVBoxLayout" name="verticalLayout" stretch="0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0">
      <property name="leftMargin">
       <number>2</number>
      </property>
@@ -154,6 +154,34 @@ font: 7pt &quot;MS Shell Dlg 2&quot;;</string>
        </property>
        <property name="value">
         <double>1.000000000000000</double>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="btnToggleDebugEnabled">
+       <property name="toolTip">
+        <string>Toggle Debug Printing</string>
+       </property>
+       <property name="statusTip">
+        <string>Toggle Debug Printing</string>
+       </property>
+       <property name="whatsThis">
+        <string>Toggle Debug Printing</string>
+       </property>
+       <property name="text">
+        <string>Debug</string>
+       </property>
+       <property name="icon">
+        <iconset theme="SP_MessageBoxInformation"/>
+       </property>
+       <property name="iconSize">
+        <size>
+         <width>24</width>
+         <height>24</height>
+        </size>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
        </property>
       </widget>
      </item>
