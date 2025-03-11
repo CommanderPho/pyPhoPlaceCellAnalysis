@@ -3040,6 +3040,9 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
     ## perform the recomputation:
     curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['non_PBE_epochs_results'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+
+    session_name: str = curr_active_pipeline.session_name
+    t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
     
     ## Unpack the results:
     # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
@@ -3057,7 +3060,6 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
     assert (results1D is not None)
     assert (results2D is not None)
-
 
     # ==================================================================================================================== #
     # Pre 2025-03-10 Semi-generic (unfinalized) Result                                                                     #
@@ -3116,6 +3118,15 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     # masked_pseudo2D_continuous_specific_decoded_result, _mask_index_tuple = pseudo2D_continuous_specific_decoded_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)))
 
 
+    ## ensure all optional fields are present before output:
+    
+    # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
+    for k in list(a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict.keys()):
+        a_df = a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict[k]
+        a_df['delta_aligned_start_t'] = a_df['t'] - t_delta ## subtract off t_delta    
+        a_df = a_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=epochs_decoding_time_bin_size, curr_session_t_delta=t_delta, time_col='t')
+        a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict[k] = a_df
+        
     # ==================================================================================================================== #
     # Create and add the output                                                                                            #
     # ==================================================================================================================== #
