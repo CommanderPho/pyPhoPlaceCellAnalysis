@@ -124,8 +124,8 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
         # add_renderables_menu[a_command].trigger()
         global_flat_action_dict[a_command].trigger()
 
-    # active_2d_plot.activeMenuReference
-    # active_2d_plot.ui.menus # .global_window_menus.docked_widgets.actions_dict
+    # # active_2d_plot.activeMenuReference
+    # # active_2d_plot.ui.menus # .global_window_menus.docked_widgets.actions_dict
 
     active_2d_plot.params.enable_non_marginalized_raw_result = False
     active_2d_plot.params.enable_marginal_over_direction = False
@@ -133,11 +133,11 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
 
 
     menu_commands = [
-        'AddTimeCurves.Position',
+        # 'AddTimeCurves.Position', ## 2025-03-11 02:32 Running this too soon after launching the window causes weird black bars on the top and bottom of the window
         # 'DockedWidgets.LongShortDecodedEpochsDockedMatplotlibView',
         # 'DockedWidgets.DirectionalDecodedEpochsDockedMatplotlibView',
         # 'DockedWidgets.TrackTemplatesDecodedEpochsDockedMatplotlibView',
-        'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView', # [/c:/Users/pho/repos/Spike3DWorkEnv/pyPhoPlaceCellAnalysis/src/pyphoplacecellanalysis/GUI/Qt/Menus/SpecificMenus/DockedWidgets_MenuProvider.py:141](vscode://file/c:/Users/pho/repos/Spike3DWorkEnv/pyPhoPlaceCellAnalysis/src/pyphoplacecellanalysis/GUI/Qt/Menus/SpecificMenus/DockedWidgets_MenuProvider.py:141)`'actionPseudo2DDecodedEpochsDockedMatplotlibView': AddNewDecodedPosteriors_MatplotlibPlotCommand`
+        # 'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView', # [/c:/Users/pho/repos/Spike3DWorkEnv/pyPhoPlaceCellAnalysis/src/pyphoplacecellanalysis/GUI/Qt/Menus/SpecificMenus/DockedWidgets_MenuProvider.py:141](vscode://file/c:/Users/pho/repos/Spike3DWorkEnv/pyPhoPlaceCellAnalysis/src/pyphoplacecellanalysis/GUI/Qt/Menus/SpecificMenus/DockedWidgets_MenuProvider.py:141)`'actionPseudo2DDecodedEpochsDockedMatplotlibView': AddNewDecodedPosteriors_MatplotlibPlotCommand`
         #  'DockedWidgets.ContinuousPseudo2DDecodedMarginalsDockedMatplotlibView',
 
     ]
@@ -147,17 +147,17 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
         global_flat_action_dict[a_command].trigger()
 
 
-    ## add the right sidebar
-    visible_intervals_info_widget_container, visible_intervals_ctrl_layout_widget =  spike_raster_window._perform_build_attached_visible_interval_info_widget() # builds the tables
+    # ## add the right sidebar
+    # visible_intervals_info_widget_container, visible_intervals_ctrl_layout_widget =  spike_raster_window._perform_build_attached_visible_interval_info_widget() # builds the tables
     
     # spike_raster_window.build_epoch_intervals_visual_configs_widget()
     
 
-    ## Dock all Grouped results from `'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView'`
-    ## INPUTS: active_2d_plot
-    nested_dock_items, nested_dynamic_docked_widget_container_widgets = active_2d_plot.ui.dynamic_docked_widget_container.layout_dockGroups()
-    grouped_dock_items_dict = active_2d_plot.ui.dynamic_docked_widget_container.get_dockGroup_dock_dict()
-    ## OUTPUTS: nested_dock_items, nested_dynamic_docked_widget_container_widgets
+    # ## Dock all Grouped results from `'DockedWidgets.Pseudo2DDecodedEpochsDockedMatplotlibView'`
+    # ## INPUTS: active_2d_plot
+    # nested_dock_items, nested_dynamic_docked_widget_container_widgets = active_2d_plot.ui.dynamic_docked_widget_container.layout_dockGroups()
+    # grouped_dock_items_dict = active_2d_plot.ui.dynamic_docked_widget_container.get_dockGroup_dock_dict()
+    # ## OUTPUTS: nested_dock_items, nested_dynamic_docked_widget_container_widgets
 
 
 
