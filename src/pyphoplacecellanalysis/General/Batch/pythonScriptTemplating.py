@@ -58,6 +58,14 @@ class ProcessingScriptPhases(Enum):
         else:
             return False
         
+
+    @property
+    def phase_job_suffix(self) -> str:
+        """The string indicating which phase/stage we're in to be used in the job_suffix."""
+        return self.value.removesuffix('_run').capitalize() # ["Clean", "Continued", "Final", "Figure"]
+    
+
+
     def get_custom_user_completion_functions_dict(self, extra_run_functions=None) -> Dict:
         """ get the extra user_completion functions
         
@@ -88,7 +96,7 @@ class ProcessingScriptPhases(Enum):
             phase0_any_run_custom_user_completion_functions_dict = {
                 # 'backup_previous_session_files_completion_function': backup_previous_session_files_completion_function, # disabled 2024-10-29
                 # "determine_session_t_delta_completion_function": determine_session_t_delta_completion_function,  # ran 2024-05-28 6am
-                # 'kdiba_session_post_fixup_completion_function': kdiba_session_post_fixup_completion_function, # 2025-01-15 10:16 REMOVED
+                'kdiba_session_post_fixup_completion_function': kdiba_session_post_fixup_completion_function, # 2025-01-15 10:16 REMOVED
             }
 
             # Unused:
@@ -237,6 +245,8 @@ class ProcessingScriptPhases(Enum):
         else:
             _out_run_config.update(dict(create_slurm_scripts=True, should_create_vscode_workspace=False))
 
+        _out_run_config['phase_job_suffix'] = self.phase_job_suffix
+
         return _out_run_config
 
 
@@ -289,11 +299,19 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
             script_file.write(script_content)
         return bash_script_path
 
+
+    # ==================================================================================================================== #
+    # BEGIN FUNCTION BODY                                                                                                  #
+    # ==================================================================================================================== #
     assert isinstance(session_batch_basedirs, dict)
 
     if not isinstance(output_directory, Path):
         output_directory = Path(output_directory).resolve()
 
+    if job_suffix is None:
+        job_suffix = ''
+        
+    job_suffix = f"{job_suffix}_{}"
 
     separate_execute_and_figure_gen_scripts = renderer_script_generation_kwargs.pop('separate_execute_and_figure_gen_scripts', True)
     assert separate_execute_and_figure_gen_scripts, f"Old non-separate mode not supported"
