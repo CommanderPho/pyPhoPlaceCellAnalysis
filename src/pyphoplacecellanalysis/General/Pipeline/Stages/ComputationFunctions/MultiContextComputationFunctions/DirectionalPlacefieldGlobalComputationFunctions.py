@@ -2721,6 +2721,10 @@ class DecoderDecodedEpochsResult(ComputedResult):
     2024-02-15 - Computed by `_decode_and_evaluate_epochs_using_directional_decoders`
     
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
+
+    #TODO 2025-03-11 05:56: - [ ] Seems stupid and wasteful, for example, why doesn't it contain the Pseudo2D decoder or its results? It also has a whole bunch of crap that just accumulated over time
+
+
     """ 
 
     _VersionedResultMixin_version: str = "2024.02.16_0" # to be updated in your IMPLEMENTOR to indicate its version
