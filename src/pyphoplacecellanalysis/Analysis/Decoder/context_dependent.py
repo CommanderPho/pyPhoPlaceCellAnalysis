@@ -176,23 +176,45 @@ data_grain | DataTimeGrain | how the data is binned in time (e.g. "data_grain='p
 class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
     """ General flat-unordered-tuple-like indicies
     
-    from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult, GenericResultTupleIndexType, KnownNamedDecodingEpochsType, MaskedTimeBinFillType
+    from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult, KnownNamedDecoderTrainedComputeEpochsType, KnownNamedDecodingEpochsType, MaskedTimeBinFillType, DataTimeGrain, GenericResultTupleIndexType
     
+    Info:
+        ### Makes masked versions of all previous results
 
-    ### Makes masked versions of all previous results
+        ## Takes the previously computed results and produces versions with each time bin masked by a required number of spike counts/participation:
+        _new_results_to_add = {} ## need a temporary entry so we aren't modifying the dict property `a_new_fully_generic_result.filter_epochs_pseudo2D_continuous_specific_decoded_result` while we update it
+        for a_context, a_decoded_filter_epochs_result in a_new_fully_generic_result.filter_epochs_pseudo2D_continuous_specific_decoded_result.items():
+            a_modified_context = deepcopy(a_context)
+            a_masked_decoded_filter_epochs_result, _mask_index_tuple = a_decoded_filter_epochs_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)))
+            a_modified_context = a_modified_context.adding_context_if_missing(masked_time_bin_fill_type='last_valid')
+            _new_results_to_add[a_modified_context] = a_masked_decoded_filter_epochs_result
+        
+        print(f'computed {len(_new_results_to_add)} new results')
 
-    ## Takes the previously computed results and produces versions with each time bin masked by a required number of spike counts/participation:
-    _new_results_to_add = {} ## need a temporary entry so we aren't modifying the dict property `a_new_fully_generic_result.filter_epochs_pseudo2D_continuous_specific_decoded_result` while we update it
-    for a_context, a_decoded_filter_epochs_result in a_new_fully_generic_result.filter_epochs_pseudo2D_continuous_specific_decoded_result.items():
-        a_modified_context = deepcopy(a_context)
-        a_masked_decoded_filter_epochs_result, _mask_index_tuple = a_decoded_filter_epochs_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)))
-        a_modified_context = a_modified_context.adding_context_if_missing(masked_time_bin_fill_type='last_valid')
-        _new_results_to_add[a_modified_context] = a_masked_decoded_filter_epochs_result
+        a_new_fully_generic_result.filter_epochs_pseudo2D_continuous_specific_decoded_result.update(_new_results_to_add)
+
+        
     
-    print(f'computed {len(_new_results_to_add)} new results')
+    COMPLETE EXAMPLE:
+    
+    
+        from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult, KnownNamedDecoderTrainedComputeEpochsType, KnownNamedDecodingEpochsType, MaskedTimeBinFillType, DataTimeGrain, GenericResultTupleIndexType
 
-    a_new_fully_generic_result.filter_epochs_pseudo2D_continuous_specific_decoded_result.update(_new_results_to_add)
+        a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = GenericDecoderDictDecodedEpochsDictResult()  # start empty
 
+        a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = a_new_fully_generic_result.adding_from_old_GeneralDecoderDictDecodedEpochsDictResult(a_general_decoder_dict_decoded_epochs_dict_result=a_general_decoder_dict_decoded_epochs_dict_result)
+
+        # a_new_fully_generic_result
+        directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = deepcopy(curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']) ## GENERAL
+        a_new_fully_generic_result = a_new_fully_generic_result.adding_directional_decoder_results_filtered_by_spikes_per_t_bin_masked(directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result)
+
+        directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
+        a_new_fully_generic_result = a_new_fully_generic_result.adding_directional_pseudo2D_decoder_results_filtered_by_spikes_per_t_bin_masked(directional_merged_decoders_result=directional_merged_decoders_result)
+
+        spikes_df = deepcopy(get_proper_global_spikes_df(curr_active_pipeline))
+        a_new_fully_generic_result = a_new_fully_generic_result.creating_new_spikes_per_t_bin_masked_variants(spikes_df=spikes_df)
+
+        a_new_fully_generic_result
     
     """
     _VersionedResultMixin_version: str = "2025.03.11_0" # to be updated in your IMPLEMENTOR to indicate its version
