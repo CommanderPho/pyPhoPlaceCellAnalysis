@@ -308,10 +308,10 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
     if not isinstance(output_directory, Path):
         output_directory = Path(output_directory).resolve()
 
-    if job_suffix is None:
-        job_suffix = ''
+    # if job_suffix is None:
+    #     job_suffix = ''
         
-    job_suffix = f"{job_suffix}_{}"
+    # job_suffix = f"{job_suffix}_{}"
 
     separate_execute_and_figure_gen_scripts = renderer_script_generation_kwargs.pop('separate_execute_and_figure_gen_scripts', True)
     assert separate_execute_and_figure_gen_scripts, f"Old non-separate mode not supported"
