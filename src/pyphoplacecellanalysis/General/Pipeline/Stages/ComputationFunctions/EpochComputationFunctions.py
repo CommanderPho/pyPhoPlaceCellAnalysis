@@ -1162,7 +1162,7 @@ class EpochComputationsComputationsContainer(ComputedResult):
             session_name: str = curr_active_pipeline.session_name
             t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
             
-            filter_epochs_pseudo2D_continuous_specific_decoded_result, filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict = EpochComputationsComputationsContainer._build_output_decoded_posteriors(non_PBE_all_directional_pf1D_Decoder=non_PBE_all_directional_pf1D_Decoder, pseudo2D_continuous_specific_decoded_result=pseudo2D_continuous_specific_decoded_result,
+            a_general_decoder_dict_decoded_epochs_dict_result: GeneralDecoderDictDecodedEpochsDictResult = EpochComputationsComputationsContainer._build_output_decoded_posteriors(non_PBE_all_directional_pf1D_Decoder=non_PBE_all_directional_pf1D_Decoder, pseudo2D_continuous_specific_decoded_result=pseudo2D_continuous_specific_decoded_result,
                 filter_epochs_to_decode_dict=filter_epochs_to_decode_dict,
                 unique_decoder_names=['long', 'short'], spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), epochs_decoding_time_bin_size=epochs_decoding_time_bin_size,
                 session_name=session_name, t_start=t_start, t_delta=t_delta, t_end=t_end,
@@ -1455,7 +1455,7 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
         validate_computation_test=validate_has_non_PBE_epoch_results, is_global=True)
     def perform_compute_non_PBE_epochs(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, training_data_portion: float=(5.0/6.0), epochs_decoding_time_bin_size: float = 0.025, frame_divide_bin_size:float=10.0,
                                         compute_1D: bool = True, compute_2D: bool = True, drop_previous_result_and_compute_fresh:bool=False, skip_training_test_split: bool = True, debug_print_memory_breakdown: bool=False):
-        """ Performs the computation of the spearman and pearson correlations for the ripple and lap epochs.
+        """ Performs the computation of non-PBE epochs for the session and all filtered epochs. Stacks things up hardcore yeah.
 
         Requires:
             ['sess']

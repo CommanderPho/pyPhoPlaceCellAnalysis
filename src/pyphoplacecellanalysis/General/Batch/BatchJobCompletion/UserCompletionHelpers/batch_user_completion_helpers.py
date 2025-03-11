@@ -2977,7 +2977,7 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
 
 
 
-@function_attributes(short_name=None, tags=['posterior', 'marginal', 'CSV', 'non-PBE', 'epochs', 'decoding'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-09 16:35', related_items=[])
+@function_attributes(short_name=None, tags=['posterior', 'marginal', 'CSV', 'non-PBE', 'epochs', 'decoding'], input_requires=[], output_provides=[], uses=['pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions.EpochComputationFunctions.perform_compute_non_PBE_epochs'], used_by=[], creation_date='2025-03-09 16:35', related_items=[])
 def generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, force_recompute:bool=True, is_dry_run: bool=False) -> dict:
     """ Aims to generally:
     1. Build a dict of decoders (usually 1D) built on several different subsets of input epochs (long_LR_laps-only, long_laps-only, long_non_PBE-only, ...etc
@@ -2986,6 +2986,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     4. Compute a variety of marginals for each result (track_ID marginals, run_dir_marginals, etc)
     5. Export all the results to .CSV for later plotting and across-session analysis 
     
+    Calls 'non_PBE_epochs_results' global computation function
     
     
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import generalized_decode_epochs_dict_and_export_results_completion_function
@@ -2998,6 +2999,14 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     ['basepath', 'session_spec', 'session_name', 'session_context', 'format_name', 'preprocessing_parameters', 'absolute_start_timestamp', 'position_sampling_rate_Hz', 'microseconds_to_seconds_conversion_factor', 'pix2cm', 'x_midpoint', 'loaded_track_limits', 'is_resolved', 'resolved_required_filespecs_dict', 'resolved_optional_filespecs_dict', 'x_unit_midpoint', 'first_valid_pos_time', 'last_valid_pos_time']
 
     """
+    from neuropy.core.epoch import EpochsAccessor, Epoch, ensure_dataframe
+    from pyphocorehelpers.indexing_helpers import partition_df_dict, partition_df        
+    # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _adding_global_non_PBE_epochs
+    # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import Compute_NonPBE_Epochs
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer, NonPBEDimensionalDecodingResult, Compute_NonPBE_Epochs, KnownFilterEpochs
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import estimate_memory_requirements_bytes
+    from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch
+    from neuropy.analyses.placefields import PfND
 
     # ==================================================================================================================== #
     # BEGIN FUNCTION BODY                                                                                                  #
@@ -3009,8 +3018,43 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     if is_dry_run:
         print(f'WARN: is_dry_run == True')
     
+
+    curr_active_pipeline.reload_default_computation_functions()
+
+    ## perform the recomputation:
+    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['non_PBE_epochs_results'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+    
+    ## Unpack the results:
+    long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+
+    ## Unpack from pipeline:
+    nonPBE_results: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+    a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = nonPBE_results.a_new_NonPBE_Epochs_obj
+    results1D: NonPBEDimensionalDecodingResult = nonPBE_results.results1D
+    results2D: NonPBEDimensionalDecodingResult = nonPBE_results.results2D
+
+    epochs_decoding_time_bin_size = nonPBE_results.epochs_decoding_time_bin_size
+    frame_divide_bin_size = nonPBE_results.frame_divide_bin_size
+
+    print(f'{epochs_decoding_time_bin_size = }, {frame_divide_bin_size = }')
+
+    assert (results1D is not None)
+    assert (results2D is not None)
+
+    # ==================================================================================================================== #
+    # 2025-02-20 20:06 New `nonPBE_results._build_merged_joint_placefields_and_decode` method                              #
+    # ==================================================================================================================== #
+    non_PBE_all_directional_pf1D_Decoder, pseudo2D_continuous_specific_decoded_result, continuous_decoded_results_dict, non_PBE_marginal_over_track_ID, (time_bin_containers, time_window_centers, track_marginal_posterior_df) = nonPBE_results._build_merged_joint_placefields_and_decode(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)))
+    masked_pseudo2D_continuous_specific_decoded_result, _mask_index_tuple = pseudo2D_continuous_specific_decoded_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)))
+
+
+
+
+
     across_session_results_extended_dict = PostHocPipelineFixup.run_as_batch_user_completion_function(self=self, global_data_root_parent_path=global_data_root_parent_path, curr_session_context=curr_session_context, curr_session_basedir=curr_session_basedir, curr_active_pipeline=curr_active_pipeline, across_session_results_extended_dict=across_session_results_extended_dict,
                                                                                                        force_recompute=force_recompute, is_dry_run=is_dry_run)
+
+
 
 
 
