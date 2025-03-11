@@ -10,6 +10,7 @@ from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlo
 
 # from pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterLeftSidebarControlBarBase import Ui_leftSideToolbarWidget # Generated file from .ui
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
+from pyphocorehelpers.gui.Qt.QtUIC_Helpers import load_ui_with_named_spacers
 # from qtpy import QtCore, QtWidgets
 # Generated from c:\Users\pho\repos\Spike3DWorkEnv\pyPhoPlaceCellAnalysis\src\pyphoplacecellanalysis\GUI\Qt\ZoomAndNavigationSidebarControls\Spike3DRasterLeftSidebarControlBarBase.ui automatically by PhoPyQtClassGenerator VSCode Extension
 
@@ -30,6 +31,9 @@ uiFile = os.path.join(path, 'Spike3DRasterLeftSidebarControlBarWidget.ui')
 
 # # install exception hook: without this, uncaught exception would cause application to exit
 # sys.excepthook = trap_exc_during_debug
+
+
+
 
 
 class Spike3DRasterLeftSidebarControlBar(QWidget):
@@ -83,7 +87,8 @@ class Spike3DRasterLeftSidebarControlBar(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
-        self.ui = uic.loadUi(uiFile, self) # Load the .ui file
+        # self.ui = uic.loadUi(uiFile, self) # Load the .ui file
+        self.ui = load_ui_with_named_spacers(uiFile, self) # Load the .ui file
         
         self.initUI() ## when did this get disabled?
         self.show() # Show the GUI

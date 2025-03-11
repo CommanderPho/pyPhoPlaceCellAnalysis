@@ -24,7 +24,7 @@ from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlo
 from pyphocorehelpers.gui.Qt.HighlightedJumpSlider import HighlightedJumpSlider
 from pyphocorehelpers.gui.Qt.ToggleButton import ToggleButtonModel, ToggleButton
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
-
+from pyphocorehelpers.gui.Qt.QtUIC_Helpers import load_ui_with_named_spacers
 # For extra button symbols:
 import qtawesome as qta
 
@@ -151,7 +151,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
     def __init__(self, parent=None):
         # super().__init__(parent=parent) # Call the inherited classes __init__ method
         QWidget.__init__(self, parent=parent)
-        self.ui = uic.loadUi(uiFile, self) # Load the .ui file
+        self.ui = load_ui_with_named_spacers(uiFile, self) # Load the .ui file
         self.ui.connections = ConnectionsContainer() 
         self.params = VisualizationParameters(name='Spike3DRasterBottomPlaybackControlBar', debug_print=False)  
         
@@ -168,13 +168,13 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         """ setup the UI
         """
    
-        playback_controls = [self.ui.button_play_pause, self.ui.button_reverse] # , self.ui.horizontalSpacer_playback
+        playback_controls = [self.ui.button_play_pause, self.ui.button_reverse, self.ui.horizontalSpacer_playback] # 
 
-        speed_controls = [self.ui.button_slow_down, self.ui.doubleSpinBoxPlaybackSpeed, self.ui.toolButton_SpeedBurstEnabled, self.ui.button_speed_up] # , self.ui.horizontalSpacer_6
+        speed_controls = [self.ui.button_slow_down, self.ui.doubleSpinBoxPlaybackSpeed, self.ui.toolButton_SpeedBurstEnabled, self.ui.button_speed_up, self.ui.horizontalSpacer_6] # 
 
         jump_to_destination_controls = [self.ui.frame_JumpToDestination, self.ui.spinBoxJumpDestination, self.ui.btnJumpToDestination]
 
-        move_controls = [self.ui.btnSkipLeft, self.ui.btnLeft, self.ui.spinBoxFrameJumpMultiplier, self.ui.btnRight, self.ui.btnSkipRight] # , self.ui.horizontalSpacer_3
+        move_controls = [self.ui.btnSkipLeft, self.ui.btnLeft, self.ui.spinBoxFrameJumpMultiplier, self.ui.btnRight, self.ui.btnSkipRight, self.ui.horizontalSpacer_3] # 
         # debug_log_controls = [self.ui.txtLogLine, self.ui.btnToggleExternalLogWindow]
         standalone_extra_controls = [self.ui.btnHelp]
         
