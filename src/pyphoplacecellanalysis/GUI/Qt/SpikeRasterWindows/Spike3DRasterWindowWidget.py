@@ -243,7 +243,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # self.ui.splitter.setStretchFactor(0, 5) # have the top widget by 3x the height as the bottom widget
         # self.ui.splitter.setStretchFactor(1, 1) # have the top widget by 3x the height as the bottom widget        
         
-        self.params = VisualizationParameters(self.applicationName, _menu_action_history_list=[], type_of_3d_plotter=type_of_3d_plotter, is_crosshair_trace_enabled=False)
+        self.params = VisualizationParameters(self.applicationName, _menu_action_history_list=[], type_of_3d_plotter=type_of_3d_plotter, is_crosshair_trace_enabled=False, debug_print=False)
         self.params.type_of_3d_plotter = type_of_3d_plotter
         self.params._menu_action_history_list = []
         # Helper Mixins: INIT:
@@ -267,8 +267,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self._delayed_gui_timer.timeout.connect(self._run_delayed_gui_load_code)
         #Set the interval and start the timer.
         self._delayed_gui_timer.start(1000)
-        
-
 
         self.show() # Show the GUI
 
@@ -731,6 +729,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.SpikeRasterBottomFrameControlsMixin_on_window_update(start_time, end_time) ## indirect 
         self.SpikeRasterLeftSidebarControlsMixin_on_window_update(start_time, end_time)
         return (start_time, end_time), window_duration
+
 
 
     # ==================================================================================================================== #

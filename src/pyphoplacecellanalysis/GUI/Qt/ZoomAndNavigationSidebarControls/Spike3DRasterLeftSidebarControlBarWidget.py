@@ -35,6 +35,8 @@ uiFile = os.path.join(path, 'Spike3DRasterLeftSidebarControlBarWidget.ui')
 class Spike3DRasterLeftSidebarControlBar(QWidget):
     """ A controls bar with buttons loaded from a Qt .ui file. 
     
+    self.ui.btnToggleDebugEnabled -- toggles whether debug printing is enabled/disabled
+    
     self.ui.btnToggleCrosshairTrace
     self.ui.lblCrosshairTraceStaticLabel
     self.ui.lblCrosshairTraceValue
@@ -52,7 +54,8 @@ class Spike3DRasterLeftSidebarControlBar(QWidget):
     animation_time_step_changed = pyqtSignal(float) # returns bool indicating whether is_playing
     temporal_zoom_factor_changed = pyqtSignal(float)
     render_window_duration_changed = pyqtSignal(float)
-        
+    
+    debug_mode_toggled = pyqtSignal()
     crosshair_trace_toggled = pyqtSignal()
 
     # @property
@@ -104,11 +107,12 @@ class Spike3DRasterLeftSidebarControlBar(QWidget):
         self.ui.spinTemporalZoomFactor.sigValueChanged.connect(self.temporal_zoom_factor_valueChanged)
         self.ui.spinRenderWindowDuration.sigValueChanged.connect(self.render_window_duration_valueChanged)
         self.ui.btnToggleCrosshairTrace.clicked.connect(self.crosshair_trace_button_Toggled)
+        self.ui.btnToggleDebugEnabled.clicked.connect(self.debug_mode_button_Toggled)
         # self.ui.btnToggleCrosshairTrace.clicked.
 
         
         
-
+        self.ui.btnToggleDebugEnabled.setVisible(True)
         self.ui.btnToggleCrosshairTrace.setVisible(True)
         self.ui.lblCrosshairTraceStaticLabel.setVisible(False)
         self.ui.lblCrosshairTraceValue.setVisible(False)
@@ -163,6 +167,19 @@ class Spike3DRasterLeftSidebarControlBar(QWidget):
         self.ui.lblCrosshairTraceValue.setVisible(wants_crosshair_trace_visible)
         # self.crosshair_trace_toggled.emit(wants_crosshair_trace_visible)
         self.crosshair_trace_toggled.emit()
+
+
+
+    def debug_mode_button_Toggled(self):
+        print(f'Spike3DRasterLeftSidebarControlBar.debug_mode_button_Toggled(): self.ui.btnToggleDebugEnabled.isChecked(): {self.ui.btnToggleDebugEnabled.isChecked()}')
+        # wants_debug_mode_enabled: bool = self.ui.btnToggleDebugEnabled.isChecked()
+        # self.crosshair_trace_toggled.emit(wants_crosshair_trace_visible)
+        self.debug_mode_toggled.emit()
+
+
+
+
+
 
     # def __str__(self):
     #      return
@@ -272,7 +289,44 @@ class SpikeRasterLeftSidebarControlsMixin:
 
             ## Unblock when done:
             left_side_bar_controls.ui.spinRenderWindowDuration.blockSignals(False)
-            
+
+
+
+    # ==================================================================================================================== #
+    # Debug Mode                                                                                                           #
+    # ==================================================================================================================== #
+    def on_debug_mode_Toggled(self):
+        """ 
+        Uses/requires/updates: self.params.debug_print
+        
+        """
+        updated_is_debug_mode_enabled: bool = self.ui.leftSideToolbarWidget.ui.btnToggleDebugEnabled.isChecked()
+        # if self.enable_debug_print:
+        print(f'Spike3DRasterWindowWidget.on_debug_mode_Toggled(): updated_is_debug_mode_enabled: {updated_is_debug_mode_enabled}')            
+        old_value = self.params.debug_print
+        did_update: bool = (old_value != updated_is_debug_mode_enabled)
+        self.params.debug_print = updated_is_debug_mode_enabled
+        self.should_debug_print_interaction_events = updated_is_debug_mode_enabled
+        # self.debug_print = updated_is_debug_mode_enabled
+        print(f'\tself.debug_print: {self.debug_print}')
+        print(f'\tself.should_debug_print_interaction_events: {self.should_debug_print_interaction_events}')
+        
+        # if updated_is_debug_mode_enabled:
+        #     ## enable crosshairs callback        
+        #     if self.spike_raster_plt_2d is not None:
+        #         ## set SpikeRaster2D's is_crosshair_trace_enabled
+        #         # self.debug_print = True
+        #         self.spike_raster_plt_2d.params.debug_print = True
+
+        # else:
+        #     print(f'\tshould disable debug mode.')
+        #     # self.params.debug_print = False
+        #     if self.spike_raster_plt_2d is not None:
+        #         ## set SpikeRaster2D's is_crosshair_trace_enabled
+        #         self.spike_raster_plt_2d.params.debug_print = False
+
+
+
         
     
 ## Start Qt event loop
