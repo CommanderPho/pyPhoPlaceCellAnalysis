@@ -75,9 +75,9 @@ doubleSpinBox_ActiveWindowEndTime
 txtLogLine -- shows a preview of the last log entries
 btnToggleExternalLogWindow -- opens the separate logging window
 
-playback_controls = [self.ui.button_play_pause, self.ui.button_reverse, self.ui.horizontalSpacer_5]
+playback_controls = [self.ui.button_play_pause, self.ui.button_reverse] # , self.ui.horizontalSpacer_playback
 
-speed_controls = [self.ui.button_slow_down, self.ui.doubleSpinBoxPlaybackSpeed, self.ui.toolButton_SpeedBurstEnabled, self.ui.button_speed_up, self.ui.horizontalSpacer_6]
+speed_controls = [self.ui.button_slow_down, self.ui.doubleSpinBoxPlaybackSpeed, self.ui.toolButton_SpeedBurstEnabled, self.ui.button_speed_up] # , self.ui.horizontalSpacer_6
 
 mark_controls = [self.ui.button_mark_start, self.ui.button_mark_end, self.ui.horizontalSpacer_2]
 
@@ -168,12 +168,21 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         """ setup the UI
         """
    
+        playback_controls = [self.ui.button_play_pause, self.ui.button_reverse] # , self.ui.horizontalSpacer_playback
+
+        speed_controls = [self.ui.button_slow_down, self.ui.doubleSpinBoxPlaybackSpeed, self.ui.toolButton_SpeedBurstEnabled, self.ui.button_speed_up] # , self.ui.horizontalSpacer_6
+
+        jump_to_destination_controls = [self.ui.frame_JumpToDestination, self.ui.spinBoxJumpDestination, self.ui.btnJumpToDestination]
 
         move_controls = [self.ui.btnSkipLeft, self.ui.btnLeft, self.ui.spinBoxFrameJumpMultiplier, self.ui.btnRight, self.ui.btnSkipRight] # , self.ui.horizontalSpacer_3
         # debug_log_controls = [self.ui.txtLogLine, self.ui.btnToggleExternalLogWindow]
         standalone_extra_controls = [self.ui.btnHelp]
         
-        controls_to_hide = [self.ui.slider_progress, self.ui.button_full_screen, self.ui.btnCurrentIntervals_Customize, *standalone_extra_controls] # , *move_controls
+        controls_to_hide = [self.ui.slider_progress, self.ui.button_full_screen, self.ui.btnCurrentIntervals_Customize, 
+                            *playback_controls,
+                            *speed_controls,
+                            *jump_to_destination_controls,
+                            *standalone_extra_controls] # , *move_controls
 
 
         # Setup Button: Play/Pause

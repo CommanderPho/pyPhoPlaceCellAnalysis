@@ -453,7 +453,7 @@ QDoubleSpinBox::down-arrow {
        </widget>
       </item>
       <item row="1" column="2">
-       <spacer name="horizontalSpacer_5">
+       <spacer name="horizontalSpacer_playback">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
         </property>

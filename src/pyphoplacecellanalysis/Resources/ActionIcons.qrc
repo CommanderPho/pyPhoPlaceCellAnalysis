@@ -1,5 +1,7 @@
 <RCC>
   <qresource prefix="Icons">
+    <file>Icons/Icon/balloons-box.png</file>
+    <file>Icons/Icon/bug--arrow.png</file>
     <file>Icons/actions/pencil.png</file>
     <file>Icons/actions/pencil-button.png</file>
     <file>Icons/actions/pencil-color.png</file>
