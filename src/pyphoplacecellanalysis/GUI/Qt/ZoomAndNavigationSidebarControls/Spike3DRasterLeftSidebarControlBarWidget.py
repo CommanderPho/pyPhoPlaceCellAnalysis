@@ -11,7 +11,6 @@ from PyQt5.QtCore import Qt, QPoint, QRect, QObject, QEvent, pyqtSignal, pyqtSlo
 # from pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterLeftSidebarControlBarBase import Ui_leftSideToolbarWidget # Generated file from .ui
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
 from pyphocorehelpers.gui.Qt.QtUIC_Helpers import load_ui_with_named_spacers
-from pyphocorehelpers.gui.Qt.QtUIC_Helpers import get_all_spacer_items, get_spacer_at
 # from qtpy import QtCore, QtWidgets
 # Generated from c:\Users\pho\repos\Spike3DWorkEnv\pyPhoPlaceCellAnalysis\src\pyphoplacecellanalysis\GUI\Qt\ZoomAndNavigationSidebarControls\Spike3DRasterLeftSidebarControlBarBase.ui automatically by PhoPyQtClassGenerator VSCode Extension
 

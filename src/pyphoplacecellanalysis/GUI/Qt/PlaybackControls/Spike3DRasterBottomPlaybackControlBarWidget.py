@@ -248,8 +248,6 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
                 a_ctrl.hide()
             else:
                 a_ctrl.changeSize(0, 0, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
-                # a_ctrl.layout().invalidate()  # or update()
-                # a_ctrl.update()
                 self.ui.layout().removeItem(a_ctrl)
                 # self.ui.layout().invalidate()
 
