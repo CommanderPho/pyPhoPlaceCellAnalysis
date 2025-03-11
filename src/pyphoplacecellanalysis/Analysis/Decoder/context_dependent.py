@@ -318,6 +318,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
 
 
+    # @function_attributes(short_name=None, tags=['adding', 'pseudo2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-11 14:24', related_items=[])
     def adding_directional_pseudo2D_decoder_results_filtered_by_spikes_per_t_bin_masked(self, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult) -> "GenericDecoderDictDecodedEpochsDictResult":
         """ Takes the previously computed results and produces versions with each time bin masked by a required number of spike counts/participation.
         Updates in-places, creating new entries, but also returns self
@@ -375,6 +376,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # dict(data_grain='per_time_bin', known_named_decoding_epochs_type='laps'): deepcopy(directional_merged_decoders_result.laps_time_bin_marginals_df), 
         # ...
 
+        filtered_decoder_filter_epochs_decoder_result_dict = {}
         for a_known_decoded_epochs_type, a_decoder_epochs_filter_epochs_decoder_result in decoder_filter_epochs_result_dict.items():
 
             filtered_decoder_filter_epochs_decoder_result = None
@@ -390,13 +392,13 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             assert filtered_decoder_filter_epochs_decoder_result is not None
             
             ## collect results:
-            filtered_decoder_filter_epochs_decoder_result[a_known_decoded_epochs_type] = filtered_decoder_filter_epochs_decoder_result
+            filtered_decoder_filter_epochs_decoder_result_dict[a_known_decoded_epochs_type] = filtered_decoder_filter_epochs_decoder_result
         ## END for a_known_decoded_epochs_type, a_....
         
         Assert.all_equal(epochs_decoding_time_bin_size_dict.values())
         epochs_decoding_time_bin_size: float = list(epochs_decoding_time_bin_size_dict.values())[0]
-        pos_bin_size: float = directional_merged_decoders_result.pos_bin_size
-        print(f'{pos_bin_size = }, {epochs_decoding_time_bin_size = }')
+        # pos_bin_size: float = directional_merged_decoders_result.pos_bin_size
+        # print(f'{pos_bin_size = }, {epochs_decoding_time_bin_size = }')
 
         ## OUTPUTS: filtered_decoder_filter_epochs_decoder_result_dict_dict, epochs_decoding_time_bin_size
 
@@ -407,7 +409,10 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             ## build the complete identifier
             a_new_identifier: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier=a_decoder_name, time_bin_size=epochs_decoding_time_bin_size, known_named_decoding_epochs_type=a_known_decoded_epochs_type, masked_time_bin_fill_type='ignore')
             self.filter_epochs_specific_decoded_result[a_new_identifier] = deepcopy(a_decoder_epochs_filter_epochs_decoder_result)
-            self.filter_epochs_to_decode_dict[a_new_identifier] = deepcopy(a_decoder_epochs_filter_epochs_decoder_result.filter_epochs) ## needed? Do I want full identifier as key?
+            # self.filter_epochs_to_decode_dict[a_new_identifier] = deepcopy(a_decoder_epochs_filter_epochs_decoder_result.filter_epochs) ## needed? Do I want full identifier as key?            
+            ## use the filtered approach instead:
+            self.filter_epochs_to_decode_dict[a_new_identifier] = deepcopy(filtered_decoder_filter_epochs_decoder_result_dict[a_known_decoded_epochs_type])
+
             # self.filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict[a_new_identifier] ## #TODO 2025-03-11 11:39: - [ ] must be computed or assigned from prev result
             self.decoders[a_new_identifier] = all_directional_pf1D_Decoder ## this will duplicate this decoder needlessly for each repetation here, but that's okay for now
             for a_known_data_grain, a_decoded_marginals_df in decoder_epoch_marginals_df_dict_dict[a_known_decoded_epochs_type].items():

@@ -3090,33 +3090,11 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     # print(f'included_qclu_values: {included_qclu_values}')
 
     # DirectionalMergedDecoders: Get the result after computation:
+    
     directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
-    ripple_decoding_time_bin_size: float = directional_merged_decoders_result.ripple_decoding_time_bin_size
-    laps_decoding_time_bin_size: float = directional_merged_decoders_result.laps_decoding_time_bin_size
-    all_directional_pf1D_Decoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
-    pf1D = all_directional_pf1D_Decoder.pf
-    directional_merged_decoders_result.laps_time_bin_marginals_df
-    directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result
+    a_new_fully_generic_result = a_new_fully_generic_result.adding_directional_pseudo2D_decoder_results_filtered_by_spikes_per_t_bin_masked(directional_merged_decoders_result=directional_merged_decoders_result)
 
-
-    ## NOTE, HAVE:
-    all_directional_pf1D_Decoder: BasePositionDecoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
-    all_directional_decoder_dict: Dict[str, BasePositionDecoder] = directional_merged_decoders_result.all_directional_decoder_dict
-    # Posteriors computed via the all_directional decoder:
-    all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult = directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result
-    all_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result
     
-    # Marginalized posteriors computed from above posteriors:
-    laps_directional_marginals_tuple: Tuple = directional_merged_decoders_result.laps_directional_marginals_tuple # laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = self.laps_directional_marginals_tuple
-    laps_track_identity_marginals_tuple: Tuple = directional_merged_decoders_result.laps_track_identity_marginals_tuple
-    # laps_non_marginalized_decoder_marginals_tuple: Tuple = serialized_field(default=None, metadata={'field_added': "2024.10.09_0"}, hdf_metadata={'epochs': 'Laps'})
-    
-    ripple_directional_marginals_tuple: Tuple = directional_merged_decoders_result.ripple_directional_marginals_tuple
-    ripple_track_identity_marginals_tuple: Tuple = directional_merged_decoders_result.ripple_track_identity_marginals_tuple
-    # ripple_non_marginalized_decoder_marginals_tuple: Tuple = serialized_field(default=None, metadata={'field_added': "2024.10.09_0"}, hdf_metadata={'epochs': 'Replay'})
-
-
-
     # ==================================================================================================================== #
     # Phase 2: build from 'DirectionalDecodersEpochsEvaluations'                                                           #
     # ==================================================================================================================== #
