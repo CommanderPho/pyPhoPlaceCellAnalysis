@@ -2,6 +2,8 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 import plotly.graph_objects as go
 import pyphoplacecellanalysis.External.pyqtgraph as pg
+from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock, DockDisplayConfig
+from pyphoplacecellanalysis.External.pyqtgraph.dockarea.DockArea import DockArea
 import sys
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes

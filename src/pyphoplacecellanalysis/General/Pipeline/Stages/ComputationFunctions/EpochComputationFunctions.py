@@ -1275,7 +1275,7 @@ class EpochComputationsComputationsContainer(ComputedResult):
     # ==================================================================================================================== #
     # Plotting Methods                                                                                                     #
     # ==================================================================================================================== #
-    @function_attributes(short_name=None, tags=['plotting'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-21 13:40', related_items=[])
+    @function_attributes(short_name=None, tags=['plotting', 'TO_DEPRICATE'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-21 13:40', related_items=[])
     def add_to_SpikeRaster2D_tracks(self, active_2d_plot, non_PBE_all_directional_pf1D_Decoder, pseudo2D_continuous_specific_decoded_result, continuous_decoded_results_dict, non_PBE_marginal_over_track_ID, time_window_centers):
         """ adds new tracks
         

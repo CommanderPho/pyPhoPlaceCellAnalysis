@@ -3036,10 +3036,13 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     print(f'generalized_decode_epochs_dict_and_export_results_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
 
 
-    curr_active_pipeline.reload_default_computation_functions()
 
-    ## perform the recomputation:
-    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['non_PBE_epochs_results'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+    if force_recompute or ('EpochComputations' not in curr_active_pipeline.global_computation_results.computed_data):
+        print(f'\t recomputing...')
+        curr_active_pipeline.reload_default_computation_functions()
+        ## perform the recomputation:
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['non_PBE_epochs_results'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+
 
     session_name: str = curr_active_pipeline.session_name
     t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
@@ -3059,14 +3062,13 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     print(f'{epochs_decoding_time_bin_size = }, {frame_divide_bin_size = }')
 
     assert (results1D is not None)
-    assert (results2D is not None)
+    # assert (results2D is not None)
 
     # ==================================================================================================================== #
     # Pre 2025-03-10 Semi-generic (unfinalized) Result                                                                     #
     # ==================================================================================================================== #
     a_general_decoder_dict_decoded_epochs_dict_result: GeneralDecoderDictDecodedEpochsDictResult = nonPBE_results.a_general_decoder_dict_decoded_epochs_dict_result ## get the pre-decoded result
     assert a_general_decoder_dict_decoded_epochs_dict_result is not None
-
 
     # ==================================================================================================================== #
     # New 2025-03-11 Generic Result:                                                                                       #

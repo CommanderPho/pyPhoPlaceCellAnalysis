@@ -782,7 +782,8 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
     # ================================================================================================================================================================================ #
     # Retreval and use                                                                                                                                                                 #
     # ================================================================================================================================================================================ #
-    def get_matching_contexts(self, context_query: IdentifyingContext, return_multiple_matches: bool=False, debug_print:bool=True):
+    @function_attributes(short_name=None, tags=['contexts', 'matching'], input_requires=[], output_provides=[], uses=['get_flattened_contexts_for_posteriors_dfs'], used_by=[], creation_date='2025-03-12 11:30', related_items=[])
+    def get_matching_contexts(self, context_query: IdentifyingContext, return_multiple_matches: bool=False, return_flat_same_length_dicts: bool=True, debug_print:bool=True): 
         """ Get a specific contexts
         
         a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='long_LR', time_bin_size=0.025, known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type='ignore')
@@ -825,7 +826,6 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
         if (not return_multiple_matches):
             # Find single best matching context
-            # Get all values using the helper function - one line per call
             result_context, a_result = _subfn_get_value_with_context_matching(self.filter_epochs_specific_decoded_result, context_query, "a_result")
             decoder_context, a_decoder = _subfn_get_value_with_context_matching(self.decoders, context_query, "a_decoder")
             posterior_context, a_decoded_marginal_posterior_df = _subfn_get_value_with_context_matching(self.filter_epochs_decoded_track_marginal_posterior_df_dict, context_query, "a_decoded_marginal_posterior_df")
@@ -849,18 +849,24 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         
         else:
             # Find multiple matching contexts
-            # Get all values using the helper function - one line per call
             result_context_dict = _subfn_get_value_with_context_matching(self.filter_epochs_specific_decoded_result, context_query, "a_result")
             decoder_context_dict = _subfn_get_value_with_context_matching(self.decoders, context_query, "a_decoder")
             decoded_marginal_posterior_df_context_dict = _subfn_get_value_with_context_matching(self.filter_epochs_decoded_track_marginal_posterior_df_dict, context_query, "a_decoded_marginal_posterior_df")            
             any_matching_contexts_list = list(set(list(result_context_dict.keys())).union(set(list(decoder_context_dict.keys()))).union(set(list(decoded_marginal_posterior_df_context_dict.keys()))))
-            return any_matching_contexts_list, result_context_dict, decoder_context_dict, decoded_marginal_posterior_df_context_dict
- 
+            if not return_flat_same_length_dicts:
+                return any_matching_contexts_list, result_context_dict, decoder_context_dict, decoded_marginal_posterior_df_context_dict
+            else:
+                return self.get_flattened_contexts_for_posteriors_dfs(decoded_marginal_posterior_df_context_dict) ## a bit inefficient but there's never that many contexts
+            
 
+    @function_attributes(short_name=None, tags=['contexts'], input_requires=[], output_provides=[], uses=[], used_by=['get_matching_contexts'], creation_date='2025-03-12 11:30', related_items=[])
     def get_flattened_contexts_for_posteriors_dfs(self, decoded_marginal_posterior_df_context_dict):
         """ returns 4 flat dicts with the same (full) contexts that the passed `decoded_marginal_posterior_df_context_dict` have
         
         Usage:
+        
+            a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, time_bin_size=0.025, known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type='ignore') # , decoder_identifier='long_LR'
+            any_matching_contexts_list, result_context_dict, decoder_context_dict, decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_matching_contexts(context_query=a_target_context, return_multiple_matches=True, return_flat_same_length_dicts=False)
             flat_context_list, flat_result_context_dict, flat_decoder_context_dict, decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_flattened_contexts_for_posteriors_dfs(decoded_marginal_posterior_df_context_dict)
             flat_context_list
 
