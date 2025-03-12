@@ -4006,7 +4006,7 @@ class AcrossSessionIdentityDataframeAccessor:
                         df = EpochsAccessor.add_maze_id_if_needed(epochs_df=df, t_start=t_start, t_delta=curr_session_t_delta, t_end=t_end, start_time_col_name=time_col, end_time_col_name=end_time_col_name) # Adds Columns: ['maze_id']
                     except (AttributeError, KeyError) as e:
                         print(f'could not add the "maze_id" column to the dataframe (err: {e})\n\tlikely because it lacks valid "t_start" or "t_end" columns. df.columns: {list(df.columns)}. Skipping.')
-                    except BaseException as e:
+                    except Exception as e:
                         raise e
 
         return df
