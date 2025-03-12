@@ -782,45 +782,101 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
     # ================================================================================================================================================================================ #
     # Retreval and use                                                                                                                                                                 #
     # ================================================================================================================================================================================ #
-    def get_matching_contexts(self, context_query: IdentifyingContext, debug_print:bool=True):
-        """ Get a specific contexts
+    def get_matching_contexts(self, context_query: IdentifyingContext, return_multiple_matches: bool=True, debug_print:bool=True):
+        """ Get a specific contexts or multiple matching contexts based on the query
         
-        a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='long_LR', time_bin_size=0.025, known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type='ignore')
+        Parameters
+        ----------
+        context_query : IdentifyingContext
+            The context to search for
+        return_multiple_matches : bool, optional
+            If True, returns multiple matching contexts instead of just the best one, by default True
+        debug_print : bool, optional
+            Whether to print debug information, by default True
+            
+        Returns
+        -------
+        If return_multiple_matches=False:
+            best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df
+        If return_multiple_matches=True:
+            List[Tuple[IdentifyingContext, DecodedFilterEpochsResult, BasePositionDecoder, pd.DataFrame]]
+        
+        Example
+        -------
+            ## Get a specific context to plot:
+            a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='long_LR', time_bin_size=0.025, known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type='ignore')
+
+            best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_matching_contexts(context_query=a_target_context, debug_print=True)
+            print(f'best_matching_context: {best_matching_context}')
+            a_decoded_marginal_posterior_df
+            ## OUTPUTS: a_target_context: IdentifyingContext, a_result: DecodedFilterEpochsResult, a_decoded_marginal_posterior_df: pd.DataFrame, a_decoder: BasePositionDecoder
+
+        
         """
         
-        def _subfn_get_value_with_context_matching(dictionary, query, item_name="item"):
-            """Helper function to get a value from a dictionary with context matching."""
+        def _get_values_with_context_matching(dictionary, query, item_name="item"):
+            """Helper function to get values from a dictionary with context matching."""
             try:
                 value = dictionary[query]  # Try exact match first
-                return query, value
+                return [(query, value)] if return_multiple_matches else (query, value)
             except KeyError:
-                # Find best matching context
-                best_match, match_count = IdentifyingContext.find_best_matching_context(query, dictionary)
-                if best_match:
-                    if debug_print:
-                        print(f"Found best match for {item_name} with {match_count} matching attributes:\t{best_match}\n")
-                    return best_match, dictionary[best_match]
+                if return_multiple_matches:
+                    # Find multiple matching contexts
+                    matching_contexts = IdentifyingContext.find_best_matching_contexts(query, dictionary)
+                    if matching_contexts:
+                        if debug_print:
+                            print(f"Found {len(matching_contexts)} matches for {item_name}")
+                        return [(ctx, dictionary[ctx]) for ctx in matching_contexts]
+                    else:
+                        if debug_print:
+                            print(f"{item_name}: No matches found in the dictionary.")
+                        return []
                 else:
-                    if debug_print:
-                        print(f"{item_name}: No matches found in the dictionary.")
-                    return None, None
+                    # Find single best matching context
+                    best_match, match_count = IdentifyingContext.find_best_matching_context(query, dictionary)
+                    if best_match:
+                        if debug_print:
+                            print(f"Found best match for {item_name} with {match_count} matching attributes:\t{best_match}\n")
+                        return (best_match, dictionary[best_match])
+                    else:
+                        if debug_print:
+                            print(f"{item_name}: No matches found in the dictionary.")
+                        return (None, None)
             except Exception as e:
                 raise e
         
-        # Get all values using the helper function - one line per call
-        result_context, a_result = _subfn_get_value_with_context_matching(self.filter_epochs_specific_decoded_result, context_query, "a_result")
-        decoder_context, a_decoder = _subfn_get_value_with_context_matching(self.decoders, context_query, "a_decoder")
-        posterior_context, a_decoded_marginal_posterior_df = _subfn_get_value_with_context_matching(self.filter_epochs_decoded_track_marginal_posterior_df_dict, context_query, "a_decoded_marginal_posterior_df")
+        # Get values from dictionaries using the helper function
+        results_matches = _get_values_with_context_matching(self.filter_epochs_specific_decoded_result, context_query, "a_result")
+        decoder_matches = _get_values_with_context_matching(self.decoders, context_query, "a_decoder")
+        posterior_matches = _get_values_with_context_matching(self.filter_epochs_decoded_track_marginal_posterior_df_dict, context_query, "a_decoded_marginal_posterior_df")
         
-        # Determine the best matching context
-        contexts = [c for c in [result_context, decoder_context, posterior_context] if c is not None]
-        best_matching_context = contexts[0] if contexts else None
-        
-        # Optionally add a warning for different contexts
-        if debug_print and len(set(contexts)) > 1:
-            print(f"Warning: Different contexts matched: result={result_context}, decoder={decoder_context}, posterior={posterior_context}")
+        if return_multiple_matches:
+            # Create a dictionary mapping contexts to their corresponding items
+            all_matches = {}
+            for ctx, result in results_matches:
+                all_matches.setdefault(ctx, [None, None, None])[0] = result
+            for ctx, decoder in decoder_matches:
+                all_matches.setdefault(ctx, [None, None, None])[1] = decoder
+            for ctx, posterior in posterior_matches:
+                all_matches.setdefault(ctx, [None, None, None])[2] = posterior
+                
+            # Convert to list of tuples in the format (context, result, decoder, posterior)
+            return [(ctx, items[0], items[1], items[2]) for ctx, items in all_matches.items()]
+        else:
+            # Single match mode - get the first result from each match list
+            result_context, a_result = results_matches[0] if results_matches else (None, None)
+            decoder_context, a_decoder = decoder_matches[0] if decoder_matches else (None, None)
+            posterior_context, a_decoded_marginal_posterior_df = posterior_matches[0] if posterior_matches else (None, None)
+            
+            # Determine the best matching context
+            contexts = [c for c in [result_context, decoder_context, posterior_context] if c is not None]
+            best_matching_context = contexts[0] if contexts else None
+            
+            # Optionally add a warning for different contexts
+            if debug_print and len(set(contexts)) > 1:
+                print(f"Warning: Different contexts matched: result={result_context}, decoder={decoder_context}, posterior={posterior_context}")
 
-        return best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df
+            return best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df
 
 
 
