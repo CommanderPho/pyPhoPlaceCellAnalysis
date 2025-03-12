@@ -92,9 +92,6 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     custom_all_param_sweep_options, param_sweep_option_n_values = parameter_sweeps(desired_laps_decoding_time_bin_size=np.linspace(start=0.030, stop=0.10, num=6),
                                                                             use_single_time_bin_per_epoch=[False],
                                                                             minimum_event_duration=[desired_shared_decoding_time_bin_sizes[-1]])
-
-
-
     additional_session_context if provided, this is combined with the session context.
     ## CSVs are saved out in `_subfn_process_time_bin_swept_results`
 
@@ -102,6 +99,25 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     'K:/scratch/collected_outputs/2024-09-25_Apogee-2006-4-28_12-38-13-None_time_bin_size_sweep_results.h5'
     'K:/scratch/collected_outputs/2024-09-25-kdiba_vvp01_two_2006-4-28_12-38-13_None-(ripple_time_bin_marginals_df).csv'
     
+
+
+    Outputs:
+
+        After the sweeps are complete and multiple (one for each time_bin_size swept) indepdnent dfs are had with the four results types this function concatenates each of the four into a single dataframe for all time_bin_size values with a column 'time_bin_size'. 
+        It also saves them out to CSVs in a manner similar to what `compute_and_export_marginals_dfs_completion_function` did to be compatible with `2024-01-23 - Across Session Point and YellowBlue Marginal CSV Exports.ipynb`
+        Captures: save_csvs
+        GLOBAL Captures: collected_outputs_path
+        
+        Produces: a single output df flattened acrossed all time bin sizes
+        
+        Outputs:
+        [laps_time_bin_marginals_out_path, laps_out_path, ripple_time_bin_marginals_out_path, ripple_out_path]:
+            '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_time_bin_marginals_df).csv'
+            '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
+            '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(ripple_time_bin_marginals_df).csv'
+            '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(ripple_marginals_df).csv'
+        
+        
     
     """
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')

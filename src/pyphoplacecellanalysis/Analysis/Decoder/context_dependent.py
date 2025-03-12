@@ -888,9 +888,6 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         return flat_context_list, flat_result_context_dict, flat_decoder_context_dict, decoded_marginal_posterior_df_context_dict
 
 
-
-
-
     def __repr__(self):
         """Custom multi-line representation for BinningContainer
         renders like:
