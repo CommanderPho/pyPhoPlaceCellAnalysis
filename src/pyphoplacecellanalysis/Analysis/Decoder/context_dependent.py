@@ -236,6 +236,10 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
     filter_epochs_decoded_track_marginal_posterior_df_dict: Dict[GenericResultTupleIndexType, pd.DataFrame] = serialized_field(default=Factory(dict), repr=keys_only_repr)
 
 
+
+    # ================================================================================================================================================================================ #
+    # Additive from old results objects                                                                                                                                                #
+    # ================================================================================================================================================================================ #
     @classmethod
     def init_from_old_GeneralDecoderDictDecodedEpochsDictResult(cls, a_general_decoder_dict_decoded_epochs_dict_result) -> "GenericDecoderDictDecodedEpochsDictResult":
         """ converts the 2025-03-10 result (`GeneralDecoderDictDecodedEpochsDictResult`) to the 2025-03-11 format (`GenericDecoderDictDecodedEpochsDictResult`)
@@ -480,6 +484,10 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         return self
     
 
+
+    # ================================================================================================================================================================================ #
+    # Self-compute                                                                                                                                                  #
+    # ================================================================================================================================================================================ #
     
     # @function_attributes(short_name=None, tags=['adding', 'generating', 'masking'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-11 13:22', related_items=[])
     def creating_new_spikes_per_t_bin_masked_variants(self, spikes_df: pd.DataFrame) -> "GenericDecoderDictDecodedEpochsDictResult":
@@ -506,8 +514,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
         return self
 
-
-
+    @function_attributes(short_name=None, tags=['UNFINISHED', 'UNTESTED', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-11 00:00', related_items=[])
     def example_compute_fn(self, curr_active_pipeline, context: IdentifyingContext):
         """ Uses the context to extract proper values from the pipeline, and performs a fresh computation
         
@@ -770,6 +777,92 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
     
         final_output_context: IdentifyingContext = IdentifyingContext(**final_output_context_dict)
         return final_output_context
+
+
+    # ================================================================================================================================================================================ #
+    # Retreval and use                                                                                                                                                                 #
+    # ================================================================================================================================================================================ #
+    def get_matching_contexts(self, context_query: IdentifyingContext, debug_print:bool=True):
+        """ Get a specific contexts
+        
+        a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='long_LR', time_bin_size=0.025, known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type='ignore')
+       
+        """
+    
+    
+        # ==================================================================================================================== #
+        # get .filter_epochs_specific_decoded_result                                                                                                        #
+        # ==================================================================================================================== #
+        try:
+            a_result: DecodedFilterEpochsResult = self.filter_epochs_specific_decoded_result[context_query] ## try exact match first
+            best_matching_context = context_query
+        except KeyError as e:
+            # this happens when there are no exact matches for the context
+            best_matching_context, match_count = IdentifyingContext.find_best_matching_context(context_query, self.filter_epochs_specific_decoded_result) # Find the best match
+            if best_matching_context:
+                if debug_print:
+                    print(f"Found best match with {match_count} matching attributes:\t{best_matching_context}\n")
+                a_result: DecodedFilterEpochsResult = self.filter_epochs_specific_decoded_result[best_matching_context] # Get the corresponding value
+                ## OUTPUTS: a_result
+            else:
+                if debug_print:
+                    print("a_result: No matches found in the dictionary.")    
+                a_result = None
+        except Exception as e:
+            raise e
+        
+
+        # ==================================================================================================================== #
+        # get .decoders                                                                                                        #
+        # ==================================================================================================================== #
+        try:
+            a_decoder: BasePositionDecoder = self.decoders[context_query] ## try exact match first
+            best_matching_context = context_query
+        except KeyError as e:
+            # this happens when there are no exact matches for the context
+            best_matching_context, match_count = IdentifyingContext.find_best_matching_context(context_query, self.decoders) # Find the best match
+            if best_matching_context:
+                if debug_print:
+                    print(f"Found best match with {match_count} matching attributes:\t{best_matching_context}\n")
+                a_decoder: BasePositionDecoder = self.decoders[best_matching_context] # Get the corresponding value
+                ## OUTPUTS: a_decoder
+            else:
+                if debug_print:
+                    print("a_decoder: No matches found in the dictionary.")    
+                a_decoder = None
+        except Exception as e:
+            raise e
+
+
+        # ================================================================================================================================================================================ #
+        # get .filter_epochs_decoded_track_marginal_posterior_df_dict                                                                                                                      #
+        # ================================================================================================================================================================================ #
+        try:
+            a_decoded_marginal_posterior_df: pd.DataFrame = self.filter_epochs_decoded_track_marginal_posterior_df_dict[context_query] ## try exact match first]
+            if best_matching_context != context_query:
+                print(f'WARN: different context match for a_decoded_marginal_posterior_df: ("{context_query}") than for a_decoder ("{best_matching_context}").')
+            best_matching_context = context_query
+        except KeyError as e:
+            # this happens when there are no exact matches for the context
+            best_matching_context, match_count = IdentifyingContext.find_best_matching_context(context_query, self.filter_epochs_decoded_track_marginal_posterior_df_dict) # Find the best match
+
+            if best_matching_context:
+                if debug_print:
+                    print(f"Found best match with {match_count} matching attributes:\t{best_matching_context}\n")
+                a_decoded_marginal_posterior_df = self.filter_epochs_decoded_track_marginal_posterior_df_dict[best_matching_context] # Get the corresponding value
+                ## OUTPUTS: a_decoded_track_marginal_posterior_df
+            else:
+                if debug_print:
+                    print("a_decoded_marginal_posterior_df: No matches found in the dictionary.")    
+                a_decoded_marginal_posterior_df = None
+        except Exception as e:
+            raise e
+
+        ## OUTPUTS: a_target_context: IdentifyingContext, a_result: DecodedFilterEpochsResult, a_decoded_marginal_posterior_df: pd.DataFrame, a_decoder: BasePositionDecoder
+
+        return best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df
+
+
 
 
 
