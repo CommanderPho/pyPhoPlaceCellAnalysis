@@ -813,7 +813,6 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                             print(f"Found {len(matching_contexts)} matches for {item_name}")
                         # return [(ctx, dictionary[ctx]) for ctx in matching_contexts]
                         return {ctx:dictionary[ctx] for ctx in matching_contexts}                        
-
                     else:
                         if debug_print:
                             print(f"{item_name}: No matches found in the dictionary.")
@@ -824,8 +823,8 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
 
 
-        # Find single best matching context
-        if not return_multiple_matches:
+        if (not return_multiple_matches):
+            # Find single best matching context
             # Get all values using the helper function - one line per call
             result_context, a_result = _subfn_get_value_with_context_matching(self.filter_epochs_specific_decoded_result, context_query, "a_result")
             decoder_context, a_decoder = _subfn_get_value_with_context_matching(self.decoders, context_query, "a_decoder")
@@ -834,8 +833,14 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
             # Determine the best matching context
             contexts = [c for c in [result_context, decoder_context, posterior_context] if c is not None]
-            best_matching_context = contexts[0] if contexts else None
-            
+            if contexts:
+                context_lenghts = np.array([len(v.to_dict()) for v in contexts])
+                max_context_length = np.max(context_lenghts)
+                max_context_length_idx = np.argmax(context_lenghts)
+                best_matching_context = contexts[max_context_length_idx]
+            else:
+                best_matching_context = None
+
             # Optionally add a warning for different contexts
             if debug_print and len(set(contexts)) > 1:
                 print(f"Warning: Different contexts matched: result={result_context}, decoder={decoder_context}, posterior={posterior_context}")
@@ -850,9 +855,31 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             decoded_marginal_posterior_df_context_dict = _subfn_get_value_with_context_matching(self.filter_epochs_decoded_track_marginal_posterior_df_dict, context_query, "a_decoded_marginal_posterior_df")            
             any_matching_contexts_list = list(set(list(result_context_dict.keys())).union(set(list(decoder_context_dict.keys()))).union(set(list(decoded_marginal_posterior_df_context_dict.keys()))))
             return any_matching_contexts_list, result_context_dict, decoder_context_dict, decoded_marginal_posterior_df_context_dict
+ 
+
+    def get_flattened_contexts_for_posteriors_dfs(self, decoded_marginal_posterior_df_context_dict):
+        """ returns 4 flat dicts with the same (full) contexts that the passed `decoded_marginal_posterior_df_context_dict` have
+        
+        Usage:
+            flat_context_list, flat_result_context_dict, flat_decoder_context_dict, decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_flattened_contexts_for_posteriors_dfs(decoded_marginal_posterior_df_context_dict)
+            flat_context_list
+
+        """
+        flat_context_list = []
+        flat_decoder_context_dict = {}
+        flat_result_context_dict = {}
+
+        for a_context, a_df in decoded_marginal_posterior_df_context_dict.items():
+            best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = self.get_matching_contexts(context_query=a_context, return_multiple_matches=False, debug_print=False)
+            assert best_matching_context == a_context, f"best_matching_context: {best_matching_context}, a_context: {a_context}"
+            flat_decoder_context_dict[best_matching_context] = a_decoder
+            flat_result_context_dict[best_matching_context] = a_result
+            flat_context_list.append(best_matching_context)
 
 
-
+        assert len(flat_decoder_context_dict) == len(flat_result_context_dict)
+        Assert.same_length(flat_context_list, decoded_marginal_posterior_df_context_dict, flat_decoder_context_dict, flat_result_context_dict)
+        return flat_context_list, flat_result_context_dict, flat_decoder_context_dict, decoded_marginal_posterior_df_context_dict
 
 
 
