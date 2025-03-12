@@ -2713,9 +2713,10 @@ def _workaround_validate_has_directional_decoded_continuous_epochs(curr_active_p
     return True
 
 
+from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import DecodedResultExportingMixin
 
 @define(slots=False, repr=False)
-class DecoderDecodedEpochsResult(ComputedResult):
+class DecoderDecodedEpochsResult(DecodedResultExportingMixin, ComputedResult):
     """ Contains Decoded Epochs (such as laps, ripple) for a each of the Decoders.
 
     2024-02-15 - Computed by `_decode_and_evaluate_epochs_using_directional_decoders`
@@ -2750,94 +2751,6 @@ class DecoderDecodedEpochsResult(ComputedResult):
     laps_simple_pf_pearson_merged_df: pd.DataFrame = serialized_field(default=None)
     ripple_simple_pf_pearson_merged_df: pd.DataFrame = serialized_field(default=None)
     
-    @classmethod
-    def compute_matching_best_indicies(cls, a_marginals_df: pd.DataFrame, index_column_name: str = 'most_likely_decoder_index', second_index_column_name: str = 'best_decoder_index', enable_print=True):
-        """ count up the number of rows that the RadonTransform and the most-likely direction agree 
-        
-        DecoderDecodedEpochsResult.compute_matching_best_indicies
-
-        """
-        num_total_epochs: int = len(a_marginals_df)
-        agreeing_rows_count: int = (a_marginals_df[index_column_name] == a_marginals_df[second_index_column_name]).sum()
-        agreeing_rows_ratio = float(agreeing_rows_count)/float(num_total_epochs)
-        if enable_print:
-            print(f'agreeing_rows_count/num_total_epochs: {agreeing_rows_count}/{num_total_epochs}\n\tagreeing_rows_ratio: {agreeing_rows_ratio}')
-        return agreeing_rows_ratio, (agreeing_rows_count, num_total_epochs)
-
-
-    @classmethod
-    def add_session_df_columns(cls, df: pd.DataFrame, session_name: str, time_bin_size: float=None, t_start: Optional[float]=None, curr_session_t_delta: Optional[float]=None, t_end: Optional[float]=None, time_col: str=None, end_time_col_name: Optional[str]=None) -> pd.DataFrame:
-        """ adds session-specific information to the marginal dataframes 
-    
-        Added Columns: ['session_name', 'time_bin_size', 'delta_aligned_start_t', 'pre_post_delta_category', 'maze_id']
-
-        Usage:
-            # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
-            session_name: str = curr_active_pipeline.session_name
-            t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
-            df = DecoderDecodedEpochsResult.add_session_df_columns(df, session_name=session_name, time_bin_size=None, curr_session_t_delta=t_delta, time_col='ripple_start_t')
-            
-            a_ripple_df = DecoderDecodedEpochsResult.add_session_df_columns(a_ripple_df, session_name=session_name, time_bin_size=None, curr_session_t_delta=t_delta, time_col='ripple_start_t')
-    
-        """
-        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor
-        
-        return df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=time_bin_size, t_start=t_start, curr_session_t_delta=curr_session_t_delta, t_end=t_end, time_col=time_col, end_time_col_name=end_time_col_name)
-    
-    @classmethod
-    @function_attributes(short_name=None, tags=['temp'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-01 22:58', related_items=[])
-    def load_user_selected_epoch_times(cls, curr_active_pipeline, track_templates=None, epochs_name='ripple', **additional_selections_context) -> Tuple[Dict[str, NDArray], NDArray]:
-        """
-
-        Usage:    
-            decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times = load_user_selected_epoch_times(curr_active_pipeline)
-            # Finds the indicies into the dataframe (`filtered_ripple_simple_pf_pearson_merged_df`) from the decoder_user_selected_epoch_times_dict
-            # Inputs: filtered_ripple_simple_pf_pearson_merged_df, decoder_user_selected_epoch_times_dict
-
-            new_selections_dict = {}
-            for a_name, a_start_stop_arr in decoder_user_selected_epoch_times_dict.items():
-                # a_pagination_controller = self.pagination_controllers[a_name] # DecodedEpochSlicesPaginatedFigureController
-                if len(a_start_stop_arr) > 0:
-                    assert np.shape(a_start_stop_arr)[1] == 2, f"input should be start, stop times as a numpy array"
-                    # new_selections_dict[a_name] = filtered_ripple_simple_pf_pearson_merged_df.epochs.find_data_indicies_from_epoch_times(a_start_stop_arr) # return indicies into dataframe
-                    new_selections_dict[a_name] = filtered_ripple_simple_pf_pearson_merged_df.epochs.matching_epoch_times_slice(a_start_stop_arr) # return sliced dataframes
-                    
-            new_selections_dict
-
-        """
-        # Inputs: curr_active_pipeline (for curr_active_pipeline.build_display_context_for_session)
-        from neuropy.utils.misc import numpyify_array
-        from neuropy.core.user_annotations import UserAnnotationsManager
-        annotations_man = UserAnnotationsManager()
-        user_annotations = annotations_man.get_user_annotations()
-
-        if track_templates is None:
-            # Get from the pipeline:
-            directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
-            rank_order_results = curr_active_pipeline.global_computation_results.computed_data['RankOrder']
-            minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
-            included_qclu_values: float = rank_order_results.included_qclu_values
-            track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only
-        
-
-        # loaded_selections_context_dict = {a_name:curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs=epochs_name, decoder=a_name, user_annotation='selections') for a_name, a_decoder in track_templates.get_decoders_dict().items()}
-        loaded_selections_context_dict = {a_name:curr_active_pipeline.sess.get_context().merging_context('display_', IdentifyingContext(display_fn_name='DecodedEpochSlices', epochs=epochs_name, decoder=a_name, user_annotation='selections', **additional_selections_context)) for a_name, a_decoder in track_templates.get_decoders_dict().items()} ## gets around DisplayPipelineStage being passed for `curr_active_pipeline` sometimes
-
-        decoder_user_selected_epoch_times_dict = {a_name:np.atleast_2d(numpyify_array(user_annotations.get(a_selections_ctx, []))) for a_name, a_selections_ctx in loaded_selections_context_dict.items()}
-        # loaded_selections_dict
-        
-        ## Inputs: loaded_selections_dict, 
-        ## Find epochs that are present in any of the decoders:
-        total_num_user_selections: int = int(np.sum([np.size(v) for v in decoder_user_selected_epoch_times_dict.values()]))
-        if total_num_user_selections > 0:
-            concatenated_selected_epoch_times = NumpyHelpers.safe_concat([a_start_stop_arr for a_name, a_start_stop_arr in decoder_user_selected_epoch_times_dict.items() if np.size(a_start_stop_arr)>0], axis=0) # ` if np.size(a_start_stop_arr)>0` part was added to avoid empty lists causing `ValueError: all the input arrays must have same number of dimensions, but the array at index 0 has 1 dimension(s) and the array at index 1 has 2 dimension(s)`
-            any_good_selected_epoch_times: NDArray = np.unique(concatenated_selected_epoch_times, axis=0) # drops duplicate rows (present in multiple decoders), and sorts them ascending
-        else:
-            print(f'WARNING: No user selections for this epoch')
-            any_good_selected_epoch_times: NDArray = np.atleast_2d([]) 
-            
-        return decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times
-
 
     @classmethod
     @function_attributes(short_name=None, tags=['temp'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-02 13:28', related_items=[])
@@ -2929,47 +2842,6 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
         return df
 
-
-
-    @classmethod
-    @function_attributes(short_name=None, tags=['user-annotations', 'column', 'epoch', 'is_valid_epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-04 00:00', related_items=[])
-    def try_add_is_epoch_boolean_column(cls, a_df: pd.DataFrame, any_good_selected_epoch_times: NDArray, new_column_name:str='is_valid_epoch', t_column_names=None, atol:float=0.01, not_found_action='skip_index', debug_print=False) -> bool:
-        """ tries to add a 'new_column_name' column to the dataframe. 
-        
-        t_column_names = ['ripple_start_t',]
-        """
-        if (any_good_selected_epoch_times is None):
-            return False
-        any_good_selected_epoch_indicies = None
-        try:
-            # any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=t_column_names, atol=atol, not_found_action=not_found_action, debug_print=debug_print)    
-            any_good_selected_epoch_indicies = a_df.epochs.find_data_indicies_from_epoch_times(epoch_times=np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=t_column_names, atol=atol)
-        except BaseException as e:
-            print(f'ERROR: failed with error {e} while trying to add column "{new_column_name}". Out of options.')
-
-        if any_good_selected_epoch_indicies is None:
-            return False
-
-        # print(f'\t succeded at getting indicies! for {a_df_name}. got {len(any_good_selected_epoch_indicies)} indicies!')
-        a_df[new_column_name] = False
-        # a_df[new_column_name].iloc[any_good_selected_epoch_indicies] = True
-        a_df[new_column_name].loc[any_good_selected_epoch_indicies] = True
-        # a_df[new_column_name].loc[a_df.index.to_numpy()[any_good_selected_epoch_indicies]] = True # IndexError: index 392 is out of bounds for axis 0 with size 390
-        return True
-
-
-    @classmethod
-    @function_attributes(short_name=None, tags=['user-annotations', 'column', 'epoch', 'is_user_annotated_epoch'], input_requires=[], output_provides=[], uses=['cls.try_add_is_epoch_boolean_column'], used_by=[], creation_date='2024-03-02 13:17', related_items=[])
-    def try_add_is_user_annotated_epoch_column(cls, a_df: pd.DataFrame, any_good_selected_epoch_times, t_column_names=['ripple_start_t',]) -> bool:
-        """ tries to add a 'is_user_annotated_epoch' column to the dataframe. """
-        return cls.try_add_is_epoch_boolean_column(a_df=a_df, any_good_selected_epoch_times=any_good_selected_epoch_times, new_column_name='is_user_annotated_epoch', t_column_names=t_column_names, atol=0.01, not_found_action='skip_index', debug_print=False)
-    
-
-    @classmethod
-    @function_attributes(short_name=None, tags=['user-annotations', 'column', 'epoch', 'is_valid_epoch'], input_requires=[], output_provides=[], uses=['cls.try_add_is_epoch_boolean_column'], used_by=[], creation_date='2024-03-02 13:17', related_items=[])
-    def try_add_is_valid_epoch_column(cls, a_df: pd.DataFrame, any_good_selected_epoch_times, t_column_names=['ripple_start_t',]) -> bool:
-        """ tries to add a 'is_valid_epoch' column to the dataframe. """
-        return cls.try_add_is_epoch_boolean_column(a_df=a_df, any_good_selected_epoch_times=any_good_selected_epoch_times, new_column_name='is_valid_epoch', t_column_names=t_column_names, atol=0.01, not_found_action='skip_index', debug_print=False)
 
 
     @function_attributes(short_name=None, tags=['columns', 'epochs', 'IMPORTANT'], input_requires=[], output_provides=[], uses=['filter_and_update_epochs_and_spikes'], used_by=[], creation_date='2024-03-14 09:22', related_items=[])
