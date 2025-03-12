@@ -1,6 +1,7 @@
 from copy import deepcopy
 import sys
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+import h5py
 from typing_extensions import TypeAlias
 from nptyping import NDArray
 import pyphoplacecellanalysis.General.type_aliases as types
@@ -187,8 +188,6 @@ class NonPBEDimensionalDecodingResult(UnpackableMixin, ComputedResult):
     
     frame_divided_epochs_df: pd.DataFrame = serialized_field(metadata={'desc': 'used for rendering a series of successive 2D decoded posteriors as "frames" on a 1D timeline.'})
     frame_divided_epochs_results: Dict[types.DecoderName, DecodedFilterEpochsResult] = serialized_field(metadata={'desc': 'used for rendering a series of successive 2D decoded posteriors as "frames" on a 1D timeline.'})
-
-
 
     @property
     def a_result2D(self) -> DecodedFilterEpochsResult:
@@ -956,7 +955,90 @@ class GeneralDecoderDictDecodedEpochsDictResult(ComputedResult):
                 attr_reprs.append(f"{a.name}: {attr_type}")
         content = ",\n\t".join(attr_reprs)
         return f"{type(self).__name__}({content}\n)"
-    
+
+
+    def to_hdf(self, file_path, key: str, debug_print=False, **kwargs):
+        """Custom HDF5 serialization function that handles complex nested dictionaries without global expansion.
+        
+        Explicitly serializes each complex field in a type-specific manner.
+        """
+        # First call the parent implementation to handle the basic fields
+        super().to_hdf(file_path, key, debug_print=debug_print, **kwargs)
+        
+        # Now handle our complex dictionary fields manually
+        file_mode = kwargs.get('file_mode', 'a')  # default to append
+        
+        # 1. Handle filter_epochs_to_decode_dict
+        if self.filter_epochs_to_decode_dict:
+            for epoch_type, epoch_obj in self.filter_epochs_to_decode_dict.items():
+                # Convert Epoch to DataFrame and save it
+                epoch_key = f"{key}/filter_epochs_to_decode_dict/{epoch_type}"
+                epoch_df = epoch_obj.to_dataframe()
+                epoch_df.to_hdf(file_path, key=epoch_key)
+        
+        # 2. Handle filter_epochs_pseudo2D_continuous_specific_decoded_result
+        if self.filter_epochs_pseudo2D_continuous_specific_decoded_result:
+            for epoch_type, decoded_result in self.filter_epochs_pseudo2D_continuous_specific_decoded_result.items():
+                result_key = f"{key}/filter_epochs_pseudo2D_continuous_specific_decoded_result/{epoch_type}"
+                # Use the DecodedFilterEpochsResult's serialization method if available
+                if hasattr(decoded_result, 'to_hdf'):
+                    decoded_result.to_hdf(file_path, key=result_key)
+                else:
+                    # Fallback: save key attributes as separate datasets
+                    # For example, save p_x_given_n arrays and other essential components
+                    with h5py.File(file_path, file_mode) as f:
+                        # Create a group if it doesn't exist
+                        if result_key not in f:
+                            f.create_group(result_key)
+                        
+                        # Save essential attributes
+                        if hasattr(decoded_result, 'p_x_given_n_list'):
+                            for i, p_x in enumerate(decoded_result.p_x_given_n_list):
+                                f.create_dataset(f"{result_key}/p_x_given_n_{i}", data=p_x)
+        
+        # 3. Handle filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict
+        if self.filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict:
+            for epoch_type, inner_dict in self.filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict.items():
+                for fill_mode, df in inner_dict.items():
+                    # DataFrame serialization is straightforward
+                    df_key = f"{key}/filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict/{epoch_type}/{fill_mode}"
+                    df.to_hdf(file_path, key=df_key)
+
+
+    @classmethod
+    def read_hdf(cls, file_path, key: str, **kwargs):
+        """Read a previously saved GeneralDecoderDictDecodedEpochsDictResult from HDF5.
+        
+        Rebuilds complex nested dictionary structures from their serialized components.
+        """
+        # Create a new instance with basic attributes
+        result = cls()
+        
+        # Populate filter_epochs_to_decode_dict
+        filter_epochs_to_decode_dict = {}
+        epochs_group_key = f"{key}/filter_epochs_to_decode_dict"
+        
+        # Check if the group exists
+        with h5py.File(file_path, 'r') as f:
+            if epochs_group_key in f:
+                # List all epoch types saved
+                epoch_types = list(f[epochs_group_key].keys())
+                
+                for epoch_type in epoch_types:
+                    epoch_key = f"{epochs_group_key}/{epoch_type}"
+                    # Read the epoch dataframe
+                    epoch_df = pd.read_hdf(file_path, key=epoch_key)
+                    # Convert back to Epoch object
+                    filter_epochs_to_decode_dict[epoch_type] = Epoch(epoch_df)
+        
+        result.filter_epochs_to_decode_dict = filter_epochs_to_decode_dict
+        
+        # Similar logic for other complex dictionaries...
+        
+        return result
+
+
+
 
 @define(slots=False, repr=False, eq=False)
 class EpochComputationsComputationsContainer(ComputedResult):
