@@ -236,6 +236,15 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
     filter_epochs_decoded_track_marginal_posterior_df_dict: Dict[GenericResultTupleIndexType, pd.DataFrame] = serialized_field(default=Factory(dict), repr=keys_only_repr)
 
 
+    @property
+    def single_FAT_df(self) -> pd.DataFrame:
+        """
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import SingleFatDataframe
+        from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult, KnownNamedDecoderTrainedComputeEpochsType, KnownNamedDecodingEpochsType, MaskedTimeBinFillType, DataTimeGrain, GenericResultTupleIndexType
+        
+        """
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import SingleFatDataframe
+        return SingleFatDataframe.build_fat_df(dfs_dict=self.filter_epochs_decoded_track_marginal_posterior_df_dict)
 
     # ================================================================================================================================================================================ #
     # Additive from old results objects                                                                                                                                                #

@@ -2965,6 +2965,8 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
                 _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, _curr_dict, session_name, curr_session_t_delta, time_key='start', **additional_columns_dict)
                 ## update when done:
                 final_sessions_loaded_extra_df_dict[file_type] = _curr_dict
+            elif file_type == 'FAT':
+                _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, final_sessions_loaded_laps_time_bin_dict, session_name, curr_session_t_delta, time_key='t_bin_center', **common_additional_columns_dict)
                 
 
             else:
