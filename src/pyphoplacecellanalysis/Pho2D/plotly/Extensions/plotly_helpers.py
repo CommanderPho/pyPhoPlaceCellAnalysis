@@ -1465,6 +1465,47 @@ def _build_dash_app(final_dfs_dict, earliest_delta_aligned_t_start: float, lates
 
     return app
 
+
+@function_attributes(short_name=None, tags=['plotly', 'scatter', 'hist', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-13 15:04', related_items=[])
+def build_single_plotly_marginal_scatter_and_hist_over_time(a_decoded_posterior_df: pd.DataFrame, a_target_context: IdentifyingContext, histogram_bins: int = 25, debug_print = False):
+    """ builds a single [hist_Long, ScatterTimeSeries, hist_Short] plotly figure, returned a dictionary.
+    
+    Usage:
+        from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import build_single_plotly_marginal_scatter_and_hist_over_time
+                
+        #INPUTS: a_target_context: IdentifyingContext, a_result: DecodedFilterEpochsResult, a_decoded_marginal_posterior_df: pd.DataFrame, a_decoder: BasePositionDecoder
+        _flat_out_figs_dict = {}
+        a_fig, a_figure_context = build_single_plotly_marginal_scatter_and_hist_over_time(a_decoded_posterior_df=a_decoded_marginal_posterior_df, a_target_context=a_target_context)
+        _flat_out_figs_dict[a_figure_context] = a_fig
+
+        a_fig.show()
+
+    """
+    import plotly.io as pio
+    template: str = 'plotly_dark' # set plotl template
+    pio.templates.default = template
+    from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import plotly_pre_post_delta_scatter
+
+    if 'time_bin_size' not in a_decoded_posterior_df:
+        ## add the missing column from the context
+        found_time_bin_size: float = a_target_context.get('time_bin_size', None)
+        assert found_time_bin_size is not None
+        a_decoded_posterior_df['time_bin_size'] = float(found_time_bin_size)
+        
+    assert 'delta_aligned_start_t' in a_decoded_posterior_df
+    # plot_row_identifier: str = f'{a_known_decoded_epochs_type.capitalize()} - {masking_bin_fill_mode.capitalize()} decoder' # should be like 'Laps (Masked) from Non-PBE decoder'    
+    plot_row_identifier: str = a_target_context.get_description(subset_includelist=['a_known_decoded_epochs_type', 'masking_bin_fill_mode'], include_property_names=True)
+    plot_row_identifier = f"{plot_row_identifier} decoder" # should be like 'Laps (Masked) from Non-PBE decoder'"
+    fig, figure_context = plotly_pre_post_delta_scatter(data_results_df=deepcopy(a_decoded_posterior_df), data_context=deepcopy(a_target_context), out_scatter_fig=None, 
+                                    histogram_variable_name='P_Short', hist_kwargs=dict(), histogram_bins=histogram_bins,
+                                    common_plot_kwargs=dict(),
+                                    px_scatter_kwargs = dict(x='delta_aligned_start_t', y='P_Short', title=plot_row_identifier))
+    return fig, figure_context
+
+
+
+
+
 @function_attributes(short_name=None, tags=['scatter', 'multi-session', 'plot', 'figure', 'plotly', 'IMPORTANT'], input_requires=[], output_provides=[], uses=['_helper_build_figure'], used_by=[], creation_date='2024-01-29 20:47', related_items=[])
 def plot_across_sessions_scatter_results(directory: Union[Path, str], concatenated_laps_df: pd.DataFrame, concatenated_ripple_df: pd.DataFrame,
                                           earliest_delta_aligned_t_start: float=0.0, latest_delta_aligned_t_end: float=666.0,
