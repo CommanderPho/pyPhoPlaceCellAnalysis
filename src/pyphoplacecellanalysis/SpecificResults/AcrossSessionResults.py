@@ -4057,3 +4057,35 @@ class AcrossSessionIdentityDataframeAccessor:
                 df['session_name'] = df[session_key_col].map(lambda x: x.split('_', maxsplit=3)[-1]) # not needed
                 
         return df
+
+
+
+@function_attributes(short_name=None, tags=['df', 'merge', 'concatenate', 'FAT', 'single_fat_df'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-13 08:26', related_items=[])
+class SingleFatDataframe:
+    """ instead of multiple output files for different results and using filenames for transmitting context, all information is added (duplicated for each row) to a single frame with most columns present.
+    
+    This only makes sense for dataframes with the same number of rows, as there would be too much duplication for epochs AND epoch_time_bins, for example.
+    
+    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import SingleFatDataframe
+    
+    
+    """
+    @classmethod
+    def build_fat_df(cls, dfs_dict: Dict[IdentifyingContext, pd.DataFrame]) -> pd.DataFrame:
+        """ builds a single FAT_df from a dict of identities and their corresponding dfs. Adds all of the index keys as columns, and all of their values a duplicated along all rows of the coresponding df.
+        Then stacks them into a single, FAT dataframe.
+
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import SingleFatDataframe
+           
+        """
+        FAT_df_list: List[pd.DataFrame] = []
+    
+        for a_df_name, a_df in dfs_dict.items():
+            ## In a single_FAT frame, we add columns with the context value for all entries in the dataframe.
+            for a_ctxt_key, a_ctxt_value in a_df_name.to_dict().items():
+                a_df[a_ctxt_key] = a_ctxt_value
+                
+            FAT_df_list.append(a_df)
+        # end for a_df_name, a_df
+        fat_df: pd.DataFrame = pd.concat(FAT_df_list, ignore_index=True)
+        return fat_df

@@ -889,12 +889,18 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
 
 
-    @function_attributes(short_name=None, tags=['rabid_mice'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-13 07:12', related_items=[])
+    @function_attributes(short_name=None, tags=['export', 'CSV', 'main'], input_requires=[], output_provides=[], uses=['SingleFatDataframe'], used_by=['self.export_csvs'], creation_date='2025-03-13 07:12', related_items=[])
     @classmethod
     def _perform_export_dfs_dict_to_csvs(cls, extracted_dfs_dict: Dict, parent_output_path: Path, active_context: IdentifyingContext, session_name: str, tbin_values_dict: Dict,
-                                        t_start: Optional[float]=None, curr_session_t_delta: Optional[float]=None, t_end: Optional[float]=None,
-                                        user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None):
+                                    t_start: Optional[float]=None, curr_session_t_delta: Optional[float]=None, t_end: Optional[float]=None,
+                                    user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None, use_single_FAT_df: bool=True):
         """ Classmethod: export as separate .csv files. 
+
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import SingleFatDataframe
+        from pyphocorehelpers.assertion_helpers import Assert        
+        from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult, KnownNamedDecoderTrainedComputeEpochsType, KnownNamedDecodingEpochsType, MaskedTimeBinFillType, DataTimeGrain, GenericResultTupleIndexType
+
+        
         active_context = curr_active_pipeline.get_session_context()
         curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
         CURR_BATCH_OUTPUT_PREFIX: str = f"{BATCH_DATE_TO_USE}-{curr_session_name}"
@@ -909,10 +915,31 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         delta_relative_t_start, delta_relative_t_delta, delta_relative_t_end = np.array([earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end]) - t_delta
         decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(curr_active_pipeline)
         any_good_selected_epoch_indicies = filtered_ripple_simple_pf_pearson_merged_df.epochs.matching_epoch_times_slice(any_good_selected_epoch_times)
-        df = filter_epochs_dfs_by_annotation_times(curr_active_pipeline, any_good_selected_epoch_times, ripple_decoding_time_bin_size=ripple_decoding_time_bin_size, filtered_ripple_simple_pf_pearson_merged_df, ripple_weighted_corr_merged_df)
-        df
 
-        tbin_values_dict={'laps': self.laps_decoding_time_bin_size, 'ripple': self.ripple_decoding_time_bin_size}
+        ## Export to CSVs:
+
+        # parent_output_path = curr_active_pipeline.get_output_path().resolve() ## Session-specific folder:
+        parent_output_path = collected_outputs_path.resolve() ## Session-specific folder:
+        Assert.path_exists(parent_output_path)
+
+        ## INPUTS: collected_outputs_path
+        decoding_time_bin_size: float = 0.025
+
+        complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
+        active_context = complete_session_context
+        session_name: str = curr_active_pipeline.session_name
+        tbin_values_dict={'laps': decoding_time_bin_size, 'pbe': decoding_time_bin_size, 'non_pbe': decoding_time_bin_size, 'FAT': decoding_time_bin_size}
+
+        # data_identifier_str: str = f'(MICE_marginals_df)'
+        data_identifier_str: str = f'(FAT_marginals_df)'
+        csv_save_paths_dict = GenericDecoderDictDecodedEpochsDictResult._perform_export_dfs_dict_to_csvs(extracted_dfs_dict=a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict,
+                                                    parent_output_path=parent_output_path.resolve(),
+                                                    active_context=active_context, session_name=session_name, #curr_active_pipeline=curr_active_pipeline,
+                                                    tbin_values_dict=tbin_values_dict,
+                                                    use_single_FAT_df=True
+                                                    )
+        csv_save_paths_dict
+
 
         #TODO 2024-11-01 07:53: - [ ] Need to pass the correct (full) context, including the qclu/fr_Hz filter values and the replay name. 
         #TODO 2024-11-01 07:54: - [X] Need to add a proper timebin column to the df instead of including it in the filename (if possible)
@@ -921,11 +948,23 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         '2024-11-01_1250PM-kdiba_gor01_two_2006-6-12_16-53-46__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0normal_computed-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]-(laps_weighted_corr_merged_df)_tbin-1.5.csv'
             
         """
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import SingleFatDataframe
+        from pyphocorehelpers.assertion_helpers import Assert
 
         assert parent_output_path.exists(), f"'{parent_output_path}' does not exist!"
         output_date_str: str = get_now_rounded_time_str(rounded_minutes=10)
+        
+        # active_context.custom_suffix = '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0' # '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0normal_computed-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]'
+        
+        #TODO 2024-03-02 12:12: - [ ] Could add weighted correlation if there is a dataframe for that and it's computed:
+        # tbin_values_dict = {'laps': self.laps_decoding_time_bin_size, 'ripple': self.ripple_decoding_time_bin_size}
+        time_col_name_dict = {'laps': 'lap_start_t', 'ripple': 'ripple_start_t', 'FAT': 't_bin_center'} ## default should be 't_bin_center'
+        
+        # ================================================================================================================================================================================ #
+        # BEGIN SUBN BLOCK                                                                                                                                                                 #
+        # ================================================================================================================================================================================ #
         # Export CSVs:
-        def export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'(laps_marginals_df)', parent_output_path: Path=None):
+        def _subfn_export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'(single_FAT)', parent_output_path: Path=None):
             """ captures `active_context`, 'output_date_str'
             """
             # parent_output_path: Path = Path('output').resolve()
@@ -939,33 +978,28 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             export_df.to_csv(out_path)
             return out_path 
 
+
         if custom_export_df_to_csv_fn is None:
             # use the default
-            custom_export_df_to_csv_fn = export_df_to_csv
+            custom_export_df_to_csv_fn = _subfn_export_df_to_csv
 
-
-        # active_context.custom_suffix = '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0' # '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0normal_computed-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]'
-        
-        #TODO 2024-03-02 12:12: - [ ] Could add weighted correlation if there is a dataframe for that and it's computed:
-        # tbin_values_dict = {'laps': self.laps_decoding_time_bin_size, 'ripple': self.ripple_decoding_time_bin_size}
-        time_col_name_dict = {'laps': 'lap_start_t', 'ripple': 'ripple_start_t'} ## default should be 't_bin_center'
-
-        ## INPUTS: decoder_ripple_filter_epochs_decoder_result_dict
-        export_files_dict = {}
-        
-        for a_df_name, a_df in extracted_dfs_dict.items():
-            if isinstance(a_df_name, str):
-                an_epochs_source_name: str = a_df_name.split(sep='_', maxsplit=1)[0] # get the first part of the variable names that indicates whether it's for "laps" or "ripple"
+        def _subfn_pre_process_and_export_df(export_df: pd.DataFrame, a_df_identifier: Union[str, IdentifyingContext]):
+            """ 
+            captures: t_start, t_delta, t_end, tbin_values_dict, time_col_name_dict, user_annotation_selections, valid_epochs_selections, custom_export_df_to_csv_fn
+            """
+            if isinstance(a_df_identifier, str):
+                an_epochs_source_name: str = a_df_identifier.split(sep='_', maxsplit=1)[0] # get the first part of the variable names that indicates whether it's for "laps" or "ripple"
             else:
                 ## probably an IdentifyingContext
-                an_epochs_source_name: str = a_df_name.known_named_decoding_epochs_type
-                
+                an_epochs_source_name: str = a_df_identifier.known_named_decoding_epochs_type
+
             a_tbin_size: float = float(tbin_values_dict[an_epochs_source_name])
             a_time_col_name: str = time_col_name_dict.get(an_epochs_source_name, 't_bin_center')
+            
             ## Add t_bin column method
-            a_df = a_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=a_tbin_size, t_start=t_start, curr_session_t_delta=curr_session_t_delta, t_end=t_end, time_col=a_time_col_name)
+            export_df = export_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=a_tbin_size, t_start=t_start, curr_session_t_delta=curr_session_t_delta, t_end=t_end, time_col=a_time_col_name)
             a_tbin_size_str: str = f"{round(a_tbin_size, ndigits=5)}"
-            a_data_identifier_str: str = f'({a_df_name})_tbin-{a_tbin_size_str}' ## build the identifier '(laps_weighted_corr_merged_df)_tbin-1.5'
+            a_data_identifier_str: str = f'({a_df_identifier})_tbin-{a_tbin_size_str}' ## build the identifier '(laps_weighted_corr_merged_df)_tbin-1.5'
             
             # add in custom columns
             #TODO 2024-03-14 06:48: - [ ] I could use my newly implemented `directional_decoders_epochs_decode_result.add_all_extra_epoch_columns(curr_active_pipeline, track_templates=track_templates, required_min_percentage_of_active_cells=0.33333333, debug_print=True)` function, but since this looks at decoder-specific info it's better just to duplicate implementation and do it again here.
@@ -981,16 +1015,16 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
                     if any_good_selected_epoch_indicies is None:
                         try:
-                            any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=['ripple_start_t',], atol=0.01, not_found_action='skip_index', debug_print=False)
+                            any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(export_df, np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=['ripple_start_t',], atol=0.01, not_found_action='skip_index', debug_print=False)
                         except AttributeError as e:
-                            print(f'ERROR: failed method 2 for {a_df_name}. Out of options.')        
+                            print(f'ERROR: failed method 2 for {a_df_identifier}. Out of options.')        
                         except Exception as e:
-                            print(f'ERROR: failed for {a_df_name}. Out of options.')
+                            print(f'ERROR: failed for {a_df_identifier}. Out of options.')
                         
                     if any_good_selected_epoch_indicies is not None:
-                        print(f'\t succeded at getting {len(any_good_selected_epoch_indicies)} selected indicies (of {num_valid_epoch_times} user selections) for {a_df_name}. got {len(any_good_selected_epoch_indicies)} indicies!')
-                        a_df['is_user_annotated_epoch'] = False
-                        a_df['is_user_annotated_epoch'].iloc[any_good_selected_epoch_indicies] = True
+                        print(f'\t succeded at getting {len(any_good_selected_epoch_indicies)} selected indicies (of {num_valid_epoch_times} user selections) for {a_df_identifier}. got {len(any_good_selected_epoch_indicies)} indicies!')
+                        export_df['is_user_annotated_epoch'] = False
+                        export_df['is_user_annotated_epoch'].iloc[any_good_selected_epoch_indicies] = True
                     else:
                         print(f'\t failed all methods for annotations')
 
@@ -1006,104 +1040,77 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
                     if any_good_selected_epoch_indicies is None:
                         try:
-                            any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(a_df, np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=['ripple_start_t',], atol=0.01, not_found_action='skip_index', debug_print=False)
+                            any_good_selected_epoch_indicies = find_data_indicies_from_epoch_times(export_df, np.squeeze(any_good_selected_epoch_times[:,0]), t_column_names=['ripple_start_t',], atol=0.01, not_found_action='skip_index', debug_print=False)
                         except AttributeError as e:
-                            print(f'ERROR: failed method 2 for {a_df_name}. Out of options.')        
+                            print(f'ERROR: failed method 2 for {a_df_identifier}. Out of options.')        
                         except Exception as e:
-                            print(f'ERROR: failed for {a_df_name}. Out of options.')
+                            print(f'ERROR: failed for {a_df_identifier}. Out of options.')
                         
                     if any_good_selected_epoch_indicies is not None:
-                        print(f'\t succeded at getting {len(any_good_selected_epoch_indicies)} selected indicies (of {num_valid_epoch_times} valid filter epoch times) for {a_df_name}. got {len(any_good_selected_epoch_indicies)} indicies!')
-                        a_df['is_valid_epoch'] = False
+                        print(f'\t succeded at getting {len(any_good_selected_epoch_indicies)} selected indicies (of {num_valid_epoch_times} valid filter epoch times) for {a_df_identifier}. got {len(any_good_selected_epoch_indicies)} indicies!')
+                        export_df['is_valid_epoch'] = False
 
                         try:
-                            a_df['is_valid_epoch'].iloc[any_good_selected_epoch_indicies] = True
+                            export_df['is_valid_epoch'].iloc[any_good_selected_epoch_indicies] = True
                             # a_df['is_valid_epoch'].loc[any_good_selected_epoch_indicies] = True
 
                         except Exception as e:
                             print(f'WARNING: trying to get whether the epochs are valid FAILED probably, 2024-06-28 custom computed epochs thing: {e}, just setting all to True')
-                            a_df['is_valid_epoch'] = True
+                            export_df['is_valid_epoch'] = True
                     else:
                         print(f'\t failed all methods for selection filter')
 
-            export_files_dict[a_df_name] = custom_export_df_to_csv_fn(a_df, data_identifier_str=a_data_identifier_str, parent_output_path=parent_output_path) # this is exporting corr '(ripple_WCorrShuffle_df)_tbin-0.025'
-        # end for a_df_name, a_df
+            return custom_export_df_to_csv_fn(export_df, data_identifier_str=a_data_identifier_str, parent_output_path=parent_output_path) # this is exporting corr '(ripple_WCorrShuffle_df)_tbin-0.025'
+        
+
+        # ================================================================================================================================================================================ #
+        # BEGIN FUNCTION BODY                                                                                                                                                              #
+        # ================================================================================================================================================================================ #
+        export_files_dict = {}
+        
+        if use_single_FAT_df:
+            single_FAT_df: pd.DataFrame = SingleFatDataframe.build_fat_df(dfs_dict=extracted_dfs_dict)
+            export_files_dict['FAT'] =  _subfn_pre_process_and_export_df(export_df=single_FAT_df, a_df_identifier="FAT")
+            
+        else:
+            for a_df_identifier, a_df in extracted_dfs_dict.items():
+                export_files_dict[a_df_identifier] =  _subfn_pre_process_and_export_df(export_df=single_FAT_df, a_df_identifier=a_df_identifier)
+            # end for a_df_name, a_df
+        # END if use_single_FAT_df
         
         return export_files_dict
     
-
-
-    def perform_export_dfs_dict_to_csvs(self, extracted_dfs_dict: Dict, parent_output_path: Path, active_context: IdentifyingContext, session_name: str, curr_session_t_delta: Optional[float], user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None):
-        """ export as separate .csv files. 
-        active_context = curr_active_pipeline.get_session_context()
-        curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
-        CURR_BATCH_OUTPUT_PREFIX: str = f"{BATCH_DATE_TO_USE}-{curr_session_name}"
-        print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
-
-        active_context = curr_active_pipeline.get_session_context()
-        session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
-        session_name: str = curr_active_pipeline.session_name
-        earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end = curr_active_pipeline.find_LongShortDelta_times()
-        histogram_bins = 25
-        # Shifts the absolute times to delta-relative values, as would be needed to draw on a 'delta_aligned_start_t' axis:
-        delta_relative_t_start, delta_relative_t_delta, delta_relative_t_end = np.array([earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end]) - t_delta
-        decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(curr_active_pipeline)
-        any_good_selected_epoch_indicies = filtered_ripple_simple_pf_pearson_merged_df.epochs.matching_epoch_times_slice(any_good_selected_epoch_times)
-        df = filter_epochs_dfs_by_annotation_times(curr_active_pipeline, any_good_selected_epoch_times, ripple_decoding_time_bin_size=ripple_decoding_time_bin_size, filtered_ripple_simple_pf_pearson_merged_df, ripple_weighted_corr_merged_df)
-        df
-
-        """
-        return self._perform_export_dfs_dict_to_csvs(extracted_dfs_dict=extracted_dfs_dict, parent_output_path=parent_output_path, active_context=active_context, session_name=session_name, tbin_values_dict={'laps': self.laps_decoding_time_bin_size, 'ripple': self.ripple_decoding_time_bin_size},
-                                                     curr_session_t_delta=curr_session_t_delta, user_annotation_selections=user_annotation_selections, valid_epochs_selections=valid_epochs_selections, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn)
-
-
-
-    @function_attributes(short_name=None, tags=['export', 'CSV', 'main'], input_requires=[], output_provides=['ripple_all_scores_merged_df.csv'], uses=['self.perform_export_dfs_dict_to_csvs', 'self.build_complete_all_scores_merged_df'], used_by=['perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'], creation_date='2024-03-15 10:13', related_items=[])
-    def export_csvs(self, parent_output_path: Path, active_context: IdentifyingContext, session_name: str, curr_session_t_delta: Optional[float], user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None, export_df_variable_names=None, should_export_complete_all_scores_df:bool=True):
-        """ export as separate .csv files. 
-
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
-
-        active_context = curr_active_pipeline.get_session_context()
-        curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
-        CURR_BATCH_OUTPUT_PREFIX: str = f"{BATCH_DATE_TO_USE}-{curr_session_name}"
-        print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
-
-        active_context = curr_active_pipeline.get_session_context()
-        session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
-        session_name: str = curr_active_pipeline.session_name
-        earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end = curr_active_pipeline.find_LongShortDelta_times()
-        histogram_bins = 25
-        # Shifts the absolute times to delta-relative values, as would be needed to draw on a 'delta_aligned_start_t' axis:
-        delta_relative_t_start, delta_relative_t_delta, delta_relative_t_end = np.array([earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end]) - t_delta
-        decoder_user_selected_epoch_times_dict, any_good_selected_epoch_times = DecoderDecodedEpochsResult.load_user_selected_epoch_times(curr_active_pipeline)
-        any_good_selected_epoch_indicies = filtered_ripple_simple_pf_pearson_merged_df.epochs.matching_epoch_times_slice(any_good_selected_epoch_times)
-        df = filter_epochs_dfs_by_annotation_times(curr_active_pipeline, any_good_selected_epoch_times, ripple_decoding_time_bin_size=ripple_decoding_time_bin_size, filtered_ripple_simple_pf_pearson_merged_df, ripple_weighted_corr_merged_df)
-        df
-
-
-            
+    @function_attributes(short_name=None, tags=['export', 'CSV', 'main'], input_requires=[], output_provides=[], uses=['_perform_export_dfs_dict_to_csvs'], used_by=[], creation_date='2025-03-13 08:58', related_items=[])
+    def export_csvs(self, parent_output_path: Path, active_context: IdentifyingContext, decoding_time_bin_size: float, session_name: str, curr_session_t_delta: Optional[float], user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None, export_df_variable_names=None, should_export_complete_all_scores_df:bool=True):
+        """ export as a single_FAT .csv file or optionally (not yet implemented) separate .csv files.             
         """
         export_files_dict = {}
-        _df_variables_names = ['laps_weighted_corr_merged_df', 'ripple_weighted_corr_merged_df', 'laps_simple_pf_pearson_merged_df', 'ripple_simple_pf_pearson_merged_df']
-        if export_df_variable_names is None:
-            # export all by default
-            export_df_variable_names = _df_variables_names
+        
+        tbin_values_dict = {'laps': decoding_time_bin_size, 'pbe': decoding_time_bin_size, 'non_pbe': decoding_time_bin_size, 'FAT': decoding_time_bin_size}
+
+        ## to restrict to specific variables
+        # _df_variables_names = ['laps_weighted_corr_merged_df', 'ripple_weighted_corr_merged_df', 'laps_simple_pf_pearson_merged_df', 'ripple_simple_pf_pearson_merged_df']
+        # if export_df_variable_names is None:
+        #     # export all by default
+        #     export_df_variable_names = _df_variables_names
             
-        extracted_dfs_dict = {a_df_name:getattr(self, a_df_name) for a_df_name in export_df_variable_names}
+        extracted_dfs_dict = self.filter_epochs_decoded_track_marginal_posterior_df_dict # {a_df_name:getattr(self, a_df_name) for a_df_name in export_df_variable_names}
         if len(extracted_dfs_dict) > 0:
-            export_files_dict = export_files_dict | self.perform_export_dfs_dict_to_csvs(extracted_dfs_dict=extracted_dfs_dict, parent_output_path=parent_output_path, active_context=active_context, session_name=session_name, curr_session_t_delta=curr_session_t_delta, user_annotation_selections=user_annotation_selections, valid_epochs_selections=valid_epochs_selections, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn)
+            export_files_dict = export_files_dict | self._perform_export_dfs_dict_to_csvs(extracted_dfs_dict=extracted_dfs_dict, parent_output_path=parent_output_path, tbin_values_dict=tbin_values_dict,
+                                                                                          active_context=active_context, session_name=session_name, curr_session_t_delta=curr_session_t_delta, user_annotation_selections=user_annotation_selections, valid_epochs_selections=valid_epochs_selections, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn,
+                                                                                          use_single_FAT_df=True)
 
-        ## try to export the merged all_scores dataframe
-        if should_export_complete_all_scores_df:
-            extracted_merged_scores_df: pd.DataFrame = self.build_complete_all_scores_merged_df()
-            if 'time_bin_size' not in extracted_merged_scores_df.columns:
-                ## add the column
-                print(f'WARN: adding the time_bin_size columns: {self.ripple_decoding_time_bin_size}')
-                extracted_merged_scores_df['time_bin_size'] = self.ripple_decoding_time_bin_size
 
-            export_df_dict = {'ripple_all_scores_merged_df': extracted_merged_scores_df}
-            export_files_dict = export_files_dict | self.perform_export_dfs_dict_to_csvs(extracted_dfs_dict=export_df_dict, parent_output_path=parent_output_path, active_context=active_context, session_name=session_name, curr_session_t_delta=curr_session_t_delta, user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn)
+        # ## try to export the merged all_scores dataframe
+        # if should_export_complete_all_scores_df:
+        #     extracted_merged_scores_df: pd.DataFrame = self.build_complete_all_scores_merged_df()
+        #     if 'time_bin_size' not in extracted_merged_scores_df.columns:
+        #         ## add the column
+        #         print(f'WARN: adding the time_bin_size columns: {self.ripple_decoding_time_bin_size}')
+        #         extracted_merged_scores_df['time_bin_size'] = self.ripple_decoding_time_bin_size
+
+        #     export_df_dict = {'ripple_all_scores_merged_df': extracted_merged_scores_df}
+        #     export_files_dict = export_files_dict | self.perform_export_dfs_dict_to_csvs(extracted_dfs_dict=export_df_dict, parent_output_path=parent_output_path, active_context=active_context, session_name=session_name, curr_session_t_delta=curr_session_t_delta, user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn)
 
         return export_files_dict
 
