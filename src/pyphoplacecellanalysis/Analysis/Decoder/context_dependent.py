@@ -891,7 +891,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
     @function_attributes(short_name=None, tags=['export', 'CSV', 'main'], input_requires=[], output_provides=[], uses=['SingleFatDataframe'], used_by=['self.export_csvs'], creation_date='2025-03-13 07:12', related_items=[])
     @classmethod
-    def _perform_export_dfs_dict_to_csvs(cls, extracted_dfs_dict: Dict, parent_output_path: Path, active_context: IdentifyingContext, session_name: str, tbin_values_dict: Dict,
+    def _perform_export_dfs_dict_to_csvs(cls, extracted_dfs_dict: Dict[IdentifyingContext, pd.DataFrame], parent_output_path: Path, active_context: IdentifyingContext, session_name: str, tbin_values_dict: Dict[str, float],
                                     t_start: Optional[float]=None, curr_session_t_delta: Optional[float]=None, t_end: Optional[float]=None,
                                     user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None, use_single_FAT_df: bool=True):
         """ Classmethod: export as separate .csv files. 
@@ -1081,12 +1081,13 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         return export_files_dict
     
     @function_attributes(short_name=None, tags=['export', 'CSV', 'main'], input_requires=[], output_provides=[], uses=['_perform_export_dfs_dict_to_csvs'], used_by=[], creation_date='2025-03-13 08:58', related_items=[])
-    def export_csvs(self, parent_output_path: Path, active_context: IdentifyingContext, decoding_time_bin_size: float, session_name: str, curr_session_t_delta: Optional[float], user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None, export_df_variable_names=None, should_export_complete_all_scores_df:bool=True):
+    def export_csvs(self, parent_output_path: Path, active_context: IdentifyingContext, decoding_time_bin_size: float, session_name: str, curr_session_t_delta: Optional[float], user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None, export_df_variable_names=None, tbin_values_dict: Optional[Dict[str, float]]=None, should_export_complete_all_scores_df:bool=True):
         """ export as a single_FAT .csv file or optionally (not yet implemented) separate .csv files.             
         """
         export_files_dict = {}
         
-        tbin_values_dict = {'laps': decoding_time_bin_size, 'pbe': decoding_time_bin_size, 'non_pbe': decoding_time_bin_size, 'FAT': decoding_time_bin_size}
+        if tbin_values_dict is None:
+            tbin_values_dict = {'laps': decoding_time_bin_size, 'pbe': decoding_time_bin_size, 'non_pbe': decoding_time_bin_size, 'FAT': decoding_time_bin_size}
 
         ## to restrict to specific variables
         # _df_variables_names = ['laps_weighted_corr_merged_df', 'ripple_weighted_corr_merged_df', 'laps_simple_pf_pearson_merged_df', 'ripple_simple_pf_pearson_merged_df']
