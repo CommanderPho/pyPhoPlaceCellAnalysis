@@ -3192,7 +3192,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     
     across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['csv_save_paths_dict'] = deepcopy(csv_save_paths_dict)
 
-
+    print(f'csv_save_paths_dict: {csv_save_paths_dict}\n')
 
 
     print('\t\tdone.')
