@@ -3021,6 +3021,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     
         callback_outputs = _across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function'] # 'PostHocPipelineFixup'
         a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = callback_outputs['a_new_fully_generic_result']
+        csv_save_paths_dict: Dict[str, Path] = callback_outputs['csv_save_paths_dict']
         a_new_fully_generic_result
 
     """
@@ -3135,7 +3136,6 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     # non_PBE_all_directional_pf1D_Decoder, pseudo2D_continuous_specific_decoded_result, continuous_decoded_results_dict, non_PBE_marginal_over_track_ID, (time_bin_containers, time_window_centers, track_marginal_posterior_df) = nonPBE_results._build_merged_joint_placefields_and_decode(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)))
     # masked_pseudo2D_continuous_specific_decoded_result, _mask_index_tuple = pseudo2D_continuous_specific_decoded_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)))
 
-
     ## ensure all optional fields are present before output:
     # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
     for k in list(a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict.keys()):
@@ -3155,11 +3155,41 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
         print(f"\t creating new across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['a_new_fully_generic_result'] result.")
         across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function'] = {
             'a_new_fully_generic_result': deepcopy(a_new_fully_generic_result),
+            'csv_save_paths_dict': {},
         }
     else:
         ## update the existing result
         print(f'\t updating existing result.')
         across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['a_new_fully_generic_result'] = deepcopy(a_new_fully_generic_result)
+
+
+
+    ## Export to CSVs:
+    csv_save_paths = {}
+    active_export_parent_output_path = self.collected_outputs_path.resolve()
+    # Assert.path_exists(parent_output_path)
+
+    ## INPUTS: collected_outputs_path
+    decoding_time_bin_size: float = epochs_decoding_time_bin_size
+
+    complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
+    active_context = complete_session_context
+    session_name: str = curr_active_pipeline.session_name
+    earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end = curr_active_pipeline.find_LongShortDelta_times()
+    # tbin_values_dict={'laps': decoding_time_bin_size, 'pbe': decoding_time_bin_size, 'non_pbe': decoding_time_bin_size, 'FAT': decoding_time_bin_size}
+
+    # csv_save_paths_dict = GenericDecoderDictDecodedEpochsDictResult._perform_export_dfs_dict_to_csvs(extracted_dfs_dict=a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict,
+    csv_save_paths_dict = a_new_fully_generic_result.export_csvs(
+                                                parent_output_path=active_export_parent_output_path.resolve(),
+                                                active_context=active_context, session_name=session_name, #curr_active_pipeline=curr_active_pipeline,
+                                                decoding_time_bin_size=decoding_time_bin_size,
+                                                curr_session_t_delta=t_delta
+                                                )
+    
+    across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']['csv_save_paths_dict'] = deepcopy(csv_save_paths_dict)
+
+
+
 
     print('\t\tdone.')
 
