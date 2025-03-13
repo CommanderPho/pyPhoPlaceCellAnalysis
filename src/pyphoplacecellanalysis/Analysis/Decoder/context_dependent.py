@@ -889,6 +889,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
 
 
+    @function_attributes(short_name=None, tags=['rabid_mice'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-13 07:12', related_items=[])
     @classmethod
     def _perform_export_dfs_dict_to_csvs(cls, extracted_dfs_dict: Dict, parent_output_path: Path, active_context: IdentifyingContext, session_name: str, tbin_values_dict: Dict,
                                         t_start: Optional[float]=None, curr_session_t_delta: Optional[float]=None, t_end: Optional[float]=None,
@@ -948,17 +949,21 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         #TODO 2024-03-02 12:12: - [ ] Could add weighted correlation if there is a dataframe for that and it's computed:
         # tbin_values_dict = {'laps': self.laps_decoding_time_bin_size, 'ripple': self.ripple_decoding_time_bin_size}
         time_col_name_dict = {'laps': 'lap_start_t', 'ripple': 'ripple_start_t'} ## default should be 't_bin_center'
-    
+
         ## INPUTS: decoder_ripple_filter_epochs_decoder_result_dict
         export_files_dict = {}
         
         for a_df_name, a_df in extracted_dfs_dict.items():
-            an_epochs_source_name: str = a_df_name.split(sep='_', maxsplit=1)[0] # get the first part of the variable names that indicates whether it's for "laps" or "ripple"
-
+            if isinstance(a_df_name, str):
+                an_epochs_source_name: str = a_df_name.split(sep='_', maxsplit=1)[0] # get the first part of the variable names that indicates whether it's for "laps" or "ripple"
+            else:
+                ## probably an IdentifyingContext
+                an_epochs_source_name: str = a_df_name.known_named_decoding_epochs_type
+                
             a_tbin_size: float = float(tbin_values_dict[an_epochs_source_name])
             a_time_col_name: str = time_col_name_dict.get(an_epochs_source_name, 't_bin_center')
             ## Add t_bin column method
-            a_df = cls.add_session_df_columns(a_df, session_name=session_name, time_bin_size=a_tbin_size, t_start=t_start, curr_session_t_delta=curr_session_t_delta, t_end=t_end, time_col=a_time_col_name)
+            a_df = a_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=a_tbin_size, t_start=t_start, curr_session_t_delta=curr_session_t_delta, t_end=t_end, time_col=a_time_col_name)
             a_tbin_size_str: str = f"{round(a_tbin_size, ndigits=5)}"
             a_data_identifier_str: str = f'({a_df_name})_tbin-{a_tbin_size_str}' ## build the identifier '(laps_weighted_corr_merged_df)_tbin-1.5'
             
