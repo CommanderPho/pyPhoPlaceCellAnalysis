@@ -3055,11 +3055,14 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
 
 
-    if force_recompute or ('EpochComputations' not in curr_active_pipeline.global_computation_results.computed_data):
+    if force_recompute and ('EpochComputations' in curr_active_pipeline.global_computation_results.computed_data):
         print(f'\t recomputing...')
-        curr_active_pipeline.reload_default_computation_functions()
-        ## perform the recomputation:
-        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['non_PBE_epochs_results'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+        del curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+
+
+    curr_active_pipeline.reload_default_computation_functions()
+    ## perform the computation either way:
+    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['non_PBE_epochs_results'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
 
 
     session_name: str = curr_active_pipeline.session_name
