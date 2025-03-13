@@ -133,6 +133,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     from neuropy.utils.indexing_helpers import PandasHelpers
     from neuropy.utils.debug_helpers import parameter_sweeps
     from neuropy.core.laps import Laps
+    from neuropy.core.epoch import TimeColumnAliasesProtocol, ensure_dataframe
     from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
     from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _check_result_laps_epochs_df_performance
@@ -144,7 +145,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _compute_lap_and_ripple_epochs_decoding_for_decoder, _perform_compute_custom_epoch_decoding, _compute_all_df_score_metrics
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df, co_filter_epochs_and_spikes
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
-
+    
     DecodedEpochsResultsDict = NewType('DecodedEpochsResultsDict', Dict[types.DecoderName, DecodedFilterEpochsResult]) # A Dict containing the decoded filter epochs result for each of the four 1D decoder names
 
     suppress_exceptions: bool = (not self.fail_on_exception)
@@ -3026,7 +3027,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
     """
     from typing import Literal
-    from neuropy.core.epoch import EpochsAccessor, Epoch, ensure_dataframe, ensure_Epoch   
+    from neuropy.core.epoch import EpochsAccessor, Epoch, ensure_dataframe, ensure_Epoch, TimeColumnAliasesProtocol
     # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _adding_global_non_PBE_epochs
     # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import Compute_NonPBE_Epochs
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer, NonPBEDimensionalDecodingResult, Compute_NonPBE_Epochs, KnownFilterEpochs, GeneralDecoderDictDecodedEpochsDictResult
