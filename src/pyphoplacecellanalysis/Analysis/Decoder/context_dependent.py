@@ -1081,8 +1081,38 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         return export_files_dict
     
     @function_attributes(short_name=None, tags=['export', 'CSV', 'main'], input_requires=[], output_provides=[], uses=['_perform_export_dfs_dict_to_csvs'], used_by=[], creation_date='2025-03-13 08:58', related_items=[])
-    def export_csvs(self, parent_output_path: Path, active_context: IdentifyingContext, decoding_time_bin_size: float, session_name: str, curr_session_t_delta: Optional[float], user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None, export_df_variable_names=None, tbin_values_dict: Optional[Dict[str, float]]=None, should_export_complete_all_scores_df:bool=True):
-        """ export as a single_FAT .csv file or optionally (not yet implemented) separate .csv files.             
+    def export_csvs(self, parent_output_path: Path, active_context: IdentifyingContext, decoding_time_bin_size: float, session_name: str, curr_session_t_delta: Optional[float]=None, user_annotation_selections=None, valid_epochs_selections=None, custom_export_df_to_csv_fn=None, export_df_variable_names=None, tbin_values_dict: Optional[Dict[str, float]]=None, should_export_complete_all_scores_df:bool=True):
+        """ export as a single_FAT .csv file or optionally (not yet implemented) separate .csv files.    
+
+
+            from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult, KnownNamedDecoderTrainedComputeEpochsType, KnownNamedDecodingEpochsType, MaskedTimeBinFillType, DataTimeGrain, GenericResultTupleIndexType
+
+            ## Export to CSVs:
+            csv_save_paths = {}
+
+            # parent_output_path = curr_active_pipeline.get_output_path().resolve() ## Session-specific folder:
+            parent_output_path = collected_outputs_path.resolve() ## Session-specific folder:
+            Assert.path_exists(parent_output_path)
+
+            ## INPUTS: collected_outputs_path
+            decoding_time_bin_size: float = 0.025
+
+            complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
+            active_context = complete_session_context
+            session_name: str = curr_active_pipeline.session_name
+            earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end = curr_active_pipeline.find_LongShortDelta_times()
+            tbin_values_dict={'laps': decoding_time_bin_size, 'pbe': decoding_time_bin_size, 'non_pbe': decoding_time_bin_size, 'FAT': decoding_time_bin_size}
+
+            # csv_save_paths_dict = GenericDecoderDictDecodedEpochsDictResult._perform_export_dfs_dict_to_csvs(extracted_dfs_dict=a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict,
+            csv_save_paths_dict = a_new_fully_generic_result.export_csvs(
+                                                        parent_output_path=parent_output_path.resolve(),
+                                                        active_context=active_context, session_name=session_name, #curr_active_pipeline=curr_active_pipeline,
+                                                        decoding_time_bin_size=decoding_time_bin_size,
+                                                        curr_session_t_delta=t_delta
+                                                        )
+            csv_save_paths_dict
+
+
         """
         export_files_dict = {}
         
