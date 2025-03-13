@@ -1204,7 +1204,7 @@ class EpochComputationsComputationsContainer(ComputedResult):
         assert len(pseudo2D_continuous_specific_decoded_result.p_x_given_n_list) == 1
 
         # NOTE: non_marginalized_raw_result is a marginal_over_track_ID since there are only two elements
-        non_PBE_marginal_over_track_IDs_list, non_PBE_marginal_over_track_ID_posterior_df = DirectionalPseudo2DDecodersResult.build_generalized_non_marginalized_raw_posteriors(pseudo2D_continuous_specific_decoded_result, unique_decoder_names=unique_decoder_names)
+        non_PBE_marginal_over_track_IDs_list, non_PBE_marginal_over_track_ID_posterior_df = DirectionalPseudo2DDecodersResult.build_generalized_non_marginalized_raw_posteriors(pseudo2D_continuous_specific_decoded_result, unique_decoder_names=unique_decoder_names) ## Must be failing here:
         non_PBE_marginal_over_track_ID = non_PBE_marginal_over_track_IDs_list[0]['p_x_given_n']
         time_bin_containers = pseudo2D_continuous_specific_decoded_result.time_bin_containers[0]
         time_window_centers = time_bin_containers.centers
