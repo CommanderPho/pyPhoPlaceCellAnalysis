@@ -1588,3 +1588,44 @@ def plot_across_sessions_scatter_results(directory: Union[Path, str], concatenat
 
     return all_figures
 
+
+
+@function_attributes(short_name=None, tags=['plotly', 'scatter'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-17 12:27', related_items=[])
+def build_single_plotly_marginal_scatter_and_hist_over_time(a_decoded_posterior_df: pd.DataFrame, a_target_context: IdentifyingContext, histogram_bins: int = 25, debug_print = False):
+    """ adds new tracks
+    
+    Adds 3 tracks like: ['ContinuousDecode_longnon-PBE-pseudo2D marginals', 'ContinuousDecode_shortnon-PBE-pseudo2D marginals', 'non-PBE_marginal_over_track_ID_ContinuousDecode - t_bin_size: 0.05']
+
+    
+    from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import build_single_plotly_marginal_scatter_and_hist_over_time
+    
+    ## Compute and plot the new tracks:
+    non_PBE_all_directional_pf1D_Decoder, pseudo2D_continuous_specific_decoded_result, continuous_decoded_results_dict, non_PBE_marginal_over_track_ID, (time_bin_containers, time_window_centers) = nonPBE_results._build_merged_joint_placefields_and_decode(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)))
+    unique_added_track_identifiers = nonPBE_results.add_to_SpikeRaster2D_tracks(active_2d_plot=active_2d_plot, non_PBE_all_directional_pf1D_Decoder=non_PBE_all_directional_pf1D_Decoder, pseudo2D_continuous_specific_decoded_result=pseudo2D_continuous_specific_decoded_result, continuous_decoded_results_dict=continuous_decoded_results_dict, non_PBE_marginal_over_track_ID=non_PBE_marginal_over_track_ID, time_window_centers=time_window_centers)
+    
+    _flat_out_figs_dict = {}
+    
+    
+    _flat_out_figs_dict[figure_context] = fig
+    
+    """
+    import plotly.io as pio
+    template: str = 'plotly_dark' # set plotl template
+    pio.templates.default = template
+
+    if 'time_bin_size' not in a_decoded_posterior_df:
+        ## add the missing column from the context
+        found_time_bin_size: float = a_target_context.get('time_bin_size', None)
+        assert found_time_bin_size is not None
+        a_decoded_posterior_df['time_bin_size'] = float(found_time_bin_size)
+        
+    assert 'delta_aligned_start_t' in a_decoded_posterior_df
+    # plot_row_identifier: str = f'{a_known_decoded_epochs_type.capitalize()} - {masking_bin_fill_mode.capitalize()} decoder' # should be like 'Laps (Masked) from Non-PBE decoder'    
+    plot_row_identifier: str = a_target_context.get_description(subset_includelist=['a_known_decoded_epochs_type', 'masking_bin_fill_mode'], include_property_names=True)
+    plot_row_identifier = f"{plot_row_identifier} decoder" # should be like 'Laps (Masked) from Non-PBE decoder'"
+    fig, figure_context = plotly_pre_post_delta_scatter(data_results_df=deepcopy(a_decoded_posterior_df), data_context=deepcopy(a_target_context), out_scatter_fig=None, 
+                                    histogram_variable_name='P_Short', hist_kwargs=dict(), histogram_bins=histogram_bins,
+                                    common_plot_kwargs=dict(),
+                                    px_scatter_kwargs = dict(x='delta_aligned_start_t', y='P_Short', title=plot_row_identifier))
+    return fig, figure_context
+
