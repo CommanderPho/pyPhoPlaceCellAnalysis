@@ -513,7 +513,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # 
         
         ## get data_grain='per_time_bin' results only
-        a_target_context: IdentifyingContext = IdentifyingContext(data_grain= 'per_time_bin') # , masked_time_bin_fill_type='ignore', decoder_identifier='long_LR'
+        a_target_context: IdentifyingContext = IdentifyingContext(data_grain='per_time_bin') # , masked_time_bin_fill_type='ignore', decoder_identifier='long_LR'
         flat_context_list, flat_result_context_dict, flat_decoder_context_dict, flat_decoded_marginal_posterior_df_context_dict = self.get_matching_contexts(context_query=a_target_context, return_multiple_matches=True, return_flat_same_length_dicts=True, debug_print=False)
         flat_context_list
 
