@@ -72,8 +72,6 @@ neuropy = {path = "../NeuroPy", develop=true} # , rev = "main", extras = ["accel
 pyphocorehelpers = {path = "../pyPhoCoreHelpers", develop=true}
 pyqode-core = {path = "../pyqode.core/dist/current.whl"} # pyqode_core-3.0.0-py2.py3-none-any.whl
 pyqode-python = {path = "../pyqode.python/dist/current.whl"}
-# pycscope = {path = "../pycscope/dist/current.whl"}
-# haesleinhuepf-pyqode-python = {path = "../pyqode.python/dist/current.whl"}
 
 [tool.poetry.group.testing.dependencies]
 mplcursors = "^0.5.2"
