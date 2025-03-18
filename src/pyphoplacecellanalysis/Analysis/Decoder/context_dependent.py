@@ -511,18 +511,32 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         """
         _new_results_to_add = {} ## need a temporary entry so we aren't modifying the dict property `a_new_fully_generic_result.filter_epochs_specific_decoded_result` while we update it
         # 
-        masked_bin_fill_mode = 'nan_filled'
-        for a_context, a_decoded_filter_epochs_result in self.filter_epochs_specific_decoded_result.items():
-            a_modified_context = deepcopy(a_context)
-            a_spikes_df = deepcopy(spikes_df)
-            a_masked_decoded_filter_epochs_result, _mask_index_tuple = a_decoded_filter_epochs_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=a_spikes_df, masked_bin_fill_mode=masked_bin_fill_mode)
-            # a_modified_context = a_modified_context.adding_context_if_missing(masked_time_bin_fill_type='last_valid')
-            a_modified_context = a_modified_context.overwriting_context(masked_time_bin_fill_type=masked_bin_fill_mode)
-            _new_results_to_add[a_modified_context] = a_masked_decoded_filter_epochs_result
-            ## can directly add the others that we aren't iterating over
-            self.spikes_df_dict[a_modified_context] = deepcopy(a_spikes_df) ## TODO: reduce the context?
+        
+        ## get data_grain='per_time_bin' results only
+        a_target_context: IdentifyingContext = IdentifyingContext(data_grain= 'per_time_bin') # , masked_time_bin_fill_type='ignore', decoder_identifier='long_LR'
+        flat_context_list, flat_result_context_dict, flat_decoder_context_dict, flat_decoded_marginal_posterior_df_context_dict = self.get_matching_contexts(context_query=a_target_context, return_multiple_matches=True, return_flat_same_length_dicts=True, debug_print=False)
+        flat_context_list
 
-        print(f'computed {len(_new_results_to_add)} new results')
+        masked_bin_fill_mode = 'nan_filled'
+        for a_context in flat_context_list:
+        # for a_context, a_decoded_filter_epochs_result in self.filter_epochs_specific_decoded_result.items():
+            a_decoded_filter_epochs_result = flat_result_context_dict[a_context]
+            try:
+                a_modified_context = deepcopy(a_context)
+                a_spikes_df = deepcopy(spikes_df)
+                a_masked_decoded_filter_epochs_result, _mask_index_tuple = a_decoded_filter_epochs_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=a_spikes_df, masked_bin_fill_mode=masked_bin_fill_mode)
+                # a_modified_context = a_modified_context.adding_context_if_missing(masked_time_bin_fill_type='last_valid')
+                a_modified_context = a_modified_context.overwriting_context(masked_time_bin_fill_type=masked_bin_fill_mode)
+                _new_results_to_add[a_modified_context] = a_masked_decoded_filter_epochs_result
+                ## can directly add the others that we aren't iterating over
+                self.spikes_df_dict[a_modified_context] = deepcopy(a_spikes_df) ## TODO: reduce the context?                
+            except IndexError as e:
+                print(f'IndexError: {e}. Skipping .creating_new_spikes_per_t_bin_masked_variants(...) for a_context: {a_context}.')
+                pass
+            except Exception as e:
+                raise e
+
+        print(f'\tcomputed {len(_new_results_to_add)} new results')
 
         self.filter_epochs_specific_decoded_result.update(_new_results_to_add)
 

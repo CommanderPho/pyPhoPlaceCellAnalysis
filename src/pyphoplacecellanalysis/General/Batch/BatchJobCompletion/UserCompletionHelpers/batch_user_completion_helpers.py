@@ -3058,8 +3058,10 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
     curr_active_pipeline.reload_default_computation_functions()
     ## perform the computation either way:
-    curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['non_PBE_epochs_results'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+    # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['non_PBE_epochs_results'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
 
+    curr_active_pipeline.batch_extended_computations(include_includelist=['non_PBE_epochs_results'], include_global_functions=True, included_computation_filter_names=None, fail_on_exception=True, debug_print=False)
+    
 
     session_name: str = curr_active_pipeline.session_name
     t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
@@ -3138,6 +3140,12 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     # non_PBE_all_directional_pf1D_Decoder, pseudo2D_continuous_specific_decoded_result, continuous_decoded_results_dict, non_PBE_marginal_over_track_ID, (time_bin_containers, time_window_centers, track_marginal_posterior_df) = nonPBE_results._build_merged_joint_placefields_and_decode(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)))
     # masked_pseudo2D_continuous_specific_decoded_result, _mask_index_tuple = pseudo2D_continuous_specific_decoded_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)))
 
+    # ==================================================================================================================== #
+    # Phase 3 - `creating_new_spikes_per_t_bin_masked_variants`                                                                      #
+    # ==================================================================================================================== #
+    spikes_df = deepcopy(get_proper_global_spikes_df(curr_active_pipeline))
+    a_new_fully_generic_result = a_new_fully_generic_result.creating_new_spikes_per_t_bin_masked_variants(spikes_df=spikes_df)
+    
     ## ensure all optional fields are present before output:
     # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
     for k in list(a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict.keys()):
@@ -3149,6 +3157,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
         a_df = a_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=epochs_decoding_time_bin_size, curr_session_t_delta=t_delta, time_col=time_column_name)
         a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict[k] = a_df
         
+
     # ==================================================================================================================== #
     # Create and add the output                                                                                            #
     # ==================================================================================================================== #
