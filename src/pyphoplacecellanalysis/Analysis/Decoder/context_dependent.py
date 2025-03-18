@@ -303,10 +303,9 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
         """
         filtered_epochs_df = None ## parameter just to allow an override I think
-        
-
-        decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = deepcopy(directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict)
+         
         decoder_laps_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = deepcopy(directional_decoders_epochs_decode_result.decoder_laps_filter_epochs_decoder_result_dict)
+        decoder_ripple_filter_epochs_decoder_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = deepcopy(directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict)
 
         # ==================================================================================================================== #
         # Reuse the old/previously computed version of the result with the additional properties                               #
@@ -353,11 +352,15 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
         for a_known_decoded_epochs_type, a_decoder_epochs_filter_epochs_decoder_result_dict in decoder_filter_epochs_result_dict_dict.items():
 
-            for a_decoder_name, a_decoded_epochs_result in decoder_ripple_filter_epochs_decoder_result_dict.items():
+            for a_decoder_name, a_decoded_epochs_result in a_decoder_epochs_filter_epochs_decoder_result_dict.items():
                 ## build the complete identifier
                 a_new_identifier: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier=a_decoder_name, time_bin_size=epochs_decoding_time_bin_size, known_named_decoding_epochs_type=a_known_decoded_epochs_type, masked_time_bin_fill_type='ignore')
                 self.filter_epochs_specific_decoded_result[a_new_identifier] = deepcopy(a_decoded_epochs_result)
                 self.filter_epochs_to_decode_dict[a_new_identifier] = deepcopy(a_decoded_epochs_result.filter_epochs) ## needed? Do I want full identifier as key?
+
+                ## add the filtered versions down here:
+                                
+
                 # a_new_fully_generic_result.filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict[a_new_identifier] ## #TODO 2025-03-11 11:39: - [ ] must be computed or assigned from prev result
                 
 
@@ -459,6 +462,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         ## Perform the decoding and masking as needed for invalid bins:
         a_decoder_name: str = 'pseudo2D' # FIXED FOR THIS ENTIRE FUNCTION
         
+        ## Updates `self.filter_epochs_specific_decoded_result`, `self.filter_epochs_to_decode_dict`
         for a_known_decoded_epochs_type, a_decoder_epochs_filter_epochs_decoder_result in decoder_filter_epochs_result_dict.items():
             ## build the complete identifier
             a_new_identifier: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier=a_decoder_name, time_bin_size=epochs_decoding_time_bin_size, known_named_decoding_epochs_type=a_known_decoded_epochs_type, masked_time_bin_fill_type='ignore')
@@ -467,14 +471,18 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             ## use the filtered approach instead:
             self.filter_epochs_to_decode_dict[a_new_identifier] = deepcopy(filtered_decoder_filter_epochs_decoder_result_dict[a_known_decoded_epochs_type])
 
+
+            ## Updates `self.filter_epochs_decoded_track_marginal_posterior_df_dict`
+            
             # self.filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict[a_new_identifier] ## #TODO 2025-03-11 11:39: - [ ] must be computed or assigned from prev result
             self.decoders[a_new_identifier] = all_directional_pf1D_Decoder ## this will duplicate this decoder needlessly for each repetation here, but that's okay for now
             for a_known_data_grain, a_decoded_marginals_df in decoder_epoch_marginals_df_dict_dict[a_known_decoded_epochs_type].items():
-                a_new_data_grain_identifier: IdentifyingContext = a_new_identifier.adding_context_if_missing(data_grain=a_known_data_grain)
+                a_new_data_grain_identifier: IdentifyingContext = deepcopy(a_new_identifier).adding_context_if_missing(data_grain=a_known_data_grain)
                 self.filter_epochs_decoded_track_marginal_posterior_df_dict[a_new_data_grain_identifier] = deepcopy(a_decoded_marginals_df) 
 
+            ## Updates `self.decoders`
             for an_individual_decoder_name, an_individual_directional_decoder in all_directional_decoder_dict.items():
-                a_new_individual_decoder_identifier: IdentifyingContext = a_new_identifier.overwriting_context(decoder_identifier=an_individual_decoder_name) # replace 'decoder_identifier'
+                a_new_individual_decoder_identifier: IdentifyingContext = deepcopy(a_new_identifier).overwriting_context(decoder_identifier=an_individual_decoder_name) # replace 'decoder_identifier'
                 self.decoders[a_new_individual_decoder_identifier] = deepcopy(an_individual_directional_decoder) 
 
                 
@@ -502,11 +510,14 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         a_new_fully_generic_result = a_new_fully_generic_result.creating_new_spikes_per_t_bin_masked_variants(spikes_df=spikes_df)
         """
         _new_results_to_add = {} ## need a temporary entry so we aren't modifying the dict property `a_new_fully_generic_result.filter_epochs_specific_decoded_result` while we update it
+        # 
+        masked_bin_fill_mode = 'nan_filled'
         for a_context, a_decoded_filter_epochs_result in self.filter_epochs_specific_decoded_result.items():
             a_modified_context = deepcopy(a_context)
             a_spikes_df = deepcopy(spikes_df)
-            a_masked_decoded_filter_epochs_result, _mask_index_tuple = a_decoded_filter_epochs_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=a_spikes_df)
-            a_modified_context = a_modified_context.adding_context_if_missing(masked_time_bin_fill_type='last_valid')
+            a_masked_decoded_filter_epochs_result, _mask_index_tuple = a_decoded_filter_epochs_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=a_spikes_df, masked_bin_fill_mode=masked_bin_fill_mode)
+            # a_modified_context = a_modified_context.adding_context_if_missing(masked_time_bin_fill_type='last_valid')
+            a_modified_context = a_modified_context.overwriting_context(masked_time_bin_fill_type=masked_bin_fill_mode)
             _new_results_to_add[a_modified_context] = a_masked_decoded_filter_epochs_result
             ## can directly add the others that we aren't iterating over
             self.spikes_df_dict[a_modified_context] = deepcopy(a_spikes_df) ## TODO: reduce the context?
@@ -514,7 +525,6 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         print(f'computed {len(_new_results_to_add)} new results')
 
         self.filter_epochs_specific_decoded_result.update(_new_results_to_add)
-        
 
         return self
 
