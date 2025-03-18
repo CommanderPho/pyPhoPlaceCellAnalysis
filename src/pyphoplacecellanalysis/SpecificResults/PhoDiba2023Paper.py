@@ -1992,7 +1992,10 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     active_filter_predicate_selector_widget: CheckBoxListWidget = non_serialized_field(init=False)
     active_plot_df_name_selector_widget = non_serialized_field(init=False)
     active_plot_variable_name_widget = non_serialized_field(init=False)
-    
+    custom_dynamic_filter_widgets_list = non_serialized_field(init=False)
+        
+
+
     output_widget: widgets.Output = non_serialized_field(init=False)
     figure_widget: go.FigureWidget = non_serialized_field(init=False)
     table_widget: DataGrid = non_serialized_field(init=False)
@@ -2136,6 +2139,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     @property
     def active_plot_df(self) -> pd.DataFrame:
         """The selected filtered dataframe to use with the plot."""
+        assert self.active_plot_df_name in list(self.filtered_df_dict.keys()), f"self.active_plot_df_name: '{self.active_plot_df_name}' not in list(self.filtered_df_dict.keys()): {list(self.filtered_df_dict.keys())}"
         return self.filtered_df_dict[self.active_plot_df_name]
 
 
@@ -2156,10 +2160,52 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         # Set up the buttons after figure_widget is created
         self._setup_widgets_buttons()
 
+
+    def build_extra_control_widget(self, a_name: str = 'replay_name', df_col_name: str = 'custom_replay_name', a_widget_label: str = 'Replay Name:'):
+        """ adds a new dropdown widget to refine the active points
+
+        Usage:        
+            df_filter.build_extra_control_widget(a_name='trained_compute_epochs', df_col_name='trained_compute_epochs', a_widget_label='TrainedComputeEpochs :')
+            df_filter.build_extra_control_widget(a_name='pfND_ndim', df_col_name='pfND_ndim', a_widget_label='pfND_ndim:')
+            df_filter.build_extra_control_widget(a_name='decoder_identifier', df_col_name='decoder_identifier', a_widget_label='decoder_identifier:')
+            df_filter.build_extra_control_widget(a_name='data_grain', df_col_name='data_grain', a_widget_label='data_grain:')
+            df_filter.build_extra_control_widget(a_name='masked_time_bin_fill_type', df_col_name='masked_time_bin_fill_type', a_widget_label='masked_time_bin_fill_type:')
+            df_filter.build_extra_control_widget(a_name='known_named_decoding_epochs_type', df_col_name='known_named_decoding_epochs_type', a_widget_label='known_named_decoding_epochs_type:')
+
+        """
+        import ipywidgets as widgets
+
+        a_widget_name: str = f"{a_name}_widget" # replay_name_widget
+        extant_widget = getattr(self, a_widget_name, None)
+        if extant_widget is not None:
+            raise NotImplementedError(f'Not sure what to do with extant widgets yet! a_widget_label: "{a_widget_label}".')
+        
+
+        ## Create and add new widget:
+        a_col_values_options = sorted(self.active_plot_df[df_col_name].astype(str).unique())    
+        a_widget = widgets.Dropdown(
+                    options=a_col_values_options,
+                    description=a_widget_label,
+                    disabled=False,
+                    layout=widgets.Layout(width='500px'),
+                    style={'description_width': 'initial'}
+                )
+        ## Add to output widgets list
+        self.custom_dynamic_filter_widgets_list.append(a_widget)
+        
+        setattr(self, a_widget_name, a_widget) # self.replay_name_widget
+
+        # Set up observers to handle changes in widget values
+        a_widget.observe(self._on_widget_change, names='value')
+        
+
     def _setup_widgets(self):
         import plotly.subplots as sp
         from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import PlotlyFigureContainer
         
+
+        self.custom_dynamic_filter_widgets_list = [] ## start with an empty list of additional filter widgets
+
         # Extract unique options for the widgets
         replay_name_options = sorted(self.active_plot_df['custom_replay_name'].astype(str).unique())
         time_bin_size_options = sorted(self.active_plot_df['time_bin_size'].unique())
@@ -2362,6 +2408,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                 self.active_filter_predicate_selector_widget,
                 # self.table_widget
             ], #layout=widgets.Layout(width='100%'),
+            ),
+            widgets.HBox([*self.custom_dynamic_filter_widgets_list], #layout=widgets.Layout(width='100%'),
             ),
             widgets.HBox([
                 self.active_plot_df_name_selector_widget, 
