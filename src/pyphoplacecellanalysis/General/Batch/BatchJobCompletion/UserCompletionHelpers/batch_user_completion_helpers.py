@@ -3103,20 +3103,22 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
     ## add the 'non_pbe' results:
     a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = a_new_fully_generic_result.adding_from_old_GeneralDecoderDictDecodedEpochsDictResult(a_general_decoder_dict_decoded_epochs_dict_result=a_general_decoder_dict_decoded_epochs_dict_result)
-
-    # ==================================================================================================================== #
-    # Phase 1: build from 'DirectionalDecodersEpochsEvaluations'                                                           #
-    # ==================================================================================================================== #
-    # filtered_epochs_df = None
-    if 'DirectionalDecodersEpochsEvaluations' in curr_active_pipeline.global_computation_results.computed_data:
-        ## INPUTS: curr_active_pipeline, track_templates, a_decoded_filter_epochs_decoder_result_dict
-        directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = deepcopy(curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']) ## GENERAL
-        ## INPUTS: directional_decoders_epochs_decode_result, filtered_epochs_df
-        ## Inputs: a_new_fully_generic_result
-        a_new_fully_generic_result = a_new_fully_generic_result.adding_directional_decoder_results_filtered_by_spikes_per_t_bin_masked(directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result)
-        ## OUTPUTS: a_new_fully_generic_result
-    else:
-        print('WARN: missing "DirectionalDecodersEpochsEvaluations" global result. Skipping.')
+    a_new_fully_generic_result.spikes_df_dict[curr_active_pipeline.get_session_context()] = deepcopy(get_proper_global_spikes_df(curr_active_pipeline))
+    a_new_fully_generic_result.spikes_df_dict[IdentifyingContext()] = deepcopy(get_proper_global_spikes_df(curr_active_pipeline)) # all contexts
+    
+    # # ==================================================================================================================== #
+    # # Phase 1: build from 'DirectionalDecodersEpochsEvaluations'                                                           #
+    # # ==================================================================================================================== #
+    # # filtered_epochs_df = None
+    # if 'DirectionalDecodersEpochsEvaluations' in curr_active_pipeline.global_computation_results.computed_data:
+    #     ## INPUTS: curr_active_pipeline, track_templates, a_decoded_filter_epochs_decoder_result_dict
+    #     directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = deepcopy(curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']) ## GENERAL
+    #     ## INPUTS: directional_decoders_epochs_decode_result, filtered_epochs_df
+    #     ## Inputs: a_new_fully_generic_result
+    #     a_new_fully_generic_result = a_new_fully_generic_result.adding_directional_decoder_results_filtered_by_spikes_per_t_bin_masked(directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result)
+    #     ## OUTPUTS: a_new_fully_generic_result
+    # else:
+    #     print('WARN: missing "DirectionalDecodersEpochsEvaluations" global result. Skipping.')
 
     # ==================================================================================================================== #
     # Phase 2 - Get Directional Decoded Epochs                                                                             #
@@ -3126,7 +3128,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     if 'DirectionalMergedDecoders' in curr_active_pipeline.global_computation_results.computed_data:
         # DirectionalMergedDecoders: Get the result after computation:
         directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
-        a_new_fully_generic_result = a_new_fully_generic_result.adding_directional_pseudo2D_decoder_results_filtered_by_spikes_per_t_bin_masked(directional_merged_decoders_result=directional_merged_decoders_result)
+        a_new_fully_generic_result = a_new_fully_generic_result.adding_directional_pseudo2D_decoder_results_filtered_by_spikes_per_t_bin_masked(directional_merged_decoders_result=directional_merged_decoders_result) # , spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline))
     else:
         print('WARN: missing "DirectionalMergedDecoders" global result. Skipping.')
     
