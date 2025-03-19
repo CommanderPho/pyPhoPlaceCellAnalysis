@@ -1026,6 +1026,45 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         return flat_context_list, flat_result_context_dict, flat_decoder_context_dict, decoded_marginal_posterior_df_context_dict
 
 
+    # ==================================================================================================================== #
+    # Updating and Adding                                                                                                  #
+    # ==================================================================================================================== #
+    @function_attributes(short_name=None, tags=['contexts', 'updating', 'adding'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-19 15:00', related_items=['self.get_matching_contexts'])
+    def updating_results_for_context(self, new_context: IdentifyingContext, a_result: DecodedFilterEpochsResult, a_decoder:BasePositionDecoder, a_decoded_marginal_posterior_df: pd.DataFrame, an_epoch_to_decode: Optional[Epoch]=None, debug_print:bool=True): 
+        """ Get a specific contexts
+        reciprocal of `self.get_matching_contexts(...)`
+        
+        a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='long_LR', time_bin_size=0.025, known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type='ignore')
+        """
+        def _subfn_update_value_with_context_matching(dictionary, updated_context, updated_value: Any) -> bool:
+            """Helper function to get a value from a dictionary with context matching.
+            
+            Captures: return_multiple_matches
+            """
+            try:
+                dictionary[updated_context] = updated_value # Try exact match first
+                return True
+            except Exception as e:
+                raise e
+                return False
+
+        # END def _subfn_update_value_wi...
+        
+        # ==================================================================================================================== #
+        # BEGIN FUNCTION BODY                                                                                                  #
+        # ==================================================================================================================== #
+        _was_update_success: bool = _subfn_update_value_with_context_matching(self.filter_epochs_specific_decoded_result, new_context, updated_value=a_result)
+        _was_update_success = _was_update_success and _subfn_update_value_with_context_matching(self.decoders, new_context, updated_value=a_decoder)
+        _was_update_success = _was_update_success and _subfn_update_value_with_context_matching(self.filter_epochs_decoded_track_marginal_posterior_df_dict, new_context, updated_value=a_decoded_marginal_posterior_df)
+        if an_epoch_to_decode is not None:
+            _was_update_success = _was_update_success and _subfn_update_value_with_context_matching(self.filter_epochs_to_decode_dict, new_context, updated_value=an_epoch_to_decode)
+
+        return _was_update_success
+    
+    
+
+
+
 
     @function_attributes(short_name=None, tags=['export', 'CSV', 'main'], input_requires=[], output_provides=[], uses=['SingleFatDataframe'], used_by=['self.export_csvs'], creation_date='2025-03-13 07:12', related_items=[])
     @classmethod

@@ -1736,11 +1736,10 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
             if debug_print:
                 print(f'a_p_x_given_n.shape: {curr_array_shape}')
 
-            assert curr_array_shape[1] == n_decoders, f"only works with the all-directional decoder with unique_decoder_names: {unique_decoder_names} "
-
             if debug_print:
                 print(f'np.shape(a_p_x_given_n): {np.shape(curr_array_shape)}')
                 
+            assert curr_array_shape[1] == n_decoders, f"only works when curr_array_shape[1]: {curr_array_shape[1]} correspond to the unique_decoder_names: {unique_decoder_names}. (typically all-directional decoder)."                
             curr_unit_marginal_x = DynamicContainer(p_x_given_n=a_p_x_given_n, most_likely_positions_1D=None)
             
             if debug_print:
