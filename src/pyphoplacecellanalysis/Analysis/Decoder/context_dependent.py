@@ -31,7 +31,7 @@ from neuropy.core.epoch import Epoch, TimeColumnAliasesProtocol, subdivide_epoch
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder # used for `complete_directional_pfs_computations`
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult # needed in DirectionalPseudo2DDecodersResult
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult, DecodedFilterEpochsResult, DirectionalPseudo2DDecodersResult, EpochFilteringMode
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult, DecodedFilterEpochsResult, DirectionalPseudo2DDecodersResult, EpochFilteringMode, _compute_proper_filter_epochs
 from pyphocorehelpers.indexing_helpers import partition_df_dict, partition_df
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
 
@@ -311,9 +311,9 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # Reuse the old/previously computed version of the result with the additional properties                               #
         # ==================================================================================================================== #
         ## These are of type `trained_compute_epochs` -- e.g. trained_compute_epochs='laps'  || trained_compute_epochs='non_pbe'
-        trained_compute_epochs_dict_dict = {'laps': ensure_Epoch(deepcopy(directional_decoders_epochs_decode_result.decoder_laps_filter_epochs_decoder_result_dict['long_LR'].filter_epochs)), ## only laps were ever trained to decode until the non-PBEs
-                                            # 'pbe': ensure_Epoch(deepcopy(directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict['long_LR'].filter_epochs)), ## PBEs were never used to decode, only laps
-        }
+        # trained_compute_epochs_dict_dict = {'laps': ensure_Epoch(deepcopy(directional_decoders_epochs_decode_result.decoder_laps_filter_epochs_decoder_result_dict['long_LR'].filter_epochs)), ## only laps were ever trained to decode until the non-PBEs
+        #                                     # 'pbe': ensure_Epoch(deepcopy(directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict['long_LR'].filter_epochs)), ## PBEs were never used to decode, only laps
+        # }
 
         ## NOTE that this is only done for the "trained_compute_epochs='laps'" context
         decoder_filter_epochs_result_dict_dict = {'laps': deepcopy(decoder_laps_filter_epochs_decoder_result_dict),
@@ -467,17 +467,16 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             ## build the complete identifier
             a_new_identifier: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier=a_decoder_name, time_bin_size=epochs_decoding_time_bin_size, known_named_decoding_epochs_type=a_known_decoded_epochs_type, masked_time_bin_fill_type='ignore')
             self.filter_epochs_specific_decoded_result[a_new_identifier] = deepcopy(a_decoder_epochs_filter_epochs_decoder_result)
-            # self.filter_epochs_to_decode_dict[a_new_identifier] = deepcopy(a_decoder_epochs_filter_epochs_decoder_result.filter_epochs) ## needed? Do I want full identifier as key?            
+            # self.filter_epochs_to_decode_dict[a_new_identifier] = deepcopy(a_decoder_epochs_filter_epochs_decoder_result.filter_epochs) ## needed? Do I want full identifier as key?
             ## use the filtered approach instead:
             self.filter_epochs_to_decode_dict[a_new_identifier] = deepcopy(filtered_decoder_filter_epochs_decoder_result_dict[a_known_decoded_epochs_type])
-
 
             ## Updates `self.filter_epochs_decoded_track_marginal_posterior_df_dict`
             
             # self.filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict[a_new_identifier] ## #TODO 2025-03-11 11:39: - [ ] must be computed or assigned from prev result
             self.decoders[a_new_identifier] = all_directional_pf1D_Decoder ## this will duplicate this decoder needlessly for each repetation here, but that's okay for now
             for a_known_data_grain, a_decoded_marginals_df in decoder_epoch_marginals_df_dict_dict[a_known_decoded_epochs_type].items():
-                a_new_data_grain_identifier: IdentifyingContext = deepcopy(a_new_identifier).adding_context_if_missing(data_grain=a_known_data_grain)
+                a_new_data_grain_identifier: IdentifyingContext = deepcopy(a_new_identifier).overwriting_context(data_grain=a_known_data_grain)
                 self.filter_epochs_decoded_track_marginal_posterior_df_dict[a_new_data_grain_identifier] = deepcopy(a_decoded_marginals_df) 
 
             ## Updates `self.decoders`
@@ -502,7 +501,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
     # ================================================================================================================================================================================ #
     
     # @function_attributes(short_name=None, tags=['adding', 'generating', 'masking'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-11 13:22', related_items=[])
-    def creating_new_spikes_per_t_bin_masked_variants(self, spikes_df: pd.DataFrame) -> "GenericDecoderDictDecodedEpochsDictResult":
+    def creating_new_spikes_per_t_bin_masked_variants(self, spikes_df: pd.DataFrame, a_target_context: Optional[IdentifyingContext]=None) -> "GenericDecoderDictDecodedEpochsDictResult":
         """ Takes the previously computed results and produces versions with each time bin masked by a required number of spike counts/participation.
         Updates in-places, creating new entries, but also returns self
         
@@ -513,15 +512,16 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # 
         
         ## get data_grain='per_time_bin' results only
-        a_target_context: IdentifyingContext = IdentifyingContext(data_grain='per_time_bin') # , masked_time_bin_fill_type='ignore', decoder_identifier='long_LR'
+        if (a_target_context is None):
+            a_target_context: IdentifyingContext = IdentifyingContext(data_grain='per_time_bin') # , masked_time_bin_fill_type='ignore', decoder_identifier='long_LR'
+            
         flat_context_list, flat_result_context_dict, flat_decoder_context_dict, flat_decoded_marginal_posterior_df_context_dict = self.get_matching_contexts(context_query=a_target_context, return_multiple_matches=True, return_flat_same_length_dicts=True, debug_print=False)
         flat_context_list
 
         masked_bin_fill_mode = 'nan_filled'
         for a_context in flat_context_list:
-        # for a_context, a_decoded_filter_epochs_result in self.filter_epochs_specific_decoded_result.items():
-            a_decoded_filter_epochs_result = flat_result_context_dict[a_context]
             try:
+                a_decoded_filter_epochs_result = flat_result_context_dict[a_context] ## this line shouldn't have to be in the try if `self.get_matching_contexts(...)` works right, but for now it is
                 a_modified_context = deepcopy(a_context)
                 a_spikes_df = deepcopy(spikes_df)
                 a_masked_decoded_filter_epochs_result, _mask_index_tuple = a_decoded_filter_epochs_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=a_spikes_df, masked_bin_fill_mode=masked_bin_fill_mode)
@@ -530,7 +530,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                 _new_results_to_add[a_modified_context] = a_masked_decoded_filter_epochs_result
                 ## can directly add the others that we aren't iterating over
                 self.spikes_df_dict[a_modified_context] = deepcopy(a_spikes_df) ## TODO: reduce the context?                
-            except IndexError as e:
+            except (IndexError, KeyError) as e:
                 print(f'IndexError: {e}. Skipping .creating_new_spikes_per_t_bin_masked_variants(...) for a_context: {a_context}.')
                 pass
             except Exception as e:
@@ -542,6 +542,10 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
         return self
 
+
+    # ==================================================================================================================== #
+    # Fresh Compute without relying on extant properties                                                                   #
+    # ==================================================================================================================== #
     @function_attributes(short_name=None, tags=['UNFINISHED', 'UNTESTED', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-11 00:00', related_items=[])
     def example_compute_fn(self, curr_active_pipeline, context: IdentifyingContext):
         """ Uses the context to extract proper values from the pipeline, and performs a fresh computation
@@ -576,13 +580,12 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         
         original_pfs_dict: Dict[types.DecoderName, PfND] = {'long': deepcopy(long_pfND), 'short': deepcopy(short_pfND), 'global': deepcopy(global_pfND)} ## Uses ND Placefields
 
-        # t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
         # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
-        # single_global_epoch_df: pd.DataFrame = pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})
-        # single_global_epoch_df['label'] = single_global_epoch_df.index.to_numpy()
-        # single_global_epoch: Epoch = Epoch(single_global_epoch_df)
-
-        single_global_epoch: Epoch = Epoch(self.single_global_epoch_df)
+        single_global_epoch_df: pd.DataFrame = pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})
+        single_global_epoch_df['label'] = single_global_epoch_df.index.to_numpy()
+        single_global_epoch: Epoch = Epoch(single_global_epoch_df)
+        # single_global_epoch: Epoch = Epoch(self.single_global_epoch_df)
 
         # # Time-dependent
         # long_pf1D_dt: PfND_TimeDependent = long_results.pf1D_dt
@@ -596,16 +599,31 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         time_bin_size: float = initial_context_dict.pop('time_bin_size', 0.025)
         epochs_decoding_time_bin_size: float = time_bin_size
         final_output_context_dict['time_bin_size'] = epochs_decoding_time_bin_size
+        
+        frame_divide_bin_size = 60.0
 
-
-        #TODO 2025-03-11 09:10: - [ ] Get proper compute epochs from the context
-        trained_compute_epochs = deepcopy(curr_active_pipeline.filtered_sessions[non_directional_names_to_default_epoch_names_map[a_name]].non_pbe)
+        # 'trained_compute_epochs' ________________________________________________________________________________________________________ #
+        trained_compute_epochs_name: str = initial_context_dict.pop('trained_compute_epochs', 'laps') # ['laps', 'pbe', 'non_pbe']
+        final_output_context_dict['trained_compute_epochs'] = trained_compute_epochs_name
+        # assert hasattr(curr_active_pipeline.filtered_sessions[non_directional_names_to_default_epoch_names_map[global_epoch_name]], trained_compute_epochs_name), f"trained_compute_epochs_name: '{trained_compute_epochs_name}'"
+        assert hasattr(global_session, trained_compute_epochs_name), f"trained_compute_epochs_name: '{trained_compute_epochs_name}'"
+        #TODO 2025-03-11 09:10: - [X] Get proper compute epochs from the context
+        trained_compute_epochs: Epoch = ensure_Epoch(deepcopy(getattr(global_session, trained_compute_epochs_name))) # .non_pbe
         
         new_decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = {a_name:BasePositionDecoder(pf=a_pfs).replacing_computation_epochs(epochs=trained_compute_epochs) for a_name, a_pfs in original_pfs_dict.items()} ## build new simple decoders
         # new_decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = {a_name:BasePositionDecoder(pf=a_pfs).replacing_computation_epochs(epochs=deepcopy(a_new_training_df_dict[a_name])) for a_name, a_pfs in original_pfs_dict.items()} ## build new simple decoders
         
+
+        # 'known_named_decoding_epochs_type' ____________________________________________________________________________________________________ #
+        # types.KnownNamedDecodingEpochsType:  typing.Literal['laps', 'replay', 'ripple', 'pbe', 'non_pbe']
+        known_named_decoding_epochs_type: str = initial_context_dict.pop('known_named_decoding_epochs_type', 'laps')
         #TODO 2025-03-11 09:10: - [ ] Get proper decode epochs from the context
         decode_epochs = deepcopy(single_global_epoch)
+        
+        
+
+        final_output_context_dict['known_named_decoding_epochs_type'] = known_named_decoding_epochs_type
+        
 
         ## Do Continuous Decoding (for all time (`single_global_epoch`), using the decoder from each epoch) -- slowest dict comp
         continuous_specific_decoded_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {a_name:a_new_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), filter_epochs=decode_epochs, decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False) for a_name, a_new_decoder in new_decoder_dict.items()}
@@ -627,14 +645,32 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # ======================================================================================================================================================================================================================================== #
         # non_PBE_all_directional_pf1D_Decoder, pseudo2D_continuous_specific_decoded_result, continuous_decoded_results_dict, non_PBE_marginal_over_track_ID, (time_bin_containers, time_window_centers, track_marginal_posterior_df) = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']._build_merged_joint_placefields_and_decode(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline))) # , filter_epochs=deepcopy(global_any_laps_epochs_obj)
         spikes_df: pd.DataFrame = deepcopy(get_proper_global_spikes_df(curr_active_pipeline))
-        a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = self.a_new_NonPBE_Epochs_obj
-        results1D: NonPBEDimensionalDecodingResult = self.results1D
+        # a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = self.a_new_NonPBE_Epochs_obj
+        # results1D: NonPBEDimensionalDecodingResult = self.results1D
         # results2D: NonPBEDimensionalDecodingResult = self.results2D
 
-        epochs_decoding_time_bin_size = self.epochs_decoding_time_bin_size
-        frame_divide_bin_size = self.frame_divide_bin_size
+        # ==================================================================================================================== #
+        # extracted from `perform_compute_non_PBE_epochs(...)` global computation function                                     #
+        # ==================================================================================================================== #
+        training_data_portion: float = 0.0
+        skip_training_test_split=True
+        a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = Compute_NonPBE_Epochs.init_from_pipeline(curr_active_pipeline=curr_active_pipeline, training_data_portion=training_data_portion, skip_training_test_split=skip_training_test_split)
+        # curr_active_pipeline.global_computation_results.computed_data['EpochComputations'].a_new_NonPBE_Epochs_obj = a_new_NonPBE_Epochs_obj
 
-        print(f'{epochs_decoding_time_bin_size = }, {frame_divide_bin_size = }')
+        ## apply the new epochs to the session:
+        # curr_active_pipeline.filtered_sessions[global_epoch_name].non_PBE = deepcopy(a_new_NonPBE_Epochs_obj.global_epoch_only_non_PBE_epoch_df) ## Only adds to global_epoch? Not even .sess?
+
+        results1D, results2D = a_new_NonPBE_Epochs_obj.compute_all(curr_active_pipeline, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, frame_divide_bin_size=frame_divide_bin_size, compute_1D=True, compute_2D=False, skip_training_test_split=skip_training_test_split)
+        # if (results1D is not None) and compute_1D:
+        #     curr_active_pipeline.global_computation_results.computed_data['EpochComputations'].results1D = results1D
+        # if (results2D is not None) and compute_2D:
+        #     curr_active_pipeline.global_computation_results.computed_data['EpochComputations'].results2D = results2D
+        # curr_active_pipeline.global_computation_results.computed_data['EpochComputations'].a_new_NonPBE_Epochs_obj = a_new_NonPBE_Epochs_obj
+    
+        # epochs_decoding_time_bin_size = results1D.epochs_decoding_time_bin_size
+        # frame_divide_bin_size = results1D.frame_divide_bin_size
+
+        # print(f'{epochs_decoding_time_bin_size = }, {frame_divide_bin_size = }')
 
         ## INPUTS: results1D, results1D.continuous_results, a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs
 
@@ -652,16 +688,16 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         non_PBE_all_directional_pf1D_Decoder: BasePositionDecoder = BasePositionDecoder(non_PBE_all_directional_pf1D, setup_on_init=True, post_load_on_init=True, debug_print=False)
         # non_PBE_all_directional_pf1D_Decoder
 
-        if filter_epochs is None:
+        if decode_epochs is None:
             # use global epoch
             # single_global_epoch_df: pd.DataFrame = Epoch(deepcopy(a_new_NonPBE_Epochs_obj.single_global_epoch_df))
             single_global_epoch: Epoch = Epoch(deepcopy(a_new_NonPBE_Epochs_obj.single_global_epoch_df))
-            filter_epochs = single_global_epoch
+            decode_epochs = single_global_epoch
 
 
         # takes 6.3 seconds
         ## Do Continuous Decoding (for all time (`single_global_epoch`), using the decoder from each epoch) -- slowest dict comp
-        pseudo2D_continuous_specific_decoded_result: DecodedFilterEpochsResult = non_PBE_all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=deepcopy(filter_epochs),
+        pseudo2D_continuous_specific_decoded_result: DecodedFilterEpochsResult = non_PBE_all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=deepcopy(decode_epochs),
                                                                                                                                                 decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False)
 
         ## OUTPUTS: pseudo2D_continuous_specific_decoded_results, non_PBE_all_directional_pf1D, non_PBE_all_directional_pf1D_Decoder
@@ -811,29 +847,46 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
     # Retreval and use                                                                                                                                                                 #
     # ================================================================================================================================================================================ #
     @function_attributes(short_name=None, tags=['contexts', 'matching'], input_requires=[], output_provides=[], uses=['get_flattened_contexts_for_posteriors_dfs'], used_by=[], creation_date='2025-03-12 11:30', related_items=[])
-    def get_matching_contexts(self, context_query: IdentifyingContext, return_multiple_matches: bool=False, return_flat_same_length_dicts: bool=True, debug_print:bool=True): 
+    def get_matching_contexts(self, context_query: IdentifyingContext, return_multiple_matches: bool=True, return_flat_same_length_dicts: bool=True, debug_print:bool=True): 
         """ Get a specific contexts
         
         a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='long_LR', time_bin_size=0.025, known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type='ignore')
         """
         
-        def _subfn_get_value_with_context_matching(dictionary, query, item_name="item"):
-            """Helper function to get a value from a dictionary with context matching."""
+        # Handle both dictionaries and tuples
+        def get_keys_or_elements(obj) -> List:
+            if hasattr(obj, 'keys'):
+                return list(obj.keys())
+            elif isinstance(obj, tuple) and len(obj) > 0:
+                return list(obj[0]) # item is a tuple (context, a_data) returned by `_subfn_get_value_with_context_matching`, extract just the context
+                # return list(obj)
+            else:
+                return []
+                
+        def _subfn_get_value_with_context_matching(dictionary, query, item_name="item", return_multiple_matches: bool=True) -> Union[Dict, Tuple[IdentifyingContext, Any]]:
+            """Helper function to get a value from a dictionary with context matching.
+            
+            Captures: return_multiple_matches
+            """
             try:
                 value = dictionary[query]  # Try exact match first
-                return query, value
+                if (not return_multiple_matches):
+                    return query, value # (context, value)
+                else:
+                    ## format as a single-item dictionary with value for compatibility
+                    return {query: value} # {context:value}-dict <single-item>
             except KeyError:
                 # Find single best matching context
-                if not return_multiple_matches:
+                if (not return_multiple_matches):
                     best_match, match_count = IdentifyingContext.find_best_matching_context(query, dictionary)
                     if best_match:
                         if debug_print:
                             print(f"Found best match for {item_name} with {match_count} matching attributes:\t{best_match}\n")
-                        return best_match, dictionary[best_match]
+                        return best_match, dictionary[best_match] # (context, value)
                     else:
                         if debug_print:
                             print(f"{item_name}: No matches found in the dictionary.")
-                        return None, None
+                        return None, None # (context, value)
                 else:
                     # Find multiple matching contexts
                     matching_contexts, match_count = IdentifyingContext.find_best_matching_contexts(query, dictionary)
@@ -841,24 +894,24 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                         if debug_print:
                             print(f"Found {len(matching_contexts)} matches for {item_name}")
                         # return [(ctx, dictionary[ctx]) for ctx in matching_contexts]
-                        return {ctx:dictionary[ctx] for ctx in matching_contexts}                        
+                        return {ctx:dictionary[ctx] for ctx in matching_contexts} # {context:value}-dict
                     else:
                         if debug_print:
                             print(f"{item_name}: No matches found in the dictionary.")
-                        return {}
+                        return {} # {context:value}-dict
                     
             except Exception as e:
                 raise e
 
 
-
         if (not return_multiple_matches):
-            # Find single best matching context
-            result_context, a_result = _subfn_get_value_with_context_matching(self.filter_epochs_specific_decoded_result, context_query, "a_result")
-            decoder_context, a_decoder = _subfn_get_value_with_context_matching(self.decoders, context_query, "a_decoder")
-            posterior_context, a_decoded_marginal_posterior_df = _subfn_get_value_with_context_matching(self.filter_epochs_decoded_track_marginal_posterior_df_dict, context_query, "a_decoded_marginal_posterior_df")
+            # ==================================================================================================================== #
+            # Find single best matching context                                                                                    #
+            # ==================================================================================================================== #
+            result_context, a_result = _subfn_get_value_with_context_matching(self.filter_epochs_specific_decoded_result, context_query, "a_result", return_multiple_matches=return_multiple_matches)
+            decoder_context, a_decoder = _subfn_get_value_with_context_matching(self.decoders, context_query, "a_decoder", return_multiple_matches=return_multiple_matches)
+            posterior_context, a_decoded_marginal_posterior_df = _subfn_get_value_with_context_matching(self.filter_epochs_decoded_track_marginal_posterior_df_dict, context_query, "a_decoded_marginal_posterior_df", return_multiple_matches=return_multiple_matches)
             
-
             # Determine the best matching context
             contexts = [c for c in [result_context, decoder_context, posterior_context] if c is not None]
             if contexts:
@@ -876,16 +929,23 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             return best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df
         
         else:
-            # Find multiple matching contexts
-            result_context_dict = _subfn_get_value_with_context_matching(self.filter_epochs_specific_decoded_result, context_query, "a_result")
-            decoder_context_dict = _subfn_get_value_with_context_matching(self.decoders, context_query, "a_decoder")
-            decoded_marginal_posterior_df_context_dict = _subfn_get_value_with_context_matching(self.filter_epochs_decoded_track_marginal_posterior_df_dict, context_query, "a_decoded_marginal_posterior_df")            
-            any_matching_contexts_list = list(set(list(result_context_dict.keys())).union(set(list(decoder_context_dict.keys()))).union(set(list(decoded_marginal_posterior_df_context_dict.keys()))))
-            if not return_flat_same_length_dicts:
+            # ==================================================================================================================== #
+            # Find multiple matching contexts                                                                                      #
+            # ==================================================================================================================== #
+            result_context_dict = _subfn_get_value_with_context_matching(self.filter_epochs_specific_decoded_result, context_query, "a_result", return_multiple_matches=return_multiple_matches)
+            decoder_context_dict = _subfn_get_value_with_context_matching(self.decoders, context_query, "a_decoder", return_multiple_matches=return_multiple_matches)
+            decoded_marginal_posterior_df_context_dict = _subfn_get_value_with_context_matching(self.filter_epochs_decoded_track_marginal_posterior_df_dict, context_query, "a_decoded_marginal_posterior_df", return_multiple_matches=return_multiple_matches)
+            
+            if isinstance(decoded_marginal_posterior_df_context_dict, dict):
+                # decoded_marginal_posterior_df_context_dict =
+                # any_matching_contexts_list = list(set(list(result_context_dict.keys())).union(set(list(decoder_context_dict.keys()))).union(set(list(decoded_marginal_posterior_df_context_dict.keys()))))
+                any_matching_contexts_list = list(set(get_keys_or_elements(result_context_dict)).union(set(get_keys_or_elements(decoder_context_dict))).union(set(get_keys_or_elements(decoded_marginal_posterior_df_context_dict))))
                 return any_matching_contexts_list, result_context_dict, decoder_context_dict, decoded_marginal_posterior_df_context_dict
             else:
                 return self.get_flattened_contexts_for_posteriors_dfs(decoded_marginal_posterior_df_context_dict) ## a bit inefficient but there's never that many contexts
             
+
+
 
     @function_attributes(short_name=None, tags=['contexts'], input_requires=[], output_provides=[], uses=[], used_by=['get_matching_contexts'], creation_date='2025-03-12 11:30', related_items=[])
     def get_flattened_contexts_for_posteriors_dfs(self, decoded_marginal_posterior_df_context_dict):
