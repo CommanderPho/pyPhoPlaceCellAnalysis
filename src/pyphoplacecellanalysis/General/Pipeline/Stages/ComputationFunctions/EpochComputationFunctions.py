@@ -1627,7 +1627,7 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
 
             # global_computation_results.computed_data['EpochComputations'].included_qclu_values = included_qclu_values
             if (not hasattr(global_computation_results.computed_data['EpochComputations'], 'a_new_NonPBE_Epochs_obj') or (global_computation_results.computed_data['EpochComputations'].a_new_NonPBE_Epochs_obj is None)):
-                # initialize a new wcorr result
+                # initialize a new result
                 a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = Compute_NonPBE_Epochs.init_from_pipeline(curr_active_pipeline=owning_pipeline_reference, training_data_portion=training_data_portion, skip_training_test_split=skip_training_test_split)
                 global_computation_results.computed_data['EpochComputations'].a_new_NonPBE_Epochs_obj = a_new_NonPBE_Epochs_obj
             else:

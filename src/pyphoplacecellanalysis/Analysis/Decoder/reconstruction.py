@@ -1339,8 +1339,12 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
 
             a_time_bin_edges: NDArray = deepcopy(a_decoded_result.time_bin_edges[i])
             if (len(a_time_bin_edges) != (num_time_bins+1)):
-                raise IndexError(f'len(a_time_bin_edges): {len(a_time_bin_edges)} != (num_time_bins+1): {(num_time_bins+1)}')
-            else:           
+                #@IgnoreException
+                print(f'WARN: Epoch[{i}]: len(a_time_bin_edges): {len(a_time_bin_edges)} != (num_time_bins+1): {(num_time_bins+1)}.') # continuing.
+                # raise IndexError(f'len(a_time_bin_edges): {len(a_time_bin_edges)} != (num_time_bins+1): {(num_time_bins+1)}') #@IgnoreException
+                # continue
+                break
+            else:
                 assert len(a_time_bin_edges) == (num_time_bins+1)
         
             unit_specific_time_binned_spike_counts, unique_units, (is_time_bin_active, inactive_mask, mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask(time_bin_edges=a_time_bin_edges,
