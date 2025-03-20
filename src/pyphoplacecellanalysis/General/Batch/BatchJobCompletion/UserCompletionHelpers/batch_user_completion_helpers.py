@@ -3194,7 +3194,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
     for k in list(a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict.keys()):
         a_df = a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict[k]
-        a_df['delta_aligned_start_t'] = a_df['t'] - t_delta ## subtract off t_delta    
+        # a_df['delta_aligned_start_t'] = a_df['t'] - t_delta ## subtract off t_delta    
         a_df = a_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=epochs_decoding_time_bin_size, curr_session_t_delta=t_delta)
         a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict[k] = a_df
         
