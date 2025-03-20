@@ -1529,10 +1529,29 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         
 
     # Low-level direct marginal computation functions ____________________________________________________________________ #
-    @function_attributes(short_name=None, tags=['pseudo2D', 'marginal', 'laps', 'pbe'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-20 08:30', related_items=[])
+    @function_attributes(short_name=None, tags=['pseudo2D', 'marginal', 'laps', 'pbe'], input_requires=[], output_provides=[], uses=[], used_by=['GenericDecoderDictDecodedEpochsDictResult'], creation_date='2025-03-20 08:30', related_items=[])
     @classmethod
-    def perform_compute_specific_marginals(cls, marginal_context: IdentifyingContext, a_result: DecodedFilterEpochsResult) -> pd.DataFrame:
+    def perform_compute_specific_marginals(cls, a_result: DecodedFilterEpochsResult, marginal_context: IdentifyingContext) -> pd.DataFrame:
         """ Computes the appropriate pseudo2D marginals for the result given the context (requires laps/pbe)        
+        Usage:
+
+            ## Common/shared for all decoded epochs:
+            unique_decoder_names = ['long', 'short']
+            masked_bin_fill_mode='nan_filled'
+
+            
+            best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_matching_contexts(IdentifyingContext(trained_compute_epochs= 'laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= 0.025, known_named_decoding_epochs_type='laps', masked_time_bin_fill_type= 'ignore', data_grain= 'per_time_bin'), return_multiple_matches=False)
+
+            ## INPUTS: a_result, masked_bin_fill_mode
+            _updated_context = deepcopy(best_matching_context).overwriting_context(masked_time_bin_fill_type=masked_bin_fill_mode)
+            _updated_context
+
+            ## MASKED with NaNs (no backfill):
+            dropping_masked_laps_pseudo2D_continuous_specific_decoded_result, _dropping_mask_index_tuple = a_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(spikes_df), masked_bin_fill_mode=masked_bin_fill_mode) ## Masks the low-firing bins so they don't confound the analysis.
+            ## Computes marginals for `dropping_masked_laps_pseudo2D_continuous_specific_decoded_result`
+            dropping_masked_laps_decoded_marginal_posterior_df = DirectionalPseudo2DDecodersResult.perform_compute_specific_marginals(a_result=dropping_masked_laps_pseudo2D_continuous_specific_decoded_result, marginal_context=_updated_context)
+            a_new_fully_generic_result.updating_results_for_context(new_context=_updated_context, a_result=deepcopy(dropping_masked_laps_pseudo2D_continuous_specific_decoded_result), a_decoder=deepcopy(a_decoder), a_decoded_marginal_posterior_df=deepcopy(dropping_masked_laps_decoded_marginal_posterior_df)) ## update using the result
+
         """
         data_grain = marginal_context.get('data_grain', None)
         assert data_grain is not None
