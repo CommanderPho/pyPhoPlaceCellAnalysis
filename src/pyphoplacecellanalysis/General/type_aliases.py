@@ -34,5 +34,9 @@ DataTimeGrain = Literal['per_epoch', 'per_time_bin']
 GenericResultTupleIndexType: TypeAlias = IdentifyingContext # an template/stand-in variable that aims to abstract away the unique-hashable index of a single result computed with a given set of parameters. Not yet fully implemented 2025-03-09 17:50 
 
 
+type_to_name_mapping: Dict = dict(zip([KnownNamedDecoderTrainedComputeEpochsType, KnownNamedDecodingEpochsType, MaskedTimeBinFillType, DataTimeGrain], ['known_named_decoder_trained_compute_epochs_type', 'known_named_decoding_epochs_type', 'masked_time_bin_fill_type', 'data_time_grain']))
+name_to_short_name_dict: Dict = dict(zip(['known_named_decoder_trained_compute_epochs_type', 'known_named_decoding_epochs_type', 'masked_time_bin_fill_type', 'data_time_grain'], ['train', 'decode', 'mfill', 'grain']))
+
+
 # FilterContextName = NewType('FilterContextName', str) 
 # ComputationFunctionName = NewType('ComputationFunctionName', str) 
