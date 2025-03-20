@@ -1529,6 +1529,112 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         
 
     # Low-level direct marginal computation functions ____________________________________________________________________ #
+    @function_attributes(short_name=None, tags=['pseudo2D', 'marginal', 'laps', 'pbe'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-20 08:30', related_items=[])
+    @classmethod
+    def perform_compute_specific_marginals(cls, marginal_context: IdentifyingContext, a_result: DecodedFilterEpochsResult) -> pd.DataFrame:
+        """ Computes the appropriate pseudo2D marginals for the result given the context (requires laps/pbe)        
+        """
+        data_grain = marginal_context.get('data_grain', None)
+        assert data_grain is not None
+        assert data_grain in ['per_time_bin', 'per_epoch']
+        
+        known_named_decoding_epochs_type = marginal_context.get('known_named_decoding_epochs_type', None)
+        assert known_named_decoding_epochs_type is not None
+        assert known_named_decoding_epochs_type in ['laps', 'pbe']
+
+        if data_grain == 'per_time_bin':
+            if known_named_decoding_epochs_type == 'laps':
+                # Case 1: Per-time-bin laps marginals
+                # Compute the marginals from the result
+                (laps_directional_marginals_tuple, laps_track_identity_marginals_tuple, laps_non_marginalized_decoder_marginals_tuple), _ = a_result.compute_marginals(
+                    epoch_idx_col_name='lap_idx', 
+                    epoch_start_t_col_name='lap_start_t',
+                    additional_transfer_column_names=['start', 'stop', 'label', 'duration', 'lap_id', 'lap_dir', 'maze_id', 'is_LR_dir']
+                )
+                
+                # Expanded implementation of build_laps_time_bin_marginals_df
+                laps_directional_marginals, _, _, _ = laps_directional_marginals_tuple
+                laps_track_identity_marginals, _, _, _ = laps_track_identity_marginals_tuple
+                non_marginalized_decoder_marginals, _, _, _ = laps_non_marginalized_decoder_marginals_tuple
+                
+                laps_time_bin_marginals_df = a_result.build_per_time_bin_marginals_df(
+                    active_marginals_tuple=(laps_directional_marginals, laps_track_identity_marginals, non_marginalized_decoder_marginals), 
+                    columns_tuple=(['P_LR', 'P_RL'], ['P_Long', 'P_Short'], ['long_LR', 'long_RL', 'short_LR', 'short_RL'])
+                )
+                
+                return laps_time_bin_marginals_df
+                
+            elif known_named_decoding_epochs_type == 'pbe':
+                # Case 2: Per-time-bin PBE/ripple marginals
+                # Compute the marginals from the result
+                (ripple_directional_marginals_tuple, ripple_track_identity_marginals_tuple, ripple_non_marginalized_decoder_marginals_tuple), _ = a_result.compute_marginals(
+                    epoch_idx_col_name='ripple_idx', 
+                    epoch_start_t_col_name='ripple_start_t',
+                    additional_transfer_column_names=['start', 'stop', 'label', 'duration']
+                )
+                
+                # Expanded implementation of build_ripple_time_bin_marginals_df
+                ripple_directional_marginals, _, _, _ = ripple_directional_marginals_tuple
+                ripple_track_identity_marginals, _, _, _ = ripple_track_identity_marginals_tuple
+                non_marginalized_decoder_marginals, _, _, _ = ripple_non_marginalized_decoder_marginals_tuple
+                
+                ripple_time_bin_marginals_df = a_result.build_per_time_bin_marginals_df(
+                    active_marginals_tuple=(ripple_directional_marginals, ripple_track_identity_marginals, non_marginalized_decoder_marginals), 
+                    columns_tuple=(['P_LR', 'P_RL'], ['P_Long', 'P_Short'], ['long_LR', 'long_RL', 'short_LR', 'short_RL'])
+                )
+                
+                return ripple_time_bin_marginals_df
+                
+            else:
+                raise ValueError(f"Unexpected value for known_named_decoding_epochs_type: {known_named_decoding_epochs_type}")
+                
+        elif data_grain == 'per_epoch':
+            if known_named_decoding_epochs_type == 'laps':
+                # Case 3: Per-epoch laps marginals
+                # Compute the marginals from the result
+                (laps_directional_marginals_tuple, laps_track_identity_marginals_tuple, _), _ = a_result.compute_marginals(
+                    epoch_idx_col_name='lap_idx', 
+                    epoch_start_t_col_name='lap_start_t',
+                    additional_transfer_column_names=['start', 'stop', 'label', 'duration', 'lap_id', 'lap_dir', 'maze_id', 'is_LR_dir']
+                )
+                
+                # Expanded implementation of build_laps_all_epoch_bins_marginals_df
+                laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir = laps_directional_marginals_tuple
+                laps_track_identity_marginals, laps_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = laps_track_identity_marginals_tuple
+
+                laps_marginals_df = pd.DataFrame(np.hstack((laps_directional_all_epoch_bins_marginal, laps_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
+                laps_marginals_df['lap_idx'] = laps_marginals_df.index.to_numpy()
+                laps_marginals_df['lap_start_t'] = a_result.filter_epochs['start'].to_numpy()
+                
+                return laps_marginals_df
+                
+            elif known_named_decoding_epochs_type == 'pbe':
+                # Case 4: Per-epoch PBE/ripple marginals
+                # Compute the marginals from the result
+                (ripple_directional_marginals_tuple, ripple_track_identity_marginals_tuple, _), _ = a_result.compute_marginals(
+                    epoch_idx_col_name='ripple_idx', 
+                    epoch_start_t_col_name='ripple_start_t',
+                    additional_transfer_column_names=['start', 'stop', 'label', 'duration']
+                )
+                
+                # Expanded implementation of build_ripple_all_epoch_bins_marginals_df
+                ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir = ripple_directional_marginals_tuple
+                ripple_track_identity_marginals, ripple_track_identity_all_epoch_bins_marginal, ripple_most_likely_track_identity_from_decoder, ripple_is_most_likely_track_identity_Long = ripple_track_identity_marginals_tuple
+
+                ripple_marginals_df = pd.DataFrame(np.hstack((ripple_directional_all_epoch_bins_marginal, ripple_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
+                ripple_marginals_df['ripple_idx'] = ripple_marginals_df.index.to_numpy()
+                ripple_marginals_df['ripple_start_t'] = a_result.filter_epochs['start'].to_numpy()
+                
+                return ripple_marginals_df
+                
+            else:
+                raise ValueError(f"Unexpected value for known_named_decoding_epochs_type: {known_named_decoding_epochs_type}")
+                
+        else:
+            raise ValueError(f"Unexpected value for data_grain: {data_grain}")
+
+
+
     @classmethod
     def get_proper_p_x_given_n_list(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult]) -> List[DynamicContainer]:
         """ only works for the all-directional coder with the four items
