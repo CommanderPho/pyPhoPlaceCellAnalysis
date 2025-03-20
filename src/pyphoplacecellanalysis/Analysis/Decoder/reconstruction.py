@@ -1401,12 +1401,35 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                 # a_binning_container.centers = a_binning_container.centers[is_time_bin_active]
                 a_sliced_centers = deepcopy(a_decoded_result.time_bin_containers[i].centers[is_time_bin_active])
                 center_info = BinningContainer.build_center_binning_info(centers=a_sliced_centers, variable_extents=a_binning_container.center_info.variable_extents)
-                ## make whole new container
-                a_decoded_result.time_bin_containers[i] = BinningContainer(centers=a_sliced_centers)
+                
+                try:
+                    a_decoded_result.time_bin_edges[i] = get_bin_edges(a_sliced_centers) #
+                    ## make whole new container
+                    a_decoded_result.time_bin_containers[i] = BinningContainer(centers=a_sliced_centers, edges=a_decoded_result.time_bin_edges[i])
+                
+                except IndexError as e:
+                    if len(a_sliced_centers) == 0:
+                        ## no center => no edges
+                        a_decoded_result.time_bin_edges[i] = np.array([])
+                        ## make whole new container
+                        edge_info = BinningInfo(variable_extents=a_binning_container.edge_info.variable_extents, step=a_binning_container.edge_info.step, num_bins=0)
+                        a_decoded_result.time_bin_containers[i] = BinningContainer(centers=a_sliced_centers, edges=a_decoded_result.time_bin_edges[i], edge_info=edge_info, center_info=center_info)
+                
+                    else:
+                        assert len(a_sliced_centers) == 1, f"a_sliced_centers: {a_sliced_centers} -- len(a_sliced_centers): {len(a_sliced_centers)}"
+                        assert len(a_binning_container.center_info.variable_extents) == 2, f"a_binning_container.center_info.variable_extents: {a_binning_container.center_info.variable_extents}"
+                        a_decoded_result.time_bin_edges[i] = np.array(a_binning_container.center_info.variable_extents) ## use the extents directly
+                        ## make whole new container
+                        a_decoded_result.time_bin_containers[i] = BinningContainer(centers=a_sliced_centers, edges=a_decoded_result.time_bin_edges[i])
+                
+                    
+                except Exception as e:
+                    raise e
+                
+
                 # a_decoded_result.time_bin_containers[i] = a_decoded_result.time_bin_containers[i][is_time_bin_active]
 
                 # a_decoded_result.time_bin_edges[i] = a_time_bin_edges[is_time_bin_active]
-                a_decoded_result.time_bin_edges[i] = get_bin_edges(a_sliced_centers) # 
                 # a_decoded_result.time_bin_edges[i] = a_time_bin_edges[is_time_bin_active] ## for sure wrong
                 a_decoded_result.nbins[i] = len(a_time_bin_edges[is_time_bin_active])
                 a_decoded_result.spkcount[i] = a_decoded_result.spkcount[i][:, is_time_bin_active] # (80, 66) - (n_neurons, n_epoch_t_bins[i])
