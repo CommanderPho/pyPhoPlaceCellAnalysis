@@ -632,7 +632,13 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
     def example_compute_fn(self, curr_active_pipeline, context: IdentifyingContext):
         """ Uses the context to extract proper values from the pipeline, and performs a fresh computation
         
-        from `pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions.Compute_NonPBE_Epochs.recompute`
+        Usage:
+            _out = a_new_fully_generic_result.example_compute_fn(curr_active_pipeline=curr_active_pipeline, context=IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, time_bin_size=0.025, known_named_decoding_epochs_type='laps'))
+            
+        
+        History:
+            from `pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions.Compute_NonPBE_Epochs.recompute`
+        
         """
         initial_context_dict: Dict = deepcopy(context.to_dict())
         final_output_context_dict: Dict = {}
