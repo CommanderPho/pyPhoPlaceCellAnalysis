@@ -505,7 +505,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             ## Updates `self.filter_epochs_decoded_track_marginal_posterior_df_dict`
             
             # self.filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict[a_new_identifier] ## #TODO 2025-03-11 11:39: - [ ] must be computed or assigned from prev result
-            self.decoders[a_new_identifier] = all_directional_pf1D_Decoder ## this will duplicate this decoder needlessly for each repetation here, but that's okay for now
+            self.decoders[a_new_identifier] = deepcopy(all_directional_pf1D_Decoder) ## this will duplicate this decoder needlessly for each repetation here, but that's okay for now
             for a_known_data_grain, a_decoded_marginals_df in decoder_epoch_marginals_df_dict_dict[a_known_decoded_epochs_type].items():
                 a_new_data_grain_identifier: IdentifyingContext = deepcopy(a_new_identifier).overwriting_context(data_grain=a_known_data_grain)
                 if debug_print:
@@ -513,7 +513,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                 assert a_new_data_grain_identifier not in self.filter_epochs_decoded_track_marginal_posterior_df_dict
                 self.filter_epochs_decoded_track_marginal_posterior_df_dict[a_new_data_grain_identifier] = deepcopy(a_decoded_marginals_df) 
 
-            ## Updates `self.decoders`
+            ## Updates `self.decoders` with the four individual decoders
             for an_individual_decoder_name, an_individual_directional_decoder in all_directional_decoder_dict.items():
                 a_new_individual_decoder_identifier: IdentifyingContext = deepcopy(a_new_identifier).overwriting_context(decoder_identifier=an_individual_decoder_name) # replace 'decoder_identifier'
                 if debug_print:
@@ -535,6 +535,21 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             self.filter_epochs_specific_decoded_result[a_modified_context] = deepcopy(a_masked_decoded_filter_epochs_result)
             self.filter_epochs_to_decode_dict[a_modified_context] = deepcopy(a_masked_decoded_filter_epochs_result.filter_epochs) ## needed? Do I want full identifier as key?
             
+
+            # TODO 2025-03-20 09:00: - [ ] New Version ___________________________________________________________________________ #
+            ## INPUTS: a_result, masked_bin_fill_mode
+            a_masked_updated_context: IdentifyingContext = deepcopy(a_new_identifier).overwriting_context(masked_time_bin_fill_type=masked_bin_fill_mode)
+            if debug_print:
+                print(f'a_masked_updated_context: {a_masked_updated_context}')
+            
+            ## MASKED with NaNs (no backfill):
+            a_dropping_masked_pseudo2D_continuous_specific_decoded_result, _dropping_mask_index_tuple = a_decoded_filter_epochs_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(spikes_df), masked_bin_fill_mode=masked_bin_fill_mode) ## Masks the low-firing bins so they don't confound the analysis.
+            ## Computes marginals for `dropping_masked_laps_pseudo2D_continuous_specific_decoded_result`
+            a_dropping_masked_decoded_marginal_posterior_df = DirectionalPseudo2DDecodersResult.perform_compute_specific_marginals(a_result=a_dropping_masked_pseudo2D_continuous_specific_decoded_result, marginal_context=a_masked_updated_context)
+            _was_update_success = self.updating_results_for_context(new_context=a_masked_updated_context, a_result=deepcopy(a_dropping_masked_pseudo2D_continuous_specific_decoded_result), a_decoder=deepcopy(all_directional_pf1D_Decoder), a_decoded_marginal_posterior_df=deepcopy(a_dropping_masked_decoded_marginal_posterior_df)) ## update using the result
+            if not _was_update_success:
+                print(f'update failed for masked context: {a_masked_updated_context}')
+
 
         # directional_decoders_epochs_decode_result.build_complete_all_scores_merged_df(debug
                                                                                     
@@ -1055,7 +1070,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
 
 
-    @function_attributes(short_name=None, tags=['contexts'], input_requires=[], output_provides=[], uses=[], used_by=['get_matching_contexts'], creation_date='2025-03-12 11:30', related_items=[])
+    @function_attributes(short_name=None, tags=['contexts', 'not-quite-working', 'BUG'], input_requires=[], output_provides=[], uses=[], used_by=['get_matching_contexts'], creation_date='2025-03-12 11:30', related_items=[])
     def get_flattened_contexts_for_posteriors_dfs(self, decoded_marginal_posterior_df_context_dict):
         """ returns 4 flat dicts with the same (full) contexts that the passed `decoded_marginal_posterior_df_context_dict` have
         
@@ -1066,6 +1081,9 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             flat_context_list, flat_result_context_dict, flat_decoder_context_dict, decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_flattened_contexts_for_posteriors_dfs(decoded_marginal_posterior_df_context_dict)
             flat_context_list
 
+        #TODO 2025-03-20 08:49: - [ ] Doesn't return consistent length results sadly
+        
+        
         """
         flat_context_list = []
         flat_decoder_context_dict = {}
