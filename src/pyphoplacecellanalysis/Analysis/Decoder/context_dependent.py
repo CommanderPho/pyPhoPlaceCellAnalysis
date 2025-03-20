@@ -1121,6 +1121,41 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
     
     
 
+    @classmethod
+    def perform_compute_specific_marginals(cls, marginal_context: IdentifyingContext, a_result: DecodedFilterEpochsResult):
+        data_grain = marginal_context.get('data_grain', None)
+        assert data_grain is not None
+        assert data_grain in ['per_time_bin', 'per_epoch']
+        
+        known_named_decoding_epochs_type = marginal_context.get('known_named_decoding_epochs_type', None)
+        assert known_named_decoding_epochs_type is not None
+        assert known_named_decoding_epochs_type in ['laps', 'pbe']
+
+        if data_grain == 'per_time_bin':
+            if known_named_decoding_epochs_type == 'laps':
+                # Case 1: Per-time-bin laps marginals
+                return cls.build_laps_time_bin_marginals_df(a_result)
+            elif known_named_decoding_epochs_type == 'pbe':
+                # Case 2: Per-time-bin PBE/ripple marginals
+                return cls.build_ripple_time_bin_marginals_df(a_result)
+            else:
+                # This shouldn't happen due to the assertion
+                raise ValueError(f"Unexpected value for known_named_decoding_epochs_type: {known_named_decoding_epochs_type}")
+        elif data_grain == 'per_epoch':
+            if known_named_decoding_epochs_type == 'laps':
+                # Case 3: Per-epoch laps marginals
+                return cls.build_laps_all_epoch_bins_marginals_df(a_result)
+            elif known_named_decoding_epochs_type == 'pbe':
+                # Case 4: Per-epoch PBE/ripple marginals
+                return cls.build_ripple_all_epoch_bins_marginals_df(a_result)
+            else:
+                # This shouldn't happen due to the assertion
+                raise ValueError(f"Unexpected value for known_named_decoding_epochs_type: {known_named_decoding_epochs_type}")
+        else:
+            # This shouldn't happen due to the assertion
+            raise ValueError(f"Unexpected value for data_grain: {data_grain}")
+
+
 
 
 
