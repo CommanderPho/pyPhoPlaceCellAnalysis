@@ -171,6 +171,9 @@ data_grain | DataTimeGrain | how the data is binned in time (e.g. "data_grain='p
 class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
     """ General dict-based class that uses IdentifyingContext (unordered-dict-like) for keys into multiple result dicts. (flat-unordered-tuple-like indicies)
     
+    Means to store general results and export them easily to .CSV (FAT_df) or separate classical .CSVs
+    
+    
     from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult, KnownNamedDecoderTrainedComputeEpochsType, KnownNamedDecodingEpochsType, MaskedTimeBinFillType, DataTimeGrain, GenericResultTupleIndexType
     
     Info:

@@ -1621,7 +1621,7 @@ def build_single_plotly_marginal_scatter_and_hist_over_time(a_decoded_posterior_
         
     assert 'delta_aligned_start_t' in a_decoded_posterior_df
     # plot_row_identifier: str = f'{a_known_decoded_epochs_type.capitalize()} - {masking_bin_fill_mode.capitalize()} decoder' # should be like 'Laps (Masked) from Non-PBE decoder'    
-    plot_row_identifier: str = a_target_context.get_description(subset_includelist=['a_known_decoded_epochs_type', 'masking_bin_fill_mode'], include_property_names=True, key_value_separator=':', separator='|', replace_separator_in_property_names='-')
+    plot_row_identifier: str = a_target_context.get_description(subset_includelist=['known_named_decoding_epochs_type', 'masked_time_bin_fill_type'], include_property_names=True, key_value_separator=':', separator='|', replace_separator_in_property_names='-')
     plot_row_identifier = f"{plot_row_identifier} decoder" # should be like 'Laps (Masked) from Non-PBE decoder'"
     fig, figure_context = plotly_pre_post_delta_scatter(data_results_df=deepcopy(a_decoded_posterior_df), data_context=deepcopy(a_target_context), out_scatter_fig=None, 
                                     histogram_variable_name='P_Short', hist_kwargs=dict(), histogram_bins=histogram_bins,
