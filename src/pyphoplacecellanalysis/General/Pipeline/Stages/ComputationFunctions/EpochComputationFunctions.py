@@ -1041,7 +1041,7 @@ class GeneralDecoderDictDecodedEpochsDictResult(ComputedResult):
 
 @define(slots=False, repr=False, eq=False)
 class EpochComputationsComputationsContainer(ComputedResult):
-    """ Holds the result from a single rank-ordering (odd/even) comparison between odd/even
+    """ Holds the result from `perform_compute_non_PBE_epochs`
 
 
     Usage:
