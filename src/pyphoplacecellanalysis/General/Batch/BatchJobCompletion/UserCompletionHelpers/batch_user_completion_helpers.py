@@ -3049,155 +3049,22 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'generalized_decode_epochs_dict_and_export_results_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
 
-    if force_recompute and ('EpochComputations' in curr_active_pipeline.global_computation_results.computed_data):
-        print(f'\t recomputing...')
-        del curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
-
-
-    curr_active_pipeline.reload_default_computation_functions()
-    ## perform the computation either way:
-    # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['non_PBE_epochs_results'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
-
-    curr_active_pipeline.batch_extended_computations(include_includelist=['non_PBE_epochs_results'], include_global_functions=True, included_computation_filter_names=None, fail_on_exception=True, debug_print=False)
-    
-    session_name: str = curr_active_pipeline.session_name
-    t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
-    
-    ## Unpack the results:
-    # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-
-    ## Unpack from pipeline:
-    nonPBE_results: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
-    # a_new_NonPBE_Epochs_obj: Compute_NonPBE_Epochs = nonPBE_results.a_new_NonPBE_Epochs_obj
-    results1D: NonPBEDimensionalDecodingResult = nonPBE_results.results1D
-    results2D: NonPBEDimensionalDecodingResult = nonPBE_results.results2D
-
-    epochs_decoding_time_bin_size = nonPBE_results.epochs_decoding_time_bin_size
-    frame_divide_bin_size = nonPBE_results.frame_divide_bin_size
-
-    print(f'{epochs_decoding_time_bin_size = }, {frame_divide_bin_size = }')
-
-    assert (results1D is not None)
-    # assert (results2D is not None)
-
-    # ==================================================================================================================== #
-    # Pre 2025-03-10 Semi-generic (unfinalized) Result                                                                     #
-    # ==================================================================================================================== #
-    a_general_decoder_dict_decoded_epochs_dict_result: GeneralDecoderDictDecodedEpochsDictResult = nonPBE_results.a_general_decoder_dict_decoded_epochs_dict_result ## get the pre-decoded result
-    assert a_general_decoder_dict_decoded_epochs_dict_result is not None
-
     # ==================================================================================================================== #
     # New 2025-03-11 Generic Result:                                                                                       #
     # ==================================================================================================================== #
-    if 'generalized_decode_epochs_dict_and_export_results_completion_function' not in across_session_results_extended_dict:
-        ## create new
-        a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = GenericDecoderDictDecodedEpochsDictResult(is_global=True)  # start empty
-        
-    else:
-        ## already, exists, use the existing:
-        a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = across_session_results_extended_dict.get('generalized_decode_epochs_dict_and_export_results_completion_function', {}).get('a_new_fully_generic_result', None)
-        assert a_new_fully_generic_result is not None
-        ## have a valid loaded one
-        
 
-    ## add the 'non_pbe' results:
-    a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = a_new_fully_generic_result.adding_from_old_GeneralDecoderDictDecodedEpochsDictResult(a_general_decoder_dict_decoded_epochs_dict_result=a_general_decoder_dict_decoded_epochs_dict_result)
-    a_new_fully_generic_result.spikes_df_dict[curr_active_pipeline.get_session_context()] = deepcopy(get_proper_global_spikes_df(curr_active_pipeline))
-    a_new_fully_generic_result.spikes_df_dict[IdentifyingContext()] = deepcopy(get_proper_global_spikes_df(curr_active_pipeline)) # all contexts
-    
-    # # ==================================================================================================================== #
-    # # Phase 1: build from 'DirectionalDecodersEpochsEvaluations'                                                           #
-    # # ==================================================================================================================== #
-    # # filtered_epochs_df = None
-    # if 'DirectionalDecodersEpochsEvaluations' in curr_active_pipeline.global_computation_results.computed_data:
-    #     ## INPUTS: curr_active_pipeline, track_templates, a_decoded_filter_epochs_decoder_result_dict
-    #     directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = deepcopy(curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']) ## GENERAL
-    #     ## INPUTS: directional_decoders_epochs_decode_result, filtered_epochs_df
-    #     ## Inputs: a_new_fully_generic_result
-    #     a_new_fully_generic_result = a_new_fully_generic_result.adding_directional_decoder_results_filtered_by_spikes_per_t_bin_masked(directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result)
-    #     ## OUTPUTS: a_new_fully_generic_result
-    # else:
-    #     print('WARN: missing "DirectionalDecodersEpochsEvaluations" global result. Skipping.')
-
-    # ==================================================================================================================== #
-    # Phase 2 - Get Directional Decoded Epochs                                                                             #
-    # ==================================================================================================================== #
-
-    #TODO 🚧 2025-03-11 13:01: - [ ] Allow overriding qclu and inclusion_fr values, see other user function
-    if 'DirectionalMergedDecoders' in curr_active_pipeline.global_computation_results.computed_data:
-        # DirectionalMergedDecoders: Get the result after computation:
-        directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
-        a_new_fully_generic_result = a_new_fully_generic_result.adding_directional_pseudo2D_decoder_results_filtered_by_spikes_per_t_bin_masked(directional_merged_decoders_result=directional_merged_decoders_result) # , spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline))
-    else:
-        print('WARN: missing "DirectionalMergedDecoders" global result. Skipping.')
-    
-    # # ==================================================================================================================== #
-    # # 2025-02-20 20:06 New `nonPBE_results._build_merged_joint_placefields_and_decode` method                              #
-    # # ==================================================================================================================== #
-    # non_PBE_all_directional_pf1D_Decoder, pseudo2D_continuous_specific_decoded_result, continuous_decoded_results_dict, non_PBE_marginal_over_track_ID, (time_bin_containers, time_window_centers, track_marginal_posterior_df) = nonPBE_results._build_merged_joint_placefields_and_decode(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)))
-    # masked_pseudo2D_continuous_specific_decoded_result, _mask_index_tuple = pseudo2D_continuous_specific_decoded_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)))
-
-    # ==================================================================================================================== #
-    # Phase 3 - `creating_new_spikes_per_t_bin_masked_variants`                                                                      #
-    # ==================================================================================================================== #
-    spikes_df = deepcopy(get_proper_global_spikes_df(curr_active_pipeline))
-    a_new_fully_generic_result = a_new_fully_generic_result.creating_new_spikes_per_t_bin_masked_variants(spikes_df=spikes_df)
-    
-    ## ensure all optional fields are present before output:
-    # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
-    for k in list(a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict.keys()):
-        a_df = a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict[k]
-        ## note in per-epoch mode we use the start of the epoch (because for example laps are long and we want to see as soon as it starts) but for time bins we use the center time.
-        time_column_name: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(a_df, col_connonical_name='t', required_columns_synonym_dict={"t":{'t_bin_center', 'lap_start_t', 'ripple_start_t', 'epoch_start_t'}}, should_raise_exception_on_fail=True)
-        assert time_column_name in a_df
-        a_df['delta_aligned_start_t'] = a_df[time_column_name] - t_delta ## subtract off t_delta
-        a_df = a_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=epochs_decoding_time_bin_size, curr_session_t_delta=t_delta, time_col=time_column_name)
-        a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict[k] = a_df
+    if ('generalized_decode_epochs_dict_and_export_results_completion_function' not in across_session_results_extended_dict) and force_recompute:
+        ## drop the existing
+        del across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']
 
 
+    a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = GenericDecoderDictDecodedEpochsDictResult.batch_user_compute_fn(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, debug_print=debug_print)
+                    
+    ## Unpack from pipeline:
+    nonPBE_results: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+    epochs_decoding_time_bin_size: float = nonPBE_results.epochs_decoding_time_bin_size ## just get the standard size. Currently assuming all things are the same size!
+    print(f'\tepochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}')
 
-    # ==================================================================================================================== #
-    # Phase 4 - Remdial - Add any missing dataframes directly.                                                             #
-    # ==================================================================================================================== #
-    ## Build masked versions of important contexts:
-
-    ## Common/shared for all decoded epochs:
-    for a_masked_bin_fill_mode in ['nan_filled', 'last_valid', 'dropped']:
-        # a_masked_bin_fill_mode = 'nan_filled'
-
-        ## INPUTS: a_new_fully_generic_result
-        base_contexts_list = [IdentifyingContext(trained_compute_epochs= 'laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= 0.025, known_named_decoding_epochs_type='laps', masked_time_bin_fill_type= 'ignore', data_grain= 'per_time_bin'),
-                            IdentifyingContext(trained_compute_epochs= 'laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= 0.025, known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type= 'ignore', data_grain= 'per_time_bin'),
-                            IdentifyingContext(trained_compute_epochs= 'non_pbe', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= 0.025, known_named_decoding_epochs_type='laps', masked_time_bin_fill_type= 'ignore', data_grain= 'per_time_bin'),
-                            IdentifyingContext(trained_compute_epochs= 'non_pbe', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= 0.025, known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type= 'ignore', data_grain= 'per_time_bin')]
-        masked_contexts_dict = {}
-
-        for a_base_context in base_contexts_list:
-
-            a_best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_matching_contexts(a_base_context, return_multiple_matches=False)
-
-            ## INPUTS: a_result, masked_bin_fill_mode
-            a_masked_updated_context: IdentifyingContext = deepcopy(a_best_matching_context).overwriting_context(masked_time_bin_fill_type=a_masked_bin_fill_mode)
-            masked_contexts_dict[a_base_context] = a_masked_updated_context
-            if debug_print:
-                print(f'a_masked_updated_context: {a_masked_updated_context}')
-            
-            ## MASKED with NaNs (no backfill):
-            a_dropping_masked_pseudo2D_continuous_specific_decoded_result, _dropping_mask_index_tuple = a_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(spikes_df), masked_bin_fill_mode=a_masked_bin_fill_mode) ## Masks the low-firing bins so they don't confound the analysis.
-            ## Computes marginals for `dropping_masked_laps_pseudo2D_continuous_specific_decoded_result`
-            a_dropping_masked_decoded_marginal_posterior_df = DirectionalPseudo2DDecodersResult.perform_compute_specific_marginals(a_result=a_dropping_masked_pseudo2D_continuous_specific_decoded_result, marginal_context=a_masked_updated_context)
-            a_new_fully_generic_result.updating_results_for_context(new_context=a_masked_updated_context, a_result=deepcopy(a_dropping_masked_pseudo2D_continuous_specific_decoded_result), a_decoder=deepcopy(a_decoder), a_decoded_marginal_posterior_df=deepcopy(a_dropping_masked_decoded_marginal_posterior_df)) ## update using the result
-            
-        ## OUTPUTS: masked_contexts_dict
-
-
-    # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
-    for k in list(a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict.keys()):
-        a_df = a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict[k]
-        # a_df['delta_aligned_start_t'] = a_df['t'] - t_delta ## subtract off t_delta    
-        a_df = a_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=epochs_decoding_time_bin_size, curr_session_t_delta=t_delta)
-        a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict[k] = a_df
-        
     # ==================================================================================================================== #
     # Create and add the output                                                                                            #
     # ==================================================================================================================== #
