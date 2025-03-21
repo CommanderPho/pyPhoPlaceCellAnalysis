@@ -956,6 +956,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             from `pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions.Compute_NonPBE_Epochs.recompute`
         
         """
+        print(f'GenericDecoderDictDecodedEpochsDictResult.compute_continuous_fn(...): NOT YET IMPLEMENTED!')
         # initial_context_dict: Dict = deepcopy(context.to_dict())
         # final_output_context_dict: Dict = {}
         
@@ -1246,7 +1247,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # final_output_context: IdentifyingContext = IdentifyingContext(**final_output_context_dict)
         pass
         # return final_output_context
-
+        return self
 
 
 
