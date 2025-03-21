@@ -3053,10 +3053,9 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     # New 2025-03-11 Generic Result:                                                                                       #
     # ==================================================================================================================== #
 
-    if ('generalized_decode_epochs_dict_and_export_results_completion_function' not in across_session_results_extended_dict) and force_recompute:
+    if ('generalized_decode_epochs_dict_and_export_results_completion_function' in across_session_results_extended_dict) and force_recompute:
         ## drop the existing
         del across_session_results_extended_dict['generalized_decode_epochs_dict_and_export_results_completion_function']
-
 
     a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = GenericDecoderDictDecodedEpochsDictResult.batch_user_compute_fn(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, debug_print=debug_print)
                     
