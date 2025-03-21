@@ -166,10 +166,11 @@ data_grain | DataTimeGrain | how the data is binned in time (e.g. "data_grain='p
 
 """
 
-# @metadata_attributes(short_name=None, tags=['Generic', 'Improved'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-11 07:53', related_items=['GeneralDecoderDictDecodedEpochsDictResult'])
+# @metadata_attributes(short_name=None, tags=['Generic', 'Improved'], input_requires=[], output_provides=[], uses=[], used_by=['generalized_decode_epochs_dict_and_export_results_completion_function'], creation_date='2025-03-11 07:53', related_items=['GeneralDecoderDictDecodedEpochsDictResult'])
 @define(slots=False, eq=False)
 class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
     """ General dict-based class that uses IdentifyingContext (unordered-dict-like) for keys into multiple result dicts. (flat-unordered-tuple-like indicies)
+    ** Just accumulates results and extracts them from previous computed results **
     
     Means to store general results and export them easily to .CSV (FAT_df) or separate classical .CSVs
     
