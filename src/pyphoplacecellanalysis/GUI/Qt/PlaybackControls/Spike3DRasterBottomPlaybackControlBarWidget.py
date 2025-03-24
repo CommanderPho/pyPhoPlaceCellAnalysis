@@ -169,6 +169,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         """ setup the UI
         """
    
+        ## Enumeration of several control groups, for the purpose of turning them enable/disabled and visible/hidden as a group
         playback_controls = [self.ui.button_play_pause, self.ui.button_reverse, self.ui.horizontalSpacer_1] # 
 
         speed_controls = [self.ui.button_slow_down, self.ui.doubleSpinBoxPlaybackSpeed, self.ui.toolButton_SpeedBurstEnabled, self.ui.button_speed_up, self.ui.horizontalSpacer_6] # 
@@ -215,7 +216,6 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         self._INIT_UI_initialize_jump_time_edit()
         self._INIT_UI_initialize_active_window_time_double_spinboxes()
         
-
         ## Remove Extra Buttons:
         self.ui.btnSkipLeft.hide()
         self.ui.btnSkipRight.hide()
@@ -230,7 +230,8 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         self.ui.btnJumpToPrevious.pressed.connect(self.on_jump_prev_series_item)
         self.ui.btnJumpToNext.pressed.connect(self.on_jump_next_series_item)
         self.ui.comboActiveJumpTargetSeries.currentTextChanged.connect(self.on_jump_combo_series_changed)
-
+        
+        self.ui.btnCurrentIntervals_Remove.setHidden(True) ## Hide the dedicated "Remove" button, add it as an entry to the "Extra" menu
         self.ui.btnCurrentIntervals_Customize.pressed.connect(self.on_series_customize_button_pressed)
         self.ui.btnCurrentIntervals_Remove.pressed.connect(self.on_series_remove_button_pressed)
 
@@ -238,6 +239,7 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
         # self.ui.btnCurrentIntervals_Extra.pressed.connect(self.on_series_customize_button_pressed)
         self.ui._series_extra_menu = QtWidgets.QMenu()
         self.ui._series_extra_menu.addAction('Clear all', self.on_action_clear_all_pressed)
+        self.ui._series_extra_menu.addAction('Remove current', self.on_series_remove_button_pressed)
         self.ui._series_extra_menu.addAction('Add Intervals...', self.on_action_request_add_intervals_pressed)
         self.ui.btnCurrentIntervals_Extra.setMenu(self.ui._series_extra_menu)
         self._update_series_action_buttons(self.has_valid_current_target_series_name) # should disable the action buttons to start
@@ -277,7 +279,9 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
 
         self.ui.btnToggleRightSidebar.pressed.connect(self.on_right_sidebar_toggle_button_pressed)
 
+
     def on_joystick_delta_state_changed(self, joystick_ctrl, new_state):
+        """ called when the little analog joystick in the UI is manipulated to control the timeline """
         print(f"on_joystick_delta_state_changed(joystick_ctrl: {joystick_ctrl} new_state: {new_state})")
         # new_state = joystick_ctrl.getState()
         dx, dy = new_state
