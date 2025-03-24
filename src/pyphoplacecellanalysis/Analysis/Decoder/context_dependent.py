@@ -109,7 +109,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 from neuropy.utils.result_context import IdentifyingContext
 from typing import Literal
 # Define a type that can only be one of these specific strings
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import Compute_NonPBE_Epochs, _DEP_GeneralDecoderDictDecodedEpochsDictResult, KnownFilterEpochs, NonPBEDimensionalDecodingResult ## #TODO 2025-03-11 08:15: - [ ] Actually look into this class instead of the literal
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import Compute_NonPBE_Epochs, GeneralDecoderDictDecodedEpochsDictResult, KnownFilterEpochs, NonPBEDimensionalDecodingResult ## #TODO 2025-03-11 08:15: - [ ] Actually look into this class instead of the literal
 
 import pyphoplacecellanalysis.General.type_aliases as types
 
@@ -893,7 +893,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # END for a_...
 
         # return filter_epochs_pseudo2D_continuous_specific_decoded_result, filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict
-        a_general_decoder_dict_decoded_epochs_dict_result: _DEP_GeneralDecoderDictDecodedEpochsDictResult = _DEP_GeneralDecoderDictDecodedEpochsDictResult(filter_epochs_to_decode_dict=filter_epochs_to_decode_dict, filter_epochs_pseudo2D_continuous_specific_decoded_result=filter_epochs_pseudo2D_continuous_specific_decoded_result,
+        a_general_decoder_dict_decoded_epochs_dict_result: GeneralDecoderDictDecodedEpochsDictResult = GeneralDecoderDictDecodedEpochsDictResult(filter_epochs_to_decode_dict=filter_epochs_to_decode_dict, filter_epochs_pseudo2D_continuous_specific_decoded_result=filter_epochs_pseudo2D_continuous_specific_decoded_result,
                                                          filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict=filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict)
     
 
@@ -1301,7 +1301,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         """
         from typing import Literal
         from neuropy.core.epoch import EpochsAccessor, Epoch, ensure_dataframe, ensure_Epoch, TimeColumnAliasesProtocol
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer, NonPBEDimensionalDecodingResult, Compute_NonPBE_Epochs, KnownFilterEpochs, _DEP_GeneralDecoderDictDecodedEpochsDictResult
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer, NonPBEDimensionalDecodingResult, Compute_NonPBE_Epochs, KnownFilterEpochs, GeneralDecoderDictDecodedEpochsDictResult
         from neuropy.analyses.placefields import PfND
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
         from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
@@ -1348,7 +1348,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # ==================================================================================================================== #
         # Pre 2025-03-10 Semi-generic (unfinalized) Result                                                                     #
         # ==================================================================================================================== #
-        a_general_decoder_dict_decoded_epochs_dict_result: _DEP_GeneralDecoderDictDecodedEpochsDictResult = nonPBE_results.a_general_decoder_dict_decoded_epochs_dict_result ## get the pre-decoded result
+        a_general_decoder_dict_decoded_epochs_dict_result: GeneralDecoderDictDecodedEpochsDictResult = nonPBE_results.a_general_decoder_dict_decoded_epochs_dict_result ## get the pre-decoded result
         assert a_general_decoder_dict_decoded_epochs_dict_result is not None
 
         # ==================================================================================================================== #
