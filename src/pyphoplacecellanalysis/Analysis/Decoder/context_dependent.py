@@ -99,46 +99,6 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 """
 
 
-
-# @define(slots=False, repr=False)
-# class GeneralizedPseudo2DDecodersResult(ComputedResult):
-#     """ a container for holding information regarding the computation of merged (pseudo2D) directional placefields.
-
-#     From `DirectionalPseudo2DDecodersResult`
-    
-#     #TODO 2024-05-22 17:26: - [ ] 'DirectionalMergedDecodersResult' -> 'DirectionalPseudo2DDecodersResult'
-
-#     #TODO 2025-03-04 17:35: - [ ] Limited in the following ways:
-#         - Assumes directional (long/short) configurations, not general
-#         - Assumes two epochs of interest: (laps/ripples)
-#         - Outputs a bunch of separate marginal files which seems excessive
-        
-    
-#     """
-#     _VersionedResultMixin_version: str = "2024.10.09_0" # to be updated in your IMPLEMENTOR to indicate its version
-    
-#     all_directional_decoder_dict: Dict[str, BasePositionDecoder] = serialized_field(default=None)
-#     all_directional_pf1D_Decoder: BasePositionDecoder = serialized_field(default=None)
-    
-#     long_directional_pf1D_Decoder: BasePositionDecoder = serialized_field(default=None)
-#     long_directional_decoder_dict: Dict[str, BasePositionDecoder] = serialized_field(default=None)
-#     short_directional_pf1D_Decoder: BasePositionDecoder = serialized_field(default=None)
-#     short_directional_decoder_dict: Dict[str, BasePositionDecoder] = serialized_field(default=None)
-
-#     # Posteriors computed via the all_directional decoder:
-#     all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult = serialized_field(default=None)
-#     all_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = serialized_field(default=None)
-
-#     # Marginalized posteriors computed from above posteriors:
-#     laps_directional_marginals_tuple: Tuple = serialized_field(default=None) # laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir  = self.laps_directional_marginals_tuple
-#     laps_track_identity_marginals_tuple: Tuple = serialized_field(default=None)
-#     laps_non_marginalized_decoder_marginals_tuple: Tuple = serialized_field(default=None, metadata={'field_added': "2024.10.09_0"}, hdf_metadata={'epochs': 'Laps'})
-    
-#     ripple_directional_marginals_tuple: Tuple = serialized_field(default=None)
-#     ripple_track_identity_marginals_tuple: Tuple = serialized_field(default=None) 
-#     ripple_non_marginalized_decoder_marginals_tuple: Tuple = serialized_field(default=None, metadata={'field_added': "2024.10.09_0"}, hdf_metadata={'epochs': 'Replay'})
-
-
 from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch
 from neuropy.analyses.placefields import PfND
 # from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
@@ -149,7 +109,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 from neuropy.utils.result_context import IdentifyingContext
 from typing import Literal
 # Define a type that can only be one of these specific strings
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import Compute_NonPBE_Epochs, GeneralDecoderDictDecodedEpochsDictResult, KnownFilterEpochs, NonPBEDimensionalDecodingResult ## #TODO 2025-03-11 08:15: - [ ] Actually look into this class instead of the literal
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import Compute_NonPBE_Epochs, _DEP_GeneralDecoderDictDecodedEpochsDictResult, KnownFilterEpochs, NonPBEDimensionalDecodingResult ## #TODO 2025-03-11 08:15: - [ ] Actually look into this class instead of the literal
 
 import pyphoplacecellanalysis.General.type_aliases as types
 
@@ -234,6 +194,9 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
     filter_epochs_specific_decoded_result: Dict[types.GenericResultTupleIndexType, DecodedFilterEpochsResult] = serialized_field(default=Factory(dict), repr=keys_only_repr) ## why is this labeled as if they have to be continuous or Pseudo2D? They can be any result right?
     filter_epochs_decoded_track_marginal_posterior_df_dict: Dict[types.GenericResultTupleIndexType, pd.DataFrame] = serialized_field(default=Factory(dict), repr=keys_only_repr)
 
+
+    should_use_flat_context_mode: bool = serialized_attribute_field(default=True, is_computable=False, repr=True)
+    
 
     @property
     def single_FAT_df(self) -> pd.DataFrame:
@@ -930,7 +893,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # END for a_...
 
         # return filter_epochs_pseudo2D_continuous_specific_decoded_result, filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict
-        a_general_decoder_dict_decoded_epochs_dict_result: GeneralDecoderDictDecodedEpochsDictResult = GeneralDecoderDictDecodedEpochsDictResult(filter_epochs_to_decode_dict=filter_epochs_to_decode_dict, filter_epochs_pseudo2D_continuous_specific_decoded_result=filter_epochs_pseudo2D_continuous_specific_decoded_result,
+        a_general_decoder_dict_decoded_epochs_dict_result: _DEP_GeneralDecoderDictDecodedEpochsDictResult = _DEP_GeneralDecoderDictDecodedEpochsDictResult(filter_epochs_to_decode_dict=filter_epochs_to_decode_dict, filter_epochs_pseudo2D_continuous_specific_decoded_result=filter_epochs_pseudo2D_continuous_specific_decoded_result,
                                                          filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict=filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict)
     
 
@@ -1338,7 +1301,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         """
         from typing import Literal
         from neuropy.core.epoch import EpochsAccessor, Epoch, ensure_dataframe, ensure_Epoch, TimeColumnAliasesProtocol
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer, NonPBEDimensionalDecodingResult, Compute_NonPBE_Epochs, KnownFilterEpochs, GeneralDecoderDictDecodedEpochsDictResult
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer, NonPBEDimensionalDecodingResult, Compute_NonPBE_Epochs, KnownFilterEpochs, _DEP_GeneralDecoderDictDecodedEpochsDictResult
         from neuropy.analyses.placefields import PfND
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import filter_and_update_epochs_and_spikes
         from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
@@ -1385,7 +1348,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # ==================================================================================================================== #
         # Pre 2025-03-10 Semi-generic (unfinalized) Result                                                                     #
         # ==================================================================================================================== #
-        a_general_decoder_dict_decoded_epochs_dict_result: GeneralDecoderDictDecodedEpochsDictResult = nonPBE_results.a_general_decoder_dict_decoded_epochs_dict_result ## get the pre-decoded result
+        a_general_decoder_dict_decoded_epochs_dict_result: _DEP_GeneralDecoderDictDecodedEpochsDictResult = nonPBE_results.a_general_decoder_dict_decoded_epochs_dict_result ## get the pre-decoded result
         assert a_general_decoder_dict_decoded_epochs_dict_result is not None
 
         # ==================================================================================================================== #
@@ -1569,19 +1532,23 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         
 
     @function_attributes(short_name=None, tags=['contexts', 'matching'], input_requires=[], output_provides=[], uses=['get_flattened_contexts_for_posteriors_dfs'], used_by=[], creation_date='2025-03-12 11:30', related_items=[])
-    def get_matching_contexts(self, context_query: IdentifyingContext, return_multiple_matches: bool=True, return_flat_same_length_dicts: bool=True, debug_print:bool=True) -> List[IdentifyingContext]: 
+    def get_matching_contexts(self, context_query: Optional[IdentifyingContext]=None, return_multiple_matches: bool=True, return_flat_same_length_dicts: bool=True, debug_print:bool=True) -> List[IdentifyingContext]: 
         """ contexts only, no results returned.
         This doesn't quite make sense because each results dictionary may have different contexts
         
         
         """
+        if context_query is None:
+            context_query = IdentifyingContext() ## empty context, returning all matches
+            
+
         if (not return_multiple_matches):
             # ==================================================================================================================== #
             # Find single best matching context                                                                                    #
             # ==================================================================================================================== #
-            result_context, a_result = self._subfn_get_value_with_context_matching(self.filter_epochs_specific_decoded_result, context_query, "a_result", return_multiple_matches=return_multiple_matches)
-            decoder_context, a_decoder = self._subfn_get_value_with_context_matching(self.decoders, context_query, "a_decoder", return_multiple_matches=return_multiple_matches)
-            posterior_context, a_decoded_marginal_posterior_df = self._subfn_get_value_with_context_matching(self.filter_epochs_decoded_track_marginal_posterior_df_dict, context_query, "a_decoded_marginal_posterior_df", return_multiple_matches=return_multiple_matches)
+            result_context, a_result = self._subfn_get_value_with_context_matching(self.filter_epochs_specific_decoded_result, context_query, "a_result", return_multiple_matches=return_multiple_matches, debug_print=debug_print)
+            decoder_context, a_decoder = self._subfn_get_value_with_context_matching(self.decoders, context_query, "a_decoder", return_multiple_matches=return_multiple_matches, debug_print=debug_print)
+            posterior_context, a_decoded_marginal_posterior_df = self._subfn_get_value_with_context_matching(self.filter_epochs_decoded_track_marginal_posterior_df_dict, context_query, "a_decoded_marginal_posterior_df", return_multiple_matches=return_multiple_matches, debug_print=debug_print)
             
             # Determine the best matching context:
             contexts = [c for c in [result_context, decoder_context, posterior_context] if c is not None]
@@ -1603,9 +1570,9 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             # ==================================================================================================================== #
             # Find multiple matching contexts                                                                                      #
             # ==================================================================================================================== #
-            result_context_dict = self._subfn_get_value_with_context_matching(self.filter_epochs_specific_decoded_result, context_query, "a_result", return_multiple_matches=return_multiple_matches)
-            decoder_context_dict = self._subfn_get_value_with_context_matching(self.decoders, context_query, "a_decoder", return_multiple_matches=return_multiple_matches)
-            decoded_marginal_posterior_df_context_dict = self._subfn_get_value_with_context_matching(self.filter_epochs_decoded_track_marginal_posterior_df_dict, context_query, "a_decoded_marginal_posterior_df", return_multiple_matches=return_multiple_matches)
+            result_context_dict = self._subfn_get_value_with_context_matching(self.filter_epochs_specific_decoded_result, context_query, "a_result", return_multiple_matches=return_multiple_matches, debug_print=debug_print)
+            decoder_context_dict = self._subfn_get_value_with_context_matching(self.decoders, context_query, "a_decoder", return_multiple_matches=return_multiple_matches, debug_print=debug_print)
+            decoded_marginal_posterior_df_context_dict = self._subfn_get_value_with_context_matching(self.filter_epochs_decoded_track_marginal_posterior_df_dict, context_query, "a_decoded_marginal_posterior_df", return_multiple_matches=return_multiple_matches, debug_print=debug_print)
             
             if isinstance(decoded_marginal_posterior_df_context_dict, dict):
                 any_matching_contexts_list = list(set(self.get_keys_or_elements(result_context_dict)).union(set(self.get_keys_or_elements(decoder_context_dict))).union(set(self.get_keys_or_elements(decoded_marginal_posterior_df_context_dict))))
@@ -1619,24 +1586,21 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
 
     @function_attributes(short_name=None, tags=['contexts', 'matching'], input_requires=[], output_provides=[], uses=['get_flattened_contexts_for_posteriors_dfs'], used_by=[], creation_date='2025-03-12 11:30', related_items=[])
-    def get_results_matching_contexts(self, context_query: IdentifyingContext, return_multiple_matches: bool=True, return_flat_same_length_dicts: bool=True, debug_print:bool=True): 
+    def get_results_matching_contexts(self, context_query: Optional[IdentifyingContext]=None, return_multiple_matches: bool=True, return_flat_same_length_dicts: bool=True, debug_print:bool=True): 
         """ Get a specific contexts
         
         a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='long_LR', time_bin_size=0.025, known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type='ignore')
         """
-        
-
-                
-
-
+        if context_query is None:
+            context_query = IdentifyingContext() ## empty context, returning all matches
 
         if (not return_multiple_matches):
             # ==================================================================================================================== #
             # Find single best matching context                                                                                    #
             # ==================================================================================================================== #
-            result_context, a_result = self._subfn_get_value_with_context_matching(self.filter_epochs_specific_decoded_result, context_query, "a_result", return_multiple_matches=return_multiple_matches)
-            decoder_context, a_decoder = self._subfn_get_value_with_context_matching(self.decoders, context_query, "a_decoder", return_multiple_matches=return_multiple_matches)
-            posterior_context, a_decoded_marginal_posterior_df = self._subfn_get_value_with_context_matching(self.filter_epochs_decoded_track_marginal_posterior_df_dict, context_query, "a_decoded_marginal_posterior_df", return_multiple_matches=return_multiple_matches)
+            result_context, a_result = self._subfn_get_value_with_context_matching(self.filter_epochs_specific_decoded_result, context_query, "a_result", return_multiple_matches=return_multiple_matches, debug_print=debug_print)
+            decoder_context, a_decoder = self._subfn_get_value_with_context_matching(self.decoders, context_query, "a_decoder", return_multiple_matches=return_multiple_matches, debug_print=debug_print)
+            posterior_context, a_decoded_marginal_posterior_df = self._subfn_get_value_with_context_matching(self.filter_epochs_decoded_track_marginal_posterior_df_dict, context_query, "a_decoded_marginal_posterior_df", return_multiple_matches=return_multiple_matches, debug_print=debug_print)
             
             # Determine the best matching context
             contexts = [c for c in [result_context, decoder_context, posterior_context] if c is not None]
@@ -1658,9 +1622,9 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             # ==================================================================================================================== #
             # Find multiple matching contexts                                                                                      #
             # ==================================================================================================================== #
-            result_context_dict = self._subfn_get_value_with_context_matching(self.filter_epochs_specific_decoded_result, context_query, "a_result", return_multiple_matches=return_multiple_matches)
-            decoder_context_dict = self._subfn_get_value_with_context_matching(self.decoders, context_query, "a_decoder", return_multiple_matches=return_multiple_matches)
-            decoded_marginal_posterior_df_context_dict = self._subfn_get_value_with_context_matching(self.filter_epochs_decoded_track_marginal_posterior_df_dict, context_query, "a_decoded_marginal_posterior_df", return_multiple_matches=return_multiple_matches)
+            result_context_dict = self._subfn_get_value_with_context_matching(self.filter_epochs_specific_decoded_result, context_query, "a_result", return_multiple_matches=return_multiple_matches, debug_print=debug_print)
+            decoder_context_dict = self._subfn_get_value_with_context_matching(self.decoders, context_query, "a_decoder", return_multiple_matches=return_multiple_matches, debug_print=debug_print)
+            decoded_marginal_posterior_df_context_dict = self._subfn_get_value_with_context_matching(self.filter_epochs_decoded_track_marginal_posterior_df_dict, context_query, "a_decoded_marginal_posterior_df", return_multiple_matches=return_multiple_matches, debug_print=debug_print)
             
             if isinstance(decoded_marginal_posterior_df_context_dict, dict):
                 # decoded_marginal_posterior_df_context_dict =
@@ -1742,7 +1706,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
     
     
 
-    @function_attributes(short_name=None, tags=['export', 'CSV', 'main'], input_requires=[], output_provides=[], uses=['SingleFatDataframe'], used_by=['self.export_csvs'], creation_date='2025-03-13 07:12', related_items=[])
+    @function_attributes(short_name=None, tags=['private', 'export', 'CSV', 'main'], input_requires=[], output_provides=[], uses=['SingleFatDataframe'], used_by=['self.export_csvs'], creation_date='2025-03-13 07:12', related_items=[])
     @classmethod
     def _perform_export_dfs_dict_to_csvs(cls, extracted_dfs_dict: Dict[IdentifyingContext, pd.DataFrame], parent_output_path: Path, active_context: IdentifyingContext, session_name: str, tbin_values_dict: Dict[str, float],
                                     t_start: Optional[float]=None, curr_session_t_delta: Optional[float]=None, t_end: Optional[float]=None,

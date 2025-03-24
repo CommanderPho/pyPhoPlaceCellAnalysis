@@ -875,7 +875,7 @@ GenericResultTupleIndexType: TypeAlias = MaskedTimeBinFillType # an template/sta
 
 @function_attributes(short_name=None, tags=['DEPRICATED', 'replaced', 'not-general'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-11 13:50', related_items=['GenericDecoderDictDecodedEpochsDictResult'])
 @define(slots=False, repr=False, eq=False)
-class GeneralDecoderDictDecodedEpochsDictResult(ComputedResult):
+class _DEP_GeneralDecoderDictDecodedEpochsDictResult(ComputedResult):
     """ REPLACED BY `GenericDecoderDictDecodedEpochsDictResult` on 2025-03-11 13:51 
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import GeneralDecoderDictDecodedEpochsDictResult, GenericResultTupleIndexType, KnownNamedDecodingEpochsType, MaskedTimeBinFillType
     
@@ -1082,7 +1082,7 @@ class EpochComputationsComputationsContainer(ComputedResult):
     results1D: Optional[NonPBEDimensionalDecodingResult] = serialized_field(default=None, repr=False)
     results2D: Optional[NonPBEDimensionalDecodingResult] = serialized_field(default=None, repr=False)
 
-    a_general_decoder_dict_decoded_epochs_dict_result: GeneralDecoderDictDecodedEpochsDictResult = serialized_field(default=None, is_computable=True, repr=False, metadata={'field_added': '2025.03.09_0'})
+    a_general_decoder_dict_decoded_epochs_dict_result: _DEP_GeneralDecoderDictDecodedEpochsDictResult = serialized_field(default=None, is_computable=True, repr=False, metadata={'field_added': '2025.03.09_0'})
     
     # Utility Methods ____________________________________________________________________________________________________ #
 
@@ -1225,7 +1225,7 @@ class EpochComputationsComputationsContainer(ComputedResult):
     @function_attributes(short_name=None, tags=['posteriors'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-09 05:21', related_items=[])
     @classmethod
     def _build_output_decoded_posteriors(cls, non_PBE_all_directional_pf1D_Decoder: BasePositionDecoder, filter_epochs_to_decode_dict: Dict[KnownNamedDecodingEpochsType, Epoch], unique_decoder_names: List[str], spikes_df: pd.DataFrame, epochs_decoding_time_bin_size: float,
-                                        session_name: str, t_start: float, t_delta: float, t_end: float) -> GeneralDecoderDictDecodedEpochsDictResult:
+                                        session_name: str, t_start: float, t_delta: float, t_end: float) -> _DEP_GeneralDecoderDictDecodedEpochsDictResult:
         """ Given a also produces  Unit Time Binned Spike Count Masking of Decodings
         
         Breakdown:
@@ -1348,7 +1348,7 @@ class EpochComputationsComputationsContainer(ComputedResult):
         # END for a_...
 
         # return filter_epochs_pseudo2D_continuous_specific_decoded_result, filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict
-        return GeneralDecoderDictDecodedEpochsDictResult(filter_epochs_to_decode_dict=filter_epochs_to_decode_dict, filter_epochs_pseudo2D_continuous_specific_decoded_result=filter_epochs_pseudo2D_continuous_specific_decoded_result,
+        return _DEP_GeneralDecoderDictDecodedEpochsDictResult(filter_epochs_to_decode_dict=filter_epochs_to_decode_dict, filter_epochs_pseudo2D_continuous_specific_decoded_result=filter_epochs_pseudo2D_continuous_specific_decoded_result,
                                                          filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict=filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict)
 
 
@@ -1675,7 +1675,7 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
             t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
 
             # filter_epochs_pseudo2D_continuous_specific_decoded_result, filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict
-            a_general_decoder_dict_decoded_epochs_dict_result: GeneralDecoderDictDecodedEpochsDictResult = EpochComputationsComputationsContainer._build_output_decoded_posteriors(non_PBE_all_directional_pf1D_Decoder=non_PBE_all_directional_pf1D_Decoder, # pseudo2D_continuous_specific_decoded_result=pseudo2D_continuous_specific_decoded_result,
+            a_general_decoder_dict_decoded_epochs_dict_result: _DEP_GeneralDecoderDictDecodedEpochsDictResult = EpochComputationsComputationsContainer._build_output_decoded_posteriors(non_PBE_all_directional_pf1D_Decoder=non_PBE_all_directional_pf1D_Decoder, # pseudo2D_continuous_specific_decoded_result=pseudo2D_continuous_specific_decoded_result,
                 filter_epochs_to_decode_dict=filter_epochs_to_decode_dict,
                 unique_decoder_names=unique_decoder_names, spikes_df=deepcopy(get_proper_global_spikes_df(owning_pipeline_reference)), epochs_decoding_time_bin_size=epochs_decoding_time_bin_size,
                 session_name=session_name, t_start=t_start, t_delta=t_delta, t_end=t_end,
