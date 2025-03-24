@@ -84,6 +84,53 @@ from pyphocorehelpers.Filesystem.path_helpers import sanitize_filename_for_Windo
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
 
 
+
+
+from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import build_single_plotly_marginal_scatter_and_hist_over_time
+
+@function_attributes(short_name=None, tags=['plotly', 'plotting'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-24 14:55', related_items=[])
+def _plot_plotly_stack_marginal_scatter_and_hist_over_time(flat_decoded_marginal_posterior_df_context_dict, session_name: str, t_delta: float, epochs_decoding_time_bin_size: float ) -> Dict:
+    """ 
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _plot_plotly_stack_marginal_scatter_and_hist_over_time
+    
+    session_name: str = curr_active_pipeline.session_name
+    t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+    epochs_decoding_time_bin_size: float = 0.025
+
+    a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', time_bin_size= 0.025, known_named_decoding_epochs_type='laps', data_grain='per_time_bin') # , known_named_decoding_epochs_type='laps'
+    flat_context_list, flat_result_context_dict, flat_decoder_context_dict, flat_decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_results_matching_contexts(context_query=a_target_context, return_multiple_matches=True, return_flat_same_length_dicts=True, debug_print=True)
+    _flat_out_figs_dict = _plot_plotly_stack_marginal_scatter_and_hist_over_time(flat_decoded_marginal_posterior_df_context_dict=flat_decoded_marginal_posterior_df_context_dict, session_name=session_name, t_delta=t_delta, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size)
+
+
+    
+    """
+    #INPUTS: a_target_context: IdentifyingContext, a_result: DecodedFilterEpochsResult, a_decoded_marginal_posterior_df: pd.DataFrame, a_decoder: BasePositionDecoder
+    _flat_out_figs_dict = {}
+
+    for a_ctxt, a_decoded_marginal_posterior_df in flat_decoded_marginal_posterior_df_context_dict.items():
+        print(a_ctxt)
+        
+        # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
+        # a_decoded_marginal_posterior_df['delta_aligned_start_t'] = a_decoded_marginal_posterior_df['start'] - t_delta ## subtract off t_delta
+        a_decoded_marginal_posterior_df = a_decoded_marginal_posterior_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=epochs_decoding_time_bin_size, curr_session_t_delta=t_delta) # , time_col='t'
+            
+        a_fig, a_figure_context = build_single_plotly_marginal_scatter_and_hist_over_time(a_decoded_posterior_df=a_decoded_marginal_posterior_df, a_target_context=a_ctxt)
+        a_fig = a_fig.update_layout(height=300, # Set your desired height
+                                    margin=dict(t=20, b=0),  # Set top and bottom margins to 0
+                                    )
+        _flat_out_figs_dict[a_figure_context] = a_fig
+        a_fig.show()
+	## END FOR
+    return _flat_out_figs_dict
+
+
+
+
+
+
+
+
+
 @function_attributes(short_name=None, tags=['pyqtgraph', 'scatter', 'histogram', 'AI', 'testing', 'unused'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-12-15 14:30', related_items=['plotly_pre_post_delta_scatter'])
 def pyqtgraph_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: Optional[IdentifyingContext]=None, 
                                      histogram_bins:int=25, common_plot_kwargs=None, scatter_kwargs=None,
@@ -528,9 +575,6 @@ def pyqtgraph_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context
     main_widget.export_to_svg = export_to_svg
     
     return main_widget, figure_context
-
-
-
 
 
 # ==================================================================================================================== #
@@ -2391,6 +2435,8 @@ class TimeBinAggregation:
             float: The streak-weighted P_Long for the DataFrame.
         """
         return df[column].rolling(window, *args, **kwargs).max().max()
+
+
 
 @metadata_attributes(short_name=None, tags=['UNUSED', 'ChatGPT', 'aggregation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 00:00', related_items=['TimeBinAggregation'])
 class ParticleFilter:
