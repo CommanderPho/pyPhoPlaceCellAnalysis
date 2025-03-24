@@ -1498,8 +1498,12 @@ def build_single_plotly_marginal_scatter_and_hist_over_time(a_decoded_posterior_
     plot_row_identifier = f"{plot_row_identifier} decoder" # should be like 'Laps (Masked) from Non-PBE decoder'"
     fig, figure_context = plotly_pre_post_delta_scatter(data_results_df=deepcopy(a_decoded_posterior_df), data_context=deepcopy(a_target_context), out_scatter_fig=None, 
                                     histogram_variable_name='P_Short', hist_kwargs=dict(), histogram_bins=histogram_bins,
-                                    common_plot_kwargs=dict(),
+                                    common_plot_kwargs=dict(height=300),
                                     px_scatter_kwargs = dict(x='delta_aligned_start_t', y='P_Short', title=plot_row_identifier))
+    fig = fig.update_layout(height=300, margin=dict(t=20, b=0),  # Set top and bottom margins to 0
+                    )  # Set your desired height
+        
+
     return fig, figure_context
 
 
