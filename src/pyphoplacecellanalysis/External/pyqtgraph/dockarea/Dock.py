@@ -553,7 +553,106 @@ class Dock(QtWidgets.QWidget, DockDrop):
         self.sigToggleOrientationClicked.emit(self)
         
 
+    # ==================================================================================================================== #
+    # Context Menu Providing                                                                                               #
+    # ==================================================================================================================== #
+    def buildContextMenu(self):
+        """
+        Build and return a context menu for this dock.
+        This method can be overridden by subclasses to customize the context menu.
+        Widgets in the dock can also add their own menu items by connecting to 
+        the label's sigContextMenuRequested signal.
+        
+        Returns:
+            QtWidgets.QMenu: The context menu to display
+        """
+        menu = QtWidgets.QMenu()
+        
+        # Create standard actions
+        renameAction = menu.addAction("Rename dock...")
+        renameAction.triggered.connect(lambda: self.label.promptRename())
+        
+        toggleOrientationAction = menu.addAction("Toggle orientation")
+        toggleOrientationAction.triggered.connect(
+            lambda: self.setOrientation('vertical' if self.orientation == 'horizontal' else 'horizontal', force=True)
+        )
+        
+        # Add Close action if close button is available
+        if self.config.showCloseButton:
+            closeAction = menu.addAction("Close dock")
+            closeAction.triggered.connect(self.close)
+        
+        # Add buttons visibility submenu
+        buttonVisibilityMenu = menu.addMenu("Show dock buttons")
+        
+        # Close button toggle
+        showCloseAction = buttonVisibilityMenu.addAction("Close button")
+        showCloseAction.setCheckable(True)
+        showCloseAction.setChecked(self.config.showCloseButton)
+        showCloseAction.toggled.connect(lambda checked: self.updateButtonVisibility('close', checked))
+        
+        # Collapse button toggle
+        showCollapseAction = buttonVisibilityMenu.addAction("Collapse button")
+        showCollapseAction.setCheckable(True)
+        showCollapseAction.setChecked(self.config.showCollapseButton)
+        showCollapseAction.toggled.connect(lambda checked: self.updateButtonVisibility('collapse', checked))
+        
+        # Group button toggle
+        showGroupAction = buttonVisibilityMenu.addAction("Group button")
+        showGroupAction.setCheckable(True)
+        showGroupAction.setChecked(self.config.showGroupButton)
+        showGroupAction.toggled.connect(lambda checked: self.updateButtonVisibility('group', checked))
+        
+        # Orientation button toggle
+        showOrientationAction = buttonVisibilityMenu.addAction("Orientation button")
+        showOrientationAction.setCheckable(True)
+        showOrientationAction.setChecked(self.config.showOrientationButton)
+        showOrientationAction.toggled.connect(lambda checked: self.updateButtonVisibility('orientation', checked))
+        
+        # Add visibility options
+        collapseAction = menu.addAction("Toggle content visibility")
+        collapseAction.triggered.connect(self.toggleContentVisibility)
+        
+        # Allow widgets to extend this menu
+        self.extendContextMenu(menu)
+        
+        return menu
+    
 
+    def extendContextMenu(self, menu):
+        """
+        This method can be overridden by subclasses to add additional items to the context menu.
+        The default implementation checks if any widgets in the dock have a method named
+        'extendDockContextMenu' and calls it if present.
+        
+        Args:
+            menu (QtWidgets.QMenu): The context menu to extend
+        """
+        # Check if any widgets want to add menu items
+        for widget in self.widgets:
+            if hasattr(widget, 'extendDockContextMenu') and callable(getattr(widget, 'extendDockContextMenu')):
+                widget.extendDockContextMenu(menu, self)
+
+
+    # ==================================================================================================================== #
+    # Specific context menu action handlers                                                                                #
+    # ==================================================================================================================== #
+    # @function_attributes(short_name=None, tags=['context_menu', 'action'], input_requires=[], output_provides=[], uses=[], used_by=['buildContextMenu'], creation_date='2025-03-25 16:56', related_items=[])
+    def updateButtonVisibility(self, button_type, visible):
+        """Update the visibility of a specific button in the dock label."""
+        if button_type == 'close':
+            self.config.showCloseButton = visible
+        elif button_type == 'collapse':
+            self.config.showCollapseButton = visible
+        elif button_type == 'group':
+            self.config.showGroupButton = visible
+        elif button_type == 'orientation':
+            self.config.showOrientationButton = visible
+        
+        # Update the buttons in the UI
+        self.label.updateButtonsFromConfig()
+    
+    # @function_attributes(short_name=None, tags=['context_menu', 'action'], input_requires=[], output_provides=[], uses=[], used_by=['buildContextMenu'], creation_date='2025-03-25 16:55', related_items=[])
     def on_renamed(self, dock, new_name):
         """Handle renaming of the dock."""
         self._name = new_name
