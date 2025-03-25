@@ -107,7 +107,7 @@ class DockPlanningHelperWindow(DynamicDockDisplayAreaOwningMixin):
     
 
     @classmethod
-    def init_dock_area_builder(cls, n_dock_planning_helper_widgets:int=4, dock_add_locations=None, **param_kwargs):
+    def init_dock_area_builder(cls, n_dock_planning_helper_widgets:int=0, dock_add_locations=None, **param_kwargs):
         """
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
@@ -128,39 +128,9 @@ class DockPlanningHelperWindow(DynamicDockDisplayAreaOwningMixin):
         #     root_dockAreaWindow.setWindowIcon(icon)
 
         _dock_helper_widgets_dict = {}
-        for i in np.arange(n_dock_planning_helper_widgets):
-            dock_id_str: str = f'dock[{i}]'
-            a_dock_helper_widget = DockPlanningHelperWidget(dock_title=dock_id_str, dock_id=dock_id_str, color=None, defer_show=True)
-            # _a_conn = a_dock_helper_widget.sigCreateNewDock.connect(_obj.on_click_create_new_dock)
-            _dock_helper_widgets_dict[dock_id_str] = a_dock_helper_widget
-
         _out_dock_widgets = {}
         dock_configs = {k:CustomCyclicColorsDockDisplayConfig(showCloseButton=False) for k, v in _dock_helper_widgets_dict.items()} # named_color_scheme=DisplayColorsEnum.Laps.get_LR_dock_colors
-
-        if (dock_add_locations is None):
-            # dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (['left'], ['bottom'], ['right'], ['right'])))
-            # dock_add_locations = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), ((lambda a_decoder_name: ['left']), (lambda a_decoder_name: ['bottom']), (lambda a_decoder_name: ['right']), (lambda a_decoder_name: ['bottom', root_dockAreaWindow.find_display_dock('short_LR')]))))
-            dock_add_locations = {k:(lambda a_decoder_name: ['bottom']) for k, v in _dock_helper_widgets_dict.items()}
-        else:
-            assert len(dock_add_locations) == len(dock_configs), f"len(dock_add_locations): {len(dock_add_locations)} != len(dock_configs): {len(dock_configs)}"
-
-        for i, (a_decoder_name, a_widget) in enumerate(_dock_helper_widgets_dict.items()):
-            active_dock_add_location_fn = dock_add_locations[a_decoder_name]
-            if callable(active_dock_add_location_fn):
-                # the value is a lambda-wrapped function that returns a list:
-                active_dock_add_location = active_dock_add_location_fn(a_decoder_name)
-            else:
-                ## the value is just a regular list of string
-                active_dock_add_location = active_dock_add_location_fn
-
-            # if (a_decoder_name == 'short_RL'):
-            #     short_LR_dock = root_dockAreaWindow.find_display_dock('short_LR')
-            #     assert short_LR_dock is not None
-            #     dock_add_locations['short_RL'] = ['bottom', short_LR_dock]
-            #     print(f'using overriden dock location.')
-
-            _out_dock_widgets[a_decoder_name] = root_dockAreaWindow.add_display_dock(identifier=a_decoder_name, widget=a_widget, dockSize=(300,600), dockAddLocationOpts=active_dock_add_location, display_config=dock_configs[a_decoder_name], autoOrientation=False)
-
+        
 
         # ## Build the utility controls at the bottom:
         # utility_controls_ui_dict, ctrls_dock_widgets_dict = _obj._build_utility_controls(root_dockAreaWindow)
@@ -204,8 +174,21 @@ class DockPlanningHelperWindow(DynamicDockDisplayAreaOwningMixin):
 
         _obj.register_internal_callbacks()
 
-    
+
+        # ==================================================================================================================== #
+        # Improved method:                                                                                                     #
+        # ==================================================================================================================== #
+        _obj._add_N_random_dock_planning_helper_widgets(n_dock_planning_helper_widgets=3)
+
         return _obj
+
+
+    def _add_N_random_dock_planning_helper_widgets(self, n_dock_planning_helper_widgets: int):
+        """ adds N new planning helper docked widgets to the window
+        """
+        for i in np.arange(n_dock_planning_helper_widgets):
+            dock_id_str: str = f'dock[{i}]'
+            a_dock_helper_widget, a_dock_config, a_dock_widget = self.perform_create_new_dock_widget(dock_id_str=dock_id_str, active_dock_add_location='bottom', dockSize=(300,600), autoOrientation=False)            
 
 
 
@@ -230,7 +213,7 @@ class DockPlanningHelperWindow(DynamicDockDisplayAreaOwningMixin):
         
         
 
-
+    @function_attributes(short_name=None, tags=['create'], input_requires=[], output_provides=[], uses=[], used_by=['.on_click_create_new_dock'], creation_date='2025-03-25 15:33', related_items=[])
     def perform_create_new_dock_widget(self, dock_id_str:str=None, active_dock_add_location:Union[str, Tuple[str, str]]='bottom', dockSize=None, autoOrientation=False):
         """ Creaets a new DockPlanningHelper widget
         
@@ -288,6 +271,8 @@ class DockPlanningHelperWindow(DynamicDockDisplayAreaOwningMixin):
         return self.dock_helper_widgets[dock_id_str], self.dock_configs[dock_id_str], self.dock_widgets[dock_id_str]
 
 
+
+    @function_attributes(short_name=None, tags=['dock'], input_requires=[], output_provides=[], uses=['self.perform_create_new_dock_widget'], used_by=[], creation_date='2025-03-25 15:33', related_items=[])
     def on_click_create_new_dock(self, child_widget: DockPlanningHelperWidget, relative_location: str):
         """ called with the child_widget to create a new relative widget
         
