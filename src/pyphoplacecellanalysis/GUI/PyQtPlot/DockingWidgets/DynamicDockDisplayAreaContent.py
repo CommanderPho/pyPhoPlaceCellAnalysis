@@ -803,6 +803,8 @@ class DynamicDockDisplayAreaContentMixin(BaseDynamicInstanceConformingMixin):
         ## Setup children:
         for a_dock in flat_group_dockitems_list:
             a_dock_identifier: str = a_dock.name()
+            # a_dock_identifier: str = a_dock.identifier
+            print(f'\ta_dock_identifier: "{a_dock_identifier}"')
             ## format nested child docks:
             a_dock.config.showCloseButton = False
             a_dock.config.showCollapseButton = False

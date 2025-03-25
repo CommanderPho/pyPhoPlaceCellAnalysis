@@ -13,7 +13,7 @@
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <layout class="QGridLayout" name="gridLayout" rowstretch="1,0,0,1,0,0,0,0" columnstretch="1,0,0">
+  <layout class="QGridLayout" name="gridLayout" rowstretch="1,0,0,0,0,0,0,0,0,0,0,0" columnstretch="1,0,0,0,0,0,0,0,0">
    <property name="rightMargin">
     <number>0</number>
    </property>
@@ -23,7 +23,152 @@
    <property name="spacing">
     <number>2</number>
    </property>
-   <item row="0" column="0">
+   <item row="1" column="0">
+    <layout class="QHBoxLayout" name="horizontalLayout_3">
+     <item>
+      <widget class="QToolButton" name="btnAddWidgetAbove">
+       <property name="toolTip">
+        <string>Add DockPlanningHelperWidget above</string>
+       </property>
+       <property name="text">
+        <string>...</string>
+       </property>
+       <property name="arrowType">
+        <enum>Qt::UpArrow</enum>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="btnCreateNewGroup">
+       <property name="toolTip">
+        <string>Create new group and embed this</string>
+       </property>
+       <property name="text">
+        <string/>
+       </property>
+       <property name="icon">
+        <iconset resource="../../../../Resources/ActionIcons.qrc">
+         <normaloff>:/Icons/Icons/Icon/application-tree.png</normaloff>:/Icons/Icons/Icon/application-tree.png</iconset>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item row="6" column="0">
+    <widget class="QGroupBox" name="groupBoxActions">
+     <property name="title">
+      <string>Actions</string>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout_2">
+      <property name="topMargin">
+       <number>2</number>
+      </property>
+      <property name="bottomMargin">
+       <number>2</number>
+      </property>
+      <item>
+       <widget class="QPushButton" name="btnRefresh">
+        <property name="text">
+         <string>Refresh</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnLog">
+        <property name="text">
+         <string>Log</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnSave">
+        <property name="text">
+         <string>Save</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item row="4" column="0">
+    <widget class="QGroupBox" name="groupBox">
+     <property name="title">
+      <string>Orientation</string>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout">
+      <property name="leftMargin">
+       <number>2</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>2</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <item>
+       <widget class="QRadioButton" name="radBtnOrientation_Auto">
+        <property name="text">
+         <string>Auto</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QRadioButton" name="radBtnOrientation_Horizontal">
+        <property name="text">
+         <string>Horizontal</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QRadioButton" name="radBtnOrientation_Vertical">
+        <property name="text">
+         <string>Vertical</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item row="10" column="0" alignment="Qt::AlignLeft|Qt::AlignTop">
+    <widget class="QFrame" name="contentsFrame">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+       <horstretch>1</horstretch>
+       <verstretch>1</verstretch>
+      </sizepolicy>
+     </property>
+    </widget>
+   </item>
+   <item row="7" column="0">
+    <widget class="Line" name="line">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="0">
     <layout class="QFormLayout" name="formLayout">
      <property name="fieldGrowthPolicy">
       <enum>QFormLayout::ExpandingFieldsGrow</enum>
@@ -222,121 +367,14 @@
      </item>
     </layout>
    </item>
-   <item row="4" column="0">
-    <widget class="Line" name="line">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-    </widget>
-   </item>
-   <item row="7" column="2">
-    <widget class="QToolButton" name="btnAddWidgetRight">
-     <property name="toolTip">
-      <string>Add DockPlanningHelperWidget right</string>
-     </property>
-     <property name="text">
-      <string>...</string>
-     </property>
-     <property name="arrowType">
-      <enum>Qt::RightArrow</enum>
-     </property>
-    </widget>
-   </item>
-   <item row="1" column="0">
-    <widget class="QGroupBox" name="groupBox">
-     <property name="title">
-      <string>Orientation</string>
-     </property>
-     <layout class="QHBoxLayout" name="horizontalLayout">
-      <property name="leftMargin">
-       <number>2</number>
-      </property>
-      <property name="topMargin">
-       <number>0</number>
-      </property>
-      <property name="rightMargin">
-       <number>2</number>
-      </property>
-      <property name="bottomMargin">
-       <number>0</number>
-      </property>
-      <item>
-       <widget class="QRadioButton" name="radBtnOrientation_Auto">
-        <property name="text">
-         <string>Auto</string>
-        </property>
-        <property name="checked">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QRadioButton" name="radBtnOrientation_Horizontal">
-        <property name="text">
-         <string>Horizontal</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QRadioButton" name="radBtnOrientation_Vertical">
-        <property name="text">
-         <string>Vertical</string>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </widget>
-   </item>
-   <item row="3" column="0">
-    <widget class="QGroupBox" name="groupBoxActions">
-     <property name="title">
-      <string>Actions</string>
-     </property>
-     <layout class="QHBoxLayout" name="horizontalLayout_2">
-      <property name="topMargin">
-       <number>2</number>
-      </property>
-      <property name="bottomMargin">
-       <number>2</number>
-      </property>
-      <item>
-       <widget class="QPushButton" name="btnRefresh">
-        <property name="text">
-         <string>Refresh</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <spacer name="horizontalSpacer">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
-      <item>
-       <widget class="QPushButton" name="btnLog">
-        <property name="text">
-         <string>Log</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="btnSave">
-        <property name="text">
-         <string>Save</string>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </widget>
-   </item>
    <item row="5" column="0">
+    <widget class="QLabel" name="lblInfoTextLine">
+     <property name="text">
+      <string/>
+     </property>
+    </widget>
+   </item>
+   <item row="8" column="0">
     <widget class="QPlainTextEdit" name="txtExtendedLabel">
      <property name="enabled">
       <bool>true</bool>
@@ -349,61 +387,80 @@
      </property>
     </widget>
    </item>
-   <item row="2" column="0">
-    <widget class="QLabel" name="lblInfoTextLine">
-     <property name="text">
-      <string/>
+   <item row="9" column="0">
+    <layout class="QHBoxLayout" name="horizontalLayout_4">
+     <property name="spacing">
+      <number>2</number>
      </property>
-    </widget>
-   </item>
-   <item row="7" column="0">
-    <widget class="QToolButton" name="btnAddWidgetBelow">
-     <property name="toolTip">
-      <string>Add DockPlanningHelperWidget below</string>
-     </property>
-     <property name="text">
-      <string>...</string>
-     </property>
-     <property name="arrowType">
-      <enum>Qt::DownArrow</enum>
-     </property>
-    </widget>
-   </item>
-   <item row="7" column="1">
-    <widget class="QToolButton" name="btnAddWidgetAbove">
-     <property name="baseSize">
-      <size>
-       <width>23</width>
-       <height>22</height>
-      </size>
-     </property>
-     <property name="toolTip">
-      <string notr="true">Add DockPlanningHelperWidget above (tabbed)</string>
-     </property>
-     <property name="text">
-      <string>...</string>
-     </property>
-     <property name="icon">
-      <iconset theme="SP_FileDialogNewFolder">
-       <normaloff>.</normaloff>.</iconset>
-     </property>
-     <property name="arrowType">
-      <enum>Qt::UpArrow</enum>
-     </property>
-    </widget>
-   </item>
-   <item row="6" column="0" alignment="Qt::AlignLeft|Qt::AlignTop">
-    <widget class="QFrame" name="contentsFrame">
-     <property name="enabled">
-      <bool>false</bool>
-     </property>
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-       <horstretch>1</horstretch>
-       <verstretch>1</verstretch>
-      </sizepolicy>
-     </property>
-    </widget>
+     <item>
+      <widget class="QToolButton" name="btnAddWidgetLeft">
+       <property name="toolTip">
+        <string>Add DockPlanningHelperWidget left</string>
+       </property>
+       <property name="text">
+        <string>...</string>
+       </property>
+       <property name="arrowType">
+        <enum>Qt::LeftArrow</enum>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="btnAddWidgetNewTab">
+       <property name="baseSize">
+        <size>
+         <width>23</width>
+         <height>22</height>
+        </size>
+       </property>
+       <property name="toolTip">
+        <string notr="true">Add DockPlanningHelperWidget above (tabbed)</string>
+       </property>
+       <property name="text">
+        <string>tab</string>
+       </property>
+       <property name="icon">
+        <iconset resource="../../../../Resources/ActionIcons.qrc">
+         <normaloff>:/Icons/Icons/Icon/application-dock-tab.png</normaloff>:/Icons/Icons/Icon/application-dock-tab.png</iconset>
+       </property>
+       <property name="toolButtonStyle">
+        <enum>Qt::ToolButtonIconOnly</enum>
+       </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
+       <property name="arrowType">
+        <enum>Qt::NoArrow</enum>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="btnAddWidgetRight">
+       <property name="toolTip">
+        <string>Add DockPlanningHelperWidget right</string>
+       </property>
+       <property name="text">
+        <string>...</string>
+       </property>
+       <property name="arrowType">
+        <enum>Qt::RightArrow</enum>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="btnAddWidgetBelow">
+       <property name="toolTip">
+        <string>Add DockPlanningHelperWidget below</string>
+       </property>
+       <property name="text">
+        <string>...</string>
+       </property>
+       <property name="arrowType">
+        <enum>Qt::DownArrow</enum>
+       </property>
+      </widget>
+     </item>
+    </layout>
    </item>
   </layout>
   <action name="actionActionEditingFinished">
@@ -429,13 +486,13 @@
   <tabstop>spinBox_Height</tabstop>
   <tabstop>radBtnOrientation_Auto</tabstop>
   <tabstop>btnSave</tabstop>
-  <tabstop>btnAddWidgetBelow</tabstop>
-  <tabstop>btnAddWidgetRight</tabstop>
   <tabstop>radBtnOrientation_Horizontal</tabstop>
   <tabstop>btnLog</tabstop>
   <tabstop>radBtnOrientation_Vertical</tabstop>
   <tabstop>txtExtendedLabel</tabstop>
  </tabstops>
- <resources/>
+ <resources>
+  <include location="../../../../Resources/ActionIcons.qrc"/>
+ </resources>
  <connections/>
 </ui>

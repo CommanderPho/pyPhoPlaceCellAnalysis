@@ -45,7 +45,7 @@
     <number>0</number>
    </property>
    <item>
-    <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,0,0,1,1,0,0,0,0,0,0,0">
+    <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,0,0,0,1,1,0,0,0,0,0,0,0,0">
      <property name="spacing">
       <number>2</number>
      </property>
@@ -71,6 +71,35 @@
        </property>
        <property name="arrowType">
         <enum>Qt::DownArrow</enum>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="btnAddWidgetNewTab">
+       <property name="baseSize">
+        <size>
+         <width>23</width>
+         <height>22</height>
+        </size>
+       </property>
+       <property name="toolTip">
+        <string notr="true">Add DockPlanningHelperWidget above (tabbed)</string>
+       </property>
+       <property name="text">
+        <string>tab</string>
+       </property>
+       <property name="icon">
+        <iconset resource="../../../../Resources/ActionIcons.qrc">
+         <normaloff>:/Icons/Icons/Icon/application-dock-tab.png</normaloff>:/Icons/Icons/Icon/application-dock-tab.png</iconset>
+       </property>
+       <property name="toolButtonStyle">
+        <enum>Qt::ToolButtonIconOnly</enum>
+       </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
+       <property name="arrowType">
+        <enum>Qt::NoArrow</enum>
        </property>
       </widget>
      </item>
@@ -241,6 +270,19 @@
       </widget>
      </item>
      <item>
+      <widget class="QToolButton" name="btnAddWidgetLeft">
+       <property name="toolTip">
+        <string>Add DockPlanningHelperWidget left</string>
+       </property>
+       <property name="text">
+        <string>...</string>
+       </property>
+       <property name="arrowType">
+        <enum>Qt::LeftArrow</enum>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QToolButton" name="btnAddWidgetRight">
        <property name="minimumSize">
         <size>
@@ -283,6 +325,8 @@
   <tabstop>btnAddWidgetBelow</tabstop>
   <tabstop>btnAddWidgetRight</tabstop>
  </tabstops>
- <resources/>
+ <resources>
+  <include location="../../../../Resources/ActionIcons.qrc"/>
+ </resources>
  <connections/>
 </ui>

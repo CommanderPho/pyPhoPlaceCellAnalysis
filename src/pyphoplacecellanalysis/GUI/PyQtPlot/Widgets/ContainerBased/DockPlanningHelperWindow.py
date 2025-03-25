@@ -30,6 +30,7 @@ from pyphocorehelpers.gui.Qt.pandas_model import SimplePandasModel, create_tabbe
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper, PhoDockAreaContainingWindow
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget.DockPlanningHelperWidget import DockPlanningHelperWidget
 from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomCyclicColorsDockDisplayConfig, CustomDockDisplayConfig, DockDisplayColors, get_utility_dock_colors
+from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import DynamicDockDisplayAreaContentMixin, DynamicDockDisplayAreaOwningMixin
 
 __all__ = ['DockPlanningHelperWindow']
 
@@ -39,7 +40,7 @@ __all__ = ['DockPlanningHelperWindow']
 # ==================================================================================================================== #
 
 @define(slots=False, eq=False)
-class DockPlanningHelperWindow:
+class DockPlanningHelperWindow(DynamicDockDisplayAreaOwningMixin):
     """ DockPlanningHelperWindow displays several testing widgets
     
 
@@ -57,6 +58,16 @@ class DockPlanningHelperWindow:
     plots_data: RenderPlotsData = field(init=False, repr=False)
     ui: PhoUIContainer = field(init=False, repr=False)
     params: VisualizationParameters = field(init=False, repr=keys_only_repr)
+
+    # ==================================================================================================================== #
+    # DynamicDockDisplayAreaOwningMixin Conformances                                                                       #
+    # ==================================================================================================================== #
+    @property 
+    def dock_manager_widget(self) -> DynamicDockDisplayAreaContentMixin:
+        """Must be implemented by subclasses to return the widget that manages the docks"""
+        return self.ui.root_dockAreaWindow ## returns the PhoDockAreaContainingWindow
+    
+
 
     # Plot Convenience Accessors _________________________________________________________________________________________ #
     # @property
@@ -89,9 +100,6 @@ class DockPlanningHelperWindow:
     @dock_configs.setter
     def dock_configs(self, value: Dict[str, CustomDockDisplayConfig]):
         self.ui.dock_configs = value
-
-
-
 
     @property
     def root_dockAreaWindow(self) -> PhoDockAreaContainingWindow:
@@ -288,6 +296,7 @@ class DockPlanningHelperWindow:
         print(f'DockPlanningHelperWindow.on_click_create_new_dock(...)')
         # print(f'\t')
         print(f'\trelative_location: {relative_location}')
+        is_add_containing_parent_item: bool = False
         
         if child_widget is None:
             print(f'\t child_widget is None!')
@@ -308,17 +317,37 @@ class DockPlanningHelperWindow:
                     print(f'relative_location_tuple: {relative_location_tuple}')
                     assert len(relative_location_tuple) == 2
                     new_dock_config.setdefault('dockAddLocationOpts', relative_location_tuple)
+                    if rel_loc == 'containing':
+                        ## Special handling
+                        print(f'found special "containing" case!')
+                        is_add_containing_parent_item = True
+                    else:
+                        is_add_containing_parent_item = False
+                        pass                                            
                 else:
                     # not parsable 
                     new_dock_config.setdefault('dockAddLocationOpts', (relative_location, ))
             else:
                     raise NotImplementedError(f'relative_location: {relative_location}')
 
-
             # new_dock_config.setdefault('dockAddLocationOpts', (relative_location, ))
             new_dock_config['widget'] = child_widget
             print(f'\t creating new child widget with config: {new_dock_config}\n')
-            a_dock_helper_widget, a_dock_config, a_dock_widget = self.perform_create_new_dock_widget(active_dock_add_location=new_dock_config.get('dockAddLocationOpts', None), dockSize=new_dock_config.get('dockSize', None), autoOrientation=new_dock_config.get('autoOrientation', None))
+            if is_add_containing_parent_item:
+                ## Special handling
+                print(f'\thandling special "containing" case!')
+                
+                ## get the child_widget's Dock
+                
+                # dDisplayItem, nested_dynamic_docked_widget_container = self.dock_manager_widget.build_wrapping_nested_dock_area([child_widget], dock_group_name='test_group_A')
+                dDisplayItem, nested_dynamic_docked_widget_container = self.dock_manager_widget.build_wrapping_nested_dock_area([child_widget.embedding_dock_item], dock_group_name='test_group_A')
+                # nested_dock_items[dock_group_name] = dDisplayItem # Dock
+                # nested_dynamic_docked_widget_container_widgets[dock_group_name] = nested_dynamic_docked_widget_container # nested_dynamic_docked_widget_container
+                print(f'dDisplayItem: {dDisplayItem}, nested_dynamic_docked_widget_container: {nested_dynamic_docked_widget_container}')
+                pass
+            else:
+                a_dock_helper_widget, a_dock_config, a_dock_widget = self.perform_create_new_dock_widget(active_dock_add_location=new_dock_config.get('dockAddLocationOpts', None), dockSize=new_dock_config.get('dockSize', None), autoOrientation=new_dock_config.get('autoOrientation', None))
+        
             print(f'\t done.')
 
         
@@ -342,6 +371,7 @@ class DockPlanningHelperWindow:
             log_string = child_widget.rebuild_output()
             print(f'\tchild_widget: {log_string}') # TypeError: __str__ returned non-string (type NoneType)
             new_dock_config: Dict = child_widget.rebuild_config()
+            print(f'\tnew_dock_config: {new_dock_config}')
             # if isinstance(relative_location, str):
             #     # try to convert to tuple:
             #     _split_active_dock_add_location = relative_location.split(', ', maxsplit=2)
@@ -360,23 +390,53 @@ class DockPlanningHelperWindow:
             # else:
             #         raise NotImplementedError(f'relative_location: {relative_location}')
 
-            for a_dock_id, a_widget in child_widget.dock_helper_widgets.items():
-                # print(a_widget.color)
-                a_config = child_widget.dock_configs[a_dock_id]
-                a_helper_widget, a_dock = child_widget.dock_widgets[a_dock_id]
-                # print(a_config)
-                a_hex_bg_color: str = a_widget.color.name(pg.QtGui.QColor.HexRgb)
-                print(f'a_hex_bg_color: {a_hex_bg_color}')
-                # a_config.custom_get_colors_callback
-                # a_config.custom_get_colors_callback = CustomDockDisplayConfig.build_custom_get_colors_fn(bg_color='#44aa44', border_color='#339933')
-                # a_config.custom_get_colors_callback = CustomDockDisplayConfig.build_custom_get_colors_fn(bg_color=a_hex_bg_color, border_color=a_hex_bg_color)
-                a_config.custom_get_colors_callback = None
-                a_config.custom_get_colors_dict = {False: DockDisplayColors(fg_color='#fff', bg_color=a_hex_bg_color, border_color=a_hex_bg_color),
-                            True: DockDisplayColors(fg_color='#aaa', bg_color=a_hex_bg_color, border_color=a_hex_bg_color),
-                    }
+
+            a_dock_id = child_widget.identifier
+            print(f'child_widget.identifier: "{child_widget.identifier}"')
+            
+            assert a_dock_id in self.dock_helper_widgets
+            assert a_dock_id in self.dock_configs
+            assert a_dock_id in self.dock_widgets
+            print(f'\tchild widget found!')
+            a_widget = self.dock_helper_widgets[a_dock_id]
+            a_config = self.dock_configs[a_dock_id]
+            a_helper_widget, a_dock = self.dock_widgets[a_dock_id]
+            # print(a_config)
+            a_hex_bg_color: str = a_widget.color.name(pg.QtGui.QColor.HexRgb)
+            print(f'a_hex_bg_color: {a_hex_bg_color}')
+            # a_config.custom_get_colors_callback
+            # a_config.custom_get_colors_callback = CustomDockDisplayConfig.build_custom_get_colors_fn(bg_color='#44aa44', border_color='#339933')
+            # a_config.custom_get_colors_callback = CustomDockDisplayConfig.build_custom_get_colors_fn(bg_color=a_hex_bg_color, border_color=a_hex_bg_color)
+            a_config.custom_get_colors_callback = None
+            a_config.custom_get_colors_dict = {False: DockDisplayColors(fg_color='#fff', bg_color=a_hex_bg_color, border_color=a_hex_bg_color),
+                        True: DockDisplayColors(fg_color='#aaa', bg_color=a_hex_bg_color, border_color=a_hex_bg_color),
+                }
+            
+            # a_config
+            a_dock.updateStyle()
+            
+
+
+
+            # for a_dock_id, a_widget in child_widget.dock_helper_widgets.items():
+            # for a_dock_id, a_widget in self.dock_helper_widgets.items():
                 
-                # a_config
-                a_dock.updateStyle()
+                # # print(a_widget.color)
+                # a_config = child_widget.dock_configs[a_dock_id]
+                # a_helper_widget, a_dock = child_widget.dock_widgets[a_dock_id]
+                # # print(a_config)
+                # a_hex_bg_color: str = a_widget.color.name(pg.QtGui.QColor.HexRgb)
+                # print(f'a_hex_bg_color: {a_hex_bg_color}')
+                # # a_config.custom_get_colors_callback
+                # # a_config.custom_get_colors_callback = CustomDockDisplayConfig.build_custom_get_colors_fn(bg_color='#44aa44', border_color='#339933')
+                # # a_config.custom_get_colors_callback = CustomDockDisplayConfig.build_custom_get_colors_fn(bg_color=a_hex_bg_color, border_color=a_hex_bg_color)
+                # a_config.custom_get_colors_callback = None
+                # a_config.custom_get_colors_dict = {False: DockDisplayColors(fg_color='#fff', bg_color=a_hex_bg_color, border_color=a_hex_bg_color),
+                #             True: DockDisplayColors(fg_color='#aaa', bg_color=a_hex_bg_color, border_color=a_hex_bg_color),
+                #     }
+                
+                # # a_config
+                # a_dock.updateStyle()
                 
 
             # new_dock_config.setdefault('dockAddLocationOpts', (relative_location, ))
