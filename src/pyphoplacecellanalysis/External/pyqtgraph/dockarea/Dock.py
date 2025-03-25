@@ -231,7 +231,9 @@ class Dock(QtWidgets.QWidget, DockDrop):
             self.label.sigGroupClicked.connect(self.on_group_btn_clicked)
         if display_config.showOrientationButton:
             self.label.sigToggleOrientationClicked.connect(self.on_orientation_btn_toggled)
-
+        # Add this line to connect the new rename signal
+        self.label.sigRenamed.connect(self.on_renamed)
+        
         self.contentsHidden = False
         self.labelHidden = False
         self.moveLabel = True  ## If false, the dock is no longer allowed to move the label.
@@ -552,6 +554,12 @@ class Dock(QtWidgets.QWidget, DockDrop):
         
 
 
+    def on_renamed(self, dock, new_name):
+        """Handle renaming of the dock."""
+        self._name = new_name
+        self.sigRenamed.emit(self, new_name)
+        
+
 
 def debug_dock_label(dock_label, label_name="Unknown"):
     """Print comprehensive debug information about a DockLabel to diagnose layout issues."""
@@ -632,6 +640,11 @@ class DockLabel(VerticalLabel):
     sigCollapseClicked = QtCore.Signal()
     sigGroupClicked = QtCore.Signal()
     sigToggleOrientationClicked = QtCore.Signal(bool)
+    
+    sigContextMenuRequested = QtCore.Signal(object, object)  # Emits dock label and QPoint
+    sigRenamed = QtCore.Signal(object, str)  # Emits dock and new name
+    
+
 
     def __init__(self, text, dock, display_config:DockDisplayConfig):
         self.dim = False
@@ -899,3 +912,88 @@ class DockLabel(VerticalLabel):
             # """)
         # self.collapseButton.setIcon(QtWidgets.QApplication.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_TitleBarMinButton))
         
+
+    def contextMenuEvent(self, event):
+        """Handle right-click events on the dock label by showing a context menu."""
+        # First emit signal to allow external handlers to process this event
+        self.sigContextMenuRequested.emit(self, event.globalPos())
+        
+        # Create the context menu
+        menu = self.dock.buildContextMenu()
+        if menu and not menu.isEmpty():
+            menu.exec(event.globalPos())
+
+        # menu = QtWidgets.QMenu(self)
+        
+        # # Create standard actions
+        # renameAction = menu.addAction("Rename dock...")
+        # toggleOrientationAction = menu.addAction("Toggle orientation")
+        
+        # # Add Close action if close button is available
+        # closeAction = None
+        # if self.config.showCloseButton:
+        #     closeAction = menu.addAction("Close dock")
+        
+        # # Add buttons visibility submenu
+        # buttonVisibilityMenu = menu.addMenu("Show dock buttons")
+        # showCloseAction = buttonVisibilityMenu.addAction("Close button")
+        # showCloseAction.setCheckable(True)
+        # showCloseAction.setChecked(self.config.showCloseButton)
+        
+        # showCollapseAction = buttonVisibilityMenu.addAction("Collapse button")
+        # showCollapseAction.setCheckable(True)
+        # showCollapseAction.setChecked(self.config.showCollapseButton)
+        
+        # showGroupAction = buttonVisibilityMenu.addAction("Group button")
+        # showGroupAction.setCheckable(True)
+        # showGroupAction.setChecked(self.config.showGroupButton)
+        
+        # showOrientationAction = buttonVisibilityMenu.addAction("Orientation button")
+        # showOrientationAction.setCheckable(True)
+        # showOrientationAction.setChecked(self.config.showOrientationButton)
+        
+        # # Add visibility options
+        # collapseAction = menu.addAction("Toggle content visibility")
+        
+        # # Show menu and get selected action
+        # action = menu.exec(event.globalPos())
+        
+        # # Handle actions
+        # if action == renameAction:
+        #     self.promptRename()
+        # elif action == toggleOrientationAction:
+        #     new_orientation = 'vertical' if self.orientation == 'horizontal' else 'horizontal'
+        #     self.dock.setOrientation(new_orientation, force=True)
+        # elif closeAction is not None and action == closeAction:
+        #     self.sigCloseClicked.emit()
+        # elif action == collapseAction:
+        #     self.sigCollapseClicked.emit()
+        # elif action == showCloseAction:
+        #     self.config.showCloseButton = showCloseAction.isChecked()
+        #     self.updateButtonsFromConfig()
+        # elif action == showCollapseAction:
+        #     self.config.showCollapseButton = showCollapseAction.isChecked()
+        #     self.updateButtonsFromConfig()
+        # elif action == showGroupAction:
+        #     self.config.showGroupButton = showGroupAction.isChecked()
+        #     self.updateButtonsFromConfig()
+        # elif action == showOrientationAction:
+        #     self.config.showOrientationButton = showOrientationAction.isChecked()
+        #     self.updateButtonsFromConfig()
+        
+
+    def promptRename(self):
+        """Show a dialog to rename the dock."""
+        current_name = self.text()
+        new_name, ok = QtWidgets.QInputDialog.getText(
+            self, 
+            "Rename Dock", 
+            "New dock name:", 
+            QtWidgets.QLineEdit.Normal, 
+            current_name
+        )
+        
+        if ok and new_name:
+            self.dock.setTitle(new_name)
+            self.sigRenamed.emit(self.dock, new_name)
+            
