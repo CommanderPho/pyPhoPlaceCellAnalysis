@@ -171,9 +171,11 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
             btnLog
             btnSave
             
+            btnAddWidgetLeft
             btnAddWidgetRight
             btnAddWidgetBelow
-            
+            btnAddWidgetAbove
+            btnAddWidgetNewTab
             
         """
         
@@ -189,9 +191,11 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
         self.ui.btnSave.clicked.connect(self.on_save)
         self.ui.btnRefresh.clicked.connect(self.on_refresh)
         
+        self.ui.btnAddWidgetLeft.clicked.connect(self.on_click_create_new_dock_left)        
         self.ui.btnAddWidgetRight.clicked.connect(self.on_click_create_new_dock_right)
         self.ui.btnAddWidgetBelow.clicked.connect(self.on_click_create_new_dock_below)
-        self.ui.btnAddWidgetAbove.clicked.connect(self.on_click_create_new_dock_tab_on_top_of)
+        self.ui.btnAddWidgetAbove.clicked.connect(self.on_click_create_new_dock_above)
+        self.ui.btnAddWidgetNewTab.clicked.connect(self.on_click_create_new_dock_tab_on_top_of)
         
         # self.ui.spinBox_Width.valueChanged.connect(self.on_values_updated)
 
@@ -311,6 +315,20 @@ class DockPlanningHelperWidget(QtWidgets.QWidget):
         print(f'DockPlanningHelperWidget.on_click_create_new_dock_right()')
         # self.action_create_new_dock.emit(self.embedding_dock_item, 'right')
         self.sigCreateNewDock.emit(self, 'right')
+        
+
+    def on_click_create_new_dock_left(self):
+        # [self.embedding_dock_item, 'right']
+        print(f'DockPlanningHelperWidget.on_click_create_new_dock_left()')
+        # self.action_create_new_dock.emit(self.embedding_dock_item, 'right')
+        self.sigCreateNewDock.emit(self, 'left')
+        
+
+    def on_click_create_new_dock_above(self):
+        # [self.embedding_dock_item, 'right']
+        print(f'DockPlanningHelperWidget.on_click_create_new_dock_above()')
+        # self.action_create_new_dock.emit(self.embedding_dock_item, 'right')
+        self.sigCreateNewDock.emit(self, 'top')
 
 
     def on_click_create_new_dock_tab_on_top_of(self):
