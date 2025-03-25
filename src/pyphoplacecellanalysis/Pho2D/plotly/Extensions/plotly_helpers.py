@@ -218,12 +218,7 @@ class PlotlyFigureContainer:
         """ Adds a trace to the figure while managing legend entries to avoid duplicates. """
         a_full_trace_name: str = '_'.join([v for v in [trace_name_prefix, trace.name] if (len(v)>0)]) ## build new trace name
         # fig.update_trace(
-        fig.update_traces(patch=trace,
-				  selector={'name': a_full_trace_name}, row=row, col=col)
-        
-        
-                  
-                  
+        fig.update_traces(patch=trace, selector={'name': a_full_trace_name}, row=row, col=col)
         trace_name = trace.name
         trace.legendgroup = trace_name  # Set the legend group so all related traces can be toggled together
         if trace_name in already_added_legend_entries:

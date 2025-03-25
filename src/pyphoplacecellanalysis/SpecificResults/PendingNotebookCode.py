@@ -2378,6 +2378,21 @@ class TimeBinAggregation:
         return weighted_sum / total_weight if total_weight > 0 else 0.0
 
 
+    @classmethod
+    def mean(cls, df: pd.DataFrame, column: str='P_Short', *args, **kwargs) -> float:
+        """
+        Computes the streak-weighted P_Long for a given DataFrame, giving higher weight to longer sequences of adjacent bins.
+
+        Args:
+            df (pd.DataFrame): Input DataFrame containing the P_Long column.
+            column (str): The column name for P_Long.
+            threshold (float): Minimum probability to consider a bin as part of a streak. Default is 0.5.
+
+        Returns:
+            float: The streak-weighted P_Long for the DataFrame.
+        """
+        return df[column].mean(*args, skipna=True, **kwargs)
+
 
     @function_attributes(short_name=None, tags=['streak', 'sequence', 'dataframe', 'probability', 'likelihood'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 14:11', related_items=[])
     @classmethod
@@ -2422,7 +2437,7 @@ class TimeBinAggregation:
 
 
     @classmethod
-    def peak_rolling_avg(cls, df: pd.DataFrame, column: str, window: int=3, *args, **kwargs) -> float:
+    def peak_rolling_avg(cls, df: pd.DataFrame, column: str='P_Short', window: int=3, *args, **kwargs) -> float:
         """
         Computes the streak-weighted P_Long for a given DataFrame, giving higher weight to longer sequences of adjacent bins.
 

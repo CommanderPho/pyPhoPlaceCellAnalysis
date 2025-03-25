@@ -45,7 +45,6 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilter
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
 
 import scipy.stats
-from scipy import ndimage
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
 
