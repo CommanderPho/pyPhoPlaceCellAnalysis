@@ -4,6 +4,7 @@ from enum import Enum
 from attrs import define, field, Factory
 import numpy as np
 
+from neuropy.utils.colors_util import ColorsUtil
 from neuropy.utils.mixins.dynamic_conformance_updating_mixin import BaseDynamicInstanceConformingMixin
 
 # import pyphoplacecellanalysis.External.pyqtgraph as pg
@@ -42,6 +43,43 @@ class DockDisplayColors:
     fg_color: str = field(default='#aaa') # Grey
     bg_color: str = field(default='#66cc66') # (120°, 50, 80)
     border_color: str = field(default='#54ba54') # (120°, 55%, 73%)
+
+
+    @classmethod
+    def _subfn_get_random_dock_colors_for_key(cls, key, orientation, is_dim):
+        """Generate consistent random colors for a dock based on its key."""
+        from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
+
+        # Generate a unique background color based on the key
+        bg_color = ColorsUtil.generate_unique_hex_color_from_hashable((key, 'bg'))
+        
+        # Create a darker border color based on the background color
+        border_color = DisplayColorsEnum.apply_dock_border_color_adjustment(bg_color)
+        
+        # Choose a contrasting foreground color (white or black) based on background brightness
+        # Simple algorithm: if R+G+B > 384 (out of 765 max), use black text, otherwise white
+        r, g, b = int(bg_color[1:3], 16), int(bg_color[3:5], 16), int(bg_color[5:7], 16)
+        fg_color = '#000' if (r + g + b) > 384 else '#fff'
+        
+        # Apply dimming if requested
+        if is_dim:
+            bg_color, fg_color = DisplayColorsEnum.apply_dock_dimming_adjustment(bg_color, fg_color)
+            border_color = DisplayColorsEnum.apply_dock_dimming_adjustment(border_color)
+        
+        return fg_color, bg_color, border_color
+    
+
+
+    @classmethod
+    def get_random_dock_colors_for_key_fn(cls, key) -> Callable:
+        """Returns a valid `custom_get_colors_callback_fn` that generates consistent random colors for a dock based on its initialization-time key/identity.
+        Usage:
+            custom_get_colors_callback_fn = DockDisplayColors.get_random_dock_colors_for_key_fn(key=a_key)
+        
+        """
+        from functools import partial
+        custom_get_colors_callback_fn = partial(cls._subfn_get_random_dock_colors_for_key, key)
+        return custom_get_colors_callback_fn
 
 
 
