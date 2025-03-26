@@ -1155,7 +1155,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         is_pseudo2D_decoder = np.all((p_x_given_n_list_second_dim_sizes == 4)) # only works with the Pseudo2D (all-directional) decoder with posteriors with .shape[1] == 4, corresponding to ['long_LR', 'long_RL', 'short_LR', 'short_RL']
         
 
-        epochs_epochs_df: pd.DataFrame = ensure_dataframe(deepcopy(filter_epochs))
+        epochs_df: pd.DataFrame = ensure_dataframe(deepcopy(filter_epochs))
         
 
         if is_pseudo2D_decoder:
@@ -1168,23 +1168,30 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         else:
             is_track_identity_only_pseudo2D_decoder: bool = np.all((p_x_given_n_list_second_dim_sizes == 2)) # only works with the Pseudo2D (all-directional) decoder with posteriors with .shape[1] == 4, corresponding to ['long_LR', 'long_RL', 'short_LR', 'short_RL']
             assert is_track_identity_only_pseudo2D_decoder
+            raise NotImplementedError(f'2025-03-26 14:06 Not finished, do the other method instead (see git commit)')
+            # epochs_directional_marginals_tuple = (None, None)
+            # epochs_directional_marginals, epochs_directional_all_epoch_bins_marginal, epochs_most_likely_direction_from_decoder, epochs_is_most_likely_direction_LR_dir  = epochs_directional_marginals_tuple
+            # epochs_track_identity_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(filter_epochs_decoder_result)
+            # epochs_track_identity_marginals, epochs_track_identity_all_epoch_bins_marginal, epochs_most_likely_track_identity_from_decoder, epochs_is_most_likely_track_identity_Long = epochs_track_identity_marginals_tuple
+            # epochs_non_marginalized_decoder_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_non_marginalized_decoder_likelihoods(filter_epochs_decoder_result, debug_print=False)
+            # non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df = epochs_non_marginalized_decoder_marginals_tuple
             
 
         ## Build combined marginals df:
         # epochs_marginals_df = pd.DataFrame(np.hstack((epochs_directional_all_epoch_bins_marginal, epochs_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
         epochs_marginals_df = pd.DataFrame(np.hstack((non_marginalized_decoder_all_epoch_bins_marginal, epochs_directional_all_epoch_bins_marginal, epochs_track_identity_all_epoch_bins_marginal)), columns=['long_LR', 'long_RL', 'short_LR', 'short_RL', 'P_LR', 'P_RL', 'P_Long', 'P_Short'])
         epochs_marginals_df[epoch_idx_col_name] = epochs_marginals_df.index.to_numpy()
-        epochs_marginals_df[epoch_start_t_col_name] = epochs_epochs_df['start'].to_numpy()
+        epochs_marginals_df[epoch_start_t_col_name] = epochs_df['start'].to_numpy()
         # epochs_marginals_df['stop'] = epochs_epochs_df['stop'].to_numpy()
         # epochs_marginals_df['label'] = epochs_epochs_df['label'].to_numpy()
         if auto_transfer_all_columns and (additional_transfer_column_names is None):
             ## if no columns are explcitly specified, transfer all columns
-            additional_transfer_column_names = list(epochs_epochs_df.columns)
+            additional_transfer_column_names = list(epochs_df.columns)
             
         if additional_transfer_column_names is not None:
             for a_col_name in additional_transfer_column_names:
-                if ((a_col_name in epochs_epochs_df) and (a_col_name not in epochs_marginals_df)):
-                    epochs_marginals_df[a_col_name] = epochs_epochs_df[a_col_name].to_numpy()
+                if ((a_col_name in epochs_df) and (a_col_name not in epochs_marginals_df)):
+                    epochs_marginals_df[a_col_name] = epochs_df[a_col_name].to_numpy()
                 else:
                     print(f'WARN: extra column: "{a_col_name}" was specified but not present in epochs_epochs_df. Skipping.')
         
