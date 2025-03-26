@@ -333,6 +333,31 @@ class Dock(QtWidgets.QWidget, DockDrop):
         if 'center' in self.allowedAreas:
             self.allowedAreas.remove('center')
         self.updateStyle()
+        # Create a special tiny button that can restore the title bar
+        if not hasattr(self, 'restoreTitleButton'):
+            self.restoreTitleButton = QtWidgets.QToolButton(self)
+            self.restoreTitleButton.setIcon(QtWidgets.QApplication.style().standardIcon(
+                QtWidgets.QStyle.StandardPixmap.SP_TitleBarNormalButton))
+            self.restoreTitleButton.setToolTip("Show title bar")
+            self.restoreTitleButton.clicked.connect(self.showTitleBar)
+            self.restoreTitleButton.setMaximumSize(16, 16)
+            self.restoreTitleButton.setStyleSheet("""
+                QToolButton {
+                    background-color: rgba(100, 100, 100, 60);
+                    border-radius: 2px;
+                }
+                QToolButton:hover {
+                    background-color: rgba(100, 100, 100, 100);
+                }
+            """)
+            
+        # Position in top-right corner and make visible
+        self.restoreTitleButton.show()
+        self.restoreTitleButton.raise_()
+        
+
+
+
 
     def showTitleBar(self):
         """
@@ -342,7 +367,11 @@ class Dock(QtWidgets.QWidget, DockDrop):
         self.labelHidden = False
         self.allowedAreas.add('center')
         self.updateStyle()
-        
+
+        # Hide the restore button if it exists
+        if hasattr(self, 'restoreTitleButton'):
+            self.restoreTitleButton.hide()
+
 
     def toggleContentVisibility(self):
         """ toggles the visibility of the contents (everything except the title bar) for this Dock.
@@ -569,6 +598,10 @@ class Dock(QtWidgets.QWidget, DockDrop):
         menu = QtWidgets.QMenu()
         
         # Create standard actions
+        showTitleAction = menu.addAction("Show title bar")
+        showTitleAction.triggered.connect(self.showTitleBar)
+        menu.addSeparator()
+
         renameAction = menu.addAction("Rename dock...")
         renameAction.triggered.connect(lambda: self.label.promptRename())
         
@@ -618,7 +651,6 @@ class Dock(QtWidgets.QWidget, DockDrop):
         
         return menu
     
-
     def extendContextMenu(self, menu):
         """
         This method can be overridden by subclasses to add additional items to the context menu.
@@ -633,6 +665,22 @@ class Dock(QtWidgets.QWidget, DockDrop):
             if hasattr(widget, 'extendDockContextMenu') and callable(getattr(widget, 'extendDockContextMenu')):
                 widget.extendDockContextMenu(menu, self)
 
+    def contextMenuEvent(self, event):
+        """
+        Handle right-click events on the dock itself (but not its contents).
+        This gives access to the context menu when clicking on the dock frame.
+        """
+        # Check if the event occurred directly on the dock widget, not on a child widget
+        if self.childAt(event.pos()) is None:
+            menu = self.buildContextMenu()
+            if menu and not menu.isEmpty():
+                menu.exec(event.globalPos())
+            event.accept()
+        else:
+            # Let the event propagate to children
+            super().contextMenuEvent(event)
+            
+        
 
     # ==================================================================================================================== #
     # Specific context menu action handlers                                                                                #
