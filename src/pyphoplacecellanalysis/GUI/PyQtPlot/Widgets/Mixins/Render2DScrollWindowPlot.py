@@ -81,7 +81,7 @@ class Render2DScrollWindowPlotMixin:
         
         #############################
         ## Bottom Windowed Scroll Plot/Widget:
-        scroll_window_plot_downsampling_rate: int = self.params.setdefault('scroll_window_plot_downsampling_rate', 100)
+        scroll_window_plot_downsampling_rate: int = self.params.setdefault('scroll_window_plot_downsampling_rate', 5) ## reduced downsample rate from 100 -> 5 after noticing that it was very desceptive how many spikes it was missing
         
         # ALL Spikes in the preview window:
         # curr_spike_x, curr_spike_y, curr_spike_pens, _all_scatterplot_tooltips_kwargs, self.plots_data.all_spots, curr_n = self._build_all_spikes_data_values(should_return_data_tooltips_kwargs=False, downsampling_rate=scroll_window_plot_downsampling_rate) #TODO 2023-06-28 21:18: - [ ] Could use returned tooltips to set the spike hover text
