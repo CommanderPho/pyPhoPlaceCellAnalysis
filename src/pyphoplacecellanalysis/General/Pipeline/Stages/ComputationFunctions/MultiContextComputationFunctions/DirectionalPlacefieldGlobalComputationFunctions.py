@@ -1571,17 +1571,10 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                 )
                 
                 # Expanded implementation of build_laps_time_bin_marginals_df
-                laps_directional_marginals, _, _, _ = laps_directional_marginals_tuple
-                laps_track_identity_marginals, _, _, _ = laps_track_identity_marginals_tuple
+                epoch_directional_marginals, _, _, _ = laps_directional_marginals_tuple
+                epoch_track_identity_marginals, _, _, _ = laps_track_identity_marginals_tuple
                 non_marginalized_decoder_marginals, _, _, _ = laps_non_marginalized_decoder_marginals_tuple
-                
-                laps_time_bin_marginals_df = a_result.build_per_time_bin_marginals_df(
-                    active_marginals_tuple=(laps_directional_marginals, laps_track_identity_marginals, non_marginalized_decoder_marginals), 
-                    columns_tuple=(['P_LR', 'P_RL'], ['P_Long', 'P_Short'], ['long_LR', 'long_RL', 'short_LR', 'short_RL'])
-                )
-                
-                return laps_time_bin_marginals_df
-                
+                                
             elif known_named_decoding_epochs_type == 'pbe':
                 # Case: Per-time-bin PBE/ripple marginals
                 # Compute the marginals from the result
@@ -1592,18 +1585,10 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                 )
                 
                 # Expanded implementation of build_ripple_time_bin_marginals_df
-                ripple_directional_marginals, _, _, _ = ripple_directional_marginals_tuple
-                ripple_track_identity_marginals, _, _, _ = ripple_track_identity_marginals_tuple
+                epoch_directional_marginals, _, _, _ = ripple_directional_marginals_tuple
+                epoch_track_identity_marginals, _, _, _ = ripple_track_identity_marginals_tuple
                 non_marginalized_decoder_marginals, _, _, _ = ripple_non_marginalized_decoder_marginals_tuple
                 
-                ripple_time_bin_marginals_df = a_result.build_per_time_bin_marginals_df(
-                    active_marginals_tuple=(ripple_directional_marginals, ripple_track_identity_marginals, non_marginalized_decoder_marginals), 
-                    columns_tuple=(['P_LR', 'P_RL'], ['P_Long', 'P_Short'], ['long_LR', 'long_RL', 'short_LR', 'short_RL'])
-                )
-                
-                return ripple_time_bin_marginals_df
-            
-
             elif known_named_decoding_epochs_type == 'global':
                 # Case: Per-time-bin global marginals
                 # Compute the marginals from the result
@@ -1618,16 +1603,19 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                 epoch_track_identity_marginals, _, _, _ = epoch_track_identity_marginals_tuple
                 non_marginalized_decoder_marginals, _, _, _ = epoch_non_marginalized_decoder_marginals_tuple
                 
-                epoch_time_bin_marginals_df = a_result.build_per_time_bin_marginals_df(
-                    active_marginals_tuple=(epoch_directional_marginals, epoch_track_identity_marginals, non_marginalized_decoder_marginals), 
-                    columns_tuple=(['P_LR', 'P_RL'], ['P_Long', 'P_Short'], ['long_LR', 'long_RL', 'short_LR', 'short_RL'])
-                )
-                
-                return epoch_time_bin_marginals_df
             
             else:
                 raise ValueError(f"Unexpected value for known_named_decoding_epochs_type: {known_named_decoding_epochs_type}")
-                
+            ## END if known_named_decoding...
+
+            epoch_time_bin_marginals_df = a_result.build_per_time_bin_marginals_df(
+                active_marginals_tuple=(epoch_directional_marginals, epoch_track_identity_marginals, non_marginalized_decoder_marginals), 
+                columns_tuple=(['P_LR', 'P_RL'], ['P_Long', 'P_Short'], ['long_LR', 'long_RL', 'short_LR', 'short_RL'])
+            )
+            
+            return epoch_time_bin_marginals_df
+        
+
         elif data_grain == 'per_epoch':
             if known_named_decoding_epochs_type == 'laps':
                 # Case: Per-epoch laps marginals
@@ -1639,14 +1627,14 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                 )
                 
                 # Expanded implementation of build_laps_all_epoch_bins_marginals_df
-                laps_directional_marginals, laps_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir = laps_directional_marginals_tuple
-                laps_track_identity_marginals, laps_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = laps_track_identity_marginals_tuple
+                epoch_directional_marginals, epoch_directional_all_epoch_bins_marginal, laps_most_likely_direction_from_decoder, laps_is_most_likely_direction_LR_dir = laps_directional_marginals_tuple
+                epoch_track_identity_marginals, epoch_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = laps_track_identity_marginals_tuple
 
-                laps_marginals_df = pd.DataFrame(np.hstack((laps_directional_all_epoch_bins_marginal, laps_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
-                laps_marginals_df['lap_idx'] = laps_marginals_df.index.to_numpy()
-                laps_marginals_df['lap_start_t'] = a_result.filter_epochs['start'].to_numpy()
+                epoch_marginals_df = pd.DataFrame(np.hstack((epoch_directional_all_epoch_bins_marginal, epoch_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
+                epoch_marginals_df['lap_idx'] = epoch_marginals_df.index.to_numpy()
+                epoch_marginals_df['lap_start_t'] = a_result.filter_epochs['start'].to_numpy()
                 
-                return laps_marginals_df
+                return epoch_marginals_df
                 
             elif known_named_decoding_epochs_type == 'pbe':
                 # Case: Per-epoch PBE/ripple marginals
@@ -1658,14 +1646,14 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                 )
                 
                 # Expanded implementation of build_ripple_all_epoch_bins_marginals_df
-                ripple_directional_marginals, ripple_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir = ripple_directional_marginals_tuple
-                ripple_track_identity_marginals, ripple_track_identity_all_epoch_bins_marginal, ripple_most_likely_track_identity_from_decoder, ripple_is_most_likely_track_identity_Long = ripple_track_identity_marginals_tuple
+                epoch_directional_marginals, epoch_directional_all_epoch_bins_marginal, ripple_most_likely_direction_from_decoder, ripple_is_most_likely_direction_LR_dir = ripple_directional_marginals_tuple
+                epoch_track_identity_marginals, epoch_track_identity_all_epoch_bins_marginal, ripple_most_likely_track_identity_from_decoder, ripple_is_most_likely_track_identity_Long = ripple_track_identity_marginals_tuple
 
-                ripple_marginals_df = pd.DataFrame(np.hstack((ripple_directional_all_epoch_bins_marginal, ripple_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
-                ripple_marginals_df['ripple_idx'] = ripple_marginals_df.index.to_numpy()
-                ripple_marginals_df['ripple_start_t'] = a_result.filter_epochs['start'].to_numpy()
+                epoch_marginals_df = pd.DataFrame(np.hstack((epoch_directional_all_epoch_bins_marginal, epoch_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
+                epoch_marginals_df['ripple_idx'] = epoch_marginals_df.index.to_numpy()
+                epoch_marginals_df['ripple_start_t'] = a_result.filter_epochs['start'].to_numpy()
                 
-                return ripple_marginals_df
+                return epoch_marginals_df
                 
 
             elif known_named_decoding_epochs_type == 'global':
