@@ -212,7 +212,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
     # Additive from old results objects                                                                                                                                                #
     # ================================================================================================================================================================================ #
     @classmethod
-    def init_from_old_GeneralDecoderDictDecodedEpochsDictResult(cls, a_general_decoder_dict_decoded_epochs_dict_result) -> "GenericDecoderDictDecodedEpochsDictResult":
+    def init_from_old_GeneralDecoderDictDecodedEpochsDictResult(cls, a_general_decoder_dict_decoded_epochs_dict_result: GeneralDecoderDictDecodedEpochsDictResult) -> "GenericDecoderDictDecodedEpochsDictResult":
         """ converts the 2025-03-10 result (`GeneralDecoderDictDecodedEpochsDictResult`) to the 2025-03-11 format (`GenericDecoderDictDecodedEpochsDictResult`)
 
         from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult, GenericResultTupleIndexType, KnownNamedDecodingEpochsType, MaskedTimeBinFillType
@@ -1434,12 +1434,27 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # masked_pseudo2D_continuous_specific_decoded_result, _mask_index_tuple = pseudo2D_continuous_specific_decoded_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)))
 
 
-
         # ==================================================================================================================== #
         # Phase 2.5 - Add Continuous Results as a `known_named_decoding_epochs_type` --- known_named_decoding_epochs_type='continuous'
         # ==================================================================================================================== #
         known_named_decoding_epochs_type='global'
         a_new_fully_generic_result = a_new_fully_generic_result.computing_for_global_epoch(curr_active_pipeline=curr_active_pipeline, debug_print=debug_print)       
+
+
+        # ==================================================================================================================== #
+        # Phase 2.55 - Add non-PBE decoders to the .decoders dict                                                              #
+        # ==================================================================================================================== #
+        # # 'trained_compute_epochs' ________________________________________________________________________________________________________ #
+        # trained_compute_epochs_name: str = initial_context_dict.pop('trained_compute_epochs', 'laps') # ['laps', 'pbe', 'non_pbe']
+        # final_output_context_dict['trained_compute_epochs'] = trained_compute_epochs_name
+        # # assert hasattr(curr_active_pipeline.filtered_sessions[non_directional_names_to_default_epoch_names_map[global_epoch_name]], trained_compute_epochs_name), f"trained_compute_epochs_name: '{trained_compute_epochs_name}'"
+        # assert hasattr(global_session, trained_compute_epochs_name), f"trained_compute_epochs_name: '{trained_compute_epochs_name}'"
+        # #TODO 2025-03-11 09:10: - [X] Get proper compute epochs from the context
+        # trained_compute_epochs: Epoch = ensure_Epoch(deepcopy(getattr(global_session, trained_compute_epochs_name))) # .non_pbe
+        
+        # new_decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = {a_name:BasePositionDecoder(pf=a_pfs).replacing_computation_epochs(epochs=trained_compute_epochs) for a_name, a_pfs in original_pfs_dict.items()} ## build new simple decoders
+        
+
 
         # ==================================================================================================================== #
         # Phase 3 - `creating_new_spikes_per_t_bin_masked_variants`                                                                      #
