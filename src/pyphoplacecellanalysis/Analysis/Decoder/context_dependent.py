@@ -473,7 +473,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         ## Updates `self.filter_epochs_specific_decoded_result`, `self.filter_epochs_to_decode_dict`
         for a_known_decoded_epochs_type, a_decoder_epochs_filter_epochs_decoder_result in decoder_filter_epochs_result_dict.items():
             ## build the complete identifier
-            a_new_identifier: IdentifyingContext = a_base_identifier.adding_context_if_missing(known_named_decoding_epochs_type=a_known_decoded_epochs_type, masked_time_bin_fill_type='ignore')) # IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier=a_decoder_name, time_bin_size=epochs_decoding_time_bin_size, known_named_decoding_epochs_type=a_known_decoded_epochs_type, masked_time_bin_fill_type='ignore')
+            a_new_identifier: IdentifyingContext = a_base_identifier.adding_context_if_missing(known_named_decoding_epochs_type=a_known_decoded_epochs_type, masked_time_bin_fill_type='ignore') # IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier=a_decoder_name, time_bin_size=epochs_decoding_time_bin_size, known_named_decoding_epochs_type=a_known_decoded_epochs_type, masked_time_bin_fill_type='ignore')
             if debug_print:
                 print(f'a_new_identifier: "{a_new_identifier}"')
             
