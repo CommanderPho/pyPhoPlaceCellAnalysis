@@ -32,7 +32,7 @@ from neuropy.core.laps import Laps # used in `DirectionalLapsHelpers`
 from neuropy.utils.result_context import IdentifyingContext
 from neuropy.utils.dynamic_container import DynamicContainer
 from neuropy.utils.mixins.dict_representable import override_dict # used to build config
-from neuropy.analyses.placefields import PlacefieldComputationParameters
+from neuropy.analyses.placefields import PfND, PlacefieldComputationParameters
 from neuropy.core.epoch import NamedTimerange, Epoch, ensure_dataframe
 from neuropy.core.epoch import find_data_indicies_from_epoch_times
 from neuropy.utils.indexing_helpers import union_of_arrays # `paired_incremental_sort_neurons`
@@ -1379,12 +1379,12 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
     """
     _VersionedResultMixin_version: str = "2024.10.09_0" # to be updated in your IMPLEMENTOR to indicate its version
     
-    all_directional_decoder_dict: Dict[str, BasePositionDecoder] = serialized_field(default=None)
+    all_directional_decoder_dict: Dict[str, PfND] = serialized_field(default=None)
     all_directional_pf1D_Decoder: BasePositionDecoder = serialized_field(default=None)
     long_directional_pf1D_Decoder: BasePositionDecoder = serialized_field(default=None)
-    long_directional_decoder_dict: Dict[str, BasePositionDecoder] = serialized_field(default=None)
+    long_directional_decoder_dict: Dict[str, PfND] = serialized_field(default=None)
     short_directional_pf1D_Decoder: BasePositionDecoder = serialized_field(default=None)
-    short_directional_decoder_dict: Dict[str, BasePositionDecoder] = serialized_field(default=None)
+    short_directional_decoder_dict: Dict[str, PfND] = serialized_field(default=None)
 
     # Posteriors computed via the all_directional decoder:
     all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult = serialized_field(default=None)
@@ -1553,8 +1553,8 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
         """
         data_grain = marginal_context.get('data_grain', None)
-        assert data_grain is not None
-        assert data_grain in ['per_time_bin', 'per_epoch']
+        assert data_grain is not None, f"marginal_context: {marginal_context}"
+        assert data_grain in ['per_time_bin', 'per_epoch'], f"marginal_context: {marginal_context}"
         
         known_named_decoding_epochs_type = marginal_context.get('known_named_decoding_epochs_type', None)
         assert known_named_decoding_epochs_type is not None
