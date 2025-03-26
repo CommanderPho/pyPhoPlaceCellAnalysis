@@ -1281,6 +1281,44 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # #     session_name=session_name, t_start=t_start, t_delta=t_delta, t_end=t_end,
         # # )
     
+
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+        global_session = curr_active_pipeline.filtered_sessions[global_epoch_name]
+        
+        laps_trained_decoder_search_context = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='laps', masked_time_bin_fill_type='ignore', data_grain='per_time_bin') # , data_grain= 'per_time_bin -- not really relevant: ['masked_time_bin_fill_type', 'known_named_decoding_epochs_type', 'data_grain']
+        # flat_context_list, flat_result_context_dict, flat_decoder_context_dict, flat_decoded_marginal_posterior_df_context_dict = a_new_fully_generic_result.get_results_matching_contexts(context_query=search_context, return_multiple_matches=True, return_flat_same_length_dicts=True, debug_print=True)
+        a_laps_trained_decoder_ctxt, a_laps_trained_decoder_result, a_laps_trained_decoder, _ = self.get_results_matching_contexts(context_query=laps_trained_decoder_search_context, return_multiple_matches=False, debug_print=True)
+        # a_decoder
+        if debug_print:
+            print(f'a_laps_trained_decoder_ctxt: {a_laps_trained_decoder_ctxt}')
+
+        # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
+        # for a_ctxt, a_result in self.filter_epochs_specific_decoded_result.items():
+        # for a_ctxt, a_decoder in self.decoders.items():            
+
+            
+
+        # 'trained_compute_epochs' ________________________________________________________________________________________________________ #
+        new_desired_trained_compute_epochs_name: str = 'non_pbe' # initial_context_dict.pop('trained_compute_epochs', 'laps') # ['laps', 'pbe', 'non_pbe']
+        # final_output_context_dict['trained_compute_epochs'] = new_desired_trained_compute_epochs_name
+        
+        a_new_context = a_laps_trained_decoder_ctxt.overwriting_context(trained_compute_epochs=new_desired_trained_compute_epochs_name)
+        if debug_print:
+            print(f'\ta_new_context: {a_new_context}')
+            
+
+        # assert hasattr(curr_active_pipeline.filtered_sessions[non_directional_names_to_default_epoch_names_map[global_epoch_name]], trained_compute_epochs_name), f"trained_compute_epochs_name: '{trained_compute_epochs_name}'"
+        assert hasattr(global_session, new_desired_trained_compute_epochs_name), f"trained_compute_epochs_name: '{new_desired_trained_compute_epochs_name}'"
+        #TODO 2025-03-11 09:10: - [X] Get proper compute epochs from the context
+        trained_compute_epochs: Epoch = ensure_Epoch(deepcopy(getattr(global_session, new_desired_trained_compute_epochs_name))) # .non_pbe
+        # new_decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = {a_name:BasePositionDecoder(pf=a_pfs).replacing_computation_epochs(epochs=trained_compute_epochs) for a_name, a_pfs in original_pfs_dict.items()} ## build new simple decoders
+        a_new_decoder: BasePositionDecoder = BasePositionDecoder(pf=deepcopy(a_laps_trained_decoder.pfs)).replacing_computation_epochs(epochs=trained_compute_epochs) ## build new simple decoders
+        ## add the new decoder
+        self.decoders[a_new_context] = a_new_decoder
+        
+        #TODO 2025-03-26 10:49: - [ ] Decoding using the decoder
+
+
         # final_output_context: IdentifyingContext = IdentifyingContext(**final_output_context_dict)
         
         # return final_output_context
