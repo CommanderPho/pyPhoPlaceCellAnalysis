@@ -1477,24 +1477,25 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # Phase 4 - Remdial - Add any missing dataframes directly.                                                             #
         # ==================================================================================================================== #
         ## Build masked versions of important contexts:
+        time_bin_size = 0.025
 
         ## Common/shared for all decoded epochs:
         for a_masked_bin_fill_mode in ['nan_filled', 'last_valid', 'dropped']:
             # a_masked_bin_fill_mode = 'nan_filled'
 
             ## INPUTS: a_new_fully_generic_result
-            base_contexts_list = [IdentifyingContext(trained_compute_epochs= 'laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= 0.025, known_named_decoding_epochs_type='laps', masked_time_bin_fill_type= 'ignore', data_grain= 'per_time_bin'),
-                                IdentifyingContext(trained_compute_epochs= 'laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= 0.025, known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type= 'ignore', data_grain= 'per_time_bin'),
-                                IdentifyingContext(trained_compute_epochs= 'non_pbe', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= 0.025, known_named_decoding_epochs_type='laps', masked_time_bin_fill_type= 'ignore', data_grain= 'per_time_bin'),
-                                IdentifyingContext(trained_compute_epochs= 'non_pbe', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size= 0.025, known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type= 'ignore', data_grain= 'per_time_bin')]
+            base_contexts_list = [IdentifyingContext(trained_compute_epochs='laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size=time_bin_size, known_named_decoding_epochs_type='laps', masked_time_bin_fill_type= 'ignore', data_grain='per_time_bin'),
+                                IdentifyingContext(trained_compute_epochs='laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size=time_bin_size, known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type= 'ignore', data_grain='per_time_bin'),
+                                IdentifyingContext(trained_compute_epochs='non_pbe', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size=time_bin_size, known_named_decoding_epochs_type='laps', masked_time_bin_fill_type= 'ignore', data_grain='per_time_bin'),
+                                IdentifyingContext(trained_compute_epochs='non_pbe', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size=time_bin_size, known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type= 'ignore', data_grain='per_time_bin')]
             masked_contexts_dict = {}
 
             for a_base_context in base_contexts_list:
 
                 a_best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_matching_contexts(a_base_context, return_multiple_matches=False)
-
+                ## `a_decoder` is None for some reason?`
                 ## INPUTS: a_result, masked_bin_fill_mode
-                a_masked_updated_context: IdentifyingContext = deepcopy(a_best_matching_context).overwriting_context(masked_time_bin_fill_type=a_masked_bin_fill_mode)
+                a_masked_updated_context: IdentifyingContext = deepcopy(a_best_matching_context).overwriting_context(masked_time_bin_fill_type=a_masked_bin_fill_mode, data_grain='per_time_bin')
                 masked_contexts_dict[a_base_context] = a_masked_updated_context
                 if debug_print:
                     print(f'a_masked_updated_context: {a_masked_updated_context}')
