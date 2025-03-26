@@ -257,7 +257,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             a_new_identifier = IdentifyingContext(**_shared_context_fragment, known_named_decoding_epochs_type=a_known_epoch_name)
             self.filter_epochs_to_decode_dict[a_new_identifier] = deepcopy(an_epoch)
             self.filter_epochs_specific_decoded_result[a_new_identifier] = deepcopy(a_general_decoder_dict_decoded_epochs_dict_result.filter_epochs_pseudo2D_continuous_specific_decoded_result[a_known_epoch_name])
-
+            ## Marginal dataframes:
             for a_known_t_bin_fill_type, a_posterior_df in a_general_decoder_dict_decoded_epochs_dict_result.filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict[a_known_epoch_name].items():
                 a_new_joint_identifier = IdentifyingContext(**_shared_context_fragment, known_named_decoding_epochs_type=a_known_epoch_name, masked_time_bin_fill_type=a_known_t_bin_fill_type)
                 if flat_contexts:
@@ -328,7 +328,8 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         Assert.all_equal(epochs_decoding_time_bin_size_dict.values())
         epochs_decoding_time_bin_size: float = list(epochs_decoding_time_bin_size_dict.values())[0]
         pos_bin_size: float = directional_decoders_epochs_decode_result.pos_bin_size
-        print(f'{pos_bin_size = }, {epochs_decoding_time_bin_size = }')
+        if debug_print:
+            print(f'{pos_bin_size = }, {epochs_decoding_time_bin_size = }')
 
 
         ## OUTPUTS: filtered_decoder_filter_epochs_decoder_result_dict_dict, epochs_decoding_time_bin_size
@@ -393,7 +394,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         
         ## NOTE, HAVE:
         all_directional_pf1D_Decoder: BasePositionDecoder = directional_merged_decoders_result.all_directional_pf1D_Decoder
-        all_directional_decoder_dict: Dict[str, BasePositionDecoder] = directional_merged_decoders_result.all_directional_decoder_dict
+        # all_directional_decoder_dict: Dict[str, PfND] = directional_merged_decoders_result.all_directional_decoder_dict ## AHHH these are PfND, NOT BasePositionDecoder
         # Posteriors computed via the all_directional decoder:
         all_directional_laps_filter_epochs_decoder_result: DecodedFilterEpochsResult = directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result
         all_directional_ripple_filter_epochs_decoder_result: DecodedFilterEpochsResult = directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result
@@ -463,6 +464,8 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
         ## Perform the decoding and masking as needed for invalid bins:
         a_decoder_name: str = 'pseudo2D' # FIXED FOR THIS ENTIRE FUNCTION
+        a_base_identifier: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier=a_decoder_name, time_bin_size=epochs_decoding_time_bin_size)
+        self.decoders[a_base_identifier] = deepcopy(all_directional_pf1D_Decoder) ## add 'pseudo2D' decoder
         
         spikes_df: pd.DataFrame = deepcopy(list(self.spikes_df_dict.values())[0])
 
@@ -470,7 +473,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         ## Updates `self.filter_epochs_specific_decoded_result`, `self.filter_epochs_to_decode_dict`
         for a_known_decoded_epochs_type, a_decoder_epochs_filter_epochs_decoder_result in decoder_filter_epochs_result_dict.items():
             ## build the complete identifier
-            a_new_identifier: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier=a_decoder_name, time_bin_size=epochs_decoding_time_bin_size, known_named_decoding_epochs_type=a_known_decoded_epochs_type, masked_time_bin_fill_type='ignore')
+            a_new_identifier: IdentifyingContext = a_base_identifier.adding_context_if_missing(known_named_decoding_epochs_type=a_known_decoded_epochs_type, masked_time_bin_fill_type='ignore')) # IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier=a_decoder_name, time_bin_size=epochs_decoding_time_bin_size, known_named_decoding_epochs_type=a_known_decoded_epochs_type, masked_time_bin_fill_type='ignore')
             if debug_print:
                 print(f'a_new_identifier: "{a_new_identifier}"')
             
@@ -481,13 +484,12 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
 
             ## Updates `self.decoders` with the four individual decoders
-            for an_individual_decoder_name, an_individual_directional_decoder in all_directional_decoder_dict.items():
-                a_new_individual_decoder_identifier: IdentifyingContext = deepcopy(a_new_identifier).overwriting_context(decoder_identifier=an_individual_decoder_name) # replace 'decoder_identifier'
-                if debug_print:
-                    print(f'\t a_new_individual_decoder_identifier: "{a_new_individual_decoder_identifier}"')
-                assert a_new_individual_decoder_identifier not in self.decoders
-                self.decoders[a_new_individual_decoder_identifier] = deepcopy(an_individual_directional_decoder) 
-
+            # for an_individual_decoder_name, an_individual_directional_decoder in all_directional_decoder_dict.items():
+            #     a_new_individual_decoder_identifier: IdentifyingContext = deepcopy(a_new_identifier).overwriting_context(decoder_identifier=an_individual_decoder_name) # replace 'decoder_identifier'
+            #     if debug_print:
+            #         print(f'\t a_new_individual_decoder_identifier: "{a_new_individual_decoder_identifier}"')
+            #     assert a_new_individual_decoder_identifier not in self.decoders
+            #     self.decoders[a_new_individual_decoder_identifier] = deepcopy(an_individual_directional_decoder) 
 
             ## Updates `self.filter_epochs_decoded_track_marginal_posterior_df_dict`
 
@@ -513,7 +515,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                 _was_update_success = self.updating_results_for_context(new_context=a_masked_updated_context, a_result=deepcopy(a_dropping_masked_pseudo2D_continuous_specific_decoded_result), a_decoder=deepcopy(all_directional_pf1D_Decoder), a_decoded_marginal_posterior_df=deepcopy(a_dropping_masked_decoded_marginal_posterior_df)) ## update using the result
                 if not _was_update_success:
                     print(f'update failed for masked context: {a_masked_updated_context}')
-
+            ## END for a_known_data_g...
 
             #TODO 2025-03-20 09:16: - [ ] These aren't time_grain specific?!?
             ## add the filtered versions down here:
@@ -543,7 +545,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             # _was_update_success = self.updating_results_for_context(new_context=a_masked_updated_context, a_result=deepcopy(a_dropping_masked_pseudo2D_continuous_specific_decoded_result), a_decoder=deepcopy(all_directional_pf1D_Decoder), a_decoded_marginal_posterior_df=deepcopy(a_dropping_masked_decoded_marginal_posterior_df)) ## update using the result
             # if not _was_update_success:
             #     print(f'update failed for masked context: {a_masked_updated_context}')
-
+        ## END for a_known_decode...
 
         # directional_decoders_epochs_decode_result.build_complete_all_scores_merged_df(debug
                                                                                     
