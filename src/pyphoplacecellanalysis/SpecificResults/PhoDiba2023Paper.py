@@ -2583,9 +2583,11 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
     @function_attributes(short_name=None, tags=['plotting'], input_requires=[], output_provides=[], uses=['_perform_plot_pre_post_delta_scatter'], used_by=[], creation_date='2024-11-20 13:08', related_items=[])
     @classmethod
-    def _build_plot_callback(cls, earliest_delta_aligned_t_start, latest_delta_aligned_t_end, save_plotly, should_save: bool = False, resolution_multiplier=1, enable_debug_print=False, **extra_plot_kwargs):
+    def _build_plot_callback(cls, earliest_delta_aligned_t_start, latest_delta_aligned_t_end, save_plotly, should_save: bool = False, should_prepare_full_hover_click_interactivity: bool = False, resolution_multiplier: float=1, enable_debug_print=False, **extra_plot_kwargs):
         """ 
-
+        
+        should_prepare_full_hover_click_interactivity: bool:  ## slow when enabled
+        
         """
         # fig_size_kwargs = {'width': 1650, 'height': 480}
         # fig_size_kwargs = {'width': resolution_multiplier*1650, 'height': resolution_multiplier*480}
@@ -2628,8 +2630,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                 # a_heatmap_img = df_filter.hover_posterior_data.ripple_img_dict['long_LR'][last_selected_idx]    
                 ## update the plot
                 df_filter.hover_posterior_preview_figure_widget.add_heatmap(z=a_heatmap_img, showscale=False, name='selected_posterior', )
-
-
+            ## END def _plot_hoverred_heatmap_preview_post....
 
             # df_filter.output_widget.clear_output(wait=True)
             active_plot_df_name: str = df_filter.active_plot_df_name
@@ -2643,138 +2644,145 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             fig, new_fig_context, _extras_output_dict, figure_out_paths = _new_perform_plot_pre_post_delta_scatter_with_embedded_context(concatenated_ripple_df=deepcopy(active_plot_df), is_dark_mode=False, should_save=should_save, extant_figure=df_filter.figure_widget,
                                                                                                                                     variable_name=plot_variable_name, **active_plot_kwargs) # , enable_custom_widget_buttons=True
             
-            fig = fig.update_layout(clickmode="event+select", hovermode='closest', dragmode='select')
-            
-            
-            # Customize the hovertemplate
-            fig.update_traces(
-                # hovertemplate="<b>sess:</b> %{customdata[0]}<br>"
-                #             # "<b>X:</b> %{x}<br>"
-                #             "<b>start, duration:</b> %{customdata[3]}, %{customdata[4]}<br>"
-                #             "<b>Y:</b> %{y}<br>"
-                #             "<b>custom_replay:</b> %{customdata[1]}",
+
+            # ==================================================================================================================== #
+            # Hover/Click Interactivity (Slow)                                                                                     #
+            # ==================================================================================================================== #
+            if should_prepare_full_hover_click_interactivity:
+                fig = fig.update_layout(clickmode="event+select", hovermode='closest', dragmode='select')
                 
-                hovertemplate="<b>sess:</b> %{customdata[0]} | <b>replay_name:</b> %{customdata[1]} | <b>time_bin_size:</b> %{customdata[2]}<br>"
-                            "<b>start:</b> %{customdata[3]}<br>",
-                customdata=active_plot_df[["session_name", "custom_replay_name", "time_bin_size", "start", "duration"]].values,
-                hoverlabel=dict(bgcolor="rgba(255, 255, 255, 0.4)", font=dict(color="black")),
-            )
-
-            if df_filter.hover_posterior_data is not None:
-                if df_filter.hover_posterior_data.plot_heatmap_fn is None:
-                    df_filter.hover_posterior_data.plot_heatmap_fn = (lambda a_df_filter, a_heatmap_img, *args, **kwargs: a_df_filter.hover_posterior_preview_figure_widget.add_heatmap(z=a_heatmap_img, showscale=False, name='selected_posterior', ))
+                
+                # Customize the hovertemplate
+                fig.update_traces(
+                    # hovertemplate="<b>sess:</b> %{customdata[0]}<br>"
+                    #             # "<b>X:</b> %{x}<br>"
+                    #             "<b>start, duration:</b> %{customdata[3]}, %{customdata[4]}<br>"
+                    #             "<b>Y:</b> %{y}<br>"
+                    #             "<b>custom_replay:</b> %{customdata[1]}",
                     
+                    hovertemplate="<b>sess:</b> %{customdata[0]} | <b>replay_name:</b> %{customdata[1]} | <b>time_bin_size:</b> %{customdata[2]}<br>"
+                                "<b>start:</b> %{customdata[3]}<br>",
+                    customdata=active_plot_df[["session_name", "custom_replay_name", "time_bin_size", "start", "duration"]].values,
+                    hoverlabel=dict(bgcolor="rgba(255, 255, 255, 0.4)", font=dict(color="black")),
+                )
 
-            allow_single_selection_only: bool = True
-            # replace_selected_points: bool = True
-            
-            def on_click(trace, points, selector):
-                if points.point_inds:
-                    df_filter.on_click_scatter_points(trace=trace, points=points, selector=selector) ## pass through call to `df_filter.on_click_scatter_points(...)`                    
-
-                    ## has selection:
-                    if (allow_single_selection_only or (len(points.point_inds) < 2)):
-                        ind = points.point_inds[0]
-                        num_new_selections = 1
-                    else:
-                        ind = points.point_inds # allows multiple selections
-                        num_new_selections = len(ind)
-
-                    session_name = df_filter.active_plot_df['session_name'].iloc[ind]
-                    custom_replay_name = df_filter.active_plot_df['custom_replay_name'].iloc[ind]
-                    time_bin_size = df_filter.active_plot_df['time_bin_size'].iloc[ind]
-                    start_t = df_filter.active_plot_df['start'].iloc[ind]
-                    stop_t = df_filter.active_plot_df['stop'].iloc[ind]
-
-
-                    # # df_filter.output_widget.clear_output()
-                    # with df_filter.output_widget:
-                    #     print(f"Clicked point index: {ind}")
-                    #     print(f'start_t, stop_t: {start_t}, {stop_t}')
-                    #     print(f"session_name: {session_name}")
-                    #     print(f"custom_replay_name: {custom_replay_name}")
-                    #     print(f"time_bin_size: {time_bin_size}")                        
-                    #     print(f'num_new_selections: {num_new_selections}')
+                if df_filter.hover_posterior_data is not None:
+                    if df_filter.hover_posterior_data.plot_heatmap_fn is None:
+                        df_filter.hover_posterior_data.plot_heatmap_fn = (lambda a_df_filter, a_heatmap_img, *args, **kwargs: a_df_filter.hover_posterior_preview_figure_widget.add_heatmap(z=a_heatmap_img, showscale=False, name='selected_posterior', ))
                         
 
-                    # with df_filter.output_widget:
-                    # print(f'num_new_selections: {num_new_selections}')
-                    # if (num_new_selections == 1):
-                    #     selected_event_session_context: IdentifyingContext = IdentifyingContext(session_name=session_name, custom_replay_name=custom_replay_name, time_bin_size=time_bin_size)
-                    #     print(f'selected_event_session_context: {selected_event_session_context}')
-                    #     # selected_event_context: IdentifyingContext = IdentifyingContext(start_t=start_t, stop_t=stop_t)
-                    #     curr_selected_points_dict = df_filter.selected_points.get(selected_event_session_context, None)
-                    #     if curr_selected_points_dict is None:
-                    #         df_filter.selected_points[selected_event_session_context] = [] # [start_t, ] ## add start_t only
-                            
-                    #     if replace_selected_points:
-                    #         df_filter.selected_points[selected_event_session_context]
-                    #     else:
-                    #         if start_t not in df_filter.selected_points[selected_event_session_context]:
-                    #             df_filter.selected_points[selected_event_session_context].append(start_t) # add to the selection points list
-                                                
-                    # else:
-                    #     # greater than one selection
-                    #     for i, (a_session_name, a_custom_replay_name, a_time_bin_size, a_start_t, a_stop_t) in enumerate(zip(session_name, custom_replay_name, time_bin_size, start_t, stop_t)):
-                            
-                    #         a_selected_event_session_context: IdentifyingContext = IdentifyingContext(session_name=a_session_name, custom_replay_name=a_custom_replay_name, time_bin_size=a_time_bin_size)
-                    #         print(f'a_selected_event_session_context: {a_selected_event_session_context}')
-                    #         # a_selected_event_context: IdentifyingContext = IdentifyingContext(start_t=a_start_t, stop_t=a_stop_t)
+                allow_single_selection_only: bool = True
+                # replace_selected_points: bool = True
 
-                    #         curr_selected_points_dict = df_filter.selected_points.get(a_selected_event_session_context, None)
-                    #         if curr_selected_points_dict is None:
-                    #             df_filter.selected_points[a_selected_event_session_context] = [] # [start_t, ] ## add start_t only                                
-                    #         # if replace_selected_points:
-                    #         #     df_filter.selected_points[a_selected_event_session_context]
-                    #         # else:
-                    #         if a_start_t not in df_filter.selected_points[a_selected_event_session_context]:
-                    #             df_filter.selected_points[a_selected_event_session_context].append(a_start_t) # add to the selection points list
+              
+                def on_click(trace, points, selector):
+                    if points.point_inds:
+                        df_filter.on_click_scatter_points(trace=trace, points=points, selector=selector) ## pass through call to `df_filter.on_click_scatter_points(...)`                    
+
+                        ## has selection:
+                        if (allow_single_selection_only or (len(points.point_inds) < 2)):
+                            ind = points.point_inds[0]
+                            num_new_selections = 1
+                        else:
+                            ind = points.point_inds # allows multiple selections
+                            num_new_selections = len(ind)
+
+                        session_name = df_filter.active_plot_df['session_name'].iloc[ind]
+                        custom_replay_name = df_filter.active_plot_df['custom_replay_name'].iloc[ind]
+                        time_bin_size = df_filter.active_plot_df['time_bin_size'].iloc[ind]
+                        start_t = df_filter.active_plot_df['start'].iloc[ind]
+                        stop_t = df_filter.active_plot_df['stop'].iloc[ind]
+
+
+                        # # df_filter.output_widget.clear_output()
+                        # with df_filter.output_widget:
+                        #     print(f"Clicked point index: {ind}")
+                        #     print(f'start_t, stop_t: {start_t}, {stop_t}')
+                        #     print(f"session_name: {session_name}")
+                        #     print(f"custom_replay_name: {custom_replay_name}")
+                        #     print(f"time_bin_size: {time_bin_size}")                        
+                        #     print(f'num_new_selections: {num_new_selections}')
+                            
+
+                        # with df_filter.output_widget:
+                        # print(f'num_new_selections: {num_new_selections}')
+                        # if (num_new_selections == 1):
+                        #     selected_event_session_context: IdentifyingContext = IdentifyingContext(session_name=session_name, custom_replay_name=custom_replay_name, time_bin_size=time_bin_size)
+                        #     print(f'selected_event_session_context: {selected_event_session_context}')
+                        #     # selected_event_context: IdentifyingContext = IdentifyingContext(start_t=start_t, stop_t=stop_t)
+                        #     curr_selected_points_dict = df_filter.selected_points.get(selected_event_session_context, None)
+                        #     if curr_selected_points_dict is None:
+                        #         df_filter.selected_points[selected_event_session_context] = [] # [start_t, ] ## add start_t only
                                 
-                    
-                    # df_filter.output_widget.clear_output()
-                    # with df_filter.output_widget:
-                    #     print(f"Clicked point index: {ind}")
-                    #     print(f'start_t, stop_t: {start_t}, {stop_t}')
-                    #     print(f"session_name: {session_name}")
-                    #     print(f"custom_replay_name: {custom_replay_name}")
-                    #     print(f"time_bin_size: {time_bin_size}")
+                        #     if replace_selected_points:
+                        #         df_filter.selected_points[selected_event_session_context]
+                        #     else:
+                        #         if start_t not in df_filter.selected_points[selected_event_session_context]:
+                        #             df_filter.selected_points[selected_event_session_context].append(start_t) # add to the selection points list
+                                                    
+                        # else:
+                        #     # greater than one selection
+                        #     for i, (a_session_name, a_custom_replay_name, a_time_bin_size, a_start_t, a_stop_t) in enumerate(zip(session_name, custom_replay_name, time_bin_size, start_t, stop_t)):
+                                
+                        #         a_selected_event_session_context: IdentifyingContext = IdentifyingContext(session_name=a_session_name, custom_replay_name=a_custom_replay_name, time_bin_size=a_time_bin_size)
+                        #         print(f'a_selected_event_session_context: {a_selected_event_session_context}')
+                        #         # a_selected_event_context: IdentifyingContext = IdentifyingContext(start_t=a_start_t, stop_t=a_stop_t)
+
+                        #         curr_selected_points_dict = df_filter.selected_points.get(a_selected_event_session_context, None)
+                        #         if curr_selected_points_dict is None:
+                        #             df_filter.selected_points[a_selected_event_session_context] = [] # [start_t, ] ## add start_t only                                
+                        #         # if replace_selected_points:
+                        #         #     df_filter.selected_points[a_selected_event_session_context]
+                        #         # else:
+                        #         if a_start_t not in df_filter.selected_points[a_selected_event_session_context]:
+                        #             df_filter.selected_points[a_selected_event_session_context].append(a_start_t) # add to the selection points list
+                                    
                         
-                 ## update selected points
-                    
-
-                    ## try to update the selected heatmap posterior:
-                    try:
-                        ## try to update by start_t, stop_t
-                        _heatmap_data = df_filter.hover_posterior_data.get_posterior_data(session_name=session_name, custom_replay_name=custom_replay_name,
-                                                                          a_decoder_name='long_LR', last_selected_idx=ind)
+                        # df_filter.output_widget.clear_output()
+                        # with df_filter.output_widget:
+                        #     print(f"Clicked point index: {ind}")
+                        #     print(f'start_t, stop_t: {start_t}, {stop_t}')
+                        #     print(f"session_name: {session_name}")
+                        #     print(f"custom_replay_name: {custom_replay_name}")
+                        #     print(f"time_bin_size: {time_bin_size}")
+                            
+                    ## update selected points
                         
-                        # _plot_hoverred_heatmap_preview_posterior(df_filter=df_filter, last_selected_idx=ind) #TODO 2024-11-26 07:32: - [ ] does this work?
-                        _plot_hoverred_heatmap_preview_posterior(df_filter=df_filter, a_heatmap_img=_heatmap_data)
 
-                    except Exception as e:
-                        print(f'encountered exception when trying to call `_plot_hoverred_heatmap_preview_posterior(..., last_selected_idx={ind}, start_t: {start_t}, stop_t: {stop_t}). Error {e}. Skipping.')
-                                            
-                else:
-                    ## no selection:
-                    # print(f'NOPE! points: {points}, trace: {trace}')
-                    # df_filter.output_widget.clear_output()
-                    if enable_debug_print:
-                        with df_filter.output_widget:
-                            print(f'NOPE! points: {points}, trace: {trace}')
+                        ## try to update the selected heatmap posterior:
+                        try:
+                            ## try to update by start_t, stop_t
+                            _heatmap_data = df_filter.hover_posterior_data.get_posterior_data(session_name=session_name, custom_replay_name=custom_replay_name,
+                                                                            a_decoder_name='long_LR', last_selected_idx=ind)
+                            
+                            # _plot_hoverred_heatmap_preview_posterior(df_filter=df_filter, last_selected_idx=ind) #TODO 2024-11-26 07:32: - [ ] does this work?
+                            _plot_hoverred_heatmap_preview_posterior(df_filter=df_filter, a_heatmap_img=_heatmap_data)
+
+                        except Exception as e:
+                            print(f'encountered exception when trying to call `_plot_hoverred_heatmap_preview_posterior(..., last_selected_idx={ind}, start_t: {start_t}, stop_t: {stop_t}). Error {e}. Skipping.')
+                                                
+                    else:
+                        ## no selection:
+                        # print(f'NOPE! points: {points}, trace: {trace}')
+                        # df_filter.output_widget.clear_output()
+                        if enable_debug_print:
+                            with df_filter.output_widget:
+                                print(f'NOPE! points: {points}, trace: {trace}')
+                ## END def on_click(t...     
+
+                fig.layout.hovermode = 'closest'
+                if len(fig.data) > 0:
+                    ## prevent IndexError: tuple index out of range
+                    fig.data[0].on_click(on_click)
+                    fig.data[0].on_selection(df_filter.on_update_selected_scatter_points)
                     
 
-            fig.layout.hovermode = 'closest'
-            if len(fig.data) > 0:
-                ## prevent IndexError: tuple index out of range
-                fig.data[0].on_click(on_click)
-                fig.data[0].on_selection(df_filter.on_update_selected_scatter_points)
-                
-
-            scatter_traces = list(fig.select_traces(selector=None, row=1, col=2))
-            for trace in scatter_traces:
-                trace.on_click(on_click)
-                trace.on_selection(df_filter.on_update_selected_scatter_points)
-                
+                scatter_traces = list(fig.select_traces(selector=None, row=1, col=2))
+                for trace in scatter_traces:
+                    trace.on_click(on_click)
+                    trace.on_selection(df_filter.on_update_selected_scatter_points)
+            ## END if should_prepare_hover_tooltips...
+            
             if fig is not None:
                 df_filter.figure_widget = fig
 
