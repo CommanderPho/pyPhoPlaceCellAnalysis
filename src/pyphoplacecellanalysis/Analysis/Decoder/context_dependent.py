@@ -934,79 +934,6 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # single_global_epoch: Epoch = Epoch(self.single_global_epoch_df)
         decode_epochs = single_global_epoch
     
-
-        # initial_context_dict: Dict = deepcopy(context.to_dict())
-        # final_output_context_dict: Dict = {}
-        
-        # # from `pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions.Compute_NonPBE_Epochs.recompute`
-        # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-        # long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
-        # long_session, short_session, global_session = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        # long_results, short_results, global_results = [curr_active_pipeline.computation_results[an_epoch_name].computed_data for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        # long_computation_config, short_computation_config, global_computation_config = [curr_active_pipeline.computation_results[an_epoch_name].computation_config for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-
-        # # 'pfND_ndim' ________________________________________________________________________________________________________ #
-        # pfND_ndim: int = initial_context_dict.pop('pfND_ndim', 1)
-        # if pfND_ndim == 1:
-        #      ## Uses 1D Placefields
-        #     print(f'Uses 1D Placefields')
-        #     long_pfND, short_pfND, global_pfND = long_results.pf1D, short_results.pf1D, global_results.pf1D
-        # else:
-        #     ## Uses 2D Placefields
-        #     print(f'Uses 2D Placefields')
-        #     long_pfND, short_pfND, global_pfND = long_results.pf2D, short_results.pf2D, global_results.pf2D
-        #     # long_pfND_decoder, short_pfND_decoder, global_pfND_decoder = long_results.pf2D_Decoder, short_results.pf2D_Decoder, global_results.pf2D_Decoder
-        # final_output_context_dict['pfND_ndim'] = pfND_ndim
-
-
-        # non_directional_names_to_default_epoch_names_map = dict(zip(['long', 'short', 'global'], [long_epoch_name, short_epoch_name, global_epoch_name]))
-        
-        # original_pfs_dict: Dict[types.DecoderName, PfND] = {'long': deepcopy(long_pfND), 'short': deepcopy(short_pfND), 'global': deepcopy(global_pfND)} ## Uses ND Placefields
-
-        # t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
-        # # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
-        # single_global_epoch_df: pd.DataFrame = pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})
-        # single_global_epoch_df['label'] = single_global_epoch_df.index.to_numpy()
-        # single_global_epoch: Epoch = Epoch(single_global_epoch_df)
-        # # single_global_epoch: Epoch = Epoch(self.single_global_epoch_df)
-
-        # # # Time-dependent
-        # # long_pf1D_dt: PfND_TimeDependent = long_results.pf1D_dt
-        # # long_pf2D_dt: PfND_TimeDependent = long_results.pf2D_dt
-        # # short_pf1D_dt: PfND_TimeDependent = short_results.pf1D_dt
-        # # short_pf2D_dt: PfND_TimeDependent = short_results.pf2D_dt
-        # # global_pf1D_dt: PfND_TimeDependent = global_results.pf1D_dt
-        # # global_pf2D_dt: PfND_TimeDependent = global_results.pf2D_dt
-        
-        # # 'time_bin_size' ____________________________________________________________________________________________________ #
-        # time_bin_size: float = initial_context_dict.pop('time_bin_size', 0.025)
-        # epochs_decoding_time_bin_size: float = time_bin_size
-        # final_output_context_dict['time_bin_size'] = epochs_decoding_time_bin_size
-        
-        # frame_divide_bin_size = 60.0
-
-        # # 'trained_compute_epochs' ________________________________________________________________________________________________________ #
-        # trained_compute_epochs_name: str = initial_context_dict.pop('trained_compute_epochs', 'laps') # ['laps', 'pbe', 'non_pbe']
-        # final_output_context_dict['trained_compute_epochs'] = trained_compute_epochs_name
-        # # assert hasattr(curr_active_pipeline.filtered_sessions[non_directional_names_to_default_epoch_names_map[global_epoch_name]], trained_compute_epochs_name), f"trained_compute_epochs_name: '{trained_compute_epochs_name}'"
-        # assert hasattr(global_session, trained_compute_epochs_name), f"trained_compute_epochs_name: '{trained_compute_epochs_name}'"
-        # #TODO 2025-03-11 09:10: - [X] Get proper compute epochs from the context
-        # trained_compute_epochs: Epoch = ensure_Epoch(deepcopy(getattr(global_session, trained_compute_epochs_name))) # .non_pbe
-        
-        # new_decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = {a_name:BasePositionDecoder(pf=a_pfs).replacing_computation_epochs(epochs=trained_compute_epochs) for a_name, a_pfs in original_pfs_dict.items()} ## build new simple decoders
-        # # new_decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = {a_name:BasePositionDecoder(pf=a_pfs).replacing_computation_epochs(epochs=deepcopy(a_new_training_df_dict[a_name])) for a_name, a_pfs in original_pfs_dict.items()} ## build new simple decoders
-        
-
-        # # 'known_named_decoding_epochs_type' ____________________________________________________________________________________________________ #
-        # # types.KnownNamedDecodingEpochsType:  typing.Literal['laps', 'replay', 'ripple', 'pbe', 'non_pbe']
-        # known_named_decoding_epochs_type: str = initial_context_dict.pop('known_named_decoding_epochs_type', 'laps')
-        # #TODO 2025-03-11 09:10: - [ ] Get proper decode epochs from the context
-        # decode_epochs = deepcopy(single_global_epoch)
-        
-
-        # final_output_context_dict['known_named_decoding_epochs_type'] = known_named_decoding_epochs_type
-        
-
         # ## Do Continuous Decoding (for all time (`single_global_epoch`), using the decoder from each epoch) -- slowest dict comp
         # continuous_specific_decoded_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = {a_name:a_new_decoder.decode_specific_epochs(spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline)), filter_epochs=decode_epochs, decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False) for a_name, a_new_decoder in new_decoder_dict.items()}
 
@@ -1120,7 +1047,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
     @function_attributes(short_name=None, tags=['batch', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=['generalized_decode_epochs_dict_and_export_results_completion_function'], creation_date='2025-03-21 00:00', related_items=[])
     @classmethod
-    def batch_user_compute_fn(cls, curr_active_pipeline, force_recompute:bool=True, debug_print:bool=True) -> 'GenericDecoderDictDecodedEpochsDictResult':
+    def batch_user_compute_fn(cls, curr_active_pipeline, force_recompute:bool=True, time_bin_size: float = 0.025, debug_print:bool=True) -> 'GenericDecoderDictDecodedEpochsDictResult':
         """ Uses the context to extract proper values from the pipeline, and performs a fresh computation
         
         Usage:
@@ -1153,8 +1080,12 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         curr_active_pipeline.reload_default_computation_functions()
         ## perform the computation either way:
         # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['non_PBE_epochs_results'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
-        curr_active_pipeline.batch_extended_computations(include_includelist=['non_PBE_epochs_results'], include_global_functions=True, included_computation_filter_names=None, fail_on_exception=True, debug_print=False)
-        
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields', 'directional_decoders_decode_continuous', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring', 'non_PBE_epochs_results'],
+                                                        computation_kwargs_list=[{'ripple_decoding_time_bin_size': time_bin_size, 'laps_decoding_time_bin_size': time_bin_size}, {'time_bin_size': time_bin_size}, {'should_skip_radon_transform': True},
+                                                                                    {'same_thresh_fraction_of_track': 0.05, 'max_ignore_bins': 2, 'use_bin_units_instead_of_realworld': False, 'max_jump_distance_cm': 60.0}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+        curr_active_pipeline.batch_extended_computations(include_includelist=['non_PBE_epochs_results'], include_global_functions=True, included_computation_filter_names=None, fail_on_exception=True, debug_print=False) ## just checking
+
+
         session_name: str = curr_active_pipeline.session_name
         t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
         
@@ -1268,17 +1199,17 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         # Phase 4 - Remdial - Add any missing dataframes directly.                                                             #
         # ==================================================================================================================== #
         ## Build masked versions of important contexts:
-        time_bin_size = 0.025
+        ## INPUTS: time_bin_size, 
 
         ## Common/shared for all decoded epochs:
         for a_masked_bin_fill_mode in ['nan_filled', 'last_valid', 'dropped']:
             # a_masked_bin_fill_mode = 'nan_filled'
 
             ## INPUTS: a_new_fully_generic_result
-            base_contexts_list = [IdentifyingContext(trained_compute_epochs='laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size=time_bin_size, known_named_decoding_epochs_type='laps', masked_time_bin_fill_type= 'ignore', data_grain='per_time_bin'),
-                                IdentifyingContext(trained_compute_epochs='laps', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size=time_bin_size, known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type= 'ignore', data_grain='per_time_bin'),
-                                IdentifyingContext(trained_compute_epochs='non_pbe', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size=time_bin_size, known_named_decoding_epochs_type='laps', masked_time_bin_fill_type= 'ignore', data_grain='per_time_bin'),
-                                IdentifyingContext(trained_compute_epochs='non_pbe', pfND_ndim= 1, decoder_identifier= 'pseudo2D', time_bin_size=time_bin_size, known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type= 'ignore', data_grain='per_time_bin')]
+            base_contexts_list = [IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', time_bin_size=time_bin_size, known_named_decoding_epochs_type='laps', masked_time_bin_fill_type='ignore', data_grain='per_time_bin'),
+                                IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', time_bin_size=time_bin_size, known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type='ignore', data_grain='per_time_bin'),
+                                IdentifyingContext(trained_compute_epochs='non_pbe', pfND_ndim=1, decoder_identifier='pseudo2D', time_bin_size=time_bin_size, known_named_decoding_epochs_type='laps', masked_time_bin_fill_type='ignore', data_grain='per_time_bin'),
+                                IdentifyingContext(trained_compute_epochs='non_pbe', pfND_ndim=1, decoder_identifier='pseudo2D', time_bin_size=time_bin_size, known_named_decoding_epochs_type='pbe', masked_time_bin_fill_type='ignore', data_grain='per_time_bin')]
             masked_contexts_dict = {}
 
             for a_base_context in base_contexts_list:
