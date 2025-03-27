@@ -2162,7 +2162,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
 
     def build_extra_control_widget(self, a_name: str = 'replay_name', df_col_name: str = 'custom_replay_name', a_widget_label: str = 'Replay Name:'):
-        """ adds a new dropdown widget to refine the active points
+        """ adds a new dropdown widget to refine the active points, triggers `self._on_widget_change` when a selection is made
 
         Usage:        
             df_filter.build_extra_control_widget(a_name='trained_compute_epochs', df_col_name='trained_compute_epochs', a_widget_label='TrainedComputeEpochs :')
@@ -2174,12 +2174,12 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
         """
         import ipywidgets as widgets
+        from traitlets import Dict as TraitDict  # Import the Dict traitlet
 
         a_widget_name: str = f"{a_name}_widget" # replay_name_widget
         extant_widget = getattr(self, a_widget_name, None)
         if extant_widget is not None:
             raise NotImplementedError(f'Not sure what to do with extant widgets yet! a_widget_label: "{a_widget_label}".')
-        
 
         ## Create and add new widget:
         a_col_values_options = sorted(self.active_plot_df[df_col_name].astype(str).unique())    
@@ -2188,17 +2188,35 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                     description=a_widget_label,
                     disabled=False,
                     layout=widgets.Layout(width='500px'),
-                    style={'description_width': 'initial'}
+                    style={'description_width': 'initial'},
+                    # metadata={  # Use the Dict traitlet here
+                    #     "desc": "TEST!",
+                    #     "df_col_name": df_col_name,
+                    #     "name": a_name,
+                    #     "widget_name": a_widget_name,
+                    # },
                 )
+        
+        ## add_traits
+        a_widget.metadata = TraitDict({  # Use the Dict traitlet here
+            "desc": "TEST!",
+            "df_col_name": df_col_name,
+            "name": a_name,
+            "widget_name": a_widget_name,
+        })
+        
         ## Add to output widgets list
         self.custom_dynamic_filter_widgets_list.append(a_widget)
         
         setattr(self, a_widget_name, a_widget) # self.replay_name_widget
 
+        ## INPUTS: self.custom_dynamic_filter_widgets_dict, self.custom_dynamic_filter_widgets_property_map
+
         # Set up observers to handle changes in widget values
         a_widget.observe(self._on_widget_change, names='value')
         
 
+    @function_attributes(short_name=None, tags=['private', 'widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-27 12:18', related_items=[])
     def _setup_widgets(self):
         import plotly.subplots as sp
         from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import PlotlyFigureContainer
@@ -2384,11 +2402,12 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         self.on_widget_update_filename()
 
 
+    @function_attributes(short_name=None, tags=['MAIN', 'update', 'filter'], input_requires=[], output_provides=[], uses=['.update_filtered_dataframes'], used_by=[], creation_date='2025-03-27 12:20', related_items=[])
     def _on_widget_change(self, change):
         active_plot_df_name = self.active_plot_df_name_selector_widget.value
         self.active_plot_df_name = self.active_plot_df_name_selector_widget.value
         self.active_plot_variable_name = self.active_plot_variable_name_widget.value
-        
+
         # Update filtered DataFrames when widget values change
         self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
 
@@ -2541,8 +2560,6 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                     print(f'NOPE! points: {points}, trace: {trace}')
             
 
-
-
     def on_update_selected_scatter_points(self, trace, points, selector):
         """ 
         updates self.selected_points
@@ -2579,7 +2596,6 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             # end for i, ind in ..
             print(f'self.selected_points: {self.selected_points}')
             
-
 
     @function_attributes(short_name=None, tags=['plotting'], input_requires=[], output_provides=[], uses=['_perform_plot_pre_post_delta_scatter'], used_by=[], creation_date='2024-11-20 13:08', related_items=[])
     @classmethod
@@ -2806,8 +2822,12 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             setattr(self, filtered_name, filtered_df)
 
 
+    @function_attributes(short_name=None, tags=['update', 'MAIN', 'callback'], input_requires=['self.additional_filter_predicates'], output_provides=[], uses=[], used_by=['self._on_widget_change'], creation_date='2025-03-27 12:49', related_items=[])
     def update_filtered_dataframes(self, replay_name, time_bin_sizes, debug_print=True, enable_overwrite_is_filter_included_column: bool=True):
-        """ Perform filtering on each DataFrame
+        """ Perform filtering on each DataFrame. Called by `self._on_widget_change` when a widget's value is changed
+        
+        
+        Uses: self.additional_filter_predicates, .original_df_dict, 
         """
         if not time_bin_sizes:
             print("Please select at least one Time Bin Size.")
@@ -2880,9 +2900,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             
             if did_applying_predicate_fail_for_df_dict[self.active_plot_df_name]:
                 print(f'!!! Warning!!! applying predicates failed for the current active plot df (self.active_plot_df_name: {self.active_plot_df_name})!\n\tthe plotted output has NOT been filtered!')
-                
-
         ## end with self.output_widget
+        
         for k, a_callback_fn in self.on_filtered_dataframes_changed_callback_fns.items():
             # print(f'k: {k}')
             try:
