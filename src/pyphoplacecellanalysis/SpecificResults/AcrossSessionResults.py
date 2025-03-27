@@ -3931,6 +3931,8 @@ class SingleFatDataframe:
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import SingleFatDataframe
            
         """
+        from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+        
         FAT_df_list: List[pd.DataFrame] = []
     
         for a_df_name, a_df in dfs_dict.items():
@@ -3938,6 +3940,14 @@ class SingleFatDataframe:
             for a_ctxt_key, a_ctxt_value in a_df_name.to_dict().items():
                 a_df[a_ctxt_key] = a_ctxt_value
                 
+            # time_col = 'start' # 'ripple_start_t' for ripples, etc
+            extant_time_col: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(a_df, col_connonical_name='t_bin_center', required_columns_synonym_dict={"t_bin_center":{'lap_start_t','ripple_start_t','start_t','start', 't'}}, should_raise_exception_on_fail=True)
+            if extant_time_col != 't_bin_center':
+                a_df['t_bin_center'] = deepcopy(a_df[extant_time_col])
+            assert 't_bin_center' in a_df
+            # assert np.all(np.logical_not(a_df.isna()))
+            a_df['is_t_bin_center_fake'] = (extant_time_col != 't_bin_center') ## #TODO 2025-03-27 18:31: - [ ] If it's not of t_bin data_grain, it's fake, and just used for temporary calculations
+            
             FAT_df_list.append(a_df)
         # end for a_df_name, a_df
         fat_df: pd.DataFrame = pd.concat(FAT_df_list, ignore_index=True)
