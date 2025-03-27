@@ -1178,8 +1178,6 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         
         # new_decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = {a_name:BasePositionDecoder(pf=a_pfs).replacing_computation_epochs(epochs=trained_compute_epochs) for a_name, a_pfs in original_pfs_dict.items()} ## build new simple decoders
         
-
-
         # ==================================================================================================================== #
         # Phase 3 - `creating_new_spikes_per_t_bin_masked_variants`                                                                      #
         # ==================================================================================================================== #
@@ -1232,14 +1230,19 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                 
             ## OUTPUTS: masked_contexts_dict
 
-
+            
+        ## ensure all optional fields are present before output:
         # Add the maze_id to the active_filter_epochs so we can see how properties change as a function of which track the replay event occured on:
         for k in list(a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict.keys()):
             a_df = a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict[k]
-            # a_df['delta_aligned_start_t'] = a_df['t'] - t_delta ## subtract off t_delta    
-            a_df = a_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=epochs_decoding_time_bin_size, curr_session_t_delta=t_delta)
+            ## note in per-epoch mode we use the start of the epoch (because for example laps are long and we want to see as soon as it starts) but for time bins we use the center time.
+            time_column_name: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(a_df, col_connonical_name='t', required_columns_synonym_dict={"t":{'t_bin_center', 'lap_start_t', 'ripple_start_t', 'epoch_start_t'}}, should_raise_exception_on_fail=True)
+            assert time_column_name in a_df
+            a_df['delta_aligned_start_t'] = a_df[time_column_name] - t_delta ## subtract off t_delta
+            a_df = a_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=epochs_decoding_time_bin_size, curr_session_t_delta=t_delta, time_col=time_column_name)
             a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict[k] = a_df
-            
+
+
         # ==================================================================================================================== #
         # Create and add the output                                                                                            #
         # ==================================================================================================================== #
