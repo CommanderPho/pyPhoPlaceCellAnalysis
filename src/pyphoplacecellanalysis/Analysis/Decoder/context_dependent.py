@@ -1312,7 +1312,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         
 
     @function_attributes(short_name=None, tags=['contexts', 'matching'], input_requires=[], output_provides=[], uses=['get_flattened_contexts_for_posteriors_dfs'], used_by=[], creation_date='2025-03-12 11:30', related_items=[])
-    def get_matching_contexts(self, context_query: Optional[IdentifyingContext]=None, return_multiple_matches: bool=True, return_flat_same_length_dicts: bool=True, debug_print:bool=True) -> List[IdentifyingContext]: 
+    def get_matching_contexts(self, context_query: Optional[IdentifyingContext]=None, return_multiple_matches: bool=True, debug_print:bool=True) -> List[IdentifyingContext]: 
         """ contexts only, no results returned.
         This doesn't quite make sense because each results dictionary may have different contexts
         
