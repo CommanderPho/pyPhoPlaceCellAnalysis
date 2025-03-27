@@ -2274,7 +2274,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         self.active_plot_df_name_selector_widget.observe(self._on_widget_change, names='value')
         self.active_plot_variable_name_widget.observe(self._on_widget_change, names='value')
         
-
+        ## the table at the bottom that shows the active number of filtered points
         self.table_widget = DataGrid(self.filtered_size_info_df,
                                 base_row_size=15, base_column_size=300, horizontal_stripes=True,
                                 #  renderers=renderers,
@@ -2584,11 +2584,10 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     @function_attributes(short_name=None, tags=['plotting'], input_requires=[], output_provides=[], uses=['_perform_plot_pre_post_delta_scatter'], used_by=[], creation_date='2024-11-20 13:08', related_items=[])
     @classmethod
     def _build_plot_callback(cls, earliest_delta_aligned_t_start, latest_delta_aligned_t_end, save_plotly, should_save: bool = False, resolution_multiplier=1, enable_debug_print=False, **extra_plot_kwargs):
-        # fig_size_kwargs = {'width': 1650, 'height': 480}
-        
-        
-                
+        """ 
 
+        """
+        # fig_size_kwargs = {'width': 1650, 'height': 480}
         # fig_size_kwargs = {'width': resolution_multiplier*1650, 'height': resolution_multiplier*480}
         ## set up figure size
         fig_size_kwargs = {'width': (resolution_multiplier * 1800), 'height': (resolution_multiplier*480)}
@@ -2613,6 +2612,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         )
         
         extra_plot_kwargs = deepcopy(extra_plot_kwargs)
+
 
         def _build_filter_changed_plotly_plotting_callback_fn(df_filter: "DataFrameFilter", should_save:bool=False, **kwargs):
             """ `filtered_all_sessions_all_scores_ripple_df` versions -
