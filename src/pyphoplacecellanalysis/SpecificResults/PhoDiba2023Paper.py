@@ -1992,10 +1992,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     active_filter_predicate_selector_widget: CheckBoxListWidget = non_serialized_field(init=False)
     active_plot_df_name_selector_widget = non_serialized_field(init=False)
     active_plot_variable_name_widget = non_serialized_field(init=False)
-    custom_dynamic_filter_widgets_list = non_serialized_field(init=False)
-        
-
-
+    custom_dynamic_filter_widgets_list: List = non_serialized_field(init=False, metadata={'desc': 'stores references to the widgets with knowledge of which properties to update to filter the dataframe.'})
+    
     output_widget: widgets.Output = non_serialized_field(init=False)
     figure_widget: go.FigureWidget = non_serialized_field(init=False)
     table_widget: DataGrid = non_serialized_field(init=False)
@@ -2161,9 +2159,14 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         self._setup_widgets_buttons()
 
 
+    @function_attributes(short_name=None, tags=['filter', 'dynamic', 'ui', 'widget'], input_requires=[], output_provides=[], uses=['._rebuild_predicate_widget()'], used_by=[], creation_date='2025-03-27 14:05', related_items=[])
     def build_extra_control_widget(self, a_name: str = 'replay_name', df_col_name: str = 'custom_replay_name', a_widget_label: str = 'Replay Name:'):
         """ adds a new dropdown widget to refine the active points, triggers `self._on_widget_change` when a selection is made
 
+        Works by adding the widget as property of this instance, and imposing the widget's selection criteria by adding a custom predicate to `self.additional_filter_predicates`. 
+        The predicate selector widget is then rebuilt by calling `self._rebuild_predicate_widget(...)`
+        
+        
         Usage:        
             df_filter.build_extra_control_widget(a_name='trained_compute_epochs', df_col_name='trained_compute_epochs', a_widget_label='TrainedComputeEpochs :')
             df_filter.build_extra_control_widget(a_name='pfND_ndim', df_col_name='pfND_ndim', a_widget_label='pfND_ndim:')
@@ -2189,28 +2192,30 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                     disabled=False,
                     layout=widgets.Layout(width='500px'),
                     style={'description_width': 'initial'},
-                    # metadata={  # Use the Dict traitlet here
-                    #     "desc": "TEST!",
-                    #     "df_col_name": df_col_name,
-                    #     "name": a_name,
-                    #     "widget_name": a_widget_name,
-                    # },
+                    # metadata={"desc": "build_extra_control_widget", "df_col_name": df_col_name, "name": a_name, "widget_name": a_widget_name, }, ## DOES NOT WORK
                 )
         
-        ## add_traits
+        ## add_traits (does work)
         a_widget.metadata = TraitDict({  # Use the Dict traitlet here
-            "desc": "TEST!",
+            "desc": "build_extra_control_widget",
             "df_col_name": df_col_name,
             "name": a_name,
             "widget_name": a_widget_name,
         })
         
+        # Build the appropriate filter predicate to go along with the custom control _________________________________________ #
+        self.additional_filter_predicates.update({
+            f'{a_widget_name}': (lambda df: (df[df_col_name].astype(str) == str(a_widget.value))),
+        })
+
+        ## INPUTS: self.custom_dynamic_filter_widgets_list
         ## Add to output widgets list
         self.custom_dynamic_filter_widgets_list.append(a_widget)
-        
         setattr(self, a_widget_name, a_widget) # self.replay_name_widget
-
         ## INPUTS: self.custom_dynamic_filter_widgets_dict, self.custom_dynamic_filter_widgets_property_map
+
+        ## Update the predicate enabled selection widget and default to enabling this predicate:
+        self._rebuild_predicate_widget(initially_is_checked={f'{a_widget_name}':True})
 
         # Set up observers to handle changes in widget values
         a_widget.observe(self._on_widget_change, names='value')
@@ -2404,12 +2409,43 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
     @function_attributes(short_name=None, tags=['MAIN', 'update', 'filter'], input_requires=[], output_provides=[], uses=['.update_filtered_dataframes'], used_by=[], creation_date='2025-03-27 12:20', related_items=[])
     def _on_widget_change(self, change):
+        """ this is the main update function that is called whenever an observed widget's value changes to update the filtered dataframe.
+        Updates the bound variables from the widget's new value!
+        """
+        # self.output_widget.clear_output()
+        with self.output_widget:
+            print(f'._on_widget_change(change: {change})') # ._on_widget_change(change: {'name': 'value', 'old': 'dropped', 'new': 'ignore', 'owner': Dropdown(description='masked_time_bin_fill_type:', index=1, layout=Layout(width='500px'), options=('dropped', 'ignore', 'last_valid', 'nan_filled'), style=DescriptionStyle(description_
+
+        # changing_widget = change['owner'] # Dropdown(description='masked_time_bin_fill_type:', index=1, layout=Layout(width='500px'), options=('dropped', 'ignore', 'last_valid', 'nan_filled'), 
+        # widget_metadata: Dict = changing_widget.metadata.__dict__['default_args'][0] # {'desc': 'TEST!', 'df_col_name': 'trained_compute_epochs', 'name': 'trained_compute_epochs', 'widget_name': 'trained_compute_epochs_widget'}
+                
         active_plot_df_name = self.active_plot_df_name_selector_widget.value
         self.active_plot_df_name = self.active_plot_df_name_selector_widget.value
         self.active_plot_variable_name = self.active_plot_variable_name_widget.value
 
         # Update filtered DataFrames when widget values change
         self.update_filtered_dataframes(self.replay_name_widget.value, self.time_bin_size_widget.value)
+
+
+    @function_attributes(short_name=None, tags=['predicate', 'controls', 'filter'], input_requires=[], output_provides=[], uses=[], used_by=['.build_extra_control_widget'], creation_date='2025-03-27 14:05', related_items=[])
+    def _rebuild_predicate_widget(self, initially_is_checked: Optional[Dict[str, bool]]=None):
+        """ remove existing if needed, then rebuild """
+        if hasattr(self, 'active_filter_predicate_selector_widget'):
+            ## get existing is_checked values
+            existing_options_dict = deepcopy(self.active_filter_predicate_selector_widget.options_dict)
+            self.active_filter_predicate_selector_widget.unobserve(self._on_widget_change, names='value') ## stop observing changes
+            self.active_filter_predicate_selector_widget.close()
+            delattr(self, 'active_filter_predicate_selector_widget')
+        else:
+            existing_options_dict = {}
+
+        if initially_is_checked is not None:
+            existing_options_dict.update(initially_is_checked)
+            
+        # options_list = list(self.additional_filter_predicates.keys())
+        new_options_dict = {k:existing_options_dict.get(k, False) for k in list(self.additional_filter_predicates.keys())} ## use the existing key value if there was one (user's selection), else default to False
+        self.active_filter_predicate_selector_widget = CheckBoxListWidget(options_list=new_options_dict) ## create widget
+        self.active_filter_predicate_selector_widget.observe(self._on_widget_change, names='value') ## observe changes
 
 
     def display(self):
